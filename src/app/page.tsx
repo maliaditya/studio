@@ -331,7 +331,7 @@ export default function WorkoutPage() {
                         key={category}
                         checked={selectedCategories.includes(category)}
                         onCheckedChange={() => handleCategoryFilterChange(category)}
-                         onSelect={(e) => e.preventDefault()} // Prevent menu from closing on item click
+                         onSelect={(e) => e.preventDefault()} 
                       >
                         {category}
                       </DropdownMenuCheckboxItem>
@@ -419,7 +419,7 @@ export default function WorkoutPage() {
                           </div>
                         ) : (
                           <div className="flex items-center justify-between gap-2">
-                            <div className="flex-grow">
+                            <div className="flex-grow min-w-0">
                                 <span className="font-medium text-foreground truncate block" title={def.name}>{def.name}</span>
                                 <Badge variant="secondary" className="text-xs">{def.category}</Badge>
                             </div>
