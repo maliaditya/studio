@@ -38,13 +38,68 @@ const dailyCategoryMap: Record<number, ExerciseCategory[]> = {
 };
 
 const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
-  { id: `def_chest_01`, name: "Flat Barbell Bench Press", category: "Chest" }, { id: `def_chest_02`, name: "Incline Barbell Press", category: "Chest" }, { id: `def_chest_03`, name: "Decline Dumbbell Press", category: "Chest" }, { id: `def_chest_04`, name: "Peck Machine", category: "Chest" }, { id: `def_chest_05`, name: "Dumbbell Flat Press", category: "Chest" }, { id: `def_chest_06`, name: "Incline Dumbbell Press", category: "Chest" }, { id: `def_chest_07`, name: "Cable Fly", category: "Chest" }, { id: `def_chest_08`, name: "Dumbbell Chest Fly", category: "Chest" }, { id: `def_chest_09`, name: "Dumbbell Pullovers", category: "Chest" },
-  { id: `def_triceps_01`, name: "Close-Grip Barbell Bench Press", category: "Triceps" }, { id: `def_triceps_02`, name: "Overhead Dumbbell Extension", category: "Triceps" }, { id: `def_triceps_03`, name: "Dumbbell Kickback", category: "Triceps" }, { id: `def_triceps_04`, name: "Cable Rope Pushdown (Slow)", category: "Triceps" }, { id: `def_triceps_05`, name: "Overhead Cable Extension", category: "Triceps" }, { id: `def_triceps_06`, name: "Reverse-grip pushdown", category: "Triceps" }, { id: `def_triceps_07`, name: "Rope Pushdown", category: "Triceps" }, { id: `def_triceps_08`, name: "Double-Arm Dumbbell Kickback", category: "Triceps" }, { id: `def_triceps_09`, name: "Straight bar pushdown", category: "Triceps" }, { id: `def_triceps_10`, name: "Reverse Bar Pushdown", category: "Triceps" }, { id: `def_triceps_11`, name: "Back dips", category: "Triceps" },
-  { id: `def_back_01`, name: "Lat Pulldown", category: "Back" }, { id: `def_back_02`, name: "Machine Row", category: "Back" }, { id: `def_back_03`, name: "T-Bar Row", category: "Back" }, { id: `def_back_04`, name: "Lat Prayer Pull", category: "Back" }, { id: `def_back_05`, name: "Lat Pulldown (Wide Grip)", category: "Back" }, { id: `def_back_06`, name: "V handle lat pulldown", category: "Back" }, { id: `def_back_07`, name: "1-Arm Dumbbell Row", category: "Back" }, { id: `def_back_08`, name: "Back extensions", category: "Back" }, { id: `def_back_09`, name: "Barbell Row", category: "Back" }, { id: `def_back_10`, name: "Seated Row", category: "Back" }, { id: `def_back_11`, name: "DeadLifts", category: "Back" },
-  { id: `def_biceps_01`, name: "Standing dumbbell curls", category: "Biceps" }, { id: `def_biceps_02`, name: "Standing Dumbbell Alternating Curl", category: "Biceps" }, { id: `def_biceps_03`, name: "Preacher curls Dumbbells", category: "Biceps" }, { id: `def_biceps_04`, name: "Hammer Curl (Dumbbell)", category: "Biceps" }, { id: `def_biceps_05`, name: "Seated Incline Dumbbell Curl", category: "Biceps" }, { id: `def_biceps_06`, name: "Seated Dumbbell Alternating Curl", category: "Biceps" }, { id: `def_biceps_07`, name: "Reverse Cable", category: "Biceps" }, { id: `def_biceps_08`, name: "Strict bar curls", category: "Biceps" }, { id: `def_biceps_09`, name: "Reversed Incline curls", category: "Biceps" }, { id: `def_biceps_10`, name: "Cable Curls Superset", category: "Biceps" }, { id: `def_biceps_11`, name: "Reversed cable curls", category: "Biceps" }, { id: `def_biceps_12`, name: "Seated Machine Curls", category: "Biceps" }, { id: `def_biceps_13`, name: "Cable Curls", category: "Biceps" },
-  { id: `def_shoulders_01`, name: "Seated Dumbbell Shoulder Press", category: "Shoulders" }, { id: `def_shoulders_02`, name: "Standing Dumbbell Lateral Raise", category: "Shoulders" }, { id: `def_shoulders_03`, name: "Face Pulls", category: "Shoulders" }, { id: `def_shoulders_04`, name: "Shrugs", category: "Shoulders" }, { id: `def_shoulders_05`, name: "Seated Dumbbell Lateral Raise", category: "Shoulders" }, { id: `def_shoulders_06`, name: "Rear Delt Fly (Incline Bench)", category: "Shoulders" }, { id: `def_shoulders_07`, name: "Cable Upright Rows", category: "Shoulders" }, { id: `def_shoulders_08`, name: "Dumbbell Lateral Raise (Lean in)", category: "Shoulders" }, { id: `def_shoulders_09`, name: "Lean-Away Cable Lateral Raise", category: "Shoulders" }, { id: `def_shoulders_10`, name: "Front Raise cable", category: "Shoulders" },
-  { id: `def_legs_01`, name: "Walking Lunges (Barbell)", category: "Legs" }, { id: `def_legs_02`, name: "Leg Press", category: "Legs" }, { id: `def_legs_03`, name: "Quads Machine", category: "Legs" }, { id: `def_legs_04`, name: "Hamstring machine", category: "Legs" }, { id: `def_legs_05`, name: "Squats (Barbell)", category: "Legs" }, { id: `def_legs_06`, name: "Calfs (Bodyweight)", category: "Legs" },
+  { id: 'def_chest_01', name: "Flat Barbell Bench Press", category: "Chest" },
+  { id: 'def_chest_02', name: "Incline Barbell Press", category: "Chest" },
+  { id: 'def_chest_03', name: "Decline Dumbbell Press", category: "Chest" },
+  { id: 'def_chest_04', name: "Peck Machine", category: "Chest" },
+  { id: 'def_chest_05', name: "Dumbbell Flat Press", category: "Chest" },
+  { id: 'def_chest_06', name: "Incline Dumbbell Press", category: "Chest" },
+  { id: 'def_chest_07', name: "Cable Fly", category: "Chest" },
+  { id: 'def_chest_08', name: "Dumbbell Chest Fly", category: "Chest" },
+  { id: 'def_chest_09', name: "Dumbbell Pullovers", category: "Chest" },
+  { id: 'def_triceps_01', name: "Close-Grip Barbell Bench Press", category: "Triceps" },
+  { id: 'def_triceps_02', name: "Overhead Dumbbell Extension", category: "Triceps" },
+  { id: 'def_triceps_03', name: "Dumbbell Kickback", category: "Triceps" },
+  { id: 'def_triceps_04', name: "Cable Rope Pushdown (Slow)", category: "Triceps" },
+  { id: 'def_triceps_05', name: "Overhead Cable Extension", category: "Triceps" },
+  { id: 'def_triceps_06', name: "Reverse-grip pushdown", category: "Triceps" },
+  { id: 'def_triceps_07', name: "Rope Pushdown", category: "Triceps" },
+  { id: 'def_triceps_08', name: "Double-Arm Dumbbell Kickback", category: "Triceps" },
+  { id: 'def_triceps_09', name: "Straight bar pushdown", category: "Triceps" },
+  { id: 'def_triceps_10', name: "Reverse Bar Pushdown", category: "Triceps" },
+  { id: 'def_triceps_11', name: "Back dips", category: "Triceps" },
+  { id: 'def_back_01', name: "Lat Pulldown", category: "Back" },
+  { id: 'def_back_02', name: "Machine Row", category: "Back" },
+  { id: 'def_back_03', name: "T-Bar Row", category: "Back" },
+  { id: 'def_back_04', name: "Lat Prayer Pull", category: "Back" },
+  { id: 'def_back_05', name: "Lat Pulldown (Wide Grip)", category: "Back" },
+  { id: 'def_back_06', name: "V handle lat pulldown", category: "Back" },
+  { id: 'def_back_07', name: "1-Arm Dumbbell Row", category: "Back" },
+  { id: 'def_back_08', name: "Back extensions", category: "Back" },
+  { id: 'def_back_09', name: "Barbell Row", category: "Back" },
+  { id: 'def_back_10', name: "Seated Row", category: "Back" },
+  { id: 'def_back_11', name: "DeadLifts", category: "Back" },
+  { id: 'def_biceps_01', name: "Standing dumbbell curls", category: "Biceps" },
+  { id: 'def_biceps_02', name: "Standing Dumbbell Alternating Curl", category: "Biceps" },
+  { id: 'def_biceps_03', name: "Preacher curls Dumbbells", category: "Biceps" },
+  { id: 'def_biceps_04', name: "Hammer Curl (Dumbbell)", category: "Biceps" },
+  { id: 'def_biceps_05', name: "Seated Incline Dumbbell Curl", category: "Biceps" },
+  { id: 'def_biceps_06', name: "Seated Dumbbell Alternating Curl", category: "Biceps" },
+  { id: 'def_biceps_07', name: "Reverse Cable", category: "Biceps" },
+  { id: 'def_biceps_08', name: "Strict bar curls", category: "Biceps" },
+  { id: 'def_biceps_09', name: "Reversed Incline curls", category: "Biceps" },
+  { id: 'def_biceps_10', name: "Cable Curls Superset", category: "Biceps" },
+  { id: 'def_biceps_11', name: "Reversed cable curls", category: "Biceps" },
+  { id: 'def_biceps_12', name: "Seated Machine Curls", category: "Biceps" },
+  { id: 'def_biceps_13', name: "Cable Curls", category: "Biceps" },
+  { id: 'def_shoulders_01', name: "Seated Dumbbell Shoulder Press", category: "Shoulders" },
+  { id: 'def_shoulders_02', name: "Standing Dumbbell Lateral Raise", category: "Shoulders" },
+  { id: 'def_shoulders_03', name: "Face Pulls", category: "Shoulders" },
+  { id: 'def_shoulders_04', name: "Shrugs", category: "Shoulders" },
+  { id: 'def_shoulders_05', name: "Seated Dumbbell Lateral Raise", category: "Shoulders" },
+  { id: 'def_shoulders_06', name: "Rear Delt Fly (Incline Bench)", category: "Shoulders" },
+  { id: 'def_shoulders_07', name: "Cable Upright Rows", category: "Shoulders" },
+  { id: 'def_shoulders_08', name: "Dumbbell Lateral Raise (Lean in)", category: "Shoulders" },
+  { id: 'def_shoulders_09', name: "Lean-Away Cable Lateral Raise", category: "Shoulders" },
+  { id: 'def_shoulders_10', name: "Front Raise cable", category: "Shoulders" },
+  { id: 'def_legs_01', name: "Walking Lunges (Barbell)", category: "Legs" },
+  { id: 'def_legs_02', name: "Leg Press", category: "Legs" },
+  { id: 'def_legs_03', name: "Quads Machine", category: "Legs" },
+  { id: 'def_legs_04', name: "Hamstring machine", category: "Legs" },
+  { id: 'def_legs_05', name: "Squats (Barbell)", category: "Legs" },
+  { id: 'def_legs_06', name: "Calfs (Bodyweight)", category: "Legs" },
 ];
+
 
 function WorkoutPageContent() {
   const { toast } = useToast();
@@ -65,108 +120,76 @@ function WorkoutPageContent() {
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<ExerciseCategory[]>([]);
   
-  const [isLoadingData, setIsLoadingData] = useState(true);
-  const [isSavingData, setIsSavingData] = useState(false);
-
-  // Debounce function
-  const debounce = <F extends (...args: any[]) => any>(func: F, delay: number) => {
-    let timeoutId: ReturnType<typeof setTimeout>;
-    return (...args: Parameters<F>): Promise<ReturnType<F>> => {
-      return new Promise((resolve) => {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          resolve(func(...args));
-        }, delay);
-      });
-    };
-  };
-
-  const saveDataToBackend = useCallback(async (userId: string, data: { exerciseDefinitions: ExerciseDefinition[], allWorkoutLogs: DatedWorkout[] }) => {
-    if (!userId) return;
-    setIsSavingData(true);
-    try {
-      const response = await fetch(`/api/workout-data?userId=${encodeURIComponent(userId)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save data');
-      }
-      // Optional: show success toast, but can be too noisy for autosave
-      // toast({ title: "Data Saved", description: "Your workout data has been saved to the server." });
-    } catch (error: any) {
-      console.error("Error saving data to backend:", error);
-      toast({ title: "Save Error", description: error.message || "Could not save data to server.", variant: "destructive" });
-    } finally {
-      setIsSavingData(false);
-    }
-  }, [toast]);
-
-  const debouncedSaveData = useMemo(() => debounce(saveDataToBackend, 2000), [saveDataToBackend]);
+  const [isLoadingPage, setIsLoadingPage] = useState(true);
 
 
   useEffect(() => {
     if (currentUser?.username) {
-      const fetchData = async () => {
-        setIsLoadingData(true);
-        try {
-          const response = await fetch(`/api/workout-data?userId=${encodeURIComponent(currentUser.username)}`);
-          if (!response.ok) {
-            throw new Error('Failed to fetch data');
-          }
-          const data = await response.json();
-          
-          if (data.exerciseDefinitions && data.exerciseDefinitions.length > 0) {
-            setExerciseDefinitions(data.exerciseDefinitions);
-          } else {
-            // Initialize with defaults if backend has no definitions for this user
-            const timestamp = Date.now().toString();
-            const uniqueDefaultDefs = DEFAULT_EXERCISE_DEFINITIONS.map((def, index) => ({
-              ...def,
-              id: `${timestamp}_${index}_${def.name.replace(/\s+/g, '_')}`
-            }));
-            setExerciseDefinitions(uniqueDefaultDefs);
-            // Trigger a save for the new default definitions
-            if(currentUser?.username){
-                // This will be picked up by the other useEffect to save
-            }
-          }
-          setAllWorkoutLogs(data.allWorkoutLogs || []);
+      const defsKey = `exerciseDefinitions_${currentUser.username}`;
+      const logsKey = `allWorkoutLogs_${currentUser.username}`;
+      let localDefsLoaded = false;
 
-        } catch (error) {
-          console.error("Error fetching data from backend:", error);
-          toast({ title: "Error", description: "Could not load data from server.", variant: "destructive" });
-          // Fallback to defaults if server fetch fails for some reason, or empty if preferred
-           const timestamp = Date.now().toString();
-            const uniqueDefaultDefs = DEFAULT_EXERCISE_DEFINITIONS.map((def, index) => ({
-              ...def,
-              id: `${timestamp}_${index}_${def.name.replace(/\s+/g, '_')}`
-            }));
-          setExerciseDefinitions(uniqueDefaultDefs);
-          setAllWorkoutLogs([]);
-        } finally {
-          setIsLoadingData(false);
+      try {
+        const storedDefinitions = localStorage.getItem(defsKey);
+        if (storedDefinitions) {
+          const parsedDefs = JSON.parse(storedDefinitions);
+          if (Array.isArray(parsedDefs) && parsedDefs.length > 0) {
+            setExerciseDefinitions(parsedDefs);
+            localDefsLoaded = true;
+          }
         }
-      };
-      fetchData();
+      } catch (e) {
+        console.error("Error parsing exercise definitions from localStorage", e);
+      }
+      
+      if (!localDefsLoaded) {
+        const timestamp = Date.now().toString();
+        const uniqueDefaultDefs = DEFAULT_EXERCISE_DEFINITIONS.map((def, index) => ({
+          ...def,
+          id: `${timestamp}_${index}_${def.name.replace(/\s+/g, '_')}`
+        }));
+        setExerciseDefinitions(uniqueDefaultDefs);
+      }
+
+      try {
+        const storedLogs = localStorage.getItem(logsKey);
+        if (storedLogs) {
+          const parsedLogs = JSON.parse(storedLogs);
+           if (Array.isArray(parsedLogs)) {
+            setAllWorkoutLogs(parsedLogs);
+          } else {
+            setAllWorkoutLogs([]);
+          }
+        } else {
+          setAllWorkoutLogs([]);
+        }
+      } catch (e) {
+        console.error("Error parsing workout logs from localStorage", e);
+        setAllWorkoutLogs([]);
+      }
+
     } else {
-      // Not logged in, clear data or handle as guest (currently AuthGuard handles this)
       setExerciseDefinitions([]);
       setAllWorkoutLogs([]);
-      setIsLoadingData(false);
     }
-  }, [currentUser, toast]);
-
+    const timer = setTimeout(() => setIsLoadingPage(false), 300); // Brief delay for perceived loading
+    return () => clearTimeout(timer);
+  }, [currentUser]);
 
   useEffect(() => {
-    // This effect triggers a save whenever exerciseDefinitions or allWorkoutLogs change,
-    // after the initial data load is complete and user is logged in.
-    if (!isLoadingData && currentUser?.username && (exerciseDefinitions.length > 0 || allWorkoutLogs.length > 0)) {
-      debouncedSaveData(currentUser.username, { exerciseDefinitions, allWorkoutLogs });
+    if (currentUser?.username && !isLoadingPage) { // Only save after initial load
+      try {
+        const defsKey = `exerciseDefinitions_${currentUser.username}`;
+        const logsKey = `allWorkoutLogs_${currentUser.username}`;
+        
+        localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
+        localStorage.setItem(logsKey, JSON.stringify(allWorkoutLogs));
+      } catch (e) {
+        console.error("Error saving data to localStorage", e);
+        toast({ title: "Save Error", description: "Could not save data locally. Storage might be full.", variant: "destructive"});
+      }
     }
-  }, [exerciseDefinitions, allWorkoutLogs, isLoadingData, currentUser, debouncedSaveData]);
+  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast]);
 
 
   useEffect(() => {
@@ -373,7 +396,7 @@ function WorkoutPageContent() {
     setIsProgressModalOpen(true);
   };
   
-  if (isLoadingData) {
+  if (isLoadingPage) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)] bg-background">
         <Loader2 className="h-16 w-16 text-primary animate-spin mb-4" />
@@ -389,11 +412,6 @@ function WorkoutPageContent() {
           Daily Workout Log
         </h1>
         <p className="text-muted-foreground mt-1 text-md">Log your gains, {currentUser?.username || "Guest"}.</p>
-        {isSavingData && (
-          <div className="absolute top-0 right-0 mt-1 mr-1 flex items-center text-xs text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin mr-1" /> Saving...
-          </div>
-        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
@@ -462,8 +480,8 @@ function WorkoutPageContent() {
                         ) : (
                           <div className="flex items-center justify-between gap-2">
                              <div className="flex-grow min-w-0">
-                                <span className="font-medium text-foreground" title={def.name}>{def.name}</span>
-                                <Badge variant="secondary" className="text-xs ml-1 my-0.5">{def.category}</Badge>
+                                <span className="font-medium text-foreground block" title={def.name}>{def.name}</span>
+                                <Badge variant="secondary" className="text-xs ml-0 my-0.5">{def.category}</Badge>
                             </div>
                             <div className="flex-shrink-0 flex items-center">
                               <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
