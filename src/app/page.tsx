@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical } from 'lucide-react';
+import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from 'date-fns';
 import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
+import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +38,9 @@ export default function WorkoutPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
 
+  const [viewingProgressExercise, setViewingProgressExercise] = useState<ExerciseDefinition | null>(null);
+  const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
+
   useEffect(() => {
     setIsClient(true);
   }, []);
@@ -49,13 +53,6 @@ export default function WorkoutPage() {
       const savedLogs = localStorage.getItem('allWorkoutLogs');
       if (savedLogs) {
         const parsedLogs: DatedWorkout[] = JSON.parse(savedLogs);
-        // Ensure dates are Date objects if they were stored as strings
-        parsedLogs.forEach(log => {
-          if (typeof log.date === 'string') {
-            // The date is already a string 'yyyy-MM-dd', which is what we want for an id.
-            // No actual conversion needed here for log.date as it's used as a string key.
-          }
-        });
         setAllWorkoutLogs(parsedLogs);
       }
     }
@@ -122,7 +119,6 @@ export default function WorkoutPage() {
   const handleDeleteExerciseDefinition = (id: string) => {
     const defToDelete = exerciseDefinitions.find(def => def.id === id);
     setExerciseDefinitions(prev => prev.filter(def => def.id !== id));
-    // Also remove from all workout logs if it's there
     setAllWorkoutLogs(prevLogs => 
       prevLogs.map(log => ({
         ...log,
@@ -148,7 +144,6 @@ export default function WorkoutPage() {
       setExerciseDefinitions(prev => 
         prev.map(def => def.id === editingDefinition.id ? updatedDef : def)
       );
-      // Update name and category in all workout logs
       setAllWorkoutLogs(prevLogs => 
         prevLogs.map(log => ({
           ...log,
@@ -206,7 +201,7 @@ export default function WorkoutPage() {
     if (existingWorkout) {
       const updatedExercises = existingWorkout.exercises.filter(ex => ex.id !== exerciseId);
       const exerciseName = existingWorkout.exercises.find(ex => ex.id === exerciseId)?.name;
-      if (updatedExercises.length === 0 && !existingWorkout.notes) { // If workout becomes empty and has no notes, remove it
+      if (updatedExercises.length === 0 && !existingWorkout.notes) { 
         setAllWorkoutLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
       } else {
         const updatedWorkout = { ...existingWorkout, exercises: updatedExercises };
@@ -262,6 +257,11 @@ export default function WorkoutPage() {
       updateOrAddWorkoutLog(updatedWorkout);
       toast({ title: "Set Updated", description: "The set has been updated successfully."});
     }
+  };
+
+  const handleViewProgress = (definition: ExerciseDefinition) => {
+    setViewingProgressExercise(definition);
+    setIsProgressModalOpen(true);
   };
 
   if (!isClient) {
@@ -360,6 +360,9 @@ export default function WorkoutPage() {
                                 <Badge variant="secondary" className="text-xs">{def.category}</Badge>
                             </div>
                             <div className="flex-shrink-0 flex items-center">
+                              <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}>
+                                <TrendingUp className="h-4 w-4" />
+                              </Button>
                               <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8 text-muted-foreground hover:text-primary" aria-label={`Edit ${def.name}`}>
                                 <Edit3 className="h-4 w-4" />
                               </Button>
@@ -436,6 +439,14 @@ export default function WorkoutPage() {
             </Card>
         </section>
       </div>
+      {viewingProgressExercise && (
+        <ExerciseProgressModal
+          isOpen={isProgressModalOpen}
+          onOpenChange={setIsProgressModalOpen}
+          exercise={viewingProgressExercise}
+          allWorkoutLogs={allWorkoutLogs}
+        />
+      )}
     </main>
   );
 }
