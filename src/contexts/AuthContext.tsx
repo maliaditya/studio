@@ -1,12 +1,11 @@
 
 "use client";
 
-import type { User } from 'firebase/auth';
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { auth, signInWithGoogle as firebaseSignInWithGoogle, signOut as firebaseSignOut } from '@/lib/firebase';
-import { useRouter } from 'next/navigation';
-import { useToast } from '@/hooks/use-toast';
-
+import type { User } from 'firebase/auth'; // Keep type for structure, but it will be null
+import { createContext, useContext, type ReactNode } from 'react';
+// import { auth, signInWithGoogle as firebaseSignInWithGoogle, signOut as firebaseSignOut } from '@/lib/firebase';
+// import { useRouter } from 'next/navigation';
+// import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -18,44 +17,34 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
-  const { toast } = useToast();
+  // const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // const [loading, setLoading] = useState(true);
+  // const router = useRouter();
+  // const { toast } = useToast();
 
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      setCurrentUser(user);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
+  // useEffect(() => {
+  //   // const unsubscribe = auth.onAuthStateChanged((user) => {
+  //   //   setCurrentUser(user);
+  //   //   setLoading(false);
+  //   // });
+  //   // return () => unsubscribe();
+  //   setLoading(false); // Simulate loading finished
+  //   setCurrentUser(null);
+  // }, []);
 
   const signInWithGoogle = async () => {
-    setLoading(true);
-    const user = await firebaseSignInWithGoogle();
-    if (user) {
-      setCurrentUser(user);
-      router.push('/');
-      toast({ title: "Login Successful", description: `Welcome, ${user.displayName}!` });
-    } else {
-      toast({ title: "Login Failed", description: "Could not sign in with Google.", variant: "destructive" });
-    }
-    setLoading(false);
+    console.warn("Sign-in functionality has been removed.");
+    // toast({ title: "Login Removed", description: "Login functionality is not available." });
   };
 
   const signOut = async () => {
-    setLoading(true);
-    await firebaseSignOut();
-    setCurrentUser(null);
-    router.push('/login');
-    toast({ title: "Logged Out", description: "You have been successfully logged out." });
-    setLoading(false);
+    console.warn("Sign-out functionality has been removed.");
+    // toast({ title: "Logout Removed", description: "Logout functionality is not available." });
   };
 
   const value = {
-    currentUser,
-    loading,
+    currentUser: null,
+    loading: false,
     signInWithGoogle,
     signOut,
   };
@@ -66,7 +55,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    // This basic context will now always be provided, but with null/false/no-op values
+     return {
+        currentUser: null,
+        loading: false,
+        signInWithGoogle: async () => { console.warn("Sign-in functionality has been removed."); },
+        signOut: async () => { console.warn("Sign-out functionality has been removed."); },
+     };
+    // throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };

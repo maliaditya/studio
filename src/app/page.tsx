@@ -17,8 +17,8 @@ import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { AuthGuard } from '@/components/AuthGuard';
-import { useAuth } from '@/contexts/AuthContext';
+// import { AuthGuard } from '@/components/AuthGuard'; // AuthGuard removed
+// import { useAuth } from '@/contexts/AuthContext'; // useAuth removed
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -45,7 +45,7 @@ const dailyCategoryMap: Record<number, ExerciseCategory[]> = {
 
 function WorkoutPageContent() {
   const { toast } = useToast();
-  const { currentUser } = useAuth(); // Get currentUser for data scoping
+  // const { currentUser } = useAuth(); // currentUser removed
 
   const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
   const [newExerciseName, setNewExerciseName] = useState('');
@@ -62,48 +62,43 @@ function WorkoutPageContent() {
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<ExerciseCategory[]>([]);
 
-  const exerciseDefsKey = useMemo(() => currentUser ? `exerciseDefinitions_${currentUser.uid}` : null, [currentUser]);
-  const workoutLogsKey = useMemo(() => currentUser ? `allWorkoutLogs_${currentUser.uid}` : null, [currentUser]);
+  // Revert to global localStorage keys
+  const exerciseDefsKey = "exerciseDefinitions";
+  const workoutLogsKey = "allWorkoutLogs";
 
 
   useEffect(() => {
-    if (currentUser && exerciseDefsKey) {
-      const savedDefs = localStorage.getItem(exerciseDefsKey);
-      if (savedDefs) setExerciseDefinitions(JSON.parse(savedDefs));
-      else setExerciseDefinitions([]); // Initialize if no data for user
+    const savedDefs = localStorage.getItem(exerciseDefsKey);
+    if (savedDefs) setExerciseDefinitions(JSON.parse(savedDefs));
+    else setExerciseDefinitions([]);
+  }, [exerciseDefsKey]);
+
+  useEffect(() => {
+    const savedLogs = localStorage.getItem(workoutLogsKey);
+    if (savedLogs) {
+      const parsedLogs: DatedWorkout[] = JSON.parse(savedLogs);
+      setAllWorkoutLogs(parsedLogs);
+    } else {
+      setAllWorkoutLogs([]);
     }
-  }, [currentUser, exerciseDefsKey]);
-
-  useEffect(() => {
-    if (currentUser && workoutLogsKey) {
-      const savedLogs = localStorage.getItem(workoutLogsKey);
-      if (savedLogs) {
-        const parsedLogs: DatedWorkout[] = JSON.parse(savedLogs);
-        setAllWorkoutLogs(parsedLogs);
-      } else {
-        setAllWorkoutLogs([]); // Initialize if no data for user
-      }
-    }
-  }, [currentUser, workoutLogsKey]);
+  }, [workoutLogsKey]);
 
 
   useEffect(() => {
-    if (currentUser && exerciseDefsKey && exerciseDefinitions.length > 0) {
+    if (exerciseDefinitions.length > 0) {
       localStorage.setItem(exerciseDefsKey, JSON.stringify(exerciseDefinitions));
-    } else if (currentUser && exerciseDefsKey && exerciseDefinitions.length === 0 && localStorage.getItem(exerciseDefsKey)) {
-       // If user clears all definitions, remove from local storage or save empty array
+    } else if (exerciseDefinitions.length === 0 && localStorage.getItem(exerciseDefsKey)) {
       localStorage.setItem(exerciseDefsKey, JSON.stringify([]));
     }
-  }, [exerciseDefinitions, currentUser, exerciseDefsKey]);
+  }, [exerciseDefinitions, exerciseDefsKey]);
 
   useEffect(() => {
-    if (currentUser && workoutLogsKey && allWorkoutLogs.length > 0) {
+    if (allWorkoutLogs.length > 0) {
       localStorage.setItem(workoutLogsKey, JSON.stringify(allWorkoutLogs));
-    } else if (currentUser && workoutLogsKey && allWorkoutLogs.length === 0 && localStorage.getItem(workoutLogsKey)) {
-      // If user clears all logs, remove from local storage or save empty array
+    } else if (allWorkoutLogs.length === 0 && localStorage.getItem(workoutLogsKey)) {
        localStorage.setItem(workoutLogsKey, JSON.stringify([]));
     }
-  }, [allWorkoutLogs, currentUser, workoutLogsKey]);
+  }, [allWorkoutLogs, workoutLogsKey]);
 
   useEffect(() => {
     if (selectedDate) {
@@ -155,10 +150,7 @@ function WorkoutPageContent() {
 
   const handleAddExerciseDefinition = (e: FormEvent) => {
     e.preventDefault();
-    if (!currentUser) {
-      toast({ title: "Error", description: "You must be logged in to add exercises.", variant: "destructive" });
-      return;
-    }
+    // Removed currentUser check
     if (newExerciseName.trim() === '') {
       toast({ title: "Error", description: "Exercise name cannot be empty.", variant: "destructive" });
       return;
@@ -183,7 +175,7 @@ function WorkoutPageContent() {
   };
 
   const handleDeleteExerciseDefinition = (id: string) => {
-    if (!currentUser) return;
+    // Removed currentUser check
     const defToDelete = exerciseDefinitions.find(def => def.id === id);
     setExerciseDefinitions(prev => prev.filter(def => def.id !== id));
     setAllWorkoutLogs(prevLogs => 
@@ -202,7 +194,7 @@ function WorkoutPageContent() {
   };
 
   const handleSaveEditDefinition = () => {
-    if (!currentUser) return;
+    // Removed currentUser check
     if (editingDefinition && editingDefinitionName.trim() !== '' && editingDefinitionCategory) {
       if (exerciseDefinitions.some(def => def.name.toLowerCase() === editingDefinitionName.trim().toLowerCase() && def.id !== editingDefinition.id)) {
         toast({ title: "Error", description: "Another exercise with this name already exists.", variant: "destructive" });
@@ -230,7 +222,7 @@ function WorkoutPageContent() {
   };
 
   const handleAddExerciseToWorkout = (definition: ExerciseDefinition) => {
-    if (!currentUser) return;
+    // Removed currentUser check
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const newWorkoutExercise: WorkoutExercise = {
       id: `${definition.id}-${Date.now()}`,
@@ -265,7 +257,7 @@ function WorkoutPageContent() {
   };
 
   const handleRemoveExerciseFromWorkout = (exerciseId: string) => {
-    if (!currentUser) return;
+    // Removed currentUser check
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
@@ -282,7 +274,7 @@ function WorkoutPageContent() {
   };
   
   const handleLogSet = (exerciseId: string, reps: number, weight: number) => {
-    if (!currentUser) return;
+    // Removed currentUser check
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
@@ -297,7 +289,7 @@ function WorkoutPageContent() {
   };
 
   const handleDeleteSet = (exerciseId: string, setId: string) => {
-    if (!currentUser) return;
+    // Removed currentUser check
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
@@ -311,7 +303,7 @@ function WorkoutPageContent() {
   };
 
   const handleUpdateSet = (exerciseId: string, setId: string, reps: number, weight: number) => {
-    if (!currentUser) return;
+    // Removed currentUser check
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
@@ -337,20 +329,13 @@ function WorkoutPageContent() {
     setIsProgressModalOpen(true);
   };
   
-  // No initial loading screen needed here as AuthGuard handles it
-  if (!currentUser) { 
-    // This case should ideally be handled by AuthGuard, but as a fallback:
-    return <div className="text-center p-10">Please log in to view your workouts.</div>;
-  }
-
-
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8"> {/* Removed min-h-screen as header takes space */}
-      <div className="mb-8 text-center"> {/* Reduced mb from 10 to 8 */}
+    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+      <div className="mb-8 text-center">
         <h1 className="text-3xl sm:text-4xl font-bold text-primary">
           Daily Workout Log
         </h1>
-        <p className="text-muted-foreground mt-1 text-md">Log your gains for {currentUser.displayName || "User"}, one rep at a time.</p>
+        <p className="text-muted-foreground mt-1 text-md">Log your gains, one rep at a time.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
@@ -428,7 +413,7 @@ function WorkoutPageContent() {
               ) : filteredExerciseDefinitions.length === 0 ? (
                 <p className="text-muted-foreground text-sm text-center py-4">Your library is empty. Add some exercises!</p>
               ) : (
-                <ul className="space-y-2 max-h-[calc(50vh-100px)] overflow-y-auto pr-1"> {/* Adjusted max-h */}
+                <ul className="space-y-2 max-h-[calc(50vh-100px)] overflow-y-auto pr-1">
                   <AnimatePresence>
                     {filteredExerciseDefinitions.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
                       <motion.li
@@ -563,8 +548,8 @@ function WorkoutPageContent() {
 
 export default function Page() {
   return (
-    <AuthGuard>
+    // <AuthGuard> // AuthGuard removed
       <WorkoutPageContent />
-    </AuthGuard>
+    // </AuthGuard>
   );
 }

@@ -4,14 +4,14 @@
 import React from 'react';
 import Link from 'next/link';
 import { Dumbbell } from 'lucide-react';
-import { UserProfile } from './UserProfile';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from './ui/button';
-import { useRouter } from 'next/navigation';
+// import { UserProfile } from './UserProfile';
+// import { useAuth } from '@/contexts/AuthContext';
+// import { Button } from './ui/button';
+// import { useRouter } from 'next/navigation';
 
 export function Header() {
-  const { currentUser, loading } = useAuth();
-  const router = useRouter();
+  // const { currentUser, loading } = useAuth();
+  // const router = useRouter();
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -22,7 +22,7 @@ export function Header() {
         </Link>
         
         <div className="flex items-center gap-4">
-          {loading ? (
+          {/* {loading ? (
              <div className="h-8 w-20 animate-pulse bg-muted rounded-md"></div>
           ) : currentUser ? (
             <UserProfile />
@@ -30,7 +30,8 @@ export function Header() {
             <Button onClick={() => router.push('/login')} variant="outline">
               Login
             </Button>
-          )}
+          )} */}
+          {/* User profile and login button removed */}
         </div>
       </div>
     </header>
