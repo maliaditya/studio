@@ -11,7 +11,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, getDay } from 'date-fns';
 import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
@@ -30,6 +30,16 @@ import {
 const DEFAULT_TARGET_SETS = 3;
 const DEFAULT_TARGET_REPS = "10-15";
 const DEFAULT_EXERCISE_CATEGORY: ExerciseCategory = "Other";
+
+const dailyCategoryMap: Record<number, ExerciseCategory[]> = {
+  0: [], // Sunday - Show all (empty array means no specific filter)
+  1: ["Chest", "Triceps"], // Monday
+  2: ["Back", "Biceps"], // Tuesday
+  3: ["Shoulders", "Legs"], // Wednesday
+  4: ["Chest", "Triceps"], // Thursday
+  5: ["Back", "Biceps"], // Friday
+  6: ["Shoulders", "Legs"], // Saturday
+};
 
 export default function WorkoutPage() {
   const { toast } = useToast();
@@ -79,6 +89,20 @@ export default function WorkoutPage() {
       localStorage.setItem('allWorkoutLogs', JSON.stringify(allWorkoutLogs));
     }
   }, [allWorkoutLogs, isClient]);
+
+  useEffect(() => {
+    if (isClient && selectedDate) {
+      const dayOfWeek = getDay(selectedDate); // 0 for Sunday, 1 for Monday, etc.
+      const categoriesForDay = dailyCategoryMap[dayOfWeek];
+      
+      // Ensure categoriesForDay is not undefined (e.g. if map doesn't cover all days)
+      // and only set if it's different from current to prevent potential loops if other effects depend on selectedCategories
+      if (categoriesForDay && JSON.stringify(categoriesForDay) !== JSON.stringify(selectedCategories)) {
+        setSelectedCategories(categoriesForDay);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, isClient]); // Not including selectedCategories here to prevent loop if user manually overrides
 
   const currentDatedWorkout = useMemo(() => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -421,7 +445,7 @@ export default function WorkoutPage() {
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex-grow min-w-0">
                                 <span className="font-medium text-foreground" title={def.name}>{def.name}</span>
-                                <Badge variant="secondary" className="text-xs ml-1">{def.category}</Badge>
+                                <Badge variant="secondary" className="text-xs ml-1 my-0.5">{def.category}</Badge>
                             </div>
                             <div className="flex-shrink-0 flex items-center">
                               <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}>
