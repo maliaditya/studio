@@ -17,8 +17,8 @@ import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-// import { AuthGuard } from '@/components/AuthGuard'; // AuthGuard removed
-// import { useAuth } from '@/contexts/AuthContext'; // useAuth removed
+import { AuthGuard } from '@/components/AuthGuard';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -45,7 +45,7 @@ const dailyCategoryMap: Record<number, ExerciseCategory[]> = {
 
 function WorkoutPageContent() {
   const { toast } = useToast();
-  // const { currentUser } = useAuth(); // currentUser removed
+  const { currentUser } = useAuth();
 
   const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
   const [newExerciseName, setNewExerciseName] = useState('');
@@ -62,18 +62,19 @@ function WorkoutPageContent() {
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<ExerciseCategory[]>([]);
 
-  // Revert to global localStorage keys
-  const exerciseDefsKey = "exerciseDefinitions";
-  const workoutLogsKey = "allWorkoutLogs";
+  const exerciseDefsKey = useMemo(() => currentUser ? `exerciseDefinitions_${currentUser.username}` : 'exerciseDefinitions_guest', [currentUser]);
+  const workoutLogsKey = useMemo(() => currentUser ? `allWorkoutLogs_${currentUser.username}` : 'allWorkoutLogs_guest', [currentUser]);
 
 
   useEffect(() => {
+    if (!currentUser) return; // Don't load/save if no user
     const savedDefs = localStorage.getItem(exerciseDefsKey);
     if (savedDefs) setExerciseDefinitions(JSON.parse(savedDefs));
     else setExerciseDefinitions([]);
-  }, [exerciseDefsKey]);
+  }, [exerciseDefsKey, currentUser]);
 
   useEffect(() => {
+    if (!currentUser) return;
     const savedLogs = localStorage.getItem(workoutLogsKey);
     if (savedLogs) {
       const parsedLogs: DatedWorkout[] = JSON.parse(savedLogs);
@@ -81,24 +82,27 @@ function WorkoutPageContent() {
     } else {
       setAllWorkoutLogs([]);
     }
-  }, [workoutLogsKey]);
+  }, [workoutLogsKey, currentUser]);
 
 
   useEffect(() => {
+    if (!currentUser) return;
     if (exerciseDefinitions.length > 0) {
       localStorage.setItem(exerciseDefsKey, JSON.stringify(exerciseDefinitions));
     } else if (exerciseDefinitions.length === 0 && localStorage.getItem(exerciseDefsKey)) {
+      // If definitions become empty, ensure localStorage is also updated to empty array
       localStorage.setItem(exerciseDefsKey, JSON.stringify([]));
     }
-  }, [exerciseDefinitions, exerciseDefsKey]);
+  }, [exerciseDefinitions, exerciseDefsKey, currentUser]);
 
   useEffect(() => {
+    if (!currentUser) return;
     if (allWorkoutLogs.length > 0) {
       localStorage.setItem(workoutLogsKey, JSON.stringify(allWorkoutLogs));
     } else if (allWorkoutLogs.length === 0 && localStorage.getItem(workoutLogsKey)) {
        localStorage.setItem(workoutLogsKey, JSON.stringify([]));
     }
-  }, [allWorkoutLogs, workoutLogsKey]);
+  }, [allWorkoutLogs, workoutLogsKey, currentUser]);
 
   useEffect(() => {
     if (selectedDate) {
@@ -137,6 +141,7 @@ function WorkoutPageContent() {
   };
 
   const updateOrAddWorkoutLog = (updatedWorkout: DatedWorkout) => {
+    if (!currentUser) return;
     setAllWorkoutLogs(prevLogs => {
       const existingLogIndex = prevLogs.findIndex(log => log.id === updatedWorkout.id);
       if (existingLogIndex > -1) {
@@ -150,7 +155,10 @@ function WorkoutPageContent() {
 
   const handleAddExerciseDefinition = (e: FormEvent) => {
     e.preventDefault();
-    // Removed currentUser check
+    if (!currentUser) {
+      toast({ title: "Error", description: "You must be logged in to add exercises.", variant: "destructive" });
+      return;
+    }
     if (newExerciseName.trim() === '') {
       toast({ title: "Error", description: "Exercise name cannot be empty.", variant: "destructive" });
       return;
@@ -175,7 +183,10 @@ function WorkoutPageContent() {
   };
 
   const handleDeleteExerciseDefinition = (id: string) => {
-    // Removed currentUser check
+    if (!currentUser) {
+      toast({ title: "Error", description: "You must be logged in to delete exercises.", variant: "destructive" });
+      return;
+    }
     const defToDelete = exerciseDefinitions.find(def => def.id === id);
     setExerciseDefinitions(prev => prev.filter(def => def.id !== id));
     setAllWorkoutLogs(prevLogs => 
@@ -194,7 +205,10 @@ function WorkoutPageContent() {
   };
 
   const handleSaveEditDefinition = () => {
-    // Removed currentUser check
+    if (!currentUser) {
+      toast({ title: "Error", description: "You must be logged in to edit exercises.", variant: "destructive" });
+      return;
+    }
     if (editingDefinition && editingDefinitionName.trim() !== '' && editingDefinitionCategory) {
       if (exerciseDefinitions.some(def => def.name.toLowerCase() === editingDefinitionName.trim().toLowerCase() && def.id !== editingDefinition.id)) {
         toast({ title: "Error", description: "Another exercise with this name already exists.", variant: "destructive" });
@@ -222,7 +236,10 @@ function WorkoutPageContent() {
   };
 
   const handleAddExerciseToWorkout = (definition: ExerciseDefinition) => {
-    // Removed currentUser check
+    if (!currentUser) {
+      toast({ title: "Error", description: "You must be logged in to add exercises to workout.", variant: "destructive" });
+      return;
+    }
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const newWorkoutExercise: WorkoutExercise = {
       id: `${definition.id}-${Date.now()}`,
@@ -257,7 +274,7 @@ function WorkoutPageContent() {
   };
 
   const handleRemoveExerciseFromWorkout = (exerciseId: string) => {
-    // Removed currentUser check
+    if (!currentUser) return;
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
@@ -274,7 +291,7 @@ function WorkoutPageContent() {
   };
   
   const handleLogSet = (exerciseId: string, reps: number, weight: number) => {
-    // Removed currentUser check
+    if (!currentUser) return;
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
@@ -289,7 +306,7 @@ function WorkoutPageContent() {
   };
 
   const handleDeleteSet = (exerciseId: string, setId: string) => {
-    // Removed currentUser check
+    if (!currentUser) return;
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
@@ -303,7 +320,7 @@ function WorkoutPageContent() {
   };
 
   const handleUpdateSet = (exerciseId: string, setId: string, reps: number, weight: number) => {
-    // Removed currentUser check
+    if (!currentUser) return;
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
@@ -335,7 +352,7 @@ function WorkoutPageContent() {
         <h1 className="text-3xl sm:text-4xl font-bold text-primary">
           Daily Workout Log
         </h1>
-        <p className="text-muted-foreground mt-1 text-md">Log your gains, one rep at a time.</p>
+        <p className="text-muted-foreground mt-1 text-md">Log your gains, one rep at a time, {currentUser?.username || "Guest"}.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
@@ -450,7 +467,7 @@ function WorkoutPageContent() {
                           </div>
                         ) : (
                           <div className="flex items-center justify-between gap-2">
-                            <div className="flex-grow min-w-0">
+                             <div className="flex-grow min-w-0">
                                 <span className="font-medium text-foreground" title={def.name}>{def.name}</span>
                                 <Badge variant="secondary" className="text-xs ml-1 my-0.5">{def.category}</Badge>
                             </div>
@@ -548,8 +565,8 @@ function WorkoutPageContent() {
 
 export default function Page() {
   return (
-    // <AuthGuard> // AuthGuard removed
+    <AuthGuard>
       <WorkoutPageContent />
-    // </AuthGuard>
+    </AuthGuard>
   );
 }
