@@ -43,6 +43,76 @@ const dailyCategoryMap: Record<number, ExerciseCategory[]> = {
   6: ["Shoulders", "Legs"], // Saturday
 };
 
+const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
+  // Chest
+  { id: `def_chest_01`, name: "Flat Barbell Bench Press", category: "Chest" },
+  { id: `def_chest_02`, name: "Incline Barbell Press", category: "Chest" },
+  { id: `def_chest_03`, name: "Decline Dumbbell Press", category: "Chest" },
+  { id: `def_chest_04`, name: "Peck Machine", category: "Chest" },
+  { id: `def_chest_05`, name: "Dumbbell Flat Press", category: "Chest" },
+  { id: `def_chest_06`, name: "Incline Dumbbell Press", category: "Chest" },
+  { id: `def_chest_07`, name: "Cable Fly", category: "Chest" },
+  { id: `def_chest_08`, name: "Dumbbell Chest Fly", category: "Chest" },
+  { id: `def_chest_09`, name: "Dumbbell Pullovers", category: "Chest" },
+  // Triceps
+  { id: `def_triceps_01`, name: "Close-Grip Barbell Bench Press", category: "Triceps" },
+  { id: `def_triceps_02`, name: "Overhead Dumbbell Extension", category: "Triceps" },
+  { id: `def_triceps_03`, name: "Dumbbell Kickback", category: "Triceps" },
+  { id: `def_triceps_04`, name: "Cable Rope Pushdown (Slow)", category: "Triceps" },
+  { id: `def_triceps_05`, name: "Overhead Cable Extension", category: "Triceps" },
+  { id: `def_triceps_06`, name: "Reverse-grip pushdown", category: "Triceps" },
+  { id: `def_triceps_07`, name: "Rope Pushdown", category: "Triceps" },
+  { id: `def_triceps_08`, name: "Double-Arm Dumbbell Kickback", category: "Triceps" },
+  { id: `def_triceps_09`, name: "Straight bar pushdown", category: "Triceps" },
+  { id: `def_triceps_10`, name: "Reverse Bar Pushdown", category: "Triceps" },
+  { id: `def_triceps_11`, name: "Back dips", category: "Triceps" },
+  // Back
+  { id: `def_back_01`, name: "Lat Pulldown", category: "Back" },
+  { id: `def_back_02`, name: "Machine Row", category: "Back" },
+  { id: `def_back_03`, name: "T-Bar Row", category: "Back" },
+  { id: `def_back_04`, name: "Lat Prayer Pull", category: "Back" },
+  { id: `def_back_05`, name: "Lat Pulldown (Wide Grip)", category: "Back" },
+  { id: `def_back_06`, name: "V handle lat pulldown", category: "Back" },
+  { id: `def_back_07`, name: "1-Arm Dumbbell Row", category: "Back" },
+  { id: `def_back_08`, name: "Back extensions", category: "Back" },
+  { id: `def_back_09`, name: "Barbell Row", category: "Back" },
+  { id: `def_back_10`, name: "Seated Row", category: "Back" },
+  { id: `def_back_11`, name: "DeadLifts", category: "Back" },
+  // Biceps
+  { id: `def_biceps_01`, name: "Standing dumbbell curls", category: "Biceps" },
+  { id: `def_biceps_02`, name: "Standing Dumbbell Alternating Curl", category: "Biceps" },
+  { id: `def_biceps_03`, name: "Preacher curls Dumbbells", category: "Biceps" },
+  { id: `def_biceps_04`, name: "Hammer Curl (Dumbbell)", category: "Biceps" },
+  { id: `def_biceps_05`, name: "Seated Incline Dumbbell Curl", category: "Biceps" },
+  { id: `def_biceps_06`, name: "Seated Dumbbell Alternating Curl", category: "Biceps" },
+  { id: `def_biceps_07`, name: "Reverse Cable", category: "Biceps" },
+  { id: `def_biceps_08`, name: "Strict bar curls", category: "Biceps" },
+  { id: `def_biceps_09`, name: "Reversed Incline curls", category: "Biceps" },
+  { id: `def_biceps_10`, name: "Cable Curls Superset", category: "Biceps" },
+  { id: `def_biceps_11`, name: "Reversed cable curls", category: "Biceps" },
+  { id: `def_biceps_12`, name: "Seated Machine Curls", category: "Biceps" },
+  { id: `def_biceps_13`, name: "Cable Curls", category: "Biceps" },
+  // Shoulders
+  { id: `def_shoulders_01`, name: "Seated Dumbbell Shoulder Press", category: "Shoulders" },
+  { id: `def_shoulders_02`, name: "Standing Dumbbell Lateral Raise", category: "Shoulders" },
+  { id: `def_shoulders_03`, name: "Face Pulls", category: "Shoulders" },
+  { id: `def_shoulders_04`, name: "Shrugs", category: "Shoulders" },
+  { id: `def_shoulders_05`, name: "Seated Dumbbell Lateral Raise", category: "Shoulders" },
+  { id: `def_shoulders_06`, name: "Rear Delt Fly (Incline Bench)", category: "Shoulders" },
+  { id: `def_shoulders_07`, name: "Cable Upright Rows", category: "Shoulders" },
+  { id: `def_shoulders_08`, name: "Dumbbell Lateral Raise (Lean in)", category: "Shoulders" },
+  { id: `def_shoulders_09`, name: "Lean-Away Cable Lateral Raise", category: "Shoulders" },
+  { id: `def_shoulders_10`, name: "Front Raise cable", category: "Shoulders" },
+  // Legs
+  { id: `def_legs_01`, name: "Walking Lunges (Barbell)", category: "Legs" },
+  { id: `def_legs_02`, name: "Leg Press", category: "Legs" },
+  { id: `def_legs_03`, name: "Quads Machine", category: "Legs" },
+  { id: `def_legs_04`, name: "Hamstring machine", category: "Legs" },
+  { id: `def_legs_05`, name: "Squats (Barbell)", category: "Legs" },
+  { id: `def_legs_06`, name: "Calfs (Bodyweight)", category: "Legs" },
+];
+
+
 function WorkoutPageContent() {
   const { toast } = useToast();
   const { currentUser } = useAuth();
@@ -67,11 +137,35 @@ function WorkoutPageContent() {
 
 
   useEffect(() => {
-    if (!currentUser) return; // Don't load/save if no user
-    const savedDefs = localStorage.getItem(exerciseDefsKey);
-    if (savedDefs) setExerciseDefinitions(JSON.parse(savedDefs));
-    else setExerciseDefinitions([]);
+    if (!currentUser) return; 
+
+    const savedDefsString = localStorage.getItem(exerciseDefsKey);
+    let existingDefs: ExerciseDefinition[] = [];
+    
+    if (savedDefsString) {
+      try {
+        existingDefs = JSON.parse(savedDefsString);
+      } catch (e) {
+        console.error("Error parsing exercise definitions from localStorage", e);
+        existingDefs = []; 
+      }
+    }
+
+    if (existingDefs.length === 0) {
+      // For new users or if their library is empty, load defaults
+      // Ensure default IDs are unique if a user clears their list and gets defaults again
+      const timestamp = Date.now().toString();
+      const uniqueDefaultDefs = DEFAULT_EXERCISE_DEFINITIONS.map((def, index) => ({
+        ...def,
+        id: `${timestamp}_${index}_${def.name.replace(/\s+/g, '_')}` // Make IDs more robustly unique
+      }));
+      setExerciseDefinitions(uniqueDefaultDefs);
+    } else {
+      setExerciseDefinitions(existingDefs);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exerciseDefsKey, currentUser]);
+
 
   useEffect(() => {
     if (!currentUser) return;
@@ -87,20 +181,16 @@ function WorkoutPageContent() {
 
   useEffect(() => {
     if (!currentUser) return;
-    if (exerciseDefinitions.length > 0) {
+    // Only save if exerciseDefinitions is not the initial empty array before defaults are loaded
+    if (exerciseDefinitions.length > 0 || localStorage.getItem(exerciseDefsKey)) {
       localStorage.setItem(exerciseDefsKey, JSON.stringify(exerciseDefinitions));
-    } else if (exerciseDefinitions.length === 0 && localStorage.getItem(exerciseDefsKey)) {
-      // If definitions become empty, ensure localStorage is also updated to empty array
-      localStorage.setItem(exerciseDefsKey, JSON.stringify([]));
     }
   }, [exerciseDefinitions, exerciseDefsKey, currentUser]);
 
   useEffect(() => {
     if (!currentUser) return;
-    if (allWorkoutLogs.length > 0) {
-      localStorage.setItem(workoutLogsKey, JSON.stringify(allWorkoutLogs));
-    } else if (allWorkoutLogs.length === 0 && localStorage.getItem(workoutLogsKey)) {
-       localStorage.setItem(workoutLogsKey, JSON.stringify([]));
+    if (allWorkoutLogs.length > 0 || localStorage.getItem(workoutLogsKey)) {
+       localStorage.setItem(workoutLogsKey, JSON.stringify(allWorkoutLogs));
     }
   }, [allWorkoutLogs, workoutLogsKey, currentUser]);
 
