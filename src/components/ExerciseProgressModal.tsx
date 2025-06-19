@@ -17,7 +17,7 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
-import type { ExerciseDefinition, DatedWorkout, LoggedSet, ExerciseCategory } from '@/types/workout';
+import type { ExerciseDefinition, DatedWorkout, LoggedSet } from '@/types/workout';
 import { format, parseISO } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -32,17 +32,12 @@ interface ExerciseProgressModalProps {
   allWorkoutLogs: DatedWorkout[];
 }
 
-interface GroupedProgressData {
-  date: string;
-  originalDate: Date;
-  sets: LoggedSet[];
-}
-
 interface ChartDataPoint {
   date: string; // Formatted for X-axis display e.g., "MMM dd"
   fullDate: string; // For tooltip
   timestamp: number; // For sorting
   maxWeight: number;
+  repsAtMaxWeight: number;
 }
 
 const chartConfig = {
@@ -50,6 +45,10 @@ const chartConfig = {
     label: "Max Weight",
     color: "hsl(var(--primary))",
   },
+  repsAtMaxWeight: {
+    label: "Reps at Max Weight",
+    color: "hsl(var(--accent))",
+  }
 } satisfies ChartConfig;
 
 export function ExerciseProgressModal({
@@ -75,7 +74,6 @@ export function ExerciseProgressModal({
               sets: []
             };
           }
-          // Sort sets by timestamp before adding
           const sortedSets = [...ex.loggedSets].sort((a, b) => a.timestamp - b.timestamp);
           groupedEntries[dateKey].sets.push(...sortedSets);
         }
@@ -91,38 +89,48 @@ export function ExerciseProgressModal({
       .sort((a, b) => b.originalDate.getTime() - a.originalDate.getTime());
   }, [exercise, allWorkoutLogs]);
 
-  const graphData = useMemo(() => {
+  const graphData = useMemo((): ChartDataPoint[] => {
     if (!exercise) return [];
     
-    const dailyMaxWeights: ChartDataPoint[] = [];
+    const dailyMetrics: Record<string, { dateObj: Date; maxWeight: number; repsAtMaxWeight: number }> = {};
 
     allWorkoutLogs.forEach(datedLog => {
-      let sessionMaxWeight = 0;
-      let setsInSession = false;
+      const dateKey = datedLog.date; // yyyy-MM-dd
       datedLog.exercises.forEach(ex => {
         if (ex.definitionId === exercise.id) {
           ex.loggedSets.forEach(set => {
-            setsInSession = true;
-            if (set.weight > sessionMaxWeight) {
-              sessionMaxWeight = set.weight;
+            if (!dailyMetrics[dateKey]) {
+              dailyMetrics[dateKey] = { 
+                dateObj: parseISO(datedLog.date), 
+                maxWeight: 0, 
+                repsAtMaxWeight: 0 
+              };
+            }
+            
+            const currentEntry = dailyMetrics[dateKey];
+            if (set.weight > currentEntry.maxWeight) {
+              currentEntry.maxWeight = set.weight;
+              currentEntry.repsAtMaxWeight = set.reps;
+            } else if (set.weight === currentEntry.maxWeight) {
+              if (set.reps > currentEntry.repsAtMaxWeight) {
+                currentEntry.repsAtMaxWeight = set.reps;
+              }
             }
           });
         }
       });
-
-      if (setsInSession && sessionMaxWeight > 0) {
-        const dateObj = parseISO(datedLog.date);
-        dailyMaxWeights.push({
-          date: format(dateObj, 'MMM dd'),
-          fullDate: format(dateObj, 'PPP'),
-          timestamp: dateObj.getTime(),
-          maxWeight: sessionMaxWeight,
-        });
-      }
     });
     
-    // Sort by date ascending for the chart
-    return dailyMaxWeights.sort((a, b) => a.timestamp - b.timestamp);
+    return Object.values(dailyMetrics)
+      .filter(metric => metric.maxWeight > 0) // Only include days where the exercise was actually done
+      .map(metric => ({
+        date: format(metric.dateObj, 'MMM dd'),
+        fullDate: format(metric.dateObj, 'PPP'),
+        timestamp: metric.dateObj.getTime(),
+        maxWeight: metric.maxWeight,
+        repsAtMaxWeight: metric.repsAtMaxWeight,
+      }))
+      .sort((a, b) => a.timestamp - b.timestamp); // Sort by date ascending for the chart
   }, [exercise, allWorkoutLogs]);
 
   if (!exercise) return null;
@@ -207,7 +215,7 @@ export function ExerciseProgressModal({
                   data={graphData}
                   margin={{
                     top: 5,
-                    right: 20,
+                    right: 40, // Increased right margin for second Y-axis label
                     left: 10,
                     bottom: 5,
                   }}
@@ -221,28 +229,54 @@ export function ExerciseProgressModal({
                     tickFormatter={(value) => value.slice(0, 6)}
                   />
                   <YAxis
+                    yAxisId="left"
                     tickLine={false}
                     axisLine={false}
                     tickMargin={8}
                     domain={['dataMin - 5', 'dataMax + 5']}
                     label={{ value: "Max Weight (kg/lb)", angle: -90, position: "insideLeft", offset: -0, style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' } }}
+                    stroke="var(--color-maxWeight)"
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    domain={['dataMin - 2', 'dataMax + 2']} // Adjust domain for reps
+                    label={{ value: "Reps", angle: 90, position: "insideRight", offset: 10, style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' } }}
+                    stroke="var(--color-repsAtMaxWeight)"
                   />
                    <RechartsTooltip
                     cursor={false}
                     content={
                       <ChartTooltipContent
                         indicator="line"
-                        nameKey="maxWeight" 
                         labelFormatter={(value, payload) => {
                            if (payload && payload.length > 0 && payload[0].payload.fullDate) {
                              return payload[0].payload.fullDate;
                            }
                            return value;
                         }}
+                        formatter={(value, name) => {
+                          const configItem = chartConfig[name as keyof typeof chartConfig];
+                          return (
+                            <>
+                              <div className="flex items-center">
+                                <div
+                                  className="w-2.5 h-2.5 rounded-full mr-2"
+                                  style={{ backgroundColor: configItem?.color }}
+                                />
+                                <span>{configItem?.label}: {value}</span>
+                              </div>
+                            </>
+                          );
+                        }}
                       />
                     }
                   />
                   <Line
+                    yAxisId="left"
                     dataKey="maxWeight"
                     type="monotone"
                     stroke="var(--color-maxWeight)"
@@ -254,6 +288,22 @@ export function ExerciseProgressModal({
                     activeDot={{
                       r: 6,
                     }}
+                    name="maxWeight" // Name for tooltip
+                  />
+                  <Line
+                    yAxisId="right"
+                    dataKey="repsAtMaxWeight"
+                    type="monotone"
+                    stroke="var(--color-repsAtMaxWeight)"
+                    strokeWidth={2}
+                    dot={{
+                      fill: "var(--color-repsAtMaxWeight)",
+                      r: 4,
+                    }}
+                    activeDot={{
+                      r: 6,
+                    }}
+                    name="repsAtMaxWeight" // Name for tooltip
                   />
                 </LineChart>
               </ChartContainer>
