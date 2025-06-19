@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp } from 'lucide-react';
+import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,6 +17,14 @@ import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 
 const DEFAULT_TARGET_SETS = 3;
@@ -40,6 +48,8 @@ export default function WorkoutPage() {
 
   const [viewingProgressExercise, setViewingProgressExercise] = useState<ExerciseDefinition | null>(null);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
+
+  const [selectedCategories, setSelectedCategories] = useState<ExerciseCategory[]>([]);
 
   useEffect(() => {
     setIsClient(true);
@@ -78,6 +88,21 @@ export default function WorkoutPage() {
   const currentWorkoutExercises = useMemo(() => {
     return currentDatedWorkout?.exercises || [];
   }, [currentDatedWorkout]);
+
+  const filteredExerciseDefinitions = useMemo(() => {
+    if (selectedCategories.length === 0) {
+      return exerciseDefinitions;
+    }
+    return exerciseDefinitions.filter(def => selectedCategories.includes(def.category));
+  }, [exerciseDefinitions, selectedCategories]);
+
+  const handleCategoryFilterChange = (category: ExerciseCategory) => {
+    setSelectedCategories(prev => 
+      prev.includes(category) 
+        ? prev.filter(c => c !== category) 
+        : [...prev, category]
+    );
+  };
 
   const updateOrAddWorkoutLog = (updatedWorkout: DatedWorkout) => {
     setAllWorkoutLogs(prevLogs => {
@@ -286,10 +311,47 @@ export default function WorkoutPage() {
         <section aria-labelledby="exercise-library-heading" className="md:col-span-1 space-y-6">
           <Card className="shadow-xl rounded-xl overflow-hidden">
             <CardHeader className="bg-primary/10">
-              <CardTitle id="exercise-library-heading" className="flex items-center gap-2 text-2xl text-primary">
-                <Dumbbell />
-                Exercise Library
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle id="exercise-library-heading" className="flex items-center gap-2 text-2xl text-primary">
+                  <Dumbbell />
+                  Exercise Library
+                </CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="ml-auto h-8">
+                      <FilterIcon className="h-4 w-4 mr-2" />
+                      Filter ({selectedCategories.length > 0 ? selectedCategories.length : "All"})
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {exerciseCategories.map((category) => (
+                      <DropdownMenuCheckboxItem
+                        key={category}
+                        checked={selectedCategories.includes(category)}
+                        onCheckedChange={() => handleCategoryFilterChange(category)}
+                         onSelect={(e) => e.preventDefault()} // Prevent menu from closing on item click
+                      >
+                        {category}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                    {selectedCategories.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="w-full justify-start text-sm"
+                          onClick={() => setSelectedCategories([])}
+                        >
+                          Clear Filters
+                        </Button>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
               <form onSubmit={handleAddExerciseDefinition} className="space-y-3">
@@ -315,12 +377,14 @@ export default function WorkoutPage() {
                   <PlusCircle className="mr-2 h-5 w-5" /> Add Exercise
                 </Button>
               </form>
-              {exerciseDefinitions.length === 0 ? (
+              {filteredExerciseDefinitions.length === 0 && exerciseDefinitions.length > 0 ? (
+                 <p className="text-muted-foreground text-sm text-center py-4">No exercises match your current filter.</p>
+              ) : filteredExerciseDefinitions.length === 0 ? (
                 <p className="text-muted-foreground text-sm text-center py-4">Your library is empty. Add some exercises!</p>
               ) : (
-                <ul className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                <ul className="space-y-2 max-h-[calc(50vh-40px)] overflow-y-auto pr-1">
                   <AnimatePresence>
-                    {exerciseDefinitions.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
+                    {filteredExerciseDefinitions.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
                       <motion.li
                         key={def.id}
                         layout
