@@ -392,7 +392,7 @@ export default function WorkoutPage() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, x: -20 }}
                         transition={{ duration: 0.2 }}
-                        className="p-3 bg-card border rounded-lg shadow-sm flex flex-col gap-2"
+                        className="p-3 bg-card border rounded-lg shadow-sm"
                       >
                         {editingDefinition?.id === def.id ? (
                           <div className="space-y-2">
@@ -420,8 +420,8 @@ export default function WorkoutPage() {
                         ) : (
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex-grow min-w-0">
-                                <span className="font-medium text-foreground truncate block" title={def.name}>{def.name}</span>
-                                <Badge variant="secondary" className="text-xs">{def.category}</Badge>
+                                <span className="font-medium text-foreground" title={def.name}>{def.name}</span>
+                                <Badge variant="secondary" className="text-xs ml-1">{def.category}</Badge>
                             </div>
                             <div className="flex-shrink-0 flex items-center">
                               <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}>
