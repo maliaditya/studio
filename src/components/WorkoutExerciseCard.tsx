@@ -73,7 +73,7 @@ export function WorkoutExerciseCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.3 }}
-      className={cn("mb-6 rounded-lg shadow-md", isCompleted ? "bg-green-100 dark:bg-green-900/30 border-green-500" : "bg-card")}
+      className={cn("rounded-lg shadow-md", isCompleted ? "bg-green-100 dark:bg-green-900/30 border-green-500" : "bg-card")}
     >
       <Card className="overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between p-4 border-b">

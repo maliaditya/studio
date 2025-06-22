@@ -768,15 +768,17 @@ function WorkoutPageContent() {
                         <p className="text-sm text-muted-foreground/80">Add exercises from library or select a weekday!</p>
                     </div>
                   ) : (
-                    <AnimatePresence>
-                    {currentWorkoutExercises.map(exercise => (
-                        <WorkoutExerciseCard 
-                        key={exercise.id} exercise={exercise}
-                        onLogSet={handleLogSet} onDeleteSet={handleDeleteSet} onUpdateSet={handleUpdateSet}
-                        onRemoveExercise={handleRemoveExerciseFromWorkout}
-                        />
-                    ))}
-                    </AnimatePresence>
+                    <div className="space-y-6 max-h-[calc(100vh-330px)] overflow-y-auto pr-2">
+                      <AnimatePresence>
+                      {currentWorkoutExercises.map(exercise => (
+                          <WorkoutExerciseCard 
+                          key={exercise.id} exercise={exercise}
+                          onLogSet={handleLogSet} onDeleteSet={handleDeleteSet} onUpdateSet={handleUpdateSet}
+                          onRemoveExercise={handleRemoveExerciseFromWorkout}
+                          />
+                      ))}
+                      </AnimatePresence>
+                    </div>
                   )}
                 </CardContent>
             </Card>
@@ -794,5 +796,3 @@ function WorkoutPageContent() {
 export default function Page() {
   return ( <AuthGuard> <WorkoutPageContent /> </AuthGuard> );
 }
-
-    
