@@ -54,6 +54,8 @@ const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
   { id: 'def_chest_07', name: "Cable Fly", category: "Chest" },
   { id: 'def_chest_08', name: "Dumbbell Chest Fly", category: "Chest" },
   { id: 'def_chest_09', name: "Dumbbell Pullovers", category: "Chest" },
+  { id: 'def_chest_10', name: "Flat Bench Chest Fly", category: "Chest" },
+
   // Triceps
   { id: 'def_triceps_01', name: "Close-Grip Barbell Bench Press", category: "Triceps" },
   { id: 'def_triceps_02', name: "Overhead Dumbbell Extension", category: "Triceps" },
@@ -65,6 +67,8 @@ const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
   { id: 'def_triceps_08', name: "Straight bar pushdown", category: "Triceps" },
   { id: 'def_triceps_09', name: "Reversebar pushdown", category: "Triceps" },
   { id: 'def_triceps_10', name: "Back dips", category: "Triceps" },
+  { id: 'def_triceps_11', name: "Single Arm Dumbbell Extensions", category: "Triceps" },
+
   // Back
   { id: 'def_back_01', name: "Lat Pulldown", category: "Back" },
   { id: 'def_back_02', name: "Machine Row", category: "Back" },
@@ -78,6 +82,7 @@ const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
   { id: 'def_back_10', name: "Seated Row", category: "Back" },
   { id: 'def_back_11', name: "V handle pulldown Cable", category: "Back" },
   { id: 'def_back_12', name: "DeadLifts", category: "Back" },
+
   // Biceps
   { id: 'def_biceps_01', name: "Standing dumbbell curls", category: "Biceps" },
   { id: 'def_biceps_02', name: "Standing Dumbbell Alternating Curl", category: "Biceps" },
@@ -92,6 +97,9 @@ const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
   { id: 'def_biceps_11', name: "Reversed cable curls", category: "Biceps" },
   { id: 'def_biceps_12', name: "Seated Machine Curls", category: "Biceps" },
   { id: 'def_biceps_13', name: "Cable Curls", category: "Biceps" },
+  { id: 'def_biceps_14', name: "Preacher Curls Bar", category: "Biceps" },
+  { id: 'def_biceps_15', name: "Concentration Curl", category: "Biceps" },
+
   // Shoulders
   { id: 'def_shoulders_01', name: "Seated Dumbbell Shoulder Press", category: "Shoulders" },
   { id: 'def_shoulders_02', name: "Standing Dumbbell Lateral Raise", category: "Shoulders" },
@@ -103,13 +111,17 @@ const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
   { id: 'def_shoulders_08', name: "Dumbbell Lateral Raise (Lean in)", category: "Shoulders" },
   { id: 'def_shoulders_09', name: "Lean-Away Cable Lateral Raise", category: "Shoulders" },
   { id: 'def_shoulders_10', name: "Front Raise cable", category: "Shoulders" },
+  { id: 'def_shoulders_11', name: "Front Raise Dumbbells", category: "Shoulders" },
+
   // Legs
   { id: 'def_legs_01', name: "Walking Lunges (Barbell)", category: "Legs" },
   { id: 'def_legs_02', name: "Leg Press", category: "Legs" },
   { id: 'def_legs_03', name: "Quads Machine", category: "Legs" },
   { id: 'def_legs_04', name: "Hamstring machine", category: "Legs" },
   { id: 'def_legs_05', name: "Squats (Barbell)", category: "Legs" },
-  { id: 'def_legs_06', name: "Calfs (Bodyweight)", category: "Legs" },
+  { id: 'def_legs_06', name: "Calf Raises (Bodyweight)", category: "Legs" },
+  { id: 'def_legs_07', name: "Calf Raises", category: "Legs" },
+  { id: 'def_legs_08', name: "Hack Squats", category: "Legs" },
 ];
 
 const W1_PLAN = {
@@ -136,7 +148,7 @@ const W3_PLAN = {
   Back: ["Lat Pulldown", "Barbell Row", "Seated Row", "Lat Prayer Pull"],
   Biceps: ["Strict bar curls", "Reversed Incline curls", "Cable Curls Superset", "Reversed cable curls"],
   Shoulders: ["Seated Dumbbell Shoulder Press", "Dumbbell Lateral Raise (Lean in)", "Face Pulls", "Shrugs"],
-  Legs: ["Leg Press", "Quads Machine", "Hamstring machine", "Calfs (Bodyweight)"]
+  Legs: ["Leg Press", "Quads Machine", "Hamstring machine", "Calf Raises (Bodyweight)"]
 };
 
 const W4_PLAN = {
@@ -146,6 +158,24 @@ const W4_PLAN = {
   Biceps: ["Seated Machine Curls", "Cable Curls", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"],
   Shoulders: ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable"],
   Legs: ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"]
+};
+
+const W5_PLAN = {
+  Chest: ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine", "Cable Fly", "Dumbbell Pullovers"],
+  Triceps: ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Straight bar pushdown", "Reversebar pushdown", "Back dips"],
+  Back: ["Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull", "1-Arm Dumbbell Row", "DeadLifts"],
+  Biceps: ["Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)", "Reversed cable curls", "Reversed Incline curls"],
+  Shoulders: ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Cable Upright Rows", "Front Raise Dumbbells", "Shrugs"],
+  Legs: ["Squats (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine", "Walking Lunges (Barbell)", "Calf Raises"],
+};
+
+const W6_PLAN = {
+  Chest: ["Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Peck Machine", "Flat Bench Chest Fly", "Dumbbell Pullovers"],
+  Triceps: ["Overhead Cable Extension", "Single Arm Dumbbell Extensions", "Rope Pushdown", "Straight bar pushdown", "Reversebar pushdown", "Back dips"],
+  Back: ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle pulldown Cable", "Barbell Row", "Lat Prayer Pull", "Back extensions"],
+  Biceps: ["Strict bar curls", "Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher Curls Bar", "Reverse Cable", "Concentration Curl"],
+  Shoulders: ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable", "Cable Upright Rows", "Shrugs"],
+  Legs: ["Walking Lunges (Barbell)", "Hack Squats", "Hamstring machine", "Quads Machine", "Leg Press", "Calf Raises"],
 };
 
 // Schedule for "Two Muscles / Day" mode
@@ -284,11 +314,10 @@ function WorkoutPageContent() {
       const dayOfWeek = getDay(selectedDate);
       const exercisesToAdd: WorkoutExercise[] = [];
       let toastDescription = "";
+      const weekOfMonth = getWeekOfMonth(selectedDate, { weekStartsOn: 1 });
+      const isOddWeek = weekOfMonth % 2 !== 0; // Weeks 1, 3, 5...
       
       if (workoutMode === 'two-muscle') {
-          const weekOfMonth = getWeekOfMonth(selectedDate, { weekStartsOn: 1 });
-          const isOddWeek = weekOfMonth % 2 !== 0; // Weeks 1, 3, 5...
-    
           let plan: typeof W1_PLAN | null = null;
           let planName = "";
     
@@ -329,17 +358,19 @@ function WorkoutPageContent() {
             }
           });
       } else { // 'one-muscle' mode
+          const plan = isOddWeek ? W5_PLAN : W6_PLAN;
+          const planName = isOddWeek ? "W5" : "W6";
           const muscleGroupForDay = singleMuscleDailySchedule[dayOfWeek];
           if (!muscleGroupForDay) return prevLogs;
 
-          toastDescription = `Added 6 exercises for ${muscleGroupForDay}.`;
-          const exercisesForMuscle = exerciseDefinitions
-            .filter(def => def.category === muscleGroupForDay)
-            .slice(0, 6);
+          const exerciseNames = (plan as any)[muscleGroupForDay] as string[] | undefined;
+          if (!exerciseNames || exerciseNames.length === 0) return prevLogs;
+          
+          toastDescription = `Added ${planName} exercises for ${muscleGroupForDay}.`;
 
-          if (exercisesForMuscle.length === 0) return prevLogs;
-
-          exercisesForMuscle.forEach(definition => {
+          exerciseNames.forEach(exName => {
+            const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
+            if (definition) {
               exercisesToAdd.push({
                 id: `${definition.id}-${Date.now()}-${Math.random()}`,
                 definitionId: definition.id,
@@ -349,6 +380,7 @@ function WorkoutPageContent() {
                 targetSets: DEFAULT_TARGET_SETS,
                 targetReps: DEFAULT_TARGET_REPS,
               });
+            }
           });
       }
 
@@ -762,3 +794,5 @@ function WorkoutPageContent() {
 export default function Page() {
   return ( <AuthGuard> <WorkoutPageContent /> </AuthGuard> );
 }
+
+    
