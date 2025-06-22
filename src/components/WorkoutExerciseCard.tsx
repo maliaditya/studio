@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Trash2, CheckSquare, Edit2, Save, X } from 'lucide-react';
+import { PlusCircle, Trash2, CheckSquare, Edit2, Save, X, Youtube } from 'lucide-react';
 import { WorkoutExercise, LoggedSet } from '@/types/workout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -57,6 +57,12 @@ export function WorkoutExerciseCard({
       }
     }
   };
+
+  const handleSearchOnYouTube = () => {
+    const query = encodeURIComponent(exercise.name);
+    const url = `https://www.youtube.com/results?search_query=${query}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
   
   const isCompleted = exercise.loggedSets.length >= exercise.targetSets;
 
@@ -71,13 +77,18 @@ export function WorkoutExerciseCard({
     >
       <Card className="overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between p-4 border-b">
-          <div className="flex items-center gap-2">
-            {isCompleted && <CheckSquare className="h-6 w-6 text-green-500" />}
-            <CardTitle className="text-xl">{exercise.name}</CardTitle>
+          <div className="flex items-center gap-2 min-w-0">
+            {isCompleted && <CheckSquare className="h-6 w-6 text-green-500 flex-shrink-0" />}
+            <CardTitle className="text-xl truncate" title={exercise.name}>{exercise.name}</CardTitle>
           </div>
-          <Button variant="ghost" size="icon" onClick={() => onRemoveExercise(exercise.id)} aria-label={`Remove ${exercise.name} from workout`}>
-            <Trash2 className="h-5 w-5 text-destructive hover:text-destructive/80" />
-          </Button>
+          <div className="flex items-center flex-shrink-0">
+             <Button variant="ghost" size="icon" onClick={handleSearchOnYouTube} aria-label={`Search ${exercise.name} on YouTube`}>
+                <Youtube className="h-5 w-5 text-muted-foreground hover:text-red-500" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => onRemoveExercise(exercise.id)} aria-label={`Remove ${exercise.name} from workout`}>
+              <Trash2 className="h-5 w-5 text-destructive hover:text-destructive/80" />
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-4">
           <p className="text-sm text-muted-foreground mb-3">

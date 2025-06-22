@@ -332,6 +332,11 @@ function WorkoutPageContent() {
     return exerciseDefinitions.filter(def => selectedCategories.includes(def.category));
   }, [exerciseDefinitions, selectedCategories]);
 
+  const muscleGroupsForSelectedDay = useMemo(() => {
+    const dayOfWeek = getDay(selectedDate);
+    return dailyMuscleGroups[dayOfWeek] || [];
+  }, [selectedDate]);
+
   const handleCategoryFilterChange = (category: ExerciseCategory) => {
     setSelectedCategories(prev => 
       prev.includes(category) 
@@ -628,9 +633,16 @@ function WorkoutPageContent() {
         <section aria-labelledby="current-workout-heading" className="md:col-span-2 space-y-6">
             <Card className="shadow-xl rounded-xl overflow-hidden">
                 <CardHeader className="bg-accent/10 flex flex-row items-center justify-between p-4">
-                    <CardTitle id="current-workout-heading" className="flex items-center gap-2 text-2xl text-accent">
-                        <ListChecks /> Workout for: {format(selectedDate, 'PPP')}
-                    </CardTitle>
+                     <div className="flex-grow">
+                        <CardTitle id="current-workout-heading" className="flex items-center gap-2 text-2xl text-accent">
+                            <ListChecks /> Workout for: {format(selectedDate, 'PPP')}
+                        </CardTitle>
+                        {muscleGroupsForSelectedDay.length > 0 && (
+                            <p className="text-sm text-muted-foreground mt-1 ml-1">
+                                Today's focus: {muscleGroupsForSelectedDay.join(' & ')}
+                            </p>
+                        )}
+                    </div>
                     <Popover>
                         <PopoverTrigger asChild>
                         <Button variant={"outline"} className={cn("w-[200px] justify-start text-left font-normal h-10",!selectedDate && "text-muted-foreground")}>
