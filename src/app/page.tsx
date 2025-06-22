@@ -263,11 +263,11 @@ function WorkoutPageContent() {
       let planName = "";
   
       if (dayOfWeek >= 1 && dayOfWeek <= 3) { // Mon-Wed
-        if (weekOfMonth === 1 || weekOfMonth === 3) { plan = W1_PLAN; planName="W1/W1"; }
-        if (weekOfMonth === 2 || weekOfMonth === 4) { plan = W3_PLAN; planName="W3/W3"; }
+        if (weekOfMonth === 1 || weekOfMonth === 3) { plan = W1_PLAN; planName="W1"; }
+        if (weekOfMonth === 2 || weekOfMonth === 4) { plan = W3_PLAN; planName="W3"; }
       } else if (dayOfWeek >= 4 && dayOfWeek <= 5) { // Thu-Fri
-        if (weekOfMonth === 1 || weekOfMonth === 3) { plan = W2_PLAN; planName="W2/W2"; }
-        if (weekOfMonth === 2 || weekOfMonth === 4) { plan = W4_PLAN; planName="W4/W4"; }
+        if (weekOfMonth === 1 || weekOfMonth === 3) { plan = W2_PLAN; planName="W2"; }
+        if (weekOfMonth === 2 || weekOfMonth === 4) { plan = W4_PLAN; planName="W4"; }
       }
   
       if (!plan) return prevLogs;
@@ -672,3 +672,5 @@ function WorkoutPageContent() {
 export default function Page() {
   return ( <AuthGuard> <WorkoutPageContent /> </AuthGuard> );
 }
+
+    
