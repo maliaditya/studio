@@ -6,13 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info } from 'lucide-react';
+import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO, getDay, getWeekOfMonth } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -33,6 +33,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Separator } from '@/components/ui/separator';
 
 
 const DEFAULT_TARGET_SETS = 4;
@@ -145,6 +148,7 @@ const W4_PLAN = {
   Legs: ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"]
 };
 
+// Schedule for "Two Muscles / Day" mode
 const dailyMuscleGroups: Record<number, string[]> = {
   1: ["Chest", "Triceps"], // Monday
   2: ["Back", "Biceps"],   // Tuesday
@@ -155,10 +159,22 @@ const dailyMuscleGroups: Record<number, string[]> = {
   0: [], // Sunday
 };
 
+// Schedule for "One Muscle / Day" mode
+const singleMuscleDailySchedule: Record<number, ExerciseCategory | null> = {
+    1: "Chest",
+    2: "Back",
+    3: "Legs",
+    4: "Shoulders",
+    5: "Biceps",
+    6: "Triceps",
+    0: null, // Sunday
+};
+
 function WorkoutPageContent() {
   const { toast } = useToast();
   const { currentUser } = useAuth();
 
+  const [workoutMode, setWorkoutMode] = useState<WorkoutMode>('two-muscle');
   const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
   const [newExerciseName, setNewExerciseName] = useState('');
   const [newExerciseCategory, setNewExerciseCategory] = useState<ExerciseCategory | "">("");
@@ -180,7 +196,13 @@ function WorkoutPageContent() {
     if (currentUser?.username) {
       const defsKey = `exerciseDefinitions_${currentUser.username}`;
       const logsKey = `allWorkoutLogs_${currentUser.username}`;
+      const modeKey = `workoutMode_${currentUser.username}`;
       let localDefsLoaded = false;
+      
+      const storedMode = localStorage.getItem(modeKey);
+      if (storedMode === 'one-muscle' || storedMode === 'two-muscle') {
+        setWorkoutMode(storedMode);
+      }
 
       try {
         const storedDefinitions = localStorage.getItem(defsKey);
@@ -234,15 +256,18 @@ function WorkoutPageContent() {
       try {
         const defsKey = `exerciseDefinitions_${currentUser.username}`;
         const logsKey = `allWorkoutLogs_${currentUser.username}`;
+        const modeKey = `workoutMode_${currentUser.username}`;
         
         localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
         localStorage.setItem(logsKey, JSON.stringify(allWorkoutLogs));
+        localStorage.setItem(modeKey, workoutMode);
+
       } catch (e) {
         console.error("Error saving data to localStorage", e);
         toast({ title: "Save Error", description: "Could not save data locally. Storage might be full.", variant: "destructive"});
       }
     }
-  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast]);
+  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, workoutMode]);
 
 
   useEffect(() => {
@@ -256,37 +281,65 @@ function WorkoutPageContent() {
         return prevLogs; // Don't modify if workout already exists
       }
   
-      const weekOfMonth = getWeekOfMonth(selectedDate, { weekStartsOn: 1 });
       const dayOfWeek = getDay(selectedDate);
-      const isOddWeek = weekOfMonth % 2 !== 0; // Weeks 1, 3, 5...
-  
-      let plan: typeof W1_PLAN | null = null;
-      let planName = "";
-  
-      if (dayOfWeek >= 1 && dayOfWeek <= 3) { // Mon-Wed
-        plan = isOddWeek ? W1_PLAN : W3_PLAN;
-        planName = isOddWeek ? "W1" : "W3";
-      } else if (dayOfWeek >= 4 && dayOfWeek <= 5) { // Thu-Fri
-        plan = isOddWeek ? W2_PLAN : W4_PLAN;
-        planName = isOddWeek ? "W2" : "W4";
-      } else if (dayOfWeek === 6) { // Saturday
-        // Shoulders & Legs day, use the same progression as Wednesday
-        plan = isOddWeek ? W1_PLAN : W3_PLAN;
-        planName = isOddWeek ? "W1" : "W3";
-      }
-  
-      if (!plan) return prevLogs;
-  
-      const muscleGroupsForDay = dailyMuscleGroups[dayOfWeek];
-      if (!muscleGroupsForDay || muscleGroupsForDay.length === 0) return prevLogs;
-      
       const exercisesToAdd: WorkoutExercise[] = [];
-      muscleGroupsForDay.forEach(muscleGroup => {
-        const exerciseNames = (plan as any)[muscleGroup] as string[];
-        if (exerciseNames) {
-          exerciseNames.forEach(exName => {
-            const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
-            if (definition && !exercisesToAdd.some(e => e.definitionId === definition.id)) {
+      let toastDescription = "";
+      
+      if (workoutMode === 'two-muscle') {
+          const weekOfMonth = getWeekOfMonth(selectedDate, { weekStartsOn: 1 });
+          const isOddWeek = weekOfMonth % 2 !== 0; // Weeks 1, 3, 5...
+    
+          let plan: typeof W1_PLAN | null = null;
+          let planName = "";
+    
+          if (dayOfWeek >= 1 && dayOfWeek <= 3) { // Mon-Wed
+            plan = isOddWeek ? W1_PLAN : W3_PLAN;
+            planName = isOddWeek ? "W1" : "W3";
+          } else if (dayOfWeek >= 4 && dayOfWeek <= 5) { // Thu-Fri
+            plan = isOddWeek ? W2_PLAN : W4_PLAN;
+            planName = isOddWeek ? "W2" : "W4";
+          } else if (dayOfWeek === 6) { // Saturday
+            plan = isOddWeek ? W1_PLAN : W3_PLAN; // Follows Wednesday's progression
+            planName = isOddWeek ? "W1" : "W3";
+          }
+    
+          if (!plan) return prevLogs;
+    
+          const muscleGroupsForDay = dailyMuscleGroups[dayOfWeek];
+          if (!muscleGroupsForDay || muscleGroupsForDay.length === 0) return prevLogs;
+          
+          toastDescription = `Added ${planName} exercises for ${muscleGroupsForDay.join(' & ')}.`;
+          muscleGroupsForDay.forEach(muscleGroup => {
+            const exerciseNames = (plan as any)[muscleGroup] as string[];
+            if (exerciseNames) {
+              exerciseNames.forEach(exName => {
+                const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
+                if (definition && !exercisesToAdd.some(e => e.definitionId === definition.id)) {
+                  exercisesToAdd.push({
+                    id: `${definition.id}-${Date.now()}-${Math.random()}`,
+                    definitionId: definition.id,
+                    name: definition.name,
+                    category: definition.category,
+                    loggedSets: [],
+                    targetSets: DEFAULT_TARGET_SETS,
+                    targetReps: DEFAULT_TARGET_REPS,
+                  });
+                }
+              });
+            }
+          });
+      } else { // 'one-muscle' mode
+          const muscleGroupForDay = singleMuscleDailySchedule[dayOfWeek];
+          if (!muscleGroupForDay) return prevLogs;
+
+          toastDescription = `Added 6 exercises for ${muscleGroupForDay}.`;
+          const exercisesForMuscle = exerciseDefinitions
+            .filter(def => def.category === muscleGroupForDay)
+            .slice(0, 6);
+
+          if (exercisesForMuscle.length === 0) return prevLogs;
+
+          exercisesForMuscle.forEach(definition => {
               exercisesToAdd.push({
                 id: `${definition.id}-${Date.now()}-${Math.random()}`,
                 definitionId: definition.id,
@@ -296,16 +349,14 @@ function WorkoutPageContent() {
                 targetSets: DEFAULT_TARGET_SETS,
                 targetReps: DEFAULT_TARGET_REPS,
               });
-            }
           });
-        }
-      });
-  
+      }
+
       if (exercisesToAdd.length > 0) {
         const newDatedWorkout: DatedWorkout = { id: dateKey, date: dateKey, exercises: exercisesToAdd };
         toast({ 
           title: "Workout Autopopulated!", 
-          description: `Added ${planName} exercises for ${muscleGroupsForDay.join(' & ')}.`
+          description: toastDescription
         });
         return [...prevLogs, newDatedWorkout];
       }
@@ -313,7 +364,7 @@ function WorkoutPageContent() {
       return prevLogs;
     });
   
-  }, [selectedDate, currentUser, exerciseDefinitions, toast]);
+  }, [selectedDate, currentUser, exerciseDefinitions, toast, workoutMode]);
 
 
   const currentDatedWorkout = useMemo(() => {
@@ -334,8 +385,12 @@ function WorkoutPageContent() {
 
   const muscleGroupsForSelectedDay = useMemo(() => {
     const dayOfWeek = getDay(selectedDate);
+    if (workoutMode === 'one-muscle') {
+        const muscle = singleMuscleDailySchedule[dayOfWeek];
+        return muscle ? [muscle] : [];
+    }
     return dailyMuscleGroups[dayOfWeek] || [];
-  }, [selectedDate]);
+  }, [selectedDate, workoutMode]);
 
   const handleCategoryFilterChange = (category: ExerciseCategory) => {
     setSelectedCategories(prev => 
@@ -578,6 +633,24 @@ function WorkoutPageContent() {
               </div>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
+               <div className="space-y-2">
+                 <Label>Workout Plan</Label>
+                 <RadioGroup
+                   value={workoutMode}
+                   onValueChange={(value) => setWorkoutMode(value as WorkoutMode)}
+                   className="flex gap-4"
+                 >
+                   <div className="flex items-center space-x-2">
+                     <RadioGroupItem value="two-muscle" id="r1" />
+                     <Label htmlFor="r1" className="font-normal">Two Muscles / Day</Label>
+                   </div>
+                   <div className="flex items-center space-x-2">
+                     <RadioGroupItem value="one-muscle" id="r2" />
+                     <Label htmlFor="r2" className="font-normal">One Muscle / Day</Label>
+                   </div>
+                 </RadioGroup>
+               </div>
+               <Separator />
               <form onSubmit={handleAddExerciseDefinition} className="space-y-3">
                 <Input type="text" placeholder="New exercise name" value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} aria-label="New exercise name" className="h-10" />
                 <Select value={newExerciseCategory} onValueChange={(value) => setNewExerciseCategory(value as ExerciseCategory)}>
@@ -689,7 +762,3 @@ function WorkoutPageContent() {
 export default function Page() {
   return ( <AuthGuard> <WorkoutPageContent /> </AuthGuard> );
 }
-
-    
-
-    

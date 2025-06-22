@@ -1,4 +1,5 @@
 
+
 export type ExerciseCategory = 
   | "Chest" 
   | "Triceps" 
@@ -58,3 +59,5 @@ export interface LocalUser {
   // In a real app, password would be hashed. For this prototype, it's stored as is.
   // This is NOT secure for production.
 }
+
+export type WorkoutMode = 'one-muscle' | 'two-muscle';
