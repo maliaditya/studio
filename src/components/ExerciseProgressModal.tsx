@@ -33,20 +33,20 @@ interface ExerciseProgressModalProps {
 }
 
 interface ChartDataPoint {
-  date: string; // Formatted for X-axis display e.g., "MMM dd"
-  fullDate: string; // For tooltip
-  timestamp: number; // For sorting
+  date: string;
+  fullDate: string;
+  timestamp: number;
   maxWeight: number;
-  repsAtMaxWeight: number;
+  totalVolume: number;
 }
 
 const chartConfig = {
   maxWeight: {
-    label: "Max Weight",
+    label: "Max Weight (kg/lb)",
     color: "hsl(var(--primary))",
   },
-  repsAtMaxWeight: {
-    label: "Reps at Max Weight",
+  totalVolume: {
+    label: "Total Volume (kg/lb)",
     color: "hsl(var(--accent))",
   }
 } satisfies ChartConfig;
@@ -91,46 +91,40 @@ export function ExerciseProgressModal({
 
   const graphData = useMemo((): ChartDataPoint[] => {
     if (!exercise) return [];
-    
-    const dailyMetrics: Record<string, { dateObj: Date; maxWeight: number; repsAtMaxWeight: number }> = {};
 
-    allWorkoutLogs.forEach(datedLog => {
+    const dailyMetrics: Record<string, { dateObj: Date; maxWeight: number; totalVolume: number; }> = {};
+
+    allWorkoutLogs.forEach((datedLog) => {
       const dateKey = datedLog.date; // yyyy-MM-dd
-      datedLog.exercises.forEach(ex => {
-        if (ex.definitionId === exercise.id) {
-          ex.loggedSets.forEach(set => {
-            if (!dailyMetrics[dateKey]) {
-              dailyMetrics[dateKey] = { 
-                dateObj: parseISO(datedLog.date), 
-                maxWeight: 0, 
-                repsAtMaxWeight: 0 
-              };
-            }
-            
-            const currentEntry = dailyMetrics[dateKey];
-            if (set.weight > currentEntry.maxWeight) {
-              currentEntry.maxWeight = set.weight;
-              currentEntry.repsAtMaxWeight = set.reps;
-            } else if (set.weight === currentEntry.maxWeight) {
-              if (set.reps > currentEntry.repsAtMaxWeight) {
-                currentEntry.repsAtMaxWeight = set.reps;
-              }
+      datedLog.exercises.forEach((ex) => {
+        if (ex.definitionId === exercise.id && ex.loggedSets.length > 0) {
+          if (!dailyMetrics[dateKey]) {
+            dailyMetrics[dateKey] = {
+              dateObj: parseISO(datedLog.date),
+              maxWeight: 0,
+              totalVolume: 0,
+            };
+          }
+
+          ex.loggedSets.forEach((set) => {
+            dailyMetrics[dateKey].totalVolume += set.reps * set.weight;
+            if (set.weight > dailyMetrics[dateKey].maxWeight) {
+              dailyMetrics[dateKey].maxWeight = set.weight;
             }
           });
         }
       });
     });
-    
+
     return Object.values(dailyMetrics)
-      .filter(metric => metric.maxWeight > 0) // Only include days where the exercise was actually done
-      .map(metric => ({
-        date: format(metric.dateObj, 'MMM dd'),
-        fullDate: format(metric.dateObj, 'PPP'),
+      .map((metric) => ({
+        date: format(metric.dateObj, "MMM dd"),
+        fullDate: format(metric.dateObj, "PPP"),
         timestamp: metric.dateObj.getTime(),
         maxWeight: metric.maxWeight,
-        repsAtMaxWeight: metric.repsAtMaxWeight,
+        totalVolume: Math.round(metric.totalVolume), // Round to nearest integer
       }))
-      .sort((a, b) => a.timestamp - b.timestamp); // Sort by date ascending for the chart
+      .sort((a, b) => a.timestamp - b.timestamp);
   }, [exercise, allWorkoutLogs]);
 
   if (!exercise) return null;
@@ -243,9 +237,9 @@ export function ExerciseProgressModal({
                     tickLine={false}
                     axisLine={false}
                     tickMargin={8}
-                    domain={['dataMin - 2', 'dataMax + 2']} // Adjust domain for reps
-                    label={{ value: "Reps", angle: 90, position: "insideRight", offset: 10, style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' } }}
-                    stroke="var(--color-repsAtMaxWeight)"
+                    domain={['dataMin - 50', 'dataMax + 50']} // Adjust domain for volume
+                    label={{ value: "Total Volume", angle: 90, position: "insideRight", offset: 10, style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' } }}
+                    stroke="var(--color-totalVolume)"
                   />
                    <RechartsTooltip
                     cursor={false}
@@ -292,18 +286,18 @@ export function ExerciseProgressModal({
                   />
                   <Line
                     yAxisId="right"
-                    dataKey="repsAtMaxWeight"
+                    dataKey="totalVolume"
                     type="monotone"
-                    stroke="var(--color-repsAtMaxWeight)"
+                    stroke="var(--color-totalVolume)"
                     strokeWidth={2}
                     dot={{
-                      fill: "var(--color-repsAtMaxWeight)",
+                      fill: "var(--color-totalVolume)",
                       r: 4,
                     }}
                     activeDot={{
                       r: 6,
                     }}
-                    name="repsAtMaxWeight" // Name for tooltip
+                    name="totalVolume" // Name for tooltip
                   />
                 </LineChart>
               </ChartContainer>
@@ -314,4 +308,3 @@ export function ExerciseProgressModal({
     </Dialog>
   );
 }
-
