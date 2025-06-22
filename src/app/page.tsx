@@ -151,8 +151,8 @@ const dailyMuscleGroups: Record<number, string[]> = {
   3: ["Shoulders", "Legs"],// Wednesday
   4: ["Chest", "Triceps"], // Thursday
   5: ["Back", "Biceps"],   // Friday
+  6: ["Shoulders", "Legs"], // Saturday
   0: [], // Sunday
-  6: [], // Saturday
 };
 
 function WorkoutPageContent() {
@@ -258,16 +258,21 @@ function WorkoutPageContent() {
   
       const weekOfMonth = getWeekOfMonth(selectedDate, { weekStartsOn: 1 });
       const dayOfWeek = getDay(selectedDate);
+      const isOddWeek = weekOfMonth % 2 !== 0; // Weeks 1, 3, 5...
   
       let plan: typeof W1_PLAN | null = null;
       let planName = "";
   
       if (dayOfWeek >= 1 && dayOfWeek <= 3) { // Mon-Wed
-        if (weekOfMonth === 1 || weekOfMonth === 3) { plan = W1_PLAN; planName="W1"; }
-        if (weekOfMonth === 2 || weekOfMonth === 4) { plan = W3_PLAN; planName="W3"; }
+        plan = isOddWeek ? W1_PLAN : W3_PLAN;
+        planName = isOddWeek ? "W1" : "W3";
       } else if (dayOfWeek >= 4 && dayOfWeek <= 5) { // Thu-Fri
-        if (weekOfMonth === 1 || weekOfMonth === 3) { plan = W2_PLAN; planName="W2"; }
-        if (weekOfMonth === 2 || weekOfMonth === 4) { plan = W4_PLAN; planName="W4"; }
+        plan = isOddWeek ? W2_PLAN : W4_PLAN;
+        planName = isOddWeek ? "W2" : "W4";
+      } else if (dayOfWeek === 6) { // Saturday
+        // Shoulders & Legs day, use the same progression as Wednesday
+        plan = isOddWeek ? W1_PLAN : W3_PLAN;
+        planName = isOddWeek ? "W1" : "W3";
       }
   
       if (!plan) return prevLogs;
@@ -672,5 +677,7 @@ function WorkoutPageContent() {
 export default function Page() {
   return ( <AuthGuard> <WorkoutPageContent /> </AuthGuard> );
 }
+
+    
 
     
