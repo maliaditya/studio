@@ -696,7 +696,7 @@ function WorkoutPageContent() {
               ) : filteredExerciseDefinitions.length === 0 ? (
                 <p className="text-muted-foreground text-sm text-center py-4">Library empty. Add exercises!</p>
               ) : (
-                <ul className="space-y-2 max-h-[calc(50vh-100px)] overflow-y-auto pr-1">
+                <ul className="space-y-2 max-h-[65vh] overflow-y-auto pr-1">
                   <AnimatePresence>
                     {filteredExerciseDefinitions.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
                       <motion.li key={def.id} layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} className="p-3 bg-card border rounded-lg shadow-sm">
@@ -768,7 +768,7 @@ function WorkoutPageContent() {
                         <p className="text-sm text-muted-foreground/80">Add exercises from library or select a weekday!</p>
                     </div>
                   ) : (
-                    <div className="space-y-6 max-h-[calc(50vh-100px)] overflow-y-auto pr-2">
+                    <div className="space-y-6 max-h-[65vh] overflow-y-auto pr-2">
                       <AnimatePresence>
                       {currentWorkoutExercises.map(exercise => (
                           <WorkoutExerciseCard 
@@ -796,3 +796,5 @@ function WorkoutPageContent() {
 export default function Page() {
   return ( <AuthGuard> <WorkoutPageContent /> </AuthGuard> );
 }
+
+    
