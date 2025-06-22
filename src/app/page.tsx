@@ -696,7 +696,7 @@ function WorkoutPageContent() {
               ) : filteredExerciseDefinitions.length === 0 ? (
                 <p className="text-muted-foreground text-sm text-center py-4">Library empty. Add exercises!</p>
               ) : (
-                <ul className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+                <ul className="space-y-2 max-h-[48vh] overflow-y-auto pr-1">
                   <AnimatePresence>
                     {filteredExerciseDefinitions.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
                       <motion.li key={def.id} layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} className="p-3 bg-card border rounded-lg shadow-sm">
