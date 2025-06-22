@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2 } from 'lucide-react';
+import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { format, parseISO, getDay } from 'date-fns';
+import { format, parseISO, getDay, getWeekOfMonth } from 'date-fns';
 import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
@@ -27,17 +27,21 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
-const DEFAULT_TARGET_SETS = 3;
-const DEFAULT_TARGET_REPS = "10-15";
+
+const DEFAULT_TARGET_SETS = 4;
+const DEFAULT_TARGET_REPS = "8-12";
 const DEFAULT_EXERCISE_CATEGORY: ExerciseCategory = "Other";
 
-const dailyCategoryMap: Record<number, ExerciseCategory[]> = {
-  0: [], 1: ["Chest", "Triceps"], 2: ["Back", "Biceps"], 3: ["Shoulders", "Legs"],
-  4: ["Chest", "Triceps"], 5: ["Back", "Biceps"], 6: ["Shoulders", "Legs"],
-};
-
+// A comprehensive default list based on the provided workout plans
 const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
+  // Chest
   { id: 'def_chest_01', name: "Flat Barbell Bench Press", category: "Chest" },
   { id: 'def_chest_02', name: "Incline Barbell Press", category: "Chest" },
   { id: 'def_chest_03', name: "Decline Dumbbell Press", category: "Chest" },
@@ -47,17 +51,18 @@ const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
   { id: 'def_chest_07', name: "Cable Fly", category: "Chest" },
   { id: 'def_chest_08', name: "Dumbbell Chest Fly", category: "Chest" },
   { id: 'def_chest_09', name: "Dumbbell Pullovers", category: "Chest" },
+  // Triceps
   { id: 'def_triceps_01', name: "Close-Grip Barbell Bench Press", category: "Triceps" },
   { id: 'def_triceps_02', name: "Overhead Dumbbell Extension", category: "Triceps" },
   { id: 'def_triceps_03', name: "Dumbbell Kickback", category: "Triceps" },
   { id: 'def_triceps_04', name: "Cable Rope Pushdown (Slow)", category: "Triceps" },
-  { id: 'def_triceps_05', name: "Overhead Cable Extension", category: "Triceps" },
-  { id: 'def_triceps_06', name: "Reverse-grip pushdown", category: "Triceps" },
-  { id: 'def_triceps_07', name: "Rope Pushdown", category: "Triceps" },
-  { id: 'def_triceps_08', name: "Double-Arm Dumbbell Kickback", category: "Triceps" },
-  { id: 'def_triceps_09', name: "Straight bar pushdown", category: "Triceps" },
-  { id: 'def_triceps_10', name: "Reverse Bar Pushdown", category: "Triceps" },
-  { id: 'def_triceps_11', name: "Back dips", category: "Triceps" },
+  { id: 'def_triceps_05', name: "Overhead Bar extension", category: "Triceps" },
+  { id: 'def_triceps_06', name: "Rope Pushdown", category: "Triceps" },
+  { id: 'def_triceps_07', name: "Overhead Cable Extension", category: "Triceps" },
+  { id: 'def_triceps_08', name: "Straight bar pushdown", category: "Triceps" },
+  { id: 'def_triceps_09', name: "Reversebar pushdown", category: "Triceps" },
+  { id: 'def_triceps_10', name: "Back dips", category: "Triceps" },
+  // Back
   { id: 'def_back_01', name: "Lat Pulldown", category: "Back" },
   { id: 'def_back_02', name: "Machine Row", category: "Back" },
   { id: 'def_back_03', name: "T-Bar Row", category: "Back" },
@@ -68,7 +73,9 @@ const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
   { id: 'def_back_08', name: "Back extensions", category: "Back" },
   { id: 'def_back_09', name: "Barbell Row", category: "Back" },
   { id: 'def_back_10', name: "Seated Row", category: "Back" },
-  { id: 'def_back_11', name: "DeadLifts", category: "Back" },
+  { id: 'def_back_11', name: "V handle pulldown Cable", category: "Back" },
+  { id: 'def_back_12', name: "DeadLifts", category: "Back" },
+  // Biceps
   { id: 'def_biceps_01', name: "Standing dumbbell curls", category: "Biceps" },
   { id: 'def_biceps_02', name: "Standing Dumbbell Alternating Curl", category: "Biceps" },
   { id: 'def_biceps_03', name: "Preacher curls Dumbbells", category: "Biceps" },
@@ -82,6 +89,7 @@ const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
   { id: 'def_biceps_11', name: "Reversed cable curls", category: "Biceps" },
   { id: 'def_biceps_12', name: "Seated Machine Curls", category: "Biceps" },
   { id: 'def_biceps_13', name: "Cable Curls", category: "Biceps" },
+  // Shoulders
   { id: 'def_shoulders_01', name: "Seated Dumbbell Shoulder Press", category: "Shoulders" },
   { id: 'def_shoulders_02', name: "Standing Dumbbell Lateral Raise", category: "Shoulders" },
   { id: 'def_shoulders_03', name: "Face Pulls", category: "Shoulders" },
@@ -92,6 +100,7 @@ const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
   { id: 'def_shoulders_08', name: "Dumbbell Lateral Raise (Lean in)", category: "Shoulders" },
   { id: 'def_shoulders_09', name: "Lean-Away Cable Lateral Raise", category: "Shoulders" },
   { id: 'def_shoulders_10', name: "Front Raise cable", category: "Shoulders" },
+  // Legs
   { id: 'def_legs_01', name: "Walking Lunges (Barbell)", category: "Legs" },
   { id: 'def_legs_02', name: "Leg Press", category: "Legs" },
   { id: 'def_legs_03', name: "Quads Machine", category: "Legs" },
@@ -100,6 +109,51 @@ const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
   { id: 'def_legs_06', name: "Calfs (Bodyweight)", category: "Legs" },
 ];
 
+const W1_PLAN = {
+  Chest: ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine"],
+  Triceps: ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Cable Rope Pushdown (Slow)"],
+  Back: ["Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull"],
+  Biceps: ["Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"],
+  Shoulders: ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Shrugs"],
+  Legs: ["Walking Lunges (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine"]
+};
+
+const W2_PLAN = {
+  Chest: ["Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Cable Fly"],
+  Triceps: ["Overhead Dumbbell Extension", "Overhead Bar extension", "Rope Pushdown", "Dumbbell Kickback"],
+  Back: ["Lat Pulldown (Wide Grip)", "V handle lat pulldown", "1-Arm Dumbbell Row", "Back extensions"],
+  Biceps: ["Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Reverse Cable"],
+  Shoulders: ["Seated Dumbbell Shoulder Press", "Seated Dumbbell Lateral Raise", "Rear Delt Fly (Incline Bench)", "Cable Upright Rows"],
+  Legs: ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"]
+};
+
+const W3_PLAN = {
+  Chest: ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine"],
+  Triceps: ["Overhead Cable Extension", "Straight bar pushdown", "Reversebar pushdown", "Back dips"],
+  Back: ["Lat Pulldown", "Barbell Row", "Seated Row", "Lat Prayer Pull"],
+  Biceps: ["Strict bar curls", "Reversed Incline curls", "Cable Curls Superset", "Reversed cable curls"],
+  Shoulders: ["Seated Dumbbell Shoulder Press", "Dumbbell Lateral Raise (Lean in)", "Face Pulls", "Shrugs"],
+  Legs: ["Leg Press", "Quads Machine", "Hamstring machine", "Calfs (Bodyweight)"]
+};
+
+const W4_PLAN = {
+  Chest: ["Dumbbell Flat Press", "Incline Dumbbell Press", "Dumbbell Pullovers", "Cable Fly"],
+  Triceps: ["Overhead Cable Extension", "Straight bar pushdown", "Reversebar pushdown", "Back dips"],
+  Back: ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle pulldown Cable", "DeadLifts"],
+  Biceps: ["Seated Machine Curls", "Cable Curls", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"],
+  Shoulders: ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable"],
+  Legs: ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"]
+};
+
+const dailyMuscleGroups: Record<number, string[]> = {
+  1: ["Chest", "Triceps"], // Monday
+  2: ["Back", "Biceps"],   // Tuesday
+  3: ["Shoulders", "Legs"],// Wednesday
+  4: ["Chest", "Triceps"], // Thursday
+  5: ["Back", "Biceps"],   // Friday
+  0: [], // Sunday
+  6: [], // Saturday
+};
 
 function WorkoutPageContent() {
   const { toast } = useToast();
@@ -121,7 +175,6 @@ function WorkoutPageContent() {
   const [selectedCategories, setSelectedCategories] = useState<ExerciseCategory[]>([]);
   
   const [isLoadingPage, setIsLoadingPage] = useState(true);
-
 
   useEffect(() => {
     if (currentUser?.username) {
@@ -172,12 +225,12 @@ function WorkoutPageContent() {
       setExerciseDefinitions([]);
       setAllWorkoutLogs([]);
     }
-    const timer = setTimeout(() => setIsLoadingPage(false), 300); // Brief delay for perceived loading
+    const timer = setTimeout(() => setIsLoadingPage(false), 300);
     return () => clearTimeout(timer);
   }, [currentUser]);
 
   useEffect(() => {
-    if (currentUser?.username && !isLoadingPage) { // Only save after initial load
+    if (currentUser?.username && !isLoadingPage) {
       try {
         const defsKey = `exerciseDefinitions_${currentUser.username}`;
         const logsKey = `allWorkoutLogs_${currentUser.username}`;
@@ -193,14 +246,69 @@ function WorkoutPageContent() {
 
 
   useEffect(() => {
-    if (selectedDate) {
-      const dayOfWeek = getDay(selectedDate);
-      const categoriesForDay = dailyCategoryMap[dayOfWeek];
-      if (categoriesForDay && JSON.stringify(categoriesForDay) !== JSON.stringify(selectedCategories)) {
-        setSelectedCategories(categoriesForDay);
+    if (!currentUser || exerciseDefinitions.length === 0) return;
+  
+    const dateKey = format(selectedDate, 'yyyy-MM-dd');
+  
+    setAllWorkoutLogs(prevLogs => {
+      const workoutExists = prevLogs.some(log => log.id === dateKey);
+      if (workoutExists) {
+        return prevLogs; // Don't modify if workout already exists
       }
-    }
-  }, [selectedDate, selectedCategories]);
+  
+      const weekOfMonth = getWeekOfMonth(selectedDate, { weekStartsOn: 1 });
+      const dayOfWeek = getDay(selectedDate);
+  
+      let plan: typeof W1_PLAN | null = null;
+      let planName = "";
+  
+      if (dayOfWeek >= 1 && dayOfWeek <= 3) { // Mon-Wed
+        if (weekOfMonth === 1 || weekOfMonth === 3) { plan = W1_PLAN; planName="W1/W1"; }
+        if (weekOfMonth === 2 || weekOfMonth === 4) { plan = W3_PLAN; planName="W3/W3"; }
+      } else if (dayOfWeek >= 4 && dayOfWeek <= 5) { // Thu-Fri
+        if (weekOfMonth === 1 || weekOfMonth === 3) { plan = W2_PLAN; planName="W2/W2"; }
+        if (weekOfMonth === 2 || weekOfMonth === 4) { plan = W4_PLAN; planName="W4/W4"; }
+      }
+  
+      if (!plan) return prevLogs;
+  
+      const muscleGroupsForDay = dailyMuscleGroups[dayOfWeek];
+      if (!muscleGroupsForDay || muscleGroupsForDay.length === 0) return prevLogs;
+      
+      const exercisesToAdd: WorkoutExercise[] = [];
+      muscleGroupsForDay.forEach(muscleGroup => {
+        const exerciseNames = (plan as any)[muscleGroup] as string[];
+        if (exerciseNames) {
+          exerciseNames.forEach(exName => {
+            const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
+            if (definition && !exercisesToAdd.some(e => e.definitionId === definition.id)) {
+              exercisesToAdd.push({
+                id: `${definition.id}-${Date.now()}-${Math.random()}`,
+                definitionId: definition.id,
+                name: definition.name,
+                category: definition.category,
+                loggedSets: [],
+                targetSets: DEFAULT_TARGET_SETS,
+                targetReps: DEFAULT_TARGET_REPS,
+              });
+            }
+          });
+        }
+      });
+  
+      if (exercisesToAdd.length > 0) {
+        const newDatedWorkout: DatedWorkout = { id: dateKey, date: dateKey, exercises: exercisesToAdd };
+        toast({ 
+          title: "Workout Autopopulated!", 
+          description: `Added ${planName} exercises for ${muscleGroupsForDay.join(' & ')}.`
+        });
+        return [...prevLogs, newDatedWorkout];
+      }
+  
+      return prevLogs;
+    });
+  
+  }, [selectedDate, currentUser, exerciseDefinitions, toast]);
 
 
   const currentDatedWorkout = useMemo(() => {
@@ -337,7 +445,7 @@ function WorkoutPageContent() {
     if (existingWorkout) {
       const updatedExercises = existingWorkout.exercises.filter(ex => ex.id !== exerciseId);
       const exerciseName = existingWorkout.exercises.find(ex => ex.id === exerciseId)?.name;
-      if (updatedExercises.length === 0 && !existingWorkout.notes) { 
+      if (updatedExercises.length === 0) { 
         setAllWorkoutLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
       } else {
         updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
@@ -411,7 +519,19 @@ function WorkoutPageContent() {
         <h1 className="text-3xl sm:text-4xl font-bold text-primary">
           Daily Workout Log
         </h1>
-        <p className="text-muted-foreground mt-1 text-md">Log your gains, {currentUser?.username || "Guest"}.</p>
+        <div className="flex justify-center items-center gap-2">
+           <p className="text-muted-foreground mt-1 text-md">Log your gains, {currentUser?.username || "Guest"}.</p>
+           <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p>Workouts are auto-populated based on a 4-week schedule.<br/> You can still add, remove, and log exercises manually.</p>
+                </TooltipContent>
+            </Tooltip>
+           </TooltipProvider>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
@@ -523,7 +643,7 @@ function WorkoutPageContent() {
                     <div className="text-center py-10">
                         <GripVertical className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
                         <p className="text-muted-foreground">No exercises for {format(selectedDate, 'PPP')}.</p>
-                        <p className="text-sm text-muted-foreground/80">Add exercises from library!</p>
+                        <p className="text-sm text-muted-foreground/80">Add exercises from library or select a weekday!</p>
                     </div>
                   ) : (
                     <AnimatePresence>
