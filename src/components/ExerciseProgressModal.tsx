@@ -22,7 +22,7 @@ import { format, parseISO } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { LineChart as LineChartIcon, TableIcon } from 'lucide-react';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from '@/components/ui/chart';
+import { ChartContainer, ChartConfig } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 
 interface ExerciseProgressModalProps {
@@ -30,14 +30,6 @@ interface ExerciseProgressModalProps {
   onOpenChange: (isOpen: boolean) => void;
   exercise: ExerciseDefinition | null;
   allWorkoutLogs: DatedWorkout[];
-}
-
-interface ChartDataPoint {
-  date: string;
-  fullDate: string;
-  timestamp: number;
-  maxWeight: number;
-  totalVolume: number;
 }
 
 const chartConfig = {
@@ -50,6 +42,55 @@ const chartConfig = {
     color: "hsl(var(--accent))",
   }
 } satisfies ChartConfig;
+
+const CustomChartTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+        const data = payload[0].payload; // The full data point for the hovered item
+        
+        return (
+            <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                {/* Date */}
+                <div className="font-medium text-foreground">{data.fullDate}</div>
+                
+                {/* Main metrics (Max Weight, Total Volume) */}
+                <div className="grid gap-1.5">
+                    {payload.map((p: any, index: number) => {
+                         const configItem = chartConfig[p.name as keyof typeof chartConfig];
+                         return (
+                            <div key={index} className="flex w-full items-center gap-2">
+                                 <div
+                                    className="w-2.5 h-2.5 shrink-0 rounded-[2px]"
+                                    style={{ backgroundColor: configItem?.color }}
+                                />
+                                <div className="flex flex-1 justify-between">
+                                    <span className="text-muted-foreground">{configItem?.label}</span>
+                                    <span className="font-mono font-medium text-foreground">{p.value.toLocaleString()}</span>
+                                </div>
+                            </div>
+                         )
+                    })}
+                </div>
+                
+                {/* Sets List */}
+                {data.sets && data.sets.length > 0 && (
+                     <div className="mt-2 pt-2 border-t">
+                        <p className="font-medium text-foreground mb-1">Sets Logged:</p>
+                        <ul className="space-y-1">
+                            {data.sets.slice().sort((a: LoggedSet, b: LoggedSet) => a.timestamp - b.timestamp).map((set: LoggedSet, index: number) => (
+                                <li key={index} className="flex justify-between text-muted-foreground">
+                                   <span>Set {index + 1}:</span> 
+                                   <span className="font-mono font-medium">{set.reps}r x {set.weight}kg/lb</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+            </div>
+        )
+    }
+    return null;
+}
+
 
 export function ExerciseProgressModal({
   isOpen,
@@ -89,10 +130,15 @@ export function ExerciseProgressModal({
       .sort((a, b) => b.originalDate.getTime() - a.originalDate.getTime());
   }, [exercise, allWorkoutLogs]);
 
-  const graphData = useMemo((): ChartDataPoint[] => {
+  const graphData = useMemo(() => {
     if (!exercise) return [];
 
-    const dailyMetrics: Record<string, { dateObj: Date; maxWeight: number; totalVolume: number; }> = {};
+    const dailyMetrics: Record<string, { 
+      dateObj: Date; 
+      maxWeight: number; 
+      totalVolume: number;
+      sets: LoggedSet[];
+    }> = {};
 
     allWorkoutLogs.forEach((datedLog) => {
       const dateKey = datedLog.date; // yyyy-MM-dd
@@ -103,6 +149,7 @@ export function ExerciseProgressModal({
               dateObj: parseISO(datedLog.date),
               maxWeight: 0,
               totalVolume: 0,
+              sets: [],
             };
           }
 
@@ -111,6 +158,7 @@ export function ExerciseProgressModal({
             if (set.weight > dailyMetrics[dateKey].maxWeight) {
               dailyMetrics[dateKey].maxWeight = set.weight;
             }
+            dailyMetrics[dateKey].sets.push(set);
           });
         }
       });
@@ -123,6 +171,7 @@ export function ExerciseProgressModal({
         timestamp: metric.dateObj.getTime(),
         maxWeight: metric.maxWeight,
         totalVolume: Math.round(metric.totalVolume), // Round to nearest integer
+        sets: metric.sets,
       }))
       .sort((a, b) => a.timestamp - b.timestamp);
   }, [exercise, allWorkoutLogs]);
@@ -242,32 +291,8 @@ export function ExerciseProgressModal({
                     stroke="var(--color-totalVolume)"
                   />
                    <RechartsTooltip
-                    cursor={false}
-                    content={
-                      <ChartTooltipContent
-                        indicator="line"
-                        labelFormatter={(value, payload) => {
-                           if (payload && payload.length > 0 && payload[0].payload.fullDate) {
-                             return payload[0].payload.fullDate;
-                           }
-                           return value;
-                        }}
-                        formatter={(value, name) => {
-                          const configItem = chartConfig[name as keyof typeof chartConfig];
-                          return (
-                            <>
-                              <div className="flex items-center">
-                                <div
-                                  className="w-2.5 h-2.5 rounded-full mr-2"
-                                  style={{ backgroundColor: configItem?.color }}
-                                />
-                                <span>{configItem?.label}: {value}</span>
-                              </div>
-                            </>
-                          );
-                        }}
-                      />
-                    }
+                    cursor={true}
+                    content={<CustomChartTooltip />}
                   />
                   <Line
                     yAxisId="left"
