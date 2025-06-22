@@ -768,15 +768,22 @@ function WorkoutPageContent() {
                         <p className="text-sm text-muted-foreground/80">Add exercises from library or select a weekday!</p>
                     </div>
                   ) : (
-                    <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
+                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                       <AnimatePresence>
-                      {currentWorkoutExercises.map(exercise => (
-                          <WorkoutExerciseCard 
-                          key={exercise.id} exercise={exercise}
-                          onLogSet={handleLogSet} onDeleteSet={handleDeleteSet} onUpdateSet={handleUpdateSet}
-                          onRemoveExercise={handleRemoveExerciseFromWorkout}
-                          />
-                      ))}
+                      {currentWorkoutExercises.map(exercise => {
+                          const definition = exerciseDefinitions.find(def => def.id === exercise.definitionId);
+                          return (
+                            <WorkoutExerciseCard 
+                              key={exercise.id} 
+                              exercise={exercise}
+                              onLogSet={handleLogSet} 
+                              onDeleteSet={handleDeleteSet} 
+                              onUpdateSet={handleUpdateSet}
+                              onRemoveExercise={handleRemoveExerciseFromWorkout}
+                              onViewProgress={definition ? () => handleViewProgress(definition) : undefined}
+                            />
+                          );
+                      })}
                       </AnimatePresence>
                     </div>
                   )}

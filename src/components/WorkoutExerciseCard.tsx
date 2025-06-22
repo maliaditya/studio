@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Trash2, CheckSquare, Edit2, Save, X, Youtube } from 'lucide-react';
+import { PlusCircle, Trash2, CheckSquare, Edit2, Save, X, Youtube, TrendingUp } from 'lucide-react';
 import { WorkoutExercise, LoggedSet } from '@/types/workout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,7 @@ interface WorkoutExerciseCardProps {
   onDeleteSet: (exerciseId: string, setId: string) => void;
   onUpdateSet: (exerciseId: string, setId: string, reps: number, weight: number) => void;
   onRemoveExercise: (exerciseId: string) => void;
+  onViewProgress?: () => void;
 }
 
 export function WorkoutExerciseCard({
@@ -23,6 +24,7 @@ export function WorkoutExerciseCard({
   onDeleteSet,
   onUpdateSet,
   onRemoveExercise,
+  onViewProgress,
 }: WorkoutExerciseCardProps) {
   const [reps, setReps] = useState('');
   const [weight, setWeight] = useState('');
@@ -82,6 +84,11 @@ export function WorkoutExerciseCard({
             <CardTitle className="text-xl truncate" title={exercise.name}>{exercise.name}</CardTitle>
           </div>
           <div className="flex items-center flex-shrink-0">
+             {onViewProgress && (
+                <Button variant="ghost" size="icon" onClick={onViewProgress} aria-label={`View progress for ${exercise.name}`}>
+                    <TrendingUp className="h-5 w-5 text-muted-foreground hover:text-blue-500" />
+                </Button>
+            )}
              <Button variant="ghost" size="icon" onClick={handleSearchOnYouTube} aria-label={`Search ${exercise.name} on YouTube`}>
                 <Youtube className="h-5 w-5 text-muted-foreground hover:text-red-500" />
             </Button>
