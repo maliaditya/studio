@@ -768,7 +768,7 @@ function WorkoutPageContent() {
                         <p className="text-sm text-muted-foreground/80">Add exercises from library or select a weekday!</p>
                     </div>
                   ) : (
-                    <div className="space-y-6 max-h-[calc(100vh-330px)] overflow-y-auto pr-2">
+                    <div className="space-y-6 max-h-[calc(50vh-100px)] overflow-y-auto pr-2">
                       <AnimatePresence>
                       {currentWorkoutExercises.map(exercise => (
                           <WorkoutExerciseCard 
