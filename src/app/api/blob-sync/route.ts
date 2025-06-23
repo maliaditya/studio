@@ -1,5 +1,5 @@
 
-import { put, head } from '@vercel/blob';
+import { put, list } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -61,11 +61,17 @@ export async function GET(request: Request) {
   const blobPathname = `${username}-data.json`;
 
   try {
-    // To download a blob, we must fetch its URL from the server-side.
-    // First, check if the blob exists to avoid 404 errors.
-    const blobInfo = await head(blobPathname);
-    
-    // If head returns successfully, we can fetch the blob's content via its URL.
+    // Use `list` to check for the blob's existence. This is more reliable than
+    // catching a specific error message from `head`.
+    const { blobs } = await list({ prefix: blobPathname, limit: 1 });
+
+    // If the blobs array is empty, no data exists for this user.
+    if (blobs.length === 0 || blobs[0]?.pathname !== blobPathname) {
+        return NextResponse.json({ data: null, message: "No cloud data found for this user. This is expected for a first-time sync." }, { status: 200 });
+    }
+
+    // The blob exists, so we can get its URL and fetch the content.
+    const blobInfo = blobs[0];
     const response = await fetch(blobInfo.url);
     
     if (!response.ok) {
@@ -75,21 +81,15 @@ export async function GET(request: Request) {
     const textData = await response.text();
     
     // If the file from the blob is empty, it's not valid JSON.
-    // Treat it as if no data exists in the cloud.
     if (!textData) {
         return NextResponse.json({ data: null, message: "Cloud data is empty." });
     }
 
-    // Now that we have text, we can safely try to parse it.
     const userData = JSON.parse(textData);
     return NextResponse.json({ data: userData });
 
   } catch (error) {
-     // The `head` method throws a specific error when the blob is not found.
-     // We check for the Vercel Blob SDK's specific message or a generic '404'.
-     if (error instanceof Error && (error.message.includes('The requested blob does not exist') || error.message.includes('404'))) {
-        return NextResponse.json({ data: null, message: "No cloud data found for this user. This is expected for a first-time sync." }, { status: 200 });
-    }
+    // This will now only catch unexpected errors during list, fetch, or parse.
     console.error(`Blob storage read error for user ${username}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
     return NextResponse.json({ error: `Failed to read data from Blob storage: ${errorMessage}` }, { status: 500 });
