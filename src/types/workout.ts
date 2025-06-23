@@ -75,6 +75,7 @@ export interface EditableMealPlan {
   meal2: string;
   meal3: string;
   supplements: string;
+  totalCalories: number | null;
 }
 
 export type UserDietPlan = EditableMealPlan[];
