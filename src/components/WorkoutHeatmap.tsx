@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import CalendarHeatmap from 'react-calendar-heatmap';
-import { subYears, format, addDays, parse, addWeeks, differenceInDays } from 'date-fns';
+import { subYears, format, addDays, addWeeks, differenceInDays, setISOWeek, startOfISOWeek, parse } from 'date-fns';
 import type { DatedWorkout, WeightLog } from '@/types/workout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -138,13 +138,21 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
 
     const weightChartData = useMemo(() => {
       return weightLogs.map(log => {
-          const [year, weekNum] = log.date.split('-W');
-          return {
-              week: `W${weekNum}`,
-              weight: log.weight,
-              fullWeek: log.date,
-              dateObj: parse(log.date, "YYYY-'W'ww", new Date()),
-          }
+        const [year, weekNum] = log.date.split('-W');
+        
+        // Manually construct date from ISO week and year to avoid parsing issues
+        const yearNum = parseInt(year);
+        const weekNumValue = parseInt(weekNum);
+        // Jan 4th is always in the first ISO week, making it a safe reference point.
+        const jan4 = new Date(yearNum, 0, 4); 
+        const weekDate = startOfISOWeek(setISOWeek(jan4, weekNumValue));
+
+        return {
+            week: `W${weekNum}`,
+            weight: log.weight,
+            fullWeek: log.date,
+            dateObj: weekDate,
+        }
       }).sort((a,b) => a.dateObj.getTime() - b.dateObj.getTime());
     }, [weightLogs]);
 
@@ -547,3 +555,5 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
     </>
   );
 }
+
+    
