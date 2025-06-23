@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview An AI flow to calculate total calories and macronutrients for a day's meals.
@@ -41,6 +42,9 @@ Meal 3: {{{meal3}}}
 Analyze each meal description, estimate its calories and macronutrients, and provide a single total sum for each. Do not include supplements in the calculation unless they are explicitly part of a meal and have caloric value.
 
 Your response must be a valid JSON object containing the total calories, and the total grams for protein, carbs, fat, and fiber.`,
+  config: {
+    temperature: 0,
+  },
 });
 
 const calculateCaloriesFlow = ai.defineFlow(
