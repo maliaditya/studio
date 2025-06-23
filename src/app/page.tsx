@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus, Activity } from 'lucide-react';
+import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus, Activity, LineChart as LineChartIcon } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -49,6 +49,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Switch } from '@/components/ui/switch';
+import { WeightChartModal } from '@/components/WeightChartModal';
 
 
 const DEFAULT_TARGET_SETS = 4;
@@ -199,8 +200,7 @@ function WorkoutPageContent() {
   const [isLibraryExpanded, setIsLibraryExpanded] = useState(true);
 
   const [goalWeight, setGoalWeight] = useState<number | null>(null);
-  const [goalWeightInput, setGoalWeightInput] = useState('');
-  const [showProjection, setShowProjection] = useState(true);
+  const [isWeightChartModalOpen, setIsWeightChartModalOpen] = useState(false);
 
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   const [today, setToday] = useState<Date | null>(null);
@@ -376,7 +376,7 @@ function WorkoutPageContent() {
           const muscleGroupsForDay = dailyMuscleGroups[dayOfWeek];
           if (!muscleGroupsForDay || muscleGroupsForDay.length === 0) return prevLogs;
           
-          toastDescription = `Added ${planName} exercises for ${muscleGroupsForDay.join(' &amp; ')}.`;
+          toastDescription = `Added ${planName} exercises for ${muscleGroupsForDay.join(' & ')}.`;
           muscleGroupsForDay.forEach(muscleGroup => {
             const exerciseNames = (plan as any)[muscleGroup] as string[];
             if (exerciseNames) {
@@ -718,13 +718,11 @@ function WorkoutPageContent() {
     toast({ title: "Weight Deleted", description: `Weight log for week ${dateKey} has been removed.` });
   };
 
-  const handleSetGoalWeight = () => {
-    const goal = parseFloat(goalWeightInput);
+  const handleSetGoalWeight = (goal: number) => {
     if (!isNaN(goal) && goal > 0) {
         if (currentUser?.username) {
             setGoalWeight(goal);
             toast({ title: "Goal Set!", description: `Your new goal weight is ${goal} kg/lb.` });
-            setGoalWeightInput('');
         } else {
             toast({ title: "Error", description: "You must be logged in to set a goal.", variant: "destructive" });
         }
@@ -873,13 +871,6 @@ function WorkoutPageContent() {
           <WorkoutHeatmap
             allWorkoutLogs={allWorkoutLogs}
             onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
-            weightLogs={weightLogs}
-            onLogWeight={handleLogWeight}
-            onUpdateWeightLog={handleUpdateWeightLog}
-            onDeleteWeightLog={handleDeleteWeightLog}
-            selectedDate={selectedDate}
-            goalWeight={goalWeight}
-            showProjection={showProjection}
             consistencyData={consistencyData}
             oneYearAgo={oneYearAgo}
             today={today}
@@ -1021,23 +1012,14 @@ function WorkoutPageContent() {
                         <Target /> Weight Goal
                     </CardTitle>
                     <CardDescription>
-                        Set a target weight to track your progress.
+                       Track your progress and stay consistent.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="flex flex-col sm:flex-row gap-2 items-center">
-                        <Input
-                            type="number"
-                            placeholder="Enter your ideal weight (kg/lb)"
-                            value={goalWeightInput}
-                            onChange={(e) => setGoalWeightInput(e.target.value)}
-                            className="h-9 flex-grow"
-                        />
-                        <Button onClick={handleSetGoalWeight} disabled={!goalWeightInput} className="h-9 w-full sm:w-auto">
-                            Set Goal
-                        </Button>
-                    </div>
-
+                     <Button onClick={() => setIsWeightChartModalOpen(true)} className="w-full">
+                        <LineChartIcon className="mr-2 h-4 w-4" />
+                        Open Weight Chart & Set Goal
+                    </Button>
                     {(projectionSummary || latestConsistency) && (
                         <div className="space-y-4 pt-4 border-t">
                             {projectionSummary && (
@@ -1087,18 +1069,13 @@ function WorkoutPageContent() {
                             )}
                             
                             {latestConsistency !== null && (
-                                <div className="space-y-1 text-sm">
+                                <div className="space-y-1 text-sm pt-4 border-t">
                                     <div className="flex justify-between items-center">
                                         <span className="text-muted-foreground flex items-center gap-2"><Activity className="h-4 w-4" /> Workout Consistency</span>
                                         <span className="font-bold text-lg">{latestConsistency}%</span>
                                     </div>
                                 </div>
                             )}
-
-                             <div className="flex items-center justify-center space-x-2 pt-3 border-t">
-                                <Switch id="show-projection" checked={showProjection} onCheckedChange={setShowProjection} />
-                                <Label htmlFor="show-projection" className="text-sm">Show Projection on Chart</Label>
-                            </div>
                         </div>
                     )}
                 </CardContent>
@@ -1115,7 +1092,7 @@ function WorkoutPageContent() {
                           </CardTitle>
                           {muscleGroupsForSelectedDay.length > 0 && (
                               <p className="text-sm text-muted-foreground mt-1 ml-1">
-                                  Today's focus: {muscleGroupsForSelectedDay.join(' &amp; ')}
+                                  Today's focus: {muscleGroupsForSelectedDay.join(' & ')}
                               </p>
                           )}
                       </div>
@@ -1195,6 +1172,17 @@ function WorkoutPageContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <WeightChartModal
+        isOpen={isWeightChartModalOpen}
+        onOpenChange={setIsWeightChartModalOpen}
+        weightLogs={weightLogs}
+        goalWeight={goalWeight}
+        onLogWeight={handleLogWeight}
+        onUpdateWeightLog={handleUpdateWeightLog}
+        onDeleteWeightLog={handleDeleteWeightLog}
+        onSetGoalWeight={handleSetGoalWeight}
+      />
     </>
   );
 }
