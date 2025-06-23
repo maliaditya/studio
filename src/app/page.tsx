@@ -11,7 +11,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { format, parseISO, getDay, getWeekOfMonth } from 'date-fns';
+import { format, parseISO, getDay, getWeekOfMonth, isMonday, getYear, getISOWeek } from 'date-fns';
 import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
@@ -38,6 +38,16 @@ import { Label } from "@/components/ui/label";
 import { Separator } from '@/components/ui/separator';
 import { WorkoutHeatmap } from '@/components/WorkoutHeatmap';
 import { WorkoutPlanModal } from '@/components/WorkoutPlanModal';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 
 const DEFAULT_TARGET_SETS = 4;
@@ -201,7 +211,7 @@ const singleMuscleDailySchedule: Record<number, ExerciseCategory | null> = {
 
 function WorkoutPageContent() {
   const { toast } = useToast();
-  const { currentUser } = useAuth();
+  const { currentUser, exportData } = useAuth();
 
   const [workoutMode, setWorkoutMode] = useState<WorkoutMode>('two-muscle');
   const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
@@ -223,6 +233,9 @@ function WorkoutPageContent() {
 
   const [workoutPlans, setWorkoutPlans] = useState<AllWorkoutPlans>(INITIAL_PLANS);
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  
+  const [showBackupPrompt, setShowBackupPrompt] = useState(false);
+
 
   useEffect(() => {
     if (currentUser?.username) {
@@ -417,6 +430,36 @@ function WorkoutPageContent() {
   
   }, [selectedDate, currentUser, exerciseDefinitions, toast, workoutMode, workoutPlans]);
 
+  // Check for backup prompt on Mondays
+  useEffect(() => {
+      if (!currentUser) return;
+      
+      const today = new Date();
+      const year = getYear(today);
+      const week = getISOWeek(today);
+      const backupPromptKey = `backupPrompt_${year}-${week}`;
+
+      const hasBeenPrompted = localStorage.getItem(backupPromptKey);
+
+      if (isMonday(today) && !hasBeenPrompted) {
+          setShowBackupPrompt(true);
+      }
+
+  }, [currentUser]);
+
+  const markBackupPromptAsHandled = () => {
+    const today = new Date();
+    const year = getYear(today);
+    const week = getISOWeek(today);
+    const backupPromptKey = `backupPrompt_${year}-${week}`;
+    localStorage.setItem(backupPromptKey, 'true');
+    setShowBackupPrompt(false);
+  };
+
+  const handleBackupConfirm = () => {
+    exportData();
+    markBackupPromptAsHandled();
+  };
 
   const currentDatedWorkout = useMemo(() => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -630,214 +673,231 @@ function WorkoutPageContent() {
   }
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-      <div className="mb-6 text-center relative">
-        <h1 className="text-3xl sm:text-4xl font-bold text-primary">
-          Daily Workout Log
-        </h1>
-        <div className="flex justify-center items-center gap-2">
-           <p className="text-muted-foreground mt-1 text-md">Log your gains, {currentUser?.username || "Guest"}.</p>
-           <TooltipProvider>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent>
-                    <p>Workouts are auto-populated based on a 4-week schedule.<br/> You can still add, remove, and log exercises manually.</p>
-                </TooltipContent>
-            </Tooltip>
-           </TooltipProvider>
+    <>
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+        <div className="mb-6 text-center relative">
+          <h1 className="text-3xl sm:text-4xl font-bold text-primary">
+            Daily Workout Log
+          </h1>
+          <div className="flex justify-center items-center gap-2">
+            <p className="text-muted-foreground mt-1 text-md">Log your gains, {currentUser?.username || "Guest"}.</p>
+            <TooltipProvider>
+              <Tooltip>
+                  <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                      <p>Workouts are auto-populated based on a 4-week schedule.<br/> You can still add, remove, and log exercises manually.</p>
+                  </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
-      </div>
 
-      <div className="mb-8">
-        <WorkoutHeatmap allWorkoutLogs={allWorkoutLogs} onDateSelect={setSelectedDate} />
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-        <section aria-labelledby="exercise-library-heading" className="md:col-span-1 space-y-6">
-          <Card className="shadow-xl rounded-xl overflow-hidden">
-            <CardHeader className="bg-primary/10">
-              <div className="flex items-center justify-between">
-                <CardTitle id="exercise-library-heading" className="flex items-center gap-2 text-2xl text-primary">
-                  <Dumbbell /> Exercise Library
-                </CardTitle>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="ml-auto h-8">
-                      <FilterIcon className="h-4 w-4 mr-2" />
-                      Filter ({selectedCategories.length > 0 ? selectedCategories.length : "All"})
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {exerciseCategories.map((category) => (
-                      <DropdownMenuCheckboxItem
-                        key={category} checked={selectedCategories.includes(category)}
-                        onCheckedChange={() => handleCategoryFilterChange(category)}
-                        onSelect={(e) => e.preventDefault()} 
-                      > {category} </DropdownMenuCheckboxItem>
-                    ))}
-                    {selectedCategories.length > 0 && (
-                      <> <DropdownMenuSeparator />
-                        <Button variant="ghost" size="sm" className="w-full justify-start text-sm" onClick={() => setSelectedCategories([])}> Clear Filters </Button>
-                      </>)}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4 space-y-4">
-               <div className="space-y-2">
-                 <Label>Workout Plan</Label>
-                 <div className="flex items-center gap-4">
-                  <RadioGroup
-                    value={workoutMode}
-                    onValueChange={(value) => setWorkoutMode(value as WorkoutMode)}
-                    className="flex gap-4"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="two-muscle" id="r1" />
-                      <Label htmlFor="r1" className="font-normal">Two Muscles / Day</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="one-muscle" id="r2" />
-                      <Label htmlFor="r2" className="font-normal">One Muscle / Day</Label>
-                    </div>
-                  </RadioGroup>
-                  <Button variant="outline" size="sm" className="h-8" onClick={() => setIsPlanModalOpen(true)}>
-                    <Settings className="h-4 w-4 mr-2" />
-                    Edit Plans
-                  </Button>
-                 </div>
-               </div>
-               <Separator />
-              <form onSubmit={handleAddExerciseDefinition} className="space-y-3">
-                <Input type="text" placeholder="New exercise name" value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} aria-label="New exercise name" className="h-10" />
-                <Select value={newExerciseCategory} onValueChange={(value) => setNewExerciseCategory(value as ExerciseCategory)}>
-                  <SelectTrigger className="h-10"><SelectValue placeholder="Select category" /></SelectTrigger>
-                  <SelectContent>{exerciseCategories.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
-                </Select>
-                <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-10"> <PlusCircle className="mr-2 h-5 w-5" /> Add Exercise </Button>
-              </form>
-              <div className="max-h-[calc(100vh-38rem)] overflow-y-auto pr-1">
-                {filteredExerciseDefinitions.length === 0 && exerciseDefinitions.length > 0 ? (
-                  <p className="text-muted-foreground text-sm text-center py-4">No exercises match filter.</p>
-                ) : filteredExerciseDefinitions.length === 0 ? (
-                  <p className="text-muted-foreground text-sm text-center py-4">Library empty. Add exercises!</p>
-                ) : (
-                  <ul className="space-y-2">
-                    <AnimatePresence>
-                      {filteredExerciseDefinitions.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
-                        <motion.li key={def.id} layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} className="p-3 bg-card border rounded-lg shadow-sm">
-                          {editingDefinition?.id === def.id ? (
-                            <div className="space-y-2">
-                              <Input value={editingDefinitionName} onChange={(e) => setEditingDefinitionName(e.target.value)} className="h-9" aria-label="Edit exercise name"/>
-                              <Select value={editingDefinitionCategory} onValueChange={(value) => setEditingDefinitionCategory(value as ExerciseCategory)}>
-                                <SelectTrigger className="h-9"><SelectValue placeholder="Select category" /></SelectTrigger>
-                                <SelectContent>{exerciseCategories.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
-                              </Select>
-                              <div className="flex gap-2">
-                                <Button size="sm" onClick={handleSaveEditDefinition} className="flex-grow bg-green-600 hover:bg-green-500 text-white"><Save className="h-4 w-4 mr-1"/>Save</Button>
-                                <Button size="sm" variant="ghost" onClick={() => setEditingDefinition(null)} className="flex-grow"><X className="h-4 w-4 mr-1"/>Cancel</Button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex-grow min-w-0">
-                                  <span className="font-medium text-foreground block" title={def.name}>{def.name}</span>
-                                  <Badge variant="secondary" className="text-xs ml-0 my-0.5">{def.category}</Badge>
-                              </div>
-                              <div className="flex-shrink-0 flex items-center">
-                                <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8 text-muted-foreground hover:text-primary" aria-label={`Edit ${def.name}`}> <Edit3 className="h-4 w-4" /> </Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleDeleteExerciseDefinition(def.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label={`Delete ${def.name}`}> <Trash2 className="h-4 w-4" /> </Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleAddExerciseToWorkout(def)} className="h-8 w-8 text-muted-foreground hover:text-accent" aria-label={`Add ${def.name} to workout`}> <ChevronRight className="h-5 w-5" /> </Button>
-                              </div>
-                            </div>
-                          )}
-                        </motion.li>
-                      ))}
-                    </AnimatePresence>
-                  </ul>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        <section aria-labelledby="current-workout-heading" className="md:col-span-2 space-y-6">
+        <div className="mb-8">
+          <WorkoutHeatmap allWorkoutLogs={allWorkoutLogs} onDateSelect={setSelectedDate} />
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+          <section aria-labelledby="exercise-library-heading" className="md:col-span-1 space-y-6">
             <Card className="shadow-xl rounded-xl overflow-hidden">
-                <CardHeader className="bg-accent/10 flex flex-row items-center justify-between p-4">
-                     <div className="flex-grow">
-                        <CardTitle id="current-workout-heading" className="flex items-center gap-2 text-2xl text-accent">
-                            <ListChecks /> Workout for: {format(selectedDate, 'PPP')}
-                        </CardTitle>
-                        {muscleGroupsForSelectedDay.length > 0 && (
-                            <p className="text-sm text-muted-foreground mt-1 ml-1">
-                                Today's focus: {muscleGroupsForSelectedDay.join(' & ')}
-                            </p>
-                        )}
-                    </div>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                        <Button variant={"outline"} className={cn("w-[200px] justify-start text-left font-normal h-10",!selectedDate && "text-muted-foreground")}>
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
-                        </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                        <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus />
-                        </PopoverContent>
-                    </Popover>
-                </CardHeader>
-                <CardContent className="p-4">
-                  <div className="max-h-[calc(100vh-26rem)] overflow-y-auto space-y-4 pr-2">
-                    {currentWorkoutExercises.length === 0 ? (
-                      <div className="text-center py-10">
-                          <GripVertical className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
-                          <p className="text-muted-foreground">No exercises for {format(selectedDate, 'PPP')}.</p>
-                          <p className="text-sm text-muted-foreground/80">Add exercises from library or select a weekday!</p>
+              <CardHeader className="bg-primary/10">
+                <div className="flex items-center justify-between">
+                  <CardTitle id="exercise-library-heading" className="flex items-center gap-2 text-2xl text-primary">
+                    <Dumbbell /> Exercise Library
+                  </CardTitle>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="ml-auto h-8">
+                        <FilterIcon className="h-4 w-4 mr-2" />
+                        Filter ({selectedCategories.length > 0 ? selectedCategories.length : "All"})
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {exerciseCategories.map((category) => (
+                        <DropdownMenuCheckboxItem
+                          key={category} checked={selectedCategories.includes(category)}
+                          onCheckedChange={() => handleCategoryFilterChange(category)}
+                          onSelect={(e) => e.preventDefault()} 
+                        > {category} </DropdownMenuCheckboxItem>
+                      ))}
+                      {selectedCategories.length > 0 && (
+                        <> <DropdownMenuSeparator />
+                          <Button variant="ghost" size="sm" className="w-full justify-start text-sm" onClick={() => setSelectedCategories([])}> Clear Filters </Button>
+                        </>)}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4 space-y-4">
+                <div className="space-y-2">
+                  <Label>Workout Plan</Label>
+                  <div className="flex items-center gap-4">
+                    <RadioGroup
+                      value={workoutMode}
+                      onValueChange={(value) => setWorkoutMode(value as WorkoutMode)}
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="two-muscle" id="r1" />
+                        <Label htmlFor="r1" className="font-normal">Two Muscles / Day</Label>
                       </div>
-                    ) : (
-                      <AnimatePresence>
-                      {currentWorkoutExercises.map(exercise => {
-                          const definition = exerciseDefinitions.find(def => def.id === exercise.definitionId);
-                          return (
-                            <WorkoutExerciseCard 
-                              key={exercise.id} 
-                              exercise={exercise}
-                              onLogSet={handleLogSet} 
-                              onDeleteSet={handleDeleteSet} 
-                              onUpdateSet={handleUpdateSet}
-                              onRemoveExercise={handleRemoveExerciseFromWorkout}
-                              onViewProgress={definition ? () => handleViewProgress(definition) : undefined}
-                            />
-                          );
-                      })}
-                      </AnimatePresence>
-                    )}
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="one-muscle" id="r2" />
+                        <Label htmlFor="r2" className="font-normal">One Muscle / Day</Label>
+                      </div>
+                    </RadioGroup>
+                    <Button variant="outline" size="sm" className="h-8" onClick={() => setIsPlanModalOpen(true)}>
+                      <Settings className="h-4 w-4 mr-2" />
+                      Edit Plans
+                    </Button>
                   </div>
-                </CardContent>
+                </div>
+                <Separator />
+                <form onSubmit={handleAddExerciseDefinition} className="space-y-3">
+                  <Input type="text" placeholder="New exercise name" value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} aria-label="New exercise name" className="h-10" />
+                  <Select value={newExerciseCategory} onValueChange={(value) => setNewExerciseCategory(value as ExerciseCategory)}>
+                    <SelectTrigger className="h-10"><SelectValue placeholder="Select category" /></SelectTrigger>
+                    <SelectContent>{exerciseCategories.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
+                  </Select>
+                  <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-10"> <PlusCircle className="mr-2 h-5 w-5" /> Add Exercise </Button>
+                </form>
+                <div className="max-h-[calc(100vh-38rem)] overflow-y-auto pr-1">
+                  {filteredExerciseDefinitions.length === 0 && exerciseDefinitions.length > 0 ? (
+                    <p className="text-muted-foreground text-sm text-center py-4">No exercises match filter.</p>
+                  ) : filteredExerciseDefinitions.length === 0 ? (
+                    <p className="text-muted-foreground text-sm text-center py-4">Library empty. Add exercises!</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      <AnimatePresence>
+                        {filteredExerciseDefinitions.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
+                          <motion.li key={def.id} layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} className="p-3 bg-card border rounded-lg shadow-sm">
+                            {editingDefinition?.id === def.id ? (
+                              <div className="space-y-2">
+                                <Input value={editingDefinitionName} onChange={(e) => setEditingDefinitionName(e.target.value)} className="h-9" aria-label="Edit exercise name"/>
+                                <Select value={editingDefinitionCategory} onValueChange={(value) => setEditingDefinitionCategory(value as ExerciseCategory)}>
+                                  <SelectTrigger className="h-9"><SelectValue placeholder="Select category" /></SelectTrigger>
+                                  <SelectContent>{exerciseCategories.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
+                                </Select>
+                                <div className="flex gap-2">
+                                  <Button size="sm" onClick={handleSaveEditDefinition} className="flex-grow bg-green-600 hover:bg-green-500 text-white"><Save className="h-4 w-4 mr-1"/>Save</Button>
+                                  <Button size="sm" variant="ghost" onClick={() => setEditingDefinition(null)} className="flex-grow"><X className="h-4 w-4 mr-1"/>Cancel</Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex-grow min-w-0">
+                                    <span className="font-medium text-foreground block" title={def.name}>{def.name}</span>
+                                    <Badge variant="secondary" className="text-xs ml-0 my-0.5">{def.category}</Badge>
+                                </div>
+                                <div className="flex-shrink-0 flex items-center">
+                                  <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8 text-muted-foreground hover:text-primary" aria-label={`Edit ${def.name}`}> <Edit3 className="h-4 w-4" /> </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => handleDeleteExerciseDefinition(def.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label={`Delete ${def.name}`}> <Trash2 className="h-4 w-4" /> </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => handleAddExerciseToWorkout(def)} className="h-8 w-8 text-muted-foreground hover:text-accent" aria-label={`Add ${def.name} to workout`}> <ChevronRight className="h-5 w-5" /> </Button>
+                                </div>
+                              </div>
+                            )}
+                          </motion.li>
+                        ))}
+                      </AnimatePresence>
+                    </ul>
+                  )}
+                </div>
+              </CardContent>
             </Card>
-        </section>
+          </section>
+
+          <section aria-labelledby="current-workout-heading" className="md:col-span-2 space-y-6">
+              <Card className="shadow-xl rounded-xl overflow-hidden">
+                  <CardHeader className="bg-accent/10 flex flex-row items-center justify-between p-4">
+                      <div className="flex-grow">
+                          <CardTitle id="current-workout-heading" className="flex items-center gap-2 text-2xl text-accent">
+                              <ListChecks /> Workout for: {format(selectedDate, 'PPP')}
+                          </CardTitle>
+                          {muscleGroupsForSelectedDay.length > 0 && (
+                              <p className="text-sm text-muted-foreground mt-1 ml-1">
+                                  Today's focus: {muscleGroupsForSelectedDay.join(' & ')}
+                              </p>
+                          )}
+                      </div>
+                      <Popover>
+                          <PopoverTrigger asChild>
+                          <Button variant={"outline"} className={cn("w-[200px] justify-start text-left font-normal h-10",!selectedDate && "text-muted-foreground")}>
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+                          </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                          <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus />
+                          </PopoverContent>
+                      </Popover>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <div className="max-h-[calc(100vh-26rem)] overflow-y-auto space-y-4 pr-2">
+                      {currentWorkoutExercises.length === 0 ? (
+                        <div className="text-center py-10">
+                            <GripVertical className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
+                            <p className="text-muted-foreground">No exercises for {format(selectedDate, 'PPP')}.</p>
+                            <p className="text-sm text-muted-foreground/80">Add exercises from library or select a weekday!</p>
+                        </div>
+                      ) : (
+                        <AnimatePresence>
+                        {currentWorkoutExercises.map(exercise => {
+                            const definition = exerciseDefinitions.find(def => def.id === exercise.definitionId);
+                            return (
+                              <WorkoutExerciseCard 
+                                key={exercise.id} 
+                                exercise={exercise}
+                                onLogSet={handleLogSet} 
+                                onDeleteSet={handleDeleteSet} 
+                                onUpdateSet={handleUpdateSet}
+                                onRemoveExercise={handleRemoveExerciseFromWorkout}
+                                onViewProgress={definition ? () => handleViewProgress(definition) : undefined}
+                              />
+                            );
+                        })}
+                        </AnimatePresence>
+                      )}
+                    </div>
+                  </CardContent>
+              </Card>
+          </section>
+        </div>
+        {viewingProgressExercise && (
+          <ExerciseProgressModal isOpen={isProgressModalOpen} onOpenChange={setIsProgressModalOpen}
+            exercise={viewingProgressExercise} allWorkoutLogs={allWorkoutLogs}
+          />
+        )}
+        {currentUser && (
+          <WorkoutPlanModal
+            isOpen={isPlanModalOpen}
+            onOpenChange={setIsPlanModalOpen}
+            workoutMode={workoutMode}
+            workoutPlans={workoutPlans}
+            setWorkoutPlans={setWorkoutPlans}
+            exerciseDefinitions={exerciseDefinitions}
+          />
+        )}
       </div>
-      {viewingProgressExercise && (
-        <ExerciseProgressModal isOpen={isProgressModalOpen} onOpenChange={setIsProgressModalOpen}
-          exercise={viewingProgressExercise} allWorkoutLogs={allWorkoutLogs}
-        />
-      )}
-      {currentUser && (
-        <WorkoutPlanModal
-          isOpen={isPlanModalOpen}
-          onOpenChange={setIsPlanModalOpen}
-          workoutMode={workoutMode}
-          workoutPlans={workoutPlans}
-          setWorkoutPlans={setWorkoutPlans}
-          exerciseDefinitions={exerciseDefinitions}
-        />
-      )}
-    </div>
+
+      <AlertDialog open={showBackupPrompt} onOpenChange={setShowBackupPrompt}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Weekly Backup Reminder</AlertDialogTitle>
+            <AlertDialogDescription>
+              It's Monday! Would you like to back up your workout data now? This will download a file to your computer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={markBackupPromptAsHandled}>Maybe Later</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBackupConfirm}>Yes, Back Up Now</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 

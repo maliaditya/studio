@@ -13,6 +13,7 @@ interface AuthContextType {
   register: (username: string, password: string) => Promise<void>;
   signIn: (username: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  exportData: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -63,6 +64,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Logged Out", description: "You have been successfully logged out." });
     setLoading(false);
   };
+
+  const exportData = () => {
+    if (!currentUser?.username) return;
+
+    try {
+      const username = currentUser.username;
+      const dataToExport = {
+        exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
+        allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
+        workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
+        workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
+      };
+
+      const jsonString = JSON.stringify(dataToExport, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `workout-tracker-backup-${username}-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Export Successful",
+        description: "Your data has been downloaded.",
+      });
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast({
+        title: "Export Failed",
+        description: "Could not export your data.",
+        variant: "destructive",
+      });
+    }
+  };
   
   const value = {
     currentUser,
@@ -70,6 +108,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     register,
     signIn,
     signOut,
+    exportData,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

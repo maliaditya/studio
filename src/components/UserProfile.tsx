@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -16,44 +17,12 @@ import {
 import { useToast } from '@/hooks/use-toast';
 
 export function UserProfile() {
-  const { currentUser, signOut: localSignOut, loading } = useAuth();
+  const { currentUser, signOut: localSignOut, loading, exportData } = useAuth();
   const { toast } = useToast();
 
   const handleExport = () => {
     if (!currentUser?.username) return;
-
-    try {
-      const username = currentUser.username;
-      const dataToExport = {
-        exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
-        allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
-        workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
-        workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
-      };
-
-      const jsonString = JSON.stringify(dataToExport, null, 2);
-      const blob = new Blob([jsonString], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `workout-tracker-backup-${username}-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: "Export Successful",
-        description: "Your data has been downloaded.",
-      });
-    } catch (error) {
-      console.error("Export failed:", error);
-      toast({
-        title: "Export Failed",
-        description: "Could not export your data.",
-        variant: "destructive",
-      });
-    }
+    exportData();
   };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
