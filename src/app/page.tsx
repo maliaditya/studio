@@ -10,7 +10,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { format, parseISO, getDay, getWeekOfMonth, isMonday, getYear, getISOWeek, parse, getISOWeekYear, addWeeks, startOfISOWeek, setISOWeek } from 'date-fns';
+import { format, parseISO, getDay, getWeekOfMonth, isMonday, getYear, getISOWeek, parse, getISOWeekYear, addWeeks, startOfISOWeek, setISOWeek, differenceInDays } from 'date-fns';
 import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans, WeightLog } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
@@ -776,6 +776,9 @@ function WorkoutPageContent() {
 
     const projectedDate = addWeeks(lastLog.dateObj, weeksToGo);
     const nextProjectedWeight = currentWeight + projectionRate;
+    const nextWeekDate = addWeeks(lastLog.dateObj, 1);
+    const daysToNextWeek = differenceInDays(nextWeekDate, new Date());
+    const daysToGoal = differenceInDays(projectedDate, new Date());
 
     return {
         currentWeight: parseFloat(currentWeight.toFixed(1)),
@@ -784,6 +787,8 @@ function WorkoutPageContent() {
         projectedDate: format(projectedDate, 'PPP'),
         nextProjectedWeight: parseFloat(nextProjectedWeight.toFixed(1)),
         weeksToGo,
+        daysToNextWeek,
+        daysToGoal,
     };
   }, [goalWeight, weightLogs]);
 
@@ -986,49 +991,50 @@ function WorkoutPageContent() {
                     </div>
 
                     {projectionSummary && (
-                        <div className="space-y-3 pt-4 border-t">
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                                <div className="flex items-center gap-2">
-                                    <Dumbbell className="h-4 w-4 text-muted-foreground" />
-                                    <div>
-                                        <div className="text-muted-foreground">Current Weight</div>
-                                        <div className="font-bold">{projectionSummary.currentWeight} kg/lb</div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Target className="h-4 w-4 text-muted-foreground" />
-                                    <div>
-                                        <div className="text-muted-foreground">Goal Weight</div>
-                                        <div className="font-bold">{projectionSummary.goalWeight} kg/lb</div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    {projectionSummary.weightDifference > 0 ? (
-                                        <Plus className="h-4 w-4 text-orange-500" />
-                                    ) : (
-                                        <Minus className="h-4 w-4 text-green-500" />
-                                    )}
-                                    <div>
-                                        <div className="text-muted-foreground">{projectionSummary.weightDifference > 0 ? "To Gain" : "To Lose"}</div>
-                                        <div className="font-bold">{Math.abs(projectionSummary.weightDifference)} kg/lb</div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                                    <div>
-                                        <div className="text-muted-foreground">Next Week Est.</div>
-                                        <div className="font-bold">{projectionSummary.nextProjectedWeight} kg/lb</div>
-                                    </div>
-                                </div>
-                            </div>
-                             <div className="flex items-center gap-2 pt-2 border-t">
-                                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                        <div className="space-y-4 pt-4 border-t">
+                            <div className="grid grid-cols-3 gap-2 text-center text-sm">
                                 <div>
-                                    <div className="text-muted-foreground">Est. Goal Date</div>
-                                    <div className="font-bold">{projectionSummary.projectedDate} (~{projectionSummary.weeksToGo} weeks)</div>
+                                    <div className="text-muted-foreground">Current</div>
+                                    <div className="font-bold text-lg">{projectionSummary.currentWeight}</div>
+                                    <div className="text-xs text-muted-foreground">kg/lb</div>
+                                </div>
+                                <div>
+                                    <div className="text-muted-foreground">Goal</div>
+                                    <div className="font-bold text-lg">{projectionSummary.goalWeight}</div>
+                                    <div className="text-xs text-muted-foreground">kg/lb</div>
+                                </div>
+                                <div>
+                                    <div className="text-muted-foreground">{projectionSummary.weightDifference > 0 ? "To Gain" : "To Lose"}</div>
+                                    <div className={`font-bold text-lg ${projectionSummary.weightDifference > 0 ? "text-orange-500" : "text-green-500"}`}>{Math.abs(projectionSummary.weightDifference)}</div>
+                                    <div className="text-xs text-muted-foreground">kg/lb</div>
                                 </div>
                             </div>
-                             <div className="flex items-center justify-center space-x-2 pt-3">
+
+                            <Separator />
+
+                            <div className="space-y-1 text-sm">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Next Week Est.</span>
+                                    <span className="font-bold">{projectionSummary.nextProjectedWeight} kg/lb</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground pl-6">Days Remaining</span>
+                                    <span className="font-bold">{projectionSummary.daysToNextWeek > 0 ? `${projectionSummary.daysToNextWeek} days` : 'Past'}</span>
+                                </div>
+                            </div>
+
+                             <div className="space-y-1 text-sm">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground flex items-center gap-2"><CalendarDays className="h-4 w-4" /> Est. Goal Date</span>
+                                    <span className="font-bold">{projectionSummary.projectedDate}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground pl-6">Days Remaining</span>
+                                    <span className="font-bold">{projectionSummary.daysToGoal > 0 ? `${projectionSummary.daysToGoal} days` : 'N/A'}</span>
+                                </div>
+                            </div>
+
+                             <div className="flex items-center justify-center space-x-2 pt-3 border-t">
                                 <Switch id="show-projection" checked={showProjection} onCheckedChange={setShowProjection} />
                                 <Label htmlFor="show-projection" className="text-sm">Show Projection on Chart</Label>
                             </div>
