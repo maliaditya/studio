@@ -57,7 +57,7 @@ const weightChartConfig = {
 } satisfies ChartConfig;
 
 
-export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLogWeight, selectedDate }: WorkoutHeatmapProps) {
+export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLogWeight }: WorkoutHeatmapProps) {
   const { currentUser, updateUserProfile } = useAuth();
   const { toast } = useToast();
   
@@ -77,7 +77,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
     setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
   }, []);
 
-  const isSettingHeight = view === 'weight' && currentUser && !currentUser.heightInCm;
+  const shouldShowHeightForm = view === 'weight' && currentUser && !currentUser.heightInCm;
 
   const heatmapValues: HeatmapValue[] = useMemo(() => allWorkoutLogs
     .filter(log => log.exercises.some(ex => ex.loggedSets.length > 0))
@@ -434,7 +434,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
                 </>
             ) : (
                  <>
-                    {isSettingHeight ? (
+                    {shouldShowHeightForm ? (
                          <div className="flex flex-col items-center justify-center min-h-[250px] gap-4 p-4 border rounded-lg bg-muted/20">
                             <h3 className="text-lg font-semibold text-center">Set Your Height</h3>
                             <p className="text-sm text-muted-foreground text-center max-w-sm">To calculate your ideal weight, please enter your height. This is used for projection only and is saved locally.</p>
@@ -547,6 +547,8 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
     </>
   );
 }
+
+    
 
     
 
