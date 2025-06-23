@@ -29,6 +29,7 @@ export async function POST(request: Request) {
     const blob = await put(blobPathname, JSON.stringify(data, null, 2), {
       access: 'public', // 'public' is required on Vercel's Hobby plan.
       contentType: 'application/json',
+      addRandomSuffix: false, // This is the crucial fix. It ensures the filename is predictable.
     });
 
     return NextResponse.json({ success: true, message: 'Data synced to cloud.', blob });
@@ -65,7 +66,8 @@ export async function GET(request: Request) {
     // catching a specific error message from `head`.
     const { blobs } = await list({ prefix: blobPathname, limit: 1 });
 
-    // If the blobs array is empty, no data exists for this user.
+    // If the blobs array is empty OR the found blob doesn't have the exact name,
+    // it means the specific user data file doesn't exist.
     if (blobs.length === 0 || blobs[0]?.pathname !== blobPathname) {
         return NextResponse.json({ data: null, message: "No cloud data found for this user. This is expected for a first-time sync." }, { status: 200 });
     }
