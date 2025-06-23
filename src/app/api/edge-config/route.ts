@@ -3,12 +3,13 @@ import { get } from '@vercel/edge-config';
 import { NextResponse } from 'next/server';
 
 /**
- * GET /api/edge-config?username=<username>
- * Fetches the data blob for a specific user from Vercel Edge Config.
+ * GET /api/edge-config?username=<username>&item=<item>
+ * Fetches a specific data blob (e.g., 'main' or 'logs') for a user.
  */
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const username = searchParams.get('username');
+    const item = searchParams.get('item') || 'main'; // Default to 'main'
 
     if (!process.env.EDGE_CONFIG) {
         return NextResponse.json({ error: 'Edge Config connection string is not configured on the server.' }, { status: 500 });
@@ -18,11 +19,14 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Username is required.' }, { status: 400 });
     }
 
+    // Construct the key based on the item type
+    const key = item === 'logs' ? `${username}_logs` : username;
+
     try {
-        const userData = await get(username);
+        const userData = await get(key);
         return NextResponse.json({ data: userData });
     } catch (error) {
-        console.error(`Edge Config read error for user ${username}:`, error);
+        console.error(`Edge Config read error for user ${username}, item ${item}:`, error);
         return NextResponse.json({ error: 'Failed to read data from Edge Config.' }, { status: 500 });
     }
 }
@@ -31,10 +35,11 @@ export async function GET(request: Request) {
 /**
  * POST /api/edge-config
  * Updates a user's data blob in Vercel Edge Config.
- * This requires using the Vercel API, as the Edge Config SDK is read-only from functions.
+ * Expects { username, data, item }, where item is 'main' or 'logs'.
  */
 export async function POST(request: Request) {
-    const { username, data } = await request.json();
+    const { username, data, item } = await request.json();
+    const itemType = item || 'main';
 
     const edgeConfigConnectionString = process.env.EDGE_CONFIG;
     const vercelApiToken = process.env.VERCEL_API_TOKEN;
@@ -46,9 +51,10 @@ export async function POST(request: Request) {
     if (!username || data === undefined) {
         return NextResponse.json({ error: 'Username and data payload are required.' }, { status: 400 });
     }
+    
+    const key = itemType === 'logs' ? `${username}_logs` : username;
 
     try {
-        // The Edge Config ID is part of the connection string URL path.
         const edgeConfigId = new URL(edgeConfigConnectionString).pathname.split('/')[1];
 
         if (!edgeConfigId) {
@@ -67,7 +73,7 @@ export async function POST(request: Request) {
                 items: [
                     {
                         operation: 'upsert',
-                        key: username,
+                        key: key,
                         value: data,
                     },
                 ],
@@ -77,10 +83,10 @@ export async function POST(request: Request) {
         if (!response.ok) {
             const errorData = await response.json();
             console.error('Vercel API error:', errorData);
-            throw new Error(errorData.error?.message || 'Failed to update Edge Config via Vercel API.');
+            throw new Error(errorData.error?.message || `Failed to update Edge Config for item: ${itemType}`);
         }
 
-        return NextResponse.json({ success: true, message: 'Data synced to cloud.' });
+        return NextResponse.json({ success: true, message: `Data chunk '${itemType}' synced to cloud.` });
 
     } catch (error) {
         console.error('Error in POST /api/edge-config:', error);

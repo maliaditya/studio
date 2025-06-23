@@ -104,29 +104,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     try {
         const username = currentUser.username;
-        const dataToPush = {
+        const mainData = {
             exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
-            allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
             workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
             workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
             weightLogs: JSON.parse(localStorage.getItem(`weightLogs_${username}`) || '[]'),
             goalWeight: localStorage.getItem(`goalWeight_${username}`) || null,
         };
+        const logsData = {
+            allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
+        };
 
-        const jsonString = JSON.stringify(dataToPush);
-        const compressed = pako.deflate(jsonString);
-        const compressedBase64 = uint8ArrayToBase64(compressed);
-
-        const response = await fetch('/api/edge-config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, data: compressedBase64 }),
-        });
-
-        const result = await response.json();
-        if (!response.ok) {
-            throw new Error(result.error || 'Failed to push data.');
+        const compressAndEncode = (data: object) => {
+            const jsonString = JSON.stringify(data);
+            const compressed = pako.deflate(jsonString);
+            return uint8ArrayToBase64(compressed);
+        };
+        
+        const compressedMainData = compressAndEncode(mainData);
+        const compressedLogsData = compressAndEncode(logsData);
+        
+        const pushItem = async (item: 'main' | 'logs', data: string) => {
+            const response = await fetch('/api/edge-config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, data, item }),
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.error || `Failed to push ${item} data.`);
+            }
+            return result;
         }
+
+        await Promise.all([
+            pushItem('main', compressedMainData),
+            pushItem('logs', compressedLogsData),
+        ]);
 
         toast({ title: "Success", description: "Your data has been saved to the cloud." });
     } catch (error) {
@@ -148,41 +162,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       try {
           const username = currentUser.username;
-          const response = await fetch(`/api/edge-config?username=${username}`);
-          const result = await response.json();
-
-          if (!response.ok) {
-              throw new Error(result.error || 'Failed to fetch data.');
-          }
           
-          if (result.data === null || result.data === undefined) {
+          const pullAndDecompress = async (item: 'main' | 'logs') => {
+             const response = await fetch(`/api/edge-config?username=${username}&item=${item}`);
+             const result = await response.json();
+             if (!response.ok) throw new Error(result.error || `Failed to fetch ${item} data.`);
+             
+             const data = result.data;
+             if (data === null || data === undefined) return null;
+
+             if (typeof data === 'string') {
+                 const compressedBytes = base64ToUint8Array(data);
+                 const decompressedString = pako.inflate(compressedBytes, { to: 'string' });
+                 return JSON.parse(decompressedString);
+             }
+             // Handle old, uncompressed single-blob format for backward compatibility.
+             return data;
+          }
+
+          const [mainData, logsData] = await Promise.all([
+              pullAndDecompress('main'),
+              pullAndDecompress('logs'),
+          ]);
+          
+          if (!mainData) { // If mainData is null, there's likely no data at all.
               toast({ title: "No Cloud Data", description: "No data found in the cloud for your user." });
               return;
           }
 
-          let cloudData;
-
-          // Check if data is a string (compressed) or an object (old format)
-          if (typeof result.data === 'string') {
-              const compressedBytes = base64ToUint8Array(result.data);
-              const decompressedString = pako.inflate(compressedBytes, { to: 'string' });
-              cloudData = JSON.parse(decompressedString);
-          } else {
-              // Handle old, uncompressed data format for backward compatibility
-              cloudData = result.data;
-          }
-
-          localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(cloudData.exerciseDefinitions || []));
-          localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(cloudData.allWorkoutLogs || []));
-          localStorage.setItem(`workoutMode_${username}`, cloudData.workoutMode || 'two-muscle');
-          localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(cloudData.workoutPlans || {}));
-          localStorage.setItem(`weightLogs_${username}`, JSON.stringify(cloudData.weightLogs || []));
-          
-          if (cloudData.goalWeight) {
-              localStorage.setItem(`goalWeight_${username}`, cloudData.goalWeight.toString());
+          // Handle the new, split-data format
+          localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(mainData.exerciseDefinitions || []));
+          localStorage.setItem(`workoutMode_${username}`, mainData.workoutMode || 'two-muscle');
+          localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(mainData.workoutPlans || {}));
+          localStorage.setItem(`weightLogs_${username}`, JSON.stringify(mainData.weightLogs || []));
+          if (mainData.goalWeight) {
+              localStorage.setItem(`goalWeight_${username}`, mainData.goalWeight.toString());
           } else {
               localStorage.removeItem(`goalWeight_${username}`);
           }
+          
+          // The `allWorkoutLogs` could be in the main blob (old format) or the logs blob (new format)
+          const workoutLogsToSet = (logsData && logsData.allWorkoutLogs) || mainData.allWorkoutLogs || [];
+          localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(workoutLogsToSet));
 
           toast({
             title: "Sync Successful",
