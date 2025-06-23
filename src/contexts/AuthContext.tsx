@@ -20,6 +20,8 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   pushDataToCloud: () => void;
   pullDataFromCloud: () => void;
+  exportData: () => void;
+  importData: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -164,6 +166,94 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           });
       }
   };
+
+  const exportData = () => {
+    if (!currentUser?.username) {
+        toast({ title: "Error", description: "You must be logged in to export data.", variant: "destructive" });
+        return;
+    }
+    try {
+        const username = currentUser.username;
+        const dataToExport = {
+            exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
+            allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
+            workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
+            workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
+            weightLogs: JSON.parse(localStorage.getItem(`weightLogs_${username}`) || '[]'),
+            goalWeight: localStorage.getItem(`goalWeight_${username}`) || null,
+        };
+
+        const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+            JSON.stringify(dataToExport, null, 2)
+        )}`;
+        const link = document.createElement("a");
+        link.href = jsonString;
+        link.download = `workout_tracker_backup_${username}_${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+        toast({ title: "Export Successful", description: "Your data has been downloaded." });
+    } catch (error) {
+        console.error("Export failed:", error);
+        toast({ title: "Export Failed", description: "Could not export your data.", variant: "destructive" });
+    }
+  };
+
+  const importData = () => {
+      if (!currentUser?.username) {
+          toast({ title: "Error", description: "You must be logged in to import data.", variant: "destructive" });
+          return;
+      }
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = (event) => {
+          const file = (event.target as HTMLInputElement).files?.[0];
+          if (file) {
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                  try {
+                      const text = e.target?.result;
+                      if (typeof text !== 'string') {
+                          throw new Error("File content is not readable.");
+                      }
+                      const data = JSON.parse(text);
+                      const username = currentUser.username;
+
+                      if (
+                          data.exerciseDefinitions === undefined ||
+                          data.allWorkoutLogs === undefined ||
+                          data.workoutMode === undefined ||
+                          data.workoutPlans === undefined ||
+                          data.weightLogs === undefined
+                      ) {
+                          throw new Error("Invalid backup file format.");
+                      }
+
+                      localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(data.exerciseDefinitions || []));
+                      localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(data.allWorkoutLogs || []));
+                      localStorage.setItem(`workoutMode_${username}`, data.workoutMode || 'two-muscle');
+                      localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(data.workoutPlans || {}));
+                      localStorage.setItem(`weightLogs_${username}`, JSON.stringify(data.weightLogs || []));
+
+                      if (data.goalWeight) {
+                          localStorage.setItem(`goalWeight_${username}`, data.goalWeight.toString());
+                      } else {
+                          localStorage.removeItem(`goalWeight_${username}`);
+                      }
+
+                      toast({ title: "Import Successful", description: "Your data has been imported. The app will now reload." });
+                      setTimeout(() => window.location.reload(), 1500);
+
+                  } catch (error) {
+                      console.error("Import failed:", error);
+                      const message = error instanceof Error ? error.message : "An unknown error occurred during import.";
+                      toast({ title: "Import Failed", description: message, variant: "destructive" });
+                  }
+              };
+              reader.readAsText(file);
+          }
+      };
+      input.click();
+  };
   
   const value = {
     currentUser,
@@ -173,6 +263,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signOut,
     pushDataToCloud,
     pullDataFromCloud,
+    exportData,
+    importData,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

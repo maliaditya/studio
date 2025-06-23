@@ -5,7 +5,7 @@ import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { LogOut, User as UserIcon, UploadCloud, DownloadCloud } from 'lucide-react';
+import { LogOut, User as UserIcon, UploadCloud, DownloadCloud, Upload, Download } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function UserProfile() {
-  const { currentUser, signOut: localSignOut, loading, pushDataToCloud, pullDataFromCloud } = useAuth();
+  const { currentUser, signOut: localSignOut, loading, pushDataToCloud, pullDataFromCloud, exportData, importData } = useAuth();
 
   if (loading) {
     return <div className="h-8 w-20 animate-pulse bg-muted rounded-md"></div>;
@@ -59,6 +59,15 @@ export function UserProfile() {
         <DropdownMenuItem onClick={pullDataFromCloud} className="cursor-pointer">
           <DownloadCloud className="mr-2 h-4 w-4" />
           <span>Pull from Cloud</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={exportData} className="cursor-pointer">
+          <Download className="mr-2 h-4 w-4" />
+          <span>Export Data</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={importData} className="cursor-pointer">
+          <Upload className="mr-2 h-4 w-4" />
+          <span>Import Data</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={localSignOut} className="cursor-pointer">
