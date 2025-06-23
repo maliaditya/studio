@@ -49,6 +49,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } else {
         localStorage.removeItem(`goalWeight_${username}`);
     }
+    if (data.height) {
+        localStorage.setItem(`height_${username}`, data.height.toString());
+    } else {
+        localStorage.removeItem(`height_${username}`);
+    }
     localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(data.exerciseDefinitions || []));
     localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(data.workoutPlans || {}));
     localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(data.allWorkoutLogs || []));
@@ -104,6 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
             weightLogs: JSON.parse(localStorage.getItem(`weightLogs_${username}`) || '[]'),
             goalWeight: localStorage.getItem(`goalWeight_${username}`) || null,
+            height: localStorage.getItem(`height_${username}`) || null,
             exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
             workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
             allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
@@ -191,6 +197,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
             weightLogs: JSON.parse(localStorage.getItem(`weightLogs_${username}`) || '[]'),
             goalWeight: localStorage.getItem(`goalWeight_${username}`) || null,
+            height: localStorage.getItem(`height_${username}`) || null,
         };
 
         const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
@@ -234,7 +241,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                           data.allWorkoutLogs === undefined ||
                           data.workoutMode === undefined ||
                           data.workoutPlans === undefined ||
-                          data.weightLogs === undefined
+                          data.weightLogs === undefined ||
+                          data.height === undefined
                       ) {
                           throw new Error("Invalid backup file format.");
                       }

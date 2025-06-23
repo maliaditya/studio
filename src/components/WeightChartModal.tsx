@@ -17,16 +17,19 @@ import { Calendar } from './ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { ScrollArea } from './ui/scroll-area';
+import { Label } from './ui/label';
 
 interface WeightChartModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   weightLogs: WeightLog[];
   goalWeight: number | null;
+  height: number | null;
   onLogWeight: (weight: number, date: Date) => void;
   onUpdateWeightLog: (dateKey: string, newWeight: number) => void;
   onDeleteWeightLog: (dateKey: string) => void;
   onSetGoalWeight: (goal: number) => void;
+  onSetHeight: (height: number) => void;
 }
 
 const weightChartConfig = {
@@ -114,15 +117,18 @@ export function WeightChartModal({
   onOpenChange,
   weightLogs, 
   goalWeight,
+  height,
   onLogWeight,
   onUpdateWeightLog,
   onDeleteWeightLog,
   onSetGoalWeight,
+  onSetHeight,
 }: WeightChartModalProps) {
   const { toast } = useToast();
   
   const [newWeight, setNewWeight] = useState('');
   const [goalWeightInput, setGoalWeightInput] = useState('');
+  const [heightInput, setHeightInput] = useState('');
   const [weightDate, setWeightDate] = useState<Date | undefined>(new Date());
   
   const [editingLog, setEditingLog] = useState<{ date: string; weight: string } | null>(null);
@@ -136,7 +142,12 @@ export function WeightChartModal({
     } else {
       setGoalWeightInput('');
     }
-  }, [goalWeight, isOpen]);
+    if (height) {
+        setHeightInput(String(height));
+    } else {
+        setHeightInput('');
+    }
+  }, [goalWeight, height, isOpen]);
 
   const weightChartData = useMemo(() => {
     const sortedLogs = weightLogs
@@ -263,6 +274,15 @@ export function WeightChartModal({
     }
   };
 
+  const handleSetHeightClick = () => {
+    const h = parseFloat(heightInput);
+    if (!isNaN(h) && h > 0) {
+      onSetHeight(h);
+    } else {
+      toast({ title: "Invalid Input", description: "Please enter a valid height in cm.", variant: "destructive" });
+    }
+  };
+
   const isZoomed = useMemo(() => {
     if (combinedChartData.length <= 1) return false;
     const { startIndex, endIndex } = brushIndex;
@@ -358,20 +378,42 @@ export function WeightChartModal({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Target/> Set Your Goal</CardTitle>
+                        <CardTitle className="flex items-center gap-2"><Target/> Your Details</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        <div className="flex gap-2 items-center">
-                            <Input
-                                type="number"
-                                placeholder="Your ideal weight (kg/lb)"
-                                value={goalWeightInput}
-                                onChange={(e) => setGoalWeightInput(e.target.value)}
-                                className="h-9 flex-grow"
-                            />
-                            <Button onClick={handleSetGoalWeightClick} disabled={!goalWeightInput} className="h-9">
-                                Set Goal
-                            </Button>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 gap-4">
+                            <div>
+                                <Label htmlFor="goal-weight-input" className="text-xs text-muted-foreground">Goal Weight (kg/lb)</Label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        id="goal-weight-input"
+                                        type="number"
+                                        placeholder="e.g., 75"
+                                        value={goalWeightInput}
+                                        onChange={(e) => setGoalWeightInput(e.target.value)}
+                                        className="h-9 flex-grow"
+                                    />
+                                    <Button onClick={handleSetGoalWeightClick} disabled={!goalWeightInput} className="h-9">
+                                        Set
+                                    </Button>
+                                </div>
+                            </div>
+                            <div>
+                                <Label htmlFor="height-input" className="text-xs text-muted-foreground">Height (cm)</Label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        id="height-input"
+                                        type="number"
+                                        placeholder="e.g., 180"
+                                        value={heightInput}
+                                        onChange={(e) => setHeightInput(e.target.value)}
+                                        className="h-9 flex-grow"
+                                    />
+                                    <Button onClick={handleSetHeightClick} disabled={!heightInput} className="h-9">
+                                        Set
+                                    </Button>
+                                </div>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
