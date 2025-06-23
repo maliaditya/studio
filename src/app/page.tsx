@@ -12,7 +12,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO, getDay, getWeekOfMonth, isMonday, getYear, getISOWeek } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans, WeightLog } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -224,6 +224,7 @@ function WorkoutPageContent() {
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
+  const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
 
   const [viewingProgressExercise, setViewingProgressExercise] = useState<ExerciseDefinition | null>(null);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
@@ -243,6 +244,7 @@ function WorkoutPageContent() {
       const logsKey = `allWorkoutLogs_${currentUser.username}`;
       const modeKey = `workoutMode_${currentUser.username}`;
       const plansKey = `workoutPlans_${currentUser.username}`;
+      const weightLogsKey = `weightLogs_${currentUser.username}`;
       let localDefsLoaded = false;
       
       const storedMode = localStorage.getItem(modeKey);
@@ -261,6 +263,18 @@ function WorkoutPageContent() {
       } catch (e) {
         console.error("Error parsing workout plans from localStorage", e);
         setWorkoutPlans(INITIAL_PLANS);
+      }
+
+      try {
+        const storedWeightLogs = localStorage.getItem(weightLogsKey);
+        if (storedWeightLogs) {
+          const parsedWeightLogs = JSON.parse(storedWeightLogs);
+          if (Array.isArray(parsedWeightLogs)) {
+            setWeightLogs(parsedWeightLogs);
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing weight logs from localStorage", e);
       }
 
       try {
@@ -306,6 +320,7 @@ function WorkoutPageContent() {
       setExerciseDefinitions([]);
       setAllWorkoutLogs([]);
       setWorkoutPlans(INITIAL_PLANS);
+      setWeightLogs([]);
     }
     const timer = setTimeout(() => setIsLoadingPage(false), 300);
     return () => clearTimeout(timer);
@@ -318,18 +333,20 @@ function WorkoutPageContent() {
         const logsKey = `allWorkoutLogs_${currentUser.username}`;
         const modeKey = `workoutMode_${currentUser.username}`;
         const plansKey = `workoutPlans_${currentUser.username}`;
+        const weightLogsKey = `weightLogs_${currentUser.username}`;
         
         localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
         localStorage.setItem(logsKey, JSON.stringify(allWorkoutLogs));
         localStorage.setItem(modeKey, workoutMode);
         localStorage.setItem(plansKey, JSON.stringify(workoutPlans));
+        localStorage.setItem(weightLogsKey, JSON.stringify(weightLogs));
 
       } catch (e) {
         console.error("Error saving data to localStorage", e);
         toast({ title: "Save Error", description: "Could not save data locally. Storage might be full.", variant: "destructive"});
       }
     }
-  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, workoutMode, workoutPlans]);
+  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, workoutMode, workoutPlans, weightLogs]);
 
 
   useEffect(() => {
@@ -346,24 +363,27 @@ function WorkoutPageContent() {
       const dayOfWeek = getDay(selectedDate);
       const exercisesToAdd: WorkoutExercise[] = [];
       let toastDescription = "";
-      const weekOfMonth = getWeekOfMonth(selectedDate, { weekStartsOn: 1 });
-      const isOddWeek = weekOfMonth % 2 !== 0; // Weeks 1, 3, 5...
       
+      const isoWeek = getISOWeek(selectedDate);
+      const isOddWeek = isoWeek % 2 !== 0;
+
       if (workoutMode === 'two-muscle') {
           let plan: any = null;
           let planName = "";
     
-          if (dayOfWeek >= 1 && dayOfWeek <= 3) { // Mon-Wed
-            plan = isOddWeek ? workoutPlans.W1 : workoutPlans.W3;
-            planName = isOddWeek ? "W1" : "W3";
-          } else if (dayOfWeek >= 4 && dayOfWeek <= 5) { // Thu-Fri
-            plan = isOddWeek ? workoutPlans.W2 : workoutPlans.W4;
-            planName = isOddWeek ? "W2" : "W4";
-          } else if (dayOfWeek === 6) { // Saturday
-            plan = isOddWeek ? workoutPlans.W1 : workoutPlans.W3; // Follows Wednesday's progression
-            planName = isOddWeek ? "W1" : "W3";
+          // Use a consistent weekly rotation
+          if (isOddWeek) {
+            // Week A schedule
+            plan = dayOfWeek >= 1 && dayOfWeek <= 3 ? workoutPlans.W1 : workoutPlans.W2;
+            planName = dayOfWeek >= 1 && dayOfWeek <= 3 ? "W1" : "W2";
+            if (dayOfWeek === 6) { plan = workoutPlans.W1; planName = "W1"; } // Saturday mirrors Monday
+          } else {
+            // Week B schedule
+            plan = dayOfWeek >= 1 && dayOfWeek <= 3 ? workoutPlans.W3 : workoutPlans.W4;
+            planName = dayOfWeek >= 1 && dayOfWeek <= 3 ? "W3" : "W4";
+            if (dayOfWeek === 6) { plan = workoutPlans.W3; planName = "W3"; } // Saturday mirrors Monday
           }
-    
+
           if (!plan) return prevLogs;
     
           const muscleGroupsForDay = dailyMuscleGroups[dayOfWeek];
@@ -663,6 +683,32 @@ function WorkoutPageContent() {
     setIsProgressModalOpen(true);
   };
   
+  const handleLogWeight = (weight: number) => {
+    if (!currentUser || isNaN(weight) || weight <= 0) {
+      toast({ title: "Invalid Input", description: "Please enter a valid weight.", variant: "destructive" });
+      return;
+    }
+    const today = new Date();
+    const year = getYear(today);
+    const week = getISOWeek(today).toString().padStart(2, '0');
+    const weekKey = `${year}-W${week}`;
+
+    setWeightLogs(prevLogs => {
+        const logIndex = prevLogs.findIndex(log => log.date === weekKey);
+        const newLog: WeightLog = { date: weekKey, weight: weight };
+        
+        if (logIndex > -1) {
+            const updatedLogs = [...prevLogs];
+            updatedLogs[logIndex] = newLog;
+            return updatedLogs;
+        } else {
+            return [...prevLogs, newLog].sort((a,b) => a.date.localeCompare(b.date));
+        }
+    });
+
+    toast({ title: "Weight Logged", description: `Your weight for this week has been saved as ${weight} kg/lb.` });
+  };
+
   if (isLoadingPage) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)] bg-background">
@@ -695,7 +741,12 @@ function WorkoutPageContent() {
         </div>
 
         <div className="mb-8">
-          <WorkoutHeatmap allWorkoutLogs={allWorkoutLogs} onDateSelect={setSelectedDate} />
+          <WorkoutHeatmap
+            allWorkoutLogs={allWorkoutLogs}
+            onDateSelect={setSelectedDate}
+            weightLogs={weightLogs}
+            onLogWeight={handleLogWeight}
+          />
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">

@@ -1,5 +1,6 @@
 
 
+
 export type ExerciseCategory = 
   | "Chest" 
   | "Triceps" 
@@ -65,3 +66,8 @@ export type WorkoutMode = 'one-muscle' | 'two-muscle';
 // Types for editable workout plans
 export type WorkoutPlan = Partial<Record<ExerciseCategory, string[]>>;
 export type AllWorkoutPlans = Record<string, WorkoutPlan>;
+
+export interface WeightLog {
+  date: string; // ISO week format 'YYYY-WW'
+  weight: number;
+}

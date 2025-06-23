@@ -4,18 +4,21 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import CalendarHeatmap from 'react-calendar-heatmap';
 import { subYears, format, addDays, parse } from 'date-fns';
-import type { DatedWorkout } from '@/types/workout';
+import type { DatedWorkout, WeightLog } from '@/types/workout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Button } from './ui/button';
-import { LineChart as LineChartIcon, Calendar as CalendarIcon } from 'lucide-react';
+import { LineChart as LineChartIcon, Calendar as CalendarIcon, Weight as WeightIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
-import { ChartContainer } from './ui/chart';
+import { ChartContainer, ChartConfig } from './ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { Input } from './ui/input';
 
 interface WorkoutHeatmapProps {
   allWorkoutLogs: DatedWorkout[];
   onDateSelect: (date: Date) => void;
+  weightLogs: WeightLog[];
+  onLogWeight: (weight: number) => void;
 }
 
 interface HeatmapValue {
@@ -30,16 +33,24 @@ interface TooltipData {
     y: number;
 }
 
-const chartConfig = {
+const consistencyChartConfig = {
   score: {
     label: "Consistency",
     color: "hsl(var(--primary))",
   }
-};
+} satisfies ChartConfig;
 
-export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapProps) {
+const weightChartConfig = {
+  weight: {
+    label: "Weight (kg/lb)",
+    color: "hsl(var(--chart-2))",
+  }
+} satisfies ChartConfig;
+
+export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLogWeight }: WorkoutHeatmapProps) {
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
-  const [view, setView] = useState<'heatmap' | 'graph'>('heatmap');
+  const [view, setView] = useState<'heatmap' | 'graph' | 'weight'>('heatmap');
+  const [newWeight, setNewWeight] = useState('');
   
   const [today, setToday] = useState<Date | null>(null);
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
@@ -99,6 +110,25 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
         return data;
     }, [allWorkoutLogs, oneYearAgo, today]);
 
+    const weightChartData = useMemo(() => {
+      return weightLogs.map(log => {
+          const weekNum = log.date.split('-W')[1];
+          return {
+              week: `W${weekNum}`,
+              weight: log.weight,
+              fullWeek: log.date
+          }
+      });
+    }, [weightLogs]);
+
+    const handleLogWeightClick = () => {
+      const weightValue = parseFloat(newWeight);
+      if (!isNaN(weightValue) && weightValue > 0) {
+        onLogWeight(weightValue);
+        setNewWeight('');
+      }
+    };
+
     const CustomTooltip = () => {
         if (!tooltipData) return null;
         const { value, x, y } = tooltipData;
@@ -133,7 +163,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
               <CardDescription>Loading...</CardDescription>
             </CardHeader>
             <CardContent className="p-4">
-              <div className="h-[150px] w-full animate-pulse bg-muted rounded-md" />
+              <div className="h-[200px] w-full animate-pulse bg-muted rounded-md" />
             </CardContent>
           </Card>
         );
@@ -147,28 +177,45 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
             <div>
               <CardTitle>Workout Activity</CardTitle>
               <CardDescription>
-                {view === 'heatmap'
-                  ? "Your workout consistency over the last year. Click a square to view that day's log."
-                  : 'Your probability of working out, based on recent consistency.'}
+                {view === 'heatmap' && "Your workout consistency over the last year. Click a square to view that day's log."}
+                {view === 'graph' && 'Your probability of working out, based on recent consistency.'}
+                {view === 'weight' && 'Your weekly body weight trend.'}
               </CardDescription>
             </div>
-             <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => setView(v => v === 'heatmap' ? 'graph' : 'heatmap')}
-                            className="ml-4 flex-shrink-0"
-                        >
-                            {view === 'heatmap' ? <LineChartIcon className="h-4 w-4" /> : <CalendarIcon className="h-4 w-4" />}
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>{view === 'heatmap' ? 'Show Consistency Graph' : 'Show Heatmap'}</p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
+             <div className='flex items-center'>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => setView(v => v === 'graph' ? 'heatmap' : 'graph')}
+                                className="ml-4 flex-shrink-0"
+                            >
+                                {view === 'heatmap' || view === 'weight' ? <LineChartIcon className="h-4 w-4" /> : <CalendarIcon className="h-4 w-4" />}
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>{view === 'graph' ? 'Show Heatmap' : 'Show Consistency Graph'}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => setView(v => v === 'weight' ? 'heatmap' : 'weight')}
+                                className="ml-2 flex-shrink-0"
+                            >
+                                <WeightIcon className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>{view === 'weight' ? 'Show Heatmap' : 'Show Weight Tracker'}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+             </div>
           </div>
         </CardHeader>
         <CardContent className="p-4">
@@ -198,7 +245,6 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
                         onClick={(value) => {
                         if (value && value.date) {
                             setTooltipData(null);
-                            // Use parse to correctly interpret the date string in the local timezone.
                             onDateSelect(parse(value.date, 'yyyy-MM-dd', new Date()));
                         }
                         }}
@@ -206,10 +252,10 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
                         showWeekdayLabels={true}
                     />
                 </div>
-            ) : (
+            ) : view === 'graph' ? (
                 <>
                 {consistencyData.length > 0 ? (
-                    <ChartContainer config={chartConfig} className="min-h-[250px] w-full pr-4">
+                    <ChartContainer config={consistencyChartConfig} className="min-h-[250px] w-full pr-4">
                         <LineChart accessibilityLayer data={consistencyData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                             <CartesianGrid vertical={false} strokeDasharray="3 3" />
                             <XAxis
@@ -275,6 +321,58 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
                         Not enough data to calculate consistency. Log some workouts!
                     </p>
                 )}
+                </>
+            ) : (
+                 <>
+                    {weightChartData.length > 1 ? (
+                        <ChartContainer config={weightChartConfig} className="min-h-[250px] w-full pr-4">
+                            <LineChart accessibilityLayer data={weightChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                                <XAxis dataKey="week" tickLine={false} axisLine={false} tickMargin={8} />
+                                <YAxis yAxisId="left" tickLine={false} axisLine={false} tickMargin={8} domain={['dataMin - 2', 'dataMax + 2']} />
+                                <RechartsTooltip
+                                    cursor={true}
+                                    content={({ active, payload }) => {
+                                        if (active && payload && payload.length) {
+                                            const data = payload[0].payload;
+                                            return (
+                                                <div className="rounded-lg border bg-background p-2.5 shadow-sm">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[0.7rem] uppercase text-muted-foreground">
+                                                            {data.fullWeek}
+                                                        </span>
+                                                        <span className="font-bold text-foreground">
+                                                            {data.weight} kg/lb
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    }}
+                                />
+                                <Line yAxisId="left" dataKey="weight" type="monotone" stroke="var(--color-weight)" strokeWidth={2} dot={true} />
+                            </LineChart>
+                        </ChartContainer>
+                    ) : (
+                        <div className="flex justify-center items-center min-h-[250px]">
+                        <p className="text-center text-muted-foreground">
+                            Not enough data for a weight chart. Log your weight for at least two weeks.
+                        </p>
+                        </div>
+                    )}
+                    <div className="flex gap-2 items-center mt-4 pt-4 border-t">
+                        <Input
+                            type="number"
+                            placeholder="Enter current weight (kg/lb)"
+                            value={newWeight}
+                            onChange={(e) => setNewWeight(e.target.value)}
+                            className="h-9"
+                        />
+                        <Button onClick={handleLogWeightClick} disabled={!newWeight} className="h-9">
+                            Log Weight
+                        </Button>
+                    </div>
                 </>
             )}
         </CardContent>
