@@ -6,13 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube } from 'lucide-react';
+import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO, getDay, getWeekOfMonth } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -37,6 +37,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Separator } from '@/components/ui/separator';
 import { WorkoutHeatmap } from '@/components/WorkoutHeatmap';
+import { WorkoutPlanModal } from '@/components/WorkoutPlanModal';
 
 
 const DEFAULT_TARGET_SETS = 4;
@@ -125,58 +126,55 @@ const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
   { id: 'def_legs_08', name: "Hack Squats", category: "Legs" },
 ];
 
-const W1_PLAN = {
-  Chest: ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine"],
-  Triceps: ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Cable Rope Pushdown (Slow)"],
-  Back: ["Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull"],
-  Biceps: ["Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"],
-  Shoulders: ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Shrugs"],
-  Legs: ["Walking Lunges (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine"]
-};
-
-const W2_PLAN = {
-  Chest: ["Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Cable Fly"],
-  Triceps: ["Overhead Dumbbell Extension", "Overhead Bar extension", "Rope Pushdown", "Dumbbell Kickback"],
-  Back: ["Lat Pulldown (Wide Grip)", "V handle lat pulldown", "1-Arm Dumbbell Row", "Back extensions"],
-  Biceps: ["Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Reverse Cable"],
-  Shoulders: ["Seated Dumbbell Shoulder Press", "Seated Dumbbell Lateral Raise", "Rear Delt Fly (Incline Bench)", "Cable Upright Rows"],
-  Legs: ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"]
-};
-
-const W3_PLAN = {
-  Chest: ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine"],
-  Triceps: ["Overhead Cable Extension", "Straight bar pushdown", "Reversebar pushdown", "Back dips"],
-  Back: ["Lat Pulldown", "Barbell Row", "Seated Row", "Lat Prayer Pull"],
-  Biceps: ["Strict bar curls", "Reversed Incline curls", "Cable Curls Superset", "Reversed cable curls"],
-  Shoulders: ["Seated Dumbbell Shoulder Press", "Dumbbell Lateral Raise (Lean in)", "Face Pulls", "Shrugs"],
-  Legs: ["Leg Press", "Quads Machine", "Hamstring machine", "Calf Raises (Bodyweight)"]
-};
-
-const W4_PLAN = {
-  Chest: ["Dumbbell Flat Press", "Incline Dumbbell Press", "Dumbbell Pullovers", "Cable Fly"],
-  Triceps: ["Overhead Cable Extension", "Straight bar pushdown", "Reversebar pushdown", "Back dips"],
-  Back: ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle pulldown Cable", "DeadLifts"],
-  Biceps: ["Seated Machine Curls", "Cable Curls", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"],
-  Shoulders: ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable"],
-  Legs: ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"]
-};
-
-const W5_PLAN = {
-  Chest: ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine", "Cable Fly", "Dumbbell Pullovers"],
-  Triceps: ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Straight bar pushdown", "Reversebar pushdown", "Back dips"],
-  Back: ["Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull", "1-Arm Dumbbell Row", "DeadLifts"],
-  Biceps: ["Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)", "Reversed cable curls", "Reversed Incline curls"],
-  Shoulders: ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Cable Upright Rows", "Front Raise Dumbbells", "Shrugs"],
-  Legs: ["Squats (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine", "Walking Lunges (Barbell)", "Calf Raises"],
-};
-
-const W6_PLAN = {
-  Chest: ["Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Peck Machine", "Flat Bench Chest Fly", "Dumbbell Pullovers"],
-  Triceps: ["Overhead Cable Extension", "Single Arm Dumbbell Extensions", "Rope Pushdown", "Straight bar pushdown", "Reversebar pushdown", "Back dips"],
-  Back: ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle pulldown Cable", "Barbell Row", "Lat Prayer Pull", "Back extensions"],
-  Biceps: ["Strict bar curls", "Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher Curls Bar", "Reverse Cable", "Concentration Curl"],
-  Shoulders: ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable", "Cable Upright Rows", "Shrugs"],
-  Legs: ["Walking Lunges (Barbell)", "Hack Squats", "Hamstring machine", "Quads Machine", "Leg Press", "Calf Raises"],
+const INITIAL_PLANS: AllWorkoutPlans = {
+  W1: {
+    Chest: ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine"],
+    Triceps: ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Cable Rope Pushdown (Slow)"],
+    Back: ["Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull"],
+    Biceps: ["Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"],
+    Shoulders: ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Shrugs"],
+    Legs: ["Walking Lunges (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine"]
+  },
+  W2: {
+    Chest: ["Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Cable Fly"],
+    Triceps: ["Overhead Dumbbell Extension", "Overhead Bar extension", "Rope Pushdown", "Dumbbell Kickback"],
+    Back: ["Lat Pulldown (Wide Grip)", "V handle lat pulldown", "1-Arm Dumbbell Row", "Back extensions"],
+    Biceps: ["Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Reverse Cable"],
+    Shoulders: ["Seated Dumbbell Shoulder Press", "Seated Dumbbell Lateral Raise", "Rear Delt Fly (Incline Bench)", "Cable Upright Rows"],
+    Legs: ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"]
+  },
+  W3: {
+    Chest: ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine"],
+    Triceps: ["Overhead Cable Extension", "Straight bar pushdown", "Reversebar pushdown", "Back dips"],
+    Back: ["Lat Pulldown", "Barbell Row", "Seated Row", "Lat Prayer Pull"],
+    Biceps: ["Strict bar curls", "Reversed Incline curls", "Cable Curls Superset", "Reversed cable curls"],
+    Shoulders: ["Seated Dumbbell Shoulder Press", "Dumbbell Lateral Raise (Lean in)", "Face Pulls", "Shrugs"],
+    Legs: ["Leg Press", "Quads Machine", "Hamstring machine", "Calf Raises (Bodyweight)"]
+  },
+  W4: {
+    Chest: ["Dumbbell Flat Press", "Incline Dumbbell Press", "Dumbbell Pullovers", "Cable Fly"],
+    Triceps: ["Overhead Cable Extension", "Straight bar pushdown", "Reversebar pushdown", "Back dips"],
+    Back: ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle pulldown Cable", "DeadLifts"],
+    Biceps: ["Seated Machine Curls", "Cable Curls", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"],
+    Shoulders: ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable"],
+    Legs: ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"]
+  },
+  W5: {
+    Chest: ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine", "Cable Fly", "Dumbbell Pullovers"],
+    Triceps: ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Straight bar pushdown", "Reversebar pushdown", "Back dips"],
+    Back: ["Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull", "1-Arm Dumbbell Row", "DeadLifts"],
+    Biceps: ["Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)", "Reversed cable curls", "Reversed Incline curls"],
+    Shoulders: ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Cable Upright Rows", "Front Raise Dumbbells", "Shrugs"],
+    Legs: ["Squats (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine", "Walking Lunges (Barbell)", "Calf Raises"],
+  },
+  W6: {
+    Chest: ["Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Peck Machine", "Flat Bench Chest Fly", "Dumbbell Pullovers"],
+    Triceps: ["Overhead Cable Extension", "Single Arm Dumbbell Extensions", "Rope Pushdown", "Straight bar pushdown", "Reversebar pushdown", "Back dips"],
+    Back: ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle pulldown Cable", "Barbell Row", "Lat Prayer Pull", "Back extensions"],
+    Biceps: ["Strict bar curls", "Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher Curls Bar", "Reverse Cable", "Concentration Curl"],
+    Shoulders: ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable", "Cable Upright Rows", "Shrugs"],
+    Legs: ["Walking Lunges (Barbell)", "Hack Squats", "Hamstring machine", "Quads Machine", "Leg Press", "Calf Raises"],
+  }
 };
 
 // Schedule for "Two Muscles / Day" mode
@@ -223,16 +221,33 @@ function WorkoutPageContent() {
   
   const [isLoadingPage, setIsLoadingPage] = useState(true);
 
+  const [workoutPlans, setWorkoutPlans] = useState<AllWorkoutPlans>(INITIAL_PLANS);
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+
   useEffect(() => {
     if (currentUser?.username) {
       const defsKey = `exerciseDefinitions_${currentUser.username}`;
       const logsKey = `allWorkoutLogs_${currentUser.username}`;
       const modeKey = `workoutMode_${currentUser.username}`;
+      const plansKey = `workoutPlans_${currentUser.username}`;
       let localDefsLoaded = false;
       
       const storedMode = localStorage.getItem(modeKey);
       if (storedMode === 'one-muscle' || storedMode === 'two-muscle') {
         setWorkoutMode(storedMode);
+      }
+
+      try {
+        const storedPlans = localStorage.getItem(plansKey);
+        if (storedPlans) {
+          const parsedPlans = JSON.parse(storedPlans);
+          setWorkoutPlans(parsedPlans);
+        } else {
+          setWorkoutPlans(INITIAL_PLANS);
+        }
+      } catch (e) {
+        console.error("Error parsing workout plans from localStorage", e);
+        setWorkoutPlans(INITIAL_PLANS);
       }
 
       try {
@@ -277,6 +292,7 @@ function WorkoutPageContent() {
     } else {
       setExerciseDefinitions([]);
       setAllWorkoutLogs([]);
+      setWorkoutPlans(INITIAL_PLANS);
     }
     const timer = setTimeout(() => setIsLoadingPage(false), 300);
     return () => clearTimeout(timer);
@@ -288,21 +304,23 @@ function WorkoutPageContent() {
         const defsKey = `exerciseDefinitions_${currentUser.username}`;
         const logsKey = `allWorkoutLogs_${currentUser.username}`;
         const modeKey = `workoutMode_${currentUser.username}`;
+        const plansKey = `workoutPlans_${currentUser.username}`;
         
         localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
         localStorage.setItem(logsKey, JSON.stringify(allWorkoutLogs));
         localStorage.setItem(modeKey, workoutMode);
+        localStorage.setItem(plansKey, JSON.stringify(workoutPlans));
 
       } catch (e) {
         console.error("Error saving data to localStorage", e);
         toast({ title: "Save Error", description: "Could not save data locally. Storage might be full.", variant: "destructive"});
       }
     }
-  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, workoutMode]);
+  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, workoutMode, workoutPlans]);
 
 
   useEffect(() => {
-    if (!currentUser || exerciseDefinitions.length === 0) return;
+    if (!currentUser || exerciseDefinitions.length === 0 || Object.keys(workoutPlans).length === 0) return;
   
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
   
@@ -319,17 +337,17 @@ function WorkoutPageContent() {
       const isOddWeek = weekOfMonth % 2 !== 0; // Weeks 1, 3, 5...
       
       if (workoutMode === 'two-muscle') {
-          let plan: typeof W1_PLAN | null = null;
+          let plan: any = null;
           let planName = "";
     
           if (dayOfWeek >= 1 && dayOfWeek <= 3) { // Mon-Wed
-            plan = isOddWeek ? W1_PLAN : W3_PLAN;
+            plan = isOddWeek ? workoutPlans.W1 : workoutPlans.W3;
             planName = isOddWeek ? "W1" : "W3";
           } else if (dayOfWeek >= 4 && dayOfWeek <= 5) { // Thu-Fri
-            plan = isOddWeek ? W2_PLAN : W4_PLAN;
+            plan = isOddWeek ? workoutPlans.W2 : workoutPlans.W4;
             planName = isOddWeek ? "W2" : "W4";
           } else if (dayOfWeek === 6) { // Saturday
-            plan = isOddWeek ? W1_PLAN : W3_PLAN; // Follows Wednesday's progression
+            plan = isOddWeek ? workoutPlans.W1 : workoutPlans.W3; // Follows Wednesday's progression
             planName = isOddWeek ? "W1" : "W3";
           }
     
@@ -359,7 +377,7 @@ function WorkoutPageContent() {
             }
           });
       } else { // 'one-muscle' mode
-          const plan = isOddWeek ? W5_PLAN : W6_PLAN;
+          const plan = isOddWeek ? workoutPlans.W5 : workoutPlans.W6;
           const planName = isOddWeek ? "W5" : "W6";
           const muscleGroupForDay = singleMuscleDailySchedule[dayOfWeek];
           if (!muscleGroupForDay) return prevLogs;
@@ -397,7 +415,7 @@ function WorkoutPageContent() {
       return prevLogs;
     });
   
-  }, [selectedDate, currentUser, exerciseDefinitions, toast, workoutMode]);
+  }, [selectedDate, currentUser, exerciseDefinitions, toast, workoutMode, workoutPlans]);
 
 
   const currentDatedWorkout = useMemo(() => {
@@ -612,8 +630,8 @@ function WorkoutPageContent() {
   }
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-      <div className="mb-6 text-center relative">
+    <div className="container mx-auto p-4 sm:p-6 lg:p-8 flex flex-col h-[calc(100vh-4rem)]">
+      <div className="mb-6 text-center relative shrink-0">
         <h1 className="text-3xl sm:text-4xl font-bold text-primary">
           Daily Workout Log
         </h1>
@@ -632,11 +650,13 @@ function WorkoutPageContent() {
         </div>
       </div>
 
-      <WorkoutHeatmap allWorkoutLogs={allWorkoutLogs} onDateSelect={setSelectedDate} />
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-        <section aria-labelledby="exercise-library-heading" className="md:col-span-1 space-y-6">
-          <Card className="shadow-xl rounded-xl overflow-hidden">
+      <div className="mb-8 shrink-0">
+        <WorkoutHeatmap allWorkoutLogs={allWorkoutLogs} onDateSelect={setSelectedDate} />
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start flex-grow min-h-0">
+        <section aria-labelledby="exercise-library-heading" className="md:col-span-1 space-y-6 flex flex-col h-full">
+          <Card className="shadow-xl rounded-xl overflow-hidden flex flex-col flex-grow">
             <CardHeader className="bg-primary/10">
               <div className="flex items-center justify-between">
                 <CardTitle id="exercise-library-heading" className="flex items-center gap-2 text-2xl text-primary">
@@ -667,26 +687,32 @@ function WorkoutPageContent() {
                 </DropdownMenu>
               </div>
             </CardHeader>
-            <CardContent className="p-4 space-y-4">
-               <div className="space-y-2">
+            <CardContent className="p-4 space-y-4 flex-grow flex flex-col min-h-0">
+               <div className="space-y-2 shrink-0">
                  <Label>Workout Plan</Label>
-                 <RadioGroup
-                   value={workoutMode}
-                   onValueChange={(value) => setWorkoutMode(value as WorkoutMode)}
-                   className="flex gap-4"
-                 >
-                   <div className="flex items-center space-x-2">
-                     <RadioGroupItem value="two-muscle" id="r1" />
-                     <Label htmlFor="r1" className="font-normal">Two Muscles / Day</Label>
-                   </div>
-                   <div className="flex items-center space-x-2">
-                     <RadioGroupItem value="one-muscle" id="r2" />
-                     <Label htmlFor="r2" className="font-normal">One Muscle / Day</Label>
-                   </div>
-                 </RadioGroup>
+                 <div className="flex items-center gap-4">
+                  <RadioGroup
+                    value={workoutMode}
+                    onValueChange={(value) => setWorkoutMode(value as WorkoutMode)}
+                    className="flex gap-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="two-muscle" id="r1" />
+                      <Label htmlFor="r1" className="font-normal">Two Muscles / Day</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="one-muscle" id="r2" />
+                      <Label htmlFor="r2" className="font-normal">One Muscle / Day</Label>
+                    </div>
+                  </RadioGroup>
+                  <Button variant="outline" size="sm" className="h-8" onClick={() => setIsPlanModalOpen(true)}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Edit Plans
+                  </Button>
+                 </div>
                </div>
-               <Separator />
-              <form onSubmit={handleAddExerciseDefinition} className="space-y-3">
+               <Separator className="shrink-0" />
+              <form onSubmit={handleAddExerciseDefinition} className="space-y-3 shrink-0">
                 <Input type="text" placeholder="New exercise name" value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} aria-label="New exercise name" className="h-10" />
                 <Select value={newExerciseCategory} onValueChange={(value) => setNewExerciseCategory(value as ExerciseCategory)}>
                   <SelectTrigger className="h-10"><SelectValue placeholder="Select category" /></SelectTrigger>
@@ -694,53 +720,55 @@ function WorkoutPageContent() {
                 </Select>
                 <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-10"> <PlusCircle className="mr-2 h-5 w-5" /> Add Exercise </Button>
               </form>
-              {filteredExerciseDefinitions.length === 0 && exerciseDefinitions.length > 0 ? (
-                 <p className="text-muted-foreground text-sm text-center py-4">No exercises match filter.</p>
-              ) : filteredExerciseDefinitions.length === 0 ? (
-                <p className="text-muted-foreground text-sm text-center py-4">Library empty. Add exercises!</p>
-              ) : (
-                <ul className="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
-                  <AnimatePresence>
-                    {filteredExerciseDefinitions.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
-                      <motion.li key={def.id} layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} className="p-3 bg-card border rounded-lg shadow-sm">
-                        {editingDefinition?.id === def.id ? (
-                          <div className="space-y-2">
-                            <Input value={editingDefinitionName} onChange={(e) => setEditingDefinitionName(e.target.value)} className="h-9" aria-label="Edit exercise name"/>
-                            <Select value={editingDefinitionCategory} onValueChange={(value) => setEditingDefinitionCategory(value as ExerciseCategory)}>
-                              <SelectTrigger className="h-9"><SelectValue placeholder="Select category" /></SelectTrigger>
-                              <SelectContent>{exerciseCategories.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
-                            </Select>
-                            <div className="flex gap-2">
-                              <Button size="sm" onClick={handleSaveEditDefinition} className="flex-grow bg-green-600 hover:bg-green-500 text-white"><Save className="h-4 w-4 mr-1"/>Save</Button>
-                              <Button size="sm" variant="ghost" onClick={() => setEditingDefinition(null)} className="flex-grow"><X className="h-4 w-4 mr-1"/>Cancel</Button>
+              <div className="flex-grow overflow-y-auto pr-1">
+                {filteredExerciseDefinitions.length === 0 && exerciseDefinitions.length > 0 ? (
+                  <p className="text-muted-foreground text-sm text-center py-4">No exercises match filter.</p>
+                ) : filteredExerciseDefinitions.length === 0 ? (
+                  <p className="text-muted-foreground text-sm text-center py-4">Library empty. Add exercises!</p>
+                ) : (
+                  <ul className="space-y-2">
+                    <AnimatePresence>
+                      {filteredExerciseDefinitions.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
+                        <motion.li key={def.id} layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} className="p-3 bg-card border rounded-lg shadow-sm">
+                          {editingDefinition?.id === def.id ? (
+                            <div className="space-y-2">
+                              <Input value={editingDefinitionName} onChange={(e) => setEditingDefinitionName(e.target.value)} className="h-9" aria-label="Edit exercise name"/>
+                              <Select value={editingDefinitionCategory} onValueChange={(value) => setEditingDefinitionCategory(value as ExerciseCategory)}>
+                                <SelectTrigger className="h-9"><SelectValue placeholder="Select category" /></SelectTrigger>
+                                <SelectContent>{exerciseCategories.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
+                              </Select>
+                              <div className="flex gap-2">
+                                <Button size="sm" onClick={handleSaveEditDefinition} className="flex-grow bg-green-600 hover:bg-green-500 text-white"><Save className="h-4 w-4 mr-1"/>Save</Button>
+                                <Button size="sm" variant="ghost" onClick={() => setEditingDefinition(null)} className="flex-grow"><X className="h-4 w-4 mr-1"/>Cancel</Button>
+                              </div>
                             </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-between gap-2">
-                             <div className="flex-grow min-w-0">
-                                <span className="font-medium text-foreground block" title={def.name}>{def.name}</span>
-                                <Badge variant="secondary" className="text-xs ml-0 my-0.5">{def.category}</Badge>
+                          ) : (
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex-grow min-w-0">
+                                  <span className="font-medium text-foreground block" title={def.name}>{def.name}</span>
+                                  <Badge variant="secondary" className="text-xs ml-0 my-0.5">{def.category}</Badge>
+                              </div>
+                              <div className="flex-shrink-0 flex items-center">
+                                <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
+                                <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8 text-muted-foreground hover:text-primary" aria-label={`Edit ${def.name}`}> <Edit3 className="h-4 w-4" /> </Button>
+                                <Button variant="ghost" size="icon" onClick={() => handleDeleteExerciseDefinition(def.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label={`Delete ${def.name}`}> <Trash2 className="h-4 w-4" /> </Button>
+                                <Button variant="ghost" size="icon" onClick={() => handleAddExerciseToWorkout(def)} className="h-8 w-8 text-muted-foreground hover:text-accent" aria-label={`Add ${def.name} to workout`}> <ChevronRight className="h-5 w-5" /> </Button>
+                              </div>
                             </div>
-                            <div className="flex-shrink-0 flex items-center">
-                              <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8 text-muted-foreground hover:text-primary" aria-label={`Edit ${def.name}`}> <Edit3 className="h-4 w-4" /> </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleDeleteExerciseDefinition(def.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label={`Delete ${def.name}`}> <Trash2 className="h-4 w-4" /> </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleAddExerciseToWorkout(def)} className="h-8 w-8 text-muted-foreground hover:text-accent" aria-label={`Add ${def.name} to workout`}> <ChevronRight className="h-5 w-5" /> </Button>
-                            </div>
-                          </div>
-                        )}
-                      </motion.li>
-                    ))}
-                  </AnimatePresence>
-                </ul>
-              )}
+                          )}
+                        </motion.li>
+                      ))}
+                    </AnimatePresence>
+                  </ul>
+                )}
+              </div>
             </CardContent>
           </Card>
         </section>
 
-        <section aria-labelledby="current-workout-heading" className="md:col-span-2 space-y-6">
-            <Card className="shadow-xl rounded-xl overflow-hidden">
-                <CardHeader className="bg-accent/10 flex flex-row items-center justify-between p-4">
+        <section aria-labelledby="current-workout-heading" className="md:col-span-2 space-y-6 flex flex-col h-full">
+            <Card className="shadow-xl rounded-xl overflow-hidden flex flex-col flex-grow">
+                <CardHeader className="bg-accent/10 flex flex-row items-center justify-between p-4 shrink-0">
                      <div className="flex-grow">
                         <CardTitle id="current-workout-heading" className="flex items-center gap-2 text-2xl text-accent">
                             <ListChecks /> Workout for: {format(selectedDate, 'PPP')}
@@ -763,7 +791,7 @@ function WorkoutPageContent() {
                         </PopoverContent>
                     </Popover>
                 </CardHeader>
-                <CardContent className="p-4">
+                <CardContent className="p-4 flex-grow overflow-y-auto">
                   {currentWorkoutExercises.length === 0 ? (
                     <div className="text-center py-10">
                         <GripVertical className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
@@ -771,7 +799,7 @@ function WorkoutPageContent() {
                         <p className="text-sm text-muted-foreground/80">Add exercises from library or select a weekday!</p>
                     </div>
                   ) : (
-                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                    <div className="space-y-4 pr-2">
                       <AnimatePresence>
                       {currentWorkoutExercises.map(exercise => {
                           const definition = exerciseDefinitions.find(def => def.id === exercise.definitionId);
@@ -799,6 +827,16 @@ function WorkoutPageContent() {
           exercise={viewingProgressExercise} allWorkoutLogs={allWorkoutLogs}
         />
       )}
+      {currentUser && (
+        <WorkoutPlanModal
+          isOpen={isPlanModalOpen}
+          onOpenChange={setIsPlanModalOpen}
+          workoutMode={workoutMode}
+          workoutPlans={workoutPlans}
+          setWorkoutPlans={setWorkoutPlans}
+          exerciseDefinitions={exerciseDefinitions}
+        />
+      )}
     </div>
   );
 }
@@ -806,10 +844,3 @@ function WorkoutPageContent() {
 export default function Page() {
   return ( <AuthGuard> <WorkoutPageContent /> </AuthGuard> );
 }
-
-    
- 
-
-
-    
-
