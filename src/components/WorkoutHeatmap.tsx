@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import CalendarHeatmap from 'react-calendar-heatmap';
-import { subYears, format, addDays, addWeeks, differenceInDays, setISOWeek, startOfISOWeek, parse } from 'date-fns';
+import { subYears, format, addDays, addWeeks, differenceInDays, setISOWeek, startOfISOWeek, parseISO } from 'date-fns';
 import type { DatedWorkout, WeightLog } from '@/types/workout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -76,8 +76,6 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
     setWeightDate(now);
     setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
   }, []);
-
-  const shouldShowHeightForm = view === 'weight' && currentUser && !currentUser.heightInCm;
 
   const heatmapValues: HeatmapValue[] = useMemo(() => allWorkoutLogs
     .filter(log => log.exercises.some(ex => ex.loggedSets.length > 0))
@@ -253,7 +251,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
         return (
             <div style={style} className={cn("z-50 overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95")}>
                  <div className="text-center">
-                    <p className="font-bold text-base">{format(parse(value.date, 'yyyy-MM-dd', new Date()), 'PPP')}</p>
+                    <p className="font-bold text-base">{format(parseISO(value.date), 'PPP')}</p>
                     <p className="text-sm">{value.count} sets logged</p>
                     {value.exercises && (
                         <div className="mt-2 pt-2 border-t text-xs text-muted-foreground max-w-xs">
@@ -434,111 +432,114 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
                 </>
             ) : (
                  <>
-                    {shouldShowHeightForm ? (
-                         <div className="flex flex-col items-center justify-center min-h-[250px] gap-4 p-4 border rounded-lg bg-muted/20">
-                            <h3 className="text-lg font-semibold text-center">Set Your Height</h3>
-                            <p className="text-sm text-muted-foreground text-center max-w-sm">To calculate your ideal weight, please enter your height. This is used for projection only and is saved locally.</p>
-                            <Input 
-                                value={heightInput} 
-                                onChange={(e) => setHeightInput(e.target.value)}
-                                placeholder="e.g., 180cm, 70in, or 5ft 10in" 
-                                className="w-full max-w-xs" 
-                            />
-                            <Button onClick={handleSaveHeight}>Save Height</Button>
+                    {!currentUser?.heightInCm && (
+                        <div className="mb-6 p-4 border rounded-lg bg-muted/20">
+                            <h3 className="text-lg font-semibold">Set Your Height</h3>
+                            <p className="text-sm text-muted-foreground mb-2">
+                                Enter your height to calculate and track your ideal weight.
+                            </p>
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                <Input 
+                                    value={heightInput} 
+                                    onChange={(e) => setHeightInput(e.target.value)}
+                                    placeholder="e.g., 180cm, 70in, or 5ft 10in" 
+                                    className="h-9 flex-grow" 
+                                />
+                                <Button onClick={handleSaveHeight} size="sm" className="h-9">Save Height</Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {weightChartData.length < 2 ? (
+                        <div className="flex justify-center items-center min-h-[250px]">
+                            <p className="text-center text-muted-foreground">
+                                Not enough data for a weight chart. Log your weight for at least two different weeks.
+                            </p>
                         </div>
                     ) : (
-                        <>
-                            {weightChartData.length < 2 ? (
-                                <div className="flex justify-center items-center min-h-[250px]">
-                                    <p className="text-center text-muted-foreground">
-                                        Not enough data for a weight chart. Log your weight for at least two different weeks.
-                                    </p>
-                                </div>
-                            ) : (
-                                <ChartContainer config={weightChartConfig} className="min-h-[250px] w-full pr-4">
-                                    <LineChart accessibilityLayer margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                                        <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                                        <XAxis dataKey="week" tickLine={false} axisLine={false} tickMargin={8} interval="preserveStartEnd" />
-                                        <YAxis yAxisId="left" tickLine={false} axisLine={false} tickMargin={8} domain={['dataMin - 2', 'dataMax + 2']} />
-                                        <RechartsTooltip
-                                            cursor={true}
-                                            content={({ active, payload }) => {
-                                                if (active && payload && payload.length) {
-                                                    const data = payload[0].payload;
-                                                    if (data.isIdeal) {
-                                                        const { tooltipData } = data;
-                                                        return (
-                                                            <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[200px]">
-                                                                <div className="font-bold text-center mb-2">Ideal Weight Goal</div>
-                                                                <div className="flex justify-between"><span className="text-muted-foreground">Target:</span> <span>{tooltipData.idealWeight} kg/lb</span></div>
-                                                                <div className="flex justify-between"><span className="text-muted-foreground">Est. Date:</span> <span>{tooltipData.projectedDate}</span></div>
-                                                                <div className="flex justify-between"><span className="text-muted-foreground">Days to Go:</span> <span>{tooltipData.daysToGoal}</span></div>
-                                                                <div className="flex justify-between"><span className="text-muted-foreground">Est. Change:</span> <span>{tooltipData.weeklyChange} kg/lb/wk</span></div>
-                                                            </div>
-                                                        );
-                                                    }
-                                                    return (
-                                                        <div className="rounded-lg border bg-background p-2.5 shadow-sm">
-                                                            <div className="flex flex-col">
-                                                                <span className="text-[0.7rem] uppercase text-muted-foreground">
-                                                                    {data.fullWeek}
-                                                                </span>
-                                                                <span className="font-bold text-foreground">
-                                                                    {data.weight} kg/lb
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                }
-                                                return null;
-                                            }}
-                                        />
-                                        <Line yAxisId="left" dataKey="weight" type="monotone" stroke="var(--color-weight)" strokeWidth={2} dot={true} data={weightChartData} name="Weight" />
-                                        {idealWeightData && (
-                                            <Line 
-                                                yAxisId="left" 
-                                                dataKey="weight" 
-                                                stroke="var(--color-projection)" 
-                                                strokeWidth={2} 
-                                                strokeDasharray="5 5"
-                                                data={idealWeightData.projectionLine}
-                                                name="Projection"
-                                                dot={(props) => {
-                                                if (props.payload.isIdeal) {
-                                                    return <Dot {...props} r={5} fill="var(--color-projection)" />;
-                                                }
-                                                return null;
-                                                }}
-                                            />
-                                        )}
-                                    </LineChart>
-                                </ChartContainer>
-                            )}
-                            <div className="flex flex-col sm:flex-row gap-2 items-center mt-4 pt-4 border-t">
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button variant={"outline"} className={cn("w-full sm:w-auto justify-start text-left font-normal h-9", !weightDate && "text-muted-foreground")}>
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {weightDate ? format(weightDate, "PPP") : <span>Pick a date</span>}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0">
-                                        <Calendar mode="single" selected={weightDate} onSelect={(date) => date && setWeightDate(date)} initialFocus />
-                                    </PopoverContent>
-                                </Popover>
-                                <Input
-                                    type="number"
-                                    placeholder="Enter weight (kg/lb)"
-                                    value={newWeight}
-                                    onChange={(e) => setNewWeight(e.target.value)}
-                                    className="h-9 flex-grow"
+                        <ChartContainer config={weightChartConfig} className="min-h-[250px] w-full pr-4">
+                            <LineChart accessibilityLayer margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                                <XAxis dataKey="week" tickLine={false} axisLine={false} tickMargin={8} interval="preserveStartEnd" />
+                                <YAxis yAxisId="left" tickLine={false} axisLine={false} tickMargin={8} domain={['dataMin - 2', 'dataMax + 2']} />
+                                <RechartsTooltip
+                                    cursor={true}
+                                    content={({ active, payload }) => {
+                                        if (active && payload && payload.length) {
+                                            const data = payload[0].payload;
+                                            if (data.isIdeal) {
+                                                const { tooltipData } = data;
+                                                return (
+                                                    <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[200px]">
+                                                        <div className="font-bold text-center mb-2">Ideal Weight Goal</div>
+                                                        <div className="flex justify-between"><span className="text-muted-foreground">Target:</span> <span>{tooltipData.idealWeight} kg/lb</span></div>
+                                                        <div className="flex justify-between"><span className="text-muted-foreground">Est. Date:</span> <span>{tooltipData.projectedDate}</span></div>
+                                                        <div className="flex justify-between"><span className="text-muted-foreground">Days to Go:</span> <span>{tooltipData.daysToGoal}</span></div>
+                                                        <div className="flex justify-between"><span className="text-muted-foreground">Est. Change:</span> <span>{tooltipData.weeklyChange} kg/lb/wk</span></div>
+                                                    </div>
+                                                );
+                                            }
+                                            return (
+                                                <div className="rounded-lg border bg-background p-2.5 shadow-sm">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[0.7rem] uppercase text-muted-foreground">
+                                                            {data.fullWeek}
+                                                        </span>
+                                                        <span className="font-bold text-foreground">
+                                                            {data.weight} kg/lb
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    }}
                                 />
-                                <Button onClick={handleLogWeightClick} disabled={!newWeight || !weightDate} className="h-9 w-full sm:w-auto">
-                                    Log Weight
-                                </Button>
-                            </div>
-                        </>
+                                <Line yAxisId="left" dataKey="weight" type="monotone" stroke="var(--color-weight)" strokeWidth={2} dot={true} data={weightChartData} name="Weight" />
+                                {idealWeightData && (
+                                    <Line 
+                                        yAxisId="left" 
+                                        dataKey="weight" 
+                                        stroke="var(--color-projection)" 
+                                        strokeWidth={2} 
+                                        strokeDasharray="5 5"
+                                        data={idealWeightData.projectionLine}
+                                        name="Projection"
+                                        dot={(props) => {
+                                        if (props.payload.isIdeal) {
+                                            return <Dot {...props} r={5} fill="var(--color-projection)" />;
+                                        }
+                                        return null;
+                                        }}
+                                    />
+                                )}
+                            </LineChart>
+                        </ChartContainer>
                     )}
+                    
+                    <div className="flex flex-col sm:flex-row gap-2 items-center mt-4 pt-4 border-t">
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant={"outline"} className={cn("w-full sm:w-auto justify-start text-left font-normal h-9", !weightDate && "text-muted-foreground")}>
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {weightDate ? format(weightDate, "PPP") : <span>Pick a date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar mode="single" selected={weightDate} onSelect={(date) => date && setWeightDate(date)} initialFocus />
+                            </PopoverContent>
+                        </Popover>
+                        <Input
+                            type="number"
+                            placeholder="Enter weight (kg/lb)"
+                            value={newWeight}
+                            onChange={(e) => setNewWeight(e.target.value)}
+                            className="h-9 flex-grow"
+                        />
+                        <Button onClick={handleLogWeightClick} disabled={!newWeight || !weightDate} className="h-9 w-full sm:w-auto">
+                            Log Weight
+                        </Button>
+                    </div>
                 </>
             )}
         </CardContent>
@@ -547,3 +548,5 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
     </>
   );
 }
+
+    
