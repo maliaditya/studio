@@ -149,8 +149,9 @@ export function WorkoutHeatmap({
   const [goalWeight, setGoalWeight] = useState<number | null>(null);
   const [goalWeightInput, setGoalWeightInput] = useState('');
 
-  const [isZoomed, setIsZoomed] = useState(false);
-  const [chartKey, setChartKey] = useState(0);
+  const [chartKey, setChartKey] = useState(Date.now());
+  const [brushIndex, setBrushIndex] = useState<{ startIndex?: number; endIndex?: number }>({});
+
 
   useEffect(() => {
     const now = new Date();
@@ -269,7 +270,6 @@ export function WorkoutHeatmap({
     if (Math.abs(projectionRate) < 0.01) return [];
 
     const weeksToGo = weightToChange / projectionRate;
-    
     if (weeksToGo <= 0) return [];
     
     const projectionEndDate = addWeeks(lastLog.dateObj, weeksToGo);
@@ -292,11 +292,6 @@ export function WorkoutHeatmap({
     ];
   }, [goalWeight, weightChartData]);
 
-    const combinedDataForChart = useMemo(() => {
-      return [...weightChartData];
-    }, [weightChartData]);
-
-    const minChartWidth = Math.max(combinedDataForChart.length * 50, 400);
 
     const handleLogWeightClick = () => {
       const weightValue = parseFloat(newWeight);
@@ -361,10 +356,20 @@ export function WorkoutHeatmap({
             </div>
         );
     }
+    
+    const isZoomed = useMemo(() => {
+      if (weightChartData.length <= 1) return false;
+      const { startIndex, endIndex } = brushIndex;
+      return (
+        startIndex !== undefined &&
+        endIndex !== undefined &&
+        (startIndex !== 0 || endIndex !== weightChartData.length - 1)
+      );
+    }, [brushIndex, weightChartData.length]);
 
     const handleResetZoom = () => {
-      setIsZoomed(false);
-      setChartKey(prev => prev + 1);
+      setBrushIndex({}); // Reset the index state
+      setChartKey(Date.now()); // Force the chart to re-mount with a new key
     };
     
     if (!oneYearAgo || !today) {
@@ -549,62 +554,58 @@ export function WorkoutHeatmap({
                             </p>
                         </div>
                     ) : (
-                       <div className="overflow-x-auto -mx-4 px-4 pb-4">
-                            <div style={{ minWidth: `${minChartWidth}px` }}>
-                                <ChartContainer config={weightChartConfig} key={chartKey} className="min-h-[350px] w-full pr-4">
-                                    <LineChart 
-                                      accessibilityLayer 
-                                      data={combinedDataForChart} 
-                                      margin={{ top: 5, right: 20, left: 0, bottom: 20 }}
-                                      onMouseDown={() => setIsZoomed(true)}
-                                    >
-                                        <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                                        <XAxis 
-                                            dataKey="timestamp"
-                                            type="number"
-                                            domain={['dataMin', 'dataMax']}
-                                            tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')}
-                                            tickLine={false}
-                                            axisLine={false}
-                                            tickMargin={8}
-                                            interval="preserveStartEnd"
-                                        />
-                                        <YAxis tickLine={false} axisLine={false} tickMargin={8} domain={['dataMin - 2', 'dataMax + 2']} />
-                                        <RechartsTooltip
-                                            cursor={true}
-                                            content={<CustomTooltip />}
-                                        />
-                                        {goalWeight !== null && (
-                                            <ReferenceLine 
-                                                y={goalWeight} 
-                                                label={{ value: `Goal: ${goalWeight}`, position: 'insideTopRight', fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} 
-                                                stroke="hsl(var(--primary))" 
-                                                strokeDasharray="4 4" 
-                                            />
-                                        )}
-                                        <Line dataKey="weight" type="monotone" stroke="var(--color-weight)" strokeWidth={2} dot={true} name="Weight" />
-                                        {projectionData && projectionData.length > 0 && (
-                                        <Line 
-                                            data={projectionData} 
-                                            dataKey="weight"
-                                            type="monotone"
-                                            stroke="var(--color-weight)" 
-                                            strokeDasharray="5 5"
-                                            dot={{r: 4}}
-                                            name="Projection" 
-                                        />
-                                        )}
-                                        <Brush 
-                                            dataKey="timestamp" 
-                                            height={40} 
-                                            stroke="hsl(var(--primary))" 
-                                            tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')}
-                                            travellerWidth={15}
-                                        />
-                                    </LineChart>
-                                </ChartContainer>
-                            </div>
-                        </div>
+                        <ChartContainer config={weightChartConfig} key={chartKey} className="min-h-[350px] w-full pr-4">
+                            <LineChart 
+                                accessibilityLayer 
+                                data={weightChartData} 
+                                margin={{ top: 5, right: 20, left: 0, bottom: 20 }}
+                            >
+                                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                                <XAxis 
+                                    dataKey="timestamp"
+                                    type="number"
+                                    domain={['dataMin', 'dataMax']}
+                                    tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickMargin={8}
+                                    interval="preserveStartEnd"
+                                />
+                                <YAxis tickLine={false} axisLine={false} tickMargin={8} domain={['dataMin - 2', 'dataMax + 2']} />
+                                <RechartsTooltip
+                                    cursor={true}
+                                    content={<CustomTooltip />}
+                                />
+                                {goalWeight !== null && (
+                                    <ReferenceLine 
+                                        y={goalWeight} 
+                                        label={{ value: `Goal: ${goalWeight}`, position: 'insideTopRight', fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} 
+                                        stroke="hsl(var(--primary))" 
+                                        strokeDasharray="4 4" 
+                                    />
+                                )}
+                                <Line dataKey="weight" type="monotone" stroke="var(--color-weight)" strokeWidth={2} dot={true} name="Weight" />
+                                {projectionData && projectionData.length > 0 && (
+                                <Line 
+                                    data={projectionData} 
+                                    dataKey="weight"
+                                    type="monotone"
+                                    stroke="var(--color-weight)" 
+                                    strokeDasharray="5 5"
+                                    dot={{r: 4}}
+                                    name="Projection" 
+                                />
+                                )}
+                                <Brush 
+                                    dataKey="timestamp" 
+                                    height={40} 
+                                    stroke="hsl(var(--primary))" 
+                                    tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')}
+                                    travellerWidth={15}
+                                    onChange={(e) => setBrushIndex({startIndex: e.startIndex, endIndex: e.endIndex})}
+                                />
+                            </LineChart>
+                        </ChartContainer>
                     )}
                     
                     <div className="flex flex-col sm:flex-row gap-2 items-center mt-4 pt-4 border-t">
