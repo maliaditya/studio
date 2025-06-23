@@ -371,7 +371,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
                             <PopoverTrigger asChild>
                                 <Button variant={"outline"} className={cn("w-full sm:w-[260px] justify-start text-left font-normal h-9", !weightDate && "text-muted-foreground")}>
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {weightDate ? `Log for week of: ${format(weightDate, "PPP")}` : <span>Pick a date</span>}
+                                    {weightDate ? format(weightDate, "PPP") : <span>Pick a date</span>}
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0">
