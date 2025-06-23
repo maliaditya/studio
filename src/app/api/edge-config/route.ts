@@ -1,3 +1,4 @@
+
 import { put, head } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
 
   try {
     const blob = await put(blobPathname, JSON.stringify(data, null, 2), {
-      access: 'protected', // 'protected' means only this application can access it
+      access: 'public', // 'public' is required on Vercel's Hobby plan.
       contentType: 'application/json',
     });
 
@@ -59,7 +60,7 @@ export async function GET(request: Request) {
   const blobPathname = `${username}-data.json`;
 
   try {
-    // To download a protected blob, we must fetch its URL from the server-side.
+    // To download a blob, we must fetch its URL from the server-side.
     // First, check if the blob exists to avoid 404 errors.
     const blobInfo = await head(blobPathname);
     
