@@ -2,6 +2,8 @@
 import { put, head } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/blob-sync
  * Uploads a user's entire data object to Vercel Blob storage.
