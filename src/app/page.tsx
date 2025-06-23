@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus, Activity, LineChart as LineChartIcon } from 'lucide-react';
+import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus, Activity, LineChart as LineChartIcon, BookCopy } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -50,6 +50,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from '@/components/ui/switch';
 import { WeightChartModal } from '@/components/WeightChartModal';
+import { DietPlanModal } from '@/components/DietPlanModal';
 
 
 const DEFAULT_TARGET_SETS = 4;
@@ -201,6 +202,7 @@ function WorkoutPageContent() {
 
   const [goalWeight, setGoalWeight] = useState<number | null>(null);
   const [isWeightChartModalOpen, setIsWeightChartModalOpen] = useState(false);
+  const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
 
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   const [today, setToday] = useState<Date | null>(null);
@@ -1025,10 +1027,16 @@ function WorkoutPageContent() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                     <Button onClick={() => setIsWeightChartModalOpen(true)} className="w-full">
-                        <LineChartIcon className="mr-2 h-4 w-4" />
-                        Open Weight Chart & Set Goal
-                    </Button>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <Button onClick={() => setIsWeightChartModalOpen(true)} className="w-full">
+                            <LineChartIcon className="mr-2 h-4 w-4" />
+                            Chart & Goal
+                        </Button>
+                        <Button onClick={() => setIsDietPlanModalOpen(true)} variant="outline" className="w-full">
+                            <BookCopy className="mr-2 h-4 w-4" />
+                            AI Diet Plan
+                        </Button>
+                    </div>
                     {(projectionSummary || latestConsistency) && (
                         <div className="space-y-4 pt-4 border-t">
                             {projectionSummary && (
@@ -1145,7 +1153,7 @@ function WorkoutPageContent() {
                                   exercise={exercise}
                                   onLogSet={handleLogSet} 
                                   onDeleteSet={handleDeleteSet} 
-                                  onUpdateSet={handleUpdateSet}
+                                  onUpdateSet={handleUpdateSet} 
                                   onRemoveExercise={handleRemoveExerciseFromWorkout}
                                   onViewProgress={definition ? () => handleViewProgress(definition) : undefined}
                                 />
@@ -1200,6 +1208,13 @@ function WorkoutPageContent() {
         onUpdateWeightLog={handleUpdateWeightLog}
         onDeleteWeightLog={handleDeleteWeightLog}
         onSetGoalWeight={handleSetGoalWeight}
+      />
+
+      <DietPlanModal
+        isOpen={isDietPlanModalOpen}
+        onOpenChange={setIsDietPlanModalOpen}
+        currentWeight={projectionSummary?.currentWeight ?? null}
+        goalWeight={goalWeight}
       />
     </>
   );

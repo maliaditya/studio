@@ -1,7 +1,5 @@
 
-
-
-
+import { z } from 'zod';
 
 export type ExerciseCategory = 
   | "Chest" 
@@ -71,3 +69,21 @@ export interface WeightLog {
   date: string; // ISO week format 'YYYY-WW'
   weight: number;
 }
+
+
+// AI Diet Plan Types
+export const GenerateDietPlanInputSchema = z.object({
+  currentWeight: z.number().describe('The user\'s current weight in kg or lb.'),
+  goalWeight: z.number().describe('The user\'s goal weight in kg or lb.'),
+  height: z.number().describe('The user\'s height in centimeters.'),
+  age: z.number().describe('The user\'s age in years.'),
+  gender: z.enum(['male', 'female', 'other']).describe('The user\'s gender.'),
+  activityLevel: z.enum(['sedentary', 'light', 'moderate', 'active', 'very_active']).describe('The user\'s daily activity level.'),
+  preferences: z.string().optional().describe('Any dietary preferences or restrictions, e.g., "vegetarian, no nuts".'),
+});
+export type GenerateDietPlanInput = z.infer<typeof GenerateDietPlanInputSchema>;
+
+export const GenerateDietPlanOutputSchema = z.object({
+  plan: z.string().describe('A detailed 7-day diet plan in Markdown format. It should include breakfast, lunch, dinner, and snacks for each day, with estimated calorie counts for each meal and a daily total. Provide a brief summary of the overall strategy at the top.'),
+});
+export type GenerateDietPlanOutput = z.infer<typeof GenerateDietPlanOutputSchema>;
