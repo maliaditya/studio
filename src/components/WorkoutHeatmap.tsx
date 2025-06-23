@@ -11,13 +11,14 @@ import { Button } from './ui/button';
 import { LineChart as LineChartIcon, Calendar as CalendarIcon, Weight as WeightIcon, Edit2, Trash2, Save, X } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { ChartContainer, ChartConfig } from './ui/chart';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine } from 'recharts';
 import { Input } from './ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { ScrollArea } from './ui/scroll-area';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface WorkoutHeatmapProps {
   allWorkoutLogs: DatedWorkout[];
@@ -65,6 +66,7 @@ export function WorkoutHeatmap({
   onDeleteWeightLog,
 }: WorkoutHeatmapProps) {
   const { toast } = useToast();
+  const { currentUser } = useAuth();
   
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
   const [view, setView] = useState<'heatmap' | 'graph' | 'weight'>('heatmap');
@@ -76,12 +78,26 @@ export function WorkoutHeatmap({
   const [today, setToday] = useState<Date | null>(null);
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
 
+  const [goalWeight, setGoalWeight] = useState<number | null>(null);
+  const [goalWeightInput, setGoalWeightInput] = useState('');
+
   useEffect(() => {
     const now = new Date();
     setToday(now);
     setWeightDate(now);
     setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
   }, []);
+
+  useEffect(() => {
+    if (currentUser?.username) {
+        const storedGoal = localStorage.getItem(`goalWeight_${currentUser.username}`);
+        if (storedGoal) {
+            setGoalWeight(parseFloat(storedGoal));
+        }
+    } else {
+        setGoalWeight(null); // Clear goal if user logs out
+    }
+  }, [currentUser]);
 
   const heatmapValues: HeatmapValue[] = useMemo(() => allWorkoutLogs
     .filter(log => log.exercises.some(ex => ex.loggedSets.length > 0))
@@ -167,6 +183,22 @@ export function WorkoutHeatmap({
       } else {
         toast({ title: "Invalid Input", description: "Please enter a valid weight and select a date.", variant: "destructive" });
       }
+    };
+
+    const handleSetGoalWeight = () => {
+        const goal = parseFloat(goalWeightInput);
+        if (!isNaN(goal) && goal > 0) {
+            if (currentUser?.username) {
+                setGoalWeight(goal);
+                localStorage.setItem(`goalWeight_${currentUser.username}`, goal.toString());
+                toast({ title: "Goal Set!", description: `Your new goal weight is ${goal} kg/lb.` });
+                setGoalWeightInput('');
+            } else {
+                toast({ title: "Error", description: "You must be logged in to set a goal.", variant: "destructive" });
+            }
+        } else {
+            toast({ title: "Invalid Input", description: "Please enter a valid goal weight.", variant: "destructive" });
+        }
     };
 
     const handleSaveEdit = () => {
@@ -429,6 +461,14 @@ export function WorkoutHeatmap({
                                         return null;
                                     }}
                                 />
+                                {goalWeight !== null && (
+                                    <ReferenceLine 
+                                        y={goalWeight} 
+                                        label={{ value: `Goal: ${goalWeight}`, position: 'insideTopRight', fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} 
+                                        stroke="hsl(var(--primary))" 
+                                        strokeDasharray="4 4" 
+                                    />
+                                )}
                                 <Line dataKey="weight" type="monotone" stroke="var(--color-weight)" strokeWidth={2} dot={true} name="Weight" />
                             </LineChart>
                         </ChartContainer>
@@ -448,13 +488,26 @@ export function WorkoutHeatmap({
                         </Popover>
                         <Input
                             type="number"
-                            placeholder="Enter weight (kg/lb)"
+                            placeholder={goalWeight ? `Log weight (Goal: ${goalWeight} kg/lb)` : "Enter weight (kg/lb)"}
                             value={newWeight}
                             onChange={(e) => setNewWeight(e.target.value)}
                             className="h-9 flex-grow"
                         />
                         <Button onClick={handleLogWeightClick} disabled={!newWeight || !weightDate} className="h-9 w-full sm:w-auto">
                             Log Weight
+                        </Button>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-2 items-center mt-2">
+                        <Input
+                            type="number"
+                            placeholder="Enter your ideal weight"
+                            value={goalWeightInput}
+                            onChange={(e) => setGoalWeightInput(e.target.value)}
+                            className="h-9 flex-grow"
+                        />
+                        <Button onClick={handleSetGoalWeight} disabled={!goalWeightInput} className="h-9 w-full sm:w-auto">
+                            Set Goal
                         </Button>
                     </div>
 
@@ -519,3 +572,5 @@ export function WorkoutHeatmap({
     </>
   );
 }
+
+    
