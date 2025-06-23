@@ -11,7 +11,6 @@ import {
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
 } from '@/lib/localAuth';
-import pako from 'pako';
 
 interface AuthContextType {
   currentUser: LocalUser | null;
@@ -26,27 +25,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Helper to safely convert a Uint8Array to a Base64 string
-function uint8ArrayToBase64(uint8array: Uint8Array): string {
-    let binary = '';
-    const len = uint8array.byteLength;
-    for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(uint8array[i]);
-    }
-    return window.btoa(binary);
-}
-
-// Helper to safely convert a Base64 string to a Uint8Array
-function base64ToUint8Array(base64: string): Uint8Array {
-    const binary_string = window.atob(base64);
-    const len = binary_string.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-        bytes[i] = binary_string.charCodeAt(i);
-    }
-    return bytes;
-}
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<LocalUser | null>(null);
@@ -100,52 +78,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
         return;
     }
-    toast({ title: "Compressing & Syncing...", description: "Pushing your local data to the cloud." });
+    toast({ title: "Syncing...", description: "Pushing your local data to the cloud." });
 
     try {
         const username = currentUser.username;
-        // Split data into three logical chunks
-        const settingsData = {
+        
+        const allUserData = {
             workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
             weightLogs: JSON.parse(localStorage.getItem(`weightLogs_${username}`) || '[]'),
             goalWeight: localStorage.getItem(`goalWeight_${username}`) || null,
-        };
-        const libraryData = {
             exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
             workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
-        };
-        const logsData = {
             allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
         };
 
-        const compressAndEncode = (data: object) => {
-            const jsonString = JSON.stringify(data);
-            const compressed = pako.deflate(jsonString);
-            return uint8ArrayToBase64(compressed);
-        };
+        const response = await fetch('/api/edge-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, data: allUserData }),
+        });
         
-        const compressedSettingsData = compressAndEncode(settingsData);
-        const compressedLibraryData = compressAndEncode(libraryData);
-        const compressedLogsData = compressAndEncode(logsData);
-        
-        const pushItem = async (item: 'settings' | 'library' | 'logs', data: string) => {
-            const response = await fetch('/api/edge-config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, data, item }),
-            });
-            const result = await response.json();
-            if (!response.ok) {
-                throw new Error(result.error || `Failed to push ${item} data.`);
-            }
-            return result;
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || `Failed to push data.`);
         }
-
-        await Promise.all([
-            pushItem('settings', compressedSettingsData),
-            pushItem('library', compressedLibraryData),
-            pushItem('logs', compressedLogsData),
-        ]);
 
         toast({ title: "Success", description: "Your data has been saved to the cloud." });
     } catch (error) {
@@ -163,54 +119,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
           return;
       }
-      toast({ title: "Syncing & Decompressing...", description: "Fetching your latest data from the cloud." });
+      toast({ title: "Syncing...", description: "Fetching your latest data from the cloud." });
 
       try {
           const username = currentUser.username;
           
-          const pullAndDecompress = async (item: 'settings' | 'library' | 'logs') => {
-             const response = await fetch(`/api/edge-config?username=${username}&item=${item}`);
-             const result = await response.json();
-             if (!response.ok) throw new Error(result.error || `Failed to fetch ${item} data.`);
-             
-             const data = result.data;
-             if (data === null || data === undefined) return null;
+          const response = await fetch(`/api/edge-config?username=${username}`);
+          const result = await response.json();
 
-             if (typeof data === 'string') {
-                 const compressedBytes = base64ToUint8Array(data);
-                 const decompressedString = pako.inflate(compressedBytes, { to: 'string' });
-                 return JSON.parse(decompressedString);
-             }
-             return null; // Don't process uncompressed/old data formats
+          if (!response.ok) {
+              throw new Error(result.error || `Failed to fetch data.`);
           }
-
-          const [settingsData, libraryData, logsData] = await Promise.all([
-              pullAndDecompress('settings'),
-              pullAndDecompress('library'),
-              pullAndDecompress('logs'),
-          ]);
           
-          if (!settingsData && !libraryData && !logsData) {
+          const data = result.data;
+          
+          if (data === null || data === undefined) {
               toast({ title: "No Cloud Data", description: "No data found in the cloud for your user." });
               return;
           }
 
-          if (settingsData) {
-              localStorage.setItem(`workoutMode_${username}`, settingsData.workoutMode || 'two-muscle');
-              localStorage.setItem(`weightLogs_${username}`, JSON.stringify(settingsData.weightLogs || []));
-              if (settingsData.goalWeight) {
-                  localStorage.setItem(`goalWeight_${username}`, settingsData.goalWeight.toString());
-              } else {
-                  localStorage.removeItem(`goalWeight_${username}`);
-              }
+          localStorage.setItem(`workoutMode_${username}`, data.workoutMode || 'two-muscle');
+          localStorage.setItem(`weightLogs_${username}`, JSON.stringify(data.weightLogs || []));
+          if (data.goalWeight) {
+              localStorage.setItem(`goalWeight_${username}`, data.goalWeight.toString());
+          } else {
+              localStorage.removeItem(`goalWeight_${username}`);
           }
-          if (libraryData) {
-              localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(libraryData.exerciseDefinitions || []));
-              localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(libraryData.workoutPlans || {}));
-          }
-          if (logsData) {
-              localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(logsData.allWorkoutLogs || []));
-          }
+          localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(data.exerciseDefinitions || []));
+          localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(data.workoutPlans || {}));
+          localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(data.allWorkoutLogs || []));
 
           toast({
             title: "Sync Successful",

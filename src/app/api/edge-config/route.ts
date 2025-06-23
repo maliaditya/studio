@@ -1,95 +1,84 @@
-
-import { get } from '@vercel/edge-config';
+import { put, head } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 
 /**
- * GET /api/edge-config?username=<username>&item=<item>
- * Fetches a specific data blob (e.g., 'settings', 'library', 'logs') for a user.
- */
-export async function GET(request: Request) {
-    const { searchParams } = new URL(request.url);
-    const username = searchParams.get('username');
-    const item = searchParams.get('item'); // e.g., 'settings', 'library', 'logs'
-
-    if (!process.env.EDGE_CONFIG) {
-        return NextResponse.json({ error: 'Edge Config connection string is not configured on the server.' }, { status: 500 });
-    }
-
-    if (!username || !item) {
-        return NextResponse.json({ error: 'Username and item are required.' }, { status: 400 });
-    }
-
-    // Construct the key based on the user and item type
-    const key = `${username}_${item}`;
-
-    try {
-        const userData = await get(key);
-        return NextResponse.json({ data: userData });
-    } catch (error) {
-        console.error(`Edge Config read error for user ${username}, item ${item}:`, error);
-        return NextResponse.json({ error: 'Failed to read data from Edge Config.' }, { status: 500 });
-    }
-}
-
-
-/**
  * POST /api/edge-config
- * Updates a user's data blob in Vercel Edge Config.
- * Expects { username, data, item }, where item is 'settings', 'library', or 'logs'.
+ * Uploads a user's entire data object to Vercel Blob storage.
+ * The user's data is stored as a single JSON file.
+ * The filename is the same as this route for simplicity, but it's now a blob sync endpoint.
  */
 export async function POST(request: Request) {
-    const { username, data, item } = await request.json();
+  const { username, data } = await request.json();
 
-    const edgeConfigConnectionString = process.env.EDGE_CONFIG;
-    const vercelApiToken = process.env.VERCEL_API_TOKEN;
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return NextResponse.json(
+      { error: 'Vercel Blob Storage is not configured on the server. Please link a Blob store.' },
+      { status: 500 }
+    );
+  }
 
-    if (!edgeConfigConnectionString || !vercelApiToken) {
-        return NextResponse.json({ error: 'Server is not configured for Vercel API access. Check EDGE_CONFIG and VERCEL_API_TOKEN environment variables.' }, { status: 500 });
-    }
+  if (!username || data === undefined) {
+    return NextResponse.json({ error: 'Username and data payload are required.' }, { status: 400 });
+  }
 
-    if (!username || data === undefined || !item) {
-        return NextResponse.json({ error: 'Username, data payload, and item type are required.' }, { status: 400 });
-    }
+  const blobPathname = `${username}-data.json`;
+
+  try {
+    const blob = await put(blobPathname, JSON.stringify(data, null, 2), {
+      access: 'protected', // 'protected' means only this application can access it
+      contentType: 'application/json',
+    });
+
+    return NextResponse.json({ success: true, message: 'Data synced to cloud.', blob });
+  } catch (error) {
+    console.error('Error in POST /api/edge-config:', error);
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
+  }
+}
+
+/**
+ * GET /api/edge-config?username=<username>
+ * Fetches a user's data file from Vercel Blob storage.
+ */
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const username = searchParams.get('username');
+  
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return NextResponse.json(
+      { error: 'Vercel Blob Storage is not configured on the server.' },
+      { status: 500 }
+    );
+  }
+
+  if (!username) {
+    return NextResponse.json({ error: 'Username is required.' }, { status: 400 });
+  }
+
+  const blobPathname = `${username}-data.json`;
+
+  try {
+    // To download a protected blob, we must fetch its URL from the server-side.
+    // First, check if the blob exists to avoid 404 errors.
+    const blobInfo = await head(blobPathname);
     
-    const key = `${username}_${item}`;
-
-    try {
-        const edgeConfigId = new URL(edgeConfigConnectionString).pathname.split('/')[1];
-
-        if (!edgeConfigId) {
-            throw new Error('Could not parse Edge Config ID from connection string.');
-        }
-
-        const vercelApiUrl = `https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`;
-
-        const response = await fetch(vercelApiUrl, {
-            method: 'PATCH',
-            headers: {
-                'Authorization': `Bearer ${vercelApiToken}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                items: [
-                    {
-                        operation: 'upsert',
-                        key: key,
-                        value: data,
-                    },
-                ],
-            }),
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('Vercel API error:', errorData);
-            throw new Error(errorData.error?.message || `Failed to update Edge Config for item: ${item}`);
-        }
-
-        return NextResponse.json({ success: true, message: `Data chunk '${item}' synced to cloud.` });
-
-    } catch (error) {
-        console.error('Error in POST /api/edge-config:', error);
-        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-        return NextResponse.json({ error: errorMessage }, { status: 500 });
+    // If head returns successfully, we can fetch the blob's content via its URL.
+    const response = await fetch(blobInfo.url);
+    
+    if (!response.ok) {
+        throw new Error(`Failed to download data from Blob storage. Status: ${response.status}`);
     }
+
+    const userData = await response.json();
+    return NextResponse.json({ data: userData });
+
+  } catch (error) {
+     // The `head` method throws an error for a 404, which we can catch.
+     if (error instanceof Error && error.message.includes('404')) {
+        return NextResponse.json({ data: null, message: "No cloud data found for this user." }, { status: 200 });
+    }
+    console.error(`Blob storage read error for user ${username}:`, error);
+    return NextResponse.json({ error: 'Failed to read data from Blob storage.' }, { status: 500 });
+  }
 }
