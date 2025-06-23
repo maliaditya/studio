@@ -11,7 +11,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { format, parseISO, getDay, getWeekOfMonth, isMonday, getYear, getISOWeek } from 'date-fns';
+import { format, parseISO, getDay, getWeekOfMonth, isMonday, getYear, getISOWeek, parse } from 'date-fns';
 import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans, WeightLog } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
@@ -743,9 +743,10 @@ function WorkoutPageContent() {
         <div className="mb-8">
           <WorkoutHeatmap
             allWorkoutLogs={allWorkoutLogs}
-            onDateSelect={setSelectedDate}
+            onDateSelect={(date) => setSelectedDate(parse(date.toISOString().split('T')[0], 'yyyy-MM-dd', new Date()))}
             weightLogs={weightLogs}
             onLogWeight={handleLogWeight}
+            selectedDate={selectedDate}
           />
         </div>
         

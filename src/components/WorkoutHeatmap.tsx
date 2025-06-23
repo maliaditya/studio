@@ -13,12 +13,15 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/t
 import { ChartContainer, ChartConfig } from './ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Input } from './ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Calendar } from './ui/calendar';
 
 interface WorkoutHeatmapProps {
   allWorkoutLogs: DatedWorkout[];
   onDateSelect: (date: Date) => void;
   weightLogs: WeightLog[];
   onLogWeight: (weight: number) => void;
+  selectedDate: Date;
 }
 
 interface HeatmapValue {
@@ -47,7 +50,7 @@ const weightChartConfig = {
   }
 } satisfies ChartConfig;
 
-export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLogWeight }: WorkoutHeatmapProps) {
+export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLogWeight, selectedDate }: WorkoutHeatmapProps) {
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
   const [view, setView] = useState<'heatmap' | 'graph' | 'weight'>('heatmap');
   const [newWeight, setNewWeight] = useState('');
@@ -182,7 +185,18 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
                 {view === 'weight' && 'Your weekly body weight trend.'}
               </CardDescription>
             </div>
-             <div className='flex items-center'>
+             <div className='flex items-center gap-2'>
+                <Popover>
+                    <PopoverTrigger asChild>
+                    <Button variant={"outline"} className={cn("w-[200px] justify-start text-left font-normal h-10",!selectedDate && "text-muted-foreground")}>
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                    <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && onDateSelect(date)} initialFocus />
+                    </PopoverContent>
+                </Popover>
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
@@ -190,7 +204,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
                                 variant="outline"
                                 size="icon"
                                 onClick={() => setView(v => v === 'graph' ? 'heatmap' : 'graph')}
-                                className="ml-4 flex-shrink-0"
+                                className="flex-shrink-0"
                             >
                                 {view === 'heatmap' || view === 'weight' ? <LineChartIcon className="h-4 w-4" /> : <CalendarIcon className="h-4 w-4" />}
                             </Button>
@@ -205,7 +219,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
                                 variant="outline"
                                 size="icon"
                                 onClick={() => setView(v => v === 'weight' ? 'heatmap' : 'weight')}
-                                className="ml-2 flex-shrink-0"
+                                className="flex-shrink-0"
                             >
                                 <WeightIcon className="h-4 w-4" />
                             </Button>
@@ -243,10 +257,12 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
                             setTooltipData(null);
                         }}
                         onClick={(value) => {
-                        if (value && value.date) {
-                            setTooltipData(null);
-                            onDateSelect(parse(value.date, 'yyyy-MM-dd', new Date()));
-                        }
+                          if (value && value.date) {
+                              setTooltipData(null);
+                              // Manually parse to avoid timezone issues with `new Date('YYYY-MM-DD')`
+                              const [year, month, day] = value.date.split('-').map(Number);
+                              onDateSelect(new Date(year, month - 1, day));
+                          }
                         }}
                         showMonthLabels={true}
                         showWeekdayLabels={true}
