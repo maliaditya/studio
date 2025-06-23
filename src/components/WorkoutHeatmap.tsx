@@ -400,7 +400,7 @@ export function WorkoutHeatmap({
                                         return null;
                                     }}
                                 />
-                                <Line yAxisId="left" dataKey="weight" type="monotone" stroke="var(--color-weight)" strokeWidth={2} dot={true} name="Weight" />
+                                <Line dataKey="weight" type="monotone" stroke="var(--color-weight)" strokeWidth={2} dot={true} name="Weight" />
                             </LineChart>
                         </ChartContainer>
                     )}
