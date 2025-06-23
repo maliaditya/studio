@@ -872,7 +872,7 @@ function WorkoutPageContent() {
                       </Popover>
                   </CardHeader>
                   <CardContent className="p-4">
-                    <div className="max-h-[calc(100vh-26rem)] overflow-y-auto space-y-4 pr-2">
+                    <div className="max-h-[calc(100vh-26rem)] overflow-y-auto pr-2">
                       {currentWorkoutExercises.length === 0 ? (
                         <div className="text-center py-10">
                             <GripVertical className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
@@ -880,22 +880,24 @@ function WorkoutPageContent() {
                             <p className="text-sm text-muted-foreground/80">Add exercises from library or select a weekday!</p>
                         </div>
                       ) : (
-                        <AnimatePresence>
-                        {currentWorkoutExercises.map(exercise => {
-                            const definition = exerciseDefinitions.find(def => def.id === exercise.definitionId);
-                            return (
-                              <WorkoutExerciseCard 
-                                key={exercise.id} 
-                                exercise={exercise}
-                                onLogSet={handleLogSet} 
-                                onDeleteSet={handleDeleteSet} 
-                                onUpdateSet={handleUpdateSet}
-                                onRemoveExercise={handleRemoveExerciseFromWorkout}
-                                onViewProgress={definition ? () => handleViewProgress(definition) : undefined}
-                              />
-                            );
-                        })}
-                        </AnimatePresence>
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                          <AnimatePresence>
+                          {currentWorkoutExercises.map(exercise => {
+                              const definition = exerciseDefinitions.find(def => def.id === exercise.definitionId);
+                              return (
+                                <WorkoutExerciseCard 
+                                  key={exercise.id} 
+                                  exercise={exercise}
+                                  onLogSet={handleLogSet} 
+                                  onDeleteSet={handleDeleteSet} 
+                                  onUpdateSet={handleUpdateSet}
+                                  onRemoveExercise={handleRemoveExerciseFromWorkout}
+                                  onViewProgress={definition ? () => handleViewProgress(definition) : undefined}
+                                />
+                              );
+                          })}
+                          </AnimatePresence>
+                        </div>
                       )}
                     </div>
                   </CardContent>
