@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -19,7 +18,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { ScrollArea } from './ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
-import { Switch } from './ui/switch';
 import { Label } from './ui/label';
 
 interface WorkoutHeatmapProps {
@@ -30,6 +28,8 @@ interface WorkoutHeatmapProps {
   onUpdateWeightLog: (dateKey: string, newWeight: number) => void;
   onDeleteWeightLog: (dateKey: string) => void;
   selectedDate: Date;
+  goalWeight: number | null;
+  showProjection: boolean;
 }
 
 interface HeatmapValue {
@@ -139,9 +139,10 @@ export function WorkoutHeatmap({
   onLogWeight,
   onUpdateWeightLog,
   onDeleteWeightLog,
+  goalWeight,
+  showProjection,
 }: WorkoutHeatmapProps) {
   const { toast } = useToast();
-  const { currentUser } = useAuth();
   
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
   const [view, setView] = useState<'heatmap' | 'graph' | 'weight'>('heatmap');
@@ -153,10 +154,6 @@ export function WorkoutHeatmap({
   const [today, setToday] = useState<Date | null>(null);
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
 
-  const [goalWeight, setGoalWeight] = useState<number | null>(null);
-  const [goalWeightInput, setGoalWeightInput] = useState('');
-  const [showProjection, setShowProjection] = useState(true);
-
   const [chartKey, setChartKey] = useState(Date.now());
   const [brushIndex, setBrushIndex] = useState<{ startIndex?: number; endIndex?: number }>({});
 
@@ -167,17 +164,6 @@ export function WorkoutHeatmap({
     setWeightDate(now);
     setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
   }, []);
-
-  useEffect(() => {
-    if (currentUser?.username) {
-        const storedGoal = localStorage.getItem(`goalWeight_${currentUser.username}`);
-        if (storedGoal) {
-            setGoalWeight(parseFloat(storedGoal));
-        }
-    } else {
-        setGoalWeight(null); // Clear goal if user logs out
-    }
-  }, [currentUser]);
 
   const heatmapValues: HeatmapValue[] = useMemo(() => allWorkoutLogs
     .filter(log => log.exercises.some(ex => ex.loggedSets.length > 0))
@@ -331,22 +317,6 @@ export function WorkoutHeatmap({
       } else {
         toast({ title: "Invalid Input", description: "Please enter a valid weight and select a date.", variant: "destructive" });
       }
-    };
-
-    const handleSetGoalWeight = () => {
-        const goal = parseFloat(goalWeightInput);
-        if (!isNaN(goal) && goal > 0) {
-            if (currentUser?.username) {
-                setGoalWeight(goal);
-                localStorage.setItem(`goalWeight_${currentUser.username}`, goal.toString());
-                toast({ title: "Goal Set!", description: `Your new goal weight is ${goal} kg/lb.` });
-                setGoalWeightInput('');
-            } else {
-                toast({ title: "Error", description: "You must be logged in to set a goal.", variant: "destructive" });
-            }
-        } else {
-            toast({ title: "Invalid Input", description: "Please enter a valid goal weight.", variant: "destructive" });
-        }
     };
 
     const handleSaveEdit = () => {
@@ -651,31 +621,6 @@ export function WorkoutHeatmap({
                             Log Weight
                         </Button>
                     </div>
-
-                    <div className="flex flex-col sm:flex-row gap-2 items-center mt-2">
-                        <Input
-                            type="number"
-                            placeholder="Enter your ideal weight"
-                            value={goalWeightInput}
-                            onChange={(e) => setGoalWeightInput(e.target.value)}
-                            className="h-9 flex-grow"
-                        />
-                        <Button onClick={handleSetGoalWeight} disabled={!goalWeightInput} className="h-9 w-full sm:w-auto">
-                            Set Goal
-                        </Button>
-                    </div>
-                    
-                    {goalWeight !== null && (
-                      <div className="flex items-center justify-center space-x-2 mt-4">
-                          <Switch 
-                              id="show-projection" 
-                              checked={showProjection} 
-                              onCheckedChange={setShowProjection} 
-                          />
-                          <Label htmlFor="show-projection">Show Ideal Weight Projection</Label>
-                      </div>
-                    )}
-
 
                     <div className="mt-6">
                         <h3 className="text-lg font-semibold mb-2">Log History</h3>

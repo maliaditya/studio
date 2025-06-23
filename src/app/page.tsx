@@ -1,17 +1,16 @@
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp } from 'lucide-react';
+import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { format, parseISO, getDay, getWeekOfMonth, isMonday, getYear, getISOWeek, parse, getISOWeekYear } from 'date-fns';
+import { format, parseISO, getDay, getWeekOfMonth, isMonday, getYear, getISOWeek, parse, getISOWeekYear, addWeeks, startOfISOWeek, setISOWeek } from 'date-fns';
 import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans, WeightLog } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
@@ -48,6 +47,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Switch } from '@/components/ui/switch';
 
 
 const DEFAULT_TARGET_SETS = 4;
@@ -197,6 +197,10 @@ function WorkoutPageContent() {
   const [showBackupPrompt, setShowBackupPrompt] = useState(false);
   const [isLibraryExpanded, setIsLibraryExpanded] = useState(true);
 
+  const [goalWeight, setGoalWeight] = useState<number | null>(null);
+  const [goalWeightInput, setGoalWeightInput] = useState('');
+  const [showProjection, setShowProjection] = useState(true);
+
 
   useEffect(() => {
     if (currentUser?.username) {
@@ -205,11 +209,17 @@ function WorkoutPageContent() {
       const modeKey = `workoutMode_${currentUser.username}`;
       const plansKey = `workoutPlans_${currentUser.username}`;
       const weightLogsKey = `weightLogs_${currentUser.username}`;
+      const goalWeightKey = `goalWeight_${currentUser.username}`;
       let localDefsLoaded = false;
       
       const storedMode = localStorage.getItem(modeKey);
       if (storedMode === 'one-muscle' || storedMode === 'two-muscle') {
         setWorkoutMode(storedMode);
+      }
+
+      const storedGoal = localStorage.getItem(goalWeightKey);
+      if (storedGoal) {
+          setGoalWeight(parseFloat(storedGoal));
       }
 
       try {
@@ -281,6 +291,7 @@ function WorkoutPageContent() {
       setAllWorkoutLogs([]);
       setWorkoutPlans(INITIAL_PLANS);
       setWeightLogs([]);
+      setGoalWeight(null);
     }
     const timer = setTimeout(() => setIsLoadingPage(false), 300);
     return () => clearTimeout(timer);
@@ -294,6 +305,7 @@ function WorkoutPageContent() {
         const modeKey = `workoutMode_${currentUser.username}`;
         const plansKey = `workoutPlans_${currentUser.username}`;
         const weightLogsKey = `weightLogs_${currentUser.username}`;
+        const goalWeightKey = `goalWeight_${currentUser.username}`;
         
         localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
         localStorage.setItem(logsKey, JSON.stringify(allWorkoutLogs));
@@ -301,12 +313,18 @@ function WorkoutPageContent() {
         localStorage.setItem(plansKey, JSON.stringify(workoutPlans));
         localStorage.setItem(weightLogsKey, JSON.stringify(weightLogs));
 
+        if (goalWeight !== null) {
+          localStorage.setItem(goalWeightKey, goalWeight.toString());
+        } else {
+          localStorage.removeItem(goalWeightKey);
+        }
+
       } catch (e) {
         console.error("Error saving data to localStorage", e);
         toast({ title: "Save Error", description: "Could not save data locally. Storage might be full.", variant: "destructive"});
       }
     }
-  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, workoutMode, workoutPlans, weightLogs]);
+  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, workoutMode, workoutPlans, weightLogs, goalWeight]);
 
 
   useEffect(() => {
@@ -349,7 +367,7 @@ function WorkoutPageContent() {
           const muscleGroupsForDay = dailyMuscleGroups[dayOfWeek];
           if (!muscleGroupsForDay || muscleGroupsForDay.length === 0) return prevLogs;
           
-          toastDescription = `Added ${planName} exercises for ${muscleGroupsForDay.join(' & ')}.`;
+          toastDescription = `Added ${planName} exercises for ${muscleGroupsForDay.join(' &amp; ')}.`;
           muscleGroupsForDay.forEach(muscleGroup => {
             const exerciseNames = (plan as any)[muscleGroup] as string[];
             if (exerciseNames) {
@@ -691,6 +709,84 @@ function WorkoutPageContent() {
     toast({ title: "Weight Deleted", description: `Weight log for week ${dateKey} has been removed.` });
   };
 
+  const handleSetGoalWeight = () => {
+    const goal = parseFloat(goalWeightInput);
+    if (!isNaN(goal) && goal > 0) {
+        if (currentUser?.username) {
+            setGoalWeight(goal);
+            toast({ title: "Goal Set!", description: `Your new goal weight is ${goal} kg/lb.` });
+            setGoalWeightInput('');
+        } else {
+            toast({ title: "Error", description: "You must be logged in to set a goal.", variant: "destructive" });
+        }
+    } else {
+        toast({ title: "Invalid Input", description: "Please enter a valid goal weight.", variant: "destructive" });
+    }
+  };
+
+  const projectionSummary = useMemo(() => {
+    if (!goalWeight || weightLogs.length < 2) {
+        return null;
+    }
+
+    const sortedLogs = weightLogs
+        .map(log => {
+            const [year, weekNum] = log.date.split('-W');
+            const dateObj = startOfISOWeek(setISOWeek(new Date(parseInt(year), 0, 4), parseInt(weekNum)));
+            return { ...log, dateObj };
+        })
+        .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+
+    const weightChartData = sortedLogs.map((log, index, arr) => {
+        let weeklyChange = null;
+        if (index > 0) {
+            const prevWeight = arr[index - 1].weight;
+            weeklyChange = log.weight - prevWeight;
+        }
+        return {
+            weight: log.weight,
+            dateObj: log.dateObj,
+            weeklyChange: weeklyChange,
+        };
+    });
+
+    const lastLog = weightChartData[weightChartData.length - 1];
+    if (!lastLog) return null;
+
+    const currentWeight = lastLog.weight;
+    const weightDifference = goalWeight - currentWeight;
+
+    const changes = weightChartData
+        .map(d => d.weeklyChange)
+        .filter((c): c is number => c !== null && c !== 0);
+
+    let averageWeeklyChange = changes.length > 0 ? changes.reduce((a, b) => a + b, 0) / changes.length : 0;
+
+    let projectionRate = averageWeeklyChange;
+    if (weightDifference < 0) { // Need to lose weight
+        if (projectionRate >= 0) projectionRate = -0.5; // Assume 0.5 kg/lb loss per week if current trend is gain/stagnant
+    } else { // Need to gain weight
+        if (projectionRate <= 0) projectionRate = 0.25; // Assume 0.25 kg/lb gain per week
+    }
+
+    if (Math.abs(projectionRate) < 0.01) return { currentWeight: parseFloat(currentWeight.toFixed(1)), weightDifference: parseFloat(weightDifference.toFixed(1)), goalWeight };
+
+    const weeksToGo = Math.ceil(Math.abs(weightDifference / projectionRate));
+    if (weeksToGo <= 0 || weeksToGo > 520) return { currentWeight: parseFloat(currentWeight.toFixed(1)), weightDifference: parseFloat(weightDifference.toFixed(1)), goalWeight };
+
+    const projectedDate = addWeeks(lastLog.dateObj, weeksToGo);
+    const nextProjectedWeight = currentWeight + projectionRate;
+
+    return {
+        currentWeight: parseFloat(currentWeight.toFixed(1)),
+        goalWeight,
+        weightDifference: parseFloat(weightDifference.toFixed(1)),
+        projectedDate: format(projectedDate, 'PPP'),
+        nextProjectedWeight: parseFloat(nextProjectedWeight.toFixed(1)),
+        weeksToGo,
+    };
+  }, [goalWeight, weightLogs]);
+
 
   if (isLoadingPage) {
     return (
@@ -732,6 +828,8 @@ function WorkoutPageContent() {
             onUpdateWeightLog={handleUpdateWeightLog}
             onDeleteWeightLog={handleDeleteWeightLog}
             selectedDate={selectedDate}
+            goalWeight={goalWeight}
+            showProjection={showProjection}
           />
         </div>
         
@@ -863,6 +961,82 @@ function WorkoutPageContent() {
                 </AnimatePresence>
               </CardContent>
             </Card>
+
+            <Card className="shadow-xl rounded-xl">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-2xl text-primary">
+                        <Target /> Weight Goal
+                    </CardTitle>
+                    <CardDescription>
+                        Set a target weight to track your progress.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-2 items-center">
+                        <Input
+                            type="number"
+                            placeholder="Enter your ideal weight (kg/lb)"
+                            value={goalWeightInput}
+                            onChange={(e) => setGoalWeightInput(e.target.value)}
+                            className="h-9 flex-grow"
+                        />
+                        <Button onClick={handleSetGoalWeight} disabled={!goalWeightInput} className="h-9 w-full sm:w-auto">
+                            Set Goal
+                        </Button>
+                    </div>
+
+                    {projectionSummary && (
+                        <div className="space-y-3 pt-4 border-t">
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                                <div className="flex items-center gap-2">
+                                    <Dumbbell className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                        <div className="text-muted-foreground">Current Weight</div>
+                                        <div className="font-bold">{projectionSummary.currentWeight} kg/lb</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Target className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                        <div className="text-muted-foreground">Goal Weight</div>
+                                        <div className="font-bold">{projectionSummary.goalWeight} kg/lb</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {projectionSummary.weightDifference > 0 ? (
+                                        <Plus className="h-4 w-4 text-orange-500" />
+                                    ) : (
+                                        <Minus className="h-4 w-4 text-green-500" />
+                                    )}
+                                    <div>
+                                        <div className="text-muted-foreground">{projectionSummary.weightDifference > 0 ? "To Gain" : "To Lose"}</div>
+                                        <div className="font-bold">{Math.abs(projectionSummary.weightDifference)} kg/lb</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                        <div className="text-muted-foreground">Next Week Est.</div>
+                                        <div className="font-bold">{projectionSummary.nextProjectedWeight} kg/lb</div>
+                                    </div>
+                                </div>
+                            </div>
+                             <div className="flex items-center gap-2 pt-2 border-t">
+                                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                                <div>
+                                    <div className="text-muted-foreground">Est. Goal Date</div>
+                                    <div className="font-bold">{projectionSummary.projectedDate} (~{projectionSummary.weeksToGo} weeks)</div>
+                                </div>
+                            </div>
+                             <div className="flex items-center justify-center space-x-2 pt-3">
+                                <Switch id="show-projection" checked={showProjection} onCheckedChange={setShowProjection} />
+                                <Label htmlFor="show-projection" className="text-sm">Show Projection on Chart</Label>
+                            </div>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
           </section>
 
           <section aria-labelledby="current-workout-heading" className="md:col-span-2 space-y-6">
@@ -874,7 +1048,7 @@ function WorkoutPageContent() {
                           </CardTitle>
                           {muscleGroupsForSelectedDay.length > 0 && (
                               <p className="text-sm text-muted-foreground mt-1 ml-1">
-                                  Today's focus: {muscleGroupsForSelectedDay.join(' & ')}
+                                  Today's focus: {muscleGroupsForSelectedDay.join(' &amp; ')}
                               </p>
                           )}
                       </div>
