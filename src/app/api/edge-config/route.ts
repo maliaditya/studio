@@ -4,23 +4,23 @@ import { NextResponse } from 'next/server';
 
 /**
  * GET /api/edge-config?username=<username>&item=<item>
- * Fetches a specific data blob (e.g., 'main' or 'logs') for a user.
+ * Fetches a specific data blob (e.g., 'settings', 'library', 'logs') for a user.
  */
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const username = searchParams.get('username');
-    const item = searchParams.get('item') || 'main'; // Default to 'main'
+    const item = searchParams.get('item'); // e.g., 'settings', 'library', 'logs'
 
     if (!process.env.EDGE_CONFIG) {
         return NextResponse.json({ error: 'Edge Config connection string is not configured on the server.' }, { status: 500 });
     }
 
-    if (!username) {
-        return NextResponse.json({ error: 'Username is required.' }, { status: 400 });
+    if (!username || !item) {
+        return NextResponse.json({ error: 'Username and item are required.' }, { status: 400 });
     }
 
-    // Construct the key based on the item type
-    const key = item === 'logs' ? `${username}_logs` : username;
+    // Construct the key based on the user and item type
+    const key = `${username}_${item}`;
 
     try {
         const userData = await get(key);
@@ -35,11 +35,10 @@ export async function GET(request: Request) {
 /**
  * POST /api/edge-config
  * Updates a user's data blob in Vercel Edge Config.
- * Expects { username, data, item }, where item is 'main' or 'logs'.
+ * Expects { username, data, item }, where item is 'settings', 'library', or 'logs'.
  */
 export async function POST(request: Request) {
     const { username, data, item } = await request.json();
-    const itemType = item || 'main';
 
     const edgeConfigConnectionString = process.env.EDGE_CONFIG;
     const vercelApiToken = process.env.VERCEL_API_TOKEN;
@@ -48,11 +47,11 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Server is not configured for Vercel API access. Check EDGE_CONFIG and VERCEL_API_TOKEN environment variables.' }, { status: 500 });
     }
 
-    if (!username || data === undefined) {
-        return NextResponse.json({ error: 'Username and data payload are required.' }, { status: 400 });
+    if (!username || data === undefined || !item) {
+        return NextResponse.json({ error: 'Username, data payload, and item type are required.' }, { status: 400 });
     }
     
-    const key = itemType === 'logs' ? `${username}_logs` : username;
+    const key = `${username}_${item}`;
 
     try {
         const edgeConfigId = new URL(edgeConfigConnectionString).pathname.split('/')[1];
@@ -83,10 +82,10 @@ export async function POST(request: Request) {
         if (!response.ok) {
             const errorData = await response.json();
             console.error('Vercel API error:', errorData);
-            throw new Error(errorData.error?.message || `Failed to update Edge Config for item: ${itemType}`);
+            throw new Error(errorData.error?.message || `Failed to update Edge Config for item: ${item}`);
         }
 
-        return NextResponse.json({ success: true, message: `Data chunk '${itemType}' synced to cloud.` });
+        return NextResponse.json({ success: true, message: `Data chunk '${item}' synced to cloud.` });
 
     } catch (error) {
         console.error('Error in POST /api/edge-config:', error);
