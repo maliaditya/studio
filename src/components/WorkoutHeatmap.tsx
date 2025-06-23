@@ -129,10 +129,8 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
       return weightLogs.map(log => {
         const [year, weekNum] = log.date.split('-W');
         
-        // Manually construct date from ISO week and year to avoid parsing issues
         const yearNum = parseInt(year);
         const weekNumValue = parseInt(weekNum);
-        // Jan 4th is always in the first ISO week, making it a safe reference point.
         const jan4 = new Date(yearNum, 0, 4); 
         const weekDate = startOfISOWeek(setISOWeek(jan4, weekNumValue));
 
@@ -141,6 +139,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
             weight: log.weight,
             fullWeek: log.date,
             dateObj: weekDate,
+            timestamp: weekDate.getTime(),
         }
       }).sort((a,b) => a.dateObj.getTime() - b.dateObj.getTime());
     }, [weightLogs]);
@@ -152,21 +151,21 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
         const lastLog = weightChartData[weightChartData.length - 1];
         const firstLog = weightChartData[0];
         
+        const weightToGoal = idealWeight - lastLog.weight;
+        if (weightToGoal === 0) return null; // Already at ideal weight
+
         const weeksDiff = (lastLog.dateObj.getTime() - firstLog.dateObj.getTime()) / (1000 * 60 * 60 * 24 * 7);
         const weightDiff = lastLog.weight - firstLog.weight;
         
         let avgWeeklyChange = weeksDiff > 0 ? weightDiff / weeksDiff : 0;
         
-        const weightToGoal = idealWeight - lastLog.weight;
-        
-        // If not making progress or no change, assume a default change rate
         if ((weightToGoal < 0 && avgWeeklyChange >= 0) || (weightToGoal > 0 && avgWeeklyChange <= 0) || avgWeeklyChange === 0) {
             avgWeeklyChange = weightToGoal > 0 ? 0.25 : -0.5; // default gain/loss
         }
 
         const weeksToGo = weightToGoal / avgWeeklyChange;
-        if (!isFinite(weeksToGo)) {
-            return null; // Cannot project if there's no change and no goal.
+        if (!isFinite(weeksToGo) || weeksToGo <= 0) {
+            return null;
         }
         
         const projectedEndDate = addWeeks(lastLog.dateObj, weeksToGo);
@@ -179,6 +178,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
                 weight: idealWeight,
                 fullWeek: format(projectedEndDate, 'PPP'),
                 dateObj: projectedEndDate,
+                timestamp: projectedEndDate.getTime(),
                 isIdeal: true,
                 tooltipData: {
                     idealWeight: idealWeight.toFixed(1),
@@ -216,9 +216,15 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
             if (ftMatch) totalInches += parseInt(ftMatch[1]) * 12;
             if (inMatch) totalInches += parseFloat(inMatch[1]);
             
-            // Allow just a number to be interpreted as inches
             if (!ftMatch && !inMatch && !isNaN(parseFloat(input))) {
-              totalInches = parseFloat(input);
+              const parsedNum = parseFloat(input);
+              // Simple heuristic: numbers over ~30 are likely cm, under are likely ft.
+              // A more robust solution might require a unit selector.
+              if(parsedNum > 48) { // if likely cm (e.g. > 4ft)
+                 cm = parsedNum;
+              } else { // assume inches if it's a small number without units
+                 totalInches = parsedNum;
+              }
             }
 
             if (totalInches > 0) {
@@ -226,13 +232,13 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
             }
         }
 
-        if (cm > 0) {
+        if (cm > 90 && cm < 250) { // Basic validation for human height
             updateUserProfile({ heightInCm: cm });
             setHeightInput('');
         } else {
             toast({
                 title: "Invalid Format",
-                description: "Please use a format like '180cm', '70in', or '5ft 10in'.",
+                description: "Please use a format like '180cm', '70in', or '5ft 10in'. Enter a realistic height.",
                 variant: "destructive"
             });
         }
@@ -462,7 +468,15 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
                         <ChartContainer config={weightChartConfig} className="min-h-[250px] w-full pr-4">
                             <LineChart accessibilityLayer margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                                <XAxis dataKey="week" tickLine={false} axisLine={false} tickMargin={8} interval="preserveStartEnd" />
+                                <XAxis 
+                                    dataKey="timestamp"
+                                    type="number"
+                                    domain={['dataMin', 'dataMax']}
+                                    tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM yy')}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickMargin={8}
+                                />
                                 <YAxis yAxisId="left" tickLine={false} axisLine={false} tickMargin={8} domain={['dataMin - 2', 'dataMax + 2']} />
                                 <RechartsTooltip
                                     cursor={true}
@@ -485,7 +499,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
                                                 <div className="rounded-lg border bg-background p-2.5 shadow-sm">
                                                     <div className="flex flex-col">
                                                         <span className="text-[0.7rem] uppercase text-muted-foreground">
-                                                            {data.fullWeek}
+                                                          {data.dateObj ? format(data.dateObj, 'PPP') : data.fullWeek}
                                                         </span>
                                                         <span className="font-bold text-foreground">
                                                             {data.weight} kg/lb
@@ -550,7 +564,3 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
     </>
   );
 }
-
-    
-
-    
