@@ -92,7 +92,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
         };
 
-        const response = await fetch('/api/edge-config', {
+        const response = await fetch('/api/blob-sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, data: allUserData }),
@@ -124,7 +124,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
           const username = currentUser.username;
           
-          const response = await fetch(`/api/edge-config?username=${username}`);
+          const response = await fetch(`/api/blob-sync?username=${username}`);
           const result = await response.json();
 
           if (!response.ok) {
