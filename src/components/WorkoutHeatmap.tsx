@@ -286,7 +286,7 @@ export function WorkoutHeatmap({
       
       if (Math.abs(projectionRate) < 0.01) return allData;
 
-      const weeksToGo = Math.ceil(Math.abs(weightTochange / projectionRate));
+      const weeksToGo = Math.ceil(Math.abs(weightToChange / projectionRate));
       if (weeksToGo <= 0) return allData;
       
       const lastLogIndex = allData.findIndex(d => d.timestamp === lastLog.timestamp);
@@ -739,5 +739,3 @@ export function WorkoutHeatmap({
     </>
   );
 }
-
-    
