@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import CalendarHeatmap from 'react-calendar-heatmap';
-import { addWeeks, format, parseISO, setISOWeek, startOfISOWeek, differenceInDays } from 'date-fns';
+import { addWeeks, format, parseISO, setISOWeek, startOfISOWeek, differenceInDays, subYears, addDays } from 'date-fns';
 import type { DatedWorkout, WeightLog } from '@/types/workout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -675,5 +675,3 @@ export function WorkoutHeatmap({
     </>
   );
 }
-
-    
