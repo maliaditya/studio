@@ -12,7 +12,6 @@ const CURRENT_USER_KEY = "currentUser"; // Stores username string of logged-in u
 // Defines the structure of the data stored for each user.
 interface UserData {
   password: string;
-  heightInCm?: number;
 }
 
 // Defines the structure of the entire credentials object in localStorage.
@@ -74,7 +73,7 @@ export function loginUser(username: string, password: string): Promise<{ success
       localStorage.setItem(CURRENT_USER_KEY, username);
     }
     
-    const user: LocalUser = { username, heightInCm: userData.heightInCm };
+    const user: LocalUser = { username };
     resolve({ success: true, message: "Login successful.", user });
   });
 }
@@ -92,24 +91,10 @@ export function getCurrentLocalUser(): LocalUser | null {
   if (typeof window !== 'undefined') {
     const username = localStorage.getItem(CURRENT_USER_KEY);
     if (!username) return null;
-
-    const credentials = getStoredCredentials();
-    const userData = credentials[username];
     
     return { 
       username, 
-      heightInCm: userData?.heightInCm 
     };
   }
   return null;
-}
-
-export function updateUserProfile(username: string, data: Partial<Omit<UserData, 'password'>>) {
-    if (typeof window !== 'undefined') {
-        const credentials = getStoredCredentials();
-        if (credentials[username]) {
-            credentials[username] = { ...credentials[username], ...data };
-            storeCredentials(credentials);
-        }
-    }
 }

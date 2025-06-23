@@ -10,7 +10,6 @@ import {
   loginUser as localLoginUser, 
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
-  updateUserProfile as localUpdateUserProfile
 } from '@/lib/localAuth';
 
 interface AuthContextType {
@@ -20,7 +19,6 @@ interface AuthContextType {
   signIn: (username: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   exportData: () => void;
-  updateUserProfile: (data: Partial<Omit<LocalUser, 'username'>>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -72,15 +70,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(false);
   };
 
-  const updateUserProfile = async (data: Partial<Omit<LocalUser, 'username'>>) => {
-    if (currentUser?.username) {
-        localUpdateUserProfile(currentUser.username, data);
-        const updatedUser = getCurrentLocalUser();
-        setCurrentUser(updatedUser);
-        toast({ title: "Profile Updated", description: "Your height has been saved." });
-    }
-  };
-
   const exportData = () => {
     if (!currentUser?.username) return;
 
@@ -125,7 +114,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signIn,
     signOut,
     exportData,
-    updateUserProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

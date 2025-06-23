@@ -2,6 +2,7 @@
 
 
 
+
 export type ExerciseCategory = 
   | "Chest" 
   | "Triceps" 
@@ -58,7 +59,6 @@ export interface DatedWorkout {
 // Updated to include more user profile data
 export interface LocalUser {
   username: string;
-  heightInCm?: number;
 }
 
 export type WorkoutMode = 'one-muscle' | 'two-muscle';

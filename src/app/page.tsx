@@ -708,6 +708,30 @@ function WorkoutPageContent() {
     toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
   };
 
+  const handleUpdateWeightLog = (dateKey: string, newWeight: number) => {
+    if (!currentUser || isNaN(newWeight) || newWeight <= 0) {
+      toast({ title: "Invalid Input", description: "Please enter a valid weight.", variant: "destructive" });
+      return;
+    }
+    setWeightLogs(prevLogs => {
+      const logIndex = prevLogs.findIndex(log => log.date === dateKey);
+      if (logIndex > -1) {
+        const updatedLogs = [...prevLogs];
+        updatedLogs[logIndex] = { ...updatedLogs[logIndex], weight: newWeight };
+        toast({ title: "Weight Updated", description: `Weight for week ${dateKey} updated.` });
+        return updatedLogs.sort((a,b) => a.date.localeCompare(b.date));
+      }
+      return prevLogs;
+    });
+  };
+
+  const handleDeleteWeightLog = (dateKey: string) => {
+    if (!currentUser) return;
+    setWeightLogs(prevLogs => prevLogs.filter(log => log.date !== dateKey));
+    toast({ title: "Weight Deleted", description: `Weight log for week ${dateKey} has been removed.` });
+  };
+
+
   if (isLoadingPage) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)] bg-background">
@@ -745,6 +769,8 @@ function WorkoutPageContent() {
             onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
             weightLogs={weightLogs}
             onLogWeight={handleLogWeight}
+            onUpdateWeightLog={handleUpdateWeightLog}
+            onDeleteWeightLog={handleDeleteWeightLog}
             selectedDate={selectedDate}
           />
         </div>
