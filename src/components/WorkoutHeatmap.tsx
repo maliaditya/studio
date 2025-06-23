@@ -160,7 +160,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
         const weightToGoal = idealWeight - lastLog.weight;
         
         // If not making progress or no change, assume a default change rate
-        if ((weightToGoal < 0 && avgWeeklyChange >= 0) || (weightToGoal > 0 && avgWeeklyChange <= 0)) {
+        if ((weightToGoal < 0 && avgWeeklyChange >= 0) || (weightToGoal > 0 && avgWeeklyChange <= 0) || avgWeeklyChange === 0) {
             avgWeeklyChange = weightToGoal > 0 ? 0.25 : -0.5; // default gain/loss
         }
 
