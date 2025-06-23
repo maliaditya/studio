@@ -164,9 +164,11 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
             avgWeeklyChange = weightToGoal > 0 ? 0.25 : -0.5; // default gain/loss
         }
 
-        if (avgWeeklyChange === 0) return null;
-
         const weeksToGo = weightToGoal / avgWeeklyChange;
+        if (!isFinite(weeksToGo)) {
+            return null; // Cannot project if there's no change and no goal.
+        }
+        
         const projectedEndDate = addWeeks(lastLog.dateObj, weeksToGo);
         const daysToGo = differenceInDays(projectedEndDate, new Date());
 
@@ -548,5 +550,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
     </>
   );
 }
+
+    
 
     
