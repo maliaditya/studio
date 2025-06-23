@@ -70,15 +70,25 @@ export async function GET(request: Request) {
         throw new Error(`Failed to download data from Blob storage. Status: ${response.status}`);
     }
 
-    const userData = await response.json();
+    const textData = await response.text();
+    
+    // If the file from the blob is empty, it's not valid JSON.
+    // Treat it as if no data exists in the cloud.
+    if (!textData) {
+        return NextResponse.json({ data: null, message: "Cloud data is empty." });
+    }
+
+    // Now that we have text, we can safely try to parse it.
+    const userData = JSON.parse(textData);
     return NextResponse.json({ data: userData });
 
   } catch (error) {
      // The `head` method throws an error for a 404, which we can catch.
-     if (error instanceof Error && error.message.includes('404')) {
+     if (error instanceof Error && (error.message.includes('404') || error.message.includes('not found'))) {
         return NextResponse.json({ data: null, message: "No cloud data found for this user." }, { status: 200 });
     }
     console.error(`Blob storage read error for user ${username}:`, error);
-    return NextResponse.json({ error: 'Failed to read data from Blob storage.' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+    return NextResponse.json({ error: `Failed to read data from Blob storage: ${errorMessage}` }, { status: 500 });
   }
 }
