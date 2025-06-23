@@ -83,8 +83,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ data: userData });
 
   } catch (error) {
-     // The `head` method throws an error for a 404, which we can catch.
-     if (error instanceof Error && (error.message.includes('404') || error.message.includes('not found'))) {
+     // The `head` method throws a specific error when the blob is not found.
+     // We check for the Vercel Blob SDK's specific message or a generic '404'.
+     if (error instanceof Error && (error.message.includes('The requested blob does not exist') || error.message.includes('404'))) {
         return NextResponse.json({ data: null, message: "No cloud data found for this user." }, { status: 200 });
     }
     console.error(`Blob storage read error for user ${username}:`, error);
