@@ -108,25 +108,24 @@ export function WorkoutPlanModal({
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue={planKeysToShow[0]} className="w-full flex-grow min-h-0 flex flex-col">
+        <Tabs defaultValue={planKeysToShow[0]} className="w-full flex-grow flex flex-col min-h-0">
           <TabsList className="shrink-0">
             {planKeysToShow.map(planKey => (
               <TabsTrigger key={planKey} value={planKey}>{planKey}</TabsTrigger>
             ))}
           </TabsList>
           
-          <div className="flex-grow overflow-hidden mt-4">
-            <ScrollArea className="h-full pr-4">
-              {planKeysToShow.map(planKey => (
-                <TabsContent key={planKey} value={planKey} className="m-0">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {relevantCategoriesForPlan(planKey).map(category => (
-                       <Card key={category} className="overflow-hidden">
-                           <CardHeader className="bg-muted/50 p-3">
-                               <CardTitle className="text-lg">{category}</CardTitle>
-                           </CardHeader>
-                           <CardContent className="p-3">
-                               <Table>
+          {planKeysToShow.map(planKey => (
+            <TabsContent key={planKey} value={planKey} className="m-0 mt-4 flex-grow min-h-0">
+                <ScrollArea className="h-full pr-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {relevantCategoriesForPlan(planKey).map(category => (
+                        <Card key={category} className="overflow-hidden">
+                            <CardHeader className="bg-muted/50 p-3">
+                                <CardTitle className="text-lg">{category}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-3">
+                                <Table>
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Exercise</TableHead>
@@ -181,14 +180,13 @@ export function WorkoutPlanModal({
                                         <PlusCircle className="h-5 w-5" />
                                     </Button>
                                 </div>
-                           </CardContent>
-                       </Card>
-                    ))}
-                  </div>
-                </TabsContent>
-              ))}
-            </ScrollArea>
-          </div>
+                            </CardContent>
+                        </Card>
+                        ))}
+                    </div>
+                </ScrollArea>
+            </TabsContent>
+          ))}
         </Tabs>
       </DialogContent>
     </Dialog>
