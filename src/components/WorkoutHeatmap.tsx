@@ -163,8 +163,9 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
         }
 
         const weeksToGo = weightToGoal / avgWeeklyChange;
-        if (!isFinite(weeksToGo) || weeksToGo <= 0) {
-            return null;
+
+        if (!isFinite(weeksToGo)) {
+          return null;
         }
         
         const projectedEndDate = addWeeks(lastLog.dateObj, weeksToGo);
@@ -466,7 +467,20 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
                 </>
             ) : (
                  <>
-                    {!currentUser?.heightInCm && (
+                    {currentUser?.heightInCm ? (
+                        <div className="mb-4 p-3 border rounded-lg bg-muted/30">
+                            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-center">
+                                <div>
+                                    <dt className="text-sm text-muted-foreground">Your Height</dt>
+                                    <dd className="font-semibold text-foreground">{currentUser.heightInCm.toFixed(1)} cm</dd>
+                                </div>
+                                <div>
+                                    <dt className="text-sm text-muted-foreground">Ideal Weight Target</dt>
+                                    <dd className="font-semibold text-foreground">{(currentUser.heightInCm - 100).toFixed(1)} kg/lb</dd>
+                                </div>
+                            </dl>
+                        </div>
+                    ) : (
                         <div className="mb-6 p-4 border rounded-lg bg-muted/20">
                             <h3 className="text-lg font-semibold">Set Your Height</h3>
                             <p className="text-sm text-muted-foreground mb-2">
