@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/tooltip"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Separator } from '@/components/ui/separator';
+import { Separator } from "@/components/ui/separator";
 import { WorkoutHeatmap } from '@/components/WorkoutHeatmap';
 import { WorkoutPlanModal } from '@/components/WorkoutPlanModal';
 import {
@@ -683,14 +683,13 @@ function WorkoutPageContent() {
     setIsProgressModalOpen(true);
   };
   
-  const handleLogWeight = (weight: number) => {
+  const handleLogWeight = (weight: number, date: Date) => {
     if (!currentUser || isNaN(weight) || weight <= 0) {
       toast({ title: "Invalid Input", description: "Please enter a valid weight.", variant: "destructive" });
       return;
     }
-    const today = new Date();
-    const year = getYear(today);
-    const week = getISOWeek(today).toString().padStart(2, '0');
+    const year = getYear(date);
+    const week = getISOWeek(date).toString().padStart(2, '0');
     const weekKey = `${year}-W${week}`;
 
     setWeightLogs(prevLogs => {
@@ -706,7 +705,7 @@ function WorkoutPageContent() {
         }
     });
 
-    toast({ title: "Weight Logged", description: `Your weight for this week has been saved as ${weight} kg/lb.` });
+    toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
   };
 
   if (isLoadingPage) {
@@ -743,7 +742,7 @@ function WorkoutPageContent() {
         <div className="mb-8">
           <WorkoutHeatmap
             allWorkoutLogs={allWorkoutLogs}
-            onDateSelect={(date) => setSelectedDate(parse(date.toISOString().split('T')[0], 'yyyy-MM-dd', new Date()))}
+            onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
             weightLogs={weightLogs}
             onLogWeight={handleLogWeight}
             selectedDate={selectedDate}

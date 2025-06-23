@@ -18,9 +18,9 @@ import { Calendar } from './ui/calendar';
 
 interface WorkoutHeatmapProps {
   allWorkoutLogs: DatedWorkout[];
-  onDateSelect: (date: Date) => void;
+  onDateSelect: (dateString: string) => void;
   weightLogs: WeightLog[];
-  onLogWeight: (weight: number) => void;
+  onLogWeight: (weight: number, date: Date) => void;
   selectedDate: Date;
 }
 
@@ -54,6 +54,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
   const [view, setView] = useState<'heatmap' | 'graph' | 'weight'>('heatmap');
   const [newWeight, setNewWeight] = useState('');
+  const [weightDate, setWeightDate] = useState<Date | undefined>();
   
   const [today, setToday] = useState<Date | null>(null);
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
@@ -62,6 +63,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
     // This now only runs on the client, preventing hydration mismatches
     const now = new Date();
     setToday(now);
+    setWeightDate(now);
     setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
   }, []);
 
@@ -126,8 +128,8 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
 
     const handleLogWeightClick = () => {
       const weightValue = parseFloat(newWeight);
-      if (!isNaN(weightValue) && weightValue > 0) {
-        onLogWeight(weightValue);
+      if (!isNaN(weightValue) && weightValue > 0 && weightDate) {
+        onLogWeight(weightValue, weightDate);
         setNewWeight('');
       }
     };
@@ -182,7 +184,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
               <CardDescription>
                 {view === 'heatmap' && "Your workout consistency over the last year. Click a square to view that day's log."}
                 {view === 'graph' && 'Your probability of working out, based on recent consistency.'}
-                {view === 'weight' && 'Your weekly body weight trend.'}
+                {view === 'weight' && 'Your weekly body weight trend. Select a date to log weight for that week.'}
               </CardDescription>
             </div>
              <div className='flex items-center gap-2'>
@@ -194,7 +196,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
                     </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && onDateSelect(date)} initialFocus />
+                    <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && onDateSelect(format(date, 'yyyy-MM-dd'))} initialFocus />
                     </PopoverContent>
                 </Popover>
                 <TooltipProvider>
@@ -259,9 +261,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
                         onClick={(value) => {
                           if (value && value.date) {
                               setTooltipData(null);
-                              // Manually parse to avoid timezone issues with `new Date('YYYY-MM-DD')`
-                              const [year, month, day] = value.date.split('-').map(Number);
-                              onDateSelect(new Date(year, month - 1, day));
+                              onDateSelect(value.date);
                           }
                         }}
                         showMonthLabels={true}
@@ -377,15 +377,26 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
                         </p>
                         </div>
                     )}
-                    <div className="flex gap-2 items-center mt-4 pt-4 border-t">
+                    <div className="flex flex-col sm:flex-row gap-2 items-center mt-4 pt-4 border-t">
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant={"outline"} className={cn("w-full sm:w-[260px] justify-start text-left font-normal h-9", !weightDate && "text-muted-foreground")}>
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {weightDate ? `Log for week of: ${format(weightDate, "PPP")}` : <span>Pick a date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar mode="single" selected={weightDate} onSelect={(date) => date && setWeightDate(date)} initialFocus />
+                            </PopoverContent>
+                        </Popover>
                         <Input
                             type="number"
-                            placeholder="Enter current weight (kg/lb)"
+                            placeholder="Enter weight (kg/lb)"
                             value={newWeight}
                             onChange={(e) => setNewWeight(e.target.value)}
-                            className="h-9"
+                            className="h-9 flex-grow"
                         />
-                        <Button onClick={handleLogWeightClick} disabled={!newWeight} className="h-9">
+                        <Button onClick={handleLogWeightClick} disabled={!newWeight || !weightDate} className="h-9 w-full sm:w-auto">
                             Log Weight
                         </Button>
                     </div>
