@@ -773,40 +773,41 @@ function WorkoutPageContent() {
                   </div>
                 </div>
               </CardHeader>
-              <AnimatePresence>
-                {isLibraryExpanded && (
-                  <motion.section
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                    style={{ overflow: 'hidden' }}
-                  >
-                    <CardContent className="p-4 space-y-4">
-                      <div className="space-y-2">
-                        <Label>Workout Plan</Label>
-                        <div className="flex items-center gap-4">
-                          <RadioGroup
-                            value={workoutMode}
-                            onValueChange={(value) => setWorkoutMode(value as WorkoutMode)}
-                            className="flex gap-4"
-                          >
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="two-muscle" id="r1" />
-                              <Label htmlFor="r1" className="font-normal">Two Muscles / Day</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="one-muscle" id="r2" />
-                              <Label htmlFor="r2" className="font-normal">One Muscle / Day</Label>
-                            </div>
-                          </RadioGroup>
-                          <Button variant="outline" size="sm" className="h-8" onClick={() => setIsPlanModalOpen(true)}>
-                            <Settings className="h-4 w-4 mr-2" />
-                            Edit Plans
-                          </Button>
-                        </div>
+              <CardContent className="p-4 space-y-4">
+                <div className="space-y-2">
+                  <Label>Workout Plan</Label>
+                  <div className="flex items-center gap-4">
+                    <RadioGroup
+                      value={workoutMode}
+                      onValueChange={(value) => setWorkoutMode(value as WorkoutMode)}
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="two-muscle" id="r1" />
+                        <Label htmlFor="r1" className="font-normal">Two Muscles / Day</Label>
                       </div>
-                      <Separator />
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="one-muscle" id="r2" />
+                        <Label htmlFor="r2" className="font-normal">One Muscle / Day</Label>
+                      </div>
+                    </RadioGroup>
+                    <Button variant="outline" size="sm" className="h-8" onClick={() => setIsPlanModalOpen(true)}>
+                      <Settings className="h-4 w-4 mr-2" />
+                      Edit Plans
+                    </Button>
+                  </div>
+                </div>
+                <Separator />
+                <AnimatePresence>
+                  {isLibraryExpanded && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.3 }}
+                      style={{ overflow: 'hidden' }}
+                      className="space-y-4"
+                    >
                       <form onSubmit={handleAddExerciseDefinition} className="space-y-3">
                         <Input type="text" placeholder="New exercise name" value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} aria-label="New exercise name" className="h-10" />
                         <Select value={newExerciseCategory} onValueChange={(value) => setNewExerciseCategory(value as ExerciseCategory)}>
@@ -857,10 +858,10 @@ function WorkoutPageContent() {
                           </ul>
                         )}
                       </div>
-                    </CardContent>
-                  </motion.section>
-                )}
-              </AnimatePresence>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </CardContent>
             </Card>
           </section>
 
