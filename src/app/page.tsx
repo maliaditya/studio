@@ -630,8 +630,8 @@ function WorkoutPageContent() {
   }
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8 flex flex-col h-[calc(100vh-4rem)]">
-      <div className="mb-6 text-center relative shrink-0">
+    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+      <div className="mb-6 text-center relative">
         <h1 className="text-3xl sm:text-4xl font-bold text-primary">
           Daily Workout Log
         </h1>
@@ -650,13 +650,13 @@ function WorkoutPageContent() {
         </div>
       </div>
 
-      <div className="mb-8 shrink-0">
+      <div className="mb-8">
         <WorkoutHeatmap allWorkoutLogs={allWorkoutLogs} onDateSelect={setSelectedDate} />
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start flex-grow min-h-0">
-        <section aria-labelledby="exercise-library-heading" className="md:col-span-1 space-y-6 flex flex-col h-full">
-          <Card className="shadow-xl rounded-xl overflow-hidden flex flex-col flex-grow">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+        <section aria-labelledby="exercise-library-heading" className="md:col-span-1 space-y-6">
+          <Card className="shadow-xl rounded-xl overflow-hidden">
             <CardHeader className="bg-primary/10">
               <div className="flex items-center justify-between">
                 <CardTitle id="exercise-library-heading" className="flex items-center gap-2 text-2xl text-primary">
@@ -687,8 +687,8 @@ function WorkoutPageContent() {
                 </DropdownMenu>
               </div>
             </CardHeader>
-            <CardContent className="p-4 space-y-4 flex-grow flex flex-col min-h-0">
-               <div className="space-y-2 shrink-0">
+            <CardContent className="p-4 space-y-4">
+               <div className="space-y-2">
                  <Label>Workout Plan</Label>
                  <div className="flex items-center gap-4">
                   <RadioGroup
@@ -711,8 +711,8 @@ function WorkoutPageContent() {
                   </Button>
                  </div>
                </div>
-               <Separator className="shrink-0" />
-              <form onSubmit={handleAddExerciseDefinition} className="space-y-3 shrink-0">
+               <Separator />
+              <form onSubmit={handleAddExerciseDefinition} className="space-y-3">
                 <Input type="text" placeholder="New exercise name" value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} aria-label="New exercise name" className="h-10" />
                 <Select value={newExerciseCategory} onValueChange={(value) => setNewExerciseCategory(value as ExerciseCategory)}>
                   <SelectTrigger className="h-10"><SelectValue placeholder="Select category" /></SelectTrigger>
@@ -720,7 +720,7 @@ function WorkoutPageContent() {
                 </Select>
                 <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-10"> <PlusCircle className="mr-2 h-5 w-5" /> Add Exercise </Button>
               </form>
-              <div className="flex-grow overflow-y-auto pr-1">
+              <div className="max-h-[calc(100vh-38rem)] overflow-y-auto pr-1">
                 {filteredExerciseDefinitions.length === 0 && exerciseDefinitions.length > 0 ? (
                   <p className="text-muted-foreground text-sm text-center py-4">No exercises match filter.</p>
                 ) : filteredExerciseDefinitions.length === 0 ? (
@@ -766,9 +766,9 @@ function WorkoutPageContent() {
           </Card>
         </section>
 
-        <section aria-labelledby="current-workout-heading" className="md:col-span-2 space-y-6 flex flex-col h-full">
-            <Card className="shadow-xl rounded-xl overflow-hidden flex flex-col flex-grow">
-                <CardHeader className="bg-accent/10 flex flex-row items-center justify-between p-4 shrink-0">
+        <section aria-labelledby="current-workout-heading" className="md:col-span-2 space-y-6">
+            <Card className="shadow-xl rounded-xl overflow-hidden">
+                <CardHeader className="bg-accent/10 flex flex-row items-center justify-between p-4">
                      <div className="flex-grow">
                         <CardTitle id="current-workout-heading" className="flex items-center gap-2 text-2xl text-accent">
                             <ListChecks /> Workout for: {format(selectedDate, 'PPP')}
@@ -791,15 +791,15 @@ function WorkoutPageContent() {
                         </PopoverContent>
                     </Popover>
                 </CardHeader>
-                <CardContent className="p-4 flex-grow overflow-y-auto">
-                  {currentWorkoutExercises.length === 0 ? (
-                    <div className="text-center py-10">
-                        <GripVertical className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
-                        <p className="text-muted-foreground">No exercises for {format(selectedDate, 'PPP')}.</p>
-                        <p className="text-sm text-muted-foreground/80">Add exercises from library or select a weekday!</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4 pr-2">
+                <CardContent className="p-4">
+                  <div className="max-h-[calc(100vh-26rem)] overflow-y-auto space-y-4 pr-2">
+                    {currentWorkoutExercises.length === 0 ? (
+                      <div className="text-center py-10">
+                          <GripVertical className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
+                          <p className="text-muted-foreground">No exercises for {format(selectedDate, 'PPP')}.</p>
+                          <p className="text-sm text-muted-foreground/80">Add exercises from library or select a weekday!</p>
+                      </div>
+                    ) : (
                       <AnimatePresence>
                       {currentWorkoutExercises.map(exercise => {
                           const definition = exerciseDefinitions.find(def => def.id === exercise.definitionId);
@@ -816,8 +816,8 @@ function WorkoutPageContent() {
                           );
                       })}
                       </AnimatePresence>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </CardContent>
             </Card>
         </section>
