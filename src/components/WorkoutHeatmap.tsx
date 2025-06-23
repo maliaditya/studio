@@ -8,10 +8,10 @@ import type { DatedWorkout, WeightLog } from '@/types/workout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Button } from './ui/button';
-import { LineChart as LineChartIcon, Calendar as CalendarIcon, Weight as WeightIcon, Edit2, Trash2, Save, X } from 'lucide-react';
+import { LineChart as LineChartIcon, Calendar as CalendarIcon, Weight as WeightIcon, Edit2, Trash2, Save, X, ZoomOut } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { ChartContainer, ChartConfig } from './ui/chart';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine, Brush } from 'recharts';
 import { Input } from './ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
@@ -149,6 +149,9 @@ export function WorkoutHeatmap({
   const [goalWeight, setGoalWeight] = useState<number | null>(null);
   const [goalWeightInput, setGoalWeightInput] = useState('');
 
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [chartKey, setChartKey] = useState(0);
+
   useEffect(() => {
     const now = new Date();
     setToday(now);
@@ -267,6 +270,8 @@ export function WorkoutHeatmap({
 
     const weeksToGo = weightToChange / projectionRate;
     
+    if (weeksToGo <= 0) return [];
+    
     const projectionEndDate = addWeeks(lastLog.dateObj, weeksToGo);
     const daysToGo = differenceInDays(projectionEndDate, new Date());
 
@@ -287,11 +292,11 @@ export function WorkoutHeatmap({
     ];
   }, [goalWeight, weightChartData]);
 
-    const combinedData = useMemo(() => {
+    const combinedDataForChart = useMemo(() => {
       return [...weightChartData];
     }, [weightChartData]);
 
-    const minChartWidth = Math.max(combinedData.length * 60, 500);
+    const minChartWidth = Math.max(combinedDataForChart.length * 50, 400);
 
     const handleLogWeightClick = () => {
       const weightValue = parseFloat(newWeight);
@@ -356,6 +361,11 @@ export function WorkoutHeatmap({
             </div>
         );
     }
+
+    const handleResetZoom = () => {
+      setIsZoomed(false);
+      setChartKey(prev => prev + 1);
+    };
     
     if (!oneYearAgo || !today) {
         return (
@@ -381,10 +391,16 @@ export function WorkoutHeatmap({
               <CardDescription>
                 {view === 'heatmap' && "Your workout consistency over the last year. Click a square to view that day's log."}
                 {view === 'graph' && 'Your probability of working out, based on recent consistency.'}
-                {view === 'weight' && 'Your weekly body weight trend. Log your weight for any week.'}
+                {view === 'weight' && 'Your weekly body weight trend. Drag on the timeline below to zoom.'}
               </CardDescription>
             </div>
              <div className='flex items-center gap-2'>
+                {view === 'weight' && isZoomed && (
+                  <Button variant="outline" size="sm" onClick={handleResetZoom}>
+                    <ZoomOut className="mr-2 h-4 w-4" />
+                    Reset Zoom
+                  </Button>
+                )}
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
@@ -535,18 +551,23 @@ export function WorkoutHeatmap({
                     ) : (
                        <div className="overflow-x-auto -mx-4 px-4 pb-4">
                             <div style={{ minWidth: `${minChartWidth}px` }}>
-                                <ChartContainer config={weightChartConfig} className="min-h-[300px] w-full pr-4">
-                                    <LineChart accessibilityLayer data={combinedData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                                <ChartContainer config={weightChartConfig} key={chartKey} className="min-h-[350px] w-full pr-4">
+                                    <LineChart 
+                                      accessibilityLayer 
+                                      data={combinedDataForChart} 
+                                      margin={{ top: 5, right: 20, left: 0, bottom: 20 }}
+                                      onMouseDown={() => setIsZoomed(true)}
+                                    >
                                         <CartesianGrid vertical={false} strokeDasharray="3 3" />
                                         <XAxis 
                                             dataKey="timestamp"
                                             type="number"
-                                            domain={['dataMin', (dataMax: number) => projectionData?.[1]?.timestamp || dataMax]}
+                                            domain={['dataMin', 'dataMax']}
                                             tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')}
                                             tickLine={false}
                                             axisLine={false}
                                             tickMargin={8}
-                                            interval={0}
+                                            interval="preserveStartEnd"
                                         />
                                         <YAxis tickLine={false} axisLine={false} tickMargin={8} domain={['dataMin - 2', 'dataMax + 2']} />
                                         <RechartsTooltip
@@ -573,6 +594,13 @@ export function WorkoutHeatmap({
                                             name="Projection" 
                                         />
                                         )}
+                                        <Brush 
+                                            dataKey="timestamp" 
+                                            height={40} 
+                                            stroke="hsl(var(--primary))" 
+                                            tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')}
+                                            travellerWidth={15}
+                                        />
                                     </LineChart>
                                 </ChartContainer>
                             </div>
