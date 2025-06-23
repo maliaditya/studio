@@ -27,7 +27,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ExerciseDefinition, ExerciseCategory, WorkoutMode, AllWorkoutPlans } from '@/types/workout';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -116,75 +115,73 @@ export function WorkoutPlanModal({
           </TabsList>
           
           {planKeysToShow.map(planKey => (
-            <TabsContent key={planKey} value={planKey} className="m-0 mt-4 flex-grow min-h-0">
-                <ScrollArea className="h-full pr-4">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {relevantCategoriesForPlan(planKey).map(category => (
-                        <Card key={category} className="overflow-hidden">
-                            <CardHeader className="bg-muted/50 p-3">
-                                <CardTitle className="text-lg">{category}</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-3">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Exercise</TableHead>
-                                            <TableHead className="w-[50px] text-right"></TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                    {workoutPlans[planKey]?.[category]?.map((exName: string) => (
-                                        <TableRow key={exName}>
-                                            <TableCell className="font-medium truncate" title={exName}>{exName}</TableCell>
-                                            <TableCell className="text-right p-1">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8"
-                                                    onClick={() => handleRemoveExercise(planKey, category as ExerciseCategory, exName)}
-                                                >
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                    </TableBody>
-                                </Table>
-                                <div className="flex items-center gap-2 mt-4 pt-4 border-t">
-                                    <Select
-                                        value={addSelection[`${planKey}-${category}`] || ''}
-                                        onValueChange={(value) => setAddSelection(prev => ({ ...prev, [`${planKey}-${category}`]: value }))}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Add an exercise..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {exerciseDefinitions
-                                                .filter(def => def.category === category)
-                                                .filter(def => !workoutPlans[planKey]?.[category]?.includes(def.name))
-                                                .sort((a,b) => a.name.localeCompare(b.name))
-                                                .map(def => (
-                                                    <SelectItem key={def.id} value={def.name}>
-                                                        {def.name}
-                                                    </SelectItem>
-                                                ))
-                                            }
-                                        </SelectContent>
-                                    </Select>
-                                    <Button
-                                        size="icon"
-                                        className="h-10 w-10 shrink-0"
-                                        onClick={() => handleAddExercise(planKey, category)}
-                                        disabled={!addSelection[`${planKey}-${category}`]}
-                                    >
-                                        <PlusCircle className="h-5 w-5" />
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        ))}
-                    </div>
-                </ScrollArea>
+            <TabsContent key={planKey} value={planKey} className="m-0 mt-4 flex-grow min-h-0 overflow-y-auto pr-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {relevantCategoriesForPlan(planKey).map(category => (
+                    <Card key={category} className="overflow-hidden">
+                        <CardHeader className="bg-muted/50 p-3">
+                            <CardTitle className="text-lg">{category}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Exercise</TableHead>
+                                        <TableHead className="w-[50px] text-right"></TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                {workoutPlans[planKey]?.[category]?.map((exName: string) => (
+                                    <TableRow key={exName}>
+                                        <TableCell className="font-medium truncate" title={exName}>{exName}</TableCell>
+                                        <TableCell className="text-right p-1">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8"
+                                                onClick={() => handleRemoveExercise(planKey, category as ExerciseCategory, exName)}
+                                            >
+                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                </TableBody>
+                            </Table>
+                            <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+                                <Select
+                                    value={addSelection[`${planKey}-${category}`] || ''}
+                                    onValueChange={(value) => setAddSelection(prev => ({ ...prev, [`${planKey}-${category}`]: value }))}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Add an exercise..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {exerciseDefinitions
+                                            .filter(def => def.category === category)
+                                            .filter(def => !workoutPlans[planKey]?.[category]?.includes(def.name))
+                                            .sort((a,b) => a.name.localeCompare(b.name))
+                                            .map(def => (
+                                                <SelectItem key={def.id} value={def.name}>
+                                                    {def.name}
+                                                </SelectItem>
+                                            ))
+                                        }
+                                    </SelectContent>
+                                </Select>
+                                <Button
+                                    size="icon"
+                                    className="h-10 w-10 shrink-0"
+                                    onClick={() => handleAddExercise(planKey, category)}
+                                    disabled={!addSelection[`${planKey}-${category}`]}
+                                >
+                                    <PlusCircle className="h-5 w-5" />
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    ))}
+                </div>
             </TabsContent>
           ))}
         </Tabs>
