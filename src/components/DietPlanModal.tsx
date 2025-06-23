@@ -202,7 +202,7 @@ export function DietPlanModal({
                     <TableCell className="align-top pt-5">
                       <div className="flex items-start gap-2">
                         <div className="flex-grow">
-                            {dayPlan.totalCalories !== null ? (
+                            {dayPlan.totalCalories != null ? (
                             <span className="font-bold text-lg">{dayPlan.totalCalories.toLocaleString()} <span className="text-xs text-muted-foreground">kcal</span></span>
                             ) : (
                             <span className="text-muted-foreground text-xs">Not set</span>
