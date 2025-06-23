@@ -17,9 +17,18 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { generateDietPlan } from '@/ai/flows/generateDietPlanFlow';
-import type { GenerateDietPlanInput } from '@/types/workout';
+import type { GenerateDietPlanInput, GenerateDietPlanOutput } from '@/types/workout';
 import { Loader2 } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from './ui/badge';
 
 interface DietPlanModalProps {
   isOpen: boolean;
@@ -36,7 +45,7 @@ export function DietPlanModal({
 }: DietPlanModalProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [dietPlan, setDietPlan] = useState<string | null>(null);
+  const [dietPlan, setDietPlan] = useState<GenerateDietPlanOutput | null>(null);
 
   const [height, setHeight] = useState('');
   const [age, setAge] = useState('');
@@ -69,10 +78,10 @@ export function DietPlanModal({
         preferences,
       };
       const result = await generateDietPlan(input);
-      if (result?.plan) {
-        setDietPlan(result.plan);
+      if (result?.weeklyPlan && result.summary) {
+        setDietPlan(result);
       } else {
-        throw new Error("The AI did not return a diet plan.");
+        throw new Error("The AI did not return a valid diet plan object.");
       }
     } catch (error) {
       console.error("Failed to generate diet plan:", error);
@@ -88,7 +97,7 @@ export function DietPlanModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-6xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>AI-Powered Diet Plan Generator</DialogTitle>
           <DialogDescription>
@@ -97,9 +106,9 @@ export function DietPlanModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-grow min-h-0">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-grow min-h-0">
           {/* Form Section */}
-          <form onSubmit={handleGeneratePlan} className="space-y-4">
+          <form onSubmit={handleGeneratePlan} className="space-y-4 md:col-span-1">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="height">Height (cm)</Label>
@@ -145,7 +154,7 @@ export function DietPlanModal({
           </form>
 
           {/* Display Section */}
-          <ScrollArea className="border rounded-md p-4 h-full bg-muted/20">
+          <ScrollArea className="md:col-span-2 border rounded-md p-4 bg-muted/20">
             {isLoading && (
               <div className="flex flex-col items-center justify-center h-full">
                 <Loader2 className="h-12 w-12 text-primary animate-spin" />
@@ -153,7 +162,45 @@ export function DietPlanModal({
               </div>
             )}
             {dietPlan && (
-              <pre className="whitespace-pre-wrap text-sm font-sans">{dietPlan}</pre>
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground italic border-l-4 pl-4">{dietPlan.summary}</p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[80px]">Day</TableHead>
+                      <TableHead>Breakfast</TableHead>
+                      <TableHead>Lunch</TableHead>
+                      <TableHead>Dinner</TableHead>
+                      <TableHead>Snacks</TableHead>
+                      <TableHead className="text-right w-[120px]">Total Calories</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {dietPlan.weeklyPlan.map((dayPlan) => (
+                      <TableRow key={dayPlan.day}>
+                        <TableCell className="font-medium">{dayPlan.day}</TableCell>
+                        <TableCell>
+                          <p>{dayPlan.breakfast.description}</p>
+                          <Badge variant="secondary" className="mt-1">{dayPlan.breakfast.calories} kcal</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <p>{dayPlan.lunch.description}</p>
+                          <Badge variant="secondary" className="mt-1">{dayPlan.lunch.calories} kcal</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <p>{dayPlan.dinner.description}</p>
+                          <Badge variant="secondary" className="mt-1">{dayPlan.dinner.calories} kcal</Badge>
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          <p>{dayPlan.snack1.description} ({dayPlan.snack1.calories} kcal)</p>
+                          <p className="mt-2">{dayPlan.snack2.description} ({dayPlan.snack2.calories} kcal)</p>
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-primary">{dayPlan.totalCalories.toLocaleString()} kcal</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
             {!isLoading && !dietPlan && (
               <div className="flex flex-col items-center justify-center h-full text-center">

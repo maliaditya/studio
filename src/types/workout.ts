@@ -72,6 +72,27 @@ export interface WeightLog {
 
 
 // AI Diet Plan Types
+
+// Meal schema
+export const MealSchema = z.object({
+  description: z.string().describe("A brief description of the meal."),
+  calories: z.number().describe("The estimated calorie count for the meal.")
+});
+export type Meal = z.infer<typeof MealSchema>;
+
+// Daily plan schema
+export const DayPlanSchema = z.object({
+  day: z.string().describe("The day of the week (e.g., 'Day 1', 'Monday')."),
+  breakfast: MealSchema,
+  lunch: MealSchema,
+  dinner: MealSchema,
+  snack1: MealSchema,
+  snack2: MealSchema,
+  totalCalories: z.number().describe("The total estimated calories for the day."),
+});
+export type DayPlan = z.infer<typeof DayPlanSchema>;
+
+
 export const GenerateDietPlanInputSchema = z.object({
   currentWeight: z.number().describe('The user\'s current weight in kg or lb.'),
   goalWeight: z.number().describe('The user\'s goal weight in kg or lb.'),
@@ -84,6 +105,7 @@ export const GenerateDietPlanInputSchema = z.object({
 export type GenerateDietPlanInput = z.infer<typeof GenerateDietPlanInputSchema>;
 
 export const GenerateDietPlanOutputSchema = z.object({
-  plan: z.string().describe('A detailed 7-day diet plan in Markdown format. It should include breakfast, lunch, dinner, and snacks for each day, with estimated calorie counts for each meal and a daily total. Provide a brief summary of the overall strategy at the top.'),
+    summary: z.string().describe("A brief summary of the recommended caloric intake and overall strategy."),
+    weeklyPlan: z.array(DayPlanSchema).describe("A 7-day diet plan, with one object per day."),
 });
 export type GenerateDietPlanOutput = z.infer<typeof GenerateDietPlanOutputSchema>;
