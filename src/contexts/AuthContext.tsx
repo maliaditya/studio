@@ -134,7 +134,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const data = result.data;
           
           if (data === null || data === undefined) {
-              toast({ title: "No Cloud Data", description: "No data found in the cloud for your user." });
+              toast({ title: "No Cloud Data", description: "No data was found in the cloud for you. This is normal if you haven't synced before." });
               return;
           }
 

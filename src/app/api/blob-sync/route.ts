@@ -86,7 +86,7 @@ export async function GET(request: Request) {
      // The `head` method throws a specific error when the blob is not found.
      // We check for the Vercel Blob SDK's specific message or a generic '404'.
      if (error instanceof Error && (error.message.includes('The requested blob does not exist') || error.message.includes('404'))) {
-        return NextResponse.json({ data: null, message: "No cloud data found for this user." }, { status: 200 });
+        return NextResponse.json({ data: null, message: "No cloud data found for this user. This is expected for a first-time sync." }, { status: 200 });
     }
     console.error(`Blob storage read error for user ${username}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
