@@ -164,10 +164,6 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
 
         const weeksToGo = weightToGoal / avgWeeklyChange;
 
-        if (!isFinite(weeksToGo)) {
-          return null;
-        }
-        
         const projectedEndDate = addWeeks(lastLog.dateObj, weeksToGo);
         const daysToGo = differenceInDays(projectedEndDate, new Date());
 
@@ -230,7 +226,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
       }
     };
     
-    const handleSaveHeight = () => {
+    const handleSaveHeight = async () => {
         const input = heightInput.trim().toLowerCase();
         let cm = 0;
 
@@ -260,7 +256,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
         }
 
         if (cm > 90 && cm < 250) { 
-            updateUserProfile({ heightInCm: cm });
+            await updateUserProfile({ heightInCm: cm });
             setHeightInput('');
         } else {
             toast({
@@ -611,3 +607,5 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
     </>
   );
 }
+
+    
