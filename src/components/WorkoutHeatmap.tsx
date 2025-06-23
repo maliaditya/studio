@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import CalendarHeatmap from 'react-calendar-heatmap';
-import { subYears, format, parseISO, addDays } from 'date-fns';
+import { subYears, format, addDays, parse } from 'date-fns';
 import type { DatedWorkout } from '@/types/workout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -45,6 +45,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
 
   useEffect(() => {
+    // This now only runs on the client, preventing hydration mismatches
     const now = new Date();
     setToday(now);
     setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
@@ -112,7 +113,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
         return (
             <div style={style} className={cn("z-50 overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95")}>
                  <div className="text-center">
-                    <p className="font-bold text-base">{format(parseISO(value.date), 'PPP')}</p>
+                    <p className="font-bold text-base">{format(parse(value.date, 'yyyy-MM-dd', new Date()), 'PPP')}</p>
                     <p className="text-sm">{value.count} sets logged</p>
                     {value.exercises && (
                         <div className="mt-2 pt-2 border-t text-xs text-muted-foreground max-w-xs">
@@ -197,8 +198,8 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
                         onClick={(value) => {
                         if (value && value.date) {
                             setTooltipData(null);
-                            const d = parseISO(value.date);
-                            onDateSelect(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+                            // Use parse to correctly interpret the date string in the local timezone.
+                            onDateSelect(parse(value.date, 'yyyy-MM-dd', new Date()));
                         }
                         }}
                         showMonthLabels={true}
