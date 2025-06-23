@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -5,12 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus } from 'lucide-react';
+import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus, Activity } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { format, parseISO, getDay, getWeekOfMonth, isMonday, getYear, getISOWeek, parse, getISOWeekYear, addWeeks, startOfISOWeek, setISOWeek, differenceInDays } from 'date-fns';
+import { format, parseISO, getDay, getWeekOfMonth, isMonday, getYear, getISOWeek, parse, getISOWeekYear, addWeeks, startOfISOWeek, setISOWeek, differenceInDays, subYears, addDays } from 'date-fns';
 import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans, WeightLog } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
@@ -201,6 +202,14 @@ function WorkoutPageContent() {
   const [goalWeightInput, setGoalWeightInput] = useState('');
   const [showProjection, setShowProjection] = useState(true);
 
+  const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
+  const [today, setToday] = useState<Date | null>(null);
+
+  useEffect(() => {
+    const now = new Date();
+    setToday(now);
+    setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
+  }, []);
 
   useEffect(() => {
     if (currentUser?.username) {
@@ -724,6 +733,42 @@ function WorkoutPageContent() {
     }
   };
 
+  const consistencyData = useMemo(() => {
+    if (!allWorkoutLogs || !oneYearAgo || !today) return [];
+
+    const workoutDates = new Set(
+      allWorkoutLogs
+        .filter(log => log.exercises.some(ex => ex.loggedSets.length > 0))
+        .map(log => log.date)
+    );
+
+    const data = [];
+    let score = 0.5;
+
+    for (let d = new Date(oneYearAgo); d <= today; d = addDays(d, 1)) {
+        const dateKey = format(d, 'yyyy-MM-dd');
+        
+        if (workoutDates.has(dateKey)) {
+            score += (1 - score) * 0.1;
+        } else {
+            score *= 0.95;
+        }
+
+        data.push({
+            date: format(d, 'MMM dd'),
+            fullDate: format(d, 'PPP'),
+            score: Math.round(score * 100),
+        });
+    }
+
+    return data;
+  }, [allWorkoutLogs, oneYearAgo, today]);
+
+  const latestConsistency = useMemo(() => {
+    if (!consistencyData.length) return null;
+    return consistencyData[consistencyData.length - 1].score;
+  }, [consistencyData]);
+
   const projectionSummary = useMemo(() => {
     if (!goalWeight || weightLogs.length < 2) {
         return null;
@@ -835,6 +880,9 @@ function WorkoutPageContent() {
             selectedDate={selectedDate}
             goalWeight={goalWeight}
             showProjection={showProjection}
+            consistencyData={consistencyData}
+            oneYearAgo={oneYearAgo}
+            today={today}
           />
         </div>
         
@@ -990,49 +1038,62 @@ function WorkoutPageContent() {
                         </Button>
                     </div>
 
-                    {projectionSummary && (
+                    {(projectionSummary || latestConsistency) && (
                         <div className="space-y-4 pt-4 border-t">
-                            <div className="grid grid-cols-3 gap-2 text-center text-sm">
-                                <div>
-                                    <div className="text-muted-foreground">Current</div>
-                                    <div className="font-bold text-lg">{projectionSummary.currentWeight}</div>
-                                    <div className="text-xs text-muted-foreground">kg/lb</div>
-                                </div>
-                                <div>
-                                    <div className="text-muted-foreground">Goal</div>
-                                    <div className="font-bold text-lg">{projectionSummary.goalWeight}</div>
-                                    <div className="text-xs text-muted-foreground">kg/lb</div>
-                                </div>
-                                <div>
-                                    <div className="text-muted-foreground">{projectionSummary.weightDifference > 0 ? "To Gain" : "To Lose"}</div>
-                                    <div className={`font-bold text-lg ${projectionSummary.weightDifference > 0 ? "text-orange-500" : "text-green-500"}`}>{Math.abs(projectionSummary.weightDifference)}</div>
-                                    <div className="text-xs text-muted-foreground">kg/lb</div>
-                                </div>
-                            </div>
+                            {projectionSummary && (
+                                <>
+                                    <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                                        <div>
+                                            <div className="text-muted-foreground">Current</div>
+                                            <div className="font-bold text-lg">{projectionSummary.currentWeight}</div>
+                                            <div className="text-xs text-muted-foreground">kg/lb</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-muted-foreground">Goal</div>
+                                            <div className="font-bold text-lg">{projectionSummary.goalWeight}</div>
+                                            <div className="text-xs text-muted-foreground">kg/lb</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-muted-foreground">{projectionSummary.weightDifference > 0 ? "To Gain" : "To Lose"}</div>
+                                            <div className={`font-bold text-lg ${projectionSummary.weightDifference > 0 ? "text-orange-500" : "text-green-500"}`}>{Math.abs(projectionSummary.weightDifference)}</div>
+                                            <div className="text-xs text-muted-foreground">kg/lb</div>
+                                        </div>
+                                    </div>
 
-                            <Separator />
+                                    <Separator />
 
-                            <div className="space-y-1 text-sm">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-muted-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Next Week Est.</span>
-                                    <span className="font-bold">{projectionSummary.nextProjectedWeight} kg/lb</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-muted-foreground pl-6">Days Remaining</span>
-                                    <span className="font-bold">{projectionSummary.daysToNextWeek > 0 ? `${projectionSummary.daysToNextWeek} days` : 'Past'}</span>
-                                </div>
-                            </div>
+                                    <div className="space-y-1 text-sm">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-muted-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Next Week Est.</span>
+                                            <span className="font-bold">{projectionSummary.nextProjectedWeight} kg/lb</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-muted-foreground pl-6">Days Remaining</span>
+                                            <span className="font-bold">{projectionSummary.daysToNextWeek > 0 ? `${projectionSummary.daysToNextWeek} days` : 'Past'}</span>
+                                        </div>
+                                    </div>
 
-                             <div className="space-y-1 text-sm">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-muted-foreground flex items-center gap-2"><CalendarDays className="h-4 w-4" /> Est. Goal Date</span>
-                                    <span className="font-bold">{projectionSummary.projectedDate}</span>
+                                    <div className="space-y-1 text-sm">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-muted-foreground flex items-center gap-2"><CalendarDays className="h-4 w-4" /> Est. Goal Date</span>
+                                            <span className="font-bold">{projectionSummary.projectedDate}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-muted-foreground pl-6">Days Remaining</span>
+                                            <span className="font-bold">{projectionSummary.daysToGoal > 0 ? `${projectionSummary.daysToGoal} days` : 'N/A'}</span>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                            
+                            {latestConsistency !== null && (
+                                <div className="space-y-1 text-sm">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-muted-foreground flex items-center gap-2"><Activity className="h-4 w-4" /> Workout Consistency</span>
+                                        <span className="font-bold text-lg">{latestConsistency}%</span>
+                                    </div>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-muted-foreground pl-6">Days Remaining</span>
-                                    <span className="font-bold">{projectionSummary.daysToGoal > 0 ? `${projectionSummary.daysToGoal} days` : 'N/A'}</span>
-                                </div>
-                            </div>
+                            )}
 
                              <div className="flex items-center justify-center space-x-2 pt-3 border-t">
                                 <Switch id="show-projection" checked={showProjection} onCheckedChange={setShowProjection} />

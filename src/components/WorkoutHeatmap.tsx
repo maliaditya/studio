@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -30,6 +31,9 @@ interface WorkoutHeatmapProps {
   selectedDate: Date;
   goalWeight: number | null;
   showProjection: boolean;
+  consistencyData: { date: string; fullDate: string; score: number }[];
+  oneYearAgo: Date | null;
+  today: Date | null;
 }
 
 interface HeatmapValue {
@@ -141,6 +145,9 @@ export function WorkoutHeatmap({
   onDeleteWeightLog,
   goalWeight,
   showProjection,
+  consistencyData,
+  oneYearAgo,
+  today
 }: WorkoutHeatmapProps) {
   const { toast } = useToast();
   
@@ -150,19 +157,12 @@ export function WorkoutHeatmap({
   const [weightDate, setWeightDate] = useState<Date | undefined>(new Date());
   
   const [editingLog, setEditingLog] = useState<{ date: string; weight: string } | null>(null);
-
-  const [today, setToday] = useState<Date | null>(null);
-  const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
-
+  
   const [chartKey, setChartKey] = useState(Date.now());
   const [brushIndex, setBrushIndex] = useState<{ startIndex?: number; endIndex?: number }>({});
 
-
   useEffect(() => {
-    const now = new Date();
-    setToday(now);
-    setWeightDate(now);
-    setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
+    setWeightDate(new Date());
   }, []);
 
   const heatmapValues: HeatmapValue[] = useMemo(() => allWorkoutLogs
@@ -182,36 +182,6 @@ export function WorkoutHeatmap({
       };
     }), [allWorkoutLogs]);
 
-    const consistencyData = useMemo(() => {
-        if (!allWorkoutLogs || !oneYearAgo || !today) return [];
-    
-        const workoutDates = new Set(
-          allWorkoutLogs
-            .filter(log => log.exercises.some(ex => ex.loggedSets.length > 0))
-            .map(log => log.date)
-        );
-    
-        const data = [];
-        let score = 0.5;
-    
-        for (let d = new Date(oneYearAgo); d <= today; d = addDays(d, 1)) {
-            const dateKey = format(d, 'yyyy-MM-dd');
-            
-            if (workoutDates.has(dateKey)) {
-                score += (1 - score) * 0.1;
-            } else {
-                score *= 0.95;
-            }
-    
-            data.push({
-                date: format(d, 'MMM dd'),
-                fullDate: format(d, 'PPP'),
-                score: Math.round(score * 100),
-            });
-        }
-    
-        return data;
-    }, [allWorkoutLogs, oneYearAgo, today]);
 
     const weightChartData = useMemo(() => {
         const sortedLogs = weightLogs
