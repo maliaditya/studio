@@ -623,7 +623,6 @@ export function WorkoutHeatmap({
                                     tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')}
                                     travellerWidth={15}
                                     onChange={(e) => setBrushIndex({startIndex: e.startIndex, endIndex: e.endIndex})}
-                                    y={310}
                                 />
                             </LineChart>
                         </ChartContainer>
