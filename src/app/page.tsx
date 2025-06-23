@@ -54,138 +54,97 @@ const DEFAULT_TARGET_SETS = 4;
 const DEFAULT_TARGET_REPS = "8-12";
 const DEFAULT_EXERCISE_CATEGORY: ExerciseCategory = "Other";
 
-// A comprehensive default list based on the provided workout plans
+// A reduced default list to fit within Vercel Edge Config free tier limits.
 const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
   // Chest
   { id: 'def_chest_01', name: "Flat Barbell Bench Press", category: "Chest" },
-  { id: 'def_chest_02', name: "Incline Barbell Press", category: "Chest" },
-  { id: 'def_chest_03', name: "Decline Dumbbell Press", category: "Chest" },
-  { id: 'def_chest_04', name: "Peck Machine", category: "Chest" },
-  { id: 'def_chest_05', name: "Dumbbell Flat Press", category: "Chest" },
-  { id: 'def_chest_06', name: "Incline Dumbbell Press", category: "Chest" },
-  { id: 'def_chest_07', name: "Cable Fly", category: "Chest" },
-  { id: 'def_chest_08', name: "Dumbbell Chest Fly", category: "Chest" },
-  { id: 'def_chest_09', name: "Dumbbell Pullovers", category: "Chest" },
-  { id: 'def_chest_10', name: "Flat Bench Chest Fly", category: "Chest" },
+  { id: 'def_chest_02', name: "Incline Dumbbell Press", category: "Chest" },
+  { id: 'def_chest_03', name: "Cable Fly", category: "Chest" },
+  { id: 'def_chest_04', name: "Dumbbell Pullovers", category: "Chest" },
 
   // Triceps
   { id: 'def_triceps_01', name: "Close-Grip Barbell Bench Press", category: "Triceps" },
   { id: 'def_triceps_02', name: "Overhead Dumbbell Extension", category: "Triceps" },
-  { id: 'def_triceps_03', name: "Dumbbell Kickback", category: "Triceps" },
-  { id: 'def_triceps_04', name: "Cable Rope Pushdown (Slow)", category: "Triceps" },
-  { id: 'def_triceps_05', name: "Overhead Bar extension", category: "Triceps" },
-  { id: 'def_triceps_06', name: "Rope Pushdown", category: "Triceps" },
-  { id: 'def_triceps_07', name: "Overhead Cable Extension", category: "Triceps" },
-  { id: 'def_triceps_08', name: "Straight bar pushdown", category: "Triceps" },
-  { id: 'def_triceps_09', name: "Reversebar pushdown", category: "Triceps" },
-  { id: 'def_triceps_10', name: "Back dips", category: "Triceps" },
-  { id: 'def_triceps_11', name: "Single Arm Dumbbell Extensions", category: "Triceps" },
+  { id: 'def_triceps_03', name: "Rope Pushdown", category: "Triceps" },
+  { id: 'def_triceps_04', name: "Dumbbell Kickback", category: "Triceps" },
 
   // Back
   { id: 'def_back_01', name: "Lat Pulldown", category: "Back" },
-  { id: 'def_back_02', name: "Machine Row", category: "Back" },
-  { id: 'def_back_03', name: "T-Bar Row", category: "Back" },
-  { id: 'def_back_04', name: "Lat Prayer Pull", category: "Back" },
-  { id: 'def_back_05', name: "Lat Pulldown (Wide Grip)", category: "Back" },
-  { id: 'def_back_06', name: "V handle lat pulldown", category: "Back" },
-  { id: 'def_back_07', name: "1-Arm Dumbbell Row", category: "Back" },
-  { id: 'def_back_08', name: "Back extensions", category: "Back" },
-  { id: 'def_back_09', name: "Barbell Row", category: "Back" },
-  { id: 'def_back_10', name: "Seated Row", category: "Back" },
-  { id: 'def_back_11', name: "V handle pulldown Cable", category: "Back" },
-  { id: 'def_back_12', name: "DeadLifts", category: "Back" },
-
+  { id: 'def_back_02', name: "Barbell Row", category: "Back" },
+  { id: 'def_back_03', name: "1-Arm Dumbbell Row", category: "Back" },
+  { id: 'def_back_04', name: "DeadLifts", category: "Back" },
+  
   // Biceps
   { id: 'def_biceps_01', name: "Standing dumbbell curls", category: "Biceps" },
-  { id: 'def_biceps_02', name: "Standing Dumbbell Alternating Curl", category: "Biceps" },
-  { id: 'def_biceps_03', name: "Preacher curls Dumbbells", category: "Biceps" },
-  { id: 'def_biceps_04', name: "Hammer Curl (Dumbbell)", category: "Biceps" },
-  { id: 'def_biceps_05', name: "Seated Incline Dumbbell Curl", category: "Biceps" },
-  { id: 'def_biceps_06', name: "Seated Dumbbell Alternating Curl", category: "Biceps" },
-  { id: 'def_biceps_07', name: "Reverse Cable", category: "Biceps" },
-  { id: 'def_biceps_08', name: "Strict bar curls", category: "Biceps" },
-  { id: 'def_biceps_09', name: "Reversed Incline curls", category: "Biceps" },
-  { id: 'def_biceps_10', name: "Cable Curls Superset", category: "Biceps" },
-  { id: 'def_biceps_11', name: "Reversed cable curls", category: "Biceps" },
-  { id: 'def_biceps_12', name: "Seated Machine Curls", category: "Biceps" },
-  { id: 'def_biceps_13', name: "Cable Curls", category: "Biceps" },
-  { id: 'def_biceps_14', name: "Preacher Curls Bar", category: "Biceps" },
-  { id: 'def_biceps_15', name: "Concentration Curl", category: "Biceps" },
+  { id: 'def_biceps_02', name: "Hammer Curl (Dumbbell)", category: "Biceps" },
+  { id: 'def_biceps_03', name: "Preacher Curls Bar", category: "Biceps" },
+  { id: 'def_biceps_04', name: "Cable Curls", category: "Biceps" },
 
   // Shoulders
   { id: 'def_shoulders_01', name: "Seated Dumbbell Shoulder Press", category: "Shoulders" },
   { id: 'def_shoulders_02', name: "Standing Dumbbell Lateral Raise", category: "Shoulders" },
   { id: 'def_shoulders_03', name: "Face Pulls", category: "Shoulders" },
   { id: 'def_shoulders_04', name: "Shrugs", category: "Shoulders" },
-  { id: 'def_shoulders_05', name: "Seated Dumbbell Lateral Raise", category: "Shoulders" },
-  { id: 'def_shoulders_06', name: "Rear Delt Fly (Incline Bench)", category: "Shoulders" },
-  { id: 'def_shoulders_07', name: "Cable Upright Rows", category: "Shoulders" },
-  { id: 'def_shoulders_08', name: "Dumbbell Lateral Raise (Lean in)", category: "Shoulders" },
-  { id: 'def_shoulders_09', name: "Lean-Away Cable Lateral Raise", category: "Shoulders" },
-  { id: 'def_shoulders_10', name: "Front Raise cable", category: "Shoulders" },
-  { id: 'def_shoulders_11', name: "Front Raise Dumbbells", category: "Shoulders" },
 
   // Legs
-  { id: 'def_legs_01', name: "Walking Lunges (Barbell)", category: "Legs" },
+  { id: 'def_legs_01', name: "Squats (Barbell)", category: "Legs" },
   { id: 'def_legs_02', name: "Leg Press", category: "Legs" },
-  { id: 'def_legs_03', name: "Quads Machine", category: "Legs" },
+  { id: 'def_legs_03', name: "Walking Lunges (Barbell)", category: "Legs" },
   { id: 'def_legs_04', name: "Hamstring machine", category: "Legs" },
-  { id: 'def_legs_05', name: "Squats (Barbell)", category: "Legs" },
-  { id: 'def_legs_06', name: "Calf Raises (Bodyweight)", category: "Legs" },
-  { id: 'def_legs_07', name: "Calf Raises", category: "Legs" },
-  { id: 'def_legs_08', name: "Hack Squats", category: "Legs" },
+  { id: 'def_legs_05', name: "Calf Raises", category: "Legs" },
 ];
 
 const INITIAL_PLANS: AllWorkoutPlans = {
   W1: {
-    Chest: ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine"],
-    Triceps: ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Cable Rope Pushdown (Slow)"],
-    Back: ["Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull"],
-    Biceps: ["Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"],
-    Shoulders: ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Shrugs"],
-    Legs: ["Walking Lunges (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine"]
+    Chest: ["Flat Barbell Bench Press", "Incline Dumbbell Press"],
+    Triceps: ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension"],
+    Back: ["Lat Pulldown", "Barbell Row"],
+    Biceps: ["Standing dumbbell curls", "Hammer Curl (Dumbbell)"],
+    Shoulders: ["Seated Dumbbell Shoulder Press", "Face Pulls"],
+    Legs: ["Squats (Barbell)", "Leg Press"]
   },
   W2: {
-    Chest: ["Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Cable Fly"],
-    Triceps: ["Overhead Dumbbell Extension", "Overhead Bar extension", "Rope Pushdown", "Dumbbell Kickback"],
-    Back: ["Lat Pulldown (Wide Grip)", "V handle lat pulldown", "1-Arm Dumbbell Row", "Back extensions"],
-    Biceps: ["Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Reverse Cable"],
-    Shoulders: ["Seated Dumbbell Shoulder Press", "Seated Dumbbell Lateral Raise", "Rear Delt Fly (Incline Bench)", "Cable Upright Rows"],
-    Legs: ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"]
+    Chest: ["Cable Fly", "Dumbbell Pullovers"],
+    Triceps: ["Rope Pushdown", "Dumbbell Kickback"],
+    Back: ["1-Arm Dumbbell Row", "DeadLifts"],
+    Biceps: ["Preacher Curls Bar", "Cable Curls"],
+    Shoulders: ["Standing Dumbbell Lateral Raise", "Shrugs"],
+    Legs: ["Walking Lunges (Barbell)", "Hamstring machine"]
   },
-  W3: {
-    Chest: ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine"],
-    Triceps: ["Overhead Cable Extension", "Straight bar pushdown", "Reversebar pushdown", "Back dips"],
-    Back: ["Lat Pulldown", "Barbell Row", "Seated Row", "Lat Prayer Pull"],
-    Biceps: ["Strict bar curls", "Reversed Incline curls", "Cable Curls Superset", "Reversed cable curls"],
-    Shoulders: ["Seated Dumbbell Shoulder Press", "Dumbbell Lateral Raise (Lean in)", "Face Pulls", "Shrugs"],
-    Legs: ["Leg Press", "Quads Machine", "Hamstring machine", "Calf Raises (Bodyweight)"]
+  W3: { // Same as W2
+    Chest: ["Cable Fly", "Dumbbell Pullovers"],
+    Triceps: ["Rope Pushdown", "Dumbbell Kickback"],
+    Back: ["1-Arm Dumbbell Row", "DeadLifts"],
+    Biceps: ["Preacher Curls Bar", "Cable Curls"],
+    Shoulders: ["Standing Dumbbell Lateral Raise", "Shrugs"],
+    Legs: ["Walking Lunges (Barbell)", "Hamstring machine"]
   },
-  W4: {
-    Chest: ["Dumbbell Flat Press", "Incline Dumbbell Press", "Dumbbell Pullovers", "Cable Fly"],
-    Triceps: ["Overhead Cable Extension", "Straight bar pushdown", "Reversebar pushdown", "Back dips"],
-    Back: ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle pulldown Cable", "DeadLifts"],
-    Biceps: ["Seated Machine Curls", "Cable Curls", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"],
-    Shoulders: ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable"],
-    Legs: ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"]
+  W4: { // Same as W1
+    Chest: ["Flat Barbell Bench Press", "Incline Dumbbell Press"],
+    Triceps: ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension"],
+    Back: ["Lat Pulldown", "Barbell Row"],
+    Biceps: ["Standing dumbbell curls", "Hammer Curl (Dumbbell)"],
+    Shoulders: ["Seated Dumbbell Shoulder Press", "Face Pulls"],
+    Legs: ["Squats (Barbell)", "Leg Press"]
   },
-  W5: {
-    Chest: ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine", "Cable Fly", "Dumbbell Pullovers"],
-    Triceps: ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Straight bar pushdown", "Reversebar pushdown", "Back dips"],
-    Back: ["Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull", "1-Arm Dumbbell Row", "DeadLifts"],
-    Biceps: ["Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)", "Reversed cable curls", "Reversed Incline curls"],
-    Shoulders: ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Cable Upright Rows", "Front Raise Dumbbells", "Shrugs"],
-    Legs: ["Squats (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine", "Walking Lunges (Barbell)", "Calf Raises"],
+  W5: { // One-muscle day, more exercises
+    Chest: ["Flat Barbell Bench Press", "Incline Dumbbell Press", "Cable Fly"],
+    Back: ["Lat Pulldown", "Barbell Row", "1-Arm Dumbbell Row"],
+    Legs: ["Squats (Barbell)", "Leg Press", "Hamstring machine", "Calf Raises"],
+    Shoulders: ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls"],
+    Biceps: ["Standing dumbbell curls", "Hammer Curl (Dumbbell)", "Preacher Curls Bar"],
+    Triceps: ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Rope Pushdown"],
   },
-  W6: {
-    Chest: ["Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Peck Machine", "Flat Bench Chest Fly", "Dumbbell Pullovers"],
-    Triceps: ["Overhead Cable Extension", "Single Arm Dumbbell Extensions", "Rope Pushdown", "Straight bar pushdown", "Reversebar pushdown", "Back dips"],
-    Back: ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle pulldown Cable", "Barbell Row", "Lat Prayer Pull", "Back extensions"],
-    Biceps: ["Strict bar curls", "Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher Curls Bar", "Reverse Cable", "Concentration Curl"],
-    Shoulders: ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable", "Cable Upright Rows", "Shrugs"],
-    Legs: ["Walking Lunges (Barbell)", "Hack Squats", "Hamstring machine", "Quads Machine", "Leg Press", "Calf Raises"],
+  W6: { // One-muscle day, alternative exercises
+    Chest: ["Incline Dumbbell Press", "Dumbbell Pullovers", "Cable Fly"],
+    Back: ["Barbell Row", "1-Arm Dumbbell Row", "DeadLifts"],
+    Legs: ["Leg Press", "Walking Lunges (Barbell)", "Hamstring machine", "Calf Raises"],
+    Shoulders: ["Standing Dumbbell Lateral Raise", "Face Pulls", "Shrugs"],
+    Biceps: ["Hammer Curl (Dumbbell)", "Preacher Curls Bar", "Cable Curls"],
+    Triceps: ["Overhead Dumbbell Extension", "Rope Pushdown", "Dumbbell Kickback"],
   }
 };
+
 
 // Schedule for "Two Muscles / Day" mode
 const dailyMuscleGroups: Record<number, string[]> = {
