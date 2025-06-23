@@ -19,6 +19,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { ScrollArea } from './ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
+import { Switch } from './ui/switch';
+import { Label } from './ui/label';
 
 interface WorkoutHeatmapProps {
   allWorkoutLogs: DatedWorkout[];
@@ -148,6 +150,7 @@ export function WorkoutHeatmap({
 
   const [goalWeight, setGoalWeight] = useState<number | null>(null);
   const [goalWeightInput, setGoalWeightInput] = useState('');
+  const [showProjection, setShowProjection] = useState(true);
 
   const [chartKey, setChartKey] = useState(Date.now());
   const [brushIndex, setBrushIndex] = useState<{ startIndex?: number; endIndex?: number }>({});
@@ -246,7 +249,7 @@ export function WorkoutHeatmap({
   }, [weightLogs]);
 
   const projectionData = useMemo(() => {
-    if (!goalWeight || weightChartData.length < 1) return [];
+    if (!goalWeight || weightChartData.length < 1 || !showProjection) return [];
     
     const lastLog = weightChartData[weightChartData.length - 1];
     const weightToChange = goalWeight - lastLog.weight;
@@ -290,7 +293,7 @@ export function WorkoutHeatmap({
       { ...lastLog, isProjection: false },
       projectionEndPoint
     ];
-  }, [goalWeight, weightChartData]);
+  }, [goalWeight, weightChartData, showProjection]);
 
 
     const handleLogWeightClick = () => {
@@ -576,7 +579,7 @@ export function WorkoutHeatmap({
                                     cursor={true}
                                     content={<CustomTooltip />}
                                 />
-                                {goalWeight !== null && (
+                                {goalWeight !== null && showProjection && (
                                     <ReferenceLine 
                                         y={goalWeight} 
                                         label={{ value: `Goal: ${goalWeight}`, position: 'insideTopRight', fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} 
@@ -585,7 +588,7 @@ export function WorkoutHeatmap({
                                     />
                                 )}
                                 <Line dataKey="weight" type="monotone" stroke="var(--color-weight)" strokeWidth={2} dot={true} name="Weight" />
-                                {projectionData && projectionData.length > 0 && (
+                                {projectionData && projectionData.length > 0 && showProjection && (
                                 <Line 
                                     data={projectionData} 
                                     dataKey="weight"
@@ -644,6 +647,18 @@ export function WorkoutHeatmap({
                             Set Goal
                         </Button>
                     </div>
+                    
+                    {goalWeight !== null && (
+                      <div className="flex items-center justify-center space-x-2 mt-4">
+                          <Switch 
+                              id="show-projection" 
+                              checked={showProjection} 
+                              onCheckedChange={setShowProjection} 
+                          />
+                          <Label htmlFor="show-projection">Show Ideal Weight Projection</Label>
+                      </div>
+                    )}
+
 
                     <div className="mt-6">
                         <h3 className="text-lg font-semibold mb-2">Log History</h3>
