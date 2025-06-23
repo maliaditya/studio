@@ -65,7 +65,7 @@ const weightChartConfig = {
 const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
-        const value = data.weight;
+        const value = data.historicalWeight ?? data.projectedWeight;
 
         if (data.isProjection) {
             return (
@@ -286,23 +286,21 @@ export function WorkoutHeatmap({
       
       if (Math.abs(projectionRate) < 0.01) return allData;
 
-      const weeksToGo = Math.ceil(Math.abs(weightToChange / projectionRate));
+      const weeksToGo = Math.ceil(Math.abs(weightTochange / projectionRate));
       if (weeksToGo <= 0) return allData;
       
-      // Connect the lines
       const lastLogIndex = allData.findIndex(d => d.timestamp === lastLog.timestamp);
       if (lastLogIndex !== -1) {
           allData[lastLogIndex].projectedWeight = lastLog.weight;
       }
 
-      // Generate future points
       for (let i = 1; i <= weeksToGo; i++) {
           const projectedDate = addWeeks(lastLog.dateObj, i);
           const projectedWeight = lastLog.weight + (i * projectionRate);
           const daysToGo = differenceInDays(projectedDate, new Date());
 
           allData.push({
-              weight: parseFloat(projectedWeight.toFixed(1)),
+              weight: null,
               historicalWeight: null,
               projectedWeight: parseFloat(projectedWeight.toFixed(1)),
               timestamp: projectedDate.getTime(),
@@ -315,10 +313,8 @@ export function WorkoutHeatmap({
           });
       }
       
-      // Ensure the very last point is exactly the goal weight
       if (allData.length > weightChartData.length) {
           const lastPoint = allData[allData.length - 1];
-          lastPoint.weight = goalWeight;
           lastPoint.projectedWeight = goalWeight;
       }
 
@@ -627,7 +623,7 @@ export function WorkoutHeatmap({
                                     tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')}
                                     travellerWidth={15}
                                     onChange={(e) => setBrushIndex({startIndex: e.startIndex, endIndex: e.endIndex})}
-                                    y={300}
+                                    y={310}
                                 />
                             </LineChart>
                         </ChartContainer>
