@@ -1,12 +1,18 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import CalendarHeatmap from 'react-calendar-heatmap';
-import { subYears, format, parseISO } from 'date-fns';
+import { subYears, format, parseISO, addDays } from 'date-fns';
 import type { DatedWorkout } from '@/types/workout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { Button } from './ui/button';
+import { LineChart as LineChartIcon, Calendar as CalendarIcon } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { ChartContainer } from './ui/chart';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+
 
 interface WorkoutHeatmapProps {
   allWorkoutLogs: DatedWorkout[];
@@ -28,8 +34,16 @@ interface TooltipData {
 const today = new Date();
 const oneYearAgo = subYears(new Date(today.getFullYear(), today.getMonth(), today.getDate()), 1);
 
+const chartConfig = {
+  score: {
+    label: "Consistency",
+    color: "hsl(var(--primary))",
+  }
+};
+
 export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapProps) {
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
+  const [view, setView] = useState<'heatmap' | 'graph'>('heatmap');
 
   const heatmapValues: HeatmapValue[] = allWorkoutLogs
     .filter(log => log.exercises.some(ex => ex.loggedSets.length > 0))
@@ -47,6 +61,39 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
         exercises: exercisesPerformed,
       };
     });
+
+    const consistencyData = useMemo(() => {
+        if (!allWorkoutLogs) return [];
+    
+        const workoutDates = new Set(
+          allWorkoutLogs
+            .filter(log => log.exercises.some(ex => ex.loggedSets.length > 0))
+            .map(log => log.date)
+        );
+    
+        const data = [];
+        let score = 0.5; // Start at 50% probability
+    
+        for (let d = new Date(oneYearAgo); d <= today; d = addDays(d, 1)) {
+            const dateKey = format(d, 'yyyy-MM-dd');
+            
+            if (workoutDates.has(dateKey)) {
+                // Went to the gym - score increases, getting 10% closer to 100%
+                score += (1 - score) * 0.1;
+            } else {
+                // Missed day - score decays by 5%
+                score *= 0.95;
+            }
+    
+            data.push({
+                date: format(d, 'MMM dd'),
+                fullDate: format(d, 'PPP'),
+                score: Math.round(score * 100),
+            });
+        }
+    
+        return data;
+    }, [allWorkoutLogs]);
 
     const CustomTooltip = () => {
         if (!tooltipData) return null;
@@ -78,47 +125,145 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
     <>
       <Card className="shadow-xl rounded-xl overflow-hidden mb-8">
         <CardHeader>
-          <CardTitle>Workout Activity</CardTitle>
-          <CardDescription>Your workout consistency over the last year. Click a square to view that day's log.</CardDescription>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Workout Activity</CardTitle>
+              <CardDescription>
+                {view === 'heatmap'
+                  ? 'Your workout consistency over the last year. Click a square to view that day\'s log.'
+                  : 'Your probability of working out, based on recent consistency.'}
+              </CardDescription>
+            </div>
+             <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => setView(v => v === 'heatmap' ? 'graph' : 'heatmap')}
+                            className="ml-4 flex-shrink-0"
+                        >
+                            {view === 'heatmap' ? <LineChartIcon className="h-4 w-4" /> : <CalendarIcon className="h-4 w-4" />}
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>{view === 'heatmap' ? 'Show Consistency Graph' : 'Show Heatmap'}</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+          </div>
         </CardHeader>
         <CardContent className="p-4 overflow-x-auto">
-          <div className="min-w-[720px]">
-            <CalendarHeatmap
-                startDate={oneYearAgo}
-                endDate={today}
-                values={heatmapValues}
-                classForValue={(value) => {
-                  if (!value || value.count === 0) {
-                    return 'color-empty';
-                  }
-                  if (value.count > 15) return 'color-scale-4';
-                  if (value.count > 10) return 'color-scale-3';
-                  if (value.count > 5) return 'color-scale-2';
-                  return 'color-scale-1';
-                }}
-                onMouseOver={(event, value) => {
-                    if (value && value.date && value.count > 0) {
-                        setTooltipData({ value: value as HeatmapValue, x: event.clientX, y: event.clientY });
-                    } else {
-                        setTooltipData(null);
-                    }
-                }}
-                onMouseOut={() => {
-                    setTooltipData(null);
-                }}
-                onClick={(value) => {
-                  if (value && value.date) {
-                      const d = parseISO(value.date);
-                      onDateSelect(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-                  }
-                }}
-                showMonthLabels={true}
-                showWeekdayLabels={true}
-              />
-          </div>
+            {view === 'heatmap' ? (
+                <div className="min-w-[720px]">
+                    <CalendarHeatmap
+                        startDate={oneYearAgo}
+                        endDate={today}
+                        values={heatmapValues}
+                        classForValue={(value) => {
+                        if (!value || value.count === 0) {
+                            return 'color-empty';
+                        }
+                        if (value.count > 15) return 'color-scale-4';
+                        if (value.count > 10) return 'color-scale-3';
+                        if (value.count > 5) return 'color-scale-2';
+                        return 'color-scale-1';
+                        }}
+                        onMouseOver={(event, value) => {
+                            if (value && value.date && value.count > 0) {
+                                setTooltipData({ value: value as HeatmapValue, x: event.clientX, y: event.clientY });
+                            } else {
+                                setTooltipData(null);
+                            }
+                        }}
+                        onMouseOut={() => {
+                            setTooltipData(null);
+                        }}
+                        onClick={(value) => {
+                        if (value && value.date) {
+                            const d = parseISO(value.date);
+                            onDateSelect(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+                        }
+                        }}
+                        showMonthLabels={true}
+                        showWeekdayLabels={true}
+                    />
+                </div>
+            ) : (
+                <>
+                {consistencyData.length > 0 ? (
+                    <ChartContainer config={chartConfig} className="min-h-[250px] w-full pr-4">
+                        <LineChart accessibilityLayer data={consistencyData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                            <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                            <XAxis
+                                dataKey="date"
+                                tickLine={false}
+                                axisLine={false}
+                                tickMargin={8}
+                                tickFormatter={(value, index) => {
+                                    if (index % 30 !== 0) return '';
+                                    return value.split(' ')[0]; // Show only month name
+                                }}
+                            />
+                            <YAxis 
+                                tickLine={false} 
+                                axisLine={false} 
+                                tickMargin={8} 
+                                domain={[0, 100]}
+                                tickFormatter={(value) => `${value}%`}
+                            />
+                            <RechartsTooltip
+                                cursor={true}
+                                content={({ active, payload, label }) => {
+                                    if (active && payload && payload.length) {
+                                        const data = payload[0].payload;
+                                        return (
+                                            <div className="rounded-lg border bg-background p-2.5 shadow-sm">
+                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[0.7rem] uppercase text-muted-foreground">
+                                                            Date
+                                                        </span>
+                                                        <span className="font-bold text-foreground">
+                                                            {data.fullDate}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-col text-right">
+                                                        <span className="text-[0.7rem] uppercase text-muted-foreground">
+                                                            Consistency
+                                                        </span>
+                                                        <span className="font-bold text-foreground">
+                                                            {data.score}%
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                }}
+                            />
+                            <Line
+                                dataKey="score"
+                                type="monotone"
+                                stroke="var(--color-score)"
+                                strokeWidth={2}
+                                dot={false}
+                                name="Consistency"
+                            />
+                        </LineChart>
+                    </ChartContainer>
+                ) : (
+                    <p className="text-center text-muted-foreground py-8">
+                        Not enough data to calculate consistency. Log some workouts!
+                    </p>
+                )}
+                </>
+            )}
         </CardContent>
       </Card>
-      <CustomTooltip />
+      {view === 'heatmap' && <CustomTooltip />}
     </>
   );
 }
+
