@@ -45,6 +45,7 @@
     "genkit": "^1.8.0",
     "lucide-react": "^0.475.0",
     "next": "15.3.3",
+    "pako": "^2.1.0",
     "patch-package": "^8.0.0",
     "react": "^18.3.1",
     "react-calendar-heatmap": "^1.9.0",
@@ -58,6 +59,7 @@
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/pako": "^2.0.3",
     "@types/react": "^18",
     "@types/react-calendar-heatmap": "^1.6.7",
     "@types/react-dom": "^18",

@@ -11,6 +11,7 @@ import {
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
 } from '@/lib/localAuth';
+import pako from 'pako';
 
 interface AuthContextType {
   currentUser: LocalUser | null;
@@ -25,6 +26,27 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Helper to safely convert a Uint8Array to a Base64 string
+function uint8ArrayToBase64(uint8array: Uint8Array): string {
+    let binary = '';
+    const len = uint8array.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(uint8array[i]);
+    }
+    return window.btoa(binary);
+}
+
+// Helper to safely convert a Base64 string to a Uint8Array
+function base64ToUint8Array(base64: string): Uint8Array {
+    const binary_string = window.atob(base64);
+    const len = binary_string.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binary_string.charCodeAt(i);
+    }
+    return bytes;
+}
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<LocalUser | null>(null);
@@ -78,7 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
         return;
     }
-    toast({ title: "Syncing...", description: "Pushing your local data to the cloud." });
+    toast({ title: "Compressing & Syncing...", description: "Pushing your local data to the cloud." });
 
     try {
         const username = currentUser.username;
@@ -91,10 +113,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             goalWeight: localStorage.getItem(`goalWeight_${username}`) || null,
         };
 
+        const jsonString = JSON.stringify(dataToPush);
+        const compressed = pako.deflate(jsonString);
+        const compressedBase64 = uint8ArrayToBase64(compressed);
+
         const response = await fetch('/api/edge-config', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, data: dataToPush }),
+            body: JSON.stringify({ username, data: compressedBase64 }),
         });
 
         const result = await response.json();
@@ -118,7 +144,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
           return;
       }
-      toast({ title: "Syncing...", description: "Fetching your latest data from the cloud." });
+      toast({ title: "Syncing & Decompressing...", description: "Fetching your latest data from the cloud." });
 
       try {
           const username = currentUser.username;
@@ -128,13 +154,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (!response.ok) {
               throw new Error(result.error || 'Failed to fetch data.');
           }
-
+          
           if (result.data === null || result.data === undefined) {
               toast({ title: "No Cloud Data", description: "No data found in the cloud for your user." });
               return;
           }
 
-          const cloudData = result.data;
+          let cloudData;
+
+          // Check if data is a string (compressed) or an object (old format)
+          if (typeof result.data === 'string') {
+              const compressedBytes = base64ToUint8Array(result.data);
+              const decompressedString = pako.inflate(compressedBytes, { to: 'string' });
+              cloudData = JSON.parse(decompressedString);
+          } else {
+              // Handle old, uncompressed data format for backward compatibility
+              cloudData = result.data;
+          }
 
           localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(cloudData.exerciseDefinitions || []));
           localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(cloudData.allWorkoutLogs || []));
