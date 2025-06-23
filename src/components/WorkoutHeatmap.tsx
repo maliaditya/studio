@@ -11,7 +11,7 @@ import { Button } from './ui/button';
 import { LineChart as LineChartIcon, Calendar as CalendarIcon, Weight as WeightIcon, Edit2, Trash2, Save, X } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { ChartContainer, ChartConfig } from './ui/chart';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine, Brush } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine } from 'recharts';
 import { Input } from './ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
@@ -257,21 +257,20 @@ export function WorkoutHeatmap({
 
     let projectionRate = averageWeeklyChange;
 
-    // If goal requires weight loss but average change is positive (or zero), set a default rate.
     if (weightToChange < 0) { 
-        if (projectionRate >= 0) projectionRate = -0.5; // default 0.5 kg/lb loss per week
-    } else { // If goal requires weight gain but average change is negative (or zero), set a default rate.
-        if (projectionRate <= 0) projectionRate = 0.25; // default 0.25 kg/lb gain per week
+        if (projectionRate >= 0) projectionRate = -0.5;
+    } else {
+        if (projectionRate <= 0) projectionRate = 0.25;
     }
     
-    if (Math.abs(projectionRate) < 0.01) return []; // Avoid division by zero or tiny numbers
+    if (Math.abs(projectionRate) < 0.01) return [];
 
     const weeksToGo = weightToChange / projectionRate;
     
     const projectionEndDate = addWeeks(lastLog.dateObj, weeksToGo);
     const daysToGo = differenceInDays(projectionEndDate, new Date());
 
-    if (daysToGo < 1) return []; // Don't project if goal is in the past
+    if (daysToGo < 1) return [];
 
     const projectionEndPoint = {
         weight: goalWeight,
@@ -283,14 +282,16 @@ export function WorkoutHeatmap({
     }
 
     return [
-      { ...lastLog, isProjection: false }, // Start point of dotted line
-      projectionEndPoint // End point of dotted line
+      { ...lastLog, isProjection: false },
+      projectionEndPoint
     ];
   }, [goalWeight, weightChartData]);
 
     const combinedData = useMemo(() => {
       return [...weightChartData];
     }, [weightChartData]);
+
+    const minChartWidth = Math.max(combinedData.length * 60, 500);
 
     const handleLogWeightClick = () => {
       const weightValue = parseFloat(newWeight);
@@ -532,46 +533,50 @@ export function WorkoutHeatmap({
                             </p>
                         </div>
                     ) : (
-                        <ChartContainer config={weightChartConfig} className="min-h-[300px] w-full pr-4">
-                             <LineChart accessibilityLayer data={combinedData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                                <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                                <XAxis 
-                                    dataKey="timestamp"
-                                    type="number"
-                                    domain={['dataMin', (dataMax: number) => projectionData?.[1]?.timestamp || dataMax]}
-                                    tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')}
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tickMargin={8}
-                                />
-                                <YAxis tickLine={false} axisLine={false} tickMargin={8} domain={['dataMin - 2', 'dataMax + 2']} />
-                                <RechartsTooltip
-                                    cursor={true}
-                                    content={<CustomTooltip />}
-                                />
-                                {goalWeight !== null && (
-                                    <ReferenceLine 
-                                        y={goalWeight} 
-                                        label={{ value: `Goal: ${goalWeight}`, position: 'insideTopRight', fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} 
-                                        stroke="hsl(var(--primary))" 
-                                        strokeDasharray="4 4" 
-                                    />
-                                )}
-                                <Line dataKey="weight" type="monotone" stroke="var(--color-weight)" strokeWidth={2} dot={true} name="Weight" />
-                                {projectionData && projectionData.length > 0 && (
-                                  <Line 
-                                    data={projectionData} 
-                                    dataKey="weight"
-                                    type="monotone"
-                                    stroke="var(--color-weight)" 
-                                    strokeDasharray="5 5"
-                                    dot={{r: 4}}
-                                    name="Projection" 
-                                  />
-                                )}
-                                <Brush dataKey="timestamp" height={30} stroke="hsl(var(--primary))" tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM yyyy')} />
-                            </LineChart>
-                        </ChartContainer>
+                       <div className="overflow-x-auto -mx-4 px-4 pb-4">
+                            <div style={{ minWidth: `${minChartWidth}px` }}>
+                                <ChartContainer config={weightChartConfig} className="min-h-[300px] w-full pr-4">
+                                    <LineChart accessibilityLayer data={combinedData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                                        <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                                        <XAxis 
+                                            dataKey="timestamp"
+                                            type="number"
+                                            domain={['dataMin', (dataMax: number) => projectionData?.[1]?.timestamp || dataMax]}
+                                            tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')}
+                                            tickLine={false}
+                                            axisLine={false}
+                                            tickMargin={8}
+                                            interval={0}
+                                        />
+                                        <YAxis tickLine={false} axisLine={false} tickMargin={8} domain={['dataMin - 2', 'dataMax + 2']} />
+                                        <RechartsTooltip
+                                            cursor={true}
+                                            content={<CustomTooltip />}
+                                        />
+                                        {goalWeight !== null && (
+                                            <ReferenceLine 
+                                                y={goalWeight} 
+                                                label={{ value: `Goal: ${goalWeight}`, position: 'insideTopRight', fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} 
+                                                stroke="hsl(var(--primary))" 
+                                                strokeDasharray="4 4" 
+                                            />
+                                        )}
+                                        <Line dataKey="weight" type="monotone" stroke="var(--color-weight)" strokeWidth={2} dot={true} name="Weight" />
+                                        {projectionData && projectionData.length > 0 && (
+                                        <Line 
+                                            data={projectionData} 
+                                            dataKey="weight"
+                                            type="monotone"
+                                            stroke="var(--color-weight)" 
+                                            strokeDasharray="5 5"
+                                            dot={{r: 4}}
+                                            name="Projection" 
+                                        />
+                                        )}
+                                    </LineChart>
+                                </ChartContainer>
+                            </div>
+                        </div>
                     )}
                     
                     <div className="flex flex-col sm:flex-row gap-2 items-center mt-4 pt-4 border-t">
@@ -672,5 +677,3 @@ export function WorkoutHeatmap({
     </>
   );
 }
-
-    
