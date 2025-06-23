@@ -143,7 +143,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
               week: `W${weekNum}`,
               weight: log.weight,
               fullWeek: log.date,
-              dateObj: parse(log.date, "yyyy-'W'ww", new Date()),
+              dateObj: parse(log.date, "YYYY-'W'ww", new Date()),
           }
       }).sort((a,b) => a.dateObj.getTime() - b.dateObj.getTime());
     }, [weightLogs]);
