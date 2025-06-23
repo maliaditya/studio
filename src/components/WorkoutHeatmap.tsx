@@ -52,15 +52,20 @@ const consistencyChartConfig = {
 } satisfies ChartConfig;
 
 const weightChartConfig = {
-  weight: {
+  historicalWeight: {
     label: "Weight (kg/lb)",
     color: "hsl(var(--chart-2))",
   },
+  projectedWeight: {
+    label: "Projection",
+    color: "hsl(var(--chart-2))",
+  }
 } satisfies ChartConfig;
 
 const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
+        const value = data.weight;
 
         if (data.isProjection) {
             return (
@@ -68,10 +73,10 @@ const CustomTooltip = ({ active, payload }: any) => {
                     <div className="grid gap-1.5">
                         <div className="flex flex-col">
                             <span className="text-[0.7rem] uppercase text-muted-foreground">
-                                Ideal Weight Goal
+                                Projected Weight
                             </span>
                             <span className="font-bold text-foreground">
-                                {data.weight.toFixed(1)} kg/lb
+                                {value.toFixed(1)} kg/lb
                             </span>
                         </div>
                         <div className="flex flex-col border-t pt-1.5 mt-1.5">
@@ -103,7 +108,7 @@ const CustomTooltip = ({ active, payload }: any) => {
                             {format(data.dateObj, 'PPP')}
                         </span>
                         <span className="font-bold text-foreground">
-                            {data.weight.toFixed(1)} kg/lb
+                            {value.toFixed(1)} kg/lb
                         </span>
                     </div>
                     {data.weeklyChange !== null && data.weeklyChange !== undefined && (
@@ -223,76 +228,102 @@ export function WorkoutHeatmap({
     }, [allWorkoutLogs, oneYearAgo, today]);
 
     const weightChartData = useMemo(() => {
-      const sortedLogs = weightLogs
-      .map(log => {
-          const [year, weekNum] = log.date.split('-W');
-          const dateObj = startOfISOWeek(setISOWeek(new Date(parseInt(year), 0, 4), parseInt(weekNum)));
-          return { ...log, dateObj };
-      })
-      .sort((a,b) => a.dateObj.getTime() - b.dateObj.getTime());
+        const sortedLogs = weightLogs
+        .map(log => {
+            const [year, weekNum] = log.date.split('-W');
+            const dateObj = startOfISOWeek(setISOWeek(new Date(parseInt(year), 0, 4), parseInt(weekNum)));
+            return { ...log, dateObj };
+        })
+        .sort((a,b) => a.dateObj.getTime() - b.dateObj.getTime());
 
-    return sortedLogs.map((log, index, arr) => {
-      let weeklyChange = null;
-      if (index > 0) {
-          const prevWeight = arr[index - 1].weight;
-          weeklyChange = log.weight - prevWeight;
+        return sortedLogs.map((log, index, arr) => {
+            let weeklyChange = null;
+            if (index > 0) {
+                const prevWeight = arr[index - 1].weight;
+                weeklyChange = log.weight - prevWeight;
+            }
+
+            return {
+                weight: log.weight,
+                fullWeek: log.date,
+                dateObj: log.dateObj,
+                weeklyChange: weeklyChange,
+                timestamp: log.dateObj.getTime(),
+            }
+        });
+    }, [weightLogs]);
+
+    const combinedChartData = useMemo(() => {
+      let allData = weightChartData.map(log => ({
+          ...log,
+          historicalWeight: log.weight,
+          projectedWeight: null,
+          isProjection: false,
+      }));
+
+      if (!goalWeight || weightChartData.length < 1 || !showProjection) {
+          return allData;
+      }
+      
+      const lastLog = weightChartData[weightChartData.length - 1];
+      const weightToChange = goalWeight - lastLog.weight;
+      
+      if (Math.abs(weightToChange) < 0.1) return allData;
+
+      const changes = weightChartData
+          .map(d => d.weeklyChange)
+          .filter((c): c is number => c !== null && c !== 0);
+      
+      let averageWeeklyChange = changes.length > 0 ? changes.reduce((a, b) => a + b, 0) / changes.length : 0;
+
+      let projectionRate = averageWeeklyChange;
+
+      if (weightToChange < 0) { 
+          if (projectionRate >= 0) projectionRate = -0.5;
+      } else {
+          if (projectionRate <= 0) projectionRate = 0.25;
+      }
+      
+      if (Math.abs(projectionRate) < 0.01) return allData;
+
+      const weeksToGo = Math.ceil(Math.abs(weightToChange / projectionRate));
+      if (weeksToGo <= 0) return allData;
+      
+      // Connect the lines
+      const lastLogIndex = allData.findIndex(d => d.timestamp === lastLog.timestamp);
+      if (lastLogIndex !== -1) {
+          allData[lastLogIndex].projectedWeight = lastLog.weight;
       }
 
-      return {
-          weight: log.weight,
-          fullWeek: log.date,
-          dateObj: log.dateObj,
-          weeklyChange: weeklyChange,
-          timestamp: log.dateObj.getTime(),
+      // Generate future points
+      for (let i = 1; i <= weeksToGo; i++) {
+          const projectedDate = addWeeks(lastLog.dateObj, i);
+          const projectedWeight = lastLog.weight + (i * projectionRate);
+          const daysToGo = differenceInDays(projectedDate, new Date());
+
+          allData.push({
+              weight: parseFloat(projectedWeight.toFixed(1)),
+              historicalWeight: null,
+              projectedWeight: parseFloat(projectedWeight.toFixed(1)),
+              timestamp: projectedDate.getTime(),
+              dateObj: projectedDate,
+              isProjection: true,
+              daysToGo: daysToGo,
+              rate: Math.abs(projectionRate),
+              weeklyChange: null,
+              fullWeek: null
+          });
       }
-    });
-  }, [weightLogs]);
+      
+      // Ensure the very last point is exactly the goal weight
+      if (allData.length > weightChartData.length) {
+          const lastPoint = allData[allData.length - 1];
+          lastPoint.weight = goalWeight;
+          lastPoint.projectedWeight = goalWeight;
+      }
 
-  const projectionData = useMemo(() => {
-    if (!goalWeight || weightChartData.length < 1 || !showProjection) return [];
-    
-    const lastLog = weightChartData[weightChartData.length - 1];
-    const weightToChange = goalWeight - lastLog.weight;
-    
-    if (Math.abs(weightToChange) < 0.1) return [];
+      return allData;
 
-    const changes = weightChartData
-        .map(d => d.weeklyChange)
-        .filter((c): c is number => c !== null && c !== 0);
-    
-    let averageWeeklyChange = changes.length > 0 ? changes.reduce((a, b) => a + b, 0) / changes.length : 0;
-
-    let projectionRate = averageWeeklyChange;
-
-    if (weightToChange < 0) { 
-        if (projectionRate >= 0) projectionRate = -0.5;
-    } else {
-        if (projectionRate <= 0) projectionRate = 0.25;
-    }
-    
-    if (Math.abs(projectionRate) < 0.01) return [];
-
-    const weeksToGo = weightToChange / projectionRate;
-    if (weeksToGo <= 0) return [];
-    
-    const projectionEndDate = addWeeks(lastLog.dateObj, weeksToGo);
-    const daysToGo = differenceInDays(projectionEndDate, new Date());
-
-    if (daysToGo < 1) return [];
-
-    const projectionEndPoint = {
-        weight: goalWeight,
-        timestamp: projectionEndDate.getTime(),
-        dateObj: projectionEndDate,
-        isProjection: true,
-        daysToGo: daysToGo,
-        rate: Math.abs(projectionRate),
-    }
-
-    return [
-      { ...lastLog, isProjection: false },
-      projectionEndPoint
-    ];
   }, [goalWeight, weightChartData, showProjection]);
 
 
@@ -361,14 +392,14 @@ export function WorkoutHeatmap({
     }
     
     const isZoomed = useMemo(() => {
-      if (weightChartData.length <= 1) return false;
+      if (combinedChartData.length <= 1) return false;
       const { startIndex, endIndex } = brushIndex;
       return (
         startIndex !== undefined &&
         endIndex !== undefined &&
-        (startIndex !== 0 || endIndex !== weightChartData.length - 1)
+        (startIndex !== 0 || endIndex !== combinedChartData.length - 1)
       );
-    }, [brushIndex, weightChartData.length]);
+    }, [brushIndex, combinedChartData.length]);
 
     const handleResetZoom = () => {
       setBrushIndex({}); // Reset the index state
@@ -550,18 +581,18 @@ export function WorkoutHeatmap({
                 </>
             ) : (
                  <>
-                    {weightChartData.length < 2 ? (
+                    {weightChartData.length < 1 ? (
                         <div className="flex justify-center items-center min-h-[300px]">
                             <p className="text-center text-muted-foreground">
-                                Not enough data for a weight chart. Log your weight for at least two different weeks.
+                                Not enough data for a weight chart. Log your weight for at least one week.
                             </p>
                         </div>
                     ) : (
                         <ChartContainer config={weightChartConfig} key={chartKey} className="min-h-[350px] w-full pr-4">
                             <LineChart 
                                 accessibilityLayer 
-                                data={weightChartData} 
-                                margin={{ top: 5, right: 20, left: 0, bottom: 20 }}
+                                data={combinedChartData} 
+                                margin={{ top: 5, right: 20, left: 0, bottom: 40 }}
                             >
                                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
                                 <XAxis 
@@ -587,18 +618,8 @@ export function WorkoutHeatmap({
                                         strokeDasharray="4 4" 
                                     />
                                 )}
-                                <Line dataKey="weight" type="monotone" stroke="var(--color-weight)" strokeWidth={2} dot={true} name="Weight" />
-                                {projectionData && projectionData.length > 0 && showProjection && (
-                                <Line 
-                                    data={projectionData} 
-                                    dataKey="weight"
-                                    type="monotone"
-                                    stroke="var(--color-weight)" 
-                                    strokeDasharray="5 5"
-                                    dot={{r: 4}}
-                                    name="Projection" 
-                                />
-                                )}
+                                <Line dataKey="historicalWeight" type="monotone" stroke="var(--color-historicalWeight)" strokeWidth={2} dot={true} name="Weight" connectNulls={false} />
+                                <Line dataKey="projectedWeight" type="monotone" stroke="var(--color-projectedWeight)" strokeDasharray="5 5" strokeWidth={2} dot={{r: 4}} name="Projection" connectNulls={false} />
                                 <Brush 
                                     dataKey="timestamp" 
                                     height={40} 
@@ -606,6 +627,7 @@ export function WorkoutHeatmap({
                                     tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')}
                                     travellerWidth={15}
                                     onChange={(e) => setBrushIndex({startIndex: e.startIndex, endIndex: e.endIndex})}
+                                    y={300}
                                 />
                             </LineChart>
                         </ChartContainer>
@@ -721,3 +743,5 @@ export function WorkoutHeatmap({
     </>
   );
 }
+
+    
