@@ -805,6 +805,13 @@ function WorkoutPageContent() {
 
     let averageWeeklyChange = changes.length > 0 ? changes.reduce((a, b) => a + b, 0) / changes.length : 0;
 
+    const baseSummary = {
+        currentWeight: parseFloat(currentWeight.toFixed(1)),
+        goalWeight,
+        weightDifference: parseFloat(weightDifference.toFixed(1)),
+        averageWeeklyChange: parseFloat(averageWeeklyChange.toFixed(2)),
+    };
+
     let projectionRate = averageWeeklyChange;
     if (weightDifference < 0) { // Need to lose weight
         if (projectionRate >= 0) projectionRate = -0.5; // Assume 0.5 kg/lb loss per week if current trend is gain/stagnant
@@ -812,10 +819,14 @@ function WorkoutPageContent() {
         if (projectionRate <= 0) projectionRate = 0.25; // Assume 0.25 kg/lb gain per week
     }
 
-    if (Math.abs(projectionRate) < 0.01) return { currentWeight: parseFloat(currentWeight.toFixed(1)), weightDifference: parseFloat(weightDifference.toFixed(1)), goalWeight };
+    if (Math.abs(projectionRate) < 0.01) {
+        return baseSummary;
+    }
 
     const weeksToGo = Math.ceil(Math.abs(weightDifference / projectionRate));
-    if (weeksToGo <= 0 || weeksToGo > 520) return { currentWeight: parseFloat(currentWeight.toFixed(1)), weightDifference: parseFloat(weightDifference.toFixed(1)), goalWeight };
+    if (weeksToGo <= 0 || weeksToGo > 520) {
+        return baseSummary;
+    }
 
     const projectedDate = addWeeks(lastLog.dateObj, weeksToGo);
     const nextProjectedWeight = currentWeight + projectionRate;
@@ -824,9 +835,7 @@ function WorkoutPageContent() {
     const daysToGoal = differenceInDays(projectedDate, new Date());
 
     return {
-        currentWeight: parseFloat(currentWeight.toFixed(1)),
-        goalWeight,
-        weightDifference: parseFloat(weightDifference.toFixed(1)),
+        ...baseSummary,
         projectedDate: format(projectedDate, 'PPP'),
         nextProjectedWeight: parseFloat(nextProjectedWeight.toFixed(1)),
         weeksToGo,
@@ -1043,27 +1052,36 @@ function WorkoutPageContent() {
                                     </div>
 
                                     <Separator />
-
-                                    <div className="space-y-1 text-sm">
+                                    
+                                    <div className="space-y-2 text-sm">
+                                      {projectionSummary.averageWeeklyChange !== undefined && (
                                         <div className="flex justify-between items-center">
-                                            <span className="text-muted-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Next Week Est.</span>
-                                            <span className="font-bold">{projectionSummary.nextProjectedWeight} kg/lb</span>
+                                            <span className="text-muted-foreground flex items-center gap-2"><Activity className="h-4 w-4" /> Avg. Weekly Change</span>
+                                            <span className={`font-bold ${projectionSummary.averageWeeklyChange > 0 ? "text-orange-500" : projectionSummary.averageWeeklyChange < 0 ? "text-green-500" : ""}`}>
+                                                {projectionSummary.averageWeeklyChange > 0 ? '+' : ''}{projectionSummary.averageWeeklyChange.toFixed(2)} kg/lb
+                                            </span>
                                         </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-muted-foreground pl-6">Days Remaining</span>
-                                            <span className="font-bold">{projectionSummary.daysToNextWeek > 0 ? `${projectionSummary.daysToNextWeek} days` : 'Past'}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-1 text-sm">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-muted-foreground flex items-center gap-2"><CalendarDays className="h-4 w-4" /> Est. Goal Date</span>
-                                            <span className="font-bold">{projectionSummary.projectedDate}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-muted-foreground pl-6">Days Remaining</span>
-                                            <span className="font-bold">{projectionSummary.daysToGoal > 0 ? `${projectionSummary.daysToGoal} days` : 'N/A'}</span>
-                                        </div>
+                                      )}
+                                      {projectionSummary.projectedDate && (
+                                        <>
+                                          <div className="flex justify-between items-center">
+                                              <span className="text-muted-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Next Week Est.</span>
+                                              <span className="font-bold">{projectionSummary.nextProjectedWeight} kg/lb</span>
+                                          </div>
+                                          <div className="flex justify-between items-center">
+                                              <span className="text-muted-foreground pl-6">Days Remaining</span>
+                                              <span className="font-bold">{projectionSummary.daysToNextWeek > 0 ? `${projectionSummary.daysToNextWeek} days` : 'Past'}</span>
+                                          </div>
+                                          <div className="flex justify-between items-center pt-2 mt-2 border-t">
+                                              <span className="text-muted-foreground flex items-center gap-2"><CalendarDays className="h-4 w-4" /> Est. Goal Date</span>
+                                              <span className="font-bold">{projectionSummary.projectedDate}</span>
+                                          </div>
+                                          <div className="flex justify-between items-center">
+                                              <span className="text-muted-foreground pl-6">Days Remaining</span>
+                                              <span className="font-bold">{projectionSummary.daysToGoal > 0 ? `${projectionSummary.daysToGoal} days` : 'N/A'}</span>
+                                          </div>
+                                        </>
+                                      )}
                                     </div>
                                 </>
                             )}
