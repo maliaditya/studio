@@ -132,17 +132,31 @@ export function WorkoutHeatmap({
     }, [allWorkoutLogs, oneYearAgo, today]);
 
     const weightChartData = useMemo(() => {
-      return weightLogs.map(log => {
-        const [year, weekNum] = log.date.split('-W');
-        const dateObj = startOfISOWeek(setISOWeek(new Date(parseInt(year), 0, 4), parseInt(weekNum)));
-        return {
-            week: `W${weekNum}`,
-            weight: log.weight,
-            fullWeek: log.date,
-            dateObj: dateObj,
-        }
-      }).sort((a,b) => a.dateObj.getTime() - b.dateObj.getTime());
-    }, [weightLogs]);
+      const sortedLogs = weightLogs
+      .map(log => {
+          const [year, weekNum] = log.date.split('-W');
+          const dateObj = startOfISOWeek(setISOWeek(new Date(parseInt(year), 0, 4), parseInt(weekNum)));
+          return { ...log, dateObj };
+      })
+      .sort((a,b) => a.dateObj.getTime() - b.dateObj.getTime());
+
+    return sortedLogs.map((log, index, arr) => {
+      const [year, weekNum] = log.date.split('-W');
+      let weeklyChange = null;
+      if (index > 0) {
+          const prevWeight = arr[index - 1].weight;
+          weeklyChange = log.weight - prevWeight;
+      }
+
+      return {
+          week: `W${weekNum}`,
+          weight: log.weight,
+          fullWeek: log.date,
+          dateObj: log.dateObj,
+          weeklyChange: weeklyChange,
+      }
+    });
+  }, [weightLogs]);
 
 
     const handleLogWeightClick = () => {
@@ -385,14 +399,29 @@ export function WorkoutHeatmap({
                                         if (active && payload && payload.length) {
                                             const data = payload[0].payload;
                                             return (
-                                                <div className="rounded-lg border bg-background p-2.5 shadow-sm">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[0.7rem] uppercase text-muted-foreground">
-                                                            {format(data.dateObj, 'PPP')}
-                                                        </span>
-                                                        <span className="font-bold text-foreground">
-                                                            {data.weight} kg/lb
-                                                        </span>
+                                                <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[12rem]">
+                                                    <div className="grid gap-1.5">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[0.7rem] uppercase text-muted-foreground">
+                                                                {format(data.dateObj, 'PPP')}
+                                                            </span>
+                                                            <span className="font-bold text-foreground">
+                                                                {data.weight.toFixed(1)} kg/lb
+                                                            </span>
+                                                        </div>
+                                                        {data.weeklyChange !== null && data.weeklyChange !== undefined && (
+                                                            <div className="flex flex-col border-t pt-1.5 mt-1.5">
+                                                                <span className="text-[0.7rem] uppercase text-muted-foreground">
+                                                                    Weekly Change
+                                                                </span>
+                                                                <span className={cn(
+                                                                    "font-bold",
+                                                                    data.weeklyChange > 0 ? "text-red-500" : data.weeklyChange < 0 ? "text-green-500" : "text-muted-foreground"
+                                                                )}>
+                                                                    {data.weeklyChange > 0 ? '+' : ''}{data.weeklyChange.toFixed(1)} kg/lb
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             );
