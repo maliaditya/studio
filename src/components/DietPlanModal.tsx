@@ -41,6 +41,10 @@ const getDefaultPlan = (): UserDietPlan => {
     meal3: '',
     supplements: '',
     totalCalories: null,
+    protein: null,
+    carbs: null,
+    fat: null,
+    fiber: null,
   }));
 };
 
@@ -88,11 +92,23 @@ export function DietPlanModal({
   }, [plan, planStorageKey, isOpen]);
 
 
-  const handlePlanChange = (day: string, field: keyof Omit<EditableMealPlan, 'day' | 'totalCalories'>, value: string) => {
-    setPlan(currentPlan => 
-      currentPlan.map(dayPlan => 
-        dayPlan.day === day ? { ...dayPlan, [field]: value } : dayPlan
-      )
+  const handlePlanChange = (day: string, field: keyof Pick<EditableMealPlan, 'meal1' | 'meal2' | 'meal3' | 'supplements'>, value: string) => {
+    setPlan(currentPlan =>
+      currentPlan.map(dayPlan => {
+        if (dayPlan.day === day) {
+          const updatedPlan = { ...dayPlan, [field]: value };
+          // If a meal is changed, reset the calculated values
+          if (field.startsWith('meal')) {
+            updatedPlan.totalCalories = null;
+            updatedPlan.protein = null;
+            updatedPlan.carbs = null;
+            updatedPlan.fat = null;
+            updatedPlan.fiber = null;
+          }
+          return updatedPlan;
+        }
+        return dayPlan;
+      })
     );
   };
   
@@ -119,15 +135,24 @@ export function DietPlanModal({
       if (result?.totalCalories !== undefined) {
         setPlan(currentPlan =>
           currentPlan.map(p =>
-            p.day === day ? { ...p, totalCalories: result.totalCalories } : p
+            p.day === day
+              ? {
+                  ...p,
+                  totalCalories: result.totalCalories,
+                  protein: result.protein ?? null,
+                  carbs: result.carbs ?? null,
+                  fat: result.fat ?? null,
+                  fiber: result.fiber ?? null,
+                }
+              : p
           )
         );
         toast({
-          title: "Calories Calculated!",
-          description: `Estimated total for ${day} is ${result.totalCalories} kcal.`,
+          title: "Macros Calculated!",
+          description: `Estimated values for ${day} have been calculated.`,
         });
       } else {
-        throw new Error("AI did not return a calorie count.");
+        throw new Error("AI did not return a valid response.");
       }
     } catch (error) {
       console.error("Failed to calculate calories:", error);
@@ -147,7 +172,7 @@ export function DietPlanModal({
         <DialogHeader>
           <DialogTitle>My Diet Plan</DialogTitle>
           <DialogDescription>
-            Create your weekly diet plan. Use the calculator to get an AI-estimated calorie count for each day. Changes are saved automatically.
+            Create your weekly diet plan. Use the calculator to get an AI-estimated calorie and macro count for each day. Changes are saved automatically.
           </DialogDescription>
         </DialogHeader>
         
@@ -160,7 +185,7 @@ export function DietPlanModal({
                     <TableHead>Meal 2</TableHead>
                     <TableHead>Meal 3</TableHead>
                     <TableHead>Supplements</TableHead>
-                    <TableHead className="w-[170px]">Total Calories</TableHead>
+                    <TableHead className="w-[180px]">Daily Totals</TableHead>
                 </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -200,29 +225,39 @@ export function DietPlanModal({
                         />
                     </TableCell>
                     <TableCell className="align-top pt-5">
-                      <div className="flex items-start gap-2">
-                        <div className="flex-grow">
-                            {dayPlan.totalCalories != null ? (
-                            <span className="font-bold text-lg">{dayPlan.totalCalories.toLocaleString()} <span className="text-xs text-muted-foreground">kcal</span></span>
-                            ) : (
-                            <span className="text-muted-foreground text-xs">Not set</span>
-                            )}
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-start gap-2">
+                            <div className="flex-grow">
+                                {dayPlan.totalCalories != null ? (
+                                <span className="font-bold text-lg">{dayPlan.totalCalories.toLocaleString()} <span className="text-xs text-muted-foreground">kcal</span></span>
+                                ) : (
+                                <span className="text-muted-foreground text-sm">Not set</span>
+                                )}
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 flex-shrink-0"
+                                onClick={() => handleCalculateCalories(dayPlan.day)}
+                                disabled={isCalculating[dayPlan.day]}
+                                aria-label={`Calculate calories for ${dayPlan.day}`}
+                                title="Calculate Calories & Macros"
+                            >
+                                {isCalculating[dayPlan.day] ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                <Calculator className="h-4 w-4" />
+                                )}
+                            </Button>
                         </div>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8 flex-shrink-0"
-                            onClick={() => handleCalculateCalories(dayPlan.day)}
-                            disabled={isCalculating[dayPlan.day]}
-                            aria-label={`Calculate calories for ${dayPlan.day}`}
-                            title="Calculate Calories"
-                        >
-                            {isCalculating[dayPlan.day] ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                            <Calculator className="h-4 w-4" />
-                            )}
-                        </Button>
+                        {dayPlan.totalCalories != null && (
+                            <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
+                                <div className="flex justify-between"><span>Protein</span> <span className="font-medium text-foreground">{dayPlan.protein?.toFixed(0) ?? '-'}g</span></div>
+                                <div className="flex justify-between"><span>Carbs</span> <span className="font-medium text-foreground">{dayPlan.carbs?.toFixed(0) ?? '-'}g</span></div>
+                                <div className="flex justify-between"><span>Fat</span> <span className="font-medium text-foreground">{dayPlan.fat?.toFixed(0) ?? '-'}g</span></div>
+                                <div className="flex justify-between"><span>Fiber</span> <span className="font-medium text-foreground">{dayPlan.fiber?.toFixed(0) ?? '-'}g</span></div>
+                            </div>
+                        )}
                       </div>
                     </TableCell>
                     </TableRow>

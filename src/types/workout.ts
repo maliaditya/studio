@@ -76,6 +76,10 @@ export interface EditableMealPlan {
   meal3: string;
   supplements: string;
   totalCalories: number | null;
+  protein: number | null;
+  carbs: number | null;
+  fat: number | null;
+  fiber: number | null;
 }
 
 export type UserDietPlan = EditableMealPlan[];
