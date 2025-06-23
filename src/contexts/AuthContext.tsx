@@ -38,6 +38,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(false);
   }, []);
 
+  const loadDataIntoLocalStorage = (data: any, username: string) => {
+    if (!data) return;
+
+    localStorage.setItem(`workoutMode_${username}`, data.workoutMode || 'two-muscle');
+    localStorage.setItem(`weightLogs_${username}`, JSON.stringify(data.weightLogs || []));
+    if (data.goalWeight) {
+        localStorage.setItem(`goalWeight_${username}`, data.goalWeight.toString());
+    } else {
+        localStorage.removeItem(`goalWeight_${username}`);
+    }
+    localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(data.exerciseDefinitions || []));
+    localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(data.workoutPlans || {}));
+    localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(data.allWorkoutLogs || []));
+  };
+  
   const register = async (username: string, password: string) => {
     setLoading(true);
     const { success, message, user } = await localRegisterUser(username, password);
@@ -138,16 +153,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               return;
           }
 
-          localStorage.setItem(`workoutMode_${username}`, data.workoutMode || 'two-muscle');
-          localStorage.setItem(`weightLogs_${username}`, JSON.stringify(data.weightLogs || []));
-          if (data.goalWeight) {
-              localStorage.setItem(`goalWeight_${username}`, data.goalWeight.toString());
-          } else {
-              localStorage.removeItem(`goalWeight_${username}`);
-          }
-          localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(data.exerciseDefinitions || []));
-          localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(data.workoutPlans || {}));
-          localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(data.allWorkoutLogs || []));
+          loadDataIntoLocalStorage(data, username);
 
           toast({
             title: "Sync Successful",
@@ -229,17 +235,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                           throw new Error("Invalid backup file format.");
                       }
 
-                      localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(data.exerciseDefinitions || []));
-                      localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(data.allWorkoutLogs || []));
-                      localStorage.setItem(`workoutMode_${username}`, data.workoutMode || 'two-muscle');
-                      localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(data.workoutPlans || {}));
-                      localStorage.setItem(`weightLogs_${username}`, JSON.stringify(data.weightLogs || []));
-
-                      if (data.goalWeight) {
-                          localStorage.setItem(`goalWeight_${username}`, data.goalWeight.toString());
-                      } else {
-                          localStorage.removeItem(`goalWeight_${username}`);
-                      }
+                      loadDataIntoLocalStorage(data, username);
 
                       toast({ title: "Import Successful", description: "Your data has been imported. The app will now reload." });
                       setTimeout(() => window.location.reload(), 1500);
