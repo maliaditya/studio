@@ -64,7 +64,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
   const [view, setView] = useState<'heatmap' | 'graph' | 'weight'>('heatmap');
   const [newWeight, setNewWeight] = useState('');
-  const [weightDate, setWeightDate] = useState<Date | undefined>();
+  const [weightDate, setWeightDate] = useState<Date | undefined>(new Date());
   const [heightInput, setHeightInput] = useState('');
 
   const [today, setToday] = useState<Date | null>(null);
@@ -131,8 +131,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
         
         const yearNum = parseInt(year);
         const weekNumValue = parseInt(weekNum);
-        const jan4 = new Date(yearNum, 0, 4); 
-        const weekDate = startOfISOWeek(setISOWeek(jan4, weekNumValue));
+        const weekDate = startOfISOWeek(setISOWeek(new Date(yearNum, 0, 4), weekNumValue));
 
         return {
             week: `W${weekNum}`,
@@ -152,7 +151,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
         const firstLog = weightChartData[0];
         
         const weightToGoal = idealWeight - lastLog.weight;
-        if (weightToGoal === 0) return null; // Already at ideal weight
+        if (weightToGoal === 0) return null;
 
         const weeksDiff = (lastLog.dateObj.getTime() - firstLog.dateObj.getTime()) / (1000 * 60 * 60 * 24 * 7);
         const weightDiff = lastLog.weight - firstLog.weight;
@@ -160,7 +159,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
         let avgWeeklyChange = weeksDiff > 0 ? weightDiff / weeksDiff : 0;
         
         if ((weightToGoal < 0 && avgWeeklyChange >= 0) || (weightToGoal > 0 && avgWeeklyChange <= 0) || avgWeeklyChange === 0) {
-            avgWeeklyChange = weightToGoal > 0 ? 0.25 : -0.5; // default gain/loss
+            avgWeeklyChange = weightToGoal > 0 ? 0.25 : -0.5;
         }
 
         const weeksToGo = weightToGoal / avgWeeklyChange;
@@ -192,6 +191,35 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
         return { idealWeight, projectionLine };
     }, [currentUser?.heightInCm, weightChartData]);
 
+    const combinedChartData = useMemo(() => {
+        if (weightChartData.length === 0) return [];
+
+        const historicalData = weightChartData.map(d => ({
+            ...d,
+            projection: null as number | null,
+        }));
+
+        if (!idealWeightData) {
+            return historicalData;
+        }
+
+        const lastLog = historicalData[historicalData.length - 1];
+        if (lastLog) {
+            lastLog.projection = lastLog.weight;
+        }
+
+        const idealPoint = idealWeightData.projectionLine[1];
+        
+        historicalData.push({
+            ...idealPoint,
+            weight: null, // Don't draw historical line to this point
+            projection: idealPoint.weight // Do draw projection line to this point
+        });
+        
+        return historicalData;
+
+    }, [weightChartData, idealWeightData]);
+
 
     const handleLogWeightClick = () => {
       const weightValue = parseFloat(newWeight);
@@ -218,11 +246,9 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
             
             if (!ftMatch && !inMatch && !isNaN(parseFloat(input))) {
               const parsedNum = parseFloat(input);
-              // Simple heuristic: numbers over ~30 are likely cm, under are likely ft.
-              // A more robust solution might require a unit selector.
-              if(parsedNum > 48) { // if likely cm (e.g. > 4ft)
+              if(parsedNum > 48) { 
                  cm = parsedNum;
-              } else { // assume inches if it's a small number without units
+              } else {
                  totalInches = parsedNum;
               }
             }
@@ -232,7 +258,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
             }
         }
 
-        if (cm > 90 && cm < 250) { // Basic validation for human height
+        if (cm > 90 && cm < 250) { 
             updateUserProfile({ heightInCm: cm });
             setHeightInput('');
         } else {
@@ -458,7 +484,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
                         </div>
                     )}
 
-                    {weightChartData.length < 2 ? (
+                    {combinedChartData.length < 2 ? (
                         <div className="flex justify-center items-center min-h-[250px]">
                             <p className="text-center text-muted-foreground">
                                 Not enough data for a weight chart. Log your weight for at least two different weeks.
@@ -466,7 +492,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
                         </div>
                     ) : (
                         <ChartContainer config={weightChartConfig} className="min-h-[250px] w-full pr-4">
-                            <LineChart accessibilityLayer margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                            <LineChart accessibilityLayer data={combinedChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
                                 <XAxis 
                                     dataKey="timestamp"
@@ -502,7 +528,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
                                                           {data.dateObj ? format(data.dateObj, 'PPP') : data.fullWeek}
                                                         </span>
                                                         <span className="font-bold text-foreground">
-                                                            {data.weight} kg/lb
+                                                            {data.weight ?? data.projection} kg/lb
                                                         </span>
                                                     </div>
                                                 </div>
@@ -511,24 +537,31 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect, weightLogs, onLog
                                         return null;
                                     }}
                                 />
-                                <Line yAxisId="left" dataKey="weight" type="monotone" stroke="var(--color-weight)" strokeWidth={2} dot={true} data={weightChartData} name="Weight" />
-                                {idealWeightData && (
-                                    <Line 
-                                        yAxisId="left" 
-                                        dataKey="weight" 
-                                        stroke="var(--color-projection)" 
-                                        strokeWidth={2} 
-                                        strokeDasharray="5 5"
-                                        data={idealWeightData.projectionLine}
-                                        name="Projection"
-                                        dot={(props) => {
+                                <Line 
+                                  yAxisId="left" 
+                                  dataKey="weight" 
+                                  type="monotone" 
+                                  stroke="var(--color-weight)" 
+                                  strokeWidth={2} 
+                                  dot={true} 
+                                  connectNulls={false}
+                                  name="Weight" 
+                                />
+                                <Line 
+                                    yAxisId="left" 
+                                    dataKey="projection"
+                                    stroke="var(--color-projection)" 
+                                    strokeWidth={2} 
+                                    strokeDasharray="5 5"
+                                    connectNulls={true}
+                                    name="Projection"
+                                    dot={(props) => {
                                         if (props.payload.isIdeal) {
                                             return <Dot {...props} r={5} fill="var(--color-projection)" />;
                                         }
                                         return null;
-                                        }}
-                                    />
-                                )}
+                                    }}
+                                />
                             </LineChart>
                         </ChartContainer>
                     )}

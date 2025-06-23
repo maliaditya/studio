@@ -11,7 +11,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { format, parseISO, getDay, getWeekOfMonth, isMonday, getYear, getISOWeek, parse } from 'date-fns';
+import { format, parseISO, getDay, getWeekOfMonth, isMonday, getYear, getISOWeek, parse, getISOWeekYear } from 'date-fns';
 import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans, WeightLog } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
@@ -688,7 +688,7 @@ function WorkoutPageContent() {
       toast({ title: "Invalid Input", description: "Please enter a valid weight.", variant: "destructive" });
       return;
     }
-    const year = getYear(date);
+    const year = getISOWeekYear(date);
     const week = getISOWeek(date).toString().padStart(2, '0');
     const weekKey = `${year}-W${week}`;
 
