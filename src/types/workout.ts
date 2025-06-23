@@ -1,6 +1,4 @@
 
-import { z } from 'zod';
-
 export type ExerciseCategory = 
   | "Chest" 
   | "Triceps" 
@@ -70,42 +68,13 @@ export interface WeightLog {
   weight: number;
 }
 
+// User-editable diet plan
+export interface EditableMealPlan {
+  day: string;
+  meal1: string;
+  meal2: string;
+  meal3: string;
+  supplements: string;
+}
 
-// AI Diet Plan Types
-
-// Meal schema
-export const MealSchema = z.object({
-  description: z.string().describe("A brief description of the meal."),
-  calories: z.number().describe("The estimated calorie count for the meal.")
-});
-export type Meal = z.infer<typeof MealSchema>;
-
-// Daily plan schema
-export const DayPlanSchema = z.object({
-  day: z.string().describe("The day of the week (e.g., 'Day 1', 'Monday')."),
-  breakfast: MealSchema,
-  lunch: MealSchema,
-  dinner: MealSchema,
-  snack1: MealSchema,
-  snack2: MealSchema,
-  totalCalories: z.number().describe("The total estimated calories for the day."),
-});
-export type DayPlan = z.infer<typeof DayPlanSchema>;
-
-
-export const GenerateDietPlanInputSchema = z.object({
-  currentWeight: z.number().describe('The user\'s current weight in kg or lb.'),
-  goalWeight: z.number().describe('The user\'s goal weight in kg or lb.'),
-  height: z.number().describe('The user\'s height in centimeters.'),
-  age: z.number().describe('The user\'s age in years.'),
-  gender: z.enum(['male', 'female', 'other']).describe('The user\'s gender.'),
-  activityLevel: z.enum(['sedentary', 'light', 'moderate', 'active', 'very_active']).describe('The user\'s daily activity level.'),
-  preferences: z.string().optional().describe('Any dietary preferences or restrictions, e.g., "vegetarian, no nuts".'),
-});
-export type GenerateDietPlanInput = z.infer<typeof GenerateDietPlanInputSchema>;
-
-export const GenerateDietPlanOutputSchema = z.object({
-    summary: z.string().describe("A brief summary of the recommended caloric intake and overall strategy."),
-    weeklyPlan: z.array(DayPlanSchema).describe("A 7-day diet plan, with one object per day."),
-});
-export type GenerateDietPlanOutput = z.infer<typeof GenerateDietPlanOutputSchema>;
+export type UserDietPlan = EditableMealPlan[];

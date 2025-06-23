@@ -1034,7 +1034,7 @@ function WorkoutPageContent() {
                         </Button>
                         <Button onClick={() => setIsDietPlanModalOpen(true)} variant="outline" className="w-full">
                             <BookCopy className="mr-2 h-4 w-4" />
-                            AI Diet Plan
+                            Diet Plan
                         </Button>
                     </div>
                     {(projectionSummary || latestConsistency) && (
@@ -1213,8 +1213,6 @@ function WorkoutPageContent() {
       <DietPlanModal
         isOpen={isDietPlanModalOpen}
         onOpenChange={setIsDietPlanModalOpen}
-        currentWeight={projectionSummary?.currentWeight ?? null}
-        goalWeight={goalWeight}
       />
     </>
   );

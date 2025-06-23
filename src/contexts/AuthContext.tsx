@@ -41,6 +41,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loadDataIntoLocalStorage = (data: any, username: string) => {
     if (!data) return;
 
+    localStorage.setItem(`dietPlan_${username}`, JSON.stringify(data.dietPlan || null));
     localStorage.setItem(`workoutMode_${username}`, data.workoutMode || 'two-muscle');
     localStorage.setItem(`weightLogs_${username}`, JSON.stringify(data.weightLogs || []));
     if (data.goalWeight) {
@@ -99,6 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const username = currentUser.username;
         
         const allUserData = {
+            dietPlan: JSON.parse(localStorage.getItem(`dietPlan_${username}`) || 'null'),
             workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
             weightLogs: JSON.parse(localStorage.getItem(`weightLogs_${username}`) || '[]'),
             goalWeight: localStorage.getItem(`goalWeight_${username}`) || null,
@@ -182,6 +184,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
         const username = currentUser.username;
         const dataToExport = {
+            dietPlan: JSON.parse(localStorage.getItem(`dietPlan_${username}`) || 'null'),
             exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
             allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
             workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
@@ -226,6 +229,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                       const username = currentUser.username;
 
                       if (
+                          data.dietPlan === undefined ||
                           data.exerciseDefinitions === undefined ||
                           data.allWorkoutLogs === undefined ||
                           data.workoutMode === undefined ||
