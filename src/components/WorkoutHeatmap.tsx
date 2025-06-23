@@ -99,6 +99,8 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
                 onMouseOver={(event, value) => {
                     if (value && value.date && value.count > 0) {
                         setTooltipData({ value: value as HeatmapValue, x: event.clientX, y: event.clientY });
+                    } else {
+                        setTooltipData(null);
                     }
                 }}
                 onMouseOut={() => {
