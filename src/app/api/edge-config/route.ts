@@ -1,3 +1,4 @@
+
 import { get } from '@vercel/edge-config';
 import { NextResponse } from 'next/server';
 
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
             body: JSON.stringify({
                 items: [
                     {
-                        operation: 'update',
+                        operation: 'upsert',
                         key: username,
                         value: data,
                     },
