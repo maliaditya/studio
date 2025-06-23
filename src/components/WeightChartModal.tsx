@@ -25,11 +25,13 @@ interface WeightChartModalProps {
   weightLogs: WeightLog[];
   goalWeight: number | null;
   height: number | null;
+  dateOfBirth: string | null;
   onLogWeight: (weight: number, date: Date) => void;
   onUpdateWeightLog: (dateKey: string, newWeight: number) => void;
   onDeleteWeightLog: (dateKey: string) => void;
   onSetGoalWeight: (goal: number) => void;
   onSetHeight: (height: number) => void;
+  onSetDateOfBirth: (dob: string) => void;
 }
 
 const weightChartConfig = {
@@ -118,17 +120,20 @@ export function WeightChartModal({
   weightLogs, 
   goalWeight,
   height,
+  dateOfBirth,
   onLogWeight,
   onUpdateWeightLog,
   onDeleteWeightLog,
   onSetGoalWeight,
   onSetHeight,
+  onSetDateOfBirth,
 }: WeightChartModalProps) {
   const { toast } = useToast();
   
   const [newWeight, setNewWeight] = useState('');
   const [goalWeightInput, setGoalWeightInput] = useState('');
   const [heightInput, setHeightInput] = useState('');
+  const [dobInput, setDobInput] = useState<Date | undefined>();
   const [weightDate, setWeightDate] = useState<Date | undefined>(new Date());
   
   const [editingLog, setEditingLog] = useState<{ date: string; weight: string } | null>(null);
@@ -147,7 +152,12 @@ export function WeightChartModal({
     } else {
         setHeightInput('');
     }
-  }, [goalWeight, height, isOpen]);
+    if (dateOfBirth) {
+        setDobInput(parseISO(dateOfBirth));
+    } else {
+        setDobInput(undefined);
+    }
+  }, [goalWeight, height, dateOfBirth, isOpen]);
 
   const weightChartData = useMemo(() => {
     const sortedLogs = weightLogs
@@ -283,6 +293,14 @@ export function WeightChartModal({
     }
   };
 
+  const handleSetDobClick = () => {
+    if (dobInput) {
+      onSetDateOfBirth(format(dobInput, 'yyyy-MM-dd'));
+    } else {
+      toast({ title: "Invalid Input", description: "Please select a date.", variant: "destructive" });
+    }
+  };
+
   const isZoomed = useMemo(() => {
     if (combinedChartData.length <= 1) return false;
     const { startIndex, endIndex } = brushIndex;
@@ -412,6 +430,34 @@ export function WeightChartModal({
                                     <Button onClick={handleSetHeightClick} disabled={!heightInput} className="h-9">
                                         Set
                                     </Button>
+                                </div>
+                            </div>
+                            <div>
+                                <Label htmlFor="dob-input" className="text-xs text-muted-foreground">Date of Birth</Label>
+                                <div className="flex gap-2">
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                    <Button id="dob-input" variant={"outline"} className={cn("h-9 w-full justify-start text-left font-normal", !dobInput && "text-muted-foreground")}>
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {dobInput ? format(dobInput, "PPP") : <span>Pick a date</span>}
+                                    </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                    <Calendar
+                                        mode="single"
+                                        selected={dobInput}
+                                        onSelect={setDobInput}
+                                        captionLayout="dropdown-buttons"
+                                        fromYear={1950}
+                                        toYear={new Date().getFullYear()}
+                                        disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                        initialFocus
+                                    />
+                                    </PopoverContent>
+                                </Popover>
+                                <Button onClick={handleSetDobClick} disabled={!dobInput} className="h-9">
+                                    Set
+                                </Button>
                                 </div>
                             </div>
                         </div>

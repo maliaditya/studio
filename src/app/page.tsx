@@ -202,6 +202,7 @@ function WorkoutPageContent() {
 
   const [goalWeight, setGoalWeight] = useState<number | null>(null);
   const [height, setHeight] = useState<number | null>(null);
+  const [dateOfBirth, setDateOfBirth] = useState<string | null>(null);
   const [isWeightChartModalOpen, setIsWeightChartModalOpen] = useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
 
@@ -223,6 +224,7 @@ function WorkoutPageContent() {
       const weightLogsKey = `weightLogs_${currentUser.username}`;
       const goalWeightKey = `goalWeight_${currentUser.username}`;
       const heightKey = `height_${currentUser.username}`;
+      const dobKey = `dateOfBirth_${currentUser.username}`;
       let localDefsLoaded = false;
       
       const storedMode = localStorage.getItem(modeKey);
@@ -238,6 +240,11 @@ function WorkoutPageContent() {
       const storedHeight = localStorage.getItem(heightKey);
       if (storedHeight) {
           setHeight(parseFloat(storedHeight));
+      }
+      
+      const storedDob = localStorage.getItem(dobKey);
+      if (storedDob) {
+          setDateOfBirth(storedDob);
       }
 
       try {
@@ -311,6 +318,7 @@ function WorkoutPageContent() {
       setWeightLogs([]);
       setGoalWeight(null);
       setHeight(null);
+      setDateOfBirth(null);
     }
     const timer = setTimeout(() => setIsLoadingPage(false), 300);
     return () => clearTimeout(timer);
@@ -326,6 +334,7 @@ function WorkoutPageContent() {
         const weightLogsKey = `weightLogs_${currentUser.username}`;
         const goalWeightKey = `goalWeight_${currentUser.username}`;
         const heightKey = `height_${currentUser.username}`;
+        const dobKey = `dateOfBirth_${currentUser.username}`;
         
         localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
         localStorage.setItem(logsKey, JSON.stringify(allWorkoutLogs));
@@ -344,13 +353,19 @@ function WorkoutPageContent() {
         } else {
           localStorage.removeItem(heightKey);
         }
+        
+        if (dateOfBirth) {
+            localStorage.setItem(dobKey, dateOfBirth);
+        } else {
+            localStorage.removeItem(dobKey);
+        }
 
       } catch (e) {
         console.error("Error saving data to localStorage", e);
         toast({ title: "Save Error", description: "Could not save data locally. Storage might be full.", variant: "destructive"});
       }
     }
-  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, workoutMode, workoutPlans, weightLogs, goalWeight, height]);
+  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, workoutMode, workoutPlans, weightLogs, goalWeight, height, dateOfBirth]);
 
 
   useEffect(() => {
@@ -758,6 +773,19 @@ function WorkoutPageContent() {
         }
     } else {
         toast({ title: "Invalid Input", description: "Please enter a valid height.", variant: "destructive" });
+    }
+  };
+
+  const handleSetDateOfBirth = (dob: string) => {
+    if (dob) {
+        if (currentUser?.username) {
+            setDateOfBirth(dob);
+            toast({ title: "Date of Birth Set", description: `Your DoB has been saved.` });
+        } else {
+            toast({ title: "Error", description: "You must be logged in to set your date of birth.", variant: "destructive" });
+        }
+    } else {
+        toast({ title: "Invalid Input", description: "Please select a valid date.", variant: "destructive" });
     }
   };
 
@@ -1233,11 +1261,13 @@ function WorkoutPageContent() {
         weightLogs={weightLogs}
         goalWeight={goalWeight}
         height={height}
+        dateOfBirth={dateOfBirth}
         onLogWeight={handleLogWeight}
         onUpdateWeightLog={handleUpdateWeightLog}
         onDeleteWeightLog={handleDeleteWeightLog}
         onSetGoalWeight={handleSetGoalWeight}
         onSetHeight={handleSetHeight}
+        onSetDateOfBirth={handleSetDateOfBirth}
       />
 
       <DietPlanModal
