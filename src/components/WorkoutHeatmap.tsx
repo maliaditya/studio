@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import CalendarHeatmap from 'react-calendar-heatmap';
 import { subYears, format, parseISO, addDays } from 'date-fns';
 import type { DatedWorkout } from '@/types/workout';
@@ -12,7 +12,6 @@ import { LineChart as LineChartIcon, Calendar as CalendarIcon } from 'lucide-rea
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { ChartContainer } from './ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-
 
 interface WorkoutHeatmapProps {
   allWorkoutLogs: DatedWorkout[];
@@ -31,9 +30,6 @@ interface TooltipData {
     y: number;
 }
 
-const today = new Date();
-const oneYearAgo = subYears(new Date(today.getFullYear(), today.getMonth(), today.getDate()), 1);
-
 const chartConfig = {
   score: {
     label: "Consistency",
@@ -44,8 +40,17 @@ const chartConfig = {
 export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapProps) {
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
   const [view, setView] = useState<'heatmap' | 'graph'>('heatmap');
+  
+  const [today, setToday] = useState<Date | null>(null);
+  const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
 
-  const heatmapValues: HeatmapValue[] = allWorkoutLogs
+  useEffect(() => {
+    const now = new Date();
+    setToday(now);
+    setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
+  }, []);
+
+  const heatmapValues: HeatmapValue[] = useMemo(() => allWorkoutLogs
     .filter(log => log.exercises.some(ex => ex.loggedSets.length > 0))
     .map(log => {
       const totalSets = log.exercises.reduce((sum, ex) => sum + ex.loggedSets.length, 0);
@@ -60,10 +65,10 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
         count: totalSets,
         exercises: exercisesPerformed,
       };
-    });
+    }), [allWorkoutLogs]);
 
     const consistencyData = useMemo(() => {
-        if (!allWorkoutLogs) return [];
+        if (!allWorkoutLogs || !oneYearAgo || !today) return [];
     
         const workoutDates = new Set(
           allWorkoutLogs
@@ -78,10 +83,8 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
             const dateKey = format(d, 'yyyy-MM-dd');
             
             if (workoutDates.has(dateKey)) {
-                // Went to the gym - score increases, getting 10% closer to 100%
                 score += (1 - score) * 0.1;
             } else {
-                // Missed day - score decays by 5%
                 score *= 0.95;
             }
     
@@ -93,7 +96,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
         }
     
         return data;
-    }, [allWorkoutLogs]);
+    }, [allWorkoutLogs, oneYearAgo, today]);
 
     const CustomTooltip = () => {
         if (!tooltipData) return null;
@@ -120,6 +123,20 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
             </div>
         );
     }
+    
+    if (!oneYearAgo || !today) {
+        return (
+          <Card className="shadow-xl rounded-xl overflow-hidden mb-8">
+            <CardHeader>
+              <CardTitle>Workout Activity</CardTitle>
+              <CardDescription>Loading...</CardDescription>
+            </CardHeader>
+            <CardContent className="p-4">
+              <div className="h-[150px] w-full animate-pulse bg-muted rounded-md" />
+            </CardContent>
+          </Card>
+        );
+    }
 
   return (
     <>
@@ -130,7 +147,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
               <CardTitle>Workout Activity</CardTitle>
               <CardDescription>
                 {view === 'heatmap'
-                  ? 'Your workout consistency over the last year. Click a square to view that day\'s log.'
+                  ? "Your workout consistency over the last year. Click a square to view that day's log."
                   : 'Your probability of working out, based on recent consistency.'}
               </CardDescription>
             </div>
@@ -153,17 +170,15 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
             </TooltipProvider>
           </div>
         </CardHeader>
-        <CardContent className="p-4 overflow-x-auto">
+        <CardContent className="p-4">
             {view === 'heatmap' ? (
-                <div className="min-w-[720px]">
+                <div className="min-w-[720px] overflow-x-auto">
                     <CalendarHeatmap
                         startDate={oneYearAgo}
                         endDate={today}
                         values={heatmapValues}
                         classForValue={(value) => {
-                        if (!value || value.count === 0) {
-                            return 'color-empty';
-                        }
+                        if (!value || value.count === 0) { return 'color-empty'; }
                         if (value.count > 15) return 'color-scale-4';
                         if (value.count > 10) return 'color-scale-3';
                         if (value.count > 5) return 'color-scale-2';
@@ -181,6 +196,7 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
                         }}
                         onClick={(value) => {
                         if (value && value.date) {
+                            setTooltipData(null);
                             const d = parseISO(value.date);
                             onDateSelect(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
                         }
@@ -266,4 +282,3 @@ export function WorkoutHeatmap({ allWorkoutLogs, onDateSelect }: WorkoutHeatmapP
     </>
   );
 }
-
