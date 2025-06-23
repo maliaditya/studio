@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import CalendarHeatmap from 'react-calendar-heatmap';
-import { subYears, format, addDays, setISOWeek, startOfISOWeek, parseISO } from 'date-fns';
+import { addWeeks, format, parseISO, setISOWeek, startOfISOWeek, differenceInDays } from 'date-fns';
 import type { DatedWorkout, WeightLog } from '@/types/workout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -55,6 +55,74 @@ const weightChartConfig = {
     color: "hsl(var(--chart-2))",
   },
 } satisfies ChartConfig;
+
+const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+        const data = payload[0].payload;
+
+        if (data.isProjection) {
+            return (
+                <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[14rem]">
+                    <div className="grid gap-1.5">
+                        <div className="flex flex-col">
+                            <span className="text-[0.7rem] uppercase text-muted-foreground">
+                                Ideal Weight Goal
+                            </span>
+                            <span className="font-bold text-foreground">
+                                {data.weight.toFixed(1)} kg/lb
+                            </span>
+                        </div>
+                        <div className="flex flex-col border-t pt-1.5 mt-1.5">
+                            <span className="text-[0.7rem] uppercase text-muted-foreground">
+                                Est. Date
+                            </span>
+                            <span className="font-bold text-foreground">
+                                {format(data.dateObj, 'PPP')} ({data.daysToGo} days)
+                            </span>
+                        </div>
+                        <div className="flex flex-col border-t pt-1.5 mt-1.5">
+                             <span className="text-[0.7rem] uppercase text-muted-foreground">
+                                Required Change
+                            </span>
+                             <span className="font-bold text-foreground">
+                                {data.rate.toFixed(2)} kg/lb per week
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            )
+        }
+
+        return (
+            <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[12rem]">
+                <div className="grid gap-1.5">
+                    <div className="flex flex-col">
+                        <span className="text-[0.7rem] uppercase text-muted-foreground">
+                            {format(data.dateObj, 'PPP')}
+                        </span>
+                        <span className="font-bold text-foreground">
+                            {data.weight.toFixed(1)} kg/lb
+                        </span>
+                    </div>
+                    {data.weeklyChange !== null && data.weeklyChange !== undefined && (
+                        <div className="flex flex-col border-t pt-1.5 mt-1.5">
+                            <span className="text-[0.7rem] uppercase text-muted-foreground">
+                                Weekly Change
+                            </span>
+                            <span className={cn(
+                                "font-bold",
+                                data.weeklyChange > 0 ? "text-red-500" : data.weeklyChange < 0 ? "text-green-500" : "text-muted-foreground"
+                            )}>
+                                {data.weeklyChange > 0 ? '+' : ''}{data.weeklyChange.toFixed(1)} kg/lb
+                            </span>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+    return null;
+}
 
 
 export function WorkoutHeatmap({ 
@@ -170,10 +238,63 @@ export function WorkoutHeatmap({
           fullWeek: log.date,
           dateObj: log.dateObj,
           weeklyChange: weeklyChange,
+          timestamp: log.dateObj.getTime(),
       }
     });
   }, [weightLogs]);
 
+  const projectionData = useMemo(() => {
+    if (!goalWeight || weightChartData.length < 1) return [];
+
+    const lastLog = weightChartData[weightChartData.length - 1];
+    const weightToChange = goalWeight - lastLog.weight;
+
+    if (Math.abs(weightToChange) < 0.1) return [];
+
+    const changes = weightChartData
+      .map(d => d.weeklyChange)
+      .filter((c): c is number => c !== null && c !== 0);
+    
+    let averageWeeklyChange = changes.length > 0 ? changes.reduce((a, b) => a + b, 0) / changes.length : 0;
+
+    let projectionRate = averageWeeklyChange;
+
+    if (weightToChange < 0) { 
+      if (projectionRate >= 0) {
+        projectionRate = -0.5;
+      }
+    } else { 
+      if (projectionRate <= 0) {
+        projectionRate = 0.25;
+      }
+    }
+    
+    if (projectionRate === 0) return [];
+
+    const weeksToGo = weightToChange / projectionRate;
+    
+    if (weeksToGo <= 0 || weeksToGo > 520) {
+      return [];
+    }
+    
+    const projectionEndDate = addWeeks(lastLog.dateObj, weeksToGo);
+    const daysToGo = differenceInDays(projectionEndDate, new Date());
+
+    const projectionEndPoint = {
+        ...lastLog,
+        weight: goalWeight,
+        timestamp: projectionEndDate.getTime(),
+        dateObj: projectionEndDate,
+        isProjection: true,
+        weeksToGo: Math.ceil(weeksToGo),
+        daysToGo: daysToGo > 0 ? daysToGo : 0,
+        rate: Math.abs(projectionRate),
+        fullWeek: 'Ideal',
+        week: 'Ideal'
+    }
+
+    return [lastLog, projectionEndPoint];
+  }, [goalWeight, weightChartData]);
 
     const handleLogWeightClick = () => {
       const weightValue = parseFloat(newWeight);
@@ -213,7 +334,7 @@ export function WorkoutHeatmap({
       }
     };
     
-    const CustomTooltip = () => {
+    const CustomHeatmapTooltip = () => {
         if (!tooltipData) return null;
         const { value, x, y } = tooltipData;
 
@@ -419,7 +540,10 @@ export function WorkoutHeatmap({
                             <LineChart accessibilityLayer data={weightChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
                                 <XAxis 
-                                    dataKey="week"
+                                    dataKey="timestamp"
+                                    type="number"
+                                    domain={['dataMin', (dataMax: number) => projectionData[1]?.timestamp || dataMax]}
+                                    tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')}
                                     tickLine={false}
                                     axisLine={false}
                                     tickMargin={8}
@@ -427,39 +551,7 @@ export function WorkoutHeatmap({
                                 <YAxis tickLine={false} axisLine={false} tickMargin={8} domain={['dataMin - 2', 'dataMax + 2']} />
                                 <RechartsTooltip
                                     cursor={true}
-                                    content={({ active, payload }) => {
-                                        if (active && payload && payload.length) {
-                                            const data = payload[0].payload;
-                                            return (
-                                                <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[12rem]">
-                                                    <div className="grid gap-1.5">
-                                                        <div className="flex flex-col">
-                                                            <span className="text-[0.7rem] uppercase text-muted-foreground">
-                                                                {format(data.dateObj, 'PPP')}
-                                                            </span>
-                                                            <span className="font-bold text-foreground">
-                                                                {data.weight.toFixed(1)} kg/lb
-                                                            </span>
-                                                        </div>
-                                                        {data.weeklyChange !== null && data.weeklyChange !== undefined && (
-                                                            <div className="flex flex-col border-t pt-1.5 mt-1.5">
-                                                                <span className="text-[0.7rem] uppercase text-muted-foreground">
-                                                                    Weekly Change
-                                                                </span>
-                                                                <span className={cn(
-                                                                    "font-bold",
-                                                                    data.weeklyChange > 0 ? "text-red-500" : data.weeklyChange < 0 ? "text-green-500" : "text-muted-foreground"
-                                                                )}>
-                                                                    {data.weeklyChange > 0 ? '+' : ''}{data.weeklyChange.toFixed(1)} kg/lb
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        }
-                                        return null;
-                                    }}
+                                    content={<CustomTooltip />}
                                 />
                                 {goalWeight !== null && (
                                     <ReferenceLine 
@@ -470,6 +562,17 @@ export function WorkoutHeatmap({
                                     />
                                 )}
                                 <Line dataKey="weight" type="monotone" stroke="var(--color-weight)" strokeWidth={2} dot={true} name="Weight" />
+                                {projectionData.length > 0 && (
+                                  <Line 
+                                    data={projectionData} 
+                                    dataKey="weight"
+                                    type="monotone"
+                                    stroke="var(--color-weight)" 
+                                    strokeDasharray="5 5"
+                                    dot={{r: 4}}
+                                    name="Projection" 
+                                  />
+                                )}
                             </LineChart>
                         </ChartContainer>
                     )}
@@ -528,7 +631,7 @@ export function WorkoutHeatmap({
                                             <TableCell colSpan={3} className="text-center text-muted-foreground h-24">No weights logged yet.</TableCell>
                                         </TableRow>
                                     ) : (
-                                        weightChartData.map((log) => (
+                                        [...weightChartData].reverse().map((log) => (
                                             <TableRow key={log.fullWeek}>
                                                 {editingLog?.date === log.fullWeek ? (
                                                     <>
@@ -568,7 +671,7 @@ export function WorkoutHeatmap({
             )}
         </CardContent>
       </Card>
-      {view === 'heatmap' && <CustomTooltip />}
+      {view === 'heatmap' && <CustomHeatmapTooltip />}
     </>
   );
 }
