@@ -11,7 +11,7 @@ import { Button } from './ui/button';
 import { LineChart as LineChartIcon, Calendar as CalendarIcon, Weight as WeightIcon, Edit2, Trash2, Save, X } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { ChartContainer, ChartConfig } from './ui/chart';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine, Brush } from 'recharts';
 import { Input } from './ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
@@ -225,7 +225,6 @@ export function WorkoutHeatmap({
       .sort((a,b) => a.dateObj.getTime() - b.dateObj.getTime());
 
     return sortedLogs.map((log, index, arr) => {
-      const [year, weekNum] = log.date.split('-W');
       let weeklyChange = null;
       if (index > 0) {
           const prevWeight = arr[index - 1].weight;
@@ -233,7 +232,6 @@ export function WorkoutHeatmap({
       }
 
       return {
-          week: `W${weekNum}`,
           weight: log.weight,
           fullWeek: log.date,
           dateObj: log.dateObj,
@@ -245,56 +243,54 @@ export function WorkoutHeatmap({
 
   const projectionData = useMemo(() => {
     if (!goalWeight || weightChartData.length < 1) return [];
-
+    
     const lastLog = weightChartData[weightChartData.length - 1];
     const weightToChange = goalWeight - lastLog.weight;
-
+    
     if (Math.abs(weightToChange) < 0.1) return [];
 
     const changes = weightChartData
-      .map(d => d.weeklyChange)
-      .filter((c): c is number => c !== null && c !== 0);
+        .map(d => d.weeklyChange)
+        .filter((c): c is number => c !== null && c !== 0);
     
     let averageWeeklyChange = changes.length > 0 ? changes.reduce((a, b) => a + b, 0) / changes.length : 0;
 
     let projectionRate = averageWeeklyChange;
 
+    // If goal requires weight loss but average change is positive (or zero), set a default rate.
     if (weightToChange < 0) { 
-      if (projectionRate >= 0) {
-        projectionRate = -0.5;
-      }
-    } else { 
-      if (projectionRate <= 0) {
-        projectionRate = 0.25;
-      }
+        if (projectionRate >= 0) projectionRate = -0.5; // default 0.5 kg/lb loss per week
+    } else { // If goal requires weight gain but average change is negative (or zero), set a default rate.
+        if (projectionRate <= 0) projectionRate = 0.25; // default 0.25 kg/lb gain per week
     }
     
-    if (projectionRate === 0) return [];
+    if (Math.abs(projectionRate) < 0.01) return []; // Avoid division by zero or tiny numbers
 
     const weeksToGo = weightToChange / projectionRate;
-    
-    if (weeksToGo <= 0 || weeksToGo > 520) {
-      return [];
-    }
     
     const projectionEndDate = addWeeks(lastLog.dateObj, weeksToGo);
     const daysToGo = differenceInDays(projectionEndDate, new Date());
 
+    if (daysToGo < 1) return []; // Don't project if goal is in the past
+
     const projectionEndPoint = {
-        ...lastLog,
         weight: goalWeight,
         timestamp: projectionEndDate.getTime(),
         dateObj: projectionEndDate,
         isProjection: true,
-        weeksToGo: Math.ceil(weeksToGo),
-        daysToGo: daysToGo > 0 ? daysToGo : 0,
+        daysToGo: daysToGo,
         rate: Math.abs(projectionRate),
-        fullWeek: 'Ideal',
-        week: 'Ideal'
     }
 
-    return [lastLog, projectionEndPoint];
+    return [
+      { ...lastLog, isProjection: false }, // Start point of dotted line
+      projectionEndPoint // End point of dotted line
+    ];
   }, [goalWeight, weightChartData]);
+
+    const combinedData = useMemo(() => {
+      return [...weightChartData];
+    }, [weightChartData]);
 
     const handleLogWeightClick = () => {
       const weightValue = parseFloat(newWeight);
@@ -460,7 +456,7 @@ export function WorkoutHeatmap({
             ) : view === 'graph' ? (
                 <>
                 {consistencyData.length > 0 ? (
-                    <ChartContainer config={consistencyChartConfig} className="min-h-[250px] w-full pr-4">
+                    <ChartContainer config={consistencyChartConfig} className="min-h-[300px] w-full pr-4">
                         <LineChart accessibilityLayer data={consistencyData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                             <CartesianGrid vertical={false} strokeDasharray="3 3" />
                             <XAxis
@@ -530,19 +526,19 @@ export function WorkoutHeatmap({
             ) : (
                  <>
                     {weightChartData.length < 2 ? (
-                        <div className="flex justify-center items-center min-h-[250px]">
+                        <div className="flex justify-center items-center min-h-[300px]">
                             <p className="text-center text-muted-foreground">
                                 Not enough data for a weight chart. Log your weight for at least two different weeks.
                             </p>
                         </div>
                     ) : (
-                        <ChartContainer config={weightChartConfig} className="min-h-[250px] w-full pr-4">
-                            <LineChart accessibilityLayer data={weightChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                        <ChartContainer config={weightChartConfig} className="min-h-[300px] w-full pr-4">
+                             <LineChart accessibilityLayer data={combinedData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
                                 <XAxis 
                                     dataKey="timestamp"
                                     type="number"
-                                    domain={['dataMin', (dataMax: number) => projectionData[1]?.timestamp || dataMax]}
+                                    domain={['dataMin', (dataMax: number) => projectionData?.[1]?.timestamp || dataMax]}
                                     tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')}
                                     tickLine={false}
                                     axisLine={false}
@@ -562,7 +558,7 @@ export function WorkoutHeatmap({
                                     />
                                 )}
                                 <Line dataKey="weight" type="monotone" stroke="var(--color-weight)" strokeWidth={2} dot={true} name="Weight" />
-                                {projectionData.length > 0 && (
+                                {projectionData && projectionData.length > 0 && (
                                   <Line 
                                     data={projectionData} 
                                     dataKey="weight"
@@ -573,6 +569,7 @@ export function WorkoutHeatmap({
                                     name="Projection" 
                                   />
                                 )}
+                                <Brush dataKey="timestamp" height={30} stroke="hsl(var(--primary))" tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM yyyy')} />
                             </LineChart>
                         </ChartContainer>
                     )}
@@ -675,3 +672,5 @@ export function WorkoutHeatmap({
     </>
   );
 }
+
+    
