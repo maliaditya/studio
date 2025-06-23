@@ -2,16 +2,22 @@
 "use client";
 
 // IMPORTANT: This is a basic local authentication for prototype purposes.
-// Storing passwords (even if "hashed" client-side) in localStorage is NOT SECURE for production.
-// This implementation stores passwords in plain text for simplicity of the request.
+// It has been updated to store a user profile object instead of just a password.
 
 import type { LocalUser } from '@/types/workout';
 
-const USER_CREDENTIALS_KEY = "userCredentials"; // Stores { [username: string]: password_string }
+const USER_CREDENTIALS_KEY = "userCredentials_v2"; // Key for storing user profile data
 const CURRENT_USER_KEY = "currentUser"; // Stores username string of logged-in user
 
+// Defines the structure of the data stored for each user.
+interface UserData {
+  password: string;
+  heightInCm?: number;
+}
+
+// Defines the structure of the entire credentials object in localStorage.
 interface UserCredentials {
-  [username: string]: string; // password
+  [username: string]: UserData;
 }
 
 function getStoredCredentials(): UserCredentials {
@@ -35,10 +41,14 @@ export function registerUser(username: string, password: string): Promise<{ succ
       resolve({ success: false, message: "Username already exists." });
       return;
     }
-    credentials[username] = password; // Storing password directly - NOT SECURE
+    
+    // Create a new user profile object
+    credentials[username] = { password }; 
     storeCredentials(credentials);
+
     const user: LocalUser = { username };
-    // Automatically log in the user after registration
+    
+    // Automatically log in the user
     if (typeof window !== 'undefined') {
       localStorage.setItem(CURRENT_USER_KEY, username);
     }
@@ -49,18 +59,22 @@ export function registerUser(username: string, password: string): Promise<{ succ
 export function loginUser(username: string, password: string): Promise<{ success: boolean, message: string, user?: LocalUser }> {
   return new Promise((resolve) => {
     const credentials = getStoredCredentials();
-    if (!credentials[username]) {
+    const userData = credentials[username];
+
+    if (!userData) {
       resolve({ success: false, message: "Username not found." });
       return;
     }
-    if (credentials[username] !== password) { // Direct password comparison - NOT SECURE
+    if (userData.password !== password) {
       resolve({ success: false, message: "Incorrect password." });
       return;
     }
+
     if (typeof window !== 'undefined') {
       localStorage.setItem(CURRENT_USER_KEY, username);
     }
-    const user: LocalUser = { username };
+    
+    const user: LocalUser = { username, heightInCm: userData.heightInCm };
     resolve({ success: true, message: "Login successful.", user });
   });
 }
@@ -77,7 +91,25 @@ export function logoutUser(): Promise<void> {
 export function getCurrentLocalUser(): LocalUser | null {
   if (typeof window !== 'undefined') {
     const username = localStorage.getItem(CURRENT_USER_KEY);
-    return username ? { username } : null;
+    if (!username) return null;
+
+    const credentials = getStoredCredentials();
+    const userData = credentials[username];
+    
+    return { 
+      username, 
+      heightInCm: userData?.heightInCm 
+    };
   }
   return null;
+}
+
+export function updateUserProfile(username: string, data: Partial<Omit<UserData, 'password'>>) {
+    if (typeof window !== 'undefined') {
+        const credentials = getStoredCredentials();
+        if (credentials[username]) {
+            credentials[username] = { ...credentials[username], ...data };
+            storeCredentials(credentials);
+        }
+    }
 }

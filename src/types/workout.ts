@@ -1,6 +1,7 @@
 
 
 
+
 export type ExerciseCategory = 
   | "Chest" 
   | "Triceps" 
@@ -54,11 +55,10 @@ export interface DatedWorkout {
   notes?: string; // Optional notes for the workout
 }
 
-// Added for local authentication
+// Updated to include more user profile data
 export interface LocalUser {
   username: string;
-  // In a real app, password would be hashed. For this prototype, it's stored as is.
-  // This is NOT secure for production.
+  heightInCm?: number;
 }
 
 export type WorkoutMode = 'one-muscle' | 'two-muscle';
