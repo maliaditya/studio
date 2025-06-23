@@ -103,3 +103,28 @@
     @apply font-headline;
   }
 }
+
+/* React Calendar Heatmap Styles */
+.react-calendar-heatmap text {
+  font-size: 10px;
+  fill: hsl(var(--muted-foreground));
+}
+
+.react-calendar-heatmap .color-empty {
+  fill: hsl(var(--muted) / 0.5);
+}
+
+.dark .react-calendar-heatmap .color-empty {
+  fill: hsl(var(--muted) / 0.2);
+}
+
+.react-calendar-heatmap .color-scale-1 { fill: hsl(var(--primary) / 0.3); }
+.react-calendar-heatmap .color-scale-2 { fill: hsl(var(--primary) / 0.5); }
+.react-calendar-heatmap .color-scale-3 { fill: hsl(var(--primary) / 0.7); }
+.react-calendar-heatmap .color-scale-4 { fill: hsl(var(--primary) / 1.0); }
+
+/* Remove outline on active/focus state */
+.react-calendar-heatmap rect:focus,
+.react-calendar-heatmap rect:active {
+  outline: none;
+}

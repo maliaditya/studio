@@ -36,6 +36,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Separator } from '@/components/ui/separator';
+import { WorkoutHeatmap } from '@/components/WorkoutHeatmap';
 
 
 const DEFAULT_TARGET_SETS = 4;
@@ -631,6 +632,8 @@ function WorkoutPageContent() {
         </div>
       </div>
 
+      <WorkoutHeatmap allWorkoutLogs={allWorkoutLogs} onDateSelect={setSelectedDate} />
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
         <section aria-labelledby="exercise-library-heading" className="md:col-span-1 space-y-6">
           <Card className="shadow-xl rounded-xl overflow-hidden">
@@ -809,3 +812,4 @@ export default function Page() {
 
 
     
+
