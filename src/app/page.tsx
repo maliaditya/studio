@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus, Activity, LineChart as LineChartIcon, BookCopy, Flame, HeartPulse } from 'lucide-react';
+import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus, Activity, LineChart as LineChartIcon, BookCopy, Flame, HeartPulse, Utensils } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -824,7 +824,7 @@ function WorkoutPageContent() {
         setGender(g);
         toast({ title: "Gender Set!", description: `Your gender has been saved.` });
       } else {
-        toast({ title: "Error", description: "You must be logged in.", variant: "destructive" });
+        toast({ title: "Error", description: "You must be logged in to set your gender.", variant: "destructive" });
       }
     }
   };
@@ -969,6 +969,12 @@ function WorkoutPageContent() {
         daysToGoal,
     };
   }, [goalWeight, weightLogs]);
+  
+  const todaysDiet = useMemo(() => {
+    if (!dietPlan || dietPlan.length === 0) return null;
+    const dayName = format(new Date(), 'EEEE'); // "Monday", "Tuesday", etc.
+    return dietPlan.find(plan => plan.day === dayName);
+  }, [dietPlan]);
 
 
   if (isLoadingPage) {
@@ -1139,6 +1145,59 @@ function WorkoutPageContent() {
                   )}
                 </AnimatePresence>
               </CardContent>
+            </Card>
+
+            <Card className="shadow-xl rounded-xl">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-2xl text-primary">
+                        <Utensils /> Today's Diet
+                    </CardTitle>
+                    <CardDescription>
+                       Your planned meals for {format(new Date(), 'EEEE')}.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {todaysDiet ? (
+                        <div className="space-y-3 text-sm">
+                            <div>
+                                <h4 className="font-semibold text-foreground">Meal 1</h4>
+                                <p className="text-muted-foreground whitespace-pre-wrap">{todaysDiet.meal1 || 'Not planned.'}</p>
+                            </div>
+                            <Separator/>
+                            <div>
+                                <h4 className="font-semibold text-foreground">Meal 2</h4>
+                                <p className="text-muted-foreground whitespace-pre-wrap">{todaysDiet.meal2 || 'Not planned.'}</p>
+                            </div>
+                            <Separator/>
+                            <div>
+                                <h4 className="font-semibold text-foreground">Meal 3</h4>
+                                <p className="text-muted-foreground whitespace-pre-wrap">{todaysDiet.meal3 || 'Not planned.'}</p>
+                            </div>
+                            <Separator/>
+                            <div>
+                                <h4 className="font-semibold text-foreground">Supplements</h4>
+                                <p className="text-muted-foreground whitespace-pre-wrap">{todaysDiet.supplements || 'Not planned.'}</p>
+                            </div>
+
+                            {todaysDiet.totalCalories != null && (
+                                <div className="pt-3 border-t">
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-semibold text-foreground">Est. Total Calories</span>
+                                        <span className="font-bold text-lg text-primary">{todaysDiet.totalCalories.toLocaleString()} kcal</span>
+                                    </div>
+                                    <div className="text-xs text-muted-foreground space-y-1 pt-2">
+                                        <div className="flex justify-between"><span>Protein</span> <span className="font-medium text-foreground">{todaysDiet.protein?.toFixed(0) ?? '-'}g</span></div>
+                                        <div className="flex justify-between"><span>Carbs</span> <span className="font-medium text-foreground">{todaysDiet.carbs?.toFixed(0) ?? '-'}g</span></div>
+                                        <div className="flex justify-between"><span>Fat</span> <span className="font-medium text-foreground">{todaysDiet.fat?.toFixed(0) ?? '-'}g</span></div>
+                                        <div className="flex justify-between"><span>Fiber</span> <span className="font-medium text-foreground">{todaysDiet.fiber?.toFixed(0) ?? '-'}g</span></div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <p className="text-muted-foreground text-center py-4">No diet plan set up for today.</p>
+                    )}
+                </CardContent>
             </Card>
 
             <Card className="shadow-xl rounded-xl">
