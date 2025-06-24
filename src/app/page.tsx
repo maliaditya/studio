@@ -99,36 +99,36 @@ const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
 
 const INITIAL_PLANS: AllWorkoutPlans = {
   W1: {
-    Chest: ["Flat Barbell Bench Press", "Incline Dumbbell Press"],
-    Triceps: ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension"],
-    Back: ["Lat Pulldown", "Barbell Row"],
-    Biceps: ["Standing dumbbell curls", "Hammer Curl (Dumbbell)"],
-    Shoulders: ["Seated Dumbbell Shoulder Press", "Face Pulls"],
-    Legs: ["Squats (Barbell)", "Leg Press"]
+    Chest: ["Flat Barbell Bench Press", "Incline Dumbbell Press", "Cable Fly"],
+    Triceps: ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Rope Pushdown"],
+    Back: ["Lat Pulldown", "Barbell Row", "1-Arm Dumbbell Row"],
+    Biceps: ["Standing dumbbell curls", "Hammer Curl (Dumbbell)", "Preacher Curls Bar"],
+    Shoulders: ["Seated Dumbbell Shoulder Press", "Face Pulls", "Standing Dumbbell Lateral Raise"],
+    Legs: ["Squats (Barbell)", "Leg Press", "Hamstring machine"]
   },
   W2: {
-    Chest: ["Cable Fly", "Dumbbell Pullovers"],
-    Triceps: ["Rope Pushdown", "Dumbbell Kickback"],
-    Back: ["1-Arm Dumbbell Row", "DeadLifts"],
-    Biceps: ["Preacher Curls Bar", "Cable Curls"],
-    Shoulders: ["Standing Dumbbell Lateral Raise", "Shrugs"],
-    Legs: ["Walking Lunges (Barbell)", "Hamstring machine"]
+    Chest: ["Cable Fly", "Dumbbell Pullovers", "Flat Barbell Bench Press"],
+    Triceps: ["Rope Pushdown", "Dumbbell Kickback", "Overhead Dumbbell Extension"],
+    Back: ["1-Arm Dumbbell Row", "DeadLifts", "Lat Pulldown"],
+    Biceps: ["Preacher Curls Bar", "Cable Curls", "Standing dumbbell curls"],
+    Shoulders: ["Standing Dumbbell Lateral Raise", "Shrugs", "Seated Dumbbell Shoulder Press"],
+    Legs: ["Walking Lunges (Barbell)", "Hamstring machine", "Calf Raises"]
   },
-  W3: { // Same as W2
-    Chest: ["Cable Fly", "Dumbbell Pullovers"],
-    Triceps: ["Rope Pushdown", "Dumbbell Kickback"],
-    Back: ["1-Arm Dumbbell Row", "DeadLifts"],
-    Biceps: ["Preacher Curls Bar", "Cable Curls"],
-    Shoulders: ["Standing Dumbbell Lateral Raise", "Shrugs"],
-    Legs: ["Walking Lunges (Barbell)", "Hamstring machine"]
+  W3: { // Same as W2 but with slight variations possible if desired
+    Chest: ["Cable Fly", "Dumbbell Pullovers", "Flat Barbell Bench Press"],
+    Triceps: ["Rope Pushdown", "Dumbbell Kickback", "Overhead Dumbbell Extension"],
+    Back: ["1-Arm Dumbbell Row", "DeadLifts", "Lat Pulldown"],
+    Biceps: ["Preacher Curls Bar", "Cable Curls", "Standing dumbbell curls"],
+    Shoulders: ["Standing Dumbbell Lateral Raise", "Shrugs", "Seated Dumbbell Shoulder Press"],
+    Legs: ["Walking Lunges (Barbell)", "Hamstring machine", "Calf Raises"]
   },
-  W4: { // Same as W1
-    Chest: ["Flat Barbell Bench Press", "Incline Dumbbell Press"],
-    Triceps: ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension"],
-    Back: ["Lat Pulldown", "Barbell Row"],
-    Biceps: ["Standing dumbbell curls", "Hammer Curl (Dumbbell)"],
-    Shoulders: ["Seated Dumbbell Shoulder Press", "Face Pulls"],
-    Legs: ["Squats (Barbell)", "Leg Press"]
+  W4: { // Same as W1 but with slight variations possible if desired
+    Chest: ["Flat Barbell Bench Press", "Incline Dumbbell Press", "Cable Fly"],
+    Triceps: ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Rope Pushdown"],
+    Back: ["Lat Pulldown", "Barbell Row", "1-Arm Dumbbell Row"],
+    Biceps: ["Standing dumbbell curls", "Hammer Curl (Dumbbell)", "Preacher Curls Bar"],
+    Shoulders: ["Seated Dumbbell Shoulder Press", "Face Pulls", "Standing Dumbbell Lateral Raise"],
+    Legs: ["Squats (Barbell)", "Leg Press", "Hamstring machine"]
   },
   W5: { // One-muscle day, more exercises
     Chest: ["Flat Barbell Bench Press", "Incline Dumbbell Press", "Cable Fly"],
