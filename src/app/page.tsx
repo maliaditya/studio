@@ -199,7 +199,7 @@ function WorkoutPageContent() {
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   
   const [showBackupPrompt, setShowBackupPrompt] = useState(false);
-  const [isLibraryExpanded, setIsLibraryExpanded] = useState(true);
+  const [isLibraryExpanded, setIsLibraryExpanded] = useState(false);
 
   const [goalWeight, setGoalWeight] = useState<number | null>(null);
   const [height, setHeight] = useState<number | null>(null);
