@@ -1011,7 +1011,7 @@ function WorkoutPageContent() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
           <section aria-labelledby="exercise-library-heading" className="md:col-span-1 space-y-6">
             <Card className="shadow-xl rounded-xl overflow-hidden">
-              <CardHeader className="bg-primary/10">
+              <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle id="exercise-library-heading" className="flex items-center gap-2 text-2xl text-primary">
                     <Dumbbell /> Exercise Library
@@ -1309,7 +1309,7 @@ function WorkoutPageContent() {
 
           <section aria-labelledby="current-workout-heading" className="md:col-span-2 space-y-6">
               <Card className="shadow-xl rounded-xl overflow-hidden">
-                  <CardHeader className="bg-accent/10 flex flex-row items-center justify-between p-4">
+                  <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
                           <CardTitle id="current-workout-heading" className="flex items-center gap-2 text-2xl text-accent">
                               <ListChecks /> Workout for: {format(selectedDate, 'PPP')}
@@ -1432,3 +1432,5 @@ function WorkoutPageContent() {
 export default function Page() {
   return ( <AuthGuard> <WorkoutPageContent /> </AuthGuard> );
 }
+
+    

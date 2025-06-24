@@ -127,7 +127,7 @@ export function WorkoutPlanModal({
                         const exercisesForCategory = workoutPlans[planKey]?.[category];
                         return (
                         <Card key={category} className="overflow-hidden">
-                            <CardHeader className="bg-muted/50 p-3">
+                            <CardHeader className="p-3">
                                 <CardTitle className="text-lg">{category}</CardTitle>
                             </CardHeader>
                             <CardContent className="p-3">
@@ -197,3 +197,5 @@ export function WorkoutPlanModal({
     </Dialog>
   );
 }
+
+    
