@@ -62,7 +62,7 @@ const singleDayPrompt = ai.definePrompt({
     name: 'generateSingleDayPlanPrompt',
     input: { schema: SingleDayPlanInputSchema },
     output: { schema: SingleDayMealPlanSchema },
-    prompt: `You are an expert nutritionist. Create a single-day meal plan for {{{day}}} based on the user's details and dietary preferences.
+    prompt: `You are an expert nutritionist. Your task is to create a single-day meal plan for {{{day}}} based on the user's details.
 
     User Details:
     - Current Weight: {{{currentWeight}}} kg/lb
@@ -73,10 +73,19 @@ const singleDayPrompt = ai.definePrompt({
     - Activity Level: {{{activityLevel}}}
     - Dietary Preferences/Restrictions: {{{preferences}}}
 
-    Provide suggestions for breakfast, lunch, dinner, and two snacks. For each, provide a brief description and an estimated calorie count.
-    Ensure all calorie values are numbers, not strings. Do NOT provide a total calorie count for the day.
+    You MUST provide suggestions for breakfast, lunch, dinner, and two snacks.
+    For EACH meal (breakfast, lunch, dinner, and each snack), you MUST provide:
+    1. A 'description' of the meal (a string).
+    2. An estimated 'calories' for that meal (a number).
 
-    Your response MUST be a valid JSON object that adheres to the provided output schema. Do not include any other text, explanations, or markdown formatting.
+    Example for one meal:
+    {
+      "description": "2 scrambled eggs with spinach and a slice of whole-wheat toast.",
+      "calories": 350
+    }
+
+    Do NOT provide a total calorie count for the day.
+    Your entire response MUST be a single, valid JSON object that adheres to the provided output schema. Do not include any other text, explanations, or markdown formatting.
     `
 });
 
