@@ -1232,6 +1232,11 @@ function WorkoutPageContent() {
                                           <span className="font-bold">{healthMetrics.maintenanceCalories} kcal</span>
                                       </div>
                                   )}
+                                  {healthMetrics.averageIntake && healthMetrics.maintenanceCalories && healthMetrics.averageIntake < healthMetrics.maintenanceCalories && (
+                                      <p className="text-xs text-orange-500 mt-2">
+                                          ⚠️ You’re eating below maintenance — watch for fatigue, low mood, or muscle loss.
+                                      </p>
+                                  )}
                               </div>
                             )}
 
