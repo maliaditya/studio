@@ -1423,12 +1423,12 @@ function WorkoutPageContent() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="flex flex-col sm:flex-row gap-2">
-                        <Button onClick={() => setIsWeightChartModalOpen(true)} className="w-full sm:flex-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <Button onClick={() => setIsWeightChartModalOpen(true)} className="w-full">
                             <LineChartIcon className="mr-2 h-4 w-4" />
                             Chart & Goal
                         </Button>
-                        <Button onClick={() => handleDietModalOpenChange(true)} variant="outline" className="w-full sm:flex-1">
+                        <Button onClick={() => handleDietModalOpenChange(true)} variant="outline" className="w-full">
                             <BookCopy className="mr-2 h-4 w-4" />
                             Diet Plan
                         </Button>
@@ -1553,7 +1553,7 @@ function WorkoutPageContent() {
                       </Popover>
                   </CardHeader>
                   <CardContent className="p-4">
-                    <div className="max-h-[calc(100vh-22rem)] overflow-y-auto pr-2">
+                    <div className="max-h-[calc(100vh-14rem)] overflow-y-auto pr-2">
                       {currentWorkoutExercises.length === 0 ? (
                         <div className="text-center py-10">
                             <GripVertical className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
