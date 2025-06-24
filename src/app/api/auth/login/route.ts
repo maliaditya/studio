@@ -7,6 +7,11 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   const { username, password } = await request.json();
 
+  // Bypass Blob check for demo user
+  if (username === 'demo' && password === 'demo') {
+    return NextResponse.json({ success: true, message: 'Demo login successful.' });
+  }
+
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     return NextResponse.json(
       { error: 'Vercel Blob Storage is not configured on the server. Please link a Blob store.' },
