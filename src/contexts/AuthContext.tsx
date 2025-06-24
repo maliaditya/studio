@@ -116,6 +116,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
         return;
     }
+    if (currentUser.username === 'demo') {
+        toast({ title: "Action Disabled", description: "The demo account data is read-only.", variant: "default" });
+        return;
+    }
     toast({ title: "Syncing...", description: "Pushing your local data to the cloud." });
 
     try {

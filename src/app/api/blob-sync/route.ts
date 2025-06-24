@@ -19,6 +19,13 @@ export async function POST(request: Request) {
     );
   }
 
+  if (username === 'demo') {
+    return NextResponse.json(
+      { error: 'The demo account is read-only and cannot be synced to the cloud.' },
+      { status: 403 } // 403 Forbidden
+    );
+  }
+
   if (!username || data === undefined) {
     return NextResponse.json({ error: 'Username and data payload are required.' }, { status: 400 });
   }
