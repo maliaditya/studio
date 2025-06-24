@@ -22,7 +22,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   if (loading || !currentUser) {
     return (
-      <div className="flex flex-col justify-center items-center min-h-[calc(100vh-4rem)] bg-background">
+      <div className="flex flex-col justify-center items-center min-h-[calc(100vh-4rem)]">
         <Dumbbell className="h-16 w-16 text-primary animate-spin mb-4" />
         <p className="text-muted-foreground">Loading your personalized workout experience...</p>
       </div>

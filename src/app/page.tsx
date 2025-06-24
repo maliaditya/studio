@@ -979,7 +979,7 @@ function WorkoutPageContent() {
 
   if (isLoadingPage) {
     return (
-      <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)] bg-background">
+      <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
         <Loader2 className="h-16 w-16 text-primary animate-spin mb-4" />
         <p className="text-muted-foreground">Loading your workout data...</p>
       </div>
