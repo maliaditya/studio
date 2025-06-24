@@ -1236,7 +1236,7 @@ function WorkoutPageContent() {
                   <CardTitle id="exercise-library-heading" className="flex items-center gap-2 text-lg lg:text-xl text-primary">
                     <BookCopy /> Exercise Library
                   </CardTitle>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" size="sm" className="h-8">
@@ -1302,9 +1302,9 @@ function WorkoutPageContent() {
                       className="space-y-4"
                     >
                       <form onSubmit={handleAddExerciseDefinition} className="space-y-3">
-                        <Input type="text" placeholder="New exercise name" value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} aria-label="New exercise name" className="h-10" />
+                        <Input type="text" placeholder="New exercise name" value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} aria-label="New exercise name" className="h-10 text-sm" />
                         <Select value={newExerciseCategory} onValueChange={(value) => setNewExerciseCategory(value as ExerciseCategory)}>
-                          <SelectTrigger className="h-10"><SelectValue placeholder="Select category" /></SelectTrigger>
+                          <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select category" /></SelectTrigger>
                           <SelectContent>{exerciseCategories.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
                         </Select>
                         <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-10"> <PlusCircle className="mr-2 h-5 w-5" /> Add Exercise </Button>
@@ -1424,11 +1424,11 @@ function WorkoutPageContent() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex flex-col sm:flex-row gap-2">
-                        <Button onClick={() => setIsWeightChartModalOpen(true)} className="w-full">
+                        <Button onClick={() => setIsWeightChartModalOpen(true)} className="w-full sm:flex-1">
                             <LineChartIcon className="mr-2 h-4 w-4" />
                             Chart & Goal
                         </Button>
-                        <Button onClick={() => handleDietModalOpenChange(true)} variant="outline" className="w-full">
+                        <Button onClick={() => handleDietModalOpenChange(true)} variant="outline" className="w-full sm:flex-1">
                             <BookCopy className="mr-2 h-4 w-4" />
                             Diet Plan
                         </Button>
@@ -1553,7 +1553,7 @@ function WorkoutPageContent() {
                       </Popover>
                   </CardHeader>
                   <CardContent className="p-4">
-                    <div className="max-h-[calc(100vh-26rem)] overflow-y-auto pr-2">
+                    <div className="max-h-[calc(100vh-22rem)] overflow-y-auto pr-2">
                       {currentWorkoutExercises.length === 0 ? (
                         <div className="text-center py-10">
                             <GripVertical className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
