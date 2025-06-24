@@ -1147,7 +1147,7 @@ function WorkoutPageContent() {
                            Your planned meals for {format(new Date(), 'EEEE')}.
                         </CardDescription>
                     </div>
-                    {todaysDiet?.totalCalories != null && (
+                    {todaysDiet?.totalCalories != null && todaysDiet.totalCalories > 0 && (
                         <div className="text-right">
                             <span className="font-bold text-2xl text-primary">{todaysDiet.totalCalories.toLocaleString()}</span>
                             <p className="text-xs text-muted-foreground -mt-1">kcal</p>
@@ -1176,7 +1176,7 @@ function WorkoutPageContent() {
                                 </div>
                             </div>
 
-                            {todaysDiet.totalCalories != null && (
+                            {todaysDiet.totalCalories != null && todaysDiet.totalCalories > 0 && (
                                 <div className="pt-4 border-t">
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1">
                                         <div className="flex justify-between"><span>Protein</span> <span className="font-medium text-foreground">{todaysDiet.protein?.toFixed(0) ?? '-'}g</span></div>
