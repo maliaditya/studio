@@ -1304,13 +1304,6 @@ function WorkoutPageContent() {
           </section>
 
           <section aria-labelledby="current-workout-heading" className="md:col-span-2 space-y-6">
-              <WorkoutHeatmap
-                allWorkoutLogs={allWorkoutLogs}
-                onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
-                consistencyData={consistencyData}
-                oneYearAgo={oneYearAgo}
-                today={today}
-              />
               <Card className="shadow-xl rounded-xl overflow-hidden">
                   <CardHeader className="bg-accent/10 flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
@@ -1366,6 +1359,13 @@ function WorkoutPageContent() {
                     </div>
                   </CardContent>
               </Card>
+              <WorkoutHeatmap
+                allWorkoutLogs={allWorkoutLogs}
+                onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
+                consistencyData={consistencyData}
+                oneYearAgo={oneYearAgo}
+                today={today}
+              />
           </section>
         </div>
         {viewingProgressExercise && (
