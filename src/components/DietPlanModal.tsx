@@ -119,7 +119,7 @@ export function DietPlanModal({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-grow border rounded-lg p-4 lg:p-6">
+        <ScrollArea className="flex-grow min-h-0 border rounded-lg p-4 lg:p-6">
           <div className="space-y-6">
             {plan.map((dayPlan) => (
               <Card key={dayPlan.day}>
