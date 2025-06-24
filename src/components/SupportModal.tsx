@@ -32,7 +32,7 @@ export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
           <a href="https://www.buymeacoffee.com/adityamali98" target="_blank" rel="noopener noreferrer">
             <img className="h-12 w-auto" src="https://img.buymeacoffee.com/button-api/?text=Keep this project alive&emoji=&slug=adityamali98&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Keep this project alive" />
           </a>
-          <Button asChild variant="outline" className="w-full max-w-xs">
+          <Button asChild className="h-12 w-auto px-6 bg-[#FFDD00] text-black hover:bg-[#FFDD00]/90 font-bold text-lg rounded-lg shadow-md">
             <a href="upi://pay?pa=9765402942@ybl&pn=YourName&cu=INR">
               Support via UPI
             </a>
