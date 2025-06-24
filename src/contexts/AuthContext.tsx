@@ -59,6 +59,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } else {
         localStorage.removeItem(`dateOfBirth_${username}`);
     }
+    if (data.gender) {
+        localStorage.setItem(`gender_${username}`, data.gender);
+    } else {
+        localStorage.removeItem(`gender_${username}`);
+    }
     localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(data.exerciseDefinitions || []));
     localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(data.workoutPlans || {}));
     localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(data.allWorkoutLogs || []));
@@ -116,6 +121,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             goalWeight: localStorage.getItem(`goalWeight_${username}`) || null,
             height: localStorage.getItem(`height_${username}`) || null,
             dateOfBirth: localStorage.getItem(`dateOfBirth_${username}`) || null,
+            gender: localStorage.getItem(`gender_${username}`) || null,
             exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
             workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
             allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
@@ -205,6 +211,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             goalWeight: localStorage.getItem(`goalWeight_${username}`) || null,
             height: localStorage.getItem(`height_${username}`) || null,
             dateOfBirth: localStorage.getItem(`dateOfBirth_${username}`) || null,
+            gender: localStorage.getItem(`gender_${username}`) || null,
         };
 
         const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
@@ -252,7 +259,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                           data.height === undefined ||
                           data.dateOfBirth === undefined
                       ) {
-                          throw new Error("Invalid backup file format.");
+                          throw new Error("Invalid backup file format. Some required fields are missing.");
                       }
 
                       loadDataIntoLocalStorage(data, username);

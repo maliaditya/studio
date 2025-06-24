@@ -58,6 +58,7 @@ export interface LocalUser {
 }
 
 export type WorkoutMode = 'one-muscle' | 'two-muscle';
+export type Gender = 'male' | 'female';
 
 // Types for editable workout plans
 export type WorkoutPlan = Partial<Record<ExerciseCategory, string[]>>;

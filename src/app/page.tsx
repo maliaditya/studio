@@ -6,13 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus, Activity, LineChart as LineChartIcon, BookCopy } from 'lucide-react';
+import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus, Activity, LineChart as LineChartIcon, BookCopy, Flame, HeartPulse } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { format, parseISO, getDay, getWeekOfMonth, isMonday, getYear, getISOWeek, parse, getISOWeekYear, addWeeks, startOfISOWeek, setISOWeek, differenceInDays, subYears, addDays } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans, WeightLog } from '@/types/workout';
+import { format, parseISO, getDay, getWeekOfMonth, isMonday, getYear, getISOWeek, parse, getISOWeekYear, addWeeks, startOfISOWeek, setISOWeek, differenceInDays, subYears, addDays, differenceInYears } from 'date-fns';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans, WeightLog, Gender, UserDietPlan } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -187,6 +187,7 @@ function WorkoutPageContent() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
+  const [dietPlan, setDietPlan] = useState<UserDietPlan>([]);
 
   const [viewingProgressExercise, setViewingProgressExercise] = useState<ExerciseDefinition | null>(null);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
@@ -203,6 +204,7 @@ function WorkoutPageContent() {
   const [goalWeight, setGoalWeight] = useState<number | null>(null);
   const [height, setHeight] = useState<number | null>(null);
   const [dateOfBirth, setDateOfBirth] = useState<string | null>(null);
+  const [gender, setGender] = useState<Gender | null>(null);
   const [isWeightChartModalOpen, setIsWeightChartModalOpen] = useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
 
@@ -225,6 +227,8 @@ function WorkoutPageContent() {
       const goalWeightKey = `goalWeight_${currentUser.username}`;
       const heightKey = `height_${currentUser.username}`;
       const dobKey = `dateOfBirth_${currentUser.username}`;
+      const genderKey = `gender_${currentUser.username}`;
+      const dietPlanKey = `dietPlan_${currentUser.username}`;
       let localDefsLoaded = false;
       
       const storedMode = localStorage.getItem(modeKey);
@@ -233,18 +237,27 @@ function WorkoutPageContent() {
       }
 
       const storedGoal = localStorage.getItem(goalWeightKey);
-      if (storedGoal) {
-          setGoalWeight(parseFloat(storedGoal));
-      }
+      if (storedGoal) setGoalWeight(parseFloat(storedGoal));
 
       const storedHeight = localStorage.getItem(heightKey);
-      if (storedHeight) {
-          setHeight(parseFloat(storedHeight));
-      }
+      if (storedHeight) setHeight(parseFloat(storedHeight));
       
       const storedDob = localStorage.getItem(dobKey);
-      if (storedDob) {
-          setDateOfBirth(storedDob);
+      if (storedDob) setDateOfBirth(storedDob);
+
+      const storedGender = localStorage.getItem(genderKey);
+      if (storedGender === 'male' || storedGender === 'female') {
+        setGender(storedGender as Gender);
+      }
+
+      try {
+        const storedDietPlan = localStorage.getItem(dietPlanKey);
+        if (storedDietPlan) {
+            const parsedPlan = JSON.parse(storedDietPlan);
+            if (Array.isArray(parsedPlan)) setDietPlan(parsedPlan);
+        }
+      } catch (e) {
+        console.error("Error parsing diet plan from localStorage", e);
       }
 
       try {
@@ -319,6 +332,8 @@ function WorkoutPageContent() {
       setGoalWeight(null);
       setHeight(null);
       setDateOfBirth(null);
+      setGender(null);
+      setDietPlan([]);
     }
     const timer = setTimeout(() => setIsLoadingPage(false), 300);
     return () => clearTimeout(timer);
@@ -335,6 +350,7 @@ function WorkoutPageContent() {
         const goalWeightKey = `goalWeight_${currentUser.username}`;
         const heightKey = `height_${currentUser.username}`;
         const dobKey = `dateOfBirth_${currentUser.username}`;
+        const genderKey = `gender_${currentUser.username}`;
         
         localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
         localStorage.setItem(logsKey, JSON.stringify(allWorkoutLogs));
@@ -342,30 +358,24 @@ function WorkoutPageContent() {
         localStorage.setItem(plansKey, JSON.stringify(workoutPlans));
         localStorage.setItem(weightLogsKey, JSON.stringify(weightLogs));
 
-        if (goalWeight !== null) {
-          localStorage.setItem(goalWeightKey, goalWeight.toString());
-        } else {
-          localStorage.removeItem(goalWeightKey);
-        }
+        if (goalWeight !== null) localStorage.setItem(goalWeightKey, goalWeight.toString());
+        else localStorage.removeItem(goalWeightKey);
 
-        if (height !== null) {
-          localStorage.setItem(heightKey, height.toString());
-        } else {
-          localStorage.removeItem(heightKey);
-        }
+        if (height !== null) localStorage.setItem(heightKey, height.toString());
+        else localStorage.removeItem(heightKey);
         
-        if (dateOfBirth) {
-            localStorage.setItem(dobKey, dateOfBirth);
-        } else {
-            localStorage.removeItem(dobKey);
-        }
+        if (dateOfBirth) localStorage.setItem(dobKey, dateOfBirth);
+        else localStorage.removeItem(dobKey);
+
+        if (gender) localStorage.setItem(genderKey, gender);
+        else localStorage.removeItem(genderKey);
 
       } catch (e) {
         console.error("Error saving data to localStorage", e);
         toast({ title: "Save Error", description: "Could not save data locally. Storage might be full.", variant: "destructive"});
       }
     }
-  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, workoutMode, workoutPlans, weightLogs, goalWeight, height, dateOfBirth]);
+  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, workoutMode, workoutPlans, weightLogs, goalWeight, height, dateOfBirth, gender]);
 
 
   useEffect(() => {
@@ -485,6 +495,25 @@ function WorkoutPageContent() {
       }
 
   }, [currentUser]);
+
+  const handleDietModalOpenChange = (isOpen: boolean) => {
+    setIsDietPlanModalOpen(isOpen);
+    if (!isOpen && currentUser?.username) {
+      // When modal closes, reload diet plan from storage to update parent state for calculations
+      const planKey = `dietPlan_${currentUser.username}`;
+      const storedPlan = localStorage.getItem(planKey);
+      if (storedPlan) {
+        try {
+          const parsedPlan = JSON.parse(storedPlan);
+          if (Array.isArray(parsedPlan)) {
+            setDietPlan(parsedPlan);
+          }
+        } catch (e) {
+          console.error("Error parsing diet plan from localStorage on modal close", e);
+        }
+      }
+    }
+  };
 
   const markBackupPromptAsHandled = () => {
     const today = new Date();
@@ -789,6 +818,17 @@ function WorkoutPageContent() {
     }
   };
 
+  const handleSetGender = (g: Gender) => {
+    if (g) {
+      if (currentUser?.username) {
+        setGender(g);
+        toast({ title: "Gender Set!", description: `Your gender has been saved.` });
+      } else {
+        toast({ title: "Error", description: "You must be logged in.", variant: "destructive" });
+      }
+    }
+  };
+
   const consistencyData = useMemo(() => {
     if (!allWorkoutLogs || !oneYearAgo || !today) return [];
 
@@ -824,6 +864,34 @@ function WorkoutPageContent() {
     if (!consistencyData.length) return null;
     return consistencyData[consistencyData.length - 1].score;
   }, [consistencyData]);
+
+  const healthMetrics = useMemo(() => {
+    const calories = dietPlan.length > 0
+        ? dietPlan
+            .map(d => d.totalCalories)
+            .filter((c): c is number => c !== null && c > 0)
+        : [];
+    const averageIntake = calories.length > 0 ? calories.reduce((sum, c) => sum + c, 0) / calories.length : null;
+
+    const currentWeight = weightLogs.length > 0 ? weightLogs[weightLogs.length - 1].weight : null;
+    const age = dateOfBirth ? differenceInYears(new Date(), parseISO(dateOfBirth)) : null;
+    
+    let bmr = null;
+    if (currentWeight && height && age && gender) {
+        if (gender === 'male') {
+            // Mifflin-St Jeor Equation for men
+            bmr = (10 * currentWeight) + (6.25 * height) - (5 * age) + 5;
+        } else {
+            // Mifflin-St Jeor Equation for women
+            bmr = (10 * currentWeight) + (6.25 * height) - (5 * age) - 161;
+        }
+    }
+
+    return {
+        averageIntake: averageIntake ? Math.round(averageIntake) : null,
+        maintenanceCalories: bmr ? Math.round(bmr) : null,
+    };
+  }, [dietPlan, weightLogs, height, dateOfBirth, gender]);
 
   const projectionSummary = useMemo(() => {
     if (!goalWeight || weightLogs.length < 2) {
@@ -1088,12 +1156,12 @@ function WorkoutPageContent() {
                             <LineChartIcon className="mr-2 h-4 w-4" />
                             Chart & Goal
                         </Button>
-                        <Button onClick={() => setIsDietPlanModalOpen(true)} variant="outline" className="w-full">
+                        <Button onClick={() => handleDietModalOpenChange(true)} variant="outline" className="w-full">
                             <BookCopy className="mr-2 h-4 w-4" />
                             Diet Plan
                         </Button>
                     </div>
-                    {(projectionSummary || latestConsistency) && (
+                    {(projectionSummary || latestConsistency || healthMetrics.averageIntake || healthMetrics.maintenanceCalories) && (
                         <div className="space-y-4 pt-4 border-t">
                             {projectionSummary && (
                                 <>
@@ -1150,6 +1218,23 @@ function WorkoutPageContent() {
                                 </>
                             )}
                             
+                            {(healthMetrics.averageIntake || healthMetrics.maintenanceCalories) && (
+                              <div className="space-y-2 text-sm pt-4 border-t">
+                                  {healthMetrics.averageIntake && (
+                                      <div className="flex justify-between items-center">
+                                          <span className="text-muted-foreground flex items-center gap-2"><Flame className="h-4 w-4" /> Avg. Daily Intake</span>
+                                          <span className="font-bold">{healthMetrics.averageIntake} kcal</span>
+                                      </div>
+                                  )}
+                                  {healthMetrics.maintenanceCalories && (
+                                      <div className="flex justify-between items-center">
+                                          <span className="text-muted-foreground flex items-center gap-2"><HeartPulse className="h-4 w-4" /> Est. Maintenance</span>
+                                          <span className="font-bold">{healthMetrics.maintenanceCalories} kcal</span>
+                                      </div>
+                                  )}
+                              </div>
+                            )}
+
                             {latestConsistency !== null && (
                                 <div className="space-y-1 text-sm pt-4 border-t">
                                     <div className="flex justify-between items-center">
@@ -1262,17 +1347,19 @@ function WorkoutPageContent() {
         goalWeight={goalWeight}
         height={height}
         dateOfBirth={dateOfBirth}
+        gender={gender}
         onLogWeight={handleLogWeight}
         onUpdateWeightLog={handleUpdateWeightLog}
         onDeleteWeightLog={handleDeleteWeightLog}
         onSetGoalWeight={handleSetGoalWeight}
         onSetHeight={handleSetHeight}
         onSetDateOfBirth={handleSetDateOfBirth}
+        onSetGender={handleSetGender}
       />
 
       <DietPlanModal
         isOpen={isDietPlanModalOpen}
-        onOpenChange={setIsDietPlanModalOpen}
+        onOpenChange={handleDietModalOpenChange}
       />
     </>
   );

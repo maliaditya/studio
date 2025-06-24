@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { addWeeks, format, parseISO, setISOWeek, startOfISOWeek, differenceInDays } from 'date-fns';
-import type { WeightLog } from '@/types/workout';
+import type { WeightLog, Gender } from '@/types/workout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { ScrollArea } from './ui/scroll-area';
 import { Label } from './ui/label';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 
 interface WeightChartModalProps {
   isOpen: boolean;
@@ -26,12 +27,14 @@ interface WeightChartModalProps {
   goalWeight: number | null;
   height: number | null;
   dateOfBirth: string | null;
+  gender: Gender | null;
   onLogWeight: (weight: number, date: Date) => void;
   onUpdateWeightLog: (dateKey: string, newWeight: number) => void;
   onDeleteWeightLog: (dateKey: string) => void;
   onSetGoalWeight: (goal: number) => void;
   onSetHeight: (height: number) => void;
   onSetDateOfBirth: (dob: string) => void;
+  onSetGender: (gender: Gender) => void;
 }
 
 const weightChartConfig = {
@@ -121,12 +124,14 @@ export function WeightChartModal({
   goalWeight,
   height,
   dateOfBirth,
+  gender,
   onLogWeight,
   onUpdateWeightLog,
   onDeleteWeightLog,
   onSetGoalWeight,
   onSetHeight,
   onSetDateOfBirth,
+  onSetGender,
 }: WeightChartModalProps) {
   const { toast } = useToast();
   
@@ -399,6 +404,23 @@ export function WeightChartModal({
                         <CardTitle className="flex items-center gap-2"><Target/> Your Details</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                         <div>
+                            <Label className="text-xs text-muted-foreground">Gender (for BMR calculation)</Label>
+                            <RadioGroup
+                                value={gender || undefined}
+                                onValueChange={(value) => onSetGender(value as Gender)}
+                                className="flex gap-4 pt-2"
+                            >
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="male" id="gender-male" />
+                                    <Label htmlFor="gender-male" className="font-normal">Male</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="female" id="gender-female" />
+                                    <Label htmlFor="gender-female" className="font-normal">Female</Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
                         <div className="grid grid-cols-1 gap-4">
                             <div>
                                 <Label htmlFor="goal-weight-input" className="text-xs text-muted-foreground">Goal Weight (kg/lb)</Label>
