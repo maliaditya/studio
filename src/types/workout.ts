@@ -85,17 +85,3 @@ export interface EditableMealPlan {
 }
 
 export type UserDietPlan = EditableMealPlan[];
-
-
-// Schemas for AI-based single meal analysis
-export const AnalyzeMealInputSchema = z.string().describe("A description of a single meal to be analyzed for nutritional content.");
-export type AnalyzeMealInput = z.infer<typeof AnalyzeMealInputSchema>;
-
-export const AnalyzeMealOutputSchema = z.object({
-    calories: z.number().describe("The estimated calorie count for the meal."),
-    protein: z.number().describe("The estimated protein in grams for the meal."),
-    carbs: z.number().describe("The estimated carbohydrates in grams for the meal."),
-    fat: z.number().describe("The estimated fat in grams for the meal."),
-    fiber: z.number().describe("The estimated fiber in grams for the meal."),
-});
-export type AnalyzeMealOutput = z.infer<typeof AnalyzeMealOutputSchema>;
