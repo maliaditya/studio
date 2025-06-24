@@ -22,7 +22,7 @@ import type { UserDietPlan, EditableMealPlan } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
 import { Calculator, Info, Loader2 } from 'lucide-react';
-import { calculateCalories } from '@/ai/flows/calculateCaloriesFlow';
+import { analyzeMeal } from '@/ai/flows/analyzeMealFlow';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 
@@ -126,20 +126,34 @@ export function DietPlanModal({
     setIsCalculating(prev => ({ ...prev, [day]: true }));
   
     try {
-      const result = await calculateCalories({
-        meal1: dayPlan.meal1,
-        meal2: dayPlan.meal2,
-        meal3: dayPlan.meal3,
-      });
+      // Create a promise for each meal
+      const mealPromises = [
+        analyzeMeal({ mealDescription: dayPlan.meal1 }),
+        analyzeMeal({ mealDescription: dayPlan.meal2 }),
+        analyzeMeal({ mealDescription: dayPlan.meal3 }),
+      ];
+
+      // Await all promises to resolve in parallel
+      const results = await Promise.all(mealPromises);
+
+      // Sum the results from all meal analyses
+      const totals = results.reduce((acc, current) => {
+        acc.totalCalories += current.calories;
+        acc.protein += current.protein;
+        acc.carbs += current.carbs;
+        acc.fat += current.fat;
+        acc.fiber += current.fiber;
+        return acc;
+      }, { totalCalories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
       
-      if (result?.totalCalories !== undefined) {
-        // Apply a 10% reduction to all calculated values as per user request
+      if (totals.totalCalories > 0) {
+        // Apply a 10% reduction to all calculated values
         const adjustedResult = {
-          totalCalories: Math.round(result.totalCalories * 0.9),
-          protein: result.protein ? Math.round(result.protein * 0.9) : null,
-          carbs: result.carbs ? Math.round(result.carbs * 0.9) : null,
-          fat: result.fat ? Math.round(result.fat * 0.9) : null,
-          fiber: result.fiber ? Math.round(result.fiber * 0.9) : null,
+          totalCalories: Math.round(totals.totalCalories * 0.9),
+          protein: Math.round(totals.protein * 0.9),
+          carbs: Math.round(totals.carbs * 0.9),
+          fat: Math.round(totals.fat * 0.9),
+          fiber: Math.round(totals.fiber * 0.9),
         };
 
         setPlan(currentPlan =>
@@ -161,7 +175,7 @@ export function DietPlanModal({
           description: `Estimated values for ${day} have been calculated (with a 10% reduction).`,
         });
       } else {
-        throw new Error("AI did not return a valid response.");
+        throw new Error("AI could not determine nutritional values from the descriptions.");
       }
     } catch (error) {
       console.error("Failed to calculate calories:", error);
@@ -174,6 +188,7 @@ export function DietPlanModal({
       setIsCalculating(prev => ({ ...prev, [day]: false }));
     }
   };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
