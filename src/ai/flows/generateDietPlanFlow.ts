@@ -49,16 +49,15 @@ const MealSchema = BaseMealSchema.extend({
 }).default({ description: 'N/A', calories: 0 });
 
 
-// Internal schema for single day output, making meals optional to handle incomplete AI responses
+// Internal schema for single day output. We no longer ask the AI for totalCalories.
 const SingleDayMealPlanSchema = z.object({
     breakfast: MealSchema,
     lunch: MealSchema,
     dinner: MealSchema,
     snacks: z.array(MealSchema).default([]),
-    totalCalories: z.number().default(0),
 });
 
-// Internal prompt for a single day's plan
+// Internal prompt for a single day's plan.
 const singleDayPrompt = ai.definePrompt({
     name: 'generateSingleDayPlanPrompt',
     input: { schema: SingleDayPlanInputSchema },
@@ -75,7 +74,7 @@ const singleDayPrompt = ai.definePrompt({
     - Dietary Preferences/Restrictions: {{{preferences}}}
 
     Provide suggestions for breakfast, lunch, dinner, and two snacks. For each, provide a brief description and an estimated calorie count.
-    Also provide a total estimated calorie count for the day. Ensure all calorie values are numbers, not strings.
+    Ensure all calorie values are numbers, not strings. Do NOT provide a total calorie count for the day.
 
     Your response MUST be a valid JSON object that adheres to the provided output schema. Do not include any other text, explanations, or markdown formatting.
     `
@@ -119,14 +118,27 @@ const generateDietPlanFlow = ai.defineFlow(
             totalCalories: 0,
           };
         }
+        
         // Ensure all parts of the plan exist, even if AI omitted them
+        const breakfast = output.breakfast || { description: 'N/A', calories: 0 };
+        const lunch = output.lunch || { description: 'N/A', calories: 0 };
+        const dinner = output.dinner || { description: 'N/A', calories: 0 };
+        const snacks = output.snacks || [];
+        
+        // Manually calculate the total calories. This is much more reliable.
+        const totalCalories =
+          (breakfast.calories || 0) +
+          (lunch.calories || 0) +
+          (dinner.calories || 0) +
+          snacks.reduce((sum, snack) => sum + (snack.calories || 0), 0);
+          
         return {
           day: days[index],
-          breakfast: output.breakfast || { description: 'N/A', calories: 0 },
-          lunch: output.lunch || { description: 'N/A', calories: 0 },
-          dinner: output.dinner || { description: 'N/A', calories: 0 },
-          snacks: output.snacks || [],
-          totalCalories: output.totalCalories || 0,
+          breakfast: breakfast,
+          lunch: lunch,
+          dinner: dinner,
+          snacks: snacks,
+          totalCalories: Math.round(totalCalories),
         };
       });
 
