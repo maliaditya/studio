@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -22,6 +21,9 @@ export function Header() {
         </Link>
         
         <div className="flex items-center gap-4">
+          <a href="https://www.buymeacoffee.com/adityamali98" target="_blank" rel="noopener noreferrer">
+            <img className="h-10 w-auto" src="https://img.buymeacoffee.com/button-api/?text=Keep this project alive&amp;emoji=&amp;slug=adityamali98&amp;button_colour=FFDD00&amp;font_colour=000000&amp;font_family=Cookie&amp;outline_colour=000000&amp;coffee_colour=ffffff" alt="Keep this project alive" />
+          </a>
           {loading ? (
              <div className="h-8 w-20 animate-pulse bg-muted rounded-md"></div>
           ) : currentUser ? (
