@@ -37,7 +37,7 @@ export function Header() {
             {loading ? (
                <div className="h-8 w-20 animate-pulse bg-muted rounded-md"></div>
             ) : currentUser ? (
-              <div data-tour="user-profile">
+              <div>
                 <UserProfile />
               </div>
             ) : (
