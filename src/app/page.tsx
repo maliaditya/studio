@@ -989,28 +989,10 @@ function WorkoutPageContent() {
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="mb-6 text-center relative">
-          <h1 className="text-3xl sm:text-4xl font-bold text-primary">
-            Daily Workout Log
-          </h1>
-          <div className="flex justify-center items-center gap-2">
-            <p className="text-muted-foreground mt-1 text-md">Log your gains, {currentUser?.username || "Guest"}.</p>
-            <TooltipProvider>
-              <Tooltip>
-                  <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                      <p>Workouts are auto-populated based on a 4-week schedule.<br/> You can still add, remove, and log exercises manually.</p>
-                  </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
           <section aria-labelledby="exercise-library-heading" className="md:col-span-1 space-y-6">
-            <Card className="shadow-xl rounded-xl overflow-hidden">
+            <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle id="exercise-library-heading" className="flex items-center gap-2 text-2xl text-primary">
@@ -1137,7 +1119,7 @@ function WorkoutPageContent() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-xl rounded-xl">
+            <Card>
                 <CardHeader className="flex flex-row items-start justify-between">
                     <div>
                         <CardTitle className="flex items-center gap-2 text-2xl text-primary">
@@ -1193,7 +1175,7 @@ function WorkoutPageContent() {
                 </CardContent>
             </Card>
 
-            <Card className="shadow-xl rounded-xl">
+            <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-2xl text-primary">
                         <Target /> Weight Goal
@@ -1308,7 +1290,7 @@ function WorkoutPageContent() {
           </section>
 
           <section aria-labelledby="current-workout-heading" className="md:col-span-2 space-y-6">
-              <Card className="shadow-xl rounded-xl overflow-hidden">
+              <Card>
                   <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
                           <CardTitle id="current-workout-heading" className="flex items-center gap-2 text-2xl text-accent">
@@ -1432,5 +1414,3 @@ function WorkoutPageContent() {
 export default function Page() {
   return ( <AuthGuard> <WorkoutPageContent /> </AuthGuard> );
 }
-
-    
