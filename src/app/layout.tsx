@@ -4,6 +4,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/contexts/AuthContext';
 import { Header } from '@/components/Header';
+import { Analytics } from '@vercel/analytics/react';
 
 export const metadata: Metadata = {
   title: 'Workout Tracker',
@@ -29,6 +30,7 @@ export default function RootLayout({
           <main>{children}</main>
           <Toaster />
         </AuthProvider>
+        <Analytics />
       </body>
     </html>
   );
