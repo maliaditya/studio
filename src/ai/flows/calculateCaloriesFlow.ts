@@ -41,9 +41,9 @@ Meal 3: {{{meal3}}}
 
 Analyze each provided meal description, estimate its calories and macronutrients, and provide a single total sum for each. Do not include supplements in the calculation unless they are explicitly part of a meal and have caloric value.
 
-If no valid meal descriptions are provided, return a JSON object with all values set to 0.
+If no valid meal descriptions are provided, or if the input is nonsensical and a nutritional estimate cannot be made, return a JSON object with all values set to 0.
 
-Your response must be a valid JSON object that strictly adheres to the output schema.`,
+Your response must be a valid JSON object that strictly adheres to the output schema. Do not include any other text, explanations, or markdown formatting like \`\`\`json blocks in your response. The response should be ONLY the JSON object.`,
   config: {
     temperature: 0,
   },
@@ -56,10 +56,20 @@ const calculateCaloriesFlow = ai.defineFlow(
     outputSchema: CalculateCaloriesOutputSchema,
   },
   async (input) => {
-    const {output} = await prompt(input);
-    if (!output) {
-      throw new Error("The AI model failed to return a valid nutritional analysis. Please try again with more descriptive input.");
+    try {
+      const {output} = await prompt(input);
+      
+      // Explicitly check for a valid output object and its primary property.
+      if (!output || typeof output.totalCalories !== 'number') {
+        console.error("AI returned invalid or incomplete data for calorie calculation.", output);
+        throw new Error("The AI model returned an unexpected data format. Please try again.");
+      }
+
+      return output;
+    } catch (e) {
+        console.error("An exception occurred during the calculateCaloriesFlow execution:", e);
+        // This will be caught by the client-side try/catch and shown in a toast.
+        throw new Error("An error occurred while communicating with the AI. Please check your input or try again later.");
     }
-    return output;
   }
 );
