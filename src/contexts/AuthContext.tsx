@@ -19,7 +19,7 @@ interface AuthContextType {
   signIn: (username: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   pushDataToCloud: () => void;
-  pullDataFromCloud: () => void;
+  pullDataFromCloud: (usernameOverride?: string) => Promise<void>;
   exportData: () => void;
   importData: () => void;
 }
@@ -87,8 +87,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { success, message, user } = await localLoginUser(username, password);
     if (success && user) {
       setCurrentUser(user);
-      router.push('/');
-      toast({ title: "Success", description: message });
+      
+      if (user.username === 'demo') {
+        // For demo user, automatically pull data.
+        // `pullDataFromCloud` handles toasts and reload.
+        await pullDataFromCloud(user.username);
+      } else {
+        router.push('/');
+        toast({ title: "Success", description: message });
+      }
     } else {
       toast({ title: "Error", description: message, variant: "destructive" });
     }
@@ -149,16 +156,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const pullDataFromCloud = async () => {
-      if (!currentUser?.username) {
+  const pullDataFromCloud = async (usernameOverride?: string) => {
+      const username = usernameOverride || currentUser?.username;
+      if (!username) {
           toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
           return;
       }
-      toast({ title: "Syncing...", description: "Fetching your latest data from the cloud." });
+
+      const isDemo = username === 'demo';
+      toast({ 
+        title: isDemo ? "Loading Demo Data..." : "Syncing...", 
+        description: isDemo ? "Please wait while we set up the demo environment." : "Fetching your latest data from the cloud." 
+      });
 
       try {
-          const username = currentUser.username;
-          
           const response = await fetch(`/api/blob-sync?username=${username}`);
           const result = await response.json();
 
@@ -169,15 +180,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const data = result.data;
           
           if (data === null || data === undefined) {
-              toast({ title: "No Cloud Data", description: "No data was found in the cloud for you. This is normal if you haven't synced before." });
+              toast({ title: "No Cloud Data", description: "No data was found in the cloud for this user." });
+              if (isDemo) {
+                router.push('/');
+              }
               return;
           }
 
           loadDataIntoLocalStorage(data, username);
 
           toast({
-            title: "Sync Successful",
-            description: "Data pulled from the cloud. The app will now reload.",
+            title: isDemo ? "Demo Loaded" : "Sync Successful",
+            description: isDemo ? "The demo workout data has been loaded. The app will now reload." : "Data pulled from the cloud. The app will now reload.",
           });
 
           setTimeout(() => {
@@ -191,6 +205,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             description: error instanceof Error ? error.message : "An unknown error occurred.",
             variant: "destructive",
           });
+          if (isDemo) {
+            router.push('/');
+          }
       }
   };
 
