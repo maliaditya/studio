@@ -1222,7 +1222,7 @@ function WorkoutPageContent() {
                               <div className="space-y-2 text-sm pt-4 border-t">
                                   {healthMetrics.averageIntake && (
                                       <div className="flex justify-between items-center">
-                                          <span className="text-muted-foreground flex items-center gap-2"><Flame className="h-4 w-4" /> Avg. Daily Intake</span>
+                                          <span className="text-muted-foreground flex items-center gap-2"><Flame className="h-4 w-4" /> Current Avg. Daily Intake</span>
                                           <span className="font-bold">{healthMetrics.averageIntake} kcal</span>
                                       </div>
                                   )}
