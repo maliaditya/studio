@@ -1307,7 +1307,7 @@ function WorkoutPageContent() {
                           <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select category" /></SelectTrigger>
                           <SelectContent>{exerciseCategories.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
                         </Select>
-                        <Button type="submit" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground xl:h-10 xl:px-4"> <PlusCircle className="mr-2 h-5 w-5" /> Add Exercise </Button>
+                        <Button type="submit" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs xl:text-sm xl:h-10 xl:px-4"> <PlusCircle className="mr-2 h-5 w-5" /> Add Exercise </Button>
                       </form>
                       <div className="max-h-[calc(100vh-38rem)] overflow-y-auto pr-1">
                         {filteredExerciseDefinitions.length === 0 && exerciseDefinitions.length > 0 ? (
@@ -1423,12 +1423,12 @@ function WorkoutPageContent() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <Button onClick={() => setIsWeightChartModalOpen(true)} size="sm" className="w-full xl:h-10 xl:px-4">
+                    <div className="grid grid-cols-2 gap-2">
+                        <Button onClick={() => setIsWeightChartModalOpen(true)} size="sm" className="w-full text-xs xl:text-sm xl:h-10 xl:px-4">
                             <LineChartIcon className="mr-2 h-4 w-4" />
                             Chart & Goal
                         </Button>
-                        <Button onClick={() => handleDietModalOpenChange(true)} variant="outline" size="sm" className="w-full xl:h-10 xl:px-4">
+                        <Button onClick={() => handleDietModalOpenChange(true)} variant="outline" size="sm" className="w-full text-xs xl:text-sm xl:h-10 xl:px-4">
                             <BookCopy className="mr-2 h-4 w-4" />
                             Diet Plan
                         </Button>
