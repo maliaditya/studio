@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -81,7 +82,7 @@ export function WorkoutExerciseCard({
         <CardHeader className="flex flex-row items-center justify-between p-3 border-b">
           <div className="flex items-center gap-2 min-w-0">
             {isCompleted && <CheckSquare className="h-5 w-5 text-green-500 flex-shrink-0" />}
-            <CardTitle className="text-base lg:text-lg truncate" title={exercise.name}>{exercise.name}</CardTitle>
+            <CardTitle className="text-base xl:text-lg truncate" title={exercise.name}>{exercise.name}</CardTitle>
           </div>
           <div className="flex items-center flex-shrink-0">
              {onViewProgress && (

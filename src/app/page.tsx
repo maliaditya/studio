@@ -1233,7 +1233,7 @@ function WorkoutPageContent() {
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle id="exercise-library-heading" className="flex items-center gap-2 text-xl lg:text-2xl text-primary">
+                  <CardTitle id="exercise-library-heading" className="flex items-center gap-2 text-xl xl:text-2xl text-primary">
                     <BookCopy /> Exercise Library
                   </CardTitle>
                   <div className="flex items-center gap-2">
@@ -1360,7 +1360,7 @@ function WorkoutPageContent() {
             <Card>
                 <CardHeader className="flex flex-row items-start justify-between">
                     <div>
-                        <CardTitle className="flex items-center gap-2 text-xl lg:text-2xl text-primary">
+                        <CardTitle className="flex items-center gap-2 text-xl xl:text-2xl text-primary">
                             <Utensils /> Today's Diet
                         </CardTitle>
                         <CardDescription>
@@ -1369,7 +1369,7 @@ function WorkoutPageContent() {
                     </div>
                     {todaysDiet?.totalCalories != null && todaysDiet.totalCalories > 0 && (
                         <div className="text-right">
-                            <span className="font-bold text-2xl text-primary">{todaysDiet.totalCalories.toLocaleString()}</span>
+                            <span className="font-bold text-xl sm:text-2xl text-primary">{todaysDiet.totalCalories.toLocaleString()}</span>
                             <p className="text-xs text-muted-foreground -mt-1">kcal</p>
                         </div>
                     )}
@@ -1415,7 +1415,7 @@ function WorkoutPageContent() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-xl lg:text-2xl text-primary">
+                    <CardTitle className="flex items-center gap-2 text-xl xl:text-2xl text-primary">
                         <Target /> Weight Goal
                     </CardTitle>
                     <CardDescription>
@@ -1440,17 +1440,17 @@ function WorkoutPageContent() {
                                     <div className="grid grid-cols-3 gap-2 text-center text-sm">
                                         <div>
                                             <div className="text-muted-foreground">Current</div>
-                                            <div className="font-bold text-lg">{projectionSummary.currentWeight}</div>
+                                            <div className="font-bold text-base sm:text-lg">{projectionSummary.currentWeight}</div>
                                             <div className="text-xs text-muted-foreground">kg/lb</div>
                                         </div>
                                         <div>
                                             <div className="text-muted-foreground">Goal</div>
-                                            <div className="font-bold text-lg">{projectionSummary.goalWeight}</div>
+                                            <div className="font-bold text-base sm:text-lg">{projectionSummary.goalWeight}</div>
                                             <div className="text-xs text-muted-foreground">kg/lb</div>
                                         </div>
                                         <div>
                                             <div className="text-muted-foreground">{projectionSummary.weightDifference > 0 ? "To Gain" : "To Lose"}</div>
-                                            <div className={`font-bold text-lg ${projectionSummary.weightDifference > 0 ? "text-orange-500" : "text-green-500"}`}>{Math.abs(projectionSummary.weightDifference)}</div>
+                                            <div className={`font-bold text-base sm:text-lg ${projectionSummary.weightDifference > 0 ? "text-orange-500" : "text-green-500"}`}>{Math.abs(projectionSummary.weightDifference)}</div>
                                             <div className="text-xs text-muted-foreground">kg/lb</div>
                                         </div>
                                     </div>
@@ -1516,7 +1516,7 @@ function WorkoutPageContent() {
                                 <div className="space-y-1 text-sm pt-4 border-t">
                                     <div className="flex justify-between items-center">
                                         <span className="text-muted-foreground flex items-center gap-2"><Activity className="h-4 w-4" /> Workout Consistency</span>
-                                        <span className="font-bold text-lg">{latestConsistency}%</span>
+                                        <span className="font-bold text-base sm:text-lg">{latestConsistency}%</span>
                                     </div>
                                 </div>
                             )}
@@ -1531,7 +1531,7 @@ function WorkoutPageContent() {
               <Card>
                   <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
-                          <CardTitle id="current-workout-heading" className="flex items-center gap-2 text-xl lg:text-2xl text-accent">
+                          <CardTitle id="current-workout-heading" className="flex items-center gap-2 text-xl xl:text-2xl text-accent">
                               <ListChecks /> Workout for: {format(selectedDate, 'PPP')}
                           </CardTitle>
                           {muscleGroupsForSelectedDay.length > 0 && (
