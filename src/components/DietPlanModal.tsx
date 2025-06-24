@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -134,23 +133,32 @@ export function DietPlanModal({
       });
       
       if (result?.totalCalories !== undefined) {
+        // Apply a 10% reduction to all calculated values as per user request
+        const adjustedResult = {
+          totalCalories: Math.round(result.totalCalories * 0.9),
+          protein: result.protein ? Math.round(result.protein * 0.9) : null,
+          carbs: result.carbs ? Math.round(result.carbs * 0.9) : null,
+          fat: result.fat ? Math.round(result.fat * 0.9) : null,
+          fiber: result.fiber ? Math.round(result.fiber * 0.9) : null,
+        };
+
         setPlan(currentPlan =>
           currentPlan.map(p =>
             p.day === day
               ? {
                   ...p,
-                  totalCalories: result.totalCalories,
-                  protein: result.protein ?? null,
-                  carbs: result.carbs ?? null,
-                  fat: result.fat ?? null,
-                  fiber: result.fiber ?? null,
+                  totalCalories: adjustedResult.totalCalories,
+                  protein: adjustedResult.protein,
+                  carbs: adjustedResult.carbs,
+                  fat: adjustedResult.fat,
+                  fiber: adjustedResult.fiber,
                 }
               : p
           )
         );
         toast({
           title: "Macros Calculated!",
-          description: `Estimated values for ${day} have been calculated.`,
+          description: `Estimated values for ${day} have been calculated (with a 10% reduction).`,
         });
       } else {
         throw new Error("AI did not return a valid response.");
@@ -278,5 +286,3 @@ export function DietPlanModal({
     </Dialog>
   );
 }
-
-    
