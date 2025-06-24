@@ -14,9 +14,17 @@ import { Heart } from 'lucide-react';
 interface SupportModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
+  onIncrementCount: () => void;
 }
 
-export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
+export function SupportModal({ isOpen, onOpenChange, onIncrementCount }: SupportModalProps) {
+  
+  const handleLinkClick = (event: React.MouseEvent<HTMLElement>, url: string) => {
+    event.preventDefault();
+    onIncrementCount();
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -25,17 +33,23 @@ export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
             <Heart className="text-red-500" /> Support the Project
           </DialogTitle>
           <DialogDescription>
-            Your support helps keep this project alive and running. Thank you for considering a contribution!
+            Your support helps keep this project alive and running. Clicking a link will open a new tab and count as one contribution. Thank you!
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col items-center justify-center gap-4 py-4">
-          <a href="https://www.buymeacoffee.com/adityamali98" target="_blank" rel="noopener noreferrer">
+          <a 
+             href="https://www.buymeacoffee.com/adityamali98" 
+             target="_blank" 
+             rel="noopener noreferrer"
+             onClick={(e) => handleLinkClick(e, 'https://www.buymeacoffee.com/adityamali98')}
+          >
             <img className="h-12 w-auto" src="https://img.buymeacoffee.com/button-api/?text=Keep this project alive&emoji=&slug=adityamali98&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Keep this project alive" />
           </a>
-          <Button asChild className="h-12 w-auto px-6 bg-[#FFDD00] text-black hover:bg-[#FFDD00]/90 font-bold text-lg rounded-lg shadow-md">
-            <a href="upi://pay?pa=9765402942@ybl&pn=YourName&cu=INR">
+          <Button 
+            onClick={(e) => handleLinkClick(e, 'upi://pay?pa=9765402942@ybl&pn=YourName&cu=INR')} 
+            className="h-12 w-auto px-6 bg-[#FFDD00] text-black hover:bg-[#FFDD00]/90 font-bold text-lg rounded-lg shadow-md"
+          >
               Support via UPI
-            </a>
           </Button>
         </div>
       </DialogContent>
