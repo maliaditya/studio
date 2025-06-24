@@ -1158,34 +1158,33 @@ function WorkoutPageContent() {
                 </CardHeader>
                 <CardContent>
                     {todaysDiet ? (
-                        <div className="space-y-3 text-sm">
-                            <div>
-                                <h4 className="font-semibold text-foreground">Meal 1</h4>
-                                <p className="text-muted-foreground whitespace-pre-wrap">{todaysDiet.meal1 || 'Not planned.'}</p>
-                            </div>
-                            <Separator/>
-                            <div>
-                                <h4 className="font-semibold text-foreground">Meal 2</h4>
-                                <p className="text-muted-foreground whitespace-pre-wrap">{todaysDiet.meal2 || 'Not planned.'}</p>
-                            </div>
-                            <Separator/>
-                            <div>
-                                <h4 className="font-semibold text-foreground">Meal 3</h4>
-                                <p className="text-muted-foreground whitespace-pre-wrap">{todaysDiet.meal3 || 'Not planned.'}</p>
-                            </div>
-                            <Separator/>
-                            <div>
-                                <h4 className="font-semibold text-foreground">Supplements</h4>
-                                <p className="text-muted-foreground whitespace-pre-wrap">{todaysDiet.supplements || 'Not planned.'}</p>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                                <div>
+                                    <h4 className="font-semibold text-foreground">Meal 1</h4>
+                                    <p className="text-muted-foreground whitespace-pre-wrap mt-1">{todaysDiet.meal1 || 'Not planned.'}</p>
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold text-foreground">Meal 2</h4>
+                                    <p className="text-muted-foreground whitespace-pre-wrap mt-1">{todaysDiet.meal2 || 'Not planned.'}</p>
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold text-foreground">Meal 3</h4>
+                                    <p className="text-muted-foreground whitespace-pre-wrap mt-1">{todaysDiet.meal3 || 'Not planned.'}</p>
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold text-foreground">Supplements</h4>
+                                    <p className="text-muted-foreground whitespace-pre-wrap mt-1">{todaysDiet.supplements || 'Not planned.'}</p>
+                                </div>
                             </div>
 
                             {todaysDiet.totalCalories != null && (
-                                <div className="pt-3 border-t">
+                                <div className="pt-4 border-t">
                                     <div className="flex justify-between items-center">
                                         <span className="font-semibold text-foreground">Est. Total Calories</span>
                                         <span className="font-bold text-lg text-primary">{todaysDiet.totalCalories.toLocaleString()} kcal</span>
                                     </div>
-                                    <div className="text-xs text-muted-foreground space-y-1 pt-2">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs text-muted-foreground pt-2">
                                         <div className="flex justify-between"><span>Protein</span> <span className="font-medium text-foreground">{todaysDiet.protein?.toFixed(0) ?? '-'}g</span></div>
                                         <div className="flex justify-between"><span>Carbs</span> <span className="font-medium text-foreground">{todaysDiet.carbs?.toFixed(0) ?? '-'}g</span></div>
                                         <div className="flex justify-between"><span>Fat</span> <span className="font-medium text-foreground">{todaysDiet.fat?.toFixed(0) ?? '-'}g</span></div>
