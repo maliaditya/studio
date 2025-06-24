@@ -19,6 +19,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  serverComponentsExternalPackages: ['@genkit-ai/googleai'],
   allowedDevOrigins: ['https://6000-firebase-studio-1750342328747.cluster-xpmcxs2fjnhg6xvn446ubtgpio.cloudworkstations.dev'],
 };
 
