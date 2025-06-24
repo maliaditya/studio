@@ -51,6 +51,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { WeightChartModal } from '@/components/WeightChartModal';
 import { DietPlanModal } from '@/components/DietPlanModal';
+import { AppTour } from '@/components/AppTour';
 
 
 const DEFAULT_TARGET_SETS = 4;
@@ -456,6 +457,27 @@ function WorkoutPageContent() {
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   const [today, setToday] = useState<Date | null>(null);
 
+  const [showTour, setShowTour] = useState(false);
+
+  useEffect(() => {
+    if (currentUser?.username === 'demo') {
+      const tourCompleted = localStorage.getItem('tour_completed_demo');
+      if (!tourCompleted) {
+        // Use a small delay to ensure the page is rendered and elements are available
+        const timer = setTimeout(() => setShowTour(true), 1000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [currentUser]);
+
+  const handleTourComplete = () => {
+    setShowTour(false);
+    if(currentUser?.username === 'demo') {
+        localStorage.setItem('tour_completed_demo', 'true');
+    }
+  };
+
+
   useEffect(() => {
     const now = new Date();
     setToday(now);
@@ -547,26 +569,17 @@ function WorkoutPageContent() {
 
         try {
             const storedDietPlan = localStorage.getItem(dietPlanKey);
-            if (storedDietPlan) {
-              const parsed = JSON.parse(storedDietPlan);
-              setDietPlan(parsed || []);
-            }
+            setDietPlan(storedDietPlan ? JSON.parse(storedDietPlan) : []);
         } catch (e) { console.error("Error parsing diet plan", e); setDietPlan([]); }
 
         try {
             const storedWeightLogs = localStorage.getItem(weightLogsKey);
-            if (storedWeightLogs) {
-              const parsed = JSON.parse(storedWeightLogs);
-              setWeightLogs(parsed || []);
-            }
+            setWeightLogs(storedWeightLogs ? JSON.parse(storedWeightLogs) : []);
         } catch (e) { console.error("Error parsing weight logs", e); setWeightLogs([]); }
 
         try {
             const storedLogs = localStorage.getItem(logsKey);
-            if (storedLogs) {
-              const parsed = JSON.parse(storedLogs);
-              setAllWorkoutLogs(parsed || []);
-            }
+            setAllWorkoutLogs(storedLogs ? JSON.parse(storedLogs) : []);
         } catch (e) { console.error("Error parsing workout logs", e); setAllWorkoutLogs([]); }
 
     } else {
@@ -1235,11 +1248,12 @@ function WorkoutPageContent() {
 
   return (
     <>
+      {showTour && <AppTour onComplete={handleTourComplete} />}
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
           <section aria-labelledby="exercise-library-heading" className="md:col-span-1 space-y-6">
-            <Card>
+            <Card data-tour="exercise-library">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle id="exercise-library-heading" className="flex items-center gap-2 text-2xl text-primary">
@@ -1276,7 +1290,7 @@ function WorkoutPageContent() {
                 </div>
               </CardHeader>
               <CardContent className="p-4 space-y-4">
-                <div className="space-y-2">
+                <div className="space-y-2" data-tour="workout-plans">
                   <Label>Workout Plan</Label>
                   <div className="flex items-center gap-4">
                     <RadioGroup
@@ -1422,7 +1436,7 @@ function WorkoutPageContent() {
                 </CardContent>
             </Card>
 
-            <Card>
+            <Card data-tour="weight-goal">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-2xl text-primary">
                         <Target /> Weight Goal
@@ -1537,7 +1551,7 @@ function WorkoutPageContent() {
           </section>
 
           <section aria-labelledby="current-workout-heading" className="md:col-span-2 space-y-6">
-              <Card>
+              <Card data-tour="daily-workout">
                   <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
                           <CardTitle id="current-workout-heading" className="flex items-center gap-2 text-2xl text-accent">
@@ -1592,13 +1606,15 @@ function WorkoutPageContent() {
                     </div>
                   </CardContent>
               </Card>
-              <WorkoutHeatmap
-                allWorkoutLogs={allWorkoutLogs}
-                onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
-                consistencyData={consistencyData}
-                oneYearAgo={oneYearAgo}
-                today={today}
-              />
+              <div data-tour="heatmap">
+                <WorkoutHeatmap
+                  allWorkoutLogs={allWorkoutLogs}
+                  onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
+                  consistencyData={consistencyData}
+                  oneYearAgo={oneYearAgo}
+                  today={today}
+                />
+              </div>
           </section>
         </div>
         {viewingProgressExercise && (

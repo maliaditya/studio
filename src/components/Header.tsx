@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -27,7 +28,9 @@ export function Header() {
           {loading ? (
              <div className="h-8 w-20 animate-pulse bg-muted rounded-md"></div>
           ) : currentUser ? (
-            <UserProfile />
+            <div data-tour="user-profile">
+              <UserProfile />
+            </div>
           ) : (
             <Button onClick={() => router.push('/login')} variant="outline">
               Login
