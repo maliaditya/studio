@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -66,8 +67,9 @@ export function SupportModal({ isOpen, onOpenChange, onIncrementCount }: Support
         {showQr ? (
           <div className="flex flex-col items-center justify-center gap-4 py-4">
             <Image
-              src="/upi-qr-code.png"
-              alt="UPI QR Code for adityamali33@okaxis"
+              src="https://placehold.co/250x250.png"
+              data-ai-hint="qr code"
+              alt="UPI QR Code - Add upi-qr-code.png to the /public folder to display it here."
               width={250}
               height={250}
               className="rounded-lg border bg-white p-2"
