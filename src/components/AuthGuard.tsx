@@ -4,7 +4,6 @@
 import React, { type ReactNode, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Dumbbell } from 'lucide-react';
 
 interface AuthGuardProps {
   children: ReactNode;
@@ -23,7 +22,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   if (loading || !currentUser) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-4rem)]">
-        <Dumbbell className="h-16 w-16 text-primary animate-spin mb-4" />
+        <div className="text-6xl animate-spin mb-4">🏋️</div>
         <p className="text-muted-foreground">Loading your personalized workout experience...</p>
       </div>
     );
