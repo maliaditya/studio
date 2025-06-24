@@ -98,10 +98,7 @@ export const AnalyzeMealOutputSchema = z.object({
     fat: z.number().describe("The estimated fat in grams for the meal."),
     fiber: z.number().describe("The estimated fiber in grams for the meal."),
 });
-<<<<<<< HEAD
 export type AnalyzeMealOutput = z.infer<typeof AnalyzeMealOutputSchema>;
-=======
-export type AnalyzeDayMealsOutput = z.infer<typeof AnalyzeDayMealsOutputSchema>;
 
 // Schemas for AI Diet Plan Generation
 export const GenerateDietPlanInputSchema = z.object({
@@ -144,4 +141,3 @@ export const GenerateDietPlanOutputSchema = z.object({
   ]).describe('An array of 7 daily meal plans, one for each day of the week.'),
 });
 export type GenerateDietPlanOutput = z.infer<typeof GenerateDietPlanOutputSchema>;
->>>>>>> d768125 (I see this error with the app, reported by NextJS, please fix it. The er)
