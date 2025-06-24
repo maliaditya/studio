@@ -1,0 +1,44 @@
+
+import { put, list } from '@vercel/blob';
+import { NextResponse } from 'next/server';
+
+export const dynamic = 'force-dynamic';
+
+export async function POST(request: Request) {
+  const { username, password } = await request.json();
+
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return NextResponse.json(
+      { error: 'Vercel Blob Storage is not configured on the server. Please link a Blob store.' },
+      { status: 500 }
+    );
+  }
+
+  if (!username || !password) {
+    return NextResponse.json({ error: 'Username and password are required.' }, { status: 400 });
+  }
+
+  const blobPathname = `auth/${username}.json`;
+
+  try {
+    // Check if user already exists
+    const { blobs } = await list({ prefix: blobPathname, limit: 1 });
+    if (blobs.length > 0 && blobs[0]?.pathname === blobPathname) {
+      return NextResponse.json({ error: 'Username already exists.' }, { status: 409 }); // 409 Conflict
+    }
+
+    // Create user data
+    const userData = { password };
+    const blob = await put(blobPathname, JSON.stringify(userData), {
+      access: 'public', // Hobby plan requirement
+      contentType: 'application/json',
+      addRandomSuffix: false,
+    });
+
+    return NextResponse.json({ success: true, message: 'Registration successful.', blob });
+  } catch (error) {
+    console.error('Error in POST /api/auth/register:', error);
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
+  }
+}

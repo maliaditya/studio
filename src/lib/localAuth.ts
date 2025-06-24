@@ -1,81 +1,65 @@
 
 "use client";
 
-// IMPORTANT: This is a basic local authentication for prototype purposes.
-// It has been updated to store a user profile object instead of just a password.
+// IMPORTANT: This service now uses Vercel Blob for user data storage.
+// It keeps a local session token (the username) in localStorage.
 
 import type { LocalUser } from '@/types/workout';
 
-const USER_CREDENTIALS_KEY = "userCredentials_v2"; // Key for storing user profile data
 const CURRENT_USER_KEY = "currentUser"; // Stores username string of logged-in user
 
-// Defines the structure of the data stored for each user.
-interface UserData {
-  password: string;
-}
+export async function registerUser(username: string, password: string): Promise<{ success: boolean, message: string, user?: LocalUser }> {
+  try {
+    const response = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
 
-// Defines the structure of the entire credentials object in localStorage.
-interface UserCredentials {
-  [username: string]: UserData;
-}
+    const result = await response.json();
 
-function getStoredCredentials(): UserCredentials {
-  if (typeof window !== 'undefined') {
-    const stored = localStorage.getItem(USER_CREDENTIALS_KEY);
-    return stored ? JSON.parse(stored) : {};
-  }
-  return {};
-}
-
-function storeCredentials(credentials: UserCredentials) {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(USER_CREDENTIALS_KEY, JSON.stringify(credentials));
-  }
-}
-
-export function registerUser(username: string, password: string): Promise<{ success: boolean, message: string, user?: LocalUser }> {
-  return new Promise((resolve) => {
-    const credentials = getStoredCredentials();
-    if (credentials[username]) {
-      resolve({ success: false, message: "Username already exists." });
-      return;
+    if (!response.ok) {
+      return { success: false, message: result.error || 'Registration failed.' };
     }
     
-    // Create a new user profile object
-    credentials[username] = { password }; 
-    storeCredentials(credentials);
-
+    // On successful registration, automatically log the user in locally
     const user: LocalUser = { username };
-    
-    // Automatically log in the user
     if (typeof window !== 'undefined') {
       localStorage.setItem(CURRENT_USER_KEY, username);
     }
-    resolve({ success: true, message: "Registration successful.", user });
-  });
+    return { success: true, message: result.message, user };
+
+  } catch (error) {
+    console.error("Registration error:", error);
+    return { success: false, message: "An unexpected error occurred. Please try again." };
+  }
 }
 
-export function loginUser(username: string, password: string): Promise<{ success: boolean, message: string, user?: LocalUser }> {
-  return new Promise((resolve) => {
-    const credentials = getStoredCredentials();
-    const userData = credentials[username];
+export async function loginUser(username: string, password: string): Promise<{ success: boolean, message: string, user?: LocalUser }> {
+  try {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
 
-    if (!userData) {
-      resolve({ success: false, message: "Username not found." });
-      return;
-    }
-    if (userData.password !== password) {
-      resolve({ success: false, message: "Incorrect password." });
-      return;
+    const result = await response.json();
+
+    if (!response.ok) {
+        return { success: false, message: result.error || 'Login failed.' };
     }
 
+    const user: LocalUser = { username };
     if (typeof window !== 'undefined') {
       localStorage.setItem(CURRENT_USER_KEY, username);
     }
     
-    const user: LocalUser = { username };
-    resolve({ success: true, message: "Login successful.", user });
-  });
+    return { success: true, message: result.message, user };
+    
+  } catch (error) {
+    console.error("Login error:", error);
+    return { success: false, message: "An unexpected error occurred. Please try again." };
+  }
 }
 
 export function logoutUser(): Promise<void> {
