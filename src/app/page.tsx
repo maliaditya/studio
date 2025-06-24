@@ -1138,13 +1138,21 @@ function WorkoutPageContent() {
             </Card>
 
             <Card className="shadow-xl rounded-xl">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-2xl text-primary">
-                        <Utensils /> Today's Diet
-                    </CardTitle>
-                    <CardDescription>
-                       Your planned meals for {format(new Date(), 'EEEE')}.
-                    </CardDescription>
+                <CardHeader className="flex flex-row items-start justify-between">
+                    <div>
+                        <CardTitle className="flex items-center gap-2 text-2xl text-primary">
+                            <Utensils /> Today's Diet
+                        </CardTitle>
+                        <CardDescription>
+                           Your planned meals for {format(new Date(), 'EEEE')}.
+                        </CardDescription>
+                    </div>
+                    {todaysDiet?.totalCalories != null && (
+                        <div className="text-right">
+                            <span className="font-bold text-2xl text-primary">{todaysDiet.totalCalories.toLocaleString()}</span>
+                            <p className="text-xs text-muted-foreground -mt-1">kcal</p>
+                        </div>
+                    )}
                 </CardHeader>
                 <CardContent>
                     {todaysDiet ? (
@@ -1170,11 +1178,7 @@ function WorkoutPageContent() {
 
                             {todaysDiet.totalCalories != null && (
                                 <div className="pt-4 border-t">
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-semibold text-foreground">Est. Total Calories</span>
-                                        <span className="font-bold text-lg text-primary">{todaysDiet.totalCalories.toLocaleString()} kcal</span>
-                                    </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs text-muted-foreground pt-2">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1">
                                         <div className="flex justify-between"><span>Protein</span> <span className="font-medium text-foreground">{todaysDiet.protein?.toFixed(0) ?? '-'}g</span></div>
                                         <div className="flex justify-between"><span>Carbs</span> <span className="font-medium text-foreground">{todaysDiet.carbs?.toFixed(0) ?? '-'}g</span></div>
                                         <div className="flex justify-between"><span>Fat</span> <span className="font-medium text-foreground">{todaysDiet.fat?.toFixed(0) ?? '-'}g</span></div>
