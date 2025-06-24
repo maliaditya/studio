@@ -137,14 +137,14 @@ export function WorkoutPlanModal({
           </TabsList>
           
           {planKeysToShow.map(planKey => (
-            <TabsContent key={planKey} value={planKey} className="m-0 mt-4 flex-grow min-h-0">
-                <div className="flex justify-end mb-4 pr-4">
+            <TabsContent key={planKey} value={planKey} className="m-0 mt-4 flex-grow flex flex-col min-h-0">
+                <div className="flex justify-end mb-4 pr-4 flex-shrink-0">
                     <Button variant="outline" size="sm" onClick={() => handleResetPlan(planKey)}>
                         <RotateCcw className="mr-2 h-4 w-4" />
                         Reset Plan to Default
                     </Button>
                 </div>
-                <div className="overflow-y-auto pr-4 h-[calc(100%-4rem)]">
+                <div className="overflow-y-auto pr-4 flex-grow">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {relevantCategoriesForPlan(planKey).map(category => {
                             const exercisesForCategory = workoutPlans[planKey]?.[category];
