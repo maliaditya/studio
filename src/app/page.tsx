@@ -547,18 +547,27 @@ function WorkoutPageContent() {
 
         try {
             const storedDietPlan = localStorage.getItem(dietPlanKey);
-            if (storedDietPlan) setDietPlan(JSON.parse(storedDietPlan));
-        } catch (e) { console.error("Error parsing diet plan", e); }
+            if (storedDietPlan) {
+              const parsed = JSON.parse(storedDietPlan);
+              setDietPlan(parsed || []);
+            }
+        } catch (e) { console.error("Error parsing diet plan", e); setDietPlan([]); }
 
         try {
             const storedWeightLogs = localStorage.getItem(weightLogsKey);
-            if (storedWeightLogs) setWeightLogs(JSON.parse(storedWeightLogs));
-        } catch (e) { console.error("Error parsing weight logs", e); }
+            if (storedWeightLogs) {
+              const parsed = JSON.parse(storedWeightLogs);
+              setWeightLogs(parsed || []);
+            }
+        } catch (e) { console.error("Error parsing weight logs", e); setWeightLogs([]); }
 
         try {
             const storedLogs = localStorage.getItem(logsKey);
-            if (storedLogs) setAllWorkoutLogs(JSON.parse(storedLogs));
-        } catch (e) { console.error("Error parsing workout logs", e); }
+            if (storedLogs) {
+              const parsed = JSON.parse(storedLogs);
+              setAllWorkoutLogs(parsed || []);
+            }
+        } catch (e) { console.error("Error parsing workout logs", e); setAllWorkoutLogs([]); }
 
     } else {
       // Clear all state for logged-out user
