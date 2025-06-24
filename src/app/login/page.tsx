@@ -37,7 +37,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="text-center">
           <Dumbbell className="mx-auto h-14 w-14 text-primary mb-2" />
-          <CardTitle className="text-2xl xl:text-3xl font-bold text-primary">Workout Tracker</CardTitle>
+          <CardTitle className="text-2xl lg:text-3xl font-bold text-primary">Workout Tracker</CardTitle>
           <CardDescription className="text-muted-foreground">Access your personalized workout log.</CardDescription>
         </CardHeader>
         <CardContent>
