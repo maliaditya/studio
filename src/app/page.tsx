@@ -1007,16 +1007,6 @@ function WorkoutPageContent() {
             </TooltipProvider>
           </div>
         </div>
-
-        <div className="mb-8">
-          <WorkoutHeatmap
-            allWorkoutLogs={allWorkoutLogs}
-            onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
-            consistencyData={consistencyData}
-            oneYearAgo={oneYearAgo}
-            today={today}
-          />
-        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
           <section aria-labelledby="exercise-library-heading" className="md:col-span-1 space-y-6">
@@ -1314,6 +1304,13 @@ function WorkoutPageContent() {
           </section>
 
           <section aria-labelledby="current-workout-heading" className="md:col-span-2 space-y-6">
+              <WorkoutHeatmap
+                allWorkoutLogs={allWorkoutLogs}
+                onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
+                consistencyData={consistencyData}
+                oneYearAgo={oneYearAgo}
+                today={today}
+              />
               <Card className="shadow-xl rounded-xl overflow-hidden">
                   <CardHeader className="bg-accent/10 flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
