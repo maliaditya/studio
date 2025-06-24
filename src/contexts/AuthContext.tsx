@@ -87,11 +87,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { success, message, user } = await localLoginUser(username, password);
     if (success && user) {
       setCurrentUser(user);
-      
+
       if (user.username === 'demo') {
-        // For demo user, automatically pull data.
-        // `pullDataFromCloud` handles toasts and reload.
+        // For demo user, automatically pull data silently and then redirect.
         await pullDataFromCloud(user.username);
+        router.push('/');
       } else {
         router.push('/');
         toast({ title: "Success", description: message });
@@ -157,58 +157,64 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const pullDataFromCloud = async (usernameOverride?: string) => {
-      const username = usernameOverride || currentUser?.username;
-      if (!username) {
-          toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
-          return;
-      }
+    const username = usernameOverride || currentUser?.username;
+    if (!username) {
+        toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
+        return;
+    }
 
-      const isDemo = username === 'demo';
+    const isDemo = username === 'demo';
+    
+    // Only show toast for non-demo users
+    if (!isDemo) {
       toast({ 
-        title: isDemo ? "Loading Demo Data..." : "Syncing...", 
-        description: isDemo ? "Please wait while we set up the demo environment." : "Fetching your latest data from the cloud." 
+        title: "Syncing...", 
+        description: "Fetching your latest data from the cloud." 
       });
+    }
 
-      try {
-          const response = await fetch(`/api/blob-sync?username=${username}`);
-          const result = await response.json();
+    try {
+        const response = await fetch(`/api/blob-sync?username=${username}`);
+        const result = await response.json();
 
-          if (!response.ok) {
-              throw new Error(result.error || `Failed to fetch data.`);
-          }
-          
-          const data = result.data;
-          
-          if (data === null || data === undefined) {
+        if (!response.ok) {
+            throw new Error(result.error || `Failed to fetch data.`);
+        }
+        
+        const data = result.data;
+        
+        if (data === null || data === undefined) {
+            if (!isDemo) {
               toast({ title: "No Cloud Data", description: "No data was found in the cloud for this user." });
-              if (isDemo) {
-                router.push('/');
-              }
-              return;
-          }
+            }
+            // For demo user, if no data found, it will just proceed to an empty page, which is fine.
+            return;
+        }
 
-          loadDataIntoLocalStorage(data, username);
+        loadDataIntoLocalStorage(data, username);
 
+        if (!isDemo) {
           toast({
-            title: isDemo ? "Demo Loaded" : "Sync Successful",
-            description: isDemo ? "The demo workout data has been loaded. The app will now reload." : "Data pulled from the cloud. The app will now reload.",
+            title: "Sync Successful",
+            description: "Data pulled from the cloud. The app will now reload.",
           });
-
+          // Reload for non-demo users to ensure all components refresh with new data.
           setTimeout(() => {
               window.location.reload();
           }, 1500);
+        }
+        // For demo users, we don't toast or reload. The `signIn` function handles redirection.
 
-      } catch (error) {
-          console.error("Pull from cloud failed:", error);
+    } catch (error) {
+        console.error("Pull from cloud failed:", error);
+        if (!isDemo) { // Only show error for non-demo sync
           toast({
             title: "Sync Failed",
             description: error instanceof Error ? error.message : "An unknown error occurred.",
             variant: "destructive",
           });
-          if (isDemo) {
-            router.push('/');
-          }
-      }
+        }
+    }
   };
 
   const exportData = () => {
