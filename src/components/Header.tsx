@@ -24,8 +24,13 @@ export function Header() {
           </Link>
           
           <div className="flex items-center gap-4">
-            <Button onClick={() => setIsSupportModalOpen(true)} variant="outline" size="sm">
-              <Heart className="mr-2 h-4 w-4 text-red-500" />
+            <Button
+              onClick={() => setIsSupportModalOpen(true)}
+              variant="secondary"
+              size="sm"
+              className="animate-subtle-pulse"
+            >
+              <Heart className="mr-2 h-4 w-4 text-destructive" />
               Support this project
             </Button>
             
