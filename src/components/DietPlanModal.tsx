@@ -22,9 +22,9 @@ import type { UserDietPlan, EditableMealPlan } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
 import { Calculator, Info, Loader2 } from 'lucide-react';
-import { estimateCalories } from '@/services/nutritionService';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { analyzeDayMeals } from '@/ai/flows/analyzeDayMealsFlow';
 
 interface DietPlanModalProps {
   isOpen: boolean;
@@ -55,6 +55,7 @@ export function DietPlanModal({
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const [plan, setPlan] = useState<UserDietPlan>(getDefaultPlan());
+  const [calculatingDay, setCalculatingDay] = useState<string | null>(null);
 
   const planStorageKey = currentUser ? `dietPlan_${currentUser.username}` : null;
 
@@ -111,7 +112,8 @@ export function DietPlanModal({
     );
   };
   
-  const handleCalculateCalories = (day: string) => {
+  const handleCalculateCalories = async (day: string) => {
+    setCalculatingDay(day);
     const dayPlan = plan.find(p => p.day === day);
     if (!dayPlan || (!dayPlan.meal1 && !dayPlan.meal2 && !dayPlan.meal3)) {
       toast({
@@ -119,23 +121,35 @@ export function DietPlanModal({
         description: "Please enter at least one meal description for the day.",
         variant: "destructive",
       });
+      setCalculatingDay(null);
       return;
     }
 
-    const result = estimateCalories({
-      meal1: dayPlan.meal1,
-      meal2: dayPlan.meal2,
-      meal3: dayPlan.meal3,
-    });
-    
-    setPlan(currentPlan =>
-      currentPlan.map(p => (p.day === day ? { ...p, ...result } : p))
-    );
-    
-    toast({
-      title: "Macros Calculated!",
-      description: `Estimated values for ${day} have been calculated based on keywords.`,
-    });
+    try {
+        const result = await analyzeDayMeals({
+            meal1: dayPlan.meal1,
+            meal2: dayPlan.meal2,
+            meal3: dayPlan.meal3,
+        });
+
+        setPlan(currentPlan =>
+            currentPlan.map(p => (p.day === day ? { ...p, ...result } : p))
+        );
+
+        toast({
+            title: "Macros Calculated!",
+            description: `AI-estimated values for ${day} have been calculated.`,
+        });
+    } catch (error) {
+        console.error("AI calculation failed:", error);
+        toast({
+            title: "Calculation Failed",
+            description: error instanceof Error ? error.message : "An unknown error occurred.",
+            variant: "destructive",
+        });
+    } finally {
+        setCalculatingDay(null);
+    }
   };
 
 
@@ -145,15 +159,15 @@ export function DietPlanModal({
         <DialogHeader>
           <DialogTitle>My Diet Plan</DialogTitle>
           <DialogDescription>
-            Create your weekly diet plan. Use the calculator to get an estimated calorie and macro count for each day based on keywords. Changes are saved automatically.
+            Create your weekly diet plan. Use the AI calculator to get an estimated calorie and macro count for each day. Changes are saved automatically.
           </DialogDescription>
         </DialogHeader>
 
         <Alert>
             <Info className="h-4 w-4" />
-            <AlertTitle>Keyword-Based Calculator</AlertTitle>
+            <AlertTitle>AI-Powered Calculator</AlertTitle>
             <AlertDescription>
-                Nutritional values are estimates based on keywords (e.g., "150g chicken breast", "2 eggs", "1 scoop protein"). This is for informational purposes only. Consult a qualified professional for precise dietary guidance.
+                Nutritional values are estimated by an AI model based on your descriptions. This is for informational purposes only and may not be 100% accurate. Consult a qualified professional for precise dietary guidance.
             </AlertDescription>
         </Alert>
         
@@ -220,10 +234,15 @@ export function DietPlanModal({
                                 size="icon"
                                 className="h-8 w-8 flex-shrink-0"
                                 onClick={() => handleCalculateCalories(dayPlan.day)}
+                                disabled={calculatingDay === dayPlan.day}
                                 aria-label={`Calculate calories for ${dayPlan.day}`}
                                 title="Calculate Calories & Macros"
                             >
-                                <Calculator className="h-4 w-4" />
+                                {calculatingDay === dayPlan.day ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Calculator className="h-4 w-4" />
+                                )}
                             </Button>
                         </div>
                         {dayPlan.totalCalories != null && dayPlan.totalCalories > 0 && (
