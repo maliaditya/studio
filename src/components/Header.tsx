@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -56,7 +55,7 @@ export function Header() {
             <Button onClick={() => setIsSupportModalOpen(true)} variant="outline" size="sm">
               <Heart className="mr-2 h-4 w-4 text-red-500" />
               Support this project 
-              {supportCount !== null && supportCount > 0 && (
+              {supportCount !== null && (
                 <span className="ml-1.5 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-600">
                   {supportCount}
                 </span>

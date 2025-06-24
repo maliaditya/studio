@@ -43,7 +43,7 @@ export function SupportModal({ isOpen, onOpenChange, onIncrementCount }: Support
              rel="noopener noreferrer"
              onClick={(e) => handleLinkClick(e, 'https://www.buymeacoffee.com/adityamali98')}
           >
-            <img className="h-12 w-auto" src="https://img.buymeacoffee.com/button-api/?text=Keep this project alive&emoji=&slug=adityamali98&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Keep this project alive" />
+            <img className="h-12 w-auto" src="https://img.buymeacoffee.com/button-api/?text=By me a coffee&emoji=&slug=adityamali98&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Keep this project alive" />
           </a>
           <Button 
             onClick={(e) => handleLinkClick(e, 'upi://pay?pa=9765402942@ybl&pn=YourName&cu=INR')} 
