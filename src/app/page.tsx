@@ -464,112 +464,104 @@ function WorkoutPageContent() {
 
   useEffect(() => {
     if (currentUser?.username) {
-      const defsKey = `exerciseDefinitions_${currentUser.username}`;
-      const logsKey = `allWorkoutLogs_${currentUser.username}`;
-      const modeKey = `workoutMode_${currentUser.username}`;
-      const plansKey = `workoutPlans_${currentUser.username}`;
-      const weightLogsKey = `weightLogs_${currentUser.username}`;
-      const goalWeightKey = `goalWeight_${currentUser.username}`;
-      const heightKey = `height_${currentUser.username}`;
-      const dobKey = `dateOfBirth_${currentUser.username}`;
-      const genderKey = `gender_${currentUser.username}`;
-      const dietPlanKey = `dietPlan_${currentUser.username}`;
-      let localDefsLoaded = false;
-      
-      const storedMode = localStorage.getItem(modeKey);
-      if (storedMode === 'one-muscle' || storedMode === 'two-muscle') {
-        setWorkoutMode(storedMode);
-      }
+        const username = currentUser.username;
+        const defsKey = `exerciseDefinitions_${username}`;
+        const plansKey = `workoutPlans_${username}`;
+        const logsKey = `allWorkoutLogs_${username}`;
+        const modeKey = `workoutMode_${username}`;
+        const weightLogsKey = `weightLogs_${username}`;
+        const goalWeightKey = `goalWeight_${username}`;
+        const heightKey = `height_${username}`;
+        const dobKey = `dateOfBirth_${username}`;
+        const genderKey = `gender_${username}`;
+        const dietPlanKey = `dietPlan_${username}`;
 
-      const storedGoal = localStorage.getItem(goalWeightKey);
-      if (storedGoal) setGoalWeight(parseFloat(storedGoal));
-
-      const storedHeight = localStorage.getItem(heightKey);
-      if (storedHeight) setHeight(parseFloat(storedHeight));
-      
-      const storedDob = localStorage.getItem(dobKey);
-      if (storedDob) setDateOfBirth(storedDob);
-
-      const storedGender = localStorage.getItem(genderKey);
-      if (storedGender === 'male' || storedGender === 'female') {
-        setGender(storedGender as Gender);
-      }
-
-      try {
-        const storedDietPlan = localStorage.getItem(dietPlanKey);
-        if (storedDietPlan) {
-            const parsedPlan = JSON.parse(storedDietPlan);
-            if (Array.isArray(parsedPlan)) setDietPlan(parsedPlan);
-        }
-      } catch (e) {
-        console.error("Error parsing diet plan from localStorage", e);
-      }
-
-      try {
-        const storedPlans = localStorage.getItem(plansKey);
-        if (storedPlans) {
-          const parsedPlans = JSON.parse(storedPlans);
-          setWorkoutPlans(parsedPlans);
+        // Load workout mode or initialize
+        const storedMode = localStorage.getItem(modeKey);
+        if (storedMode === 'one-muscle' || storedMode === 'two-muscle') {
+            setWorkoutMode(storedMode as WorkoutMode);
         } else {
-          setWorkoutPlans(INITIAL_PLANS);
+            setWorkoutMode('two-muscle');
+            localStorage.setItem(modeKey, 'two-muscle');
         }
-      } catch (e) {
-        console.error("Error parsing workout plans from localStorage", e);
-        setWorkoutPlans(INITIAL_PLANS);
-      }
 
-      try {
-        const storedWeightLogs = localStorage.getItem(weightLogsKey);
-        if (storedWeightLogs) {
-          const parsedWeightLogs = JSON.parse(storedWeightLogs);
-          if (Array.isArray(parsedWeightLogs)) {
-            setWeightLogs(parsedWeightLogs);
-          }
+        // Load workout plans or initialize with defaults AND save
+        try {
+            const storedPlans = localStorage.getItem(plansKey);
+            if (storedPlans) {
+                setWorkoutPlans(JSON.parse(storedPlans));
+            } else {
+                setWorkoutPlans(INITIAL_PLANS);
+                localStorage.setItem(plansKey, JSON.stringify(INITIAL_PLANS));
+            }
+        } catch (e) {
+            console.error("Error with workout plans, resetting to default:", e);
+            setWorkoutPlans(INITIAL_PLANS);
+            localStorage.setItem(plansKey, JSON.stringify(INITIAL_PLANS));
         }
-      } catch (e) {
-        console.error("Error parsing weight logs from localStorage", e);
-      }
 
-      try {
-        const storedDefinitions = localStorage.getItem(defsKey);
-        if (storedDefinitions) {
-          const parsedDefs = JSON.parse(storedDefinitions);
-          if (Array.isArray(parsedDefs) && parsedDefs.length > 0) {
-            setExerciseDefinitions(parsedDefs);
-            localDefsLoaded = true;
-          }
+        // Load exercise definitions or initialize with defaults AND save
+        try {
+            const storedDefinitions = localStorage.getItem(defsKey);
+            if (storedDefinitions) {
+                const parsedDefs = JSON.parse(storedDefinitions);
+                if (Array.isArray(parsedDefs) && parsedDefs.length > 0) {
+                    setExerciseDefinitions(parsedDefs);
+                } else {
+                    throw new Error("Stored definitions are empty or invalid.");
+                }
+            } else {
+                const timestamp = Date.now().toString();
+                const uniqueDefaultDefs = DEFAULT_EXERCISE_DEFINITIONS.map((def, index) => ({
+                    ...def,
+                    id: `${timestamp}_${index}_${def.name.replace(/\s+/g, '_')}`
+                }));
+                setExerciseDefinitions(uniqueDefaultDefs);
+                localStorage.setItem(defsKey, JSON.stringify(uniqueDefaultDefs));
+            }
+        } catch (e) {
+            console.error("Error with exercise definitions, resetting to default:", e);
+            const timestamp = Date.now().toString();
+            const uniqueDefaultDefs = DEFAULT_EXERCISE_DEFINITIONS.map((def, index) => ({
+                ...def,
+                id: `${timestamp}_${index}_${def.name.replace(/\s+/g, '_')}`
+            }));
+            setExerciseDefinitions(uniqueDefaultDefs);
+            localStorage.setItem(defsKey, JSON.stringify(uniqueDefaultDefs));
         }
-      } catch (e) {
-        console.error("Error parsing exercise definitions from localStorage", e);
-      }
-      
-      if (!localDefsLoaded) {
-        const timestamp = Date.now().toString();
-        const uniqueDefaultDefs = DEFAULT_EXERCISE_DEFINITIONS.map((def, index) => ({
-          ...def,
-          id: `${timestamp}_${index}_${def.name.replace(/\s+/g, '_')}`
-        }));
-        setExerciseDefinitions(uniqueDefaultDefs);
-      }
+        
+        // Load remaining user data
+        const storedGoal = localStorage.getItem(goalWeightKey);
+        if (storedGoal) setGoalWeight(parseFloat(storedGoal));
+        
+        const storedHeight = localStorage.getItem(heightKey);
+        if (storedHeight) setHeight(parseFloat(storedHeight));
+        
+        const storedDob = localStorage.getItem(dobKey);
+        if (storedDob) setDateOfBirth(storedDob);
+        
+        const storedGender = localStorage.getItem(genderKey);
+        if (storedGender === 'male' || storedGender === 'female') {
+            setGender(storedGender as Gender);
+        }
 
-      try {
-        const storedLogs = localStorage.getItem(logsKey);
-        if (storedLogs) {
-          const parsedLogs = JSON.parse(storedLogs);
-           if (Array.isArray(parsedLogs)) {
-            setAllWorkoutLogs(parsedLogs);
-          } else {
-            setAllWorkoutLogs([]);
-          }
-        } else {
-          setAllWorkoutLogs([]);
-        }
-      } catch (e) {
-        console.error("Error parsing workout logs from localStorage", e);
-        setAllWorkoutLogs([]);
-      }
+        try {
+            const storedDietPlan = localStorage.getItem(dietPlanKey);
+            if (storedDietPlan) setDietPlan(JSON.parse(storedDietPlan));
+        } catch (e) { console.error("Error parsing diet plan", e); }
+
+        try {
+            const storedWeightLogs = localStorage.getItem(weightLogsKey);
+            if (storedWeightLogs) setWeightLogs(JSON.parse(storedWeightLogs));
+        } catch (e) { console.error("Error parsing weight logs", e); }
+
+        try {
+            const storedLogs = localStorage.getItem(logsKey);
+            if (storedLogs) setAllWorkoutLogs(JSON.parse(storedLogs));
+        } catch (e) { console.error("Error parsing workout logs", e); }
 
     } else {
+      // Clear all state for logged-out user
       setExerciseDefinitions([]);
       setAllWorkoutLogs([]);
       setWorkoutPlans(INITIAL_PLANS);
@@ -582,7 +574,8 @@ function WorkoutPageContent() {
     }
     const timer = setTimeout(() => setIsLoadingPage(false), 300);
     return () => clearTimeout(timer);
-  }, [currentUser]);
+}, [currentUser]);
+
 
   useEffect(() => {
     if (currentUser?.username && !isLoadingPage) {
