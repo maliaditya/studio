@@ -1233,7 +1233,7 @@ function WorkoutPageContent() {
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle id="exercise-library-heading" className="flex items-center gap-2 text-2xl text-primary">
+                  <CardTitle id="exercise-library-heading" className="flex items-center gap-2 text-xl lg:text-2xl text-primary">
                     <BookCopy /> Exercise Library
                   </CardTitle>
                   <div className="flex items-center gap-2">
@@ -1360,7 +1360,7 @@ function WorkoutPageContent() {
             <Card>
                 <CardHeader className="flex flex-row items-start justify-between">
                     <div>
-                        <CardTitle className="flex items-center gap-2 text-2xl text-primary">
+                        <CardTitle className="flex items-center gap-2 text-xl lg:text-2xl text-primary">
                             <Utensils /> Today's Diet
                         </CardTitle>
                         <CardDescription>
@@ -1415,7 +1415,7 @@ function WorkoutPageContent() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-2xl text-primary">
+                    <CardTitle className="flex items-center gap-2 text-xl lg:text-2xl text-primary">
                         <Target /> Weight Goal
                     </CardTitle>
                     <CardDescription>
@@ -1531,7 +1531,7 @@ function WorkoutPageContent() {
               <Card>
                   <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
-                          <CardTitle id="current-workout-heading" className="flex items-center gap-2 text-2xl text-accent">
+                          <CardTitle id="current-workout-heading" className="flex items-center gap-2 text-xl lg:text-2xl text-accent">
                               <ListChecks /> Workout for: {format(selectedDate, 'PPP')}
                           </CardTitle>
                           {muscleGroupsForSelectedDay.length > 0 && (
