@@ -8,38 +8,8 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'zod';
-
-// Define schemas directly in the file
-export const GenerateDietPlanInputSchema = z.object({
-  currentWeight: z.number().describe("The user's current weight in kg or lb."),
-  goalWeight: z.number().describe("The user's goal weight in kg or lb."),
-  height: z.number().describe("The user's height in cm."),
-  age: z.number().describe("The user's age in years."),
-  gender: z.enum(['male', 'female']).describe("The user's gender."),
-  activityLevel: z.string().describe("The user's daily activity level (e.g., sedentary, light, moderate, active)."),
-  preferences: z.string().describe('Any dietary preferences or restrictions the user has.'),
-});
-export type GenerateDietPlanInput = z.infer<typeof GenerateDietPlanInputSchema>;
-
-const MealSchema = z.object({
-    description: z.string().describe("A brief description of the meal."),
-    calories: z.number().describe("The estimated calorie count for the meal."),
-});
-
-const DailyPlanSchema = z.object({
-    day: z.string().describe("The day of the week (e.g., Monday, Tuesday)."),
-    breakfast: MealSchema,
-    lunch: MealSchema,
-    dinner: MealSchema,
-    snacks: z.array(MealSchema).describe("A list of snacks for the day."),
-    totalCalories: z.number().describe("The total estimated calories for the day."),
-});
-
-export const GenerateDietPlanOutputSchema = z.object({
-    summary: z.string().describe("A brief summary of the diet plan strategy and recommended intake."),
-    dailyPlans: z.array(DailyPlanSchema).length(7).describe("A 7-day diet plan."),
-});
-export type GenerateDietPlanOutput = z.infer<typeof GenerateDietPlanOutputSchema>;
+import type { GenerateDietPlanInput, GenerateDietPlanOutput } from '@/types/workout';
+import { GenerateDietPlanInputSchema, GenerateDietPlanOutputSchema, MealSchema as BaseMealSchema } from '@/types/workout';
 
 
 export async function generateDietPlan(input: GenerateDietPlanInput): Promise<GenerateDietPlanOutput> {
@@ -72,13 +42,20 @@ const SingleDayPlanInputSchema = GenerateDietPlanInputSchema.extend({
     day: z.string().describe("The day of the week to generate a plan for (e.g., Monday).")
 });
 
-// Internal schema for single day output (re-using parts of the original)
+// Make the meal schema more robust for flaky AI responses
+const MealSchema = BaseMealSchema.extend({
+    description: z.string().default('N/A'),
+    calories: z.number().default(0),
+}).default({ description: 'N/A', calories: 0 });
+
+
+// Internal schema for single day output, making meals optional to handle incomplete AI responses
 const SingleDayMealPlanSchema = z.object({
     breakfast: MealSchema,
     lunch: MealSchema,
     dinner: MealSchema,
-    snacks: z.array(MealSchema).describe("A list of snacks for the day."),
-    totalCalories: z.number().describe("The total estimated calories for the day."),
+    snacks: z.array(MealSchema).default([]),
+    totalCalories: z.number().default(0),
 });
 
 // Internal prompt for a single day's plan
@@ -129,8 +106,9 @@ const generateDietPlanFlow = ai.defineFlow(
       const summary = summaryResult.output ?? "Could not generate a plan summary. Please check your input.";
 
       const dailyPlans = dailyResults.map((result, index) => {
-        if (!result.output) {
-          // If a single day fails, create a blank entry to avoid crashing the whole process
+        const output = result.output;
+        // Robust fallback if AI fails for a day
+        if (!output) {
           console.error(`Failed to generate plan for ${days[index]}. AI output was null.`);
           return {
             day: days[index],
@@ -141,10 +119,15 @@ const generateDietPlanFlow = ai.defineFlow(
             totalCalories: 0,
           };
         }
+        // Ensure all parts of the plan exist, even if AI omitted them
         return {
           day: days[index],
-          ...result.output,
-        }
+          breakfast: output.breakfast || { description: 'N/A', calories: 0 },
+          lunch: output.lunch || { description: 'N/A', calories: 0 },
+          dinner: output.dinner || { description: 'N/A', calories: 0 },
+          snacks: output.snacks || [],
+          totalCalories: output.totalCalories || 0,
+        };
       });
 
       const finalOutput: GenerateDietPlanOutput = {
