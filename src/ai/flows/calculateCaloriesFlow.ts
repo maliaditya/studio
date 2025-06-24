@@ -33,15 +33,17 @@ const prompt = ai.definePrompt({
   name: 'calculateCaloriesPrompt',
   input: {schema: CalculateCaloriesInputSchema},
   output: {schema: CalculateCaloriesOutputSchema},
-  prompt: `You are an expert nutritionist. Based on the following meal descriptions, estimate the total caloric content and macronutrient breakdown for the day.
+  prompt: `You are an expert nutritionist. Based on the following meal descriptions, estimate the total caloric content and macronutrient breakdown for the day. If a meal description is empty, ignore it.
 
 Meal 1: {{{meal1}}}
 Meal 2: {{{meal2}}}
 Meal 3: {{{meal3}}}
 
-Analyze each meal description, estimate its calories and macronutrients, and provide a single total sum for each. Do not include supplements in the calculation unless they are explicitly part of a meal and have caloric value.
+Analyze each provided meal description, estimate its calories and macronutrients, and provide a single total sum for each. Do not include supplements in the calculation unless they are explicitly part of a meal and have caloric value.
 
-Your response must be a valid JSON object containing the total calories, and the total grams for protein, carbs, fat, and fiber.`,
+If no valid meal descriptions are provided, return a JSON object with all values set to 0.
+
+Your response must be a valid JSON object that strictly adheres to the output schema.`,
   config: {
     temperature: 0,
   },
@@ -55,6 +57,9 @@ const calculateCaloriesFlow = ai.defineFlow(
   },
   async (input) => {
     const {output} = await prompt(input);
-    return output!;
+    if (!output) {
+      throw new Error("The AI model failed to return a valid nutritional analysis. Please try again with more descriptive input.");
+    }
+    return output;
   }
 );
