@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -17,10 +16,9 @@ import { useIsMobile } from '@/hooks/use-mobile';
 interface SupportModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onIncrementCount: () => void;
 }
 
-export function SupportModal({ isOpen, onOpenChange, onIncrementCount }: SupportModalProps) {
+export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
   const isMobile = useIsMobile();
   const [showQr, setShowQr] = useState(false);
 
@@ -33,13 +31,11 @@ export function SupportModal({ isOpen, onOpenChange, onIncrementCount }: Support
   
   const handleCoffeeClick = (event: React.MouseEvent<HTMLElement>) => {
     event.preventDefault();
-    onIncrementCount();
     window.open('https://www.buymeacoffee.com/adityamali98', '_blank', 'noopener,noreferrer');
   };
 
   const handleUpiClick = (event: React.MouseEvent<HTMLElement>) => {
     event.preventDefault();
-    onIncrementCount();
 
     if (isMobile) {
       // On mobile, attempt to open the UPI app directly.
@@ -60,16 +56,16 @@ export function SupportModal({ isOpen, onOpenChange, onIncrementCount }: Support
           <DialogDescription>
             {showQr
               ? "Scan the QR code below to pay with any UPI app. Thanks for your support!"
-              : "Your support helps keep this project alive. Clicking a link will open a new tab and count as one contribution. Thank you!"}
+              : "Your support helps keep this project alive. Clicking a link will open a new tab. Thank you!"}
           </DialogDescription>
         </DialogHeader>
 
         {showQr ? (
           <div className="flex flex-col items-center justify-center gap-4 py-4">
             <Image
-              src="/QRcode.jpg"
+              src="https://placehold.co/250x250.png"
               data-ai-hint="qr code"
-              alt="UPI QR Code - Add upi-qr-code.png to the /public folder to display it here."
+              alt="UPI QR Code"
               width={250}
               height={250}
               className="rounded-lg border bg-white p-2"
