@@ -24,7 +24,7 @@ import { Button } from './ui/button';
 import { Calculator, Info, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
-import { analyzeDayMeals } from '@/ai/flows/analyzeDayMealsFlow';
+import { analyzeMeal } from '@/ai/flows/analyzeMealFlow';
 
 interface DietPlanModalProps {
   isOpen: boolean;
@@ -115,7 +115,14 @@ export function DietPlanModal({
   const handleCalculateCalories = async (day: string) => {
     setCalculatingDay(day);
     const dayPlan = plan.find(p => p.day === day);
-    if (!dayPlan || (!dayPlan.meal1 && !dayPlan.meal2 && !dayPlan.meal3)) {
+    if (!dayPlan) {
+        setCalculatingDay(null);
+        return;
+    }
+
+    const mealsToAnalyze = [dayPlan.meal1, dayPlan.meal2, dayPlan.meal3].filter(m => m && m.trim() !== '');
+
+    if (mealsToAnalyze.length === 0) {
       toast({
         title: "Cannot Calculate",
         description: "Please enter at least one meal description for the day.",
@@ -126,14 +133,27 @@ export function DietPlanModal({
     }
 
     try {
-        const result = await analyzeDayMeals({
-            meal1: dayPlan.meal1,
-            meal2: dayPlan.meal2,
-            meal3: dayPlan.meal3,
-        });
+        const analysisPromises = mealsToAnalyze.map(meal => analyzeMeal(meal));
+        const results = await Promise.all(analysisPromises);
+
+        const totals = results.reduce((acc, current) => {
+            acc.totalCalories += current.calories;
+            acc.protein += current.protein;
+            acc.carbs += current.carbs;
+            acc.fat += current.fat;
+            acc.fiber += current.fiber;
+            return acc;
+        }, { totalCalories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
 
         setPlan(currentPlan =>
-            currentPlan.map(p => (p.day === day ? { ...p, ...result } : p))
+            currentPlan.map(p => (p.day === day ? { 
+                ...p, 
+                totalCalories: Math.round(totals.totalCalories),
+                protein: Math.round(totals.protein),
+                carbs: Math.round(totals.carbs),
+                fat: Math.round(totals.fat),
+                fiber: Math.round(totals.fiber),
+            } : p))
         );
 
         toast({

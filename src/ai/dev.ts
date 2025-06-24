@@ -1,3 +1,3 @@
 // Flows will be imported for their side effects in this file.
 import './flows/generateDietPlanFlow';
-import './flows/analyzeDayMealsFlow';
+import './flows/analyzeMealFlow';
