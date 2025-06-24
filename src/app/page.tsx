@@ -1234,7 +1234,7 @@ function WorkoutPageContent() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle id="exercise-library-heading" className="flex items-center gap-2 text-2xl text-primary">
-                    <Dumbbell /> Exercise Library
+                    <BookCopy /> Exercise Library
                   </CardTitle>
                   <div className="flex items-center gap-2">
                     <DropdownMenu>
@@ -1605,6 +1605,7 @@ function WorkoutPageContent() {
             workoutPlans={workoutPlans}
             setWorkoutPlans={setWorkoutPlans}
             exerciseDefinitions={exerciseDefinitions}
+            initialPlans={INITIAL_PLANS}
           />
         )}
       </div>
