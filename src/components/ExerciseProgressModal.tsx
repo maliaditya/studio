@@ -217,6 +217,7 @@ export function ExerciseProgressModal({
         timestamp: d.dateObj.getTime(),
         cumulativeProgress: cumulativeProgress,
         dailyProgress: d.dailyProgress,
+        dateObj: d.dateObj, // Pass the date object along
       };
     });
 
@@ -228,7 +229,7 @@ export function ExerciseProgressModal({
     }
 
     const firstDataPoint = graphData[0];
-    const durationInDays = differenceInDays(parseISO(lastDataPoint.fullDate), parseISO(firstDataPoint.fullDate)) + 1;
+    const durationInDays = differenceInDays(lastDataPoint.dateObj, firstDataPoint.dateObj) + 1;
     const averageRatePerDay = totalProgress / durationInDays;
 
     if (averageRatePerDay <= 0) {
@@ -237,11 +238,18 @@ export function ExerciseProgressModal({
 
     const remainingProgress = topicGoal.goalValue - totalProgress;
     const daysToCompletion = Math.ceil(remainingProgress / averageRatePerDay);
-    const projectedDate = addDays(parseISO(lastDataPoint.fullDate), daysToCompletion);
+    const projectedDate = addDays(lastDataPoint.dateObj, daysToCompletion);
 
     const projection = [
-        { timestamp: lastDataPoint.timestamp, cumulativeProgress: lastDataPoint.cumulativeProgress, fullDate: lastDataPoint.fullDate, dailyProgress: lastDataPoint.dailyProgress },
-        { timestamp: projectedDate.getTime(), cumulativeProgress: topicGoal.goalValue, projectedDate: format(projectedDate, 'PPP'), fullDate: format(projectedDate, 'PPP'), dailyProgress: 0 },
+        lastDataPoint,
+        { 
+          timestamp: projectedDate.getTime(), 
+          cumulativeProgress: topicGoal.goalValue, 
+          projectedDate: format(projectedDate, 'PPP'), 
+          fullDate: format(projectedDate, 'PPP'), 
+          dailyProgress: 0,
+          date: format(projectedDate, "MMM dd"), // Add date for X-axis
+        },
     ];
     const summary = {
       totalProgress,
