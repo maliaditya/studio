@@ -17,7 +17,7 @@ interface WorkoutExerciseCardProps {
   onUpdateSet: (exerciseId: string, setId: string, reps: number, weight: number) => void;
   onRemoveExercise: (exerciseId: string) => void;
   onViewProgress?: () => void;
-  pageType?: 'workout' | 'upskill';
+  pageType?: 'workout' | 'upskill' | 'deepwork';
 }
 
 export function WorkoutExerciseCard({
@@ -49,7 +49,7 @@ export function WorkoutExerciseCard({
         setReps('');
         setWeight('');
       }
-    } else { // upskill
+    } else { // upskill or deepwork
       const numDuration = parseInt(duration);
       if (!isNaN(numDuration) && numDuration > 0) {
         onLogSet(exercise.id, 1, numDuration); // reps=1, weight=duration
@@ -64,7 +64,7 @@ export function WorkoutExerciseCard({
       setEditReps(set.reps.toString());
       setEditWeight(set.weight.toString());
     } else {
-      setEditDuration(set.weight.toString()); // weight stores duration for upskill
+      setEditDuration(set.weight.toString()); // weight stores duration for upskill/deepwork
     }
   };
 
@@ -77,7 +77,7 @@ export function WorkoutExerciseCard({
           onUpdateSet(exercise.id, editingSet.id, numReps, numWeight);
           setEditingSet(null);
         }
-      } else { // upskill
+      } else { // upskill or deepwork
         const numDuration = parseInt(editDuration);
         if (!isNaN(numDuration) && numDuration > 0) {
           onUpdateSet(exercise.id, editingSet.id, 1, numDuration);
@@ -185,12 +185,15 @@ export function WorkoutExerciseCard({
                         </>
                       ) : (
                         <>
-                          <span className="truncate">
-                            {pageType === 'workout' 
-                              ? `Set ${exercise.loggedSets.length - index}: <strong>${set.reps}</strong>r @ <strong>${set.weight}</strong>kg/lb`
-                              : `Session ${exercise.loggedSets.length - index}: <strong>${set.weight}</strong> min`
-                            }
-                          </span>
+                           <span
+                            className="truncate"
+                            dangerouslySetInnerHTML={{
+                              __html:
+                                pageType === 'workout'
+                                  ? `Set ${exercise.loggedSets.length - index}: <strong>${set.reps}</strong>r @ <strong>${set.weight}</strong>kg/lb`
+                                  : `Session ${exercise.loggedSets.length - index}: <strong>${set.weight}</strong> min`,
+                            }}
+                          />
                           <div className="flex items-center">
                              <Button variant="ghost" size="icon" onClick={() => handleEditSet(set)} className="h-6 w-6 text-muted-foreground hover:text-primary" aria-label="Edit set">
                                <Edit2 className="h-3 w-3" />
@@ -212,5 +215,3 @@ export function WorkoutExerciseCard({
     </motion.div>
   );
 }
-
-    
