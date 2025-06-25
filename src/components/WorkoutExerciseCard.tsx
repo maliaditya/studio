@@ -17,6 +17,7 @@ interface WorkoutExerciseCardProps {
   onUpdateSet: (exerciseId: string, setId: string, reps: number, weight: number) => void;
   onRemoveExercise: (exerciseId: string) => void;
   onViewProgress?: () => void;
+  pageType?: 'workout' | 'upskill';
 }
 
 export function WorkoutExerciseCard({
@@ -26,37 +27,62 @@ export function WorkoutExerciseCard({
   onUpdateSet,
   onRemoveExercise,
   onViewProgress,
+  pageType = 'workout'
 }: WorkoutExerciseCardProps) {
   const [reps, setReps] = useState('');
   const [weight, setWeight] = useState('');
+  const [duration, setDuration] = useState('');
+
   const [editingSet, setEditingSet] = useState<LoggedSet | null>(null);
   const [editReps, setEditReps] = useState('');
   const [editWeight, setEditWeight] = useState('');
+  const [editDuration, setEditDuration] = useState('');
+
 
   const handleLogSetSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const numReps = parseInt(reps);
-    const numWeight = parseFloat(weight);
-    if (!isNaN(numReps) && !isNaN(numWeight) && numReps > 0) {
-      onLogSet(exercise.id, numReps, numWeight);
-      setReps('');
-      setWeight('');
+    if (pageType === 'workout') {
+      const numReps = parseInt(reps);
+      const numWeight = parseFloat(weight);
+      if (!isNaN(numReps) && !isNaN(numWeight) && numReps > 0) {
+        onLogSet(exercise.id, numReps, numWeight);
+        setReps('');
+        setWeight('');
+      }
+    } else { // upskill
+      const numDuration = parseInt(duration);
+      if (!isNaN(numDuration) && numDuration > 0) {
+        onLogSet(exercise.id, 1, numDuration); // reps=1, weight=duration
+        setDuration('');
+      }
     }
   };
 
   const handleEditSet = (set: LoggedSet) => {
     setEditingSet(set);
-    setEditReps(set.reps.toString());
-    setEditWeight(set.weight.toString());
+    if (pageType === 'workout') {
+      setEditReps(set.reps.toString());
+      setEditWeight(set.weight.toString());
+    } else {
+      setEditDuration(set.weight.toString()); // weight stores duration for upskill
+    }
   };
 
   const handleSaveEditSet = () => {
     if (editingSet) {
-      const numReps = parseInt(editReps);
-      const numWeight = parseFloat(editWeight);
-      if (!isNaN(numReps) && !isNaN(numWeight) && numReps > 0) {
-        onUpdateSet(exercise.id, editingSet.id, numReps, numWeight);
-        setEditingSet(null);
+      if (pageType === 'workout') {
+        const numReps = parseInt(editReps);
+        const numWeight = parseFloat(editWeight);
+        if (!isNaN(numReps) && !isNaN(numWeight) && numReps > 0) {
+          onUpdateSet(exercise.id, editingSet.id, numReps, numWeight);
+          setEditingSet(null);
+        }
+      } else { // upskill
+        const numDuration = parseInt(editDuration);
+        if (!isNaN(numDuration) && numDuration > 0) {
+          onUpdateSet(exercise.id, editingSet.id, 1, numDuration);
+          setEditingSet(null);
+        }
       }
     }
   };
@@ -100,37 +126,30 @@ export function WorkoutExerciseCard({
         </CardHeader>
         <CardContent className="p-3">
           <p className="text-xs text-muted-foreground mb-2">
-            Target: {exercise.targetSets} sets of {exercise.targetReps} reps. Progress: {exercise.loggedSets.length}/{exercise.targetSets} sets.
+            {pageType === 'workout' 
+              ? `Target: ${exercise.targetSets} sets of ${exercise.targetReps} reps. Progress: ${exercise.loggedSets.length}/${exercise.targetSets} sets.`
+              : `Target: ${exercise.targetSets} sessions of ${exercise.targetReps} min. Progress: ${exercise.loggedSets.length}/${exercise.targetSets} sessions.`
+            }
           </p>
 
           <form onSubmit={handleLogSetSubmit} className="flex gap-2 mb-3 items-end">
-            <div className="flex-1">
-              <label htmlFor={`reps-${exercise.id}`} className="sr-only">Reps</label>
-              <Input
-                id={`reps-${exercise.id}`}
-                type="number"
-                placeholder="Reps"
-                value={reps}
-                onChange={(e) => setReps(e.target.value)}
-                className="h-9"
-                min="1"
-                required
-              />
-            </div>
-            <div className="flex-1">
-              <label htmlFor={`weight-${exercise.id}`} className="sr-only">Weight (kg/lb)</label>
-              <Input
-                id={`weight-${exercise.id}`}
-                type="number"
-                placeholder="Weight"
-                value={weight}
-                onChange={(e) => setWeight(e.target.value)}
-                className="h-9"
-                min="0"
-                step="0.1"
-                required
-              />
-            </div>
+            {pageType === 'workout' ? (
+              <>
+                <div className="flex-1">
+                  <label htmlFor={`reps-${exercise.id}`} className="sr-only">Reps</label>
+                  <Input id={`reps-${exercise.id}`} type="number" placeholder="Reps" value={reps} onChange={(e) => setReps(e.target.value)} className="h-9" min="1" required />
+                </div>
+                <div className="flex-1">
+                  <label htmlFor={`weight-${exercise.id}`} className="sr-only">Weight (kg/lb)</label>
+                  <Input id={`weight-${exercise.id}`} type="number" placeholder="Weight" value={weight} onChange={(e) => setWeight(e.target.value)} className="h-9" min="0" step="0.1" required />
+                </div>
+              </>
+            ) : (
+              <div className="flex-1">
+                <label htmlFor={`duration-${exercise.id}`} className="sr-only">Duration (min)</label>
+                <Input id={`duration-${exercise.id}`} type="number" placeholder="Duration (min)" value={duration} onChange={(e) => setDuration(e.target.value)} className="h-9" min="1" required />
+              </div>
+            )}
             <Button type="submit" size="icon" className="h-9 w-9 shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground" aria-label="Log set">
               <PlusCircle className="h-5 w-5" />
             </Button>
@@ -153,14 +172,25 @@ export function WorkoutExerciseCard({
                     >
                       {editingSet?.id === set.id ? (
                         <>
-                          <Input type="number" value={editReps} onChange={(e) => setEditReps(e.target.value)} className="w-14 h-7 mr-1 text-xs" /> reps
-                          <Input type="number" value={editWeight} onChange={(e) => setEditWeight(e.target.value)} className="w-16 h-7 mx-1 text-xs" /> kg/lb
+                          {pageType === 'workout' ? (
+                            <>
+                              <Input type="number" value={editReps} onChange={(e) => setEditReps(e.target.value)} className="w-14 h-7 mr-1 text-xs" /> reps
+                              <Input type="number" value={editWeight} onChange={(e) => setEditWeight(e.target.value)} className="w-16 h-7 mx-1 text-xs" /> kg/lb
+                            </>
+                          ) : (
+                            <Input type="number" value={editDuration} onChange={(e) => setEditDuration(e.target.value)} className="w-20 h-7 mr-1 text-xs" /> 
+                          )}
                           <Button size="icon" variant="ghost" onClick={handleSaveEditSet} className="h-7 w-7 text-green-600"><Save className="h-4 w-4" /></Button>
                           <Button size="icon" variant="ghost" onClick={() => setEditingSet(null)} className="h-7 w-7 text-gray-600"><X className="h-4 w-4" /></Button>
                         </>
                       ) : (
                         <>
-                          <span className="truncate">Set {exercise.loggedSets.length - index}: <strong>{set.reps}</strong>r @ <strong>{set.weight}</strong>kg/lb</span>
+                          <span className="truncate">
+                            {pageType === 'workout' 
+                              ? `Set ${exercise.loggedSets.length - index}: <strong>${set.reps}</strong>r @ <strong>${set.weight}</strong>kg/lb`
+                              : `Session ${exercise.loggedSets.length - index}: <strong>${set.weight}</strong> min`
+                            }
+                          </span>
                           <div className="flex items-center">
                              <Button variant="ghost" size="icon" onClick={() => handleEditSet(set)} className="h-6 w-6 text-muted-foreground hover:text-primary" aria-label="Edit set">
                                <Edit2 className="h-3 w-3" />
@@ -182,3 +212,5 @@ export function WorkoutExerciseCard({
     </motion.div>
   );
 }
+
+    
