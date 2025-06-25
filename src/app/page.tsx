@@ -8,7 +8,7 @@ import { BrainCircuit, Sunrise, Sun, Sunset, Moon, MoonStar, CloudSun, PlusCircl
 import { useState, useEffect, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, getWeekOfMonth } from 'date-fns';
+import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysLearningModal } from '@/components/TodaysLearningModal';
@@ -400,16 +400,16 @@ function HomePageContent() {
     let plan: any = null;
 
     if (workoutMode === 'two-muscle') {
-      const weekOfMonth = getWeekOfMonth(today);
-      const isWeek1Or3 = weekOfMonth % 2 !== 0;
+      const isoWeek = getISOWeek(today);
+      const isOddWeek = isoWeek % 2 !== 0;
 
       muscleGroupsForDay = dailyMuscleGroups[dayOfWeek] || [];
 
       if (muscleGroupsForDay.length > 0) {
         if (dayOfWeek >= 1 && dayOfWeek <= 3) { // Mon, Tue, Wed
-          plan = isWeek1Or3 ? workoutPlans.W1 : workoutPlans.W3;
+          plan = isOddWeek ? workoutPlans.W1 : workoutPlans.W3;
         } else { // Thu, Fri, Sat
-          plan = isWeek1Or3 ? workoutPlans.W2 : workoutPlans.W4;
+          plan = isOddWeek ? workoutPlans.W2 : workoutPlans.W4;
         }
       }
     } else { // 'one-muscle' mode

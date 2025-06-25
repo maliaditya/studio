@@ -11,7 +11,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { format, parseISO, getDay, getWeekOfMonth, isMonday, getYear, getISOWeek, parse, getISOWeekYear, addWeeks, startOfISOWeek, setISOWeek, differenceInDays, subYears, addDays, differenceInYears } from 'date-fns';
+import { format, parseISO, getDay, getISOWeek, isMonday, getYear, parse, getISOWeekYear, addWeeks, startOfISOWeek, setISOWeek, differenceInDays, subYears, addDays, differenceInYears } from 'date-fns';
 import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans, WeightLog, Gender, UserDietPlan } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
@@ -632,8 +632,8 @@ function WorkoutPageContent() {
       let toastDescription = "";
 
       if (workoutMode === 'two-muscle') {
-          const weekOfMonth = getWeekOfMonth(selectedDate);
-          const isWeek1Or3 = weekOfMonth % 2 !== 0;
+          const isoWeek = getISOWeek(selectedDate);
+          const isOddWeek = isoWeek % 2 !== 0;
 
           const muscleGroupsForDay = dailyMuscleGroups[dayOfWeek];
           if (!muscleGroupsForDay || muscleGroupsForDay.length === 0) return prevLogs;
@@ -642,11 +642,11 @@ function WorkoutPageContent() {
           let planName = "";
 
           if (dayOfWeek >= 1 && dayOfWeek <= 3) { // Monday, Tuesday, Wednesday
-            currentPlan = isWeek1Or3 ? workoutPlans.W1 : workoutPlans.W3;
-            planName = isWeek1Or3 ? 'W1' : 'W3';
+            currentPlan = isOddWeek ? workoutPlans.W1 : workoutPlans.W3;
+            planName = isOddWeek ? 'W1' : 'W3';
           } else { // Thursday, Friday, Saturday
-            currentPlan = isWeek1Or3 ? workoutPlans.W2 : workoutPlans.W4;
-            planName = isWeek1Or3 ? 'W2' : 'W4';
+            currentPlan = isOddWeek ? workoutPlans.W2 : workoutPlans.W4;
+            planName = isOddWeek ? 'W2' : 'W4';
           }
           
           if (!currentPlan) return prevLogs;
