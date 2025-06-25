@@ -12,6 +12,9 @@ import { format, getDay, getISOWeek } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise } from '@/types/workout';
+import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 const slots = [
   { name: 'Late Night', time: '12 AM - 4 AM', icon: <Moon className="h-6 w-6 text-indigo-400" /> },
@@ -64,6 +67,7 @@ const INITIAL_PLANS: AllWorkoutPlans = {
 type Activity = {
   type: 'workout' | 'upskill';
   details: string;
+  completed: boolean;
 };
 type DailySchedule = Record<string, Activity>; // Slot name -> Activity
 type FullSchedule = Record<string, DailySchedule>; // Date key -> DailySchedule
@@ -98,7 +102,16 @@ function HomePageContent() {
       try {
         const storedSchedule = localStorage.getItem(scheduleStorageKey);
         if (storedSchedule) {
-          setSchedule(JSON.parse(storedSchedule));
+          const parsedSchedule: FullSchedule = JSON.parse(storedSchedule);
+          // Data migration: ensure all activities have a 'completed' property
+          Object.keys(parsedSchedule).forEach(dateKey => {
+            Object.keys(parsedSchedule[dateKey]).forEach(slotName => {
+              if (parsedSchedule[dateKey][slotName].completed === undefined) {
+                parsedSchedule[dateKey][slotName].completed = false;
+              }
+            });
+          });
+          setSchedule(parsedSchedule);
         }
       } catch (error) {
         console.error("Failed to parse schedule from localStorage", error);
@@ -197,7 +210,7 @@ function HomePageContent() {
 
     setSchedule(prev => ({
       ...prev,
-      [todayKey]: { ...(prev[todayKey] || {}), [slotName]: { type, details } }
+      [todayKey]: { ...(prev[todayKey] || {}), [slotName]: { type, details, completed: false } }
     }));
   };
 
@@ -207,6 +220,20 @@ function HomePageContent() {
       const newTodaySchedule = { ...(prev[todayKey] || {}) };
       delete newTodaySchedule[slotName];
       return { ...prev, [todayKey]: newTodaySchedule };
+    });
+  };
+
+  const handleToggleComplete = (slotName: string) => {
+    if (!todayKey) return;
+    setSchedule(prev => {
+      const todaySchedule = { ...(prev[todayKey] || {}) };
+      const activity = todaySchedule[slotName];
+
+      if (activity) {
+        todaySchedule[slotName] = { ...activity, completed: !activity.completed };
+      }
+
+      return { ...prev, [todayKey]: todaySchedule };
     });
   };
 
@@ -256,6 +283,8 @@ function HomePageContent() {
   };
 
   const handleActivityClick = (activity: Activity) => {
+    if (activity.completed) return; // Don't open modal for completed tasks
+
     if (activity.type === 'workout') {
       const { exercises, muscleGroups } = getTodaysWorkout();
       setTodaysExercises(exercises);
@@ -310,19 +339,29 @@ function HomePageContent() {
                     <CardContent className="flex flex-col justify-between min-h-[8rem]">
                         {activity ? (
                           <>
-                            <div className="flex-grow cursor-pointer" onClick={() => handleActivityClick(activity)}>
+                            <div 
+                              className={cn("flex-grow", activity.completed ? "opacity-60" : "cursor-pointer")}
+                              onClick={() => handleActivityClick(activity)}
+                            >
                               <div className="flex items-center gap-2 mb-2">
                                   {activity.type === 'workout' 
                                       ? <Dumbbell className="h-5 w-5 text-primary" /> 
                                       : <BookOpenCheck className="h-5 w-5 text-primary" />}
                                   <span className="font-semibold capitalize">{activity.type}</span>
                               </div>
-                              <p className="text-xl font-bold text-foreground">{activity.details}</p>
+                              <p className={cn("text-xl font-bold text-foreground", activity.completed && "line-through")}>
+                                {activity.details}
+                              </p>
                             </div>
-                            <Button variant="ghost" size="sm" onClick={() => handleRemoveActivity(slot.name)} className="self-start p-1 h-auto text-xs text-muted-foreground hover:text-destructive mt-2">
-                                <Trash2 className="h-3 w-3 mr-1" />
-                                Remove
-                            </Button>
+                            <div className="flex items-center justify-between mt-4 pt-3 border-t">
+                                <div className="flex items-center space-x-2">
+                                    <Checkbox id={`cb-${slot.name}`} checked={!!activity.completed} onCheckedChange={() => handleToggleComplete(slot.name)} />
+                                    <Label htmlFor={`cb-${slot.name}`} className="text-sm font-medium cursor-pointer text-muted-foreground">Mark as done</Label>
+                                </div>
+                                <Button variant="ghost" size="icon" onClick={() => handleRemoveActivity(slot.name)} className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </div>
                           </>
                         ) : (
                           <>
@@ -381,5 +420,3 @@ function HomePageContent() {
 export default function Page() {
     return ( <AuthGuard> <HomePageContent /> </AuthGuard> );
 }
-
-    
