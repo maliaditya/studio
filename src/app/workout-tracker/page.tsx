@@ -415,7 +415,7 @@ function WorkoutPageContent() {
             });
         }
     }
-  }, [selectedDate, currentUser, exerciseDefinitions, workoutMode, workoutPlans, allWorkoutLogs]);
+  }, [selectedDate, currentUser, exerciseDefinitions, workoutMode, workoutPlans, allWorkoutLogs, toast]);
 
   // Check for backup prompt on Mondays
   useEffect(() => {
@@ -767,6 +767,18 @@ function WorkoutPageContent() {
     }
   };
 
+  const handleWorkoutModeChange = (newMode: WorkoutMode) => {
+    if (newMode === workoutMode) return;
+
+    // Set the new mode state
+    setWorkoutMode(newMode);
+
+    // Remove the current day's workout log. This will trigger the auto-population
+    // useEffect to regenerate the workout with the new mode.
+    const dateKey = format(selectedDate, 'yyyy-MM-dd');
+    setAllWorkoutLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
+  };
+
   const consistencyData = useMemo(() => {
     if (!allWorkoutLogs || !oneYearAgo || !today) return [];
 
@@ -972,7 +984,7 @@ function WorkoutPageContent() {
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                     <RadioGroup
                       value={workoutMode}
-                      onValueChange={(value) => setWorkoutMode(value as WorkoutMode)}
+                      onValueChange={(value) => handleWorkoutModeChange(value as WorkoutMode)}
                       className="flex flex-wrap gap-x-4 gap-y-2"
                     >
                       <div className="flex items-center space-x-2">
@@ -1357,5 +1369,3 @@ function WorkoutPageContent() {
 export default function Page() {
   return ( <AuthGuard> <WorkoutPageContent /> </AuthGuard> );
 }
-
-    
