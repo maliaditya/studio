@@ -21,7 +21,7 @@ import type { ExerciseDefinition, DatedWorkout, LoggedSet, TopicGoal } from '@/t
 import { format, parseISO, addDays, differenceInDays } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { LineChart as LineChartIcon, TableIcon, ZoomOut } from 'lucide-react';
+import { LineChart as LineChartIcon, TableIcon, ZoomOut, Check } from 'lucide-react';
 import { ChartContainer, ChartConfig } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine, Legend, Brush } from 'recharts';
 import { cn } from '@/lib/utils';
@@ -235,39 +235,58 @@ export function ExerciseProgressModal({
     
     const totalProgress = lastDataPoint.cumulativeProgress;
 
-    if (totalProgress >= topicGoal.goalValue) {
-      return { graphData, projection: null, summary: { totalProgress } };
-    }
-
     const firstDataPoint = graphData[0];
-    const durationInDays = differenceInDays(lastDataPoint.dateObj, firstDataPoint.dateObj) + 1;
+    const durationInDays = differenceInDays(new Date(), firstDataPoint.dateObj) + 1;
     const averageRatePerDay = totalProgress / durationInDays;
 
-    if (averageRatePerDay <= 0) {
-      return { graphData, projection: null, summary: { totalProgress, averageRatePerDay } };
-    }
+    let projection = null;
+    let summary: any = { totalProgress, averageRatePerDay };
 
-    const remainingProgress = topicGoal.goalValue - totalProgress;
-    const daysToCompletion = Math.ceil(remainingProgress / averageRatePerDay);
-    const projectedDate = addDays(lastDataPoint.dateObj, daysToCompletion);
+    if (totalProgress < topicGoal.goalValue && averageRatePerDay > 0) {
+      const remainingProgress = topicGoal.goalValue - totalProgress;
+      const daysToCompletion = Math.ceil(remainingProgress / averageRatePerDay);
+      const projectedDate = addDays(new Date(), daysToCompletion);
+      
+      projection = [
+          lastDataPoint,
+          { 
+            timestamp: projectedDate.getTime(), 
+            cumulativeProgress: topicGoal.goalValue, 
+            projectedDate: format(projectedDate, 'PPP'), 
+            dateObj: projectedDate,
+            fullDate: format(projectedDate, 'PPP'), 
+            dailyProgress: 0,
+            date: format(projectedDate, "MMM dd"),
+            daysToCompletion: daysToCompletion,
+          },
+      ];
+      
+      summary.projectedDate = format(projectedDate, 'PPP');
+      summary.daysToCompletion = daysToCompletion;
 
-    const projection = [
-        lastDataPoint,
-        { 
-          timestamp: projectedDate.getTime(), 
-          cumulativeProgress: topicGoal.goalValue, 
-          projectedDate: format(projectedDate, 'PPP'), 
-          dateObj: projectedDate,
-          fullDate: format(projectedDate, 'PPP'), 
-          dailyProgress: 0,
-          date: format(projectedDate, "MMM dd"),
-        },
-    ];
-    const summary = {
-      totalProgress,
-      averageRatePerDay,
-      projectedDate: format(projectedDate, 'PPP'),
-      daysToCompletion
+      summary.milestones = [0.25, 0.5, 0.75, 1.0].map(percent => {
+            const milestoneValue = topicGoal.goalValue * percent;
+            if (totalProgress >= milestoneValue) {
+                return {
+                    percent: Math.round(percent * 100),
+                    value: Math.round(milestoneValue),
+                    date: 'Reached',
+                    daysRemaining: 0,
+                    isReached: true,
+                };
+            }
+            const progressToMilestone = milestoneValue - totalProgress;
+            const daysToMilestone = Math.ceil(progressToMilestone / averageRatePerDay);
+            const estimatedMilestoneDate = addDays(new Date(), daysToMilestone);
+
+            return {
+                percent: Math.round(percent * 100),
+                value: Math.round(milestoneValue),
+                date: format(estimatedMilestoneDate, 'PPP'),
+                daysRemaining: daysToMilestone,
+                isReached: false,
+            };
+        });
     }
 
     return { graphData, projection, summary };
@@ -370,24 +389,54 @@ export function ExerciseProgressModal({
       return (
         <div className='space-y-4'>
           {upskillData.summary && topicGoal && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center text-xs">
-              <div className="p-2 bg-muted/50 rounded-md">
-                <div className="text-muted-foreground">Progress</div>
-                <div className="font-bold text-base">{upskillData.summary.totalProgress.toLocaleString()} / {topicGoal.goalValue?.toLocaleString()}</div>
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center text-xs">
+                <div className="p-2 bg-muted/50 rounded-md">
+                  <div className="text-muted-foreground">Progress</div>
+                  <div className="font-bold text-base">{upskillData.summary.totalProgress.toLocaleString()} / {topicGoal.goalValue?.toLocaleString()}</div>
+                </div>
+                 <div className="p-2 bg-muted/50 rounded-md">
+                  <div className="text-muted-foreground">Avg. Daily Rate</div>
+                  <div className="font-bold text-base">{upskillData.summary.averageRatePerDay?.toFixed(1) || '-'} {topicGoal.goalType}/day</div>
+                </div>
+                 <div className="p-2 bg-muted/50 rounded-md">
+                  <div className="text-muted-foreground">Est. Completion</div>
+                  <div className="font-bold text-base">{upskillData.summary.projectedDate || 'N/A'}</div>
+                </div>
+                 <div className="p-2 bg-muted/50 rounded-md">
+                  <div className="text-muted-foreground">Days Remaining</div>
+                  <div className="font-bold text-base">{upskillData.summary.daysToCompletion || '-'}</div>
+                </div>
               </div>
-               <div className="p-2 bg-muted/50 rounded-md">
-                <div className="text-muted-foreground">Avg. Daily Rate</div>
-                <div className="font-bold text-base">{upskillData.summary.averageRatePerDay?.toFixed(1) || '-'} {topicGoal.goalType}/day</div>
-              </div>
-               <div className="p-2 bg-muted/50 rounded-md">
-                <div className="text-muted-foreground">Est. Completion</div>
-                <div className="font-bold text-base">{upskillData.summary.projectedDate || 'N/A'}</div>
-              </div>
-               <div className="p-2 bg-muted/50 rounded-md">
-                <div className="text-muted-foreground">Days Remaining</div>
-                <div className="font-bold text-base">{upskillData.summary.daysToCompletion || '-'}</div>
-              </div>
-            </div>
+
+              {upskillData.summary.milestones && (
+                <div className="pt-4">
+                  <h4 className="text-sm font-semibold mb-2">Milestone Projections</h4>
+                  <div className="border rounded-md">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Milestone</TableHead>
+                          <TableHead>Target ({topicGoal.goalType})</TableHead>
+                          <TableHead>Est. Date</TableHead>
+                          <TableHead className="text-right">Days Left</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {upskillData.summary.milestones.map((m: any) => (
+                          <TableRow key={m.percent} className={m.isReached ? 'opacity-60' : ''}>
+                            <TableCell className="font-medium">{m.percent}%</TableCell>
+                            <TableCell>{m.value.toLocaleString()}</TableCell>
+                            <TableCell>{m.date}</TableCell>
+                            <TableCell className="text-right">{m.isReached ? <Check className="h-4 w-4 text-green-500 ml-auto" /> : m.daysRemaining}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </>
           )}
           <ChartContainer config={upskillChartConfig} key={chartKey} className="min-h-[400px] w-full">
             <LineChart accessibilityLayer data={combinedUpskillData} margin={{ top: 5, right: 40, left: 10, bottom: 40 }}>
