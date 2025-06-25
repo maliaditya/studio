@@ -426,7 +426,7 @@ function DeepWorkPageContent() {
   
   const handleOpenDecompositionModal = (def: ExerciseDefinition) => {
     setSelectedFocusArea(def);
-    setEditableDecompositionData(def.decompositionData || decompositionTechniques);
+    setEditableDecompositionData(Array.isArray(def.decompositionData) ? def.decompositionData : decompositionTechniques);
     setIsDecompositionModalOpen(true);
     setIsDecompositionEditing(false);
   };
@@ -451,7 +451,8 @@ function DeepWorkPageContent() {
   };
   
   const handleCancelDecompositionEdit = () => {
-    setEditableDecompositionData(selectedFocusArea?.decompositionData || decompositionTechniques);
+    const data = selectedFocusArea?.decompositionData;
+    setEditableDecompositionData(Array.isArray(data) ? data : decompositionTechniques);
     setIsDecompositionEditing(false);
   };
 
