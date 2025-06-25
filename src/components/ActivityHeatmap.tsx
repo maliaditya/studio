@@ -4,7 +4,7 @@
 import React from 'react';
 import CalendarHeatmap from 'react-calendar-heatmap';
 import { subYears, format, parseISO } from 'date-fns';
-import type { FullSchedule } from '@/types/workout';
+import type { FullSchedule, Activity } from '@/types/workout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -23,12 +23,17 @@ export function ActivityHeatmap({ schedule }: ActivityHeatmapProps) {
   const oneYearAgo = subYears(today, 1);
 
   const heatmapValues: HeatmapValue[] = React.useMemo(() => Object.entries(schedule)
-    .filter(([date, dailySchedule]) => {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
-      return Object.values(dailySchedule).some(activity => activity.completed);
-    })
     .map(([date, dailySchedule]) => {
-      const completedActivities = Object.values(dailySchedule).filter(activity => activity.completed);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+
+      const completedActivities = Object.values(dailySchedule) // Gets Activity[][]
+        .flat() // Gets Activity[]
+        .filter(activity => activity && activity.completed);
+      
+      if (completedActivities.length === 0) {
+        return null;
+      }
+
       const count = completedActivities.length;
       const activities = completedActivities
         .map(a => a.details)
@@ -40,7 +45,9 @@ export function ActivityHeatmap({ schedule }: ActivityHeatmapProps) {
         count,
         activities,
       };
-    }), [schedule]);
+    })
+    .filter((value): value is HeatmapValue => value !== null), // filter out nulls
+  [schedule]);
     
   return (
     <Card className="mt-8 max-w-5xl mx-auto shadow-lg border-0 bg-transparent">

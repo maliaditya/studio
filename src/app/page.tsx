@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
+import { useToast } from '@/hooks/use-toast';
 
 const slots = [
   { name: 'Late Night', time: '12 AM - 4 AM', icon: <Moon className="h-6 w-6 text-indigo-400" /> },
@@ -77,6 +78,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
 function HomePageContent() {
   const { currentUser } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
   const [remainingTime, setRemainingTime] = useState('');
   const [schedule, setSchedule] = useState<FullSchedule>({});
@@ -106,11 +108,23 @@ function HomePageContent() {
         const storedSchedule = localStorage.getItem(scheduleStorageKey);
         if (storedSchedule) {
           const parsedSchedule: FullSchedule = JSON.parse(storedSchedule);
-          // Data migration: ensure all activities have a 'completed' property
+          // Data migration: ensure all slots have arrays of activities with IDs.
           Object.keys(parsedSchedule).forEach(dateKey => {
             Object.keys(parsedSchedule[dateKey]).forEach(slotName => {
-              if (parsedSchedule[dateKey][slotName].completed === undefined) {
-                parsedSchedule[dateKey][slotName].completed = false;
+              const slotContent = parsedSchedule[dateKey][slotName];
+              if (slotContent && !Array.isArray(slotContent)) {
+                // This is old data (a single activity object). Convert to an array.
+                const activity = slotContent as Activity;
+                parsedSchedule[dateKey][slotName] = [{
+                  ...activity,
+                  id: activity.id || `${activity.type}-${Date.now()}-${Math.random()}`,
+                }];
+              } else if (Array.isArray(slotContent)) {
+                // It's already an array. Ensure all items have an ID.
+                parsedSchedule[dateKey][slotName] = slotContent.map(activity => ({
+                  ...activity,
+                  id: activity.id || `${activity.type}-${Date.now()}-${Math.random()}`
+                }));
               }
             });
           });
@@ -196,6 +210,16 @@ function HomePageContent() {
 
   const handleAddActivity = (slotName: string, type: ActivityType) => {
     if (!currentUser?.username || !todayKey) return;
+    
+    const currentActivities = schedule[todayKey]?.[slotName] || [];
+    if (currentActivities.length >= 2) {
+      toast({
+        title: "Slot Full",
+        description: "You can add a maximum of two activities per slot.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     let details = '';
     switch (type) {
@@ -228,29 +252,49 @@ function HomePageContent() {
         break;
     }
 
+    const newActivity: Activity = {
+      id: `${type}-${Date.now()}`,
+      type,
+      details,
+      completed: false,
+    };
+
     setSchedule(prev => ({
       ...prev,
-      [todayKey]: { ...(prev[todayKey] || {}), [slotName]: { type, details, completed: false } }
+      [todayKey]: {
+        ...(prev[todayKey] || {}),
+        [slotName]: [...(prev[todayKey]?.[slotName] || []), newActivity]
+      }
     }));
   };
 
-  const handleRemoveActivity = (slotName: string) => {
+  const handleRemoveActivity = (slotName: string, activityId: string) => {
     if (!todayKey) return;
     setSchedule(prev => {
       const newTodaySchedule = { ...(prev[todayKey] || {}) };
-      delete newTodaySchedule[slotName];
+      const activities = newTodaySchedule[slotName] || [];
+      const updatedActivities = activities.filter(act => act.id !== activityId);
+      
+      if (updatedActivities.length > 0) {
+        newTodaySchedule[slotName] = updatedActivities;
+      } else {
+        delete newTodaySchedule[slotName]; // Clean up if slot becomes empty
+      }
+      
       return { ...prev, [todayKey]: newTodaySchedule };
     });
   };
 
-  const handleToggleComplete = (slotName: string) => {
+  const handleToggleComplete = (slotName: string, activityId: string) => {
     if (!todayKey) return;
     setSchedule(prev => {
       const todaySchedule = { ...(prev[todayKey] || {}) };
-      const activity = todaySchedule[slotName];
+      const activities = todaySchedule[slotName] || [];
 
-      if (activity) {
-        todaySchedule[slotName] = { ...activity, completed: !activity.completed };
+      if (activities.length > 0) {
+        todaySchedule[slotName] = activities.map(act => 
+            act.id === activityId ? { ...act, completed: !act.completed } : act
+        );
       }
 
       return { ...prev, [todayKey]: todaySchedule };
@@ -331,11 +375,11 @@ function HomePageContent() {
         <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
               {slots.map((slot) => {
-                const activity = todaysSchedule[slot.name];
+                const activities = todaysSchedule[slot.name];
                 return (
                   <Card 
                     key={slot.name} 
-                    className={`transition-all duration-300 ease-in-out transform hover:-translate-y-1 ${
+                    className={`transition-all duration-300 ease-in-out transform hover:-translate-y-1 flex flex-col ${
                       currentSlot === slot.name 
                       ? 'ring-2 ring-primary shadow-2xl bg-card' 
                       : 'shadow-md bg-card/60'
@@ -356,84 +400,89 @@ function HomePageContent() {
                         )}
                       </div>
                     </CardHeader>
-                    <CardContent className="flex flex-col justify-between min-h-[8rem]">
-                        {activity ? (
-                          <>
-                            <div 
-                              className={cn("flex-grow", activity.completed ? "opacity-60" : "cursor-pointer")}
-                              onClick={() => handleActivityClick(activity)}
-                            >
-                              <div className="flex items-center gap-2 mb-2">
-                                {activityIcons[activity.type]}
-                                <span className="font-semibold capitalize">
-                                  {activity.type === 'deepwork' ? 'Deep Work' : activity.type}
-                                </span>
+                    <CardContent className="flex flex-col flex-grow justify-between min-h-[8rem]">
+                      <div className="flex-grow space-y-2 mb-2">
+                        {activities && activities.length > 0 ? (
+                          activities.map((activity) => (
+                            <div key={activity.id} className="p-2.5 rounded-md border bg-card/70 shadow-sm">
+                              <div
+                                className={cn("flex items-start gap-3", activity.completed ? "opacity-60" : "cursor-pointer")}
+                                onClick={() => handleActivityClick(activity)}
+                              >
+                                <div className="pt-0.5">{activityIcons[activity.type]}</div>
+                                <div className="flex-grow">
+                                  <p className={cn("font-semibold text-foreground", activity.completed && "line-through")}>
+                                    {activity.details}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground capitalize">
+                                    {activity.type === 'deepwork' ? 'Deep Work' : activity.type}
+                                  </p>
+                                </div>
                               </div>
-                              <p className={cn("text-xl font-bold text-foreground", activity.completed && "line-through")}>
-                                {activity.details}
-                              </p>
-                            </div>
-                            <div className="flex items-center justify-between mt-4 pt-3 border-t">
+                              <div className="flex items-center justify-between mt-2 pt-2 border-t">
                                 <div className="flex items-center space-x-2">
-                                    <Checkbox id={`cb-${slot.name}`} checked={!!activity.completed} onCheckedChange={() => handleToggleComplete(slot.name)} />
-                                    <Label htmlFor={`cb-${slot.name}`} className="text-sm font-medium cursor-pointer text-muted-foreground">Mark as done</Label>
+                                  <Checkbox id={`cb-${activity.id}`} checked={!!activity.completed} onCheckedChange={() => handleToggleComplete(slot.name, activity.id)} />
+                                  <Label htmlFor={`cb-${activity.id}`} className="text-sm font-medium cursor-pointer text-muted-foreground">Mark as done</Label>
                                 </div>
-                                <Button variant="ghost" size="icon" onClick={() => handleRemoveActivity(slot.name)} className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                                    <Trash2 className="h-4 w-4" />
+                                <Button variant="ghost" size="icon" onClick={() => handleRemoveActivity(slot.name, activity.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                                  <Trash2 className="h-4 w-4" />
                                 </Button>
+                              </div>
                             </div>
-                          </>
+                          ))
                         ) : (
-                          <>
-                              {currentSlot === slot.name ? (
-                                <div className="flex-grow flex items-center justify-center">
-                                    <div className="text-center">
-                                        <p className="text-lg text-muted-foreground">Current Focus</p>
-                                    </div>
-                                </div>
-                              ) : (
-                                <p className="text-sm text-muted-foreground flex-grow flex items-center justify-center text-center px-4">
-                                    Plan an activity for this block.
-                                </p>
-                              )}
-                              <Popover>
-                                  <PopoverTrigger asChild>
-                                      <Button variant="outline" size="sm" className="mt-2 self-start">
-                                          <PlusCircle className="h-4 w-4 mr-2" />
-                                          Add Activity
-                                      </Button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-52 p-2">
-                                    <div className="grid gap-1">
-                                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'workout')}>
-                                        <Dumbbell className="h-4 w-4 mr-2" />
-                                        Add Workout
-                                      </Button>
-                                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'upskill')}>
-                                        <BookOpenCheck className="h-4 w-4 mr-2" />
-                                        Add Upskill
-                                      </Button>
-                                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'deepwork')}>
-                                        <Briefcase className="h-4 w-4 mr-2" />
-                                        Add Deep Work
-                                      </Button>
-                                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'planning')}>
-                                        <ClipboardList className="h-4 w-4 mr-2" />
-                                        Add Planning
-                                      </Button>
-                                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'reflection')}>
-                                        <Lightbulb className="h-4 w-4 mr-2" />
-                                        Add Reflection
-                                      </Button>
-                                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'journaling')}>
-                                        <PenSquare className="h-4 w-4 mr-2" />
-                                        Add Journaling
-                                      </Button>
-                                    </div>
-                                  </PopoverContent>
-                              </Popover>
-                          </>
+                          <div className="flex-grow flex items-center justify-center h-full">
+                            {currentSlot === slot.name ? (
+                              <div className="text-center">
+                                <p className="text-lg text-muted-foreground">Current Focus</p>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground text-center px-4">
+                                Plan an activity for this block.
+                              </p>
+                            )}
+                          </div>
                         )}
+                      </div>
+
+                      {(!activities || activities.length < 2) && (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="mt-auto self-start w-full">
+                              <PlusCircle className="h-4 w-4 mr-2" />
+                              Add Activity
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-52 p-2">
+                            <div className="grid gap-1">
+                              <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'workout')}>
+                                <Dumbbell className="h-4 w-4 mr-2" />
+                                Add Workout
+                              </Button>
+                              <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'upskill')}>
+                                <BookOpenCheck className="h-4 w-4 mr-2" />
+                                Add Upskill
+                              </Button>
+                              <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'deepwork')}>
+                                <Briefcase className="h-4 w-4 mr-2" />
+                                Add Deep Work
+                              </Button>
+                              <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'planning')}>
+                                <ClipboardList className="h-4 w-4 mr-2" />
+                                Add Planning
+                              </Button>
+                              <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'reflection')}>
+                                <Lightbulb className="h-4 w-4 mr-2" />
+                                Add Reflection
+                              </Button>
+                              <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'journaling')}>
+                                <PenSquare className="h-4 w-4 mr-2" />
+                                Add Journaling
+                              </Button>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      )}
                     </CardContent>
                   </Card>
                 )
@@ -459,7 +508,3 @@ function HomePageContent() {
 export default function Page() {
     return ( <AuthGuard> <HomePageContent /> </AuthGuard> );
 }
-
-    
-
-    

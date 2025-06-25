@@ -91,12 +91,11 @@ export type UserDietPlan = EditableMealPlan[];
 export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'reflection' | 'journaling';
 
 export type Activity = {
+  id: string;
   type: ActivityType;
   details: string;
   completed: boolean;
 };
 
-export type DailySchedule = Record<string, Activity>; // Slot name -> Activity
+export type DailySchedule = Record<string, Activity[]>; // Slot name -> Array of Activities
 export type FullSchedule = Record<string, DailySchedule>; // Date key -> DailySchedule
-
-    
