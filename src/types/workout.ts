@@ -88,10 +88,15 @@ export interface EditableMealPlan {
 export type UserDietPlan = EditableMealPlan[];
 
 // Types for homepage schedule
+export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'reflection' | 'journaling';
+
 export type Activity = {
-  type: 'workout' | 'upskill';
+  type: ActivityType;
   details: string;
   completed: boolean;
 };
+
 export type DailySchedule = Record<string, Activity>; // Slot name -> Activity
 export type FullSchedule = Record<string, DailySchedule>; // Date key -> DailySchedule
+
+    

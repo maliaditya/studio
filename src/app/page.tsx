@@ -4,14 +4,14 @@
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Sunrise, Sun, Sunset, Moon, MoonStar, CloudSun, PlusCircle, Trash2, Dumbbell, BookOpenCheck } from 'lucide-react';
+import { BrainCircuit, Sunrise, Sun, Sunset, Moon, MoonStar, CloudSun, PlusCircle, Trash2, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, Lightbulb, PenSquare } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { format, getDay, getISOWeek } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity, ActivityType } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -63,6 +63,15 @@ const INITIAL_PLANS: AllWorkoutPlans = {
     "W4": { "Chest": ["Dumbbell Flat Press", "Incline Dumbbell Press", "Dumbbell Pullovers", "Cable Fly"], "Triceps": ["Overhead Cable Extension", "Straight bar pushdown", "Reversebar pushdown", "Back dips"], "Back": ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle pulldown Cable", "DeadLifts"], "Biceps": ["Seated Machine Curls", "Cable Curls", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable"], "Legs": ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"] },
     "W5": { "Chest": ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine", "Cable Fly", "Dumbbell Pullovers"], "Triceps": ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Straight bar pushdown", "Reversebar pushdown", "Back dips"], "Back": ["Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull", "1-Arm Dumbbell Row", "DeadLifts"], "Biceps": ["Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)", "Reversed cable curls", "Reversed Incline curls"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Cable Upright Rows", "Front Raise Dumbbells", "Shrugs"], "Legs": ["Squats (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine", "Walking Lunges (Barbell)", "Calf Raises"] },
     "W6": { "Chest": ["Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Peck Machine", "Flat Bench Chest Fly", "Dumbbell Pullovers"], "Triceps": ["Overhead Cable Extension", "Single Arm Dumbbell Extensions", "Rope Pushdown", "Straight bar pushdown", "Reversebar pushdown", "Back dips"], "Back": ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle pulldown Cable", "Barbell Row", "Lat Prayer Pull", "Back extensions"], "Biceps": ["Strict bar curls", "Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher Curls Bar", "Reverse Cable", "Concentration Curl"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable", "Cable Upright Rows", "Shrugs"], "Legs": ["Walking Lunges (Barbell)", "Hack Squats", "Hamstring machine", "Quads Machine", "Leg Press", "Calf Raises"] }
+};
+
+const activityIcons: Record<ActivityType, React.ReactNode> = {
+  workout: <Dumbbell className="h-5 w-5 text-primary" />,
+  upskill: <BookOpenCheck className="h-5 w-5 text-primary" />,
+  deepwork: <Briefcase className="h-5 w-5 text-primary" />,
+  planning: <ClipboardList className="h-5 w-5 text-primary" />,
+  reflection: <Lightbulb className="h-5 w-5 text-primary" />,
+  journaling: <PenSquare className="h-5 w-5 text-primary" />,
 };
 
 function HomePageContent() {
@@ -185,22 +194,38 @@ function HomePageContent() {
     return () => clearInterval(timerInterval);
   }, []);
 
-  const handleAddActivity = (slotName: string, type: 'workout' | 'upskill') => {
+  const handleAddActivity = (slotName: string, type: ActivityType) => {
     if (!currentUser?.username || !todayKey) return;
 
     let details = '';
-    if (type === 'workout') {
-      const dayOfWeek = getDay(new Date());
-      let muscleGroups: string[] = [];
-      if (workoutMode === 'one-muscle') {
-        const muscle = singleMuscleDailySchedule[dayOfWeek];
-        if (muscle) muscleGroups = [muscle];
-      } else {
-        muscleGroups = dailyMuscleGroups[dayOfWeek] || [];
+    switch (type) {
+      case 'workout': {
+        const dayOfWeek = getDay(new Date());
+        let muscleGroups: string[] = [];
+        if (workoutMode === 'one-muscle') {
+          const muscle = singleMuscleDailySchedule[dayOfWeek];
+          if (muscle) muscleGroups = [muscle];
+        } else {
+          muscleGroups = dailyMuscleGroups[dayOfWeek] || [];
+        }
+        details = muscleGroups.join(' & ') || "Rest Day";
+        break;
       }
-      details = muscleGroups.join(' & ') || "Rest Day";
-    } else {
-      details = 'Learning Session';
+      case 'upskill':
+        details = 'Learning Session';
+        break;
+      case 'deepwork':
+        details = 'Deep Work';
+        break;
+      case 'planning':
+        details = 'Planning Session';
+        break;
+      case 'reflection':
+        details = 'Reflection';
+        break;
+      case 'journaling':
+        details = 'Journaling';
+        break;
     }
 
     setSchedule(prev => ({
@@ -339,10 +364,10 @@ function HomePageContent() {
                               onClick={() => handleActivityClick(activity)}
                             >
                               <div className="flex items-center gap-2 mb-2">
-                                  {activity.type === 'workout' 
-                                      ? <Dumbbell className="h-5 w-5 text-primary" /> 
-                                      : <BookOpenCheck className="h-5 w-5 text-primary" />}
-                                  <span className="font-semibold capitalize">{activity.type}</span>
+                                {activityIcons[activity.type]}
+                                <span className="font-semibold capitalize">
+                                  {activity.type === 'deepwork' ? 'Deep Work' : activity.type}
+                                </span>
                               </div>
                               <p className={cn("text-xl font-bold text-foreground", activity.completed && "line-through")}>
                                 {activity.details}
@@ -378,17 +403,33 @@ function HomePageContent() {
                                           Add Activity
                                       </Button>
                                   </PopoverTrigger>
-                                  <PopoverContent className="w-48 p-2">
-                                      <div className="grid gap-1">
-                                          <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'workout')}>
-                                              <Dumbbell className="h-4 w-4 mr-2" />
-                                              Add Workout
-                                          </Button>
-                                          <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'upskill')}>
-                                              <BookOpenCheck className="h-4 w-4 mr-2" />
-                                              Add Upskill
-                                          </Button>
-                                      </div>
+                                  <PopoverContent className="w-52 p-2">
+                                    <div className="grid gap-1">
+                                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'workout')}>
+                                        <Dumbbell className="h-4 w-4 mr-2" />
+                                        Add Workout
+                                      </Button>
+                                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'upskill')}>
+                                        <BookOpenCheck className="h-4 w-4 mr-2" />
+                                        Add Upskill
+                                      </Button>
+                                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'deepwork')}>
+                                        <Briefcase className="h-4 w-4 mr-2" />
+                                        Add Deep Work
+                                      </Button>
+                                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'planning')}>
+                                        <ClipboardList className="h-4 w-4 mr-2" />
+                                        Add Planning
+                                      </Button>
+                                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'reflection')}>
+                                        <Lightbulb className="h-4 w-4 mr-2" />
+                                        Add Reflection
+                                      </Button>
+                                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'journaling')}>
+                                        <PenSquare className="h-4 w-4 mr-2" />
+                                        Add Journaling
+                                      </Button>
+                                    </div>
                                   </PopoverContent>
                               </Popover>
                           </>
@@ -418,5 +459,7 @@ function HomePageContent() {
 export default function Page() {
     return ( <AuthGuard> <HomePageContent /> </AuthGuard> );
 }
+
+    
 
     
