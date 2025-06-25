@@ -12,7 +12,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO, getDay, getISOWeek, isMonday, getYear, parse, getISOWeekYear, addWeeks, startOfISOWeek, setISOWeek, differenceInDays, subYears, addDays, differenceInYears } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans, WeightLog, Gender, UserDietPlan } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans, WeightLog, Gender, UserDietPlan, WorkoutPlan } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -638,24 +638,27 @@ function WorkoutPageContent() {
           const muscleGroupsForDay = dailyMuscleGroups[dayOfWeek];
           if (!muscleGroupsForDay || muscleGroupsForDay.length === 0) return prevLogs;
           
-          let currentPlan: any = null;
-          let planName = "";
+          let currentPlan: WorkoutPlan;
+          let planName: string;
 
-          if (dayOfWeek >= 1 && dayOfWeek <= 3) { // Monday, Tuesday, Wednesday
-            currentPlan = isOddWeek ? workoutPlans.W1 : workoutPlans.W3;
-            planName = isOddWeek ? 'W1' : 'W3';
-          } else { // Thursday, Friday, Saturday
-            currentPlan = isOddWeek ? workoutPlans.W2 : workoutPlans.W4;
-            planName = isOddWeek ? 'W2' : 'W4';
+          if (isOddWeek) {
+            planName = (dayOfWeek <= 3) ? 'W1' : 'W2';
+            currentPlan = (dayOfWeek <= 3) ? workoutPlans.W1 : workoutPlans.W2;
+          } else { // Even week
+            planName = (dayOfWeek <= 3) ? 'W3' : 'W4';
+            currentPlan = (dayOfWeek <= 3) ? workoutPlans.W3 : workoutPlans.W4;
           }
           
           if (!currentPlan) return prevLogs;
-
+          
           toastDescription = `Added ${planName} exercises for ${muscleGroupsForDay.join(' & ')}.`;
-          muscleGroupsForDay.forEach(muscleGroup => {
-            const exerciseNames = (currentPlan as any)[muscleGroup] as string[] | undefined;
+          
+          for (const muscleGroup of muscleGroupsForDay) {
+            const category = muscleGroup as ExerciseCategory;
+            const exerciseNames = currentPlan[category];
+
             if (exerciseNames) {
-              exerciseNames.forEach(exName => {
+              for (const exName of exerciseNames) {
                 const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
                 if (definition && !exercisesToAdd.some(e => e.definitionId === definition.id)) {
                   exercisesToAdd.push({
@@ -668,10 +671,10 @@ function WorkoutPageContent() {
                     targetReps: DEFAULT_TARGET_REPS,
                   });
                 }
-              });
+              }
             }
-          });
-      } else { // 'one-muscle' mode
+          }
+      } else if (workoutMode === 'one-muscle') {
           const isoWeek = getISOWeek(selectedDate);
           const isOddWeek = isoWeek % 2 !== 0;
           const plan = isOddWeek ? workoutPlans.W5 : workoutPlans.W6;

@@ -12,7 +12,7 @@ import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO } from 
 import { useRouter } from 'next/navigation';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysLearningModal } from '@/components/TodaysLearningModal';
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity, ActivityType, DatedWorkout, TopicGoal } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity, ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
@@ -395,37 +395,39 @@ function HomePageContent() {
   const getTodaysWorkout = () => {
     const today = new Date();
     const dayOfWeek = getDay(today);
-    
+    const exercisesToAdd: WorkoutExercise[] = [];
     let muscleGroupsForDay: string[] = [];
-    let plan: any = null;
-
+    let plan: WorkoutPlan | null = null;
+  
     if (workoutMode === 'two-muscle') {
       const isoWeek = getISOWeek(today);
       const isOddWeek = isoWeek % 2 !== 0;
-
       muscleGroupsForDay = dailyMuscleGroups[dayOfWeek] || [];
-
+  
       if (muscleGroupsForDay.length > 0) {
-        if (dayOfWeek >= 1 && dayOfWeek <= 3) { // Mon, Tue, Wed
-          plan = isOddWeek ? workoutPlans.W1 : workoutPlans.W3;
-        } else { // Thu, Fri, Sat
-          plan = isOddWeek ? workoutPlans.W2 : workoutPlans.W4;
+        if (isOddWeek) {
+          plan = (dayOfWeek <= 3) ? workoutPlans.W1 : workoutPlans.W2;
+        } else { // Even week
+          plan = (dayOfWeek <= 3) ? workoutPlans.W3 : workoutPlans.W4;
         }
       }
-    } else { // 'one-muscle' mode
+    } else if (workoutMode === 'one-muscle') {
       const isoWeek = getISOWeek(today);
       const isOddWeek = isoWeek % 2 !== 0;
       plan = isOddWeek ? workoutPlans.W5 : workoutPlans.W6;
       const muscleGroupForDay = singleMuscleDailySchedule[dayOfWeek];
-      if (muscleGroupForDay) muscleGroupsForDay = [muscleGroupForDay];
+      if (muscleGroupForDay) {
+        muscleGroupsForDay = [muscleGroupForDay];
+      }
     }
-    
-    const exercisesToAdd: WorkoutExercise[] = [];
+  
     if (plan && muscleGroupsForDay.length > 0) {
-      muscleGroupsForDay.forEach(muscleGroup => {
-        const exerciseNames = (plan as any)[muscleGroup] as string[] | undefined;
+      for (const muscleGroup of muscleGroupsForDay) {
+        const category = muscleGroup as ExerciseCategory;
+        const exerciseNames = (plan as WorkoutPlan)[category];
+  
         if (exerciseNames) {
-          exerciseNames.forEach(exName => {
+          for (const exName of exerciseNames) {
             const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
             if (definition && !exercisesToAdd.some(e => e.definitionId === definition.id)) {
               const lastPerformance = findLastPerformance(definition.id);
@@ -434,13 +436,15 @@ function HomePageContent() {
                 definitionId: definition.id,
                 name: definition.name,
                 category: definition.category,
-                loggedSets: [], targetSets: 4, targetReps: "8-12",
+                loggedSets: [],
+                targetSets: 4,
+                targetReps: "8-12",
                 lastPerformance,
               });
             }
-          });
+          }
         }
-      });
+      }
     }
     return { exercises: exercisesToAdd, muscleGroups: muscleGroupsForDay };
   };
@@ -887,5 +891,3 @@ function HomePageContent() {
 export default function Page() {
     return ( <AuthGuard> <HomePageContent /> </AuthGuard> );
 }
-
-    
