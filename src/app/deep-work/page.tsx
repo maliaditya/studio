@@ -37,6 +37,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { WeightChartModal } from '@/components/WeightChartModal';
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
@@ -84,6 +91,9 @@ function DeepWorkPageContent() {
 
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   const [today, setToday] = useState<Date | null>(null);
+
+  const [isDecompositionModalOpen, setIsDecompositionModalOpen] = useState(false);
+  const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
 
   const decompositionTechniques = [
     {
@@ -409,6 +419,11 @@ function DeepWorkPageContent() {
     setIsProgressModalOpen(true);
   };
   
+  const handleOpenDecompositionModal = (def: ExerciseDefinition) => {
+    setSelectedFocusArea(def);
+    setIsDecompositionModalOpen(true);
+  };
+
   const handleLogWeight = (weight: number, date: Date) => {
     if (!currentUser) return;
     const year = getYear(date);
@@ -566,6 +581,7 @@ function DeepWorkPageContent() {
                                           <Badge variant="secondary" className="text-xs ml-0 my-0.5">{def.category}</Badge>
                                       </div>
                                       <div className="flex-shrink-0 flex items-center">
+                                        <Button variant="ghost" size="icon" onClick={() => handleOpenDecompositionModal(def)} className="h-8 w-8 text-muted-foreground hover:text-yellow-500" aria-label={`View decomposition techniques for ${def.name}`}> <Puzzle className="h-4 w-4" /> </Button>
                                         <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
                                         <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8 text-muted-foreground hover:text-primary" aria-label={`Edit ${def.name}`}> <Edit3 className="h-4 w-4" /> </Button>
                                         <Button variant="ghost" size="icon" onClick={() => handleDeleteExerciseDefinition(def.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label={`Delete ${def.name}`}> <Trash2 className="h-4 w-4" /> </Button>
@@ -703,37 +719,6 @@ function DeepWorkPageContent() {
                   </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg text-primary">
-                    <Puzzle /> Modular Decomposition
-                  </CardTitle>
-                  <CardDescription>
-                    Key techniques for breaking down and optimizing complex scenes.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[200px]">Technique</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Use Cases</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {decompositionTechniques.map((item) => (
-                        <TableRow key={item.technique}>
-                          <TableCell className="font-medium">{item.technique}</TableCell>
-                          <TableCell>{item.description}</TableCell>
-                          <TableCell>{item.useCases}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-
               <div>
                 <WorkoutHeatmap
                   allWorkoutLogs={allWorkoutLogs}
@@ -787,6 +772,35 @@ function DeepWorkPageContent() {
         onSetDateOfBirth={(dob) => setDateOfBirth(dob)}
         onSetGender={(g) => setGender(g)}
       />
+
+      <Dialog open={isDecompositionModalOpen} onOpenChange={setIsDecompositionModalOpen}>
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Decomposition Techniques for: {selectedFocusArea?.name}</DialogTitle>
+            <DialogDescription>
+                Key techniques for breaking down and optimizing complex scenes.
+            </DialogDescription>
+          </DialogHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[200px]">Technique</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Use Cases</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {decompositionTechniques.map((item) => (
+                <TableRow key={item.technique}>
+                  <TableCell className="font-medium">{item.technique}</TableCell>
+                  <TableCell>{item.description}</TableCell>
+                  <TableCell>{item.useCases}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
