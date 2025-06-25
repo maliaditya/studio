@@ -366,7 +366,9 @@ function HomePageContent() {
     const healthDone = completedActivities.some(act => act.type === 'workout');
     const wealthDone = completedActivities.some(act => act.type === 'deepwork');
     const growthDone = completedActivities.some(act => act.type === 'upskill');
-    const directionDone = completedActivities.some(act => act.type === 'planning' || act.type === 'tracking');
+    const planningDone = completedActivities.some(act => act.type === 'planning');
+    const trackingDone = completedActivities.some(act => act.type === 'tracking');
+    const directionDone = planningDone && trackingDone;
 
     return { health: healthDone, wealth: wealthDone, growth: growthDone, direction: directionDone };
   }, [schedule, todayKey]);
