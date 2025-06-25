@@ -769,10 +769,21 @@ function WorkoutPageContent() {
 
   const handleWorkoutModeChange = (newMode: WorkoutMode) => {
     if (newMode === workoutMode) return;
-
+  
+    const hasLoggedData = currentDatedWorkout?.exercises.some(ex => ex.loggedSets.length > 0);
+  
+    if (hasLoggedData) {
+      toast({
+        title: "Cannot Change Mode",
+        description: "You have already logged sets for this workout. Please clear the logged sets before changing the workout mode.",
+        variant: "destructive"
+      });
+      return; // Prevent switching
+    }
+  
     // Set the new mode state
     setWorkoutMode(newMode);
-
+  
     // Remove the current day's workout log. This will trigger the auto-population
     // useEffect to regenerate the workout with the new mode.
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
