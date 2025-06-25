@@ -130,7 +130,7 @@ const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
 const INITIAL_PLANS: AllWorkoutPlans = {
     "W1": {
       "Chest": [ "Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine" ],
-      "Triceps": [ "Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Cable Rope Pushdown (Slow)" ],
+      "Triceps": [ "Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Rope Pushdown" ],
       "Back": [ "Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull" ],
       "Biceps": [ "Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)" ],
       "Shoulders": [ "Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Shrugs" ],
@@ -146,7 +146,7 @@ const INITIAL_PLANS: AllWorkoutPlans = {
     },
     "W3": {
       "Chest": [ "Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine" ],
-      "Triceps": [ "Overhead Cable Extension", "Straight bar pushdown", "Reverse-grip pushdown", "Back dips" ],
+      "Triceps": [ "Overhead Cable Extension", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips" ],
       "Back": [ "Lat Pulldown", "Barbell Row", "Seated Row", "Lat Prayer Pull" ],
       "Biceps": [ "Strict bar curls", "Reversed Incline curls", "Cable Curls Superset", "Reversed cable curls" ],
       "Shoulders": [ "Seated Dumbbell Shoulder Press", "Dumbbell Lateral Raise (Lean in)", "Face Pulls", "Shrugs" ],
@@ -154,7 +154,7 @@ const INITIAL_PLANS: AllWorkoutPlans = {
     },
     "W4": {
       "Chest": [ "Dumbbell Flat Press", "Incline Dumbbell Press", "Dumbbell Pullovers", "Cable Fly" ],
-      "Triceps": [ "Overhead Cable Extension", "Straight bar pushdown", "Reverse-grip pushdown", "Back dips" ],
+      "Triceps": [ "Overhead Cable Extension", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips" ],
       "Back": [ "Lat Pulldown", "1-Arm Dumbbell Row", "V handle lat pulldown", "DeadLifts" ],
       "Biceps": [ "Seated Machine Curls", "Cable Curls", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)" ],
       "Shoulders": [ "Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable" ],
@@ -162,7 +162,7 @@ const INITIAL_PLANS: AllWorkoutPlans = {
     },
     "W5": {
       "Chest": [ "Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine", "Cable Fly", "Dumbbell Pullovers" ],
-      "Triceps": [ "Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Straight bar pushdown", "Reverse-grip pushdown", "Back dips" ],
+      "Triceps": [ "Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips" ],
       "Back": [ "Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull", "1-Arm Dumbbell Row", "DeadLifts" ],
       "Biceps": [ "Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)", "Reversed cable curls", "Reversed Incline curls" ],
       "Shoulders": [ "Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Cable Upright Rows", "Front Raise Dumbbells", "Shrugs" ],
@@ -170,7 +170,7 @@ const INITIAL_PLANS: AllWorkoutPlans = {
     },
     "W6": {
       "Chest": [ "Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Peck Machine", "Flat Bench Chest Fly", "Dumbbell Pullovers" ],
-      "Triceps": [ "Overhead Cable Extension", "Single Arm Dumbbell Extensions", "Rope Pushdown", "Straight bar pushdown", "Reverse-grip pushdown", "Back dips" ],
+      "Triceps": [ "Overhead Cable Extension", "Single Arm Dumbbell Extensions", "Rope Pushdown", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips" ],
       "Back": [ "Lat Pulldown", "1-Arm Dumbbell Row", "V handle lat pulldown", "Barbell Row", "Lat Prayer Pull", "Back extensions" ],
       "Biceps": [ "Strict bar curls", "Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher Curls Bar", "Reverse Cable", "Concentration Curl" ],
       "Shoulders": [ "Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable", "Cable Upright Rows", "Shrugs" ],
@@ -390,96 +390,86 @@ function WorkoutPageContent() {
     }
   }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, workoutMode, workoutPlans, weightLogs, goalWeight, height, dateOfBirth, gender]);
 
+  // This useEffect is responsible for auto-populating the workout for the selected date
+  // if one doesn't already exist. It has been rewritten for clarity and correctness.
   useEffect(() => {
-    if (!currentUser || exerciseDefinitions.length === 0 || Object.keys(workoutPlans).length === 0) return;
-  
-    // This function encapsulates the logic for generating a day's workout.
-    // It is defined inside the useEffect to ensure it always uses the latest state.
-    const getExercisesForDay = (date: Date, mode: WorkoutMode, plans: AllWorkoutPlans, definitions: ExerciseDefinition[]) => {
-      const dayOfWeek = getDay(date);
-      const isoWeek = getISOWeek(date);
-  
-      let muscleGroups: ExerciseCategory[] = [];
+    // Guard clauses to prevent running with incomplete data or on a non-logged-in user
+    if (!currentUser || exerciseDefinitions.length === 0 || Object.keys(workoutPlans).length === 0 || !workoutMode) {
+      return;
+    }
+
+    const dateKey = format(selectedDate, 'yyyy-MM-dd');
+    const workoutExists = allWorkoutLogs.some(log => log.id === dateKey);
+
+    // Only populate if no workout exists for the selected date
+    if (!workoutExists) {
+      const dayOfWeek = getDay(selectedDate);
+      const isoWeek = getISOWeek(selectedDate);
+      
+      let muscleGroupsForDay: ExerciseCategory[] = [];
       let planKey: keyof AllWorkoutPlans | null = null;
   
-      if (mode === 'two-muscle') {
-        muscleGroups = (dailyMuscleGroups[dayOfWeek] || []) as ExerciseCategory[];
-        if (muscleGroups.length > 0) {
+      // Determine plan and muscle groups based on workout mode
+      if (workoutMode === 'two-muscle') {
+        muscleGroupsForDay = (dailyMuscleGroups[dayOfWeek] || []) as ExerciseCategory[];
+        if (muscleGroupsForDay.length > 0) { // Check if it's a workout day
           const isOddWeek = isoWeek % 2 !== 0;
-          if (dayOfWeek >= 1 && dayOfWeek <= 3) { // Mon, Tue, Wed
-            planKey = isOddWeek ? 'W1' : 'W3';
-          } else { // Thu, Fri, Sat
-            planKey = isOddWeek ? 'W2' : 'W4';
-          }
+          planKey = isOddWeek
+            ? ((dayOfWeek >= 1 && dayOfWeek <= 3) ? 'W1' : 'W2') // Mon-Wed: W1, Thu-Sat: W2 on odd weeks
+            : ((dayOfWeek >= 1 && dayOfWeek <= 3) ? 'W3' : 'W4'); // Mon-Wed: W3, Thu-Sat: W4 on even weeks
         }
-      } else { // one-muscle
+      } else { // 'one-muscle' mode
         const muscle = singleMuscleDailySchedule[dayOfWeek];
         if (muscle) {
-          muscleGroups = [muscle];
+          muscleGroupsForDay = [muscle];
           const isOddWeek = isoWeek % 2 !== 0;
           planKey = isOddWeek ? 'W5' : 'W6';
         }
       }
-  
-      if (!planKey || muscleGroups.length === 0) {
-        return { exercises: [], description: "Rest day." };
-      }
-  
-      const plan = plans[planKey];
-      if (!plan) {
-        return { exercises: [], description: `Plan ${planKey} not found.` };
-      }
-  
-      const definitionsMap = new Map(definitions.map(def => [def.name.toLowerCase(), def]));
-  
-      const exerciseNamesFromPlan = muscleGroups.flatMap(mg => plan[mg] || []);
-  
-      const exercisesToAdd = exerciseNamesFromPlan
-        .map(name => {
-            const definition = definitionsMap.get(name.toLowerCase());
-            if (!definition) {
-              console.warn(`Definition not found for exercise: "${name}" in plan ${planKey}`);
-              return null;
+      
+      // If we have a valid plan and it's not a rest day, generate the workout
+      if (planKey && muscleGroupsForDay.length > 0) {
+        const plan = workoutPlans[planKey];
+        if (plan) {
+          const definitionsMap = new Map(exerciseDefinitions.map(def => [def.name.toLowerCase(), def]));
+          const exercisesToAdd: WorkoutExercise[] = [];
+
+          // Explicitly loop through muscle groups and their exercises to avoid functional programming bugs
+          for (const muscleGroup of muscleGroupsForDay) {
+            const exerciseNames = plan[muscleGroup];
+            if (Array.isArray(exerciseNames)) {
+              for (const name of exerciseNames) {
+                const definition = definitionsMap.get(name.toLowerCase());
+                if (definition) {
+                  exercisesToAdd.push({
+                    id: `${definition.id}-${Date.now()}-${Math.random()}`,
+                    definitionId: definition.id,
+                    name: definition.name,
+                    category: definition.category,
+                    loggedSets: [],
+                    targetSets: DEFAULT_TARGET_SETS,
+                    targetReps: DEFAULT_TARGET_REPS,
+                  });
+                } else {
+                  // This log helps debug if an exercise in a plan doesn't have a matching definition
+                  console.warn(`Definition not found for exercise: "${name}" in plan ${planKey}`);
+                }
+              }
             }
-            return {
-                id: `${definition.id}-${Date.now()}-${Math.random()}`,
-                definitionId: definition.id,
-                name: definition.name,
-                category: definition.category,
-                loggedSets: [],
-                targetSets: DEFAULT_TARGET_SETS,
-                targetReps: DEFAULT_TARGET_REPS,
-            };
-        })
-        .filter((ex): ex is WorkoutExercise => ex !== null)
-        .filter((ex, index, self) => 
-            index === self.findIndex((t) => t.definitionId === ex.definitionId)
-        );
+          }
   
-      const description = `Added ${planKey} exercises for ${muscleGroups.join(' & ')}.`;
-      return { exercises: exercisesToAdd, description };
-    };
-
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-  
-    const workoutExists = allWorkoutLogs.some(log => log.id === dateKey);
-    if (workoutExists) {
-        return;
+          if (exercisesToAdd.length > 0) {
+            const newDatedWorkout: DatedWorkout = { id: dateKey, date: dateKey, exercises: exercisesToAdd };
+            setAllWorkoutLogs(prevLogs => [...prevLogs, newDatedWorkout]);
+            toast({
+              title: "Workout Autopopulated!",
+              description: `Added ${planKey} exercises for ${muscleGroupsForDay.join(' & ')}.`,
+            });
+          }
+        }
+      }
     }
-    
-    // Call the generation function with the latest state
-    const { exercises, description } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
-
-    if (exercises.length > 0) {
-        const newDatedWorkout: DatedWorkout = { id: dateKey, date: dateKey, exercises: exercises };
-        setAllWorkoutLogs(prevLogs => [...prevLogs, newDatedWorkout]);
-        toast({ 
-          title: "Workout Autopopulated!", 
-          description: description
-        });
-    }
-  
-  }, [selectedDate, currentUser, exerciseDefinitions, workoutMode, workoutPlans, allWorkoutLogs, toast]);
+  }, [selectedDate, currentUser, exerciseDefinitions, workoutMode, workoutPlans]);
 
   // Check for backup prompt on Mondays
   useEffect(() => {

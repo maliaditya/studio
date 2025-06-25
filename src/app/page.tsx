@@ -63,7 +63,7 @@ const singleMuscleDailySchedule: Record<number, string | null> = {
 const INITIAL_PLANS: AllWorkoutPlans = {
     "W1": {
       "Chest": [ "Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine" ],
-      "Triceps": [ "Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Cable Rope Pushdown (Slow)" ],
+      "Triceps": [ "Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Rope Pushdown" ],
       "Back": [ "Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull" ],
       "Biceps": [ "Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)" ],
       "Shoulders": [ "Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Shrugs" ],
@@ -71,7 +71,7 @@ const INITIAL_PLANS: AllWorkoutPlans = {
     },
     "W2": {
       "Chest": [ "Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Cable Fly" ],
-      "Triceps": [ "Overhead Dumbbell Extension", "Overhead Cable Extension", "Rope Pushdown", "Dumbbell Kickback" ],
+      "Triceps": [ "Overhead Dumbbell Extension", "Overhead Bar extension", "Rope Pushdown", "Dumbbell Kickback" ],
       "Back": [ "Lat Pulldown (Wide Grip)", "V handle lat pulldown", "1-Arm Dumbbell Row", "Back extensions" ],
       "Biceps": [ "Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Reverse Cable" ],
       "Shoulders": [ "Seated Dumbbell Shoulder Press", "Seated Dumbbell Lateral Raise", "Rear Delt Fly (Incline Bench)", "Cable Upright Rows" ],
@@ -102,8 +102,8 @@ const INITIAL_PLANS: AllWorkoutPlans = {
       "Legs": [ "Squats (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine", "Walking Lunges (Barbell)", "Calfs (Bodyweight)" ]
     },
     "W6": {
-      "Chest": [ "Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Peck Machine", "Dumbbell Chest Fly", "Dumbbell Pullovers" ],
-      "Triceps": [ "Overhead Cable Extension", "Double-Arm Dumbbell Kickback", "Rope Pushdown", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips" ],
+      "Chest": [ "Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Peck Machine", "Flat Bench Chest Fly", "Dumbbell Pullovers" ],
+      "Triceps": [ "Overhead Cable Extension", "Single Arm Dumbbell Extensions", "Rope Pushdown", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips" ],
       "Back": [ "Lat Pulldown", "1-Arm Dumbbell Row", "V handle lat pulldown", "Barbell Row", "Lat Prayer Pull", "Back extensions" ],
       "Biceps": [ "Strict bar curls", "Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher Curls Bar", "Reverse Cable", "Concentration Curl" ],
       "Shoulders": [ "Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable", "Cable Upright Rows", "Shrugs" ],
@@ -441,56 +441,66 @@ function HomePageContent() {
     const today = new Date();
     const dayOfWeek = getDay(today);
     const isoWeek = getISOWeek(today);
-    const isOddWeek = isoWeek % 2 !== 0;
-
+    
     let muscleGroupsForDay: ExerciseCategory[] = [];
     let planKey: keyof AllWorkoutPlans | null = null;
-
+    
+    // Determine plan and muscle groups based on workout mode
     if (workoutMode === 'two-muscle') {
-        muscleGroupsForDay = (dailyMuscleGroups[dayOfWeek] || []) as ExerciseCategory[];
-        if (muscleGroupsForDay.length > 0) {
-            planKey = isOddWeek
-                ? ((dayOfWeek >= 1 && dayOfWeek <= 3) ? 'W1' : 'W2')
-                : ((dayOfWeek >= 1 && dayOfWeek <= 3) ? 'W3' : 'W4');
-        }
-    } else { // one-muscle
-        const muscle = singleMuscleDailySchedule[dayOfWeek];
-        if (muscle) {
-            muscleGroupsForDay = [muscle as ExerciseCategory];
-            planKey = isOddWeek ? 'W5' : 'W6';
-        }
+      muscleGroupsForDay = (dailyMuscleGroups[dayOfWeek] || []) as ExerciseCategory[];
+      if (muscleGroupsForDay.length > 0) {
+        const isOddWeek = isoWeek % 2 !== 0;
+        planKey = isOddWeek
+          ? ((dayOfWeek >= 1 && dayOfWeek <= 3) ? 'W1' : 'W2')
+          : ((dayOfWeek >= 1 && dayOfWeek <= 3) ? 'W3' : 'W4');
+      }
+    } else { // 'one-muscle' mode
+      const muscle = singleMuscleDailySchedule[dayOfWeek];
+      if (muscle) {
+        muscleGroupsForDay = [muscle as ExerciseCategory];
+        const isOddWeek = isoWeek % 2 !== 0;
+        planKey = isOddWeek ? 'W5' : 'W6';
+      }
     }
 
     if (!planKey || muscleGroupsForDay.length === 0) {
-        return { exercises: [], muscleGroups: [] };
+      return { exercises: [], muscleGroups: [] };
     }
 
     const plan = workoutPlans[planKey];
     if (!plan) {
-        return { exercises: [], muscleGroups: muscleGroupsForDay };
+      return { exercises: [], muscleGroups: muscleGroupsForDay };
     }
-
-    const allExerciseNamesInPlan = muscleGroupsForDay.flatMap(mg => plan[mg] || []);
     
     const definitionsMap = new Map(exerciseDefinitions.map(def => [def.name.toLowerCase(), def]));
+    const exercisesToAdd: WorkoutExercise[] = [];
 
-    const exercisesToAdd = allExerciseNamesInPlan
-        .map(name => definitionsMap.get(name.toLowerCase()))
-        .filter((def): def is ExerciseDefinition => !!def)
-        .map(definition => {
+    // Explicitly loop through muscle groups and their exercises
+    for (const muscleGroup of muscleGroupsForDay) {
+      const exerciseNames = plan[muscleGroup];
+      if (Array.isArray(exerciseNames)) {
+        for (const name of exerciseNames) {
+          const definition = definitionsMap.get(name.toLowerCase());
+          if (definition) {
             const lastPerformance = findLastPerformance(definition.id);
-            return {
-                id: `${definition.id}-${Date.now()}-${Math.random()}`,
-                definitionId: definition.id,
-                name: definition.name,
-                category: definition.category,
-                loggedSets: [],
-                targetSets: DEFAULT_TARGET_SETS,
-                targetReps: DEFAULT_TARGET_REPS,
-                lastPerformance,
-            };
-        });
+            exercisesToAdd.push({
+              id: `${definition.id}-${Date.now()}-${Math.random()}`,
+              definitionId: definition.id,
+              name: definition.name,
+              category: definition.category,
+              loggedSets: [],
+              targetSets: DEFAULT_TARGET_SETS,
+              targetReps: DEFAULT_TARGET_REPS,
+              lastPerformance,
+            });
+          } else {
+            console.warn(`Definition not found for exercise: "${name}" in plan ${planKey}`);
+          }
+        }
+      }
+    }
 
+    // Deduplicate exercises in case of any overlap (shouldn't happen with current structure, but safe)
     const uniqueExercises = exercisesToAdd.filter((ex, index, self) => 
         index === self.findIndex((t) => t.definitionId === ex.definitionId)
     );
