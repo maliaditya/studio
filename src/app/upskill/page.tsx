@@ -305,43 +305,41 @@ function UpskillPageContent() {
 
   useEffect(() => {
     if (!currentUser || exerciseDefinitions.length === 0 || Object.keys(workoutPlans).length === 0) return;
-  
+
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-  
+
     setAllWorkoutLogs(prevLogs => {
       const workoutExists = prevLogs.some(log => log.id === dateKey);
       if (workoutExists) {
-        return prevLogs; // Don't modify if log for this date already exists
+        return prevLogs;
       }
-  
+
       const dayOfWeek = getDay(selectedDate);
       const exercisesToAdd: WorkoutExercise[] = [];
-      
       const isoWeek = getISOWeek(selectedDate);
       const isOddWeek = isoWeek % 2 !== 0;
 
       let relevantPlan: AllWorkoutPlans[string] | undefined;
       let skillsForDay: (ExerciseCategory | string)[] = [];
+      let toastDescription = "";
 
       if (workoutMode === 'two-muscle') {
-          // Determine which plan (W1-W4) to use. This is just a way to cycle through different skill pairings.
-          const planIndex = (isoWeek % 4); // 0, 1, 2, 3
-          const planKey = `W${planIndex + 1}` as keyof AllWorkoutPlans;
+          const planKey = isOddWeek ? 'W1' : 'W2'; // Cycle between two plans
           relevantPlan = workoutPlans[planKey];
           if (relevantPlan) {
             skillsForDay = Object.keys(relevantPlan);
+            toastDescription = `Added tasks from ${planKey} for ${skillsForDay.join(' & ')}.`;
           }
       } else { // 'one-muscle' mode
-          const planKey = isOddWeek ? 'W5' : 'W6';
+          const planKey = 'W5'; // Always use one plan
           relevantPlan = workoutPlans[planKey];
           if (relevantPlan) {
             skillsForDay = Object.keys(relevantPlan);
+            toastDescription = `Added tasks from ${planKey} for ${skillsForDay.join(' & ')}.`;
           }
       }
 
       if (!relevantPlan || skillsForDay.length === 0) return prevLogs;
-      
-      const toastDescription = `Added tasks for ${skillsForDay.join(' & ')}.`;
 
       skillsForDay.forEach(skill => {
         const exerciseNames = (relevantPlan as any)[skill] as string[];
@@ -362,20 +360,19 @@ function UpskillPageContent() {
           });
         }
       });
-      
 
       if (exercisesToAdd.length > 0) {
         const newDatedWorkout: DatedWorkout = { id: dateKey, date: dateKey, exercises: exercisesToAdd };
-        toast({ 
-          title: "Learning Plan Autopopulated!", 
+        toast({
+          title: "Learning Plan Autopopulated!",
           description: toastDescription
         });
         return [...prevLogs, newDatedWorkout];
       }
-  
+
       return prevLogs;
     });
-  
+
   }, [selectedDate, currentUser, exerciseDefinitions, toast, workoutMode, workoutPlans]);
 
   // Check for backup prompt on Mondays
