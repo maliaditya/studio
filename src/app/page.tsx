@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { format, getDay, getISOWeek } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
+import { TodaysLearningModal } from '@/components/TodaysLearningModal';
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity, ActivityType, DatedWorkout } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -89,11 +90,24 @@ function HomePageContent() {
   const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
   const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
   
+  // State for upskill and deepwork data
+  const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
+  const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
+
   // State for TodaysWorkoutModal
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
   const [todaysExercises, setTodaysExercises] = useState<WorkoutExercise[]>([]);
   const [todaysMuscleGroups, setTodaysMuscleGroups] = useState<string[]>([]);
   
+  // State for TodaysLearningModal
+  const [isLearningModalOpen, setIsLearningModalOpen] = useState(false);
+  const [learningModalProps, setLearningModalProps] = useState({
+      tasks: [] as WorkoutExercise[],
+      title: '',
+      description: '',
+      pageType: 'upskill' as 'upskill' | 'deepwork'
+  });
+
   useEffect(() => {
     setTodayKey(format(new Date(), 'yyyy-MM-dd'));
   }, []);
@@ -144,7 +158,7 @@ function HomePageContent() {
     }
   }, [schedule, scheduleStorageKey, isScheduleLoaded]);
 
-  // Load workout data
+  // Load workout, upskill, and deepwork data
   useEffect(() => {
     if (currentUser?.username) {
         const username = currentUser.username;
@@ -152,6 +166,9 @@ function HomePageContent() {
         const plansKey = `workoutPlans_${username}`;
         const modeKey = `workoutMode_${username}`;
         const logsKey = `allWorkoutLogs_${username}`;
+        const upskillLogsKey = `upskill_logs_${username}`;
+        const deepworkLogsKey = `deepwork_logs_${username}`;
+
 
         const storedMode = localStorage.getItem(modeKey);
         setWorkoutMode((storedMode as WorkoutMode) || 'two-muscle');
@@ -173,10 +190,17 @@ function HomePageContent() {
         try {
             const storedLogs = localStorage.getItem(logsKey);
             setAllWorkoutLogs(storedLogs ? JSON.parse(storedLogs) : []);
-        } catch (e) {
-            console.error("Error parsing workout logs", e);
-            setAllWorkoutLogs([]);
-        }
+        } catch (e) { console.error("Error parsing workout logs", e); setAllWorkoutLogs([]); }
+        
+        try {
+            const storedUpskillLogs = localStorage.getItem(upskillLogsKey);
+            setAllUpskillLogs(storedUpskillLogs ? JSON.parse(storedUpskillLogs) : []);
+        } catch (e) { console.error("Error parsing upskill logs", e); setAllUpskillLogs([]); }
+
+        try {
+            const storedDeepWorkLogs = localStorage.getItem(deepworkLogsKey);
+            setAllDeepWorkLogs(storedDeepWorkLogs ? JSON.parse(storedDeepWorkLogs) : []);
+        } catch (e) { console.error("Error parsing deep work logs", e); setAllDeepWorkLogs([]); }
     }
   }, [currentUser]);
 
@@ -389,7 +413,23 @@ function HomePageContent() {
       setTodaysMuscleGroups(muscleGroups);
       setIsTodaysWorkoutModalOpen(true);
     } else if (activity.type === 'upskill') {
-      router.push('/upskill');
+        const todayLog = allUpskillLogs.find(log => log.date === todayKey);
+        setLearningModalProps({
+            tasks: todayLog?.exercises || [],
+            title: "Today's Learning Session",
+            description: "Here are the learning tasks planned for today.",
+            pageType: 'upskill'
+        });
+        setIsLearningModalOpen(true);
+    } else if (activity.type === 'deepwork') {
+        const todayLog = allDeepWorkLogs.find(log => log.date === todayKey);
+        setLearningModalProps({
+            tasks: todayLog?.exercises || [],
+            title: "Today's Deep Work Session",
+            description: "Here are the focus areas planned for today.",
+            pageType: 'deepwork'
+        });
+        setIsLearningModalOpen(true);
     }
   };
 
@@ -576,6 +616,17 @@ function HomePageContent() {
             todaysExercises={todaysExercises}
             muscleGroupsForDay={todaysMuscleGroups}
             allWorkoutLogs={allWorkoutLogs}
+        />
+      )}
+
+      {currentUser && (
+        <TodaysLearningModal
+            isOpen={isLearningModalOpen}
+            onOpenChange={setIsLearningModalOpen}
+            tasks={learningModalProps.tasks}
+            title={learningModalProps.title}
+            description={learningModalProps.description}
+            pageType={learningModalProps.pageType}
         />
       )}
     </div>
