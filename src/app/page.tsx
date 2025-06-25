@@ -297,12 +297,13 @@ function HomePageContent() {
                         <CardDescription>{slot.time}</CardDescription>
                       </div>
                       <div className="flex items-center gap-2">
-                        {currentSlot === slot.name && (
-                            <div className="font-mono text-lg text-primary/80 tracking-wider animate-subtle-pulse">
-                                {remainingTime}
-                            </div>
+                        {currentSlot === slot.name ? (
+                          <div className="font-mono text-lg text-primary/80 tracking-wider animate-subtle-pulse">
+                            {remainingTime}
+                          </div>
+                        ) : (
+                          slot.icon
                         )}
-                        {slot.icon}
                       </div>
                     </CardHeader>
                     <CardContent className="flex flex-col justify-between min-h-[8rem]">
