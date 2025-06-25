@@ -404,26 +404,30 @@ function HomePageContent() {
                       <div className="flex-grow space-y-2 mb-2">
                         {activities && activities.length > 0 ? (
                           activities.map((activity) => (
-                            <div key={activity.id} className="p-2.5 rounded-md border bg-card/70 shadow-sm">
-                              <div
-                                className={cn("flex items-start gap-3", activity.completed ? "opacity-60" : "cursor-pointer")}
-                                onClick={() => handleActivityClick(activity)}
-                              >
-                                <div className="pt-0.5">{activityIcons[activity.type]}</div>
-                                <div className="flex-grow">
-                                  <p className={cn("font-semibold text-foreground", activity.completed && "line-through")}>
-                                    {activity.details}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground capitalize">
-                                    {activity.type === 'deepwork' ? 'Deep Work' : activity.type}
-                                  </p>
+                            <div key={activity.id} className="p-2.5 rounded-md bg-card/70 shadow-sm">
+                              <div className="flex items-start justify-between gap-3">
+                                <div
+                                  className={cn("flex items-start gap-3 flex-grow", activity.completed ? "opacity-60" : "cursor-pointer")}
+                                  onClick={() => handleActivityClick(activity)}
+                                >
+                                  <div className="pt-0.5">{activityIcons[activity.type]}</div>
+                                  <div className="flex-grow">
+                                    <p className={cn("font-semibold text-foreground", activity.completed && "line-through")}>
+                                      {activity.details}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground capitalize">
+                                      {activity.type === 'deepwork' ? 'Deep Work' : activity.type}
+                                    </p>
+                                  </div>
                                 </div>
+                                <Checkbox
+                                    id={`cb-${activity.id}`}
+                                    checked={!!activity.completed}
+                                    onCheckedChange={() => handleToggleComplete(slot.name, activity.id)}
+                                    className="mt-1"
+                                />
                               </div>
-                              <div className="flex items-center justify-between mt-2 pt-2 border-t">
-                                <div className="flex items-center space-x-2">
-                                  <Checkbox id={`cb-${activity.id}`} checked={!!activity.completed} onCheckedChange={() => handleToggleComplete(slot.name, activity.id)} />
-                                  <Label htmlFor={`cb-${activity.id}`} className="text-sm font-medium cursor-pointer text-muted-foreground">Mark as done</Label>
-                                </div>
+                              <div className="flex items-center justify-end mt-2 pt-2 border-t">
                                 <Button variant="ghost" size="icon" onClick={() => handleRemoveActivity(slot.name, activity.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive">
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
