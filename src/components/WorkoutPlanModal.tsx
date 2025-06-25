@@ -116,57 +116,55 @@ export function WorkoutPlanModal({
     };
 
     const renderPlanContent = (planKey: string) => (
-      <TabsContent key={planKey} value={planKey} className="m-0 mt-4 flex-grow flex flex-col min-h-0">
-        <div className="flex justify-end mb-4 pr-6 flex-shrink-0">
-            <Button variant="outline" size="sm" onClick={() => handleResetPlan(planKey)}>
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Reset Plan to Default
-            </Button>
-        </div>
-        <div className="relative flex-1">
-            <ScrollArea className="absolute inset-0 pr-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {(Object.keys(workoutPlans[planKey] || {}) as ExerciseCategory[]).map(category => {
-                        const exercisesForCategory = workoutPlans[planKey]?.[category];
-                        const addEntityPlaceholder = pageType === 'upskill' ? 'Add a task...' : 'Add an exercise...';
-                        return (
-                        <Card key={category} className="overflow-hidden">
-                            <CardHeader className="p-3"><CardTitle className="text-lg">{category}</CardTitle></CardHeader>
-                            <CardContent className="p-3">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow><TableHead>Exercise</TableHead><TableHead className="w-[50px] text-right"></TableHead></TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                    {Array.isArray(exercisesForCategory) && exercisesForCategory.map((exName: string) => (
-                                        <TableRow key={exName}>
-                                            <TableCell className="font-medium truncate" title={exName}>{exName}</TableCell>
-                                            <TableCell className="text-right p-1">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRemoveExercise(planKey, category, exName)}>
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                    </TableBody>
-                                </Table>
-                                <div className="flex items-center gap-2 mt-4 pt-4 border-t">
-                                    <Select value={addSelection[`${planKey}-${category}`] || ''} onValueChange={(value) => setAddSelection(prev => ({ ...prev, [`${planKey}-${category}`]: value }))}>
-                                        <SelectTrigger><SelectValue placeholder={addEntityPlaceholder} /></SelectTrigger>
-                                        <SelectContent>
-                                            {definitions.filter(def => def.category === category).filter(def => !(Array.isArray(exercisesForCategory) && exercisesForCategory.includes(def.name))).sort((a,b) => a.name.localeCompare(b.name)).map(def => (<SelectItem key={def.id} value={def.name}>{def.name}</SelectItem>))}
-                                        </SelectContent>
-                                    </Select>
-                                    <Button size="icon" className="h-10 w-10 shrink-0" onClick={() => handleAddExercise(planKey, category)} disabled={!addSelection[`${planKey}-${category}`]}>
-                                        <PlusCircle className="h-5 w-5" />
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )})}
-                </div>
-            </ScrollArea>
-        </div>
+      <TabsContent key={planKey} value={planKey} className="m-0 mt-4 flex-grow min-h-0">
+        <ScrollArea className="h-full pr-6">
+            <div className="flex justify-end mb-4">
+                <Button variant="outline" size="sm" onClick={() => handleResetPlan(planKey)}>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Reset Plan to Default
+                </Button>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {(Object.keys(workoutPlans[planKey] || {}) as ExerciseCategory[]).map(category => {
+                    const exercisesForCategory = workoutPlans[planKey]?.[category];
+                    const addEntityPlaceholder = pageType === 'upskill' ? 'Add a task...' : 'Add an exercise...';
+                    return (
+                    <Card key={category} className="overflow-hidden">
+                        <CardHeader className="p-3"><CardTitle className="text-lg">{category}</CardTitle></CardHeader>
+                        <CardContent className="p-3">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow><TableHead>Exercise</TableHead><TableHead className="w-[50px] text-right"></TableHead></TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                {Array.isArray(exercisesForCategory) && exercisesForCategory.map((exName: string) => (
+                                    <TableRow key={exName}>
+                                        <TableCell className="font-medium truncate" title={exName}>{exName}</TableCell>
+                                        <TableCell className="text-right p-1">
+                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRemoveExercise(planKey, category, exName)}>
+                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                </TableBody>
+                            </Table>
+                            <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+                                <Select value={addSelection[`${planKey}-${category}`] || ''} onValueChange={(value) => setAddSelection(prev => ({ ...prev, [`${planKey}-${category}`]: value }))}>
+                                    <SelectTrigger><SelectValue placeholder={addEntityPlaceholder} /></SelectTrigger>
+                                    <SelectContent>
+                                        {definitions.filter(def => def.category === category).filter(def => !(Array.isArray(exercisesForCategory) && exercisesForCategory.includes(def.name))).sort((a,b) => a.name.localeCompare(b.name)).map(def => (<SelectItem key={def.id} value={def.name}>{def.name}</SelectItem>))}
+                                    </SelectContent>
+                                </Select>
+                                <Button size="icon" className="h-10 w-10 shrink-0" onClick={() => handleAddExercise(planKey, category)} disabled={!addSelection[`${planKey}-${category}`]}>
+                                    <PlusCircle className="h-5 w-5" />
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )})}
+            </div>
+        </ScrollArea>
       </TabsContent>
     );
 
