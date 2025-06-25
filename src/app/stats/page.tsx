@@ -6,41 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { DatedWorkout, TopicGoal } from '@/types/workout';
-import { Loader2, TrendingUp, BarChart, Clock, Award, BrainCircuit, Dumbbell, BookOpenCheck, Briefcase } from 'lucide-react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-
-// Level data structure
-const levels = [
-    { level: 'L1', hours: '15 – 30 mins', description: 'Just showing up', zone: '⚪️ Entry Zone', minHours: 0.25, maxHours: 0.5 },
-    { level: 'L2', hours: '30 – 45 mins', description: 'Light touch / spark', zone: '⚪️ Entry Zone', minHours: 0.5, maxHours: 0.75 },
-    { level: 'L3', hours: '45 mins – 1 hr', description: 'Single Pomodoro session', zone: '⚪️ Entry Zone', minHours: 0.75, maxHours: 1 },
-    { level: 'L4', hours: '1 – 1.5 hrs', description: 'Basic learner habit', zone: '🟢 Stable Zone', minHours: 1, maxHours: 1.5 },
-    { level: 'L5', hours: '1.5 – 2 hrs', description: 'Focused beginner phase', zone: '🟢 Stable Zone', minHours: 1.5, maxHours: 2 },
-    { level: 'L6', hours: '2 – 2.5 hrs', description: 'Mini deep work commitment', zone: '🟢 Stable Zone', minHours: 2, maxHours: 2.5 },
-    { level: 'L7', hours: '2.5 – 3 hrs', description: 'Structured discipline zone', zone: '🟢 Stable Zone', minHours: 2.5, maxHours: 3 },
-    { level: 'L8', hours: '3 – 3.5 hrs', description: 'Daily scholar mode', zone: '🟡 Progress Zone', minHours: 3, maxHours: 3.5 },
-    { level: 'L9', hours: '3.5 – 4 hrs', description: 'Solid effort / Part-time student', zone: '🟡 Progress Zone', minHours: 3.5, maxHours: 4 },
-    { level: 'L10', hours: '4 – 5 hrs', description: 'Full-time learner level', zone: '🟡 Progress Zone', minHours: 4, maxHours: 5 },
-    { level: 'L11', hours: '5 – 6 hrs', description: 'Deep learner zone', zone: '🟡 Progress Zone', minHours: 5, maxHours: 6 },
-    { level: 'L12', hours: '6 – 7 hrs', description: 'Advanced practice / Bootcamp ready', zone: '🟠 High Intensity', minHours: 6, maxHours: 7 },
-    { level: 'L13', hours: '7 – 8 hrs', description: 'Peak state zone', zone: '🟠 High Intensity', minHours: 7, maxHours: 8 },
-    { level: 'L14', hours: '8 – 9 hrs', description: 'Monastic discipline', zone: '🔴 Extreme Zone', minHours: 8, maxHours: 9 },
-    { level: 'L15', hours: '9 – 10 hrs', description: 'Total immersion day', zone: '🔴 Extreme Zone', minHours: 9, maxHours: 10 },
-    { level: 'L16', hours: '10 – 11 hrs', description: 'Elite performer stretch', zone: '🔴 Extreme Zone', minHours: 10, maxHours: 11 },
-    { level: 'L17', hours: '11 – 12 hrs', description: 'Near-max capacity', zone: '🔴 Extreme Zone', minHours: 11, maxHours: 12 },
-    { level: 'L18', hours: '12 – 13 hrs', description: 'Obsessive learner', zone: '🔴 Extreme Zone', minHours: 12, maxHours: 13 },
-    { level: 'L19', hours: '13 – 15 hrs', description: 'Burning fuel — not sustainable daily', zone: '🔥 Overdrive Zone', minHours: 13, maxHours: 15 },
-    { level: 'L20', hours: '15 – 16+ hrs', description: 'Legendary grind day (Rare / Purpose-driven only)', zone: '⚠️ Apex Zone', minHours: 15, maxHours: Infinity },
-];
+import { Loader2, TrendingUp, BarChart, Clock, BrainCircuit, Dumbbell, BookOpenCheck, Briefcase } from 'lucide-react';
 
 function StatsPageContent() {
     const { currentUser } = useAuth();
@@ -135,11 +101,6 @@ function StatsPageContent() {
         }
     }, [allWorkoutLogs, allUpskillLogs, allDeepWorkLogs, topicGoals, currentUser]);
 
-    const currentLevel = useMemo(() => {
-        if (!stats) return null;
-        return levels.find(l => stats.dailyProductiveHours >= l.minHours && stats.dailyProductiveHours < l.maxHours) || null;
-    }, [stats]);
-
 
     if (isLoading) {
         return (
@@ -156,31 +117,6 @@ function StatsPageContent() {
 
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-             <Card className="mb-8 text-center bg-card/50">
-                <CardHeader>
-                    <Award className="mx-auto h-12 w-12 text-primary" />
-                    <CardTitle className="text-3xl">Your Productivity Level</CardTitle>
-                    {currentLevel ? (
-                        <CardDescription className="text-lg">
-                           Based on your daily average productive time of <strong>{stats.dailyProductiveHours.toFixed(2)} hours</strong>.
-                        </CardDescription>
-                    ) : (
-                         <CardDescription className="text-lg">
-                           Log some activities to determine your level.
-                        </CardDescription>
-                    )}
-                </CardHeader>
-                <CardContent>
-                    {currentLevel && (
-                         <div className="max-w-md mx-auto bg-primary/10 p-4 rounded-lg">
-                            <p className="text-5xl font-bold text-primary">{currentLevel.level}</p>
-                            <p className="text-xl font-semibold text-foreground mt-1">{currentLevel.description}</p>
-                            <p className="text-lg text-muted-foreground">{currentLevel.zone}</p>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                  <Card>
                     <CardHeader>
@@ -221,41 +157,6 @@ function StatsPageContent() {
                     </CardContent>
                 </Card>
             </div>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Productivity Levels</CardTitle>
-                    <CardDescription>Find your current standing and see what's next.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Level</TableHead>
-                                <TableHead>Daily Hours</TableHead>
-                                <TableHead>Description</TableHead>
-                                <TableHead>Zone</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {levels.map((level) => (
-                                <TableRow key={level.level} className={cn(level.level === currentLevel?.level && "bg-primary/10")}>
-                                    <TableCell className="font-bold">{level.level}</TableCell>
-                                    <TableCell>{level.hours}</TableCell>
-                                    <TableCell>{level.description}</TableCell>
-                                    <TableCell>
-                                         <Badge variant={
-                                            level.zone.includes('Stable') ? 'secondary' :
-                                            level.zone.includes('Extreme') || level.zone.includes('Overdrive') || level.zone.includes('Apex') ? 'destructive' :
-                                            'default'
-                                         }>{level.zone}</Badge>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
         </div>
     );
 }
