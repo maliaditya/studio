@@ -395,7 +395,33 @@ export function ExerciseProgressModal({
               <XAxis dataKey="timestamp" type="number" domain={['dataMin', 'dataMax']} tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')} tickLine={false} axisLine={false} tickMargin={8} interval="preserveStartEnd" />
               <YAxis tickLine={false} axisLine={false} tickMargin={8} domain={['auto', 'dataMax + 10']} label={{ value: `Cumulative ${topicGoal?.goalType}`, angle: -90, position: "insideLeft", offset: -0, style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' } }} />
               <RechartsTooltip cursor={true} content={<CustomChartTooltip pageType={pageType} goalType={topicGoal?.goalType} />} />
-              {topicGoal && <ReferenceLine y={topicGoal.goalValue} stroke="hsl(var(--destructive))" strokeDasharray="3 3" label={{ value: "Goal", position: 'insideTopRight' }} />}
+              {topicGoal && (
+                  <>
+                      <ReferenceLine y={topicGoal.goalValue} stroke="hsl(var(--destructive))" strokeDasharray="3 3" label={{ value: "Goal", position: 'insideTopRight' }} />
+                      {[0.25, 0.5, 0.75].map(fraction => {
+                          const milestoneValue = Math.round(topicGoal.goalValue * fraction);
+                          if (milestoneValue > 0 && milestoneValue < topicGoal.goalValue) {
+                              return (
+                                  <ReferenceLine 
+                                      key={fraction}
+                                      y={milestoneValue} 
+                                      stroke="hsl(var(--muted-foreground))" 
+                                      strokeOpacity={0.6}
+                                      strokeDasharray="2 6" 
+                                      label={{ 
+                                          value: `${fraction * 100}%`, 
+                                          position: 'insideTopRight', 
+                                          fill: 'hsl(var(--muted-foreground))', 
+                                          fontSize: 10,
+                                          opacity: 0.8
+                                      }} 
+                                  />
+                              );
+                          }
+                          return null;
+                      })}
+                  </>
+              )}
               <Line dataKey="historicalProgress" type="monotone" stroke="var(--color-historicalProgress)" strokeWidth={2} dot={{ r: 4 }} name="historicalProgress" connectNulls={false} />
               <Line dataKey="projectedProgress" type="monotone" stroke="var(--color-projectedProgress)" strokeDasharray="5 5" strokeWidth={2} dot={{ r: 4 }} name="projectedProgress" connectNulls={false} />
                <Brush 
