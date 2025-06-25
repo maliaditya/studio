@@ -31,10 +31,17 @@ export interface LoggedSet {
   timestamp: number;
 }
 
+export interface DecompositionRow {
+  technique: string;
+  description: string;
+  useCases: string;
+}
+
 export interface ExerciseDefinition {
   id: string;
   name: string; // Subtopic for upskill
   category: ExerciseCategory; // Topic for upskill
+  decompositionData?: DecompositionRow[];
 }
 
 export interface TopicGoal {

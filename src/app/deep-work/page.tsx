@@ -11,7 +11,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, parse, getISOWeek, isMonday, getYear, subYears, addDays, parseISO } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, WeightLog, Gender } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, WeightLog, Gender, DecompositionRow } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -48,6 +48,7 @@ import { WeightChartModal } from '@/components/WeightChartModal';
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from '@/components/ui/textarea';
 
 
 const DEFAULT_TARGET_SESSIONS = 1;
@@ -92,10 +93,14 @@ function DeepWorkPageContent() {
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   const [today, setToday] = useState<Date | null>(null);
 
+  // State for decomposition modal
   const [isDecompositionModalOpen, setIsDecompositionModalOpen] = useState(false);
   const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
+  const [isDecompositionEditing, setIsDecompositionEditing] = useState(false);
+  const [editableDecompositionData, setEditableDecompositionData] = useState<DecompositionRow[]>([]);
 
-  const decompositionTechniques = [
+
+  const decompositionTechniques: DecompositionRow[] = [
     {
       technique: "📏 Unit Consistency",
       description: "Define `1 unit = 1 meter` for realism and coherence",
@@ -421,7 +426,33 @@ function DeepWorkPageContent() {
   
   const handleOpenDecompositionModal = (def: ExerciseDefinition) => {
     setSelectedFocusArea(def);
+    setEditableDecompositionData(def.decompositionData || decompositionTechniques);
     setIsDecompositionModalOpen(true);
+    setIsDecompositionEditing(false);
+  };
+
+  const handleDecompositionChange = (index: number, field: keyof DecompositionRow, value: string) => {
+    setEditableDecompositionData(currentData => {
+        const newData = [...currentData];
+        newData[index] = { ...newData[index], [field]: value };
+        return newData;
+    });
+  };
+  
+  const handleSaveDecomposition = () => {
+    if (!selectedFocusArea) return;
+    setExerciseDefinitions(prevDefs => prevDefs.map(def =>
+        def.id === selectedFocusArea.id
+            ? { ...def, decompositionData: editableDecompositionData }
+            : def
+    ));
+    setIsDecompositionEditing(false);
+    toast({ title: "Saved", description: "Decomposition techniques have been updated." });
+  };
+  
+  const handleCancelDecompositionEdit = () => {
+    setEditableDecompositionData(selectedFocusArea?.decompositionData || decompositionTechniques);
+    setIsDecompositionEditing(false);
   };
 
   const handleLogWeight = (weight: number, date: Date) => {
@@ -778,27 +809,55 @@ function DeepWorkPageContent() {
           <DialogHeader>
             <DialogTitle>Decomposition Techniques for: {selectedFocusArea?.name}</DialogTitle>
             <DialogDescription>
-                Key techniques for breaking down and optimizing complex scenes.
+                Key techniques for breaking down and optimizing complex scenes. Click Edit to customize.
             </DialogDescription>
           </DialogHeader>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[200px]">Technique</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Use Cases</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {decompositionTechniques.map((item) => (
-                <TableRow key={item.technique}>
-                  <TableCell className="font-medium">{item.technique}</TableCell>
-                  <TableCell>{item.description}</TableCell>
-                  <TableCell>{item.useCases}</TableCell>
+          <div className="flex justify-end gap-2 py-2">
+            {isDecompositionEditing ? (
+                <>
+                    <Button onClick={handleSaveDecomposition}><Save className="mr-2 h-4 w-4" /> Save Changes</Button>
+                    <Button variant="outline" onClick={handleCancelDecompositionEdit}><X className="mr-2 h-4 w-4" /> Cancel</Button>
+                </>
+            ) : (
+                <Button onClick={() => setIsDecompositionEditing(true)}><Edit3 className="mr-2 h-4 w-4" /> Edit</Button>
+            )}
+          </div>
+          <div className="max-h-[60vh] overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[200px]">Technique</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Use Cases</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {editableDecompositionData.map((item, index) => (
+                  <TableRow key={index}>
+                    {isDecompositionEditing ? (
+                      <>
+                        <TableCell className="align-top">
+                          <Textarea value={item.technique} onChange={(e) => handleDecompositionChange(index, 'technique', e.target.value)} className="min-h-[60px]" />
+                        </TableCell>
+                        <TableCell className="align-top">
+                          <Textarea value={item.description} onChange={(e) => handleDecompositionChange(index, 'description', e.target.value)} className="min-h-[60px]" />
+                        </TableCell>
+                        <TableCell className="align-top">
+                           <Textarea value={item.useCases} onChange={(e) => handleDecompositionChange(index, 'useCases', e.target.value)} className="min-h-[60px]" />
+                        </TableCell>
+                      </>
+                    ) : (
+                      <>
+                        <TableCell className="font-medium align-top">{item.technique}</TableCell>
+                        <TableCell className="align-top">{item.description}</TableCell>
+                        <TableCell className="align-top">{item.useCases}</TableCell>
+                      </>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </DialogContent>
       </Dialog>
     </>
@@ -808,5 +867,3 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
-
-    
