@@ -11,7 +11,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { format, parse, getISOWeek, isMonday, getYear, subYears, addDays } from 'date-fns';
+import { format, parse, getISOWeek, isMonday, getYear, subYears, addDays, parseISO } from 'date-fns';
 import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, WeightLog, Gender, AllWorkoutPlans } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
@@ -39,9 +39,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { WeightChartModal } from '@/components/WeightChartModal';
+import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 
 const DEFAULT_TARGET_SESSIONS = 1;
 const DEFAULT_TARGET_DURATION = "25";
+
+const durationChartConfig = {
+  totalDuration: { label: "Duration (min)", color: "hsl(var(--primary))" },
+} satisfies ChartConfig;
+
 
 function UpskillPageContent() {
   const { toast } = useToast();
@@ -436,6 +443,31 @@ function UpskillPageContent() {
     }
     return data;
   }, [allWorkoutLogs, oneYearAgo, today]);
+
+  const dailyDurationData = useMemo(() => {
+    const dailyTotals: Record<string, number> = {};
+
+    allWorkoutLogs.forEach(log => {
+        const totalDuration = log.exercises.reduce((total, exercise) => 
+            total + exercise.loggedSets.reduce((sum, set) => sum + set.weight, 0)
+        , 0);
+
+        if (totalDuration > 0) {
+            dailyTotals[log.date] = (dailyTotals[log.date] || 0) + totalDuration;
+        }
+    });
+
+    return Object.entries(dailyTotals)
+        .map(([date, totalDuration]) => ({
+            dateObj: parseISO(date),
+            totalDuration,
+        }))
+        .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime())
+        .map(item => ({
+            ...item,
+            date: format(item.dateObj, 'MMM dd'),
+        }));
+  }, [allWorkoutLogs]);
   
   if (isLoadingPage) {
     return (
@@ -557,19 +589,41 @@ function UpskillPageContent() {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg text-primary">
-                        <Target /> Weight Goal
+                        <LineChartIcon /> Daily Learning Duration
                     </CardTitle>
                     <CardDescription>
-                       This section is shared with the Workout Tracker. Track your physical health alongside your skills.
+                       Total minutes of learning logged each day.
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div>
-                        <Button onClick={() => setIsWeightChartModalOpen(true)} className="w-full text-xs xl:text-sm">
-                            <LineChartIcon className="mr-2 h-4 w-4" />
-                            View Weight Chart & Goal
-                        </Button>
-                    </div>
+                <CardContent>
+                    {dailyDurationData.length > 1 ? (
+                      <ChartContainer config={durationChartConfig} className="h-[200px] w-full">
+                        <ResponsiveContainer>
+                          <LineChart data={dailyDurationData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                            <CartesianGrid vertical={false} />
+                            <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
+                            <YAxis 
+                                tickLine={false} 
+                                axisLine={false} 
+                                tickMargin={8}
+                                fontSize={12}
+                                domain={['auto', 'auto']}
+                                label={{ value: "Minutes", angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' }}}
+                            />
+                            <RechartsTooltip 
+                                contentStyle={{ background: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)' }} 
+                                labelStyle={{ fontWeight: 'bold' }}
+                                formatter={(value: number) => [`${value} min`, "Duration"]}
+                            />
+                            <Line type="monotone" dataKey="totalDuration" stroke="var(--color-totalDuration)" strokeWidth={2} dot={false} name="totalDuration" />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </ChartContainer>
+                    ) : (
+                      <div className="flex h-[200px] items-center justify-center text-center text-sm text-muted-foreground">
+                        <p>Log learning sessions on multiple days to see a chart of your daily duration.</p>
+                      </div>
+                    )}
                 </CardContent>
             </Card>
 
@@ -687,5 +741,7 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
+
+    
 
     
