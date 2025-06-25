@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -8,6 +9,9 @@ import { useState, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { format, getDay } from 'date-fns';
+import { useRouter } from 'next/navigation';
+import { WorkoutPlanModal } from '@/components/WorkoutPlanModal';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode } from '@/types/workout';
 
 const slots = [
   { name: 'Late Night', time: '12 AM - 4 AM', icon: <Moon className="h-6 w-6 text-indigo-400" /> },
@@ -38,6 +42,15 @@ const singleMuscleDailySchedule: Record<number, string | null> = {
     0: null,
 };
 
+const INITIAL_PLANS: AllWorkoutPlans = {
+    "W1": { "Chest": ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine"], "Triceps": ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Cable Rope Pushdown (Slow)"], "Back": ["Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull"], "Biceps": ["Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Shrugs"], "Legs": ["Walking Lunges (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine"] },
+    "W2": { "Chest": ["Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Cable Fly"], "Triceps": ["Overhead Dumbbell Extension", "Overhead Bar extension", "Rope Pushdown", "Dumbbell Kickback"], "Back": ["Lat Pulldown (Wide Grip)", "V handle lat pulldown", "1-Arm Dumbbell Row", "Back extensions"], "Biceps": ["Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Reverse Cable"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Seated Dumbbell Lateral Raise", "Rear Delt Fly (Incline Bench)", "Cable Upright Rows"], "Legs": ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"] },
+    "W3": { "Chest": ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine"], "Triceps": ["Overhead Cable Extension", "Straight bar pushdown", "Reversebar pushdown", "Back dips"], "Back": ["Lat Pulldown", "Barbell Row", "Seated Row", "Lat Prayer Pull"], "Biceps": ["Strict bar curls", "Reversed Incline curls", "Cable Curls Superset", "Reversed cable curls"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Dumbbell Lateral Raise (Lean in)", "Face Pulls", "Shrugs"], "Legs": ["Leg Press", "Quads Machine", "Hamstring machine", "Calf Raises (Bodyweight)"] },
+    "W4": { "Chest": ["Dumbbell Flat Press", "Incline Dumbbell Press", "Dumbbell Pullovers", "Cable Fly"], "Triceps": ["Overhead Cable Extension", "Straight bar pushdown", "Reversebar pushdown", "Back dips"], "Back": ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle pulldown Cable", "DeadLifts"], "Biceps": ["Seated Machine Curls", "Cable Curls", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable"], "Legs": ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"] },
+    "W5": { "Chest": ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine", "Cable Fly", "Dumbbell Pullovers"], "Triceps": ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Straight bar pushdown", "Reversebar pushdown", "Back dips"], "Back": ["Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull", "1-Arm Dumbbell Row", "DeadLifts"], "Biceps": ["Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)", "Reversed cable curls", "Reversed Incline curls"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Cable Upright Rows", "Front Raise Dumbbells", "Shrugs"], "Legs": ["Squats (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine", "Walking Lunges (Barbell)", "Calf Raises"] },
+    "W6": { "Chest": ["Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Peck Machine", "Flat Bench Chest Fly", "Dumbbell Pullovers"], "Triceps": ["Overhead Cable Extension", "Single Arm Dumbbell Extensions", "Rope Pushdown", "Straight bar pushdown", "Reversebar pushdown", "Back dips"], "Back": ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle pulldown Cable", "Barbell Row", "Lat Prayer Pull", "Back extensions"], "Biceps": ["Strict bar curls", "Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher Curls Bar", "Reverse Cable", "Concentration Curl"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable", "Cable Upright Rows", "Shrugs"], "Legs": ["Walking Lunges (Barbell)", "Hack Squats", "Hamstring machine", "Quads Machine", "Leg Press", "Calf Raises"] }
+};
+
 type Activity = {
   type: 'workout' | 'upskill';
   details: string;
@@ -47,9 +60,16 @@ type FullSchedule = Record<string, DailySchedule>; // Date key -> DailySchedule
 
 function HomePageContent() {
   const { currentUser } = useAuth();
+  const router = useRouter();
   const [currentSlot, setCurrentSlot] = useState('');
   const [schedule, setSchedule] = useState<FullSchedule>({});
   const [todayKey, setTodayKey] = useState('');
+
+  // State for WorkoutPlanModal
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  const [workoutMode, setWorkoutMode] = useState<WorkoutMode>('two-muscle');
+  const [workoutPlans, setWorkoutPlans] = useState<AllWorkoutPlans>(INITIAL_PLANS);
+  const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
 
   useEffect(() => {
     setTodayKey(format(new Date(), 'yyyy-MM-dd'));
@@ -79,6 +99,53 @@ function HomePageContent() {
     }
   }, [schedule, scheduleStorageKey]);
 
+  // Load workout data for the modal
+  useEffect(() => {
+    if (currentUser?.username) {
+        const username = currentUser.username;
+        const defsKey = `exerciseDefinitions_${username}`;
+        const plansKey = `workoutPlans_${username}`;
+        const modeKey = `workoutMode_${username}`;
+
+        const storedMode = localStorage.getItem(modeKey);
+        if (storedMode === 'one-muscle' || storedMode === 'two-muscle') {
+            setWorkoutMode(storedMode as WorkoutMode);
+        } else {
+            setWorkoutMode('two-muscle');
+        }
+
+        try {
+            const storedPlans = localStorage.getItem(plansKey);
+            setWorkoutPlans(storedPlans ? JSON.parse(storedPlans) : INITIAL_PLANS);
+        } catch (e) {
+            console.error("Error loading workout plans", e);
+            setWorkoutPlans(INITIAL_PLANS);
+        }
+
+        try {
+            const storedDefinitions = localStorage.getItem(defsKey);
+            if(storedDefinitions) {
+                setExerciseDefinitions(JSON.parse(storedDefinitions));
+            } else {
+                console.warn(`Exercise definitions not found for ${username}. Please visit Workout Tracker page to initialize them.`);
+                setExerciseDefinitions([]);
+            }
+        } catch (e) {
+            console.error("Error loading exercise definitions", e);
+            setExerciseDefinitions([]);
+        }
+    }
+  }, [currentUser]);
+
+  // Save workout plans if modified in the modal
+  useEffect(() => {
+      if (currentUser?.username) {
+          const plansKey = `workoutPlans_${currentUser.username}`;
+          localStorage.setItem(plansKey, JSON.stringify(workoutPlans));
+      }
+  }, [workoutPlans, currentUser]);
+
+
   useEffect(() => {
     const getSlot = () => {
       const currentHour = new Date().getHours();
@@ -100,7 +167,6 @@ function HomePageContent() {
 
     let details = '';
     if (type === 'workout') {
-      const workoutMode = localStorage.getItem(`workoutMode_${currentUser.username}`) || 'two-muscle';
       const dayOfWeek = getDay(new Date());
 
       let muscleGroups: string[] = [];
@@ -139,6 +205,14 @@ function HomePageContent() {
     });
   };
 
+  const handleActivityClick = (activity: Activity) => {
+    if (activity.type === 'workout') {
+      setIsPlanModalOpen(true);
+    } else if (activity.type === 'upskill') {
+      router.push('/upskill');
+    }
+  };
+
   const todaysSchedule = schedule[todayKey] || {};
 
   return (
@@ -171,7 +245,7 @@ function HomePageContent() {
                     <CardContent className="flex flex-col justify-between min-h-[8rem]">
                         {activity ? (
                           <>
-                            <div>
+                            <div className="flex-grow cursor-pointer" onClick={() => handleActivityClick(activity)}>
                               <div className="flex items-center gap-2 mb-2">
                                   {activity.type === 'workout' 
                                       ? <Dumbbell className="h-5 w-5 text-primary" /> 
@@ -219,6 +293,17 @@ function HomePageContent() {
             </div>
         </CardContent>
       </Card>
+      {currentUser && (
+        <WorkoutPlanModal
+            isOpen={isPlanModalOpen}
+            onOpenChange={setIsPlanModalOpen}
+            workoutMode={workoutMode}
+            workoutPlans={workoutPlans}
+            setWorkoutPlans={setWorkoutPlans}
+            exerciseDefinitions={exerciseDefinitions}
+            initialPlans={INITIAL_PLANS}
+        />
+      )}
     </div>
   );
 }
