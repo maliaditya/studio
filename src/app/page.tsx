@@ -4,15 +4,15 @@
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Sunrise, Sun, Sunset, Moon, MoonStar, CloudSun, PlusCircle, Trash2, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, BarChart3, Clock, TrendingUp, Zap } from 'lucide-react';
+import { BrainCircuit, Sunrise, Sun, Sunset, Moon, MoonStar, CloudSun, PlusCircle, Trash2, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, BarChart3, Clock, TrendingUp, Zap, Target, LineChart as LineChartIcon, BookCopy, Activity, CalendarDays, Flame, HeartPulse, Utensils } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subYears } from 'date-fns';
+import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subYears, differenceInYears, addWeeks, startOfISOWeek, setISOWeek, getISOWeekYear } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysLearningModal } from '@/components/TodaysLearningModal';
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity, ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity, ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
@@ -21,6 +21,8 @@ import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { getExercisesForDay } from '@/lib/workoutUtils';
+import { WeightChartModal } from '@/components/WeightChartModal';
+import { DietPlanModal } from '@/components/DietPlanModal';
 
 const slots = [
   { name: 'Late Night', time: '12 AM - 4 AM', icon: <Moon className="h-6 w-6 text-indigo-400" /> },
@@ -165,13 +167,23 @@ function HomePageContent() {
   const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
   const [topicGoals, setTopicGoals] = useState<Record<string, TopicGoal>>({});
 
-  // State for TodaysWorkoutModal
+  // State for health data
+  const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
+  const [goalWeight, setGoalWeight] = useState<number | null>(null);
+  const [height, setHeight] = useState<number | null>(null);
+  const [dateOfBirth, setDateOfBirth] = useState<string | null>(null);
+  const [gender, setGender] = useState<Gender | null>(null);
+  const [dietPlan, setDietPlan] = useState<UserDietPlan>([]);
+
+  // State for Modals
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
+  const [isLearningModalOpen, setIsLearningModalOpen] = useState(false);
+  const [isWeightChartModalOpen, setIsWeightChartModalOpen] = useState(false);
+  const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
+  
+  // State for Modal content
   const [todaysExercises, setTodaysExercises] = useState<WorkoutExercise[]>([]);
   const [todaysMuscleGroups, setTodaysMuscleGroups] = useState<string[]>([]);
-  
-  // State for TodaysLearningModal
-  const [isLearningModalOpen, setIsLearningModalOpen] = useState(false);
   const [learningModalProps, setLearningModalProps] = useState({
       tasks: [] as WorkoutExercise[],
       title: '',
@@ -239,58 +251,66 @@ function HomePageContent() {
     }
   }, [schedule, scheduleStorageKey, isScheduleLoaded]);
 
-  // Load workout, upskill, and deepwork data
+  // Load all other data from local storage
   useEffect(() => {
     if (currentUser?.username) {
         const username = currentUser.username;
+        // Workout
         const defsKey = `exerciseDefinitions_${username}`;
         const plansKey = `workoutPlans_${username}`;
         const modeKey = `workoutMode_${username}`;
         const logsKey = `allWorkoutLogs_${username}`;
+        // Upskill
         const upskillLogsKey = `upskill_logs_${username}`;
         const deepworkLogsKey = `deepwork_logs_${username}`;
         const goalsKey = `upskill_topic_goals_${username}`;
+        // Health
+        const weightLogsKey = `weightLogs_${username}`;
+        const goalWeightKey = `goalWeight_${username}`;
+        const heightKey = `height_${username}`;
+        const dobKey = `dateOfBirth_${username}`;
+        const genderKey = `gender_${username}`;
+        const dietPlanKey = `dietPlan_${username}`;
 
-
+        // Load workout
         const storedMode = localStorage.getItem(modeKey);
         setWorkoutMode((storedMode as WorkoutMode) || 'two-muscle');
-
-        try {
-            const storedPlans = localStorage.getItem(plansKey);
-            setWorkoutPlans(storedPlans ? JSON.parse(storedPlans) : INITIAL_PLANS);
-        } catch (e) {
-            setWorkoutPlans(INITIAL_PLANS);
-        }
-
-        try {
-            const storedDefinitions = localStorage.getItem(defsKey);
-            setExerciseDefinitions(storedDefinitions ? JSON.parse(storedDefinitions) : []);
-        } catch (e) {
-            setExerciseDefinitions([]);
-        }
-
-        try {
-            const storedLogs = localStorage.getItem(logsKey);
-            setAllWorkoutLogs(storedLogs ? JSON.parse(storedLogs) : []);
-        } catch (e) { console.error("Error parsing workout logs", e); setAllWorkoutLogs([]); }
+        try { const d = localStorage.getItem(plansKey); setWorkoutPlans(d ? JSON.parse(d) : INITIAL_PLANS); } catch (e) { setWorkoutPlans(INITIAL_PLANS); }
+        try { const d = localStorage.getItem(defsKey); setExerciseDefinitions(d ? JSON.parse(d) : []); } catch (e) { setExerciseDefinitions([]); }
+        try { const d = localStorage.getItem(logsKey); setAllWorkoutLogs(d ? JSON.parse(d) : []); } catch (e) { setAllWorkoutLogs([]); }
         
-        try {
-            const storedUpskillLogs = localStorage.getItem(upskillLogsKey);
-            setAllUpskillLogs(storedUpskillLogs ? JSON.parse(storedUpskillLogs) : []);
-        } catch (e) { console.error("Error parsing upskill logs", e); setAllUpskillLogs([]); }
-
-        try {
-            const storedDeepWorkLogs = localStorage.getItem(deepworkLogsKey);
-            setAllDeepWorkLogs(storedDeepWorkLogs ? JSON.parse(storedDeepWorkLogs) : []);
-        } catch (e) { console.error("Error parsing deep work logs", e); setAllDeepWorkLogs([]); }
+        // Load upskill/deepwork
+        try { const d = localStorage.getItem(upskillLogsKey); setAllUpskillLogs(d ? JSON.parse(d) : []); } catch (e) { setAllUpskillLogs([]); }
+        try { const d = localStorage.getItem(deepworkLogsKey); setAllDeepWorkLogs(d ? JSON.parse(d) : []); } catch (e) { setAllDeepWorkLogs([]); }
+        try { const d = localStorage.getItem(goalsKey); setTopicGoals(d ? JSON.parse(d) : {}); } catch (e) { setTopicGoals({}); }
         
-        try {
-            const storedGoals = localStorage.getItem(goalsKey);
-            setTopicGoals(storedGoals ? JSON.parse(storedGoals) : {});
-        } catch (e) { console.error("Error parsing topic goals", e); setTopicGoals({}); }
-
+        // Load health
+        try { const d = localStorage.getItem(dietPlanKey); setDietPlan(d ? JSON.parse(d) : []); } catch(e) { setDietPlan([]); }
+        try { const d = localStorage.getItem(weightLogsKey); setWeightLogs(d ? JSON.parse(d) : []); } catch(e) { setWeightLogs([]); }
+        const storedGoal = localStorage.getItem(goalWeightKey);
+        if (storedGoal) setGoalWeight(parseFloat(storedGoal));
+        const storedHeight = localStorage.getItem(heightKey);
+        if (storedHeight) setHeight(parseFloat(storedHeight));
+        const storedDob = localStorage.getItem(dobKey);
+        if (storedDob) setDateOfBirth(storedDob);
+        const storedGender = localStorage.getItem(genderKey);
+        if (storedGender === 'male' || storedGender === 'female') setGender(storedGender as Gender);
     }
   }, [currentUser]);
+
+  // Save health data back to local storage on change
+  useEffect(() => {
+    if (currentUser?.username) {
+        const username = currentUser.username;
+        localStorage.setItem(`weightLogs_${username}`, JSON.stringify(weightLogs));
+        localStorage.setItem(`dietPlan_${username}`, JSON.stringify(dietPlan));
+        if (goalWeight !== null) localStorage.setItem(`goalWeight_${username}`, goalWeight.toString()); else localStorage.removeItem(`goalWeight_${username}`);
+        if (height !== null) localStorage.setItem(`height_${username}`, height.toString()); else localStorage.removeItem(`height_${username}`);
+        if (dateOfBirth) localStorage.setItem(`dateOfBirth_${username}`, dateOfBirth); else localStorage.removeItem(`dateOfBirth_${username}`);
+        if (gender) localStorage.setItem(`gender_${username}`, gender); else localStorage.removeItem(`gender_${username}`);
+    }
+  }, [weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, currentUser]);
+
 
   useEffect(() => {
     const timerInterval = setInterval(() => {
@@ -620,21 +640,6 @@ function HomePageContent() {
             return { avgVolume: Math.round(totalVolume / daysWithWorkouts) };
         };
 
-        const avgUpskillDuration = calculateAverageDuration(allUpskillLogs, 'reps');
-        const avgDeepWorkDuration = calculateAverageDuration(allDeepWorkLogs, 'weight');
-        
-        const totalProductiveMinutes = avgUpskillDuration + avgDeepWorkDuration;
-        const totalProductiveHours = totalProductiveMinutes / 60;
-
-        const avgUpskillHours = avgUpskillDuration / 60;
-        const avgDeepWorkHours = avgDeepWorkDuration / 60;
-
-        const currentLevel = productivityLevels.find(l => totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max) || null;
-
-        const learningStats = calculateLearningStats(allUpskillLogs, topicGoals);
-
-        const workoutStats = calculateWorkoutStats(allWorkoutLogs);
-
         const consistencyData: { score: number }[] = [];
         if (oneYearAgo && today) {
             const workoutDates = new Set(allWorkoutLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date));
@@ -651,19 +656,156 @@ function HomePageContent() {
         }
         const latestConsistency = consistencyData.length > 0 ? consistencyData[consistencyData.length - 1].score : 0;
 
-
-        return {
-            avgUpskillDuration,
-            avgDeepWorkDuration,
-            avgUpskillHours,
-            avgDeepWorkHours,
-            totalProductiveHours,
-            currentLevel,
-            learningStats,
-            workoutStats,
-            latestConsistency,
+        const avgUpskillDuration = calculateAverageDuration(allUpskillLogs, 'reps');
+        const avgDeepWorkDuration = calculateAverageDuration(allDeepWorkLogs, 'weight');
+        const totalProductiveMinutes = avgUpskillDuration + avgDeepWorkDuration;
+        const totalProductiveHours = totalProductiveMinutes / 60;
+        const avgUpskillHours = avgUpskillDuration / 60;
+        const avgDeepWorkHours = avgDeepWorkDuration / 60;
+        const currentLevel = productivityLevels.find(l => totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max) || null;
+        const learningStats = calculateLearningStats(allUpskillLogs, topicGoals);
+        const workoutStats = calculateWorkoutStats(allWorkoutLogs);
+        
+        // Health Metrics calculation
+        const calories = dietPlan.length > 0 ? dietPlan.map(d => d.totalCalories).filter((c): c is number => c !== null && c > 0) : [];
+        const averageIntake = calories.length > 0 ? calories.reduce((sum, c) => sum + c, 0) / calories.length : null;
+        const currentWeightVal = weightLogs.length > 0 ? weightLogs[weightLogs.length - 1].weight : null;
+        const age = dateOfBirth ? differenceInYears(new Date(), parseISO(dateOfBirth)) : null;
+        let bmr = null;
+        if (currentWeightVal && height && age && gender) {
+            if (gender === 'male') { bmr = (10 * currentWeightVal) + (6.25 * height) - (5 * age) + 5; } 
+            else { bmr = (10 * currentWeightVal) + (6.25 * height) - (5 * age) - 161; }
+        }
+        const healthMetrics = {
+            averageIntake: averageIntake ? Math.round(averageIntake) : null,
+            maintenanceCalories: bmr ? Math.round(bmr) : null,
         };
-    }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today]);
+
+        // Projection Summary calculation
+        let projectionSummary = null;
+        if (goalWeight && weightLogs.length >= 2) {
+            const sortedLogs = weightLogs.map(log => {
+                const [year, weekNum] = log.date.split('-W');
+                return { ...log, dateObj: startOfISOWeek(setISOWeek(new Date(parseInt(year), 0, 4), parseInt(weekNum))) };
+            }).sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+
+            const weightChartData = sortedLogs.map((log, index, arr) => ({
+                weight: log.weight, dateObj: log.dateObj,
+                weeklyChange: index > 0 ? log.weight - arr[index - 1].weight : null,
+            }));
+            const lastLog = weightChartData[weightChartData.length - 1];
+            
+            if (lastLog) {
+                const currentWeight = lastLog.weight;
+                const weightDifference = goalWeight - currentWeight;
+                const changes = weightChartData.map(d => d.weeklyChange).filter((c): c is number => c !== null && c !== 0);
+                let averageWeeklyChange = changes.length > 0 ? changes.reduce((a, b) => a + b, 0) / changes.length : 0;
+                let projectionRate = averageWeeklyChange;
+                if (weightDifference < 0) { if (projectionRate >= 0) projectionRate = -0.5; } 
+                else { if (projectionRate <= 0) projectionRate = 0.25; }
+
+                const baseSummary = {
+                    currentWeight: parseFloat(currentWeight.toFixed(1)), goalWeight,
+                    weightDifference: parseFloat(weightDifference.toFixed(1)),
+                    averageWeeklyChange: parseFloat(averageWeeklyChange.toFixed(2)),
+                };
+
+                if (Math.abs(projectionRate) > 0.01) {
+                    const weeksToGo = Math.ceil(Math.abs(weightDifference / projectionRate));
+                    if (weeksToGo > 0 && weeksToGo <= 520) {
+                        const projectedDate = addWeeks(lastLog.dateObj, weeksToGo);
+                        const nextProjectedWeight = currentWeight + projectionRate;
+                        const nextWeekDate = addWeeks(lastLog.dateObj, 1);
+                        projectionSummary = {
+                            ...baseSummary,
+                            projectedDate: format(projectedDate, 'PPP'),
+                            nextProjectedWeight: parseFloat(nextProjectedWeight.toFixed(1)),
+                            weeksToGo,
+                            daysToNextWeek: differenceInDays(nextWeekDate, new Date()),
+                            daysToGoal: differenceInDays(projectedDate, new Date()),
+                        };
+                    } else { projectionSummary = baseSummary; }
+                } else { projectionSummary = baseSummary; }
+            }
+        }
+        
+        return {
+            avgUpskillDuration, avgDeepWorkDuration, avgUpskillHours, avgDeepWorkHours,
+            totalProductiveHours, currentLevel, learningStats, workoutStats, latestConsistency,
+            healthMetrics, projectionSummary
+        };
+    }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, dietPlan, weightLogs, dateOfBirth, height, gender, goalWeight]);
+    
+    // MODAL HANDLERS
+    const handleDietModalOpenChange = (isOpen: boolean) => {
+        setIsDietPlanModalOpen(isOpen);
+        if (!isOpen && currentUser?.username) {
+            const planKey = `dietPlan_${currentUser.username}`;
+            const storedPlan = localStorage.getItem(planKey);
+            if (storedPlan) {
+                try {
+                    const parsedPlan = JSON.parse(storedPlan);
+                    if (Array.isArray(parsedPlan)) { setDietPlan(parsedPlan); }
+                } catch (e) { console.error("Error parsing diet plan on modal close", e); }
+            }
+        }
+    };
+    
+    const handleLogWeight = (weight: number, date: Date) => {
+      if (!currentUser || isNaN(weight) || weight <= 0) { toast({ title: "Invalid Input", description: "Please enter a valid weight.", variant: "destructive" }); return; }
+      const year = getISOWeekYear(date);
+      const week = getISOWeek(date).toString().padStart(2, '0');
+      const weekKey = `${year}-W${week}`;
+      setWeightLogs(prevLogs => {
+          const logIndex = prevLogs.findIndex(log => log.date === weekKey);
+          const newLog: WeightLog = { date: weekKey, weight: weight };
+          if (logIndex > -1) {
+              const updatedLogs = [...prevLogs];
+              updatedLogs[logIndex] = newLog;
+              return updatedLogs;
+          } else {
+              return [...prevLogs, newLog].sort((a,b) => a.date.localeCompare(b.date));
+          }
+      });
+      toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved.` });
+    };
+
+  const handleUpdateWeightLog = (dateKey: string, newWeight: number) => {
+    if (!currentUser || isNaN(newWeight) || newWeight <= 0) { toast({ title: "Invalid Input", description: "Please enter a valid weight.", variant: "destructive" }); return; }
+    setWeightLogs(prevLogs => {
+      const logIndex = prevLogs.findIndex(log => log.date === dateKey);
+      if (logIndex > -1) {
+        const updatedLogs = [...prevLogs];
+        updatedLogs[logIndex] = { ...updatedLogs[logIndex], weight: newWeight };
+        toast({ title: "Weight Updated" });
+        return updatedLogs.sort((a,b) => a.date.localeCompare(b.date));
+      }
+      return prevLogs;
+    });
+  };
+
+  const handleDeleteWeightLog = (dateKey: string) => {
+    if (!currentUser) return;
+    setWeightLogs(prevLogs => prevLogs.filter(log => log.date !== dateKey));
+    toast({ title: "Weight Deleted" });
+  };
+  const handleSetGoalWeight = (goal: number) => {
+    if (!isNaN(goal) && goal > 0) {
+      if (currentUser?.username) { setGoalWeight(goal); toast({ title: "Goal Set!" }); }
+    } else { toast({ title: "Invalid Input", variant: "destructive" }); }
+  };
+  const handleSetHeight = (h: number) => {
+    if (!isNaN(h) && h > 0) {
+      if (currentUser?.username) { setHeight(h); toast({ title: "Height Set!" }); }
+    } else { toast({ title: "Invalid Input", variant: "destructive" }); }
+  };
+  const handleSetDateOfBirth = (dob: string) => {
+    if (dob && currentUser?.username) { setDateOfBirth(dob); toast({ title: "Date of Birth Set" }); }
+  };
+  const handleSetGender = (g: Gender) => {
+    if (g && currentUser?.username) { setGender(g); toast({ title: "Gender Set!" }); }
+  };
+
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -704,118 +846,227 @@ function HomePageContent() {
               </div>
             </div>
 
-            <Card className="mb-6 bg-card/50">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-primary"><BarChart3 /> Your Productivity Snapshot</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="md:col-span-1 flex flex-col items-center justify-center text-center p-4 rounded-lg bg-muted/50">
-                            <p className="text-muted-foreground">Productivity Level</p>
-                            {productivityStats.currentLevel ? (
-                                <>
-                                    <h3 className="text-4xl font-bold text-primary">{productivityStats.currentLevel.level}</h3>
-                                    <p className="text-sm">{productivityStats.currentLevel.description}</p>
-                                    <p className="text-xs text-muted-foreground">{productivityStats.currentLevel.zone}</p>
-                                </>
-                            ) : (
-                                <p className="text-muted-foreground mt-2">Not enough data</p>
-                            )}
-                            <Separator className="my-4" />
-                            <p className="text-muted-foreground">Total Productive Hours</p>
-                            <h3 className="text-2xl font-bold">{productivityStats.totalProductiveHours.toFixed(2)}</h3>
-                            <p className="text-xs text-muted-foreground">per day (average)</p>
-                        </div>
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
+                <div className="lg:col-span-3">
+                    <Card className="h-full bg-card/50">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-primary"><BarChart3 /> Your Productivity Snapshot</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="md:col-span-1 flex flex-col items-center justify-center text-center p-4 rounded-lg bg-muted/50">
+                                    <p className="text-muted-foreground">Productivity Level</p>
+                                    {productivityStats.currentLevel ? (
+                                        <>
+                                            <h3 className="text-4xl font-bold text-primary">{productivityStats.currentLevel.level}</h3>
+                                            <p className="text-sm">{productivityStats.currentLevel.description}</p>
+                                            <p className="text-xs text-muted-foreground">{productivityStats.currentLevel.zone}</p>
+                                        </>
+                                    ) : (
+                                        <p className="text-muted-foreground mt-2">Not enough data</p>
+                                    )}
+                                    <Separator className="my-4" />
+                                    <p className="text-muted-foreground">Total Productive Hours</p>
+                                    <h3 className="text-2xl font-bold">{productivityStats.totalProductiveHours.toFixed(2)}</h3>
+                                    <p className="text-xs text-muted-foreground">per day (average)</p>
+                                </div>
 
-                        <div className="md:col-span-2 space-y-4">
-                            <div>
-                                <h4 className="font-semibold mb-2 flex items-center gap-2"><Clock /> Daily Averages</h4>
-                                <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between items-center p-2 rounded bg-muted/30">
-                                        <span className="flex items-center gap-2 text-muted-foreground"><BookOpenCheck className="h-4 w-4" /> Learning</span>
-                                        <span className="font-semibold">{productivityStats.avgUpskillHours.toFixed(2)} hr</span>
+                                <div className="md:col-span-2 space-y-4">
+                                    <div>
+                                        <h4 className="font-semibold mb-2 flex items-center gap-2"><Clock /> Daily Averages</h4>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between items-center p-2 rounded bg-muted/30">
+                                                <span className="flex items-center gap-2 text-muted-foreground"><BookOpenCheck className="h-4 w-4" /> Learning</span>
+                                                <span className="font-semibold">{productivityStats.avgUpskillHours.toFixed(2)} hr</span>
+                                            </div>
+                                            <div className="flex justify-between items-center p-2 rounded bg-muted/30">
+                                                <span className="flex items-center gap-2 text-muted-foreground"><Briefcase className="h-4 w-4" /> Deep Work</span>
+                                                <span className="font-semibold">{productivityStats.avgDeepWorkHours.toFixed(2)} hr</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="flex justify-between items-center p-2 rounded bg-muted/30">
-                                        <span className="flex items-center gap-2 text-muted-foreground"><Briefcase className="h-4 w-4" /> Deep Work</span>
-                                        <span className="font-semibold">{productivityStats.avgDeepWorkHours.toFixed(2)} hr</span>
+                                    
+                                    {(productivityStats.workoutStats.avgVolume > 0 || productivityStats.latestConsistency > 0) && (
+                                        <div>
+                                            <h4 className="font-semibold mb-2 flex items-center gap-2"><Dumbbell className="h-4 w-4 text-destructive" /> Workout Stats</h4>
+                                            <div className="space-y-2 text-sm">
+                                                {productivityStats.workoutStats.avgVolume > 0 && (
+                                                    <div className="flex justify-between items-center p-2 rounded bg-muted/30">
+                                                        <span className="flex items-center gap-2 text-muted-foreground"><BarChart3 className="h-4 w-4" /> Avg. Daily Volume</span>
+                                                        <span className="font-semibold">{productivityStats.workoutStats.avgVolume.toLocaleString()} kg/lb</span>
+                                                    </div>
+                                                )}
+                                                {productivityStats.latestConsistency > 0 && (
+                                                    <div className="flex justify-between items-center p-2 rounded bg-muted/30">
+                                                        <span className="flex items-center gap-2 text-muted-foreground"><Zap className="h-4 w-4" /> Consistency</span>
+                                                        <span className="font-semibold">{productivityStats.latestConsistency}%</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Learning Progress</h4>
+                                        <div className="text-sm">
+                                            {Object.keys(productivityStats.learningStats).length > 0 ? (
+                                                <Accordion type="single" collapsible className="w-full space-y-2">
+                                                    {Object.entries(productivityStats.learningStats).map(([topic, stats]: [string, any]) => (
+                                                        <AccordionItem key={topic} value={topic} className="p-3 rounded-md bg-muted/30 border-0">
+                                                            <AccordionTrigger className="py-0 text-left hover:no-underline">
+                                                                <div className="flex flex-col items-start">
+                                                                    <h5 className="font-bold text-foreground text-base">{topic}</h5>
+                                                                    <div className="text-xs text-muted-foreground font-normal">
+                                                                        Progress: {stats.totalProgress.toLocaleString()} / {stats.goalValue.toLocaleString()} {stats.unit.split('/')[0]}
+                                                                    </div>
+                                                                </div>
+                                                            </AccordionTrigger>
+                                                            <AccordionContent className="pt-2">
+                                                                <Progress value={(stats.totalProgress / stats.goalValue) * 100} className="h-2 my-2" />
+                                                                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                                                                    {stats.nextMilestone && (
+                                                                        <div className="space-y-1">
+                                                                            <div className="font-semibold">Next Milestone ({stats.nextMilestone.percent}%)</div>
+                                                                            <div>Est. Date: <span className="font-medium text-foreground">{stats.nextMilestone.date}</span></div>
+                                                                            <div>Days Left: <span className="font-medium text-foreground">{stats.nextMilestone.daysRemaining}</span></div>
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="space-y-1">
+                                                                    <div className="font-semibold">Goal Completion</div>
+                                                                    {stats.completion ? (
+                                                                            <>
+                                                                                <div>Est. Date: <span className="font-medium text-foreground">{stats.completion.date}</span></div>
+                                                                                <div>Days Left: <span className="font-medium text-foreground">{stats.completion.daysRemaining}</span></div>
+                                                                            </>
+                                                                    ) : (stats.totalProgress >= stats.goalValue) ? <div className="text-green-500 font-bold">Completed!</div> : <div className="text-muted-foreground">Not enough data to project.</div>}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="mt-2 pt-2 border-t text-xs">
+                                                                    <div className="flex justify-between">
+                                                                        <span className="text-muted-foreground">Learning Speed</span>
+                                                                        <span className="font-medium text-foreground">{stats.speed.toFixed(1)} {stats.unit}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </AccordionContent>
+                                                        </AccordionItem>
+                                                    ))}
+                                                </Accordion>
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground text-center py-2">No learning stats yet. Log progress and duration in the Upskill page.</p>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            
-                            {(productivityStats.workoutStats.avgVolume > 0 || productivityStats.latestConsistency > 0) && (
-                                <div>
-                                    <h4 className="font-semibold mb-2 flex items-center gap-2"><Dumbbell className="h-4 w-4 text-destructive" /> Workout Stats</h4>
-                                    <div className="space-y-2 text-sm">
-                                        {productivityStats.workoutStats.avgVolume > 0 && (
-                                            <div className="flex justify-between items-center p-2 rounded bg-muted/30">
-                                                <span className="flex items-center gap-2 text-muted-foreground"><BarChart3 className="h-4 w-4" /> Avg. Daily Volume</span>
-                                                <span className="font-semibold">{productivityStats.workoutStats.avgVolume.toLocaleString()} kg/lb</span>
+                        </CardContent>
+                    </Card>
+                </div>
+                <div className="lg:col-span-2">
+                    <Card className="h-full bg-card/50">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-primary">
+                                <Target /> Weight Goal
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <Button onClick={() => setIsWeightChartModalOpen(true)} className="w-full text-xs xl:text-sm">
+                                    <LineChartIcon className="mr-2 h-4 w-4" />
+                                    Chart & Goal
+                                </Button>
+                                <Button onClick={() => handleDietModalOpenChange(true)} variant="outline" className="w-full text-xs xl:text-sm">
+                                    <BookCopy className="mr-2 h-4 w-4" />
+                                    Diet Plan
+                                </Button>
+                            </div>
+                            {(productivityStats.projectionSummary || productivityStats.latestConsistency || productivityStats.healthMetrics.averageIntake || productivityStats.healthMetrics.maintenanceCalories) ? (
+                                <div className="space-y-4 pt-4 border-t">
+                                    {productivityStats.projectionSummary && (
+                                        <>
+                                            <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                                                <div>
+                                                    <div className="text-muted-foreground">Current</div>
+                                                    <div className="font-bold text-lg">{productivityStats.projectionSummary.currentWeight}</div>
+                                                    <div className="text-xs text-muted-foreground">kg/lb</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-muted-foreground">Goal</div>
+                                                    <div className="font-bold text-lg">{productivityStats.projectionSummary.goalWeight}</div>
+                                                    <div className="text-xs text-muted-foreground">kg/lb</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-muted-foreground">{productivityStats.projectionSummary.weightDifference > 0 ? "To Gain" : "To Lose"}</div>
+                                                    <div className={`font-bold text-lg ${productivityStats.projectionSummary.weightDifference > 0 ? "text-orange-500" : "text-green-500"}`}>{Math.abs(productivityStats.projectionSummary.weightDifference)}</div>
+                                                    <div className="text-xs text-muted-foreground">kg/lb</div>
+                                                </div>
+                                            </div>
+
+                                            <Separator />
+                                            
+                                            <div className="space-y-2 text-sm">
+                                            {productivityStats.projectionSummary.averageWeeklyChange !== undefined && (
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-muted-foreground flex items-center gap-2"><Activity className="h-4 w-4" /> Avg. Weekly Change</span>
+                                                    <span className={`font-bold ${productivityStats.projectionSummary.averageWeeklyChange > 0 ? "text-orange-500" : productivityStats.projectionSummary.averageWeeklyChange < 0 ? "text-green-500" : ""}`}>
+                                                        {productivityStats.projectionSummary.averageWeeklyChange > 0 ? '+' : ''}{productivityStats.projectionSummary.averageWeeklyChange.toFixed(2)} kg/lb
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {productivityStats.projectionSummary.projectedDate && (
+                                                <>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-muted-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Next Week Est.</span>
+                                                    <span className="font-bold">{productivityStats.projectionSummary.nextProjectedWeight} kg/lb</span>
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-muted-foreground pl-6">Days Remaining</span>
+                                                    <span className="font-bold">{productivityStats.projectionSummary.daysToNextWeek > 0 ? `${productivityStats.projectionSummary.daysToNextWeek} days` : 'Past'}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center pt-2 mt-2 border-t">
+                                                    <span className="text-muted-foreground flex items-center gap-2"><CalendarDays className="h-4 w-4" /> Est. Goal Date</span>
+                                                    <span className="font-bold">{productivityStats.projectionSummary.projectedDate}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-muted-foreground pl-6">Days Remaining</span>
+                                                    <span className="font-bold">{productivityStats.projectionSummary.daysToGoal > 0 ? `${productivityStats.projectionSummary.daysToGoal} days` : 'N/A'}</span>
+                                                </div>
+                                                </>
+                                            )}
+                                            </div>
+                                        </>
+                                    )}
+                                    
+                                    {(productivityStats.healthMetrics.averageIntake || productivityStats.healthMetrics.maintenanceCalories) && (
+                                    <div className="space-y-2 text-sm pt-4 border-t">
+                                        {productivityStats.healthMetrics.averageIntake && (
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-muted-foreground flex items-center gap-2"><Flame className="h-4 w-4" /> Current Avg. Daily Intake</span>
+                                                <span className="font-bold">{productivityStats.healthMetrics.averageIntake} kcal</span>
                                             </div>
                                         )}
-                                        {productivityStats.latestConsistency > 0 && (
-                                            <div className="flex justify-between items-center p-2 rounded bg-muted/30">
-                                                <span className="flex items-center gap-2 text-muted-foreground"><Zap className="h-4 w-4" /> Consistency</span>
-                                                <span className="font-semibold">{productivityStats.latestConsistency}%</span>
+                                        {productivityStats.healthMetrics.maintenanceCalories && (
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-muted-foreground flex items-center gap-2"><HeartPulse className="h-4 w-4" /> Est. Maintenance</span>
+                                                <span className="font-bold">{productivityStats.healthMetrics.maintenanceCalories} kcal</span>
                                             </div>
+                                        )}
+                                        {productivityStats.healthMetrics.averageIntake && productivityStats.healthMetrics.maintenanceCalories && productivityStats.healthMetrics.averageIntake < productivityStats.healthMetrics.maintenanceCalories && (
+                                            <p className="text-xs text-orange-500 mt-2">
+                                                ⚠️ You’re eating below maintenance — watch for fatigue, low mood, or muscle loss.
+                                            </p>
                                         )}
                                     </div>
-                                </div>
-                            )}
-
-                            <div>
-                                <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Learning Progress</h4>
-                                <div className="text-sm">
-                                    {Object.keys(productivityStats.learningStats).length > 0 ? (
-                                        <Accordion type="single" collapsible className="w-full space-y-2">
-                                            {Object.entries(productivityStats.learningStats).map(([topic, stats]: [string, any]) => (
-                                                <AccordionItem key={topic} value={topic} className="p-3 rounded-md bg-muted/30 border-0">
-                                                    <AccordionTrigger className="py-0 text-left hover:no-underline">
-                                                        <div className="flex flex-col items-start">
-                                                            <h5 className="font-bold text-foreground text-base">{topic}</h5>
-                                                            <div className="text-xs text-muted-foreground font-normal">
-                                                                Progress: {stats.totalProgress.toLocaleString()} / {stats.goalValue.toLocaleString()} {stats.unit.split('/')[0]}
-                                                            </div>
-                                                        </div>
-                                                    </AccordionTrigger>
-                                                    <AccordionContent className="pt-2">
-                                                        <Progress value={(stats.totalProgress / stats.goalValue) * 100} className="h-2 my-2" />
-                                                        <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                                                            {stats.nextMilestone && (
-                                                                <div className="space-y-1">
-                                                                    <div className="font-semibold">Next Milestone ({stats.nextMilestone.percent}%)</div>
-                                                                    <div>Est. Date: <span className="font-medium text-foreground">{stats.nextMilestone.date}</span></div>
-                                                                    <div>Days Left: <span className="font-medium text-foreground">{stats.nextMilestone.daysRemaining}</span></div>
-                                                                </div>
-                                                            )}
-                                                            <div className="space-y-1">
-                                                               <div className="font-semibold">Goal Completion</div>
-                                                               {stats.completion ? (
-                                                                    <>
-                                                                        <div>Est. Date: <span className="font-medium text-foreground">{stats.completion.date}</span></div>
-                                                                        <div>Days Left: <span className="font-medium text-foreground">{stats.completion.daysRemaining}</span></div>
-                                                                    </>
-                                                               ) : (stats.totalProgress >= stats.goalValue) ? <div className="text-green-500 font-bold">Completed!</div> : <div className="text-muted-foreground">Not enough data to project.</div>}
-                                                            </div>
-                                                        </div>
-                                                         <div className="mt-2 pt-2 border-t text-xs">
-                                                            <div className="flex justify-between">
-                                                                <span className="text-muted-foreground">Learning Speed</span>
-                                                                <span className="font-medium text-foreground">{stats.speed.toFixed(1)} {stats.unit}</span>
-                                                            </div>
-                                                        </div>
-                                                    </AccordionContent>
-                                                </AccordionItem>
-                                            ))}
-                                        </Accordion>
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground text-center py-2">No learning stats yet. Log progress and duration in the Upskill page.</p>
                                     )}
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+                            ) : (
+                                <p className="text-sm text-muted-foreground text-center py-4">
+                                  Log your weight and set a goal on the Workout Tracker page to see your projection here.
+                                </p>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {slots.map((slot) => {
@@ -956,6 +1207,28 @@ function HomePageContent() {
             pageType={learningModalProps.pageType}
         />
       )}
+
+      <WeightChartModal
+        isOpen={isWeightChartModalOpen}
+        onOpenChange={setIsWeightChartModalOpen}
+        weightLogs={weightLogs}
+        goalWeight={goalWeight}
+        height={height}
+        dateOfBirth={dateOfBirth}
+        gender={gender}
+        onLogWeight={handleLogWeight}
+        onUpdateWeightLog={handleUpdateWeightLog}
+        onDeleteWeightLog={handleDeleteWeightLog}
+        onSetGoalWeight={handleSetGoalWeight}
+        onSetHeight={handleSetHeight}
+        onSetDateOfBirth={handleSetDateOfBirth}
+        onSetGender={handleSetGender}
+      />
+
+      <DietPlanModal
+        isOpen={isDietPlanModalOpen}
+        onOpenChange={handleDietModalOpenChange}
+      />
     </div>
   );
 }
@@ -963,7 +1236,3 @@ function HomePageContent() {
 export default function Page() {
     return ( <AuthGuard> <HomePageContent /> </AuthGuard> );
 }
-
-    
-
-    
