@@ -17,7 +17,7 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
-import type { ExerciseDefinition, DatedWorkout, LoggedSet } from '@/types/workout';
+import type { ExerciseDefinition, DatedWorkout, LoggedSet, TopicGoal } from '@/types/workout';
 import { format, parseISO, addDays, differenceInDays } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ interface ExerciseProgressModalProps {
   onOpenChange: (isOpen: boolean) => void;
   exercise: ExerciseDefinition | null;
   allWorkoutLogs: DatedWorkout[];
+  topicGoals?: Record<string, TopicGoal>;
   pageType?: 'workout' | 'upskill' | 'deepwork';
 }
 
@@ -126,6 +127,7 @@ export function ExerciseProgressModal({
   onOpenChange,
   exercise,
   allWorkoutLogs,
+  topicGoals,
   pageType = 'workout'
 }: ExerciseProgressModalProps) {
   const [viewMode, setViewMode] = useState<'table' | 'graph'>('table');
@@ -183,18 +185,22 @@ export function ExerciseProgressModal({
   }, [exercise, allWorkoutLogs, pageType]);
 
   const upskillData = useMemo(() => {
-    if (!exercise || !exercise.goalValue || pageType !== 'upskill') return null;
+    if (!exercise || !topicGoals || pageType !== 'upskill') return null;
 
-    const allLogsForExercise = allWorkoutLogs
+    const topic = exercise.category;
+    const topicGoal = topicGoals[topic];
+    if (!topicGoal) return null;
+
+    const allLogsForTopic = allWorkoutLogs
       .flatMap(datedLog => datedLog.exercises
-        .filter(ex => ex.definitionId === exercise.id && ex.loggedSets.length > 0)
+        .filter(ex => ex.category === topic && ex.loggedSets.length > 0)
         .flatMap(ex => ex.loggedSets.map(set => ({ date: datedLog.date, progress: set.weight })))
       );
     
-    if (allLogsForExercise.length === 0) return { graphData: [], projection: null, summary: null };
+    if (allLogsForTopic.length === 0) return { graphData: [], projection: null, summary: null };
 
     const dailyDataMap = new Map<string, number>();
-    allLogsForExercise.forEach(log => {
+    allLogsForTopic.forEach(log => {
       dailyDataMap.set(log.date, (dailyDataMap.get(log.date) || 0) + log.progress);
     });
 
@@ -217,7 +223,7 @@ export function ExerciseProgressModal({
     const lastDataPoint = graphData[graphData.length - 1];
     const totalProgress = lastDataPoint.cumulativeProgress;
 
-    if (totalProgress >= exercise.goalValue) {
+    if (totalProgress >= topicGoal.goalValue) {
       return { graphData, projection: null, summary: { totalProgress } };
     }
 
@@ -229,13 +235,13 @@ export function ExerciseProgressModal({
       return { graphData, projection: null, summary: { totalProgress, averageRatePerDay } };
     }
 
-    const remainingProgress = exercise.goalValue - totalProgress;
+    const remainingProgress = topicGoal.goalValue - totalProgress;
     const daysToCompletion = Math.ceil(remainingProgress / averageRatePerDay);
     const projectedDate = addDays(parseISO(lastDataPoint.fullDate), daysToCompletion);
 
     const projection = [
         { timestamp: lastDataPoint.timestamp, cumulativeProgress: lastDataPoint.cumulativeProgress, fullDate: lastDataPoint.fullDate, dailyProgress: lastDataPoint.dailyProgress },
-        { timestamp: projectedDate.getTime(), cumulativeProgress: exercise.goalValue, projectedDate: format(projectedDate, 'PPP'), fullDate: format(projectedDate, 'PPP'), dailyProgress: 0 },
+        { timestamp: projectedDate.getTime(), cumulativeProgress: topicGoal.goalValue, projectedDate: format(projectedDate, 'PPP'), fullDate: format(projectedDate, 'PPP'), dailyProgress: 0 },
     ];
     const summary = {
       totalProgress,
@@ -245,9 +251,11 @@ export function ExerciseProgressModal({
     }
 
     return { graphData, projection, summary };
-  }, [exercise, allWorkoutLogs, pageType]);
+  }, [exercise, allWorkoutLogs, pageType, topicGoals]);
 
   if (!exercise) return null;
+
+  const topicGoal = pageType === 'upskill' && topicGoals ? topicGoals[exercise.category] : null;
 
   const renderContent = () => {
     if (viewMode === 'table') {
@@ -261,7 +269,7 @@ export function ExerciseProgressModal({
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[150px]">Date</TableHead>
-                  <TableHead>{pageType === 'workout' ? 'Sets Details (Reps x Weight)' : pageType === 'upskill' && exercise.goalType ? `Progress (${exercise.goalType})` : 'Session Details (Duration)'}</TableHead>
+                  <TableHead>{pageType === 'workout' ? 'Sets Details (Reps x Weight)' : topicGoal ? `Progress (${topicGoal.goalType})` : 'Session Details (Duration)'}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -271,7 +279,7 @@ export function ExerciseProgressModal({
                     <TableCell>
                       {entry.sets.map((set) => (
                         <span key={set.id} className="mr-2 inline-block bg-muted/50 px-1.5 py-0.5 rounded text-xs">
-                          {pageType === 'workout' ? `${set.reps}r x ${set.weight}kg/lb` : `${set.weight} ${exercise.goalType || 'min'}`}
+                          {pageType === 'workout' ? `${set.reps}r x ${set.weight}kg/lb` : `${set.weight} ${topicGoal?.goalType || 'min'}`}
                         </span>
                       ))}
                     </TableCell>
@@ -287,19 +295,19 @@ export function ExerciseProgressModal({
 
     if (pageType === 'upskill' && upskillData) {
       if (upskillData.graphData.length < 2) {
-        return <p className="text-center text-muted-foreground py-8">Need at least two log entries to draw a graph.</p>;
+        return <p className="text-center text-muted-foreground py-8">Need at least two log entries for this topic to draw a graph.</p>;
       }
       return (
         <div className='space-y-4'>
-          {upskillData.summary && (
+          {upskillData.summary && topicGoal && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center text-xs">
               <div className="p-2 bg-muted/50 rounded-md">
                 <div className="text-muted-foreground">Progress</div>
-                <div className="font-bold text-base">{upskillData.summary.totalProgress.toLocaleString()} / {exercise.goalValue?.toLocaleString()}</div>
+                <div className="font-bold text-base">{upskillData.summary.totalProgress.toLocaleString()} / {topicGoal.goalValue?.toLocaleString()}</div>
               </div>
                <div className="p-2 bg-muted/50 rounded-md">
                 <div className="text-muted-foreground">Avg. Daily Rate</div>
-                <div className="font-bold text-base">{upskillData.summary.averageRatePerDay?.toFixed(1) || '-'} {exercise.goalType}/day</div>
+                <div className="font-bold text-base">{upskillData.summary.averageRatePerDay?.toFixed(1) || '-'} {topicGoal.goalType}/day</div>
               </div>
                <div className="p-2 bg-muted/50 rounded-md">
                 <div className="text-muted-foreground">Est. Completion</div>
@@ -315,9 +323,9 @@ export function ExerciseProgressModal({
             <LineChart accessibilityLayer data={upskillData.graphData} margin={{ top: 5, right: 40, left: 10, bottom: 5, }}>
               <CartesianGrid vertical={false} strokeDasharray="3 3" />
               <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value) => value.slice(0, 6)} />
-              <YAxis tickLine={false} axisLine={false} tickMargin={8} domain={['auto', 'dataMax + 10']} label={{ value: `Cumulative ${exercise.goalType}`, angle: -90, position: "insideLeft", offset: -0, style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' } }} />
-              <RechartsTooltip cursor={true} content={<CustomChartTooltip pageType={pageType} goalType={exercise.goalType} />} />
-              {exercise.goalValue && <ReferenceLine y={exercise.goalValue} stroke="hsl(var(--destructive))" strokeDasharray="3 3" label={{ value: "Goal", position: 'insideTopRight' }} />}
+              <YAxis tickLine={false} axisLine={false} tickMargin={8} domain={['auto', 'dataMax + 10']} label={{ value: `Cumulative ${topicGoal?.goalType}`, angle: -90, position: "insideLeft", offset: -0, style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' } }} />
+              <RechartsTooltip cursor={true} content={<CustomChartTooltip pageType={pageType} goalType={topicGoal?.goalType} />} />
+              {topicGoal && <ReferenceLine y={topicGoal.goalValue} stroke="hsl(var(--destructive))" strokeDasharray="3 3" label={{ value: "Goal", position: 'insideTopRight' }} />}
               <Line dataKey="cumulativeProgress" type="monotone" stroke="var(--color-cumulativeProgress)" strokeWidth={2} dot={{ r: 4 }} name="cumulativeProgress" />
               {upskillData.projection && (
                 <Line dataKey="cumulativeProgress" data={upskillData.projection} type="monotone" stroke="var(--color-projection)" strokeDasharray="5 5" strokeWidth={2} dot={{ r: 4 }} name="projection" />
@@ -354,12 +362,12 @@ export function ExerciseProgressModal({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl md:max-w-3xl lg:max-w-4xl max-h-[85dvh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Progress for: {exercise.name}</DialogTitle>
+          <DialogTitle>Progress for: {pageType === 'upskill' ? exercise.category : exercise.name}</DialogTitle>
           <DialogDescription>
             {pageType === 'workout' 
              ? "Showing history for this exercise. Toggle between table and graph view."
-             : pageType === 'upskill' && exercise.goalValue
-             ? `Showing cumulative progress towards your goal of ${exercise.goalValue} ${exercise.goalType}.`
+             : pageType === 'upskill' && topicGoal
+             ? `Showing cumulative progress for the topic "${exercise.category}" towards your goal of ${topicGoal.goalValue} ${topicGoal.goalType}.`
              : "Showing history for this task. Toggle between table and graph view."
             }
           </DialogDescription>

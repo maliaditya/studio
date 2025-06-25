@@ -33,10 +33,13 @@ export interface LoggedSet {
 
 export interface ExerciseDefinition {
   id: string;
-  name: string;
-  category: ExerciseCategory; // This is the "Topic" in upskill
-  goalType?: 'pages' | 'hours' | null;
-  goalValue?: number | null;
+  name: string; // Subtopic for upskill
+  category: ExerciseCategory; // Topic for upskill
+}
+
+export interface TopicGoal {
+  goalType: 'pages' | 'hours';
+  goalValue: number;
 }
 
 export interface WorkoutExercise {

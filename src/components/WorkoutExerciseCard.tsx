@@ -6,13 +6,13 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Trash2, CheckSquare, Edit2, Save, X, Youtube, TrendingUp } from 'lucide-react';
-import { WorkoutExercise, LoggedSet, ExerciseDefinition } from '@/types/workout';
+import { WorkoutExercise, LoggedSet, TopicGoal } from '@/types/workout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 interface WorkoutExerciseCardProps {
   exercise: WorkoutExercise;
-  definition?: ExerciseDefinition;
+  definitionGoal?: TopicGoal;
   onLogSet: (exerciseId: string, reps: number, weight: number) => void;
   onDeleteSet: (exerciseId: string, setId: string) => void;
   onUpdateSet: (exerciseId: string, setId: string, reps: number, weight: number) => void;
@@ -23,7 +23,7 @@ interface WorkoutExerciseCardProps {
 
 export function WorkoutExerciseCard({
   exercise,
-  definition,
+  definitionGoal,
   onLogSet,
   onDeleteSet,
   onUpdateSet,
@@ -42,13 +42,13 @@ export function WorkoutExerciseCard({
 
   const placeholder = useMemo(() => {
     if (pageType === 'upskill') {
-      return definition?.goalType ? `Log ${definition.goalType}` : 'Log Duration (min)';
+      return definitionGoal?.goalType ? `Log ${definitionGoal.goalType}` : 'Log Duration (min)';
     }
     if (pageType === 'deepwork') {
       return 'Duration (min)';
     }
     return ''; // for workout, there are two inputs
-  }, [pageType, definition]);
+  }, [pageType, definitionGoal]);
 
   const handleLogSetSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,18 +105,19 @@ export function WorkoutExerciseCard({
   };
   
   const isCompleted = useMemo(() => {
-    if (pageType === 'upskill' && definition?.goalValue) {
-      const totalProgress = exercise.loggedSets.reduce((sum, set) => sum + set.weight, 0);
-      return totalProgress >= definition.goalValue;
+    // Card-level completion is only for workout sets for now.
+    // Topic-level completion for upskill is handled in the progress modal.
+    if (pageType === 'workout') {
+        return exercise.loggedSets.length >= exercise.targetSets;
     }
-    return exercise.loggedSets.length >= exercise.targetSets;
-  }, [exercise, definition, pageType]);
+    return false;
+  }, [exercise, pageType]);
   
 
   const getProgressText = () => {
-    if (pageType === 'upskill' && definition?.goalValue) {
+    if (pageType === 'upskill' && definitionGoal) {
       const totalProgress = exercise.loggedSets.reduce((sum, set) => sum + set.weight, 0);
-      return `Goal: ${definition.goalValue} ${definition.goalType}. Progress: ${totalProgress}/${definition.goalValue}`;
+      return `Topic Goal: ${definitionGoal.goalValue} ${definitionGoal.goalType}. This subtopic: ${totalProgress} logged.`;
     }
     if (pageType === 'workout') {
       return `Target: ${exercise.targetSets} sets of ${exercise.targetReps} reps. Progress: ${exercise.loggedSets.length}/${exercise.targetSets} sets.`;
@@ -128,8 +129,8 @@ export function WorkoutExerciseCard({
     if (pageType === 'workout') {
       return `Set ${exercise.loggedSets.length - index}: <strong>${set.reps}</strong>r @ <strong>${set.weight}</strong>kg/lb`;
     }
-    if (pageType === 'upskill' && definition?.goalType) {
-      return `Logged: <strong>${set.weight}</strong> ${definition.goalType}`;
+    if (pageType === 'upskill' && definitionGoal?.goalType) {
+      return `Logged: <strong>${set.weight}</strong> ${definitionGoal.goalType}`;
     }
     return `Session ${exercise.loggedSets.length - index}: <strong>${set.weight}</strong> min`;
   }
