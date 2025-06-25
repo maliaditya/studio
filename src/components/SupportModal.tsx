@@ -63,7 +63,7 @@ export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
         {showQr ? (
           <div className="flex flex-col items-center justify-center gap-4 py-4">
             <Image
-              src="https://placehold.co/250x250.png"
+              src="/QRcode.jpg"
               data-ai-hint="qr code"
               alt="UPI QR Code"
               width={250}
