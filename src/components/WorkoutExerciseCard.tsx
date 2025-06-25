@@ -34,15 +34,17 @@ export function WorkoutExerciseCard({
   const [reps, setReps] = useState('');
   const [weight, setWeight] = useState('');
   const [duration, setDuration] = useState('');
+  const [progress, setProgress] = useState('');
 
   const [editingSet, setEditingSet] = useState<LoggedSet | null>(null);
   const [editReps, setEditReps] = useState('');
   const [editWeight, setEditWeight] = useState('');
   const [editDuration, setEditDuration] = useState('');
+  const [editProgress, setEditProgress] = useState('');
 
   const placeholder = useMemo(() => {
     if (pageType === 'upskill') {
-      return definitionGoal?.goalType ? `Log ${definitionGoal.goalType}` : 'Log Duration (min)';
+      return definitionGoal?.goalType ? `Log ${definitionGoal.goalType}` : 'Log Progress';
     }
     if (pageType === 'deepwork') {
       return 'Duration (min)';
@@ -60,10 +62,18 @@ export function WorkoutExerciseCard({
         setReps('');
         setWeight('');
       }
-    } else { // upskill or deepwork
+    } else if (pageType === 'upskill') {
+      const numProgress = parseInt(progress);
+      const numDuration = parseInt(duration);
+      if (!isNaN(numProgress) && numProgress > 0 && !isNaN(numDuration) && numDuration > 0) {
+        onLogSet(exercise.id, numDuration, numProgress); // reps = duration, weight = progress
+        setProgress('');
+        setDuration('');
+      }
+    } else { // deepwork
       const numDuration = parseInt(duration);
       if (!isNaN(numDuration) && numDuration > 0) {
-        onLogSet(exercise.id, 1, numDuration); // reps=1, weight=progress
+        onLogSet(exercise.id, 1, numDuration); // reps=1, weight=duration
         setDuration('');
       }
     }
@@ -74,6 +84,9 @@ export function WorkoutExerciseCard({
     if (pageType === 'workout') {
       setEditReps(set.reps.toString());
       setEditWeight(set.weight.toString());
+    } else if (pageType === 'upskill') {
+        setEditProgress(set.weight.toString());
+        setEditDuration(set.reps.toString());
     } else {
       setEditDuration(set.weight.toString());
     }
@@ -88,7 +101,14 @@ export function WorkoutExerciseCard({
           onUpdateSet(exercise.id, editingSet.id, numReps, numWeight);
           setEditingSet(null);
         }
-      } else { // upskill or deepwork
+      } else if (pageType === 'upskill') {
+        const numProgress = parseInt(editProgress);
+        const numDuration = parseInt(editDuration);
+        if (!isNaN(numProgress) && numProgress > 0 && !isNaN(numDuration) && numDuration > 0) {
+            onUpdateSet(exercise.id, editingSet.id, numDuration, numProgress);
+            setEditingSet(null);
+        }
+      } else { // deepwork
         const numDuration = parseInt(editDuration);
         if (!isNaN(numDuration) && numDuration > 0) {
           onUpdateSet(exercise.id, editingSet.id, 1, numDuration);
@@ -130,7 +150,7 @@ export function WorkoutExerciseCard({
       return `Set ${exercise.loggedSets.length - index}: <strong>${set.reps}</strong>r @ <strong>${set.weight}</strong>kg/lb`;
     }
     if (pageType === 'upskill' && definitionGoal?.goalType) {
-      return `Logged: <strong>${set.weight}</strong> ${definitionGoal.goalType}`;
+      return `Progress: <strong>${set.weight}</strong> ${definitionGoal.goalType} in <strong>${set.reps}</strong> min`;
     }
     return `Session ${exercise.loggedSets.length - index}: <strong>${set.weight}</strong> min`;
   }
@@ -170,7 +190,7 @@ export function WorkoutExerciseCard({
           </p>
 
           <form onSubmit={handleLogSetSubmit} className="flex gap-2 mb-3 items-end">
-            {pageType === 'workout' ? (
+             {pageType === 'workout' ? (
               <>
                 <div className="flex-1">
                   <label htmlFor={`reps-${exercise.id}`} className="sr-only">Reps</label>
@@ -181,6 +201,17 @@ export function WorkoutExerciseCard({
                   <Input id={`weight-${exercise.id}`} type="number" placeholder="Weight" value={weight} onChange={(e) => setWeight(e.target.value)} className="h-9" min="0" step="0.1" required />
                 </div>
               </>
+            ) : pageType === 'upskill' ? (
+                <>
+                    <div className="flex-1">
+                        <label htmlFor={`progress-${exercise.id}`} className="sr-only">{placeholder}</label>
+                        <Input id={`progress-${exercise.id}`} type="number" placeholder={placeholder.replace('Log ', '')} value={progress} onChange={(e) => setProgress(e.target.value)} className="h-9" min="1" required />
+                    </div>
+                    <div className="flex-1">
+                        <label htmlFor={`duration-${exercise.id}`} className="sr-only">Duration (min)</label>
+                        <Input id={`duration-${exercise.id}`} type="number" placeholder="Duration (min)" value={duration} onChange={(e) => setDuration(e.target.value)} className="h-9" min="1" required />
+                    </div>
+                </>
             ) : (
               <div className="flex-1">
                 <label htmlFor={`duration-${exercise.id}`} className="sr-only">{placeholder}</label>
@@ -213,6 +244,13 @@ export function WorkoutExerciseCard({
                             <>
                               <Input type="number" value={editReps} onChange={(e) => setEditReps(e.target.value)} className="w-14 h-7 mr-1 text-xs" /> reps
                               <Input type="number" value={editWeight} onChange={(e) => setEditWeight(e.target.value)} className="w-16 h-7 mx-1 text-xs" /> kg/lb
+                            </>
+                          ) : pageType === 'upskill' ? (
+                            <>
+                               <Input type="number" value={editProgress} onChange={(e) => setEditProgress(e.target.value)} className="w-16 h-7 text-xs" />
+                               <span className="mx-1">{definitionGoal?.goalType} in</span>
+                               <Input type="number" value={editDuration} onChange={(e) => setEditDuration(e.target.value)} className="w-16 h-7 text-xs" />
+                               <span className="ml-1">min</span>
                             </>
                           ) : (
                             <Input type="number" value={editDuration} onChange={(e) => setEditDuration(e.target.value)} className="w-20 h-7 mr-1 text-xs" /> 

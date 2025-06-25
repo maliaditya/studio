@@ -349,7 +349,7 @@ function UpskillPageContent() {
     }
   };
   
-  const handleLogSet = (exerciseId: string, reps: number, weight: number) => { // Reps will be 1, weight is progress
+  const handleLogSet = (exerciseId: string, reps: number, weight: number) => { // Reps will be duration, weight is progress
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
     if (existingWorkout && currentUser?.username) {
@@ -358,7 +358,7 @@ function UpskillPageContent() {
         ex.id === exerciseId ? { ...ex, loggedSets: [...ex.loggedSets, newSet] } : ex
       );
       updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
-      toast({ title: "Progress Logged!", description: `Logged ${weight} progress.`});
+      toast({ title: "Progress Logged!", description: `Your learning session has been saved.`});
     }
   };
 
@@ -373,7 +373,7 @@ function UpskillPageContent() {
     }
   };
 
-  const handleUpdateSet = (exerciseId: string, setId: string, reps: number, weight: number) => { // Reps=1, weight=progress
+  const handleUpdateSet = (exerciseId: string, setId: string, reps: number, weight: number) => { // Reps=duration, weight=progress
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
@@ -432,7 +432,7 @@ function UpskillPageContent() {
 
     allWorkoutLogs.forEach(log => {
         log.exercises.forEach(exercise => {
-            const duration = exercise.loggedSets.reduce((sum, set) => sum + set.weight, 0);
+            const duration = exercise.loggedSets.reduce((sum, set) => sum + set.reps, 0);
             if (duration > 0) {
                 if (!dailyData[log.date]) {
                     dailyData[log.date] = { totalDuration: 0, topics: new Set() };

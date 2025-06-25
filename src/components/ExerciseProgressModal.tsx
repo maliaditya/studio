@@ -269,7 +269,7 @@ export function ExerciseProgressModal({
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[150px]">Date</TableHead>
-                  <TableHead>{pageType === 'workout' ? 'Sets Details (Reps x Weight)' : topicGoal ? `Progress (${topicGoal.goalType})` : 'Session Details (Duration)'}</TableHead>
+                  <TableHead>{pageType === 'workout' ? 'Sets Details (Reps x Weight)' : 'Session Details'}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -279,7 +279,11 @@ export function ExerciseProgressModal({
                     <TableCell>
                       {entry.sets.map((set) => (
                         <span key={set.id} className="mr-2 inline-block bg-muted/50 px-1.5 py-0.5 rounded text-xs">
-                          {pageType === 'workout' ? `${set.reps}r x ${set.weight}kg/lb` : `${set.weight} ${topicGoal?.goalType || 'min'}`}
+                           {
+                            pageType === 'workout' ? `${set.reps}r x ${set.weight}kg/lb` :
+                            pageType === 'upskill' ? `${set.weight} ${topicGoal?.goalType || 'units'} in ${set.reps} min` :
+                            `${set.weight} min`
+                          }
                         </span>
                       ))}
                     </TableCell>
