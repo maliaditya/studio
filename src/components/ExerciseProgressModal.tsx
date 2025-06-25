@@ -67,7 +67,15 @@ const CustomChartTooltip = ({ active, payload, pageType, goalType }: any) => {
                     </div>
                     <div className="flex flex-col border-t pt-1.5 mt-1.5">
                         <span className="text-[0.7rem] uppercase text-muted-foreground">Est. Date</span>
-                        <span className="font-bold text-foreground">{format(data.dateObj, 'PPP')} ({data.daysToCompletion} days)</span>
+                        <span className="font-bold text-foreground">{format(data.dateObj, 'PPP')} ({data.daysRemaining} days remaining)</span>
+                    </div>
+                    <div className="flex flex-col border-t pt-1.5 mt-1.5">
+                        <span className="text-[0.7rem] uppercase text-muted-foreground">
+                            Required Rate
+                        </span>
+                        <span className="font-bold text-foreground">
+                            {data.averageRatePerDay.toFixed(1)} {goalType}/day
+                        </span>
                     </div>
                 </div>
               </div>
@@ -206,7 +214,7 @@ export function ExerciseProgressModal({
         .flatMap(ex => ex.loggedSets.map(set => ({ date: datedLog.date, progress: set.weight })))
       );
     
-    if (allLogsForTopic.length === 0) return { graphData: [], projection: null, summary: null };
+    if (allLogsForTopic.length === 0) return { graphData: [], summary: null };
 
     const dailyDataMap = new Map<string, number>();
     allLogsForTopic.forEach(log => {
@@ -231,7 +239,7 @@ export function ExerciseProgressModal({
     });
 
     const lastDataPoint = graphData[graphData.length - 1];
-    if (!lastDataPoint) return { graphData: [], projection: null, summary: null };
+    if (!lastDataPoint) return { graphData: [], summary: null };
     
     const totalProgress = lastDataPoint.cumulativeProgress;
 
@@ -239,27 +247,12 @@ export function ExerciseProgressModal({
     const durationInDays = differenceInDays(new Date(), firstDataPoint.dateObj) + 1;
     const averageRatePerDay = totalProgress / durationInDays;
 
-    let projection = null;
     let summary: any = { totalProgress, averageRatePerDay };
 
     if (totalProgress < topicGoal.goalValue && averageRatePerDay > 0) {
       const remainingProgress = topicGoal.goalValue - totalProgress;
       const daysToCompletion = Math.ceil(remainingProgress / averageRatePerDay);
       const projectedDate = addDays(new Date(), daysToCompletion);
-      
-      projection = [
-          lastDataPoint,
-          { 
-            timestamp: projectedDate.getTime(), 
-            cumulativeProgress: topicGoal.goalValue, 
-            projectedDate: format(projectedDate, 'PPP'), 
-            dateObj: projectedDate,
-            fullDate: format(projectedDate, 'PPP'), 
-            dailyProgress: 0,
-            date: format(projectedDate, "MMM dd"),
-            daysToCompletion: daysToCompletion,
-          },
-      ];
       
       summary.projectedDate = format(projectedDate, 'PPP');
       summary.daysToCompletion = daysToCompletion;
@@ -289,11 +282,11 @@ export function ExerciseProgressModal({
         });
     }
 
-    return { graphData, projection, summary };
+    return { graphData, summary };
   }, [exercise, allWorkoutLogs, pageType, topicGoals]);
 
   const combinedUpskillData = useMemo(() => {
-    if (!upskillData || !upskillData.graphData) return [];
+    if (!upskillData || !upskillData.graphData || !upskillData.summary) return [];
 
     let allData = upskillData.graphData.map(d => ({
         ...d,
@@ -301,26 +294,53 @@ export function ExerciseProgressModal({
         projectedProgress: null,
         isProjection: false,
     }));
+    
+    const { summary, graphData } = upskillData;
+    const { totalProgress, averageRatePerDay, daysToCompletion } = summary;
+    const topicGoal = topicGoals && exercise ? topicGoals[exercise.category] : null;
 
-    if (upskillData.projection) {
-        const lastHistoricalPoint = allData[allData.length - 1];
-        if (lastHistoricalPoint) {
-            lastHistoricalPoint.projectedProgress = lastHistoricalPoint.historicalProgress;
-        }
+    if (!topicGoal || totalProgress >= topicGoal.goalValue || averageRatePerDay <= 0 || !daysToCompletion) {
+        return allData;
+    }
 
-        const goalPoint = upskillData.projection[1];
+    const lastDataPoint = graphData[graphData.length - 1];
+    if (!lastDataPoint) return allData;
+
+    // Connect the last historical point to the start of the projection
+    const lastHistoricalDataPointInCombined = allData.find(d => d.timestamp === lastDataPoint.timestamp);
+    if(lastHistoricalDataPointInCombined) {
+        lastHistoricalDataPointInCombined.projectedProgress = lastHistoricalDataPointInCombined.historicalProgress;
+    }
+
+    const today = new Date();
+    // Add projection points. Let's add one point per day for the projection.
+    for (let i = 1; i <= daysToCompletion; i++) {
+        const projectedDate = addDays(today, i);
+        const projectedProgress = totalProgress + (i * averageRatePerDay);
+        const daysRemaining = daysToCompletion - i;
+        
         allData.push({
-            ...goalPoint,
+            date: format(projectedDate, "MMM dd"),
+            fullDate: format(projectedDate, "PPP"),
+            timestamp: projectedDate.getTime(),
+            dateObj: projectedDate,
             historicalProgress: null,
-            projectedProgress: goalPoint.cumulativeProgress,
+            projectedProgress: parseFloat(projectedProgress.toFixed(1)),
             isProjection: true,
-            daysToCompletion: upskillData.summary?.daysToCompletion,
+            daysRemaining: daysRemaining,
+            averageRatePerDay: averageRatePerDay,
+            dailyProgress: 0,
         });
     }
     
-    return allData;
+    // Ensure the very last point is exactly the goal value
+    const lastPoint = allData[allData.length - 1];
+    if (lastPoint && lastPoint.isProjection) {
+        lastPoint.projectedProgress = topicGoal.goalValue;
+    }
 
-  }, [upskillData]);
+    return allData;
+  }, [upskillData, topicGoals, exercise]);
 
   const isZoomed = useMemo(() => {
     const data = pageType === 'upskill' ? combinedUpskillData : defaultGraphData;
@@ -549,3 +569,5 @@ export function ExerciseProgressModal({
     </Dialog>
   );
 }
+
+    
