@@ -6,13 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus, Activity, LineChart as LineChartIcon, BookCopy, Flame, HeartPulse, Utensils } from 'lucide-react';
+import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus, Activity, LineChart as LineChartIcon, BookCopy } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO, getDay, getWeekOfMonth, isMonday, getYear, getISOWeek, parse, getISOWeekYear, addWeeks, startOfISOWeek, setISOWeek, differenceInDays, subYears, addDays, differenceInYears } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans, WeightLog, Gender, UserDietPlan } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans, WeightLog, Gender } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -50,7 +50,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from '@/components/ui/switch';
 import { WeightChartModal } from '@/components/WeightChartModal';
-import { DietPlanModal } from '@/components/DietPlanModal';
 
 
 const DEFAULT_TARGET_SETS = 4;
@@ -432,7 +431,6 @@ function UpskillPageContent() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
-  const [dietPlan, setDietPlan] = useState<UserDietPlan>([]);
 
   const [viewingProgressExercise, setViewingProgressExercise] = useState<ExerciseDefinition | null>(null);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
@@ -451,7 +449,6 @@ function UpskillPageContent() {
   const [dateOfBirth, setDateOfBirth] = useState<string | null>(null);
   const [gender, setGender] = useState<Gender | null>(null);
   const [isWeightChartModalOpen, setIsWeightChartModalOpen] = useState(false);
-  const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
 
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   const [today, setToday] = useState<Date | null>(null);
@@ -474,7 +471,6 @@ function UpskillPageContent() {
         const heightKey = `height_${username}`;
         const dobKey = `dateOfBirth_${username}`;
         const genderKey = `gender_${username}`;
-        const dietPlanKey = `dietPlan_${username}`;
 
         // Load workout mode or initialize
         const storedMode = localStorage.getItem(modeKey);
@@ -546,11 +542,6 @@ function UpskillPageContent() {
         }
 
         try {
-            const storedDietPlan = localStorage.getItem(dietPlanKey);
-            setDietPlan(storedDietPlan ? JSON.parse(storedDietPlan) : []);
-        } catch (e) { console.error("Error parsing diet plan", e); setDietPlan([]); }
-
-        try {
             const storedWeightLogs = localStorage.getItem(weightLogsKey);
             setWeightLogs(storedWeightLogs ? JSON.parse(storedWeightLogs) : []);
         } catch (e) { console.error("Error parsing weight logs", e); setWeightLogs([]); }
@@ -570,7 +561,6 @@ function UpskillPageContent() {
       setHeight(null);
       setDateOfBirth(null);
       setGender(null);
-      setDietPlan([]);
     }
     const timer = setTimeout(() => setIsLoadingPage(false), 300);
     return () => clearTimeout(timer);
@@ -733,25 +723,6 @@ function UpskillPageContent() {
       }
 
   }, [currentUser]);
-
-  const handleDietModalOpenChange = (isOpen: boolean) => {
-    setIsDietPlanModalOpen(isOpen);
-    if (!isOpen && currentUser?.username) {
-      // When modal closes, reload diet plan from storage to update parent state for calculations
-      const planKey = `dietPlan_${currentUser.username}`;
-      const storedPlan = localStorage.getItem(planKey);
-      if (storedPlan) {
-        try {
-          const parsedPlan = JSON.parse(storedPlan);
-          if (Array.isArray(parsedPlan)) {
-            setDietPlan(parsedPlan);
-          }
-        } catch (e) {
-          console.error("Error parsing diet plan from localStorage on modal close", e);
-        }
-      }
-    }
-  };
 
   const markBackupPromptAsHandled = () => {
     const today = new Date();
@@ -1103,34 +1074,6 @@ function UpskillPageContent() {
     return consistencyData[consistencyData.length - 1].score;
   }, [consistencyData]);
 
-  const healthMetrics = useMemo(() => {
-    const calories = dietPlan.length > 0
-        ? dietPlan
-            .map(d => d.totalCalories)
-            .filter((c): c is number => c !== null && c > 0)
-        : [];
-    const averageIntake = calories.length > 0 ? calories.reduce((sum, c) => sum + c, 0) / calories.length : null;
-
-    const currentWeight = weightLogs.length > 0 ? weightLogs[weightLogs.length - 1].weight : null;
-    const age = dateOfBirth ? differenceInYears(new Date(), parseISO(dateOfBirth)) : null;
-    
-    let bmr = null;
-    if (currentWeight && height && age && gender) {
-        if (gender === 'male') {
-            // Mifflin-St Jeor Equation for men
-            bmr = (10 * currentWeight) + (6.25 * height) - (5 * age) + 5;
-        } else {
-            // Mifflin-St Jeor Equation for women
-            bmr = (10 * currentWeight) + (6.25 * height) - (5 * age) - 161;
-        }
-    }
-
-    return {
-        averageIntake: averageIntake ? Math.round(averageIntake) : null,
-        maintenanceCalories: bmr ? Math.round(bmr) : null,
-    };
-  }, [dietPlan, weightLogs, height, dateOfBirth, gender]);
-
   const projectionSummary = useMemo(() => {
     if (!goalWeight || weightLogs.length < 2) {
         return null;
@@ -1208,13 +1151,6 @@ function UpskillPageContent() {
     };
   }, [goalWeight, weightLogs]);
   
-  const todaysDiet = useMemo(() => {
-    if (!dietPlan || dietPlan.length === 0) return null;
-    const dayName = format(new Date(), 'EEEE'); // "Monday", "Tuesday", etc.
-    return dietPlan.find(plan => plan.day === dayName);
-  }, [dietPlan]);
-
-
   if (isLoadingPage) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
@@ -1358,62 +1294,6 @@ function UpskillPageContent() {
             </Card>
 
             <Card>
-                <CardHeader className="flex flex-row items-start justify-between">
-                    <div>
-                        <CardTitle className="flex items-center gap-2 text-lg text-primary">
-                            <Utensils /> Today's Diet
-                        </CardTitle>
-                        <CardDescription>
-                           Your planned meals for {format(new Date(), 'EEEE')}.
-                        </CardDescription>
-                    </div>
-                    {todaysDiet?.totalCalories != null && todaysDiet.totalCalories > 0 && (
-                        <div className="text-right">
-                            <span className="font-bold text-xl text-primary">{todaysDiet.totalCalories.toLocaleString()}</span>
-                            <p className="text-xs text-muted-foreground -mt-1">kcal</p>
-                        </div>
-                    )}
-                </CardHeader>
-                <CardContent>
-                    {todaysDiet ? (
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                                <div>
-                                    <h4 className="font-semibold text-foreground">Meal 1</h4>
-                                    <p className="text-muted-foreground whitespace-pre-wrap mt-1">{todaysDiet.meal1 || 'Not planned.'}</p>
-                                </div>
-                                <div>
-                                    <h4 className="font-semibold text-foreground">Meal 2</h4>
-                                    <p className="text-muted-foreground whitespace-pre-wrap mt-1">{todaysDiet.meal2 || 'Not planned.'}</p>
-                                </div>
-                                <div>
-                                    <h4 className="font-semibold text-foreground">Meal 3</h4>
-                                    <p className="text-muted-foreground whitespace-pre-wrap mt-1">{todaysDiet.meal3 || 'Not planned.'}</p>
-                                </div>
-                                <div>
-                                    <h4 className="font-semibold text-foreground">Supplements</h4>
-                                    <p className="text-muted-foreground whitespace-pre-wrap mt-1">{todaysDiet.supplements || 'Not planned.'}</p>
-                                </div>
-                            </div>
-
-                            {todaysDiet.totalCalories != null && todaysDiet.totalCalories > 0 && (
-                                <div className="pt-4 border-t">
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1">
-                                        <div className="flex justify-between"><span>Protein</span> <span className="font-medium text-foreground">{todaysDiet.protein?.toFixed(0) ?? '-'}g</span></div>
-                                        <div className="flex justify-between"><span>Carbs</span> <span className="font-medium text-foreground">{todaysDiet.carbs?.toFixed(0) ?? '-'}g</span></div>
-                                        <div className="flex justify-between"><span>Fat</span> <span className="font-medium text-foreground">{todaysDiet.fat?.toFixed(0) ?? '-'}g</span></div>
-                                        <div className="flex justify-between"><span>Fiber</span> <span className="font-medium text-foreground">{todaysDiet.fiber?.toFixed(0) ?? '-'}g</span></div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <p className="text-muted-foreground text-center py-4">No diet plan set up for today.</p>
-                    )}
-                </CardContent>
-            </Card>
-
-            <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg text-primary">
                         <Target /> Weight Goal
@@ -1423,17 +1303,13 @@ function UpskillPageContent() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div>
                         <Button onClick={() => setIsWeightChartModalOpen(true)} className="w-full text-xs xl:text-sm">
                             <LineChartIcon className="mr-2 h-4 w-4" />
                             Chart & Goal
                         </Button>
-                        <Button onClick={() => handleDietModalOpenChange(true)} variant="outline" className="w-full text-xs xl:text-sm">
-                            <BookCopy className="mr-2 h-4 w-4" />
-                            Diet Plan
-                        </Button>
                     </div>
-                    {(projectionSummary || latestConsistency || healthMetrics.averageIntake || healthMetrics.maintenanceCalories) && (
+                    {(projectionSummary || latestConsistency) && (
                         <div className="space-y-4 pt-4 border-t">
                             {projectionSummary && (
                                 <>
@@ -1490,28 +1366,6 @@ function UpskillPageContent() {
                                 </>
                             )}
                             
-                            {(healthMetrics.averageIntake || healthMetrics.maintenanceCalories) && (
-                              <div className="space-y-2 text-sm pt-4 border-t">
-                                  {healthMetrics.averageIntake && (
-                                      <div className="flex justify-between items-center">
-                                          <span className="text-muted-foreground flex items-center gap-2"><Flame className="h-4 w-4" /> Current Avg. Daily Intake</span>
-                                          <span className="font-bold">{healthMetrics.averageIntake} kcal</span>
-                                      </div>
-                                  )}
-                                  {healthMetrics.maintenanceCalories && (
-                                      <div className="flex justify-between items-center">
-                                          <span className="text-muted-foreground flex items-center gap-2"><HeartPulse className="h-4 w-4" /> Est. Maintenance</span>
-                                          <span className="font-bold">{healthMetrics.maintenanceCalories} kcal</span>
-                                      </div>
-                                  )}
-                                  {healthMetrics.averageIntake && healthMetrics.maintenanceCalories && healthMetrics.averageIntake < healthMetrics.maintenanceCalories && (
-                                      <p className="text-xs text-orange-500 mt-2">
-                                          ⚠️ You’re eating below maintenance — watch for fatigue, low mood, or muscle loss.
-                                      </p>
-                                  )}
-                              </div>
-                            )}
-
                             {latestConsistency !== null && (
                                 <div className="space-y-1 text-sm pt-4 border-t">
                                     <div className="flex justify-between items-center">
@@ -1642,11 +1496,6 @@ function UpskillPageContent() {
         onSetHeight={handleSetHeight}
         onSetDateOfBirth={handleSetDateOfBirth}
         onSetGender={handleSetGender}
-      />
-
-      <DietPlanModal
-        isOpen={isDietPlanModalOpen}
-        onOpenChange={handleDietModalOpenChange}
       />
     </>
   );
