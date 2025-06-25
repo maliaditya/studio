@@ -19,6 +19,7 @@ import { ActivityHeatmap } from '@/components/ActivityHeatmap';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 const slots = [
   { name: 'Late Night', time: '12 AM - 4 AM', icon: <Moon className="h-6 w-6 text-indigo-400" /> },
@@ -681,42 +682,49 @@ function HomePageContent() {
                             </div>
                             <div>
                                 <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Learning Progress</h4>
-                                <div className="space-y-4 text-sm">
+                                <div className="text-sm">
                                     {Object.keys(productivityStats.learningStats).length > 0 ? (
-                                        Object.entries(productivityStats.learningStats).map(([topic, stats]: [string, any]) => (
-                                            <div key={topic} className="p-3 rounded bg-muted/30">
-                                                <h5 className="font-bold text-foreground">{topic}</h5>
-                                                <div className="mt-2 text-xs text-muted-foreground">
-                                                    Progress: {stats.totalProgress.toLocaleString()} / {stats.goalValue.toLocaleString()} {stats.unit.split('/')[0]}
-                                                </div>
-                                                <Progress value={(stats.totalProgress / stats.goalValue) * 100} className="h-2 my-1" />
-                                                
-                                                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                                                    {stats.nextMilestone && (
-                                                        <div className="space-y-1">
-                                                            <div className="font-semibold">Next Milestone ({stats.nextMilestone.percent}%)</div>
-                                                            <div>Est. Date: <span className="font-medium text-foreground">{stats.nextMilestone.date}</span></div>
-                                                            <div>Days Left: <span className="font-medium text-foreground">{stats.nextMilestone.daysRemaining}</span></div>
+                                        <Accordion type="single" collapsible className="w-full space-y-2">
+                                            {Object.entries(productivityStats.learningStats).map(([topic, stats]: [string, any]) => (
+                                                <AccordionItem key={topic} value={topic} className="p-3 rounded-md bg-muted/30 border-0">
+                                                    <AccordionTrigger className="py-0 text-left hover:no-underline">
+                                                        <div className="flex flex-col items-start">
+                                                            <h5 className="font-bold text-foreground text-base">{topic}</h5>
+                                                            <div className="text-xs text-muted-foreground font-normal">
+                                                                Progress: {stats.totalProgress.toLocaleString()} / {stats.goalValue.toLocaleString()} {stats.unit.split('/')[0]}
+                                                            </div>
                                                         </div>
-                                                    )}
-                                                    <div className="space-y-1">
-                                                       <div className="font-semibold">Goal Completion</div>
-                                                       {stats.completion ? (
-                                                            <>
-                                                                <div>Est. Date: <span className="font-medium text-foreground">{stats.completion.date}</span></div>
-                                                                <div>Days Left: <span className="font-medium text-foreground">{stats.completion.daysRemaining}</span></div>
-                                                            </>
-                                                       ) : (stats.totalProgress >= stats.goalValue) ? <div className="text-green-500 font-bold">Completed!</div> : <div className="text-muted-foreground">Not enough data to project.</div>}
-                                                    </div>
-                                                </div>
-                                                 <div className="mt-2 pt-2 border-t text-xs">
-                                                    <div className="flex justify-between">
-                                                        <span className="text-muted-foreground">Learning Speed</span>
-                                                        <span className="font-medium text-foreground">{stats.speed.toFixed(1)} {stats.unit}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))
+                                                    </AccordionTrigger>
+                                                    <AccordionContent className="pt-2">
+                                                        <Progress value={(stats.totalProgress / stats.goalValue) * 100} className="h-2 my-2" />
+                                                        <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                                                            {stats.nextMilestone && (
+                                                                <div className="space-y-1">
+                                                                    <div className="font-semibold">Next Milestone ({stats.nextMilestone.percent}%)</div>
+                                                                    <div>Est. Date: <span className="font-medium text-foreground">{stats.nextMilestone.date}</span></div>
+                                                                    <div>Days Left: <span className="font-medium text-foreground">{stats.nextMilestone.daysRemaining}</span></div>
+                                                                </div>
+                                                            )}
+                                                            <div className="space-y-1">
+                                                               <div className="font-semibold">Goal Completion</div>
+                                                               {stats.completion ? (
+                                                                    <>
+                                                                        <div>Est. Date: <span className="font-medium text-foreground">{stats.completion.date}</span></div>
+                                                                        <div>Days Left: <span className="font-medium text-foreground">{stats.completion.daysRemaining}</span></div>
+                                                                    </>
+                                                               ) : (stats.totalProgress >= stats.goalValue) ? <div className="text-green-500 font-bold">Completed!</div> : <div className="text-muted-foreground">Not enough data to project.</div>}
+                                                            </div>
+                                                        </div>
+                                                         <div className="mt-2 pt-2 border-t text-xs">
+                                                            <div className="flex justify-between">
+                                                                <span className="text-muted-foreground">Learning Speed</span>
+                                                                <span className="font-medium text-foreground">{stats.speed.toFixed(1)} {stats.unit}</span>
+                                                            </div>
+                                                        </div>
+                                                    </AccordionContent>
+                                                </AccordionItem>
+                                            ))}
+                                        </Accordion>
                                     ) : (
                                         <p className="text-sm text-muted-foreground text-center py-2">No learning stats yet. Log progress and duration in the Upskill page.</p>
                                     )}
