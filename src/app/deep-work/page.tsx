@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, ChevronDown, ChevronUp, Target, LineChart as LineChartIcon, Briefcase } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, ChevronDown, ChevronUp, Target, LineChart as LineChartIcon, Briefcase, Puzzle } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,7 @@ import {
 import { WeightChartModal } from '@/components/WeightChartModal';
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 
 const DEFAULT_TARGET_SESSIONS = 1;
@@ -83,6 +84,54 @@ function DeepWorkPageContent() {
 
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   const [today, setToday] = useState<Date | null>(null);
+
+  const decompositionTechniques = [
+    {
+      technique: "📏 Unit Consistency",
+      description: "Define `1 unit = 1 meter` for realism and coherence",
+      useCases: "Accurately sizing doors, walls, furniture; physics-based movement",
+    },
+    {
+      technique: "🧵 Texture Optimization",
+      description: "Use `.jpg` for color, `.png` for normals; tile and wrap correctly",
+      useCases: "Optimizing texture memory; preventing seams; enhancing visual fidelity",
+    },
+    {
+      technique: "📐 Geometry Reuse",
+      description: "Reuse geometries like `SphereGeometry` or `BoxGeometry`",
+      useCases: "Multiple bushes or graves; instancing; reducing GPU load",
+    },
+    {
+      technique: "🎲 Randomization Techniques",
+      description: "Use `Math.random()` for variation in placement, rotation, scale",
+      useCases: "Scattering graves, rocks, vegetation; procedural generation",
+    },
+    {
+      technique: "👻 Ghosts",
+      description: "Orbiting point lights with sine/cosine and oscillating Y position",
+      useCases: "Spooky floating effects; animated magical particles",
+    },
+    {
+      technique: "🧱 Z-Fighting Avoidance",
+      description: "Slightly offset objects to prevent flickering surface artifacts",
+      useCases: "Overlapping meshes like door-on-wall or decals-on-geometry",
+    },
+    {
+      technique: "🔦 Shadow Optimization",
+      description: "Use low-res shadow maps and tight shadow camera bounds",
+      useCases: "Improve FPS while maintaining soft shadows",
+    },
+    {
+      technique: "🌫️ Fog Integration",
+      description: "Match fog color to sky for seamless blending",
+      useCases: "Distant hills, mystery atmosphere, depth cueing in large outdoor scenes",
+    },
+    {
+      technique: "🔁 Circular Motion (Orbits)",
+      description: "Animate objects using `Math.sin()` and `Math.cos()`",
+      useCases: "Ghosts orbiting a house, rotating planets, flying creatures around targets",
+    },
+  ];
 
   const allTopics = useMemo(() => {
     const topics = new Set(exerciseDefinitions.map(def => def.category));
@@ -653,6 +702,38 @@ function DeepWorkPageContent() {
                     </div>
                   </CardContent>
               </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg text-primary">
+                    <Puzzle /> Modular Decomposition
+                  </CardTitle>
+                  <CardDescription>
+                    Key techniques for breaking down and optimizing complex scenes.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[200px]">Technique</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Use Cases</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {decompositionTechniques.map((item) => (
+                        <TableRow key={item.technique}>
+                          <TableCell className="font-medium">{item.technique}</TableCell>
+                          <TableCell>{item.description}</TableCell>
+                          <TableCell>{item.useCases}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
               <div>
                 <WorkoutHeatmap
                   allWorkoutLogs={allWorkoutLogs}
