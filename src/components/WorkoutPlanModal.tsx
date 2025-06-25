@@ -30,7 +30,6 @@ import {
 import type { ExerciseDefinition, ExerciseCategory, WorkoutMode, AllWorkoutPlans } from '@/types/workout';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { ScrollArea } from './ui/scroll-area';
 
 interface WorkoutPlanModalProps {
   isOpen: boolean;
@@ -116,8 +115,7 @@ export function WorkoutPlanModal({
     };
 
     const renderPlanContent = (planKey: string) => (
-      <TabsContent key={planKey} value={planKey} className="m-0 mt-4 flex-grow min-h-0">
-        <ScrollArea className="h-full pr-6">
+      <TabsContent key={planKey} value={planKey} className="m-0 mt-4 flex-grow min-h-0 overflow-y-auto pr-4">
             <div className="flex justify-end mb-4">
                 <Button variant="outline" size="sm" onClick={() => handleResetPlan(planKey)}>
                     <RotateCcw className="mr-2 h-4 w-4" />
@@ -164,7 +162,6 @@ export function WorkoutPlanModal({
                     </Card>
                 )})}
             </div>
-        </ScrollArea>
       </TabsContent>
     );
 
