@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { DatedWorkout, TopicGoal } from '@/types/workout';
-import { Loader2, TrendingUp, BarChart, Clock, BrainCircuit, Dumbbell, BookOpenCheck, Briefcase } from 'lucide-react';
+import { Loader2, TrendingUp, Clock, BrainCircuit, Dumbbell, BookOpenCheck, Briefcase, Trophy } from 'lucide-react';
 
 function StatsPageContent() {
     const { currentUser } = useAuth();
@@ -17,6 +17,31 @@ function StatsPageContent() {
     const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
     const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
     const [topicGoals, setTopicGoals] = useState<Record<string, TopicGoal>>({});
+
+    const levels = [
+        { level: 'L1', min: 15 / 60, max: 30 / 60, name: 'Just showing up', zone: '⚪️ Entry Zone' },
+        { level: 'L2', min: 30 / 60, max: 45 / 60, name: 'Light touch / spark', zone: '⚪️ Entry Zone' },
+        { level: 'L3', min: 45 / 60, max: 1, name: 'Single Pomodoro session', zone: '⚪️ Entry Zone' },
+        { level: 'L4', min: 1, max: 1.5, name: 'Basic learner habit', zone: '🟢 Stable Zone' },
+        { level: 'L5', min: 1.5, max: 2, name: 'Focused beginner phase', zone: '🟢 Stable Zone' },
+        { level: 'L6', min: 2, max: 2.5, name: 'Mini deep work commitment', zone: '🟢 Stable Zone' },
+        { level: 'L7', min: 2.5, max: 3, name: 'Structured discipline zone', zone: '🟢 Stable Zone' },
+        { level: 'L8', min: 3, max: 3.5, name: 'Daily scholar mode', zone: '🟡 Progress Zone' },
+        { level: 'L9', min: 3.5, max: 4, name: 'Solid effort / Part-time student', zone: '🟡 Progress Zone' },
+        { level: 'L10', min: 4, max: 5, name: 'Full-time learner level', zone: '🟡 Progress Zone' },
+        { level: 'L11', min: 5, max: 6, name: 'Deep learner zone', zone: '🟡 Progress Zone' },
+        { level: 'L12', min: 6, max: 7, name: 'Advanced practice / Bootcamp ready', zone: '🟠 High Intensity' },
+        { level: 'L13', min: 7, max: 8, name: 'Peak state zone', zone: '🟠 High Intensity' },
+        { level: 'L14', min: 8, max: 9, name: 'Monastic discipline', zone: '🔴 Extreme Zone' },
+        { level: 'L15', min: 9, max: 10, name: 'Total immersion day', zone: '🔴 Extreme Zone' },
+        { level: 'L16', min: 10, max: 11, name: 'Elite performer stretch', zone: '🔴 Extreme Zone' },
+        { level: 'L17', min: 11, max: 12, name: 'Near-max capacity', zone: '🔴 Extreme Zone' },
+        { level: 'L18', min: 12, max: 13, name: 'Obsessive learner', zone: '🔴 Extreme Zone' },
+        { level: 'L19', min: 13, max: 15, name: 'Burning fuel — not sustainable daily', zone: '🔥 Overdrive Zone' },
+        { level: 'L20', min: 15, max: 24, name: 'Legendary grind day (Rare / Purpose-driven only)', zone: '⚠️ Apex Zone' },
+    ];
+    const defaultLevel = { level: 'L0', name: 'Just starting', zone: '⚪️ Entry Zone' };
+
 
     useEffect(() => {
         if (currentUser?.username) {
@@ -92,12 +117,16 @@ function StatsPageContent() {
             };
         });
 
+        const levelInfo = levels.find(l => dailyProductiveHours >= l.min && dailyProductiveHours < l.max) || defaultLevel;
+
+
         return {
             avgUpskillDuration,
             avgDeepWorkDuration,
             avgWorkoutDuration,
             dailyProductiveHours,
             learningSpeeds,
+            levelInfo,
         }
     }, [allWorkoutLogs, allUpskillLogs, allDeepWorkLogs, topicGoals, currentUser]);
 
@@ -117,7 +146,26 @@ function StatsPageContent() {
 
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Trophy className="text-primary"/> Your Level</CardTitle>
+                    </CardHeader>
+                     <CardContent className="text-center">
+                        <p className="text-5xl font-bold text-primary">{stats.levelInfo.level}</p>
+                        <p className="text-muted-foreground mt-1">{stats.levelInfo.name}</p>
+                        <p className="text-sm font-semibold mt-2">{stats.levelInfo.zone}</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><BrainCircuit className="text-primary"/> Total Productivity</CardTitle>
+                    </CardHeader>
+                     <CardContent className="text-center">
+                        <p className="text-5xl font-bold text-primary">{stats.dailyProductiveHours.toFixed(2)}</p>
+                        <p className="text-muted-foreground mt-1">Avg. Productive Hours / Day</p>
+                    </CardContent>
+                </Card>
                  <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Clock className="text-primary"/> Daily Averages</CardTitle>
@@ -145,15 +193,6 @@ function StatsPageContent() {
                         ) : (
                             <p className="text-muted-foreground text-center py-8">Set goals for topics in the Upskill page to see your learning speed.</p>
                         )}
-                    </CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><BrainCircuit className="text-primary"/> Total Productivity</CardTitle>
-                    </CardHeader>
-                     <CardContent className="text-center">
-                        <p className="text-6xl font-bold text-primary">{stats.dailyProductiveHours.toFixed(2)}</p>
-                        <p className="text-muted-foreground mt-1">Avg. Productive Hours / Day</p>
                     </CardContent>
                 </Card>
             </div>
