@@ -449,42 +449,42 @@ function HomePageContent() {
                       </div>
 
                       {(!activities || activities.length < 2) && (
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="mt-auto self-start w-full">
-                              <PlusCircle className="h-4 w-4 mr-2" />
-                              Add Activity
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-52 p-2">
-                            <div className="grid gap-1">
-                              <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'workout')}>
-                                <Dumbbell className="h-4 w-4 mr-2" />
-                                Add Workout
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="ghost" size="icon" className="mt-auto self-end h-8 w-8 rounded-full">
+                                <PlusCircle className="h-5 w-5" />
+                                <span className="sr-only">Add Activity</span>
                               </Button>
-                              <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'upskill')}>
-                                <BookOpenCheck className="h-4 w-4 mr-2" />
-                                Add Upskill
-                              </Button>
-                              <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'deepwork')}>
-                                <Briefcase className="h-4 w-4 mr-2" />
-                                Add Deep Work
-                              </Button>
-                              <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'planning')}>
-                                <ClipboardList className="h-4 w-4 mr-2" />
-                                Add Planning
-                              </Button>
-                              <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'reflection')}>
-                                <Lightbulb className="h-4 w-4 mr-2" />
-                                Add Reflection
-                              </Button>
-                              <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'journaling')}>
-                                <PenSquare className="h-4 w-4 mr-2" />
-                                Add Journaling
-                              </Button>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-52 p-2" align="end" side="top">
+                              <div className="grid gap-1">
+                                <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'workout')}>
+                                  <Dumbbell className="h-4 w-4 mr-2" />
+                                  Add Workout
+                                </Button>
+                                <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'upskill')}>
+                                  <BookOpenCheck className="h-4 w-4 mr-2" />
+                                  Add Upskill
+                                </Button>
+                                <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'deepwork')}>
+                                  <Briefcase className="h-4 w-4 mr-2" />
+                                  Add Deep Work
+                                </Button>
+                                <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'planning')}>
+                                  <ClipboardList className="h-4 w-4 mr-2" />
+                                  Add Planning
+                                </Button>
+                                <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'reflection')}>
+                                  <Lightbulb className="h-4 w-4 mr-2" />
+                                  Add Reflection
+                                </Button>
+                                <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'journaling')}>
+                                  <PenSquare className="h-4 w-4 mr-2" />
+                                  Add Journaling
+                                </Button>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                       )}
                     </CardContent>
                   </Card>
