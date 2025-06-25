@@ -601,6 +601,9 @@ function HomePageContent() {
         const totalProductiveMinutes = avgUpskillDuration + avgDeepWorkDuration;
         const totalProductiveHours = totalProductiveMinutes / 60;
 
+        const avgUpskillHours = avgUpskillDuration / 60;
+        const avgDeepWorkHours = avgDeepWorkDuration / 60;
+
         const currentLevel = productivityLevels.find(l => totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max) || null;
 
         const learningStats = calculateLearningStats(allUpskillLogs, topicGoals);
@@ -608,6 +611,8 @@ function HomePageContent() {
         return {
             avgUpskillDuration,
             avgDeepWorkDuration,
+            avgUpskillHours,
+            avgDeepWorkHours,
             totalProductiveHours,
             currentLevel,
             learningStats
@@ -682,11 +687,11 @@ function HomePageContent() {
                                 <div className="space-y-2 text-sm">
                                     <div className="flex justify-between items-center p-2 rounded bg-muted/30">
                                         <span className="flex items-center gap-2 text-muted-foreground"><BookOpenCheck className="h-4 w-4" /> Learning</span>
-                                        <span className="font-semibold">{productivityStats.avgUpskillDuration.toFixed(0)} min</span>
+                                        <span className="font-semibold">{productivityStats.avgUpskillHours.toFixed(2)} hr</span>
                                     </div>
                                     <div className="flex justify-between items-center p-2 rounded bg-muted/30">
                                         <span className="flex items-center gap-2 text-muted-foreground"><Briefcase className="h-4 w-4" /> Deep Work</span>
-                                        <span className="font-semibold">{productivityStats.avgDeepWorkDuration.toFixed(0)} min</span>
+                                        <span className="font-semibold">{productivityStats.avgDeepWorkHours.toFixed(2)} hr</span>
                                     </div>
                                 </div>
                             </div>
@@ -891,5 +896,7 @@ function HomePageContent() {
 export default function Page() {
     return ( <AuthGuard> <HomePageContent /> </AuthGuard> );
 }
+
+    
 
     
