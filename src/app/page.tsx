@@ -8,10 +8,10 @@ import { BrainCircuit, Sunrise, Sun, Sunset, Moon, MoonStar, CloudSun, PlusCircl
 import { useState, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { format, getDay } from 'date-fns';
+import { format, getDay, getISOWeek } from 'date-fns';
 import { useRouter } from 'next/navigation';
-import { WorkoutPlanModal } from '@/components/WorkoutPlanModal';
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode } from '@/types/workout';
+import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise } from '@/types/workout';
 
 const slots = [
   { name: 'Late Night', time: '12 AM - 4 AM', icon: <Moon className="h-6 w-6 text-indigo-400" /> },
@@ -65,11 +65,15 @@ function HomePageContent() {
   const [schedule, setSchedule] = useState<FullSchedule>({});
   const [todayKey, setTodayKey] = useState('');
 
-  // State for WorkoutPlanModal
-  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  // State for workout data
   const [workoutMode, setWorkoutMode] = useState<WorkoutMode>('two-muscle');
   const [workoutPlans, setWorkoutPlans] = useState<AllWorkoutPlans>(INITIAL_PLANS);
   const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
+  
+  // State for TodaysWorkoutModal
+  const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
+  const [todaysExercises, setTodaysExercises] = useState<WorkoutExercise[]>([]);
+  const [todaysMuscleGroups, setTodaysMuscleGroups] = useState<string[]>([]);
 
   useEffect(() => {
     setTodayKey(format(new Date(), 'yyyy-MM-dd'));
@@ -99,7 +103,7 @@ function HomePageContent() {
     }
   }, [schedule, scheduleStorageKey]);
 
-  // Load workout data for the modal
+  // Load workout data
   useEffect(() => {
     if (currentUser?.username) {
         const username = currentUser.username;
@@ -108,43 +112,23 @@ function HomePageContent() {
         const modeKey = `workoutMode_${username}`;
 
         const storedMode = localStorage.getItem(modeKey);
-        if (storedMode === 'one-muscle' || storedMode === 'two-muscle') {
-            setWorkoutMode(storedMode as WorkoutMode);
-        } else {
-            setWorkoutMode('two-muscle');
-        }
+        setWorkoutMode((storedMode as WorkoutMode) || 'two-muscle');
 
         try {
             const storedPlans = localStorage.getItem(plansKey);
             setWorkoutPlans(storedPlans ? JSON.parse(storedPlans) : INITIAL_PLANS);
         } catch (e) {
-            console.error("Error loading workout plans", e);
             setWorkoutPlans(INITIAL_PLANS);
         }
 
         try {
             const storedDefinitions = localStorage.getItem(defsKey);
-            if(storedDefinitions) {
-                setExerciseDefinitions(JSON.parse(storedDefinitions));
-            } else {
-                console.warn(`Exercise definitions not found for ${username}. Please visit Workout Tracker page to initialize them.`);
-                setExerciseDefinitions([]);
-            }
+            setExerciseDefinitions(storedDefinitions ? JSON.parse(storedDefinitions) : []);
         } catch (e) {
-            console.error("Error loading exercise definitions", e);
             setExerciseDefinitions([]);
         }
     }
   }, [currentUser]);
-
-  // Save workout plans if modified in the modal
-  useEffect(() => {
-      if (currentUser?.username) {
-          const plansKey = `workoutPlans_${currentUser.username}`;
-          localStorage.setItem(plansKey, JSON.stringify(workoutPlans));
-      }
-  }, [workoutPlans, currentUser]);
-
 
   useEffect(() => {
     const getSlot = () => {
@@ -168,7 +152,6 @@ function HomePageContent() {
     let details = '';
     if (type === 'workout') {
       const dayOfWeek = getDay(new Date());
-
       let muscleGroups: string[] = [];
       if (workoutMode === 'one-muscle') {
         const muscle = singleMuscleDailySchedule[dayOfWeek];
@@ -176,20 +159,14 @@ function HomePageContent() {
       } else {
         muscleGroups = dailyMuscleGroups[dayOfWeek] || [];
       }
-      
-      details = muscleGroups.join(' & ');
-      if (!details) details = "Rest Day";
-
-    } else if (type === 'upskill') {
-      details = 'Learning Session'; // Placeholder
+      details = muscleGroups.join(' & ') || "Rest Day";
+    } else {
+      details = 'Learning Session';
     }
 
     setSchedule(prev => ({
       ...prev,
-      [todayKey]: {
-        ...(prev[todayKey] || {}),
-        [slotName]: { type, details }
-      }
+      [todayKey]: { ...(prev[todayKey] || {}), [slotName]: { type, details } }
     }));
   };
 
@@ -198,16 +175,61 @@ function HomePageContent() {
     setSchedule(prev => {
       const newTodaySchedule = { ...(prev[todayKey] || {}) };
       delete newTodaySchedule[slotName];
-      return {
-        ...prev,
-        [todayKey]: newTodaySchedule
-      };
+      return { ...prev, [todayKey]: newTodaySchedule };
     });
+  };
+
+  const getTodaysWorkout = () => {
+    const today = new Date();
+    const dayOfWeek = getDay(today);
+    const isoWeek = getISOWeek(today);
+    const isOddWeek = isoWeek % 2 !== 0;
+
+    let muscleGroupsForDay: string[] = [];
+    let plan: any = null;
+    
+    if (workoutMode === 'two-muscle') {
+        if (isOddWeek) {
+          plan = (dayOfWeek >= 1 && dayOfWeek <= 3) || dayOfWeek === 6 ? workoutPlans.W1 : workoutPlans.W2;
+        } else {
+          plan = (dayOfWeek >= 1 && dayOfWeek <= 3) || dayOfWeek === 6 ? workoutPlans.W3 : workoutPlans.W4;
+        }
+        muscleGroupsForDay = dailyMuscleGroups[dayOfWeek] || [];
+    } else {
+        plan = isOddWeek ? workoutPlans.W5 : workoutPlans.W6;
+        const muscleGroupForDay = singleMuscleDailySchedule[dayOfWeek];
+        if (muscleGroupForDay) muscleGroupsForDay = [muscleGroupForDay];
+    }
+
+    const exercisesToAdd: WorkoutExercise[] = [];
+    if (plan && muscleGroupsForDay.length > 0) {
+      muscleGroupsForDay.forEach(muscleGroup => {
+        const exerciseNames = (plan as any)[muscleGroup] as string[] | undefined;
+        if (exerciseNames) {
+          exerciseNames.forEach(exName => {
+            const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
+            if (definition && !exercisesToAdd.some(e => e.definitionId === definition.id)) {
+              exercisesToAdd.push({
+                id: `${definition.id}-${Date.now()}-${Math.random()}`,
+                definitionId: definition.id,
+                name: definition.name,
+                category: definition.category,
+                loggedSets: [], targetSets: 4, targetReps: "8-12",
+              });
+            }
+          });
+        }
+      });
+    }
+    return { exercises: exercisesToAdd, muscleGroups: muscleGroupsForDay };
   };
 
   const handleActivityClick = (activity: Activity) => {
     if (activity.type === 'workout') {
-      setIsPlanModalOpen(true);
+      const { exercises, muscleGroups } = getTodaysWorkout();
+      setTodaysExercises(exercises);
+      setTodaysMuscleGroups(muscleGroups);
+      setIsTodaysWorkoutModalOpen(true);
     } else if (activity.type === 'upskill') {
       router.push('/upskill');
     }
@@ -294,14 +316,11 @@ function HomePageContent() {
         </CardContent>
       </Card>
       {currentUser && (
-        <WorkoutPlanModal
-            isOpen={isPlanModalOpen}
-            onOpenChange={setIsPlanModalOpen}
-            workoutMode={workoutMode}
-            workoutPlans={workoutPlans}
-            setWorkoutPlans={setWorkoutPlans}
-            exerciseDefinitions={exerciseDefinitions}
-            initialPlans={INITIAL_PLANS}
+        <TodaysWorkoutModal
+            isOpen={isTodaysWorkoutModalOpen}
+            onOpenChange={setIsTodaysWorkoutModalOpen}
+            todaysExercises={todaysExercises}
+            muscleGroupsForDay={todaysMuscleGroups}
         />
       )}
     </div>

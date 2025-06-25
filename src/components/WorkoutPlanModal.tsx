@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -29,6 +30,7 @@ import {
 import type { ExerciseDefinition, ExerciseCategory, WorkoutMode, AllWorkoutPlans } from '@/types/workout';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { ScrollArea } from './ui/scroll-area';
 
 interface WorkoutPlanModalProps {
   isOpen: boolean;
@@ -144,7 +146,7 @@ export function WorkoutPlanModal({
                         Reset Plan to Default
                     </Button>
                 </div>
-                <div className="overflow-y-auto pr-4 flex-grow">
+                <ScrollArea className="flex-grow pr-4">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {relevantCategoriesForPlan(planKey).map(category => {
                             const exercisesForCategory = workoutPlans[planKey]?.[category];
@@ -213,7 +215,7 @@ export function WorkoutPlanModal({
                             </Card>
                         )})}
                     </div>
-                </div>
+                </ScrollArea>
             </TabsContent>
           ))}
         </Tabs>
