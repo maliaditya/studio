@@ -117,15 +117,15 @@ export function WorkoutPlanModal({
 
     const renderPlanContent = (planKey: string) => (
       <TabsContent key={planKey} value={planKey} className="m-0 mt-4 flex-grow flex flex-col min-h-0">
-        <div className="flex justify-end mb-4 pr-4 flex-shrink-0">
+        <div className="flex justify-end mb-4 pr-6 flex-shrink-0">
             <Button variant="outline" size="sm" onClick={() => handleResetPlan(planKey)}>
                 <RotateCcw className="mr-2 h-4 w-4" />
                 Reset Plan to Default
             </Button>
         </div>
         <div className="relative flex-1">
-            <ScrollArea className="absolute inset-0">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pr-6">
+            <ScrollArea className="absolute inset-0 pr-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {(Object.keys(workoutPlans[planKey] || {}) as ExerciseCategory[]).map(category => {
                         const exercisesForCategory = workoutPlans[planKey]?.[category];
                         const addEntityPlaceholder = pageType === 'upskill' ? 'Add a task...' : 'Add an exercise...';
