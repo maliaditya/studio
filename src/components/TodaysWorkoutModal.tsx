@@ -19,13 +19,15 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { WorkoutExercise } from '@/types/workout';
-import { Dumbbell } from 'lucide-react';
+import { Dumbbell, TrendingUp } from 'lucide-react';
+import { Button } from './ui/button';
 
 interface TodaysWorkoutModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   todaysExercises: WorkoutExercise[];
   muscleGroupsForDay: string[];
+  onViewProgress: (definitionId: string) => void;
 }
 
 export function TodaysWorkoutModal({
@@ -33,6 +35,7 @@ export function TodaysWorkoutModal({
   onOpenChange,
   todaysExercises,
   muscleGroupsForDay,
+  onViewProgress,
 }: TodaysWorkoutModalProps) {
 
   return (
@@ -64,14 +67,19 @@ export function TodaysWorkoutModal({
                           <p className="text-xs text-muted-foreground">{exercise.category}</p>
                       </TableCell>
                       <TableCell className="text-right">
-                          {exercise.lastPerformance ? (
-                          <>
-                              <p className="font-semibold">{exercise.lastPerformance.weight} kg/lb &times; {exercise.lastPerformance.reps} reps</p>
-                              <p className="text-xs text-muted-foreground">Top Set</p>
-                          </>
-                          ) : (
-                          <p className="text-xs text-muted-foreground">No history</p>
-                          )}
+                        <div className="flex items-center justify-end gap-2">
+                            {exercise.lastPerformance ? (
+                            <div>
+                                <p className="font-semibold">{exercise.lastPerformance.weight} kg/lb &times; {exercise.lastPerformance.reps} reps</p>
+                                <p className="text-xs text-muted-foreground">Top Set</p>
+                            </div>
+                            ) : (
+                            <p className="text-xs text-muted-foreground">No history</p>
+                            )}
+                            <Button variant="ghost" size="icon" onClick={() => onViewProgress(exercise.definitionId)} className="h-8 w-8 text-muted-foreground hover:text-primary">
+                                <TrendingUp className="h-4 w-4" />
+                            </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

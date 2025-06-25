@@ -17,6 +17,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
 import { useToast } from '@/hooks/use-toast';
+import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 
 const slots = [
   { name: 'Late Night', time: '12 AM - 4 AM', icon: <Moon className="h-6 w-6 text-indigo-400" /> },
@@ -94,6 +95,10 @@ function HomePageContent() {
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
   const [todaysExercises, setTodaysExercises] = useState<WorkoutExercise[]>([]);
   const [todaysMuscleGroups, setTodaysMuscleGroups] = useState<string[]>([]);
+  
+  // State for ExerciseProgressModal
+  const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
+  const [viewingProgressExercise, setViewingProgressExercise] = useState<ExerciseDefinition | null>(null);
 
   useEffect(() => {
     setTodayKey(format(new Date(), 'yyyy-MM-dd'));
@@ -394,6 +399,21 @@ function HomePageContent() {
     }
   };
 
+  const handleViewProgress = (definitionId: string) => {
+    const definition = exerciseDefinitions.find(def => def.id === definitionId);
+    if (definition) {
+        setViewingProgressExercise(definition);
+        setIsTodaysWorkoutModalOpen(false); // Close current modal
+        setIsProgressModalOpen(true); // Open progress modal
+    } else {
+        toast({
+            title: "Error",
+            description: "Could not find exercise details to show progress.",
+            variant: "destructive"
+        });
+    }
+  };
+
   const todaysSchedule = schedule[todayKey] || {};
 
   const dailyStats = useMemo(() => {
@@ -576,6 +596,16 @@ function HomePageContent() {
             onOpenChange={setIsTodaysWorkoutModalOpen}
             todaysExercises={todaysExercises}
             muscleGroupsForDay={todaysMuscleGroups}
+            onViewProgress={handleViewProgress}
+        />
+      )}
+
+      {viewingProgressExercise && (
+        <ExerciseProgressModal
+            isOpen={isProgressModalOpen}
+            onOpenChange={setIsProgressModalOpen}
+            exercise={viewingProgressExercise}
+            allWorkoutLogs={allWorkoutLogs}
         />
       )}
     </div>
