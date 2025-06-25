@@ -52,366 +52,64 @@ import { Switch } from '@/components/ui/switch';
 import { WeightChartModal } from '@/components/WeightChartModal';
 
 
-const DEFAULT_TARGET_SETS = 4;
-const DEFAULT_TARGET_REPS = "8-12";
-const DEFAULT_EXERCISE_CATEGORY: ExerciseCategory = "Other";
+const DEFAULT_TARGET_SESSIONS = 3;
+const DEFAULT_TARGET_DURATION = "25";
+const DEFAULT_SKILL_CATEGORY: ExerciseCategory = "Other";
 
-// A reduced default list to fit within Vercel Edge Config free tier limits.
-const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
-  // Chest
-  { id: 'def_chest_01', name: "Flat Barbell Bench Press", category: "Chest" },
-  { id: 'def_chest_02', name: "Incline Dumbbell Press", category: "Chest" },
-  { id: 'def_chest_03', name: "Cable Fly", category: "Chest" },
-  { id: 'def_chest_04', name: "Dumbbell Pullovers", category: "Chest" },
-  { id: 'def_chest_05', name: "Incline Barbell Press", category: "Chest" },
-  { id: 'def_chest_06', name: "Decline Dumbbell Press", category: "Chest" },
-  { id: 'def_chest_07', name: "Peck Machine", category: "Chest" },
-  { id: 'def_chest_08', name: "Dumbbell Flat Press", category: "Chest" },
-  { id: 'def_chest_09', name: "Flat Bench Chest Fly", category: "Chest" },
+const skillCategories: ExerciseCategory[] = ["Programming", "Design", "Writing", "Marketing", "Data Analysis", "Language", "Music", "Business", "Other"];
 
-  // Triceps
-  { id: 'def_triceps_01', name: "Close-Grip Barbell Bench Press", category: "Triceps" },
-  { id: 'def_triceps_02', name: "Overhead Dumbbell Extension", category: "Triceps" },
-  { id: 'def_triceps_03', name: "Rope Pushdown", category: "Triceps" },
-  { id: 'def_triceps_04', name: "Dumbbell Kickback", category: "Triceps" },
-  { id: 'def_triceps_05', name: "Cable Rope Pushdown (Slow)", category: "Triceps" },
-  { id: 'def_triceps_06', name: "Overhead Bar extension", category: "Triceps" },
-  { id: 'def_triceps_07', name: "Overhead Cable Extension", category: "Triceps" },
-  { id: 'def_triceps_08', name: "Straight bar pushdown", category: "Triceps" },
-  { id: 'def_triceps_09', name: "Reversebar pushdown", category: "Triceps" },
-  { id: 'def_triceps_10', name: "Back dips", category: "Triceps" },
-  { id: 'def_triceps_11', name: "Single Arm Dumbbell Extensions", category: "Triceps" },
-
-  // Back
-  { id: 'def_back_01', name: "Lat Pulldown", category: "Back" },
-  { id: 'def_back_02', name: "Barbell Row", category: "Back" },
-  { id: 'def_back_03', name: "1-Arm Dumbbell Row", category: "Back" },
-  { id: 'def_back_04', name: "DeadLifts", category: "Back" },
-  { id: 'def_back_05', name: "Machine Row", category: "Back" },
-  { id: 'def_back_06', name: "T-Bar Row", category: "Back" },
-  { id: 'def_back_07', name: "Lat Prayer Pull", category: "Back" },
-  { id: 'def_back_08', name: "Lat Pulldown (Wide Grip)", category: "Back" },
-  { id: 'def_back_09', name: "V handle lat pulldown", category: "Back" },
-  { id: 'def_back_10', name: "Back extensions", category: "Back" },
-  { id: 'def_back_11', name: "Seated Row", category: "Back" },
-  { id: 'def_back_12', name: "V handle pulldown Cable", category: "Back" },
-  
-  // Biceps
-  { id: 'def_biceps_01', name: "Standing dumbbell curls", category: "Biceps" },
-  { id: 'def_biceps_02', name: "Hammer Curl (Dumbbell)", category: "Biceps" },
-  { id: 'def_biceps_03', name: "Preacher Curls Bar", category: "Biceps" },
-  { id: 'def_biceps_04', name: "Cable Curls", category: "Biceps" },
-  { id: 'def_biceps_05', name: "Standing Dumbbell Alternating Curl", category: "Biceps" },
-  { id: 'def_biceps_06', name: "Preacher curls Dumbbells", category: "Biceps" },
-  { id: 'def_biceps_07', name: "Seated Incline Dumbbell Curl", category: "Biceps" },
-  { id: 'def_biceps_08', name: "Seated Dumbbell Alternating Curl", category: "Biceps" },
-  { id: 'def_biceps_09', name: "Reverse Cable", category: "Biceps" },
-  { id: 'def_biceps_10', name: "Strict bar curls", category: "Biceps" },
-  { id: 'def_biceps_11', name: "Reversed Incline curls", category: "Biceps" },
-  { id: 'def_biceps_12', name: "Cable Curls Superset", category: "Biceps" },
-  { id: 'def_biceps_13', name: "Reversed cable curls", category: "Biceps" },
-  { id: 'def_biceps_14', name: "Seated Machine Curls", category: "Biceps" },
-  { id: 'def_biceps_15', name: "Concentration Curl", category: "Biceps" },
-
-  // Shoulders
-  { id: 'def_shoulders_01', name: "Seated Dumbbell Shoulder Press", category: "Shoulders" },
-  { id: 'def_shoulders_02', name: "Standing Dumbbell Lateral Raise", category: "Shoulders" },
-  { id: 'def_shoulders_03', name: "Face Pulls", category: "Shoulders" },
-  { id: 'def_shoulders_04', name: "Shrugs", category: "Shoulders" },
-  { id: 'def_shoulders_05', name: "Seated Dumbbell Lateral Raise", category: "Shoulders" },
-  { id: 'def_shoulders_06', name: "Rear Delt Fly (Incline Bench)", category: "Shoulders" },
-  { id: 'def_shoulders_07', name: "Cable Upright Rows", category: "Shoulders" },
-  { id: 'def_shoulders_08', name: "Dumbbell Lateral Raise (Lean in)", category: "Shoulders" },
-  { id: 'def_shoulders_09', name: "Lean-Away Cable Lateral Raise", category: "Shoulders" },
-  { id: 'def_shoulders_10', name: "Front Raise cable", category: "Shoulders" },
-  { id: 'def_shoulders_11', name: "Front Raise Dumbbells", category: "Shoulders" },
-
-  // Legs
-  { id: 'def_legs_01', name: "Squats (Barbell)", category: "Legs" },
-  { id: 'def_legs_02', name: "Leg Press", category: "Legs" },
-  { id: 'def_legs_03', name: "Walking Lunges (Barbell)", category: "Legs" },
-  { id: 'def_legs_04', name: "Hamstring machine", category: "Legs" },
-  { id: 'def_legs_05', name: "Calf Raises", category: "Legs" },
-  { id: 'def_legs_06', name: "Quads Machine", category: "Legs" },
-  { id: 'def_legs_07', name: "Calf Raises (Bodyweight)", category: "Legs" },
-  { id: 'def_legs_08', name: "Hack Squats", category: "Legs" },
+const DEFAULT_SKILL_DEFINITIONS: ExerciseDefinition[] = [
+  // Programming
+  { id: 'def_prog_01', name: "Complete a coding challenge", category: "Programming" },
+  { id: 'def_prog_02', name: "Read a chapter of a tech book", category: "Programming" },
+  { id: 'def_prog_03', name: "Work on a side project", category: "Programming" },
+  // Design
+  { id: 'def_design_01', name: "Practice with Figma/Sketch", category: "Design" },
+  { id: 'def_design_02', name: "Recreate a UI from a popular app", category: "Design" },
+  // Writing
+  { id: 'def_writing_01', name: "Write 500 words for a blog post", category: "Writing" },
+  // Marketing
+  { id: 'def_mktg_01', name: "Analyze a competitor's strategy", category: "Marketing" },
+  // Data Analysis
+  { id: 'def_data_01', name: "Analyze a sample dataset", category: "Data Analysis" },
+  // Language
+  { id: 'def_lang_01', name: "Practice vocabulary for 30 mins", category: "Language" },
+  // Music
+  { id: 'def_music_01', name: "Practice an instrument for 30 mins", category: "Music" },
+  // Business
+  { id: 'def_biz_01', name: "Read an article on finance", category: "Business" },
 ];
 
-const INITIAL_PLANS: AllWorkoutPlans = {
-    "W1": {
-      "Chest": [
-        "Flat Barbell Bench Press",
-        "Incline Barbell Press",
-        "Decline Dumbbell Press",
-        "Peck Machine"
-      ],
-      "Triceps": [
-        "Close-Grip Barbell Bench Press",
-        "Overhead Dumbbell Extension",
-        "Dumbbell Kickback",
-        "Cable Rope Pushdown (Slow)"
-      ],
-      "Back": [
-        "Lat Pulldown",
-        "Machine Row",
-        "T-Bar Row",
-        "Lat Prayer Pull"
-      ],
-      "Biceps": [
-        "Standing dumbbell curls",
-        "Standing Dumbbell Alternating Curl",
-        "Preacher curls Dumbbells",
-        "Hammer Curl (Dumbbell)"
-      ],
-      "Shoulders": [
-        "Seated Dumbbell Shoulder Press",
-        "Standing Dumbbell Lateral Raise",
-        "Face Pulls",
-        "Shrugs"
-      ],
-      "Legs": [
-        "Walking Lunges (Barbell)",
-        "Leg Press",
-        "Quads Machine",
-        "Hamstring machine"
-      ]
-    },
-    "W2": {
-      "Chest": [
-        "Dumbbell Flat Press",
-        "Incline Dumbbell Press",
-        "Decline Dumbbell Press",
-        "Cable Fly"
-      ],
-      "Triceps": [
-        "Overhead Dumbbell Extension",
-        "Overhead Bar extension",
-        "Rope Pushdown",
-        "Dumbbell Kickback"
-      ],
-      "Back": [
-        "Lat Pulldown (Wide Grip)",
-        "V handle lat pulldown",
-        "1-Arm Dumbbell Row",
-        "Back extensions"
-      ],
-      "Biceps": [
-        "Seated Incline Dumbbell Curl",
-        "Seated Dumbbell Alternating Curl",
-        "Preacher curls Dumbbells",
-        "Reverse Cable"
-      ],
-      "Shoulders": [
-        "Seated Dumbbell Shoulder Press",
-        "Seated Dumbbell Lateral Raise",
-        "Rear Delt Fly (Incline Bench)",
-        "Cable Upright Rows"
-      ],
-      "Legs": [
-        "Walking Lunges (Barbell)",
-        "Squats (Barbell)",
-        "Hamstring machine",
-        "Quads Machine"
-      ]
-    },
-    "W3": {
-      "Chest": [
-        "Flat Barbell Bench Press",
-        "Incline Barbell Press",
-        "Decline Dumbbell Press",
-        "Peck Machine"
-      ],
-      "Triceps": [
-        "Overhead Cable Extension",
-        "Straight bar pushdown",
-        "Reversebar pushdown",
-        "Back dips"
-      ],
-      "Back": [
-        "Lat Pulldown",
-        "Barbell Row",
-        "Seated Row",
-        "Lat Prayer Pull"
-      ],
-      "Biceps": [
-        "Strict bar curls",
-        "Reversed Incline curls",
-        "Cable Curls Superset",
-        "Reversed cable curls"
-      ],
-      "Shoulders": [
-        "Seated Dumbbell Shoulder Press",
-        "Dumbbell Lateral Raise (Lean in)",
-        "Face Pulls",
-        "Shrugs"
-      ],
-      "Legs": [
-        "Leg Press",
-        "Quads Machine",
-        "Hamstring machine",
-        "Calf Raises (Bodyweight)"
-      ]
-    },
-    "W4": {
-      "Chest": [
-        "Dumbbell Flat Press",
-        "Incline Dumbbell Press",
-        "Dumbbell Pullovers",
-        "Cable Fly"
-      ],
-      "Triceps": [
-        "Overhead Cable Extension",
-        "Straight bar pushdown",
-        "Reversebar pushdown",
-        "Back dips"
-      ],
-      "Back": [
-        "Lat Pulldown",
-        "1-Arm Dumbbell Row",
-        "V handle pulldown Cable",
-        "DeadLifts"
-      ],
-      "Biceps": [
-        "Seated Machine Curls",
-        "Cable Curls",
-        "Preacher curls Dumbbells",
-        "Hammer Curl (Dumbbell)"
-      ],
-      "Shoulders": [
-        "Seated Dumbbell Shoulder Press",
-        "Lean-Away Cable Lateral Raise",
-        "Face Pulls",
-        "Front Raise cable"
-      ],
-      "Legs": [
-        "Walking Lunges (Barbell)",
-        "Squats (Barbell)",
-        "Hamstring machine",
-        "Quads Machine"
-      ]
-    },
-    "W5": {
-      "Chest": [
-        "Flat Barbell Bench Press",
-        "Incline Barbell Press",
-        "Decline Dumbbell Press",
-        "Peck Machine",
-        "Cable Fly",
-        "Dumbbell Pullovers"
-      ],
-      "Triceps": [
-        "Close-Grip Barbell Bench Press",
-        "Overhead Dumbbell Extension",
-        "Dumbbell Kickback",
-        "Straight bar pushdown",
-        "Reversebar pushdown",
-        "Back dips"
-      ],
-      "Back": [
-        "Lat Pulldown",
-        "Machine Row",
-        "T-Bar Row",
-        "Lat Prayer Pull",
-        "1-Arm Dumbbell Row",
-        "DeadLifts"
-      ],
-      "Biceps": [
-        "Standing dumbbell curls",
-        "Standing Dumbbell Alternating Curl",
-        "Preacher curls Dumbbells",
-        "Hammer Curl (Dumbbell)",
-        "Reversed cable curls",
-        "Reversed Incline curls"
-      ],
-      "Shoulders": [
-        "Seated Dumbbell Shoulder Press",
-        "Standing Dumbbell Lateral Raise",
-        "Face Pulls",
-        "Cable Upright Rows",
-        "Front Raise Dumbbells",
-        "Shrugs"
-      ],
-      "Legs": [
-        "Squats (Barbell)",
-        "Leg Press",
-        "Quads Machine",
-        "Hamstring machine",
-        "Walking Lunges (Barbell)",
-        "Calf Raises"
-      ]
-    },
-    "W6": {
-      "Chest": [
-        "Dumbbell Flat Press",
-        "Incline Dumbbell Press",
-        "Decline Dumbbell Press",
-        "Peck Machine",
-        "Flat Bench Chest Fly",
-        "Dumbbell Pullovers"
-      ],
-      "Triceps": [
-        "Overhead Cable Extension",
-        "Single Arm Dumbbell Extensions",
-        "Rope Pushdown",
-        "Straight bar pushdown",
-        "Reversebar pushdown",
-        "Back dips"
-      ],
-      "Back": [
-        "Lat Pulldown",
-        "1-Arm Dumbbell Row",
-        "V handle pulldown Cable",
-        "Barbell Row",
-        "Lat Prayer Pull",
-        "Back extensions"
-      ],
-      "Biceps": [
-        "Strict bar curls",
-        "Seated Incline Dumbbell Curl",
-        "Seated Dumbbell Alternating Curl",
-        "Preacher Curls Bar",
-        "Reverse Cable",
-        "Concentration Curl"
-      ],
-      "Shoulders": [
-        "Seated Dumbbell Shoulder Press",
-        "Lean-Away Cable Lateral Raise",
-        "Face Pulls",
-        "Front Raise cable",
-        "Cable Upright Rows",
-        "Shrugs"
-      ],
-      "Legs": [
-        "Walking Lunges (Barbell)",
-        "Hack Squats",
-        "Hamstring machine",
-        "Quads Machine",
-        "Leg Press",
-        "Calf Raises"
-      ]
-    }
-  };
+const INITIAL_SKILL_PLANS: AllWorkoutPlans = {
+    // Two skills per day plans
+    "W1": { "Programming": ["Work on a side project"], "Data Analysis": ["Analyze a sample dataset"] },
+    "W2": { "Design": ["Practice with Figma/Sketch"], "Writing": ["Write 500 words for a blog post"] },
+    "W3": { "Marketing": ["Analyze a competitor's strategy"], "Business": ["Read an article on finance"] },
+    "W4": { "Language": ["Practice vocabulary for 30 mins"], "Music": ["Practice an instrument for 30 mins"] },
+    // One skill per day plans
+    "W5": { "Programming": ["Complete a coding challenge", "Read a chapter of a tech book"], "Design": [], "Writing": [], "Marketing": [], "Data Analysis": [], "Language": [], "Music": [], "Business": [] },
+    "W6": { "Design": ["Practice with Figma/Sketch", "Recreate a UI from a popular app"], "Writing": [], "Marketing": [], "Data Analysis": [], "Language": [], "Music": [], "Business": [] },
+};
 
-
-// Schedule for "Two Muscles / Day" mode
-const dailyMuscleGroups: Record<number, string[]> = {
-  1: ["Chest", "Triceps"], // Monday
-  2: ["Back", "Biceps"],   // Tuesday
-  3: ["Shoulders", "Legs"],// Wednesday
-  4: ["Chest", "Triceps"], // Thursday
-  5: ["Back", "Biceps"],   // Friday
-  6: ["Shoulders", "Legs"], // Saturday
+// Schedule for "Two Skills / Day" mode
+const dailySkillPairs: Record<number, string[]> = {
+  1: ["Programming", "Data Analysis"], // Monday
+  2: ["Design", "Writing"],   // Tuesday
+  3: ["Marketing", "Business"],// Wednesday
+  4: ["Language", "Music"], // Thursday
+  5: ["Programming", "Design"],   // Friday
+  6: ["Data Analysis", "Writing"], // Saturday
   0: [], // Sunday
 };
 
-// Schedule for "One Muscle / Day" mode
-const singleMuscleDailySchedule: Record<number, ExerciseCategory | null> = {
-    1: "Chest",
-    2: "Back",
-    3: "Legs",
-    4: "Shoulders",
-    5: "Biceps",
-    6: "Triceps",
+// Schedule for "One Skill / Day" mode
+const singleSkillDailySchedule: Record<number, ExerciseCategory | null> = {
+    1: "Programming",
+    2: "Design",
+    3: "Writing",
+    4: "Marketing",
+    5: "Data Analysis",
+    6: "Language",
     0: null, // Sunday
 };
 
@@ -438,7 +136,7 @@ function UpskillPageContent() {
   
   const [isLoadingPage, setIsLoadingPage] = useState(true);
 
-  const [workoutPlans, setWorkoutPlans] = useState<AllWorkoutPlans>(INITIAL_PLANS);
+  const [workoutPlans, setWorkoutPlans] = useState<AllWorkoutPlans>(INITIAL_SKILL_PLANS);
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   
   const [showBackupPrompt, setShowBackupPrompt] = useState(false);
@@ -487,13 +185,13 @@ function UpskillPageContent() {
             if (storedPlans) {
                 setWorkoutPlans(JSON.parse(storedPlans));
             } else {
-                setWorkoutPlans(INITIAL_PLANS);
-                localStorage.setItem(plansKey, JSON.stringify(INITIAL_PLANS));
+                setWorkoutPlans(INITIAL_SKILL_PLANS);
+                localStorage.setItem(plansKey, JSON.stringify(INITIAL_SKILL_PLANS));
             }
         } catch (e) {
             console.error("Error with workout plans, resetting to default:", e);
-            setWorkoutPlans(INITIAL_PLANS);
-            localStorage.setItem(plansKey, JSON.stringify(INITIAL_PLANS));
+            setWorkoutPlans(INITIAL_SKILL_PLANS);
+            localStorage.setItem(plansKey, JSON.stringify(INITIAL_SKILL_PLANS));
         }
 
         // Load exercise definitions or initialize with defaults AND save
@@ -508,7 +206,7 @@ function UpskillPageContent() {
                 }
             } else {
                 const timestamp = Date.now().toString();
-                const uniqueDefaultDefs = DEFAULT_EXERCISE_DEFINITIONS.map((def, index) => ({
+                const uniqueDefaultDefs = DEFAULT_SKILL_DEFINITIONS.map((def, index) => ({
                     ...def,
                     id: `${timestamp}_${index}_${def.name.replace(/\s+/g, '_')}`
                 }));
@@ -516,9 +214,9 @@ function UpskillPageContent() {
                 localStorage.setItem(defsKey, JSON.stringify(uniqueDefaultDefs));
             }
         } catch (e) {
-            console.error("Error with exercise definitions, resetting to default:", e);
+            console.error("Error with skill definitions, resetting to default:", e);
             const timestamp = Date.now().toString();
-            const uniqueDefaultDefs = DEFAULT_EXERCISE_DEFINITIONS.map((def, index) => ({
+            const uniqueDefaultDefs = DEFAULT_SKILL_DEFINITIONS.map((def, index) => ({
                 ...def,
                 id: `${timestamp}_${index}_${def.name.replace(/\s+/g, '_')}`
             }));
@@ -555,7 +253,7 @@ function UpskillPageContent() {
       // Clear all state for logged-out user
       setExerciseDefinitions([]);
       setAllWorkoutLogs([]);
-      setWorkoutPlans(INITIAL_PLANS);
+      setWorkoutPlans(INITIAL_SKILL_PLANS);
       setWeightLogs([]);
       setGoalWeight(null);
       setHeight(null);
@@ -605,6 +303,102 @@ function UpskillPageContent() {
     }
   }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, workoutMode, workoutPlans, weightLogs, goalWeight, height, dateOfBirth, gender]);
 
+  useEffect(() => {
+    if (!currentUser || exerciseDefinitions.length === 0 || Object.keys(workoutPlans).length === 0) return;
+  
+    const dateKey = format(selectedDate, 'yyyy-MM-dd');
+  
+    setAllWorkoutLogs(prevLogs => {
+      const workoutExists = prevLogs.some(log => log.id === dateKey);
+      if (workoutExists) {
+        return prevLogs; // Don't modify if log for this date already exists
+      }
+  
+      const dayOfWeek = getDay(selectedDate);
+      const exercisesToAdd: WorkoutExercise[] = [];
+      let toastDescription = "";
+      
+      const isoWeek = getISOWeek(selectedDate);
+      const isOddWeek = isoWeek % 2 !== 0;
+
+      if (workoutMode === 'two-muscle') {
+          let plan: any = null;
+          let planName = "";
+    
+          if (isOddWeek) {
+            plan = dayOfWeek >= 1 && dayOfWeek <= 3 ? workoutPlans.W1 : workoutPlans.W2;
+            planName = dayOfWeek >= 1 && dayOfWeek <= 3 ? "W1" : "W2";
+          } else {
+            plan = dayOfWeek >= 1 && dayOfWeek <= 3 ? workoutPlans.W3 : workoutPlans.W4;
+            planName = dayOfWeek >= 1 && dayOfWeek <= 3 ? "W3" : "W4";
+          }
+
+          if (!plan) return prevLogs;
+    
+          const skillsForDay = dailySkillPairs[dayOfWeek];
+          if (!skillsForDay || skillsForDay.length === 0) return prevLogs;
+          
+          toastDescription = `Added ${planName} tasks for ${skillsForDay.join(' & ')}.`;
+          skillsForDay.forEach(skill => {
+            const exerciseNames = (plan as any)[skill] as string[];
+            if (exerciseNames) {
+              exerciseNames.forEach(exName => {
+                const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
+                if (definition && !exercisesToAdd.some(e => e.definitionId === definition.id)) {
+                  exercisesToAdd.push({
+                    id: `${definition.id}-${Date.now()}-${Math.random()}`,
+                    definitionId: definition.id,
+                    name: definition.name,
+                    category: definition.category,
+                    loggedSets: [],
+                    targetSets: DEFAULT_TARGET_SESSIONS,
+                    targetReps: DEFAULT_TARGET_DURATION,
+                  });
+                }
+              });
+            }
+          });
+      } else { // 'one-muscle' mode
+          const plan = isOddWeek ? workoutPlans.W5 : workoutPlans.W6;
+          const planName = isOddWeek ? "W5" : "W6";
+          const skillForDay = singleSkillDailySchedule[dayOfWeek];
+          if (!skillForDay) return prevLogs;
+
+          const exerciseNames = (plan as any)[skillForDay] as string[] | undefined;
+          if (!exerciseNames || exerciseNames.length === 0) return prevLogs;
+          
+          toastDescription = `Added ${planName} tasks for ${skillForDay}.`;
+
+          exerciseNames.forEach(exName => {
+            const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
+            if (definition) {
+              exercisesToAdd.push({
+                id: `${definition.id}-${Date.now()}-${Math.random()}`,
+                definitionId: definition.id,
+                name: definition.name,
+                category: definition.category,
+                loggedSets: [],
+                targetSets: DEFAULT_TARGET_SESSIONS,
+                targetReps: DEFAULT_TARGET_DURATION,
+              });
+            }
+          });
+      }
+
+      if (exercisesToAdd.length > 0) {
+        const newDatedWorkout: DatedWorkout = { id: dateKey, date: dateKey, exercises: exercisesToAdd };
+        toast({ 
+          title: "Learning Plan Autopopulated!", 
+          description: toastDescription
+        });
+        return [...prevLogs, newDatedWorkout];
+      }
+  
+      return prevLogs;
+    });
+  
+  }, [selectedDate, currentUser, exerciseDefinitions, toast, workoutMode, workoutPlans]);
+
   // Check for backup prompt on Mondays
   useEffect(() => {
       if (!currentUser) return;
@@ -652,13 +446,13 @@ function UpskillPageContent() {
     return exerciseDefinitions.filter(def => selectedCategories.includes(def.category));
   }, [exerciseDefinitions, selectedCategories]);
 
-  const muscleGroupsForSelectedDay = useMemo(() => {
+  const skillsForSelectedDay = useMemo(() => {
     const dayOfWeek = getDay(selectedDate);
     if (workoutMode === 'one-muscle') {
-        const muscle = singleMuscleDailySchedule[dayOfWeek];
-        return muscle ? [muscle] : [];
+        const skill = singleSkillDailySchedule[dayOfWeek];
+        return skill ? [skill] : [];
     }
-    return dailyMuscleGroups[dayOfWeek] || [];
+    return dailySkillPairs[dayOfWeek] || [];
   }, [selectedDate, workoutMode]);
 
   const handleCategoryFilterChange = (category: ExerciseCategory) => {
@@ -687,23 +481,23 @@ function UpskillPageContent() {
       toast({ title: "Error", description: "You must be logged in.", variant: "destructive" }); return;
     }
     if (newExerciseName.trim() === '') {
-      toast({ title: "Error", description: "Exercise name cannot be empty.", variant: "destructive" }); return;
+      toast({ title: "Error", description: "Task name cannot be empty.", variant: "destructive" }); return;
     }
     if (!newExerciseCategory) {
-      toast({ title: "Error", description: "Please select an exercise category.", variant: "destructive" }); return;
+      toast({ title: "Error", description: "Please select a skill category.", variant: "destructive" }); return;
     }
     if (exerciseDefinitions.some(def => def.name.toLowerCase() === newExerciseName.trim().toLowerCase())) {
-      toast({ title: "Error", description: "Exercise with this name already exists.", variant: "destructive" }); return;
+      toast({ title: "Error", description: "A task with this name already exists.", variant: "destructive" }); return;
     }
     const newDef: ExerciseDefinition = { 
       id: `def_${Date.now().toString()}_${newExerciseName.trim().replace(/\s+/g, '_')}`, 
       name: newExerciseName.trim(),
-      category: newExerciseCategory || DEFAULT_EXERCISE_CATEGORY
+      category: newExerciseCategory || DEFAULT_SKILL_CATEGORY
     };
     setExerciseDefinitions(prev => [...prev, newDef]);
     setNewExerciseName('');
     setNewExerciseCategory("");
-    toast({ title: "Success", description: `Exercise "${newDef.name}" added to library.` });
+    toast({ title: "Success", description: `Task "${newDef.name}" added to library.` });
   };
 
   const handleDeleteExerciseDefinition = (id: string) => {
@@ -716,7 +510,7 @@ function UpskillPageContent() {
         exercises: log.exercises.filter(ex => ex.definitionId !== id)
       }))
     );
-    toast({ title: "Success", description: `Exercise "${defToDelete?.name}" removed.` });
+    toast({ title: "Success", description: `Task "${defToDelete?.name}" removed.` });
   };
 
   const handleStartEditDefinition = (def: ExerciseDefinition) => {
@@ -729,7 +523,7 @@ function UpskillPageContent() {
     if (!currentUser) { toast({ title: "Error", description: "You must be logged in.", variant: "destructive" }); return; }
     if (editingDefinition && editingDefinitionName.trim() !== '' && editingDefinitionCategory) {
       if (exerciseDefinitions.some(def => def.name.toLowerCase() === editingDefinitionName.trim().toLowerCase() && def.id !== editingDefinition.id)) {
-        toast({ title: "Error", description: "Another exercise with this name already exists.", variant: "destructive" }); return;
+        toast({ title: "Error", description: "Another task with this name already exists.", variant: "destructive" }); return;
       }
       const updatedDef = { ...editingDefinition, name: editingDefinitionName.trim(), category: editingDefinitionCategory };
       setExerciseDefinitions(prev => 
@@ -743,12 +537,12 @@ function UpskillPageContent() {
           )
         }))
       );
-      toast({ title: "Success", description: `Exercise updated to "${updatedDef.name}".` });
+      toast({ title: "Success", description: `Task updated to "${updatedDef.name}".` });
       setEditingDefinition(null);
       setEditingDefinitionName('');
       setEditingDefinitionCategory("");
     } else {
-      toast({ title: "Error", description: "Exercise name and category cannot be empty.", variant: "destructive" });
+      toast({ title: "Error", description: "Task name and skill category cannot be empty.", variant: "destructive" });
     }
   };
 
@@ -757,19 +551,19 @@ function UpskillPageContent() {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const newWorkoutExercise: WorkoutExercise = {
       id: `${definition.id}-${Date.now()}`, definitionId: definition.id, name: definition.name, category: definition.category,
-      loggedSets: [], targetSets: DEFAULT_TARGET_SETS, targetReps: DEFAULT_TARGET_REPS,
+      loggedSets: [], targetSets: DEFAULT_TARGET_SESSIONS, targetReps: DEFAULT_TARGET_DURATION,
     };
 
     const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
       if (existingWorkout.exercises.some(ex => ex.definitionId === definition.id)) {
-        toast({ title: "Info", description: `"${definition.name}" is already in this workout.`, variant: "default" }); return;
+        toast({ title: "Info", description: `"${definition.name}" is already in this session.`, variant: "default" }); return;
       }
       updateOrAddWorkoutLog({ ...existingWorkout, exercises: [...existingWorkout.exercises, newWorkoutExercise] });
     } else {
       updateOrAddWorkoutLog({ id: dateKey, date: dateKey, exercises: [newWorkoutExercise] });
     }
-    toast({ title: "Added to Workout", description: `"${definition.name}" added for ${format(selectedDate, 'PPP')}.` });
+    toast({ title: "Added to Session", description: `"${definition.name}" added for ${format(selectedDate, 'PPP')}.` });
   };
 
   const handleRemoveExerciseFromWorkout = (exerciseId: string) => {
@@ -784,7 +578,7 @@ function UpskillPageContent() {
       } else {
         updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
       }
-      toast({ title: "Success", description: `"${exerciseName || ''}" removed from workout.` });
+      toast({ title: "Success", description: `"${exerciseName || ''}" removed from session.` });
     }
   };
   
@@ -798,7 +592,7 @@ function UpskillPageContent() {
         ex.id === exerciseId ? { ...ex, loggedSets: [...ex.loggedSets, newSet] } : ex
       );
       updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
-      toast({ title: "Set Logged!", description: `Logged ${reps} reps at ${weight} kg/lb.`});
+      toast({ title: "Session Logged!", description: `Logged a session.`});
     }
   };
 
@@ -811,7 +605,7 @@ function UpskillPageContent() {
         ex.id === exerciseId ? { ...ex, loggedSets: ex.loggedSets.filter(s => s.id !== setId) } : ex
       );
       updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
-      toast({ title: "Set Deleted", description: "The set has been removed." });
+      toast({ title: "Session Deleted", description: "The session has been removed." });
     }
   };
 
@@ -829,7 +623,7 @@ function UpskillPageContent() {
         return ex;
       });
       updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
-      toast({ title: "Set Updated", description: "The set has been updated."});
+      toast({ title: "Session Updated", description: "The session has been updated."});
     }
   };
 
@@ -1053,7 +847,7 @@ function UpskillPageContent() {
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
         <Loader2 className="h-16 w-16 text-primary animate-spin mb-4" />
-        <p className="text-muted-foreground">Loading your workout data...</p>
+        <p className="text-muted-foreground">Loading your upskill data...</p>
       </div>
     );
   }
@@ -1063,12 +857,12 @@ function UpskillPageContent() {
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-          <section aria-labelledby="exercise-library-heading" className="md:col-span-1 space-y-6">
+          <section aria-labelledby="task-library-heading" className="md:col-span-1 space-y-6">
             <Card>
               <CardHeader>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <CardTitle id="exercise-library-heading" className="flex items-center gap-2 text-lg text-primary">
-                    <BookCopy /> Exercise Library
+                  <CardTitle id="task-library-heading" className="flex items-center gap-2 text-lg text-primary">
+                    <BookCopy /> Task Library
                   </CardTitle>
                   <div className="flex items-center gap-2 flex-wrap">
                     <DropdownMenu>
@@ -1079,9 +873,9 @@ function UpskillPageContent() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
+                        <DropdownMenuLabel>Filter by Skill</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        {exerciseCategories.map((category) => (
+                        {skillCategories.map((category) => (
                           <DropdownMenuCheckboxItem
                             key={category} checked={selectedCategories.includes(category)}
                             onCheckedChange={() => handleCategoryFilterChange(category)}
@@ -1094,7 +888,7 @@ function UpskillPageContent() {
                           </>)}
                       </DropdownMenuContent>
                     </DropdownMenu>
-                    <Button variant="ghost" size="icon" onClick={() => setIsLibraryExpanded(!isLibraryExpanded)} className="h-8 w-8" aria-label={isLibraryExpanded ? "Collapse exercise library" : "Expand exercise library"}>
+                    <Button variant="ghost" size="icon" onClick={() => setIsLibraryExpanded(!isLibraryExpanded)} className="h-8 w-8" aria-label={isLibraryExpanded ? "Collapse task library" : "Expand task library"}>
                       {isLibraryExpanded ? <ChevronUp className="h-5 w-5 text-primary" /> : <ChevronDown className="h-5 w-5 text-primary" />}
                     </Button>
                   </div>
@@ -1102,7 +896,7 @@ function UpskillPageContent() {
               </CardHeader>
               <CardContent className="p-4 space-y-4">
                 <div className="space-y-2">
-                  <Label>Workout Plan</Label>
+                  <Label>Learning Schedule</Label>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                     <RadioGroup
                       value={workoutMode}
@@ -1111,11 +905,11 @@ function UpskillPageContent() {
                     >
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="two-muscle" id="r1" />
-                        <Label htmlFor="r1" className="font-normal">Two Muscles / Day</Label>
+                        <Label htmlFor="r1" className="font-normal">Two Skills / Day</Label>
                       </div>
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="one-muscle" id="r2" />
-                        <Label htmlFor="r2" className="font-normal">One Muscle / Day</Label>
+                        <Label htmlFor="r2" className="font-normal">One Skill / Day</Label>
                       </div>
                     </RadioGroup>
                     <Button variant="outline" size="sm" className="h-8" onClick={() => setIsPlanModalOpen(true)}>
@@ -1136,18 +930,18 @@ function UpskillPageContent() {
                       className="space-y-4"
                     >
                       <form onSubmit={handleAddExerciseDefinition} className="space-y-3">
-                        <Input type="text" placeholder="New exercise name" value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} aria-label="New exercise name" className="h-10 text-sm" />
+                        <Input type="text" placeholder="New task name" value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} aria-label="New task name" className="h-10 text-sm" />
                         <Select value={newExerciseCategory} onValueChange={(value) => setNewExerciseCategory(value as ExerciseCategory)}>
-                          <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select category" /></SelectTrigger>
-                          <SelectContent>{exerciseCategories.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
+                          <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select skill" /></SelectTrigger>
+                          <SelectContent>{skillCategories.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
                         </Select>
-                        <Button type="submit" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs xl:text-sm xl:h-10 xl:px-4"> <PlusCircle className="mr-2 h-5 w-5" /> Add Exercise </Button>
+                        <Button type="submit" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs xl:text-sm xl:h-10 xl:px-4"> <PlusCircle className="mr-2 h-5 w-5" /> Add Task </Button>
                       </form>
                       <div className="max-h-[calc(100vh-38rem)] overflow-y-auto pr-1">
                         {filteredExerciseDefinitions.length === 0 && exerciseDefinitions.length > 0 ? (
-                          <p className="text-muted-foreground text-sm text-center py-4">No exercises match filter.</p>
+                          <p className="text-muted-foreground text-sm text-center py-4">No tasks match filter.</p>
                         ) : filteredExerciseDefinitions.length === 0 ? (
-                          <p className="text-muted-foreground text-sm text-center py-4">Library empty. Add exercises!</p>
+                          <p className="text-muted-foreground text-sm text-center py-4">Library empty. Add tasks!</p>
                         ) : (
                           <ul className="space-y-2">
                             <AnimatePresence>
@@ -1155,10 +949,10 @@ function UpskillPageContent() {
                                 <motion.li key={def.id} layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} className="p-3 bg-card border rounded-lg shadow-sm">
                                   {editingDefinition?.id === def.id ? (
                                     <div className="space-y-2">
-                                      <Input value={editingDefinitionName} onChange={(e) => setEditingDefinitionName(e.target.value)} className="h-9" aria-label="Edit exercise name"/>
+                                      <Input value={editingDefinitionName} onChange={(e) => setEditingDefinitionName(e.target.value)} className="h-9" aria-label="Edit task name"/>
                                       <Select value={editingDefinitionCategory} onValueChange={(value) => setEditingDefinitionCategory(value as ExerciseCategory)}>
-                                        <SelectTrigger className="h-9"><SelectValue placeholder="Select category" /></SelectTrigger>
-                                        <SelectContent>{exerciseCategories.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
+                                        <SelectTrigger className="h-9"><SelectValue placeholder="Select skill" /></SelectTrigger>
+                                        <SelectContent>{skillCategories.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
                                       </Select>
                                       <div className="flex gap-2">
                                         <Button size="sm" onClick={handleSaveEditDefinition} className="flex-grow bg-green-600 hover:bg-green-500 text-white"><Save className="h-4 w-4 mr-1"/>Save</Button>
@@ -1175,7 +969,7 @@ function UpskillPageContent() {
                                         <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
                                         <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8 text-muted-foreground hover:text-primary" aria-label={`Edit ${def.name}`}> <Edit3 className="h-4 w-4" /> </Button>
                                         <Button variant="ghost" size="icon" onClick={() => handleDeleteExerciseDefinition(def.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label={`Delete ${def.name}`}> <Trash2 className="h-4 w-4" /> </Button>
-                                        <Button variant="ghost" size="icon" onClick={() => handleAddExerciseToWorkout(def)} className="h-8 w-8 text-muted-foreground hover:text-accent" aria-label={`Add ${def.name} to workout`}> <ChevronRight className="h-5 w-5" /> </Button>
+                                        <Button variant="ghost" size="icon" onClick={() => handleAddExerciseToWorkout(def)} className="h-8 w-8 text-muted-foreground hover:text-accent" aria-label={`Add ${def.name} to session`}> <ChevronRight className="h-5 w-5" /> </Button>
                                       </div>
                                     </div>
                                   )}
@@ -1267,7 +1061,7 @@ function UpskillPageContent() {
                             {latestConsistency !== null && (
                                 <div className="space-y-1 text-sm pt-4 border-t">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-muted-foreground flex items-center gap-2"><Activity className="h-4 w-4" /> Workout Consistency</span>
+                                        <span className="text-muted-foreground flex items-center gap-2"><Activity className="h-4 w-4" /> Learning Consistency</span>
                                         <span className="font-bold text-lg">{latestConsistency}%</span>
                                     </div>
                                 </div>
@@ -1279,16 +1073,16 @@ function UpskillPageContent() {
 
           </section>
 
-          <section aria-labelledby="current-workout-heading" className="md:col-span-2 space-y-6">
+          <section aria-labelledby="current-learning-heading" className="md:col-span-2 space-y-6">
               <Card>
                   <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
-                          <CardTitle id="current-workout-heading" className="flex items-center gap-2 text-lg text-accent">
-                              <ListChecks /> Workout for: {format(selectedDate, 'PPP')}
+                          <CardTitle id="current-learning-heading" className="flex items-center gap-2 text-lg text-accent">
+                              <ListChecks /> Learning Session for: {format(selectedDate, 'PPP')}
                           </CardTitle>
-                          {muscleGroupsForSelectedDay.length > 0 && (
+                          {skillsForSelectedDay.length > 0 && (
                               <p className="text-sm text-muted-foreground mt-1 ml-1">
-                                  Today's focus: {muscleGroupsForSelectedDay.join(' & ')}
+                                  Today's focus: {skillsForSelectedDay.join(' & ')}
                               </p>
                           )}
                       </div>
@@ -1309,8 +1103,8 @@ function UpskillPageContent() {
                       {currentWorkoutExercises.length === 0 ? (
                         <div className="text-center py-10">
                             <GripVertical className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
-                            <p className="text-muted-foreground">No exercises for {format(selectedDate, 'PPP')}.</p>
-                            <p className="text-sm text-muted-foreground/80">Add exercises from library or select a weekday!</p>
+                            <p className="text-muted-foreground">No tasks for {format(selectedDate, 'PPP')}.</p>
+                            <p className="text-sm text-muted-foreground/80">Add tasks from the library or select a different day!</p>
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -1359,7 +1153,7 @@ function UpskillPageContent() {
             workoutPlans={workoutPlans}
             setWorkoutPlans={setWorkoutPlans}
             exerciseDefinitions={exerciseDefinitions}
-            initialPlans={INITIAL_PLANS}
+            initialPlans={INITIAL_SKILL_PLANS}
           />
         )}
       </div>
@@ -1369,7 +1163,7 @@ function UpskillPageContent() {
           <AlertDialogHeader>
             <AlertDialogTitle>Weekly Backup Reminder</AlertDialogTitle>
             <AlertDialogDescription>
-              It's Monday! Would you like to back up your workout data now? This will download a file to your computer.
+              It's Monday! Would you like to back up your learning data now? This will download a file to your computer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1402,5 +1196,3 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
-
-    
