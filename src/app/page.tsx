@@ -178,6 +178,9 @@ function HomePageContent() {
       pageType: 'upskill' as 'upskill' | 'deepwork'
   });
 
+  const DEFAULT_TARGET_SETS = 4;
+  const DEFAULT_TARGET_REPS = "8-12";
+
   useEffect(() => {
     setTodayKey(format(new Date(), 'yyyy-MM-dd'));
   }, []);
@@ -437,63 +440,62 @@ function HomePageContent() {
   const getTodaysWorkout = () => {
     const today = new Date();
     const dayOfWeek = getDay(today);
-    const exercisesToAdd: WorkoutExercise[] = [];
-    let muscleGroupsForDay: string[] = [];
-    let plan: WorkoutPlan | null = null;
-    let planName: string = '';
+    const isoWeek = getISOWeek(today);
+    const isOddWeek = isoWeek % 2 !== 0;
+
+    let muscleGroupsForDay: ExerciseCategory[] = [];
+    let planKey: keyof AllWorkoutPlans | null = null;
 
     if (workoutMode === 'two-muscle') {
-        const isoWeek = getISOWeek(today);
-        const isOddWeek = isoWeek % 2 !== 0;
-        muscleGroupsForDay = dailyMuscleGroups[dayOfWeek] || [];
-
+        muscleGroupsForDay = (dailyMuscleGroups[dayOfWeek] || []) as ExerciseCategory[];
         if (muscleGroupsForDay.length > 0) {
-            if (dayOfWeek >= 1 && dayOfWeek <= 3) {
-                plan = isOddWeek ? workoutPlans.W1 : workoutPlans.W3;
-                planName = isOddWeek ? 'W1' : 'W3';
-            } else { // For Thursday, Friday, Saturday
-                plan = isOddWeek ? workoutPlans.W2 : workoutPlans.W4;
-                planName = isOddWeek ? 'W2' : 'W4';
-            }
+            planKey = isOddWeek
+                ? ((dayOfWeek >= 1 && dayOfWeek <= 3) ? 'W1' : 'W2')
+                : ((dayOfWeek >= 1 && dayOfWeek <= 3) ? 'W3' : 'W4');
         }
-    } else if (workoutMode === 'one-muscle') {
-      const isoWeek = getISOWeek(today);
-      const isOddWeek = isoWeek % 2 !== 0;
-      plan = isOddWeek ? workoutPlans.W5 : workoutPlans.W6;
-      planName = isOddWeek ? 'W5' : 'W6';
-      const muscleGroupForDay = singleMuscleDailySchedule[dayOfWeek];
-      if (muscleGroupForDay) {
-        muscleGroupsForDay = [muscleGroupForDay];
-      }
+    } else { // one-muscle
+        const muscle = singleMuscleDailySchedule[dayOfWeek];
+        if (muscle) {
+            muscleGroupsForDay = [muscle as ExerciseCategory];
+            planKey = isOddWeek ? 'W5' : 'W6';
+        }
     }
-  
-    if (plan && muscleGroupsForDay.length > 0) {
-      for (const muscleGroup of muscleGroupsForDay) {
-        const category = muscleGroup as ExerciseCategory;
-        const exerciseNames = (plan as WorkoutPlan)[category];
-  
-        if (exerciseNames) {
-          for (let i = 0; i < exerciseNames.length; i++) {
-            const exName = exerciseNames[i];
-            const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
-            if (definition && !exercisesToAdd.some(e => e.definitionId === definition.id)) {
-              const lastPerformance = findLastPerformance(definition.id);
-              exercisesToAdd.push({
+
+    if (!planKey || muscleGroupsForDay.length === 0) {
+        return { exercises: [], muscleGroups: [] };
+    }
+
+    const plan = workoutPlans[planKey];
+    if (!plan) {
+        return { exercises: [], muscleGroups: muscleGroupsForDay };
+    }
+
+    const allExerciseNamesInPlan = muscleGroupsForDay.flatMap(mg => plan[mg] || []);
+    
+    const definitionsMap = new Map(exerciseDefinitions.map(def => [def.name.toLowerCase(), def]));
+
+    const exercisesToAdd = allExerciseNamesInPlan
+        .map(name => definitionsMap.get(name.toLowerCase()))
+        .filter((def): def is ExerciseDefinition => !!def)
+        .map(definition => {
+            const lastPerformance = findLastPerformance(definition.id);
+            return {
                 id: `${definition.id}-${Date.now()}-${Math.random()}`,
                 definitionId: definition.id,
                 name: definition.name,
                 category: definition.category,
                 loggedSets: [],
-                targetSets: 4,
-                targetReps: "8-12",
+                targetSets: DEFAULT_TARGET_SETS,
+                targetReps: DEFAULT_TARGET_REPS,
                 lastPerformance,
-              });
-            }
-          }
-        }
-      }
-    }
-    return { exercises: exercisesToAdd, muscleGroups: muscleGroupsForDay };
+            };
+        });
+
+    const uniqueExercises = exercisesToAdd.filter((ex, index, self) => 
+        index === self.findIndex((t) => t.definitionId === ex.definitionId)
+    );
+
+    return { exercises: uniqueExercises, muscleGroups: muscleGroupsForDay };
   };
 
   const handleActivityClick = (activity: Activity) => {
