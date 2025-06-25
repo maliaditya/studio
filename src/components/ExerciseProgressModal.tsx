@@ -180,7 +180,7 @@ export function ExerciseProgressModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl md:max-w-3xl lg:max-w-4xl max-h-[85vh] flex flex-col">
+      <DialogContent className="sm:max-w-xl md:max-w-3xl lg:max-w-4xl max-h-[85dvh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Progress for: {exercise.name}</DialogTitle>
           <DialogDescription>

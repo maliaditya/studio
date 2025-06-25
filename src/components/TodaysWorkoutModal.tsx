@@ -213,7 +213,7 @@ export function TodaysWorkoutModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col">
+      <DialogContent className="sm:max-w-lg max-h-[80dvh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
             Today's Focus: {muscleGroupsForDay.join(' & ') || 'Rest Day'}
