@@ -394,28 +394,29 @@ function DeepWorkPageContent() {
   }, [allWorkoutLogs, oneYearAgo, today]);
 
   const dailyDurationData = useMemo(() => {
-    const dailyTotals: Record<string, number> = {};
+    const dailyData: Record<string, { totalDuration: number, topics: Set<string> }> = {};
 
     allWorkoutLogs.forEach(log => {
-        const totalDuration = log.exercises.reduce((total, exercise) => 
-            total + exercise.loggedSets.reduce((sum, set) => sum + set.weight, 0)
-        , 0);
-
-        if (totalDuration > 0) {
-            dailyTotals[log.date] = (dailyTotals[log.date] || 0) + totalDuration;
-        }
+        log.exercises.forEach(exercise => {
+            const duration = exercise.loggedSets.reduce((sum, set) => sum + set.weight, 0);
+            if (duration > 0) {
+                if (!dailyData[log.date]) {
+                    dailyData[log.date] = { totalDuration: 0, topics: new Set() };
+                }
+                dailyData[log.date].totalDuration += duration;
+                dailyData[log.date].topics.add(exercise.name);
+            }
+        });
     });
 
-    return Object.entries(dailyTotals)
-        .map(([date, totalDuration]) => ({
-            dateObj: parseISO(date),
-            totalDuration,
+    return Object.entries(dailyData)
+        .map(([dateString, data]) => ({
+            dateObj: parseISO(dateString),
+            totalDuration: data.totalDuration,
+            topics: Array.from(data.topics).join(', '),
+            date: format(parseISO(dateString), 'MMM dd'),
         }))
-        .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime())
-        .map(item => ({
-            ...item,
-            date: format(item.dateObj, 'MMM dd'),
-        }));
+        .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
   }, [allWorkoutLogs]);
   
   if (isLoadingPage) {
@@ -559,10 +560,33 @@ function DeepWorkPageContent() {
                                 domain={['auto', 'auto']}
                                 label={{ value: "Minutes", angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' }}}
                             />
-                            <RechartsTooltip 
-                                contentStyle={{ background: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)' }} 
-                                labelStyle={{ fontWeight: 'bold' }}
-                                formatter={(value: number) => [`${value} min`, "Duration"]}
+                            <RechartsTooltip
+                                content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                        const data = payload[0].payload;
+                                        return (
+                                            <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                <div className="font-bold text-foreground">{format(data.dateObj, 'PPP')}</div>
+                                                <div className="grid gap-1.5">
+                                                    <div className="flex w-full items-center gap-2">
+                                                        <div className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: 'hsl(var(--primary))' }} />
+                                                        <div className="flex flex-1 justify-between">
+                                                            <span className="text-muted-foreground">Duration</span>
+                                                            <span className="font-mono font-medium text-foreground">{data.totalDuration} min</span>
+                                                        </div>
+                                                    </div>
+                                                    {data.topics && (
+                                                        <div className="mt-1 pt-1.5 border-t">
+                                                            <p className="font-medium text-foreground mb-1">Focus Areas:</p>
+                                                            <p className="text-muted-foreground whitespace-normal">{data.topics}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                }}
                             />
                             <Line type="monotone" dataKey="totalDuration" stroke="var(--color-totalDuration)" strokeWidth={2} dot={false} name="totalDuration" />
                           </LineChart>
