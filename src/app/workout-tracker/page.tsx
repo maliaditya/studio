@@ -638,17 +638,15 @@ function WorkoutPageContent() {
           let plan: any = null;
           let planName = "";
     
-          // Use a consistent weekly rotation
+          // A/B rotation within the week, with the pair of plans rotating weekly.
           if (isOddWeek) {
-            // Week A schedule
-            plan = dayOfWeek >= 1 && dayOfWeek <= 3 ? workoutPlans.W1 : workoutPlans.W2;
-            planName = dayOfWeek >= 1 && dayOfWeek <= 3 ? "W1" : "W2";
-            if (dayOfWeek === 6) { plan = workoutPlans.W1; planName = "W1"; } // Saturday mirrors Monday
-          } else {
-            // Week B schedule
-            plan = dayOfWeek >= 1 && dayOfWeek <= 3 ? workoutPlans.W3 : workoutPlans.W4;
-            planName = dayOfWeek >= 1 && dayOfWeek <= 3 ? "W3" : "W4";
-            if (dayOfWeek === 6) { plan = workoutPlans.W3; planName = "W3"; } // Saturday mirrors Monday
+            // Odd week of the year: Mon,Wed,Fri use W1; Tue,Thu,Sat use W2
+            plan = [1, 3, 5].includes(dayOfWeek) ? workoutPlans.W1 : workoutPlans.W2;
+            planName = [1, 3, 5].includes(dayOfWeek) ? "W1" : "W2";
+          } else { // Even week
+            // Even week of the year: Mon,Wed,Fri use W3; Tue,Thu,Sat use W4
+            plan = [1, 3, 5].includes(dayOfWeek) ? workoutPlans.W3 : workoutPlans.W4;
+            planName = [1, 3, 5].includes(dayOfWeek) ? "W3" : "W4";
           }
 
           if (!plan) return prevLogs;
