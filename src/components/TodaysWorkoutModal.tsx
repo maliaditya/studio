@@ -53,14 +53,26 @@ export function TodaysWorkoutModal({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Exercise</TableHead>
-                    <TableHead>Category</TableHead>
+                    <TableHead className="text-right">Last Workout</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {todaysExercises.map((exercise) => (
                     <TableRow key={exercise.id}>
-                      <TableCell className="font-medium">{exercise.name}</TableCell>
-                      <TableCell>{exercise.category}</TableCell>
+                      <TableCell>
+                          <p className="font-medium">{exercise.name}</p>
+                          <p className="text-xs text-muted-foreground">{exercise.category}</p>
+                      </TableCell>
+                      <TableCell className="text-right">
+                          {exercise.lastPerformance ? (
+                          <>
+                              <p className="font-semibold">{exercise.lastPerformance.weight} kg/lb &times; {exercise.lastPerformance.reps} reps</p>
+                              <p className="text-xs text-muted-foreground">Top Set</p>
+                          </>
+                          ) : (
+                          <p className="text-xs text-muted-foreground">No history</p>
+                          )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

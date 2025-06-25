@@ -45,6 +45,10 @@ export interface WorkoutExercise {
   loggedSets: LoggedSet[];
   targetSets: number;
   targetReps: string; // e.g., "10-15"
+  lastPerformance?: {
+    reps: number;
+    weight: number;
+  } | null;
 }
 
 export interface DatedWorkout {

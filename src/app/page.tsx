@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { format, getDay, getISOWeek } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity, ActivityType } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity, ActivityType, DatedWorkout } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -88,6 +88,7 @@ function HomePageContent() {
   const [workoutMode, setWorkoutMode] = useState<WorkoutMode>('two-muscle');
   const [workoutPlans, setWorkoutPlans] = useState<AllWorkoutPlans>(INITIAL_PLANS);
   const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
+  const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
   
   // State for TodaysWorkoutModal
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
@@ -151,6 +152,7 @@ function HomePageContent() {
         const defsKey = `exerciseDefinitions_${username}`;
         const plansKey = `workoutPlans_${username}`;
         const modeKey = `workoutMode_${username}`;
+        const logsKey = `allWorkoutLogs_${username}`;
 
         const storedMode = localStorage.getItem(modeKey);
         setWorkoutMode((storedMode as WorkoutMode) || 'two-muscle');
@@ -167,6 +169,14 @@ function HomePageContent() {
             setExerciseDefinitions(storedDefinitions ? JSON.parse(storedDefinitions) : []);
         } catch (e) {
             setExerciseDefinitions([]);
+        }
+
+        try {
+            const storedLogs = localStorage.getItem(logsKey);
+            setAllWorkoutLogs(storedLogs ? JSON.parse(storedLogs) : []);
+        } catch (e) {
+            console.error("Error parsing workout logs", e);
+            setAllWorkoutLogs([]);
         }
     }
   }, [currentUser]);
@@ -297,6 +307,33 @@ function HomePageContent() {
     });
   };
 
+  const findLastPerformance = (exerciseDefinitionId: string) => {
+    // Iterate through all logs in reverse chronological order
+    const sortedLogs = allWorkoutLogs
+      .slice()
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    for (const log of sortedLogs) {
+        // Skip today's log if we're looking for *previous* performance
+        if (log.date === todayKey) continue;
+
+        const exerciseInstance = log.exercises.find(ex => ex.definitionId === exerciseDefinitionId && ex.loggedSets.length > 0);
+        if (exerciseInstance) {
+            // Find the set with the highest weight in that session
+            const bestSet = [...exerciseInstance.loggedSets].sort((a, b) => b.weight - a.weight)[0];
+            
+            if (bestSet) {
+              return {
+                  reps: bestSet.reps,
+                  weight: bestSet.weight,
+              };
+            }
+        }
+    }
+
+    return null; // No previous performance found
+  };
+
   const getTodaysWorkout = () => {
     const today = new Date();
     const dayOfWeek = getDay(today);
@@ -327,12 +364,14 @@ function HomePageContent() {
           exerciseNames.forEach(exName => {
             const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
             if (definition && !exercisesToAdd.some(e => e.definitionId === definition.id)) {
+              const lastPerformance = findLastPerformance(definition.id);
               exercisesToAdd.push({
                 id: `${definition.id}-${Date.now()}-${Math.random()}`,
                 definitionId: definition.id,
                 name: definition.name,
                 category: definition.category,
                 loggedSets: [], targetSets: 4, targetReps: "8-12",
+                lastPerformance,
               });
             }
           });
