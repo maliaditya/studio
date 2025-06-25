@@ -21,9 +21,9 @@ import type { ExerciseDefinition, DatedWorkout, LoggedSet, TopicGoal } from '@/t
 import { format, parseISO, addDays, differenceInDays } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { LineChart as LineChartIcon, TableIcon } from 'lucide-react';
+import { LineChart as LineChartIcon, TableIcon, ZoomOut } from 'lucide-react';
 import { ChartContainer, ChartConfig } from '@/components/ui/chart';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine, Legend, Brush } from 'recharts';
 import { cn } from '@/lib/utils';
 import { Badge } from './ui/badge';
 
@@ -47,50 +47,57 @@ const deepworkChartConfig = {
 } satisfies ChartConfig;
 
 const upskillChartConfig = {
-  cumulativeProgress: { label: "Cumulative Progress", color: "hsl(var(--primary))" },
-  projection: { label: "Projection", color: "hsl(var(--primary))" }
+  historicalProgress: { label: "Progress", color: "hsl(var(--primary))" },
+  projectedProgress: { label: "Projection", color: "hsl(var(--primary))" }
 } satisfies ChartConfig;
 
-const CustomChartTooltip = ({ active, payload, label, pageType, goalType }: any) => {
+const CustomChartTooltip = ({ active, payload, pageType, goalType }: any) => {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
-        const config = pageType === 'upskill' ? upskillChartConfig : pageType === 'deepwork' ? deepworkChartConfig : workoutChartConfig;
         
         if (pageType === 'upskill') {
-          const isProjection = data.projection !== undefined;
-          return (
-             <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                <div className="font-bold text-foreground">{data.fullDate || data.projectedDate}</div>
+          const value = data.historicalProgress ?? data.projectedProgress;
+          if (data.isProjection) {
+            return (
+              <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[14rem]">
                 <div className="grid gap-1.5">
-                    <div className="flex w-full items-center gap-2">
-                         <div className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: 'hsl(var(--primary))' }} />
-                        <div className="flex flex-1 justify-between">
-                            <span className="text-muted-foreground">Progress ({goalType})</span>
-                            <span className="font-mono font-medium text-foreground">{data.cumulativeProgress.toLocaleString()}</span>
-                        </div>
+                    <div className="flex flex-col">
+                        <span className="text-[0.7rem] uppercase text-muted-foreground">Projected Progress</span>
+                        <span className="font-bold text-foreground">{value.toLocaleString()} {goalType}</span>
                     </div>
-                    {data.dailyProgress > 0 && !isProjection && (
-                      <div className="flex w-full items-center gap-2">
-                        <div className="w-2.5 h-2.5 shrink-0 rounded-[2px] bg-transparent" />
-                        <div className="flex flex-1 justify-between">
-                            <span className="text-muted-foreground">Daily</span>
-                            <span className="font-mono font-medium text-foreground">+{data.dailyProgress.toLocaleString()}</span>
+                    <div className="flex flex-col border-t pt-1.5 mt-1.5">
+                        <span className="text-[0.7rem] uppercase text-muted-foreground">Est. Date</span>
+                        <span className="font-bold text-foreground">{format(data.dateObj, 'PPP')} ({data.daysToCompletion} days)</span>
+                    </div>
+                </div>
+              </div>
+            )
+          }
+          return (
+             <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[12rem]">
+                <div className="grid gap-1.5">
+                    <div className="flex flex-col">
+                        <span className="text-[0.7rem] uppercase text-muted-foreground">{format(data.dateObj, 'PPP')}</span>
+                        <span className="font-bold text-foreground">{value.toLocaleString()} {goalType}</span>
+                    </div>
+                    {data.dailyProgress > 0 && (
+                        <div className="flex flex-col border-t pt-1.5 mt-1.5">
+                            <span className="text-[0.7rem] uppercase text-muted-foreground">Daily Change</span>
+                            <span className="font-bold text-green-500">+{data.dailyProgress.toLocaleString()} {goalType}</span>
                         </div>
-                      </div>
-                    )}
-                    {isProjection && (
-                       <p className="text-muted-foreground text-center mt-1 pt-1 border-t">Projected completion date</p>
                     )}
                 </div>
             </div>
           )
         }
         
+        // Fallback for workout/deepwork
         return (
             <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
                 <div className="font-medium text-foreground">{data.fullDate}</div>
                 <div className="grid gap-1.5">
                     {payload.map((p: any, index: number) => {
+                         const config = pageType === 'deepwork' ? deepworkChartConfig : workoutChartConfig;
                          const configItem = config[p.name as keyof typeof config];
                          return (
                             <div key={index} className="flex w-full items-center gap-2">
@@ -131,6 +138,8 @@ export function ExerciseProgressModal({
   pageType = 'workout'
 }: ExerciseProgressModalProps) {
   const [viewMode, setViewMode] = useState<'table' | 'graph'>('table');
+  const [chartKey, setChartKey] = useState(Date.now());
+  const [brushIndex, setBrushIndex] = useState<{ startIndex?: number; endIndex?: number }>({});
 
   const tableData = useMemo(() => {
     if (!exercise) return [];
@@ -217,11 +226,13 @@ export function ExerciseProgressModal({
         timestamp: d.dateObj.getTime(),
         cumulativeProgress: cumulativeProgress,
         dailyProgress: d.dailyProgress,
-        dateObj: d.dateObj, // Pass the date object along
+        dateObj: d.dateObj,
       };
     });
 
     const lastDataPoint = graphData[graphData.length - 1];
+    if (!lastDataPoint) return { graphData: [], projection: null, summary: null };
+    
     const totalProgress = lastDataPoint.cumulativeProgress;
 
     if (totalProgress >= topicGoal.goalValue) {
@@ -246,9 +257,10 @@ export function ExerciseProgressModal({
           timestamp: projectedDate.getTime(), 
           cumulativeProgress: topicGoal.goalValue, 
           projectedDate: format(projectedDate, 'PPP'), 
+          dateObj: projectedDate,
           fullDate: format(projectedDate, 'PPP'), 
           dailyProgress: 0,
-          date: format(projectedDate, "MMM dd"), // Add date for X-axis
+          date: format(projectedDate, "MMM dd"),
         },
     ];
     const summary = {
@@ -260,6 +272,52 @@ export function ExerciseProgressModal({
 
     return { graphData, projection, summary };
   }, [exercise, allWorkoutLogs, pageType, topicGoals]);
+
+  const combinedUpskillData = useMemo(() => {
+    if (!upskillData || !upskillData.graphData) return [];
+
+    let allData = upskillData.graphData.map(d => ({
+        ...d,
+        historicalProgress: d.cumulativeProgress,
+        projectedProgress: null,
+        isProjection: false,
+    }));
+
+    if (upskillData.projection) {
+        const lastHistoricalPoint = allData[allData.length - 1];
+        if (lastHistoricalPoint) {
+            lastHistoricalPoint.projectedProgress = lastHistoricalPoint.historicalProgress;
+        }
+
+        const goalPoint = upskillData.projection[1];
+        allData.push({
+            ...goalPoint,
+            historicalProgress: null,
+            projectedProgress: goalPoint.cumulativeProgress,
+            isProjection: true,
+            daysToCompletion: upskillData.summary?.daysToCompletion,
+        });
+    }
+    
+    return allData;
+
+  }, [upskillData]);
+
+  const isZoomed = useMemo(() => {
+    const data = pageType === 'upskill' ? combinedUpskillData : defaultGraphData;
+    if (data.length <= 1) return false;
+    const { startIndex, endIndex } = brushIndex;
+    return (
+      startIndex !== undefined &&
+      endIndex !== undefined &&
+      (startIndex !== 0 || endIndex !== data.length - 1)
+    );
+  }, [brushIndex, combinedUpskillData, defaultGraphData, pageType]);
+
+  const handleResetZoom = () => {
+    setBrushIndex({});
+    setChartKey(Date.now());
+  };
 
   if (!exercise) return null;
 
@@ -331,17 +389,23 @@ export function ExerciseProgressModal({
               </div>
             </div>
           )}
-          <ChartContainer config={upskillChartConfig} className="min-h-[400px] w-full">
-            <LineChart accessibilityLayer data={upskillData.graphData} margin={{ top: 5, right: 40, left: 10, bottom: 5, }}>
+          <ChartContainer config={upskillChartConfig} key={chartKey} className="min-h-[400px] w-full">
+            <LineChart accessibilityLayer data={combinedUpskillData} margin={{ top: 5, right: 40, left: 10, bottom: 40 }}>
               <CartesianGrid vertical={false} strokeDasharray="3 3" />
-              <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value) => value.slice(0, 6)} />
+              <XAxis dataKey="timestamp" type="number" domain={['dataMin', 'dataMax']} tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')} tickLine={false} axisLine={false} tickMargin={8} interval="preserveStartEnd" />
               <YAxis tickLine={false} axisLine={false} tickMargin={8} domain={['auto', 'dataMax + 10']} label={{ value: `Cumulative ${topicGoal?.goalType}`, angle: -90, position: "insideLeft", offset: -0, style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' } }} />
               <RechartsTooltip cursor={true} content={<CustomChartTooltip pageType={pageType} goalType={topicGoal?.goalType} />} />
               {topicGoal && <ReferenceLine y={topicGoal.goalValue} stroke="hsl(var(--destructive))" strokeDasharray="3 3" label={{ value: "Goal", position: 'insideTopRight' }} />}
-              <Line dataKey="cumulativeProgress" type="monotone" stroke="var(--color-cumulativeProgress)" strokeWidth={2} dot={{ r: 4 }} name="cumulativeProgress" />
-              {upskillData.projection && (
-                <Line dataKey="cumulativeProgress" data={upskillData.projection} type="monotone" stroke="var(--color-projection)" strokeDasharray="5 5" strokeWidth={2} dot={{ r: 4 }} name="projection" />
-              )}
+              <Line dataKey="historicalProgress" type="monotone" stroke="var(--color-historicalProgress)" strokeWidth={2} dot={{ r: 4 }} name="historicalProgress" connectNulls={false} />
+              <Line dataKey="projectedProgress" type="monotone" stroke="var(--color-projectedProgress)" strokeDasharray="5 5" strokeWidth={2} dot={{ r: 4 }} name="projectedProgress" connectNulls={false} />
+               <Brush 
+                  dataKey="timestamp" 
+                  height={40} 
+                  stroke="hsl(var(--primary))" 
+                  tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')}
+                  travellerWidth={15}
+                  onChange={(e) => setBrushIndex({startIndex: e.startIndex, endIndex: e.endIndex})}
+              />
             </LineChart>
           </ChartContainer>
         </div>
@@ -374,15 +438,25 @@ export function ExerciseProgressModal({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl md:max-w-3xl lg:max-w-4xl max-h-[85dvh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Progress for: {pageType === 'upskill' ? exercise.category : exercise.name}</DialogTitle>
-          <DialogDescription>
-            {pageType === 'workout' 
-             ? "Showing history for this exercise. Toggle between table and graph view."
-             : pageType === 'upskill' && topicGoal
-             ? `Showing cumulative progress for the topic "${exercise.category}" towards your goal of ${topicGoal.goalValue} ${topicGoal.goalType}.`
-             : "Showing history for this task. Toggle between table and graph view."
-            }
-          </DialogDescription>
+          <div className="flex justify-between items-center">
+            <div className='flex-grow'>
+              <DialogTitle>Progress for: {pageType === 'upskill' ? exercise.category : exercise.name}</DialogTitle>
+              <DialogDescription>
+                {pageType === 'workout' 
+                ? "Showing history for this exercise. Toggle between table and graph view."
+                : pageType === 'upskill' && topicGoal
+                ? `Showing cumulative progress for the topic "${exercise.category}" towards your goal of ${topicGoal.goalValue} ${topicGoal.goalType}.`
+                : "Showing history for this task. Toggle between table and graph view."
+                }
+              </DialogDescription>
+            </div>
+            {viewMode === 'graph' && isZoomed && (
+                <Button variant="outline" size="sm" onClick={handleResetZoom} className="flex-shrink-0">
+                    <ZoomOut className="mr-2 h-4 w-4" />
+                    Reset Zoom
+                </Button>
+            )}
+          </div>
         </DialogHeader>
 
         <div className="flex justify-end mb-2">
