@@ -1606,8 +1606,10 @@ function WorkoutPageContent() {
             workoutMode={workoutMode}
             workoutPlans={workoutPlans}
             setWorkoutPlans={setWorkoutPlans}
-            exerciseDefinitions={exerciseDefinitions}
+            definitions={exerciseDefinitions}
             initialPlans={INITIAL_PLANS}
+            pageType="workout"
+            categories={exerciseCategories}
           />
         )}
       </div>

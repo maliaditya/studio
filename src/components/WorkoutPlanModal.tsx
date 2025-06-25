@@ -37,9 +37,11 @@ interface WorkoutPlanModalProps {
   onOpenChange: (isOpen: boolean) => void;
   workoutPlans: AllWorkoutPlans;
   setWorkoutPlans: (plans: AllWorkoutPlans) => void;
-  exerciseDefinitions: ExerciseDefinition[];
+  definitions: ExerciseDefinition[];
   workoutMode: WorkoutMode;
   initialPlans: AllWorkoutPlans;
+  pageType: 'workout' | 'upskill';
+  categories: ExerciseCategory[];
 }
 
 export function WorkoutPlanModal({
@@ -47,17 +49,19 @@ export function WorkoutPlanModal({
   onOpenChange,
   workoutPlans,
   setWorkoutPlans,
-  exerciseDefinitions,
+  definitions,
   workoutMode,
   initialPlans,
+  pageType,
+  categories,
 }: WorkoutPlanModalProps) {
     const { toast } = useToast();
-    const [addSelection, setAddSelection] = useState<Record<string, string>>({}); // Key: 'W1-Chest', Value: 'Exercise Name'
+    const [addSelection, setAddSelection] = useState<Record<string, string>>({});
 
     const handleRemoveExercise = (planKey: string, category: ExerciseCategory, exerciseName: string) => {
         const currentExercises = workoutPlans[planKey]?.[category];
         if (!Array.isArray(currentExercises)) {
-            toast({ title: "Error", description: "Could not remove exercise from an invalid plan.", variant: "destructive" });
+            toast({ title: "Error", description: "Could not remove from an invalid plan.", variant: "destructive" });
             return;
         }
 
@@ -68,13 +72,13 @@ export function WorkoutPlanModal({
                 [category]: currentExercises.filter(name => name !== exerciseName)
             }
         });
-        toast({ title: "Exercise Removed", description: `"${exerciseName}" removed from ${planKey}.` });
+        toast({ title: "Item Removed", description: `"${exerciseName}" removed from ${planKey}.` });
     };
     
     const handleAddExercise = (planKey: string, category: ExerciseCategory) => {
         const exerciseName = addSelection[`${planKey}-${category}`];
         if (!exerciseName) {
-            toast({ title: "Error", description: "Please select an exercise to add.", variant: "destructive" });
+            toast({ title: "Error", description: "Please select an item to add.", variant: "destructive" });
             return;
         }
 
@@ -92,9 +96,8 @@ export function WorkoutPlanModal({
             }
         });
 
-        // Clear selection after adding
         setAddSelection(prev => ({ ...prev, [`${planKey}-${category}`]: '' }));
-        toast({ title: "Exercise Added", description: `"${exerciseName}" added to ${category} in ${planKey}.` });
+        toast({ title: "Item Added", description: `"${exerciseName}" added to ${category} in ${planKey}.` });
     };
 
     const handleResetPlan = (planKeyToReset: string) => {
@@ -109,26 +112,184 @@ export function WorkoutPlanModal({
             [planKeyToReset]: defaultPlan
         }));
     
-        toast({ title: "Plan Reset", description: `Plan ${planKeyToReset} has been restored to its default exercises.` });
+        toast({ title: "Plan Reset", description: `Plan ${planKeyToReset} has been restored to its default state.` });
+    };
+
+    const handleSkillChange = (planKey: string, oldCategory: ExerciseCategory, newCategory: ExerciseCategory) => {
+        setWorkoutPlans(prevPlans => {
+            const newPlans = { ...prevPlans };
+            const plan = { ...newPlans[planKey] };
+            
+            if (plan[newCategory] !== undefined) {
+                toast({ title: "Error", description: `"${newCategory}" is already in this plan.`, variant: "destructive"});
+                return prevPlans;
+            }
+
+            const tasks = plan[oldCategory];
+            delete plan[oldCategory];
+            plan[newCategory] = tasks || [];
+            newPlans[planKey] = plan;
+            return newPlans;
+        });
+        toast({ title: "Plan Updated", description: `Swapped "${oldCategory}" with "${newCategory}" in ${planKey}.` });
+    };
+    
+    const handleAddNewSkillToPlan = (planKey: string) => {
+        const planCategories = Object.keys(workoutPlans[planKey] || {});
+        const newSkill = categories.find(c => !planCategories.includes(c));
+
+        if (newSkill) {
+            setWorkoutPlans(prevPlans => {
+                const newPlans = { ...prevPlans };
+                const plan = { ...(newPlans[planKey] || {}) };
+                plan[newSkill] = [];
+                newPlans[planKey] = plan;
+                return newPlans;
+            });
+            toast({ title: "Skill Added", description: `Added "${newSkill}" to plan ${planKey}.` });
+        } else {
+            toast({ title: "No More Skills", description: "All available skills are already in this plan.", variant: "destructive" });
+        }
     };
 
     const planKeysToShow = workoutMode === 'one-muscle' 
         ? Object.keys(workoutPlans).filter(k => k === 'W5' || k === 'W6')
         : Object.keys(workoutPlans).filter(k => k !== 'W5' && k !== 'W6');
 
-    // Get categories relevant to the current mode
-    const relevantCategoriesForPlan = (planKey: string): ExerciseCategory[] => {
-        return Object.keys(workoutPlans[planKey] || {}) as ExerciseCategory[];
-    }
+    const dialogTitle = pageType === 'upskill' ? 'Edit Auto-Populated Learning Plans' : 'Edit Auto-Populated Workout Plans';
+    const dialogDescription = pageType === 'upskill' ? 'Customize the tasks for each weekly learning plan. Changes are saved automatically.' : 'Customize the exercises for each weekly plan. Changes are saved automatically.';
+    const addEntityPlaceholder = pageType === 'upskill' ? 'Add a task...' : 'Add an exercise...';
+
+    const renderWorkoutContent = () => (
+      planKeysToShow.map(planKey => (
+        <TabsContent key={planKey} value={planKey} className="m-0 mt-4 flex-grow flex flex-col min-h-0">
+          <div className="flex justify-end mb-4 pr-4 flex-shrink-0">
+              <Button variant="outline" size="sm" onClick={() => handleResetPlan(planKey)}>
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Reset Plan to Default
+              </Button>
+          </div>
+          <ScrollArea className="flex-grow pr-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {(Object.keys(workoutPlans[planKey] || {}) as ExerciseCategory[]).map(category => {
+                      const exercisesForCategory = workoutPlans[planKey]?.[category];
+                      return (
+                      <Card key={category} className="overflow-hidden">
+                          <CardHeader className="p-3"><CardTitle className="text-lg">{category}</CardTitle></CardHeader>
+                          <CardContent className="p-3">
+                              <Table>
+                                  <TableHeader>
+                                      <TableRow><TableHead>Exercise</TableHead><TableHead className="w-[50px] text-right"></TableHead></TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                  {Array.isArray(exercisesForCategory) && exercisesForCategory.map((exName: string) => (
+                                      <TableRow key={exName}>
+                                          <TableCell className="font-medium truncate" title={exName}>{exName}</TableCell>
+                                          <TableCell className="text-right p-1">
+                                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRemoveExercise(planKey, category, exName)}>
+                                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                              </Button>
+                                          </TableCell>
+                                      </TableRow>
+                                  ))}
+                                  </TableBody>
+                              </Table>
+                              <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+                                  <Select value={addSelection[`${planKey}-${category}`] || ''} onValueChange={(value) => setAddSelection(prev => ({ ...prev, [`${planKey}-${category}`]: value }))}>
+                                      <SelectTrigger><SelectValue placeholder={addEntityPlaceholder} /></SelectTrigger>
+                                      <SelectContent>
+                                          {definitions.filter(def => def.category === category).filter(def => !(Array.isArray(exercisesForCategory) && exercisesForCategory.includes(def.name))).sort((a,b) => a.name.localeCompare(b.name)).map(def => (<SelectItem key={def.id} value={def.name}>{def.name}</SelectItem>))}
+                                      </SelectContent>
+                                  </Select>
+                                  <Button size="icon" className="h-10 w-10 shrink-0" onClick={() => handleAddExercise(planKey, category)} disabled={!addSelection[`${planKey}-${category}`]}>
+                                      <PlusCircle className="h-5 w-5" />
+                                  </Button>
+                              </div>
+                          </CardContent>
+                      </Card>
+                  )})}
+              </div>
+          </ScrollArea>
+        </TabsContent>
+      ))
+    );
+
+    const renderUpskillContent = () => {
+      return planKeysToShow.map(planKey => {
+        const planCategories = Object.keys(workoutPlans[planKey] || {}) as ExerciseCategory[];
+        const isSingleSkillPlan = planKey === 'W5' || planKey === 'W6';
+        const maxSkills = isSingleSkillPlan ? 1 : 2;
+
+        return (
+          <TabsContent key={planKey} value={planKey} className="m-0 mt-4 flex-grow flex flex-col min-h-0">
+            <div className="flex justify-end mb-4 pr-4 flex-shrink-0">
+                <Button variant="outline" size="sm" onClick={() => handleResetPlan(planKey)}>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Reset Plan to Default
+                </Button>
+            </div>
+            <ScrollArea className="flex-grow pr-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {planCategories.map((category, index) => (
+                        <Card key={category} className="overflow-hidden">
+                            <CardHeader className="p-3"><CardTitle className="text-lg">{isSingleSkillPlan ? 'Skill' : `Skill ${index + 1}`}</CardTitle></CardHeader>
+                            <CardContent className="p-3 space-y-4">
+                                <Select value={category} onValueChange={(newCat) => handleSkillChange(planKey, category, newCat as ExerciseCategory)}>
+                                    <SelectTrigger><SelectValue placeholder="Select skill..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {categories.filter(c => c === category || !planCategories.includes(c)).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                                <Table>
+                                    <TableHeader><TableRow><TableHead>Task</TableHead><TableHead className="w-[50px] text-right"></TableHead></TableRow></TableHeader>
+                                    <TableBody>
+                                        {(workoutPlans[planKey]?.[category] || []).map((exName: string) => (
+                                            <TableRow key={exName}>
+                                                <TableCell className="font-medium truncate" title={exName}>{exName}</TableCell>
+                                                <TableCell className="text-right p-1">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRemoveExercise(planKey, category, exName)}>
+                                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                                <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+                                    <Select value={addSelection[`${planKey}-${category}`] || ''} onValueChange={(value) => setAddSelection(prev => ({ ...prev, [`${planKey}-${category}`]: value }))}>
+                                        <SelectTrigger><SelectValue placeholder={addEntityPlaceholder} /></SelectTrigger>
+                                        <SelectContent>
+                                            {definitions.filter(def => def.category === category).filter(def => !(workoutPlans[planKey]?.[category] || []).includes(def.name)).sort((a,b) => a.name.localeCompare(b.name)).map(def => (<SelectItem key={def.id} value={def.name}>{def.name}</SelectItem>))}
+                                        </SelectContent>
+                                    </Select>
+                                    <Button size="icon" className="h-10 w-10 shrink-0" onClick={() => handleAddExercise(planKey, category)} disabled={!addSelection[`${planKey}-${category}`]}>
+                                        <PlusCircle className="h-5 w-5" />
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                    {planCategories.length < maxSkills && (
+                        <div className="flex justify-center items-center p-4 border-2 border-dashed rounded-lg lg:col-span-1">
+                            <Button onClick={() => handleAddNewSkillToPlan(planKey)}>
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Add Skill to Plan
+                            </Button>
+                        </div>
+                    )}
+                </div>
+            </ScrollArea>
+          </TabsContent>
+        );
+      });
+    };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl max-h-[90dvh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Edit Auto-Populated Workout Plans</DialogTitle>
-          <DialogDescription>
-            Customize the exercises for each weekly plan. Changes are saved automatically when you close this window.
-          </DialogDescription>
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue={planKeysToShow[0]} className="w-full flex-grow flex flex-col min-h-0">
@@ -138,86 +299,8 @@ export function WorkoutPlanModal({
             ))}
           </TabsList>
           
-          {planKeysToShow.map(planKey => (
-            <TabsContent key={planKey} value={planKey} className="m-0 mt-4 flex-grow flex flex-col min-h-0">
-                <div className="flex justify-end mb-4 pr-4 flex-shrink-0">
-                    <Button variant="outline" size="sm" onClick={() => handleResetPlan(planKey)}>
-                        <RotateCcw className="mr-2 h-4 w-4" />
-                        Reset Plan to Default
-                    </Button>
-                </div>
-                <ScrollArea className="flex-grow pr-4">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {relevantCategoriesForPlan(planKey).map(category => {
-                            const exercisesForCategory = workoutPlans[planKey]?.[category];
-                            return (
-                            <Card key={category} className="overflow-hidden">
-                                <CardHeader className="p-3">
-                                    <CardTitle className="text-lg">{category}</CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-3">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Exercise</TableHead>
-                                                <TableHead className="w-[50px] text-right"></TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                        {Array.isArray(exercisesForCategory) && exercisesForCategory.map((exName: string) => (
-                                            <TableRow key={exName}>
-                                                <TableCell className="font-medium truncate" title={exName}>{exName}</TableCell>
-                                                <TableCell className="text-right p-1">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8"
-                                                        onClick={() => handleRemoveExercise(planKey, category as ExerciseCategory, exName)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                        </TableBody>
-                                    </Table>
-                                    <div className="flex items-center gap-2 mt-4 pt-4 border-t">
-                                        <Select
-                                            value={addSelection[`${planKey}-${category}`] || ''}
-                                            onValueChange={(value) => setAddSelection(prev => ({ ...prev, [`${planKey}-${category}`]: value }))}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Add an exercise..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {exerciseDefinitions
-                                                    .filter(def => def.category === category)
-                                                    .filter(def => !(Array.isArray(exercisesForCategory) && exercisesForCategory.includes(def.name)))
-                                                    .sort((a,b) => a.name.localeCompare(b.name))
-                                                    .map(def => (
-                                                        <SelectItem key={def.id} value={def.name}>
-                                                            {def.name}
-                                                        </SelectItem>
-                                                    ))
-                                                }
-                                            </SelectContent>
-                                        </Select>
-                                        <Button
-                                            size="icon"
-                                            className="h-10 w-10 shrink-0"
-                                            onClick={() => handleAddExercise(planKey, category)}
-                                            disabled={!addSelection[`${planKey}-${category}`]}
-                                        >
-                                            <PlusCircle className="h-5 w-5" />
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )})}
-                    </div>
-                </ScrollArea>
-            </TabsContent>
-          ))}
+          {pageType === 'workout' ? renderWorkoutContent() : renderUpskillContent()}
+
         </Tabs>
       </DialogContent>
     </Dialog>

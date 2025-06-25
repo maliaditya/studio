@@ -87,8 +87,8 @@ const INITIAL_SKILL_PLANS: AllWorkoutPlans = {
     "W3": { "Marketing": ["Analyze a competitor's strategy"], "Business": ["Read an article on finance"] },
     "W4": { "Language": ["Practice vocabulary for 30 mins"], "Music": ["Practice an instrument for 30 mins"] },
     // One skill per day plans
-    "W5": { "Programming": ["Complete a coding challenge", "Read a chapter of a tech book"], "Design": [], "Writing": [], "Marketing": [], "Data Analysis": [], "Language": [], "Music": [], "Business": [] },
-    "W6": { "Design": ["Practice with Figma/Sketch", "Recreate a UI from a popular app"], "Writing": [], "Marketing": [], "Data Analysis": [], "Language": [], "Music": [], "Business": [] },
+    "W5": { "Programming": ["Complete a coding challenge", "Read a chapter of a tech book"] },
+    "W6": { "Design": ["Practice with Figma/Sketch", "Recreate a UI from a popular app"] },
 };
 
 // Schedule for "Two Skills / Day" mode
@@ -316,62 +316,39 @@ function UpskillPageContent() {
   
       const dayOfWeek = getDay(selectedDate);
       const exercisesToAdd: WorkoutExercise[] = [];
-      let toastDescription = "";
       
       const isoWeek = getISOWeek(selectedDate);
       const isOddWeek = isoWeek % 2 !== 0;
 
+      let relevantPlan: AllWorkoutPlans[string] | undefined;
+      let skillsForDay: (ExerciseCategory | string)[] = [];
+
       if (workoutMode === 'two-muscle') {
-          let plan: any = null;
-          let planName = "";
-    
-          if (isOddWeek) {
-            plan = dayOfWeek >= 1 && dayOfWeek <= 3 ? workoutPlans.W1 : workoutPlans.W2;
-            planName = dayOfWeek >= 1 && dayOfWeek <= 3 ? "W1" : "W2";
-          } else {
-            plan = dayOfWeek >= 1 && dayOfWeek <= 3 ? workoutPlans.W3 : workoutPlans.W4;
-            planName = dayOfWeek >= 1 && dayOfWeek <= 3 ? "W3" : "W4";
+          // Determine which plan (W1-W4) to use. This is just a way to cycle through different skill pairings.
+          const planIndex = (isoWeek % 4); // 0, 1, 2, 3
+          const planKey = `W${planIndex + 1}` as keyof AllWorkoutPlans;
+          relevantPlan = workoutPlans[planKey];
+          if (relevantPlan) {
+            skillsForDay = Object.keys(relevantPlan);
           }
-
-          if (!plan) return prevLogs;
-    
-          const skillsForDay = dailySkillPairs[dayOfWeek];
-          if (!skillsForDay || skillsForDay.length === 0) return prevLogs;
-          
-          toastDescription = `Added ${planName} tasks for ${skillsForDay.join(' & ')}.`;
-          skillsForDay.forEach(skill => {
-            const exerciseNames = (plan as any)[skill] as string[];
-            if (exerciseNames) {
-              exerciseNames.forEach(exName => {
-                const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
-                if (definition && !exercisesToAdd.some(e => e.definitionId === definition.id)) {
-                  exercisesToAdd.push({
-                    id: `${definition.id}-${Date.now()}-${Math.random()}`,
-                    definitionId: definition.id,
-                    name: definition.name,
-                    category: definition.category,
-                    loggedSets: [],
-                    targetSets: DEFAULT_TARGET_SESSIONS,
-                    targetReps: DEFAULT_TARGET_DURATION,
-                  });
-                }
-              });
-            }
-          });
       } else { // 'one-muscle' mode
-          const plan = isOddWeek ? workoutPlans.W5 : workoutPlans.W6;
-          const planName = isOddWeek ? "W5" : "W6";
-          const skillForDay = singleSkillDailySchedule[dayOfWeek];
-          if (!skillForDay) return prevLogs;
+          const planKey = isOddWeek ? 'W5' : 'W6';
+          relevantPlan = workoutPlans[planKey];
+          if (relevantPlan) {
+            skillsForDay = Object.keys(relevantPlan);
+          }
+      }
 
-          const exerciseNames = (plan as any)[skillForDay] as string[] | undefined;
-          if (!exerciseNames || exerciseNames.length === 0) return prevLogs;
-          
-          toastDescription = `Added ${planName} tasks for ${skillForDay}.`;
+      if (!relevantPlan || skillsForDay.length === 0) return prevLogs;
+      
+      const toastDescription = `Added tasks for ${skillsForDay.join(' & ')}.`;
 
+      skillsForDay.forEach(skill => {
+        const exerciseNames = (relevantPlan as any)[skill] as string[];
+        if (exerciseNames) {
           exerciseNames.forEach(exName => {
             const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
-            if (definition) {
+            if (definition && !exercisesToAdd.some(e => e.definitionId === definition.id)) {
               exercisesToAdd.push({
                 id: `${definition.id}-${Date.now()}-${Math.random()}`,
                 definitionId: definition.id,
@@ -383,7 +360,9 @@ function UpskillPageContent() {
               });
             }
           });
-      }
+        }
+      });
+      
 
       if (exercisesToAdd.length > 0) {
         const newDatedWorkout: DatedWorkout = { id: dateKey, date: dateKey, exercises: exercisesToAdd };
@@ -1152,8 +1131,10 @@ function UpskillPageContent() {
             workoutMode={workoutMode}
             workoutPlans={workoutPlans}
             setWorkoutPlans={setWorkoutPlans}
-            exerciseDefinitions={exerciseDefinitions}
+            definitions={exerciseDefinitions}
             initialPlans={INITIAL_SKILL_PLANS}
+            pageType="upskill"
+            categories={skillCategories}
           />
         )}
       </div>
