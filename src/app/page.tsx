@@ -420,17 +420,16 @@ function HomePageContent() {
                                     </p>
                                   </div>
                                 </div>
-                                <Checkbox
-                                    id={`cb-${activity.id}`}
-                                    checked={!!activity.completed}
-                                    onCheckedChange={() => handleToggleComplete(slot.name, activity.id)}
-                                    className="mt-1"
-                                />
-                              </div>
-                              <div className="flex items-center justify-end mt-2 pt-2 border-t">
-                                <Button variant="ghost" size="icon" onClick={() => handleRemoveActivity(slot.name, activity.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                <div className="flex items-center flex-shrink-0">
+                                  <Checkbox
+                                      id={`cb-${activity.id}`}
+                                      checked={!!activity.completed}
+                                      onCheckedChange={() => handleToggleComplete(slot.name, activity.id)}
+                                  />
+                                  <Button variant="ghost" size="icon" onClick={() => handleRemoveActivity(slot.name, activity.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           ))
