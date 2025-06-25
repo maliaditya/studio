@@ -802,12 +802,7 @@ function DeepWorkPageContent() {
       <Dialog open={isDecompositionModalOpen} onOpenChange={setIsDecompositionModalOpen}>
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader className="flex flex-row justify-between items-center">
-            <div className="space-y-1.5">
-              <DialogTitle>Decomposition Techniques for: {selectedFocusArea?.name}</DialogTitle>
-              <DialogDescription>
-                  Key techniques for breaking down and optimizing complex scenes. Click the pencil to edit.
-              </DialogDescription>
-            </div>
+            <DialogTitle>Decomposition Techniques for: {selectedFocusArea?.name}</DialogTitle>
             <div className="flex-shrink-0">
               {isDecompositionEditing ? (
                   <Button variant="ghost" size="icon" onClick={handleSaveDecomposition} aria-label="Save Changes">
@@ -865,3 +860,5 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
+
+    
