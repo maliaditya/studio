@@ -11,10 +11,11 @@ import { Button } from '@/components/ui/button';
 import { format, getDay, getISOWeek } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { ActivityHeatmap } from '@/components/ActivityHeatmap';
 
 const slots = [
   { name: 'Late Night', time: '12 AM - 4 AM', icon: <Moon className="h-6 w-6 text-indigo-400" /> },
@@ -63,14 +64,6 @@ const INITIAL_PLANS: AllWorkoutPlans = {
     "W5": { "Chest": ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine", "Cable Fly", "Dumbbell Pullovers"], "Triceps": ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Straight bar pushdown", "Reversebar pushdown", "Back dips"], "Back": ["Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull", "1-Arm Dumbbell Row", "DeadLifts"], "Biceps": ["Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)", "Reversed cable curls", "Reversed Incline curls"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Cable Upright Rows", "Front Raise Dumbbells", "Shrugs"], "Legs": ["Squats (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine", "Walking Lunges (Barbell)", "Calf Raises"] },
     "W6": { "Chest": ["Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Peck Machine", "Flat Bench Chest Fly", "Dumbbell Pullovers"], "Triceps": ["Overhead Cable Extension", "Single Arm Dumbbell Extensions", "Rope Pushdown", "Straight bar pushdown", "Reversebar pushdown", "Back dips"], "Back": ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle pulldown Cable", "Barbell Row", "Lat Prayer Pull", "Back extensions"], "Biceps": ["Strict bar curls", "Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher Curls Bar", "Reverse Cable", "Concentration Curl"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable", "Cable Upright Rows", "Shrugs"], "Legs": ["Walking Lunges (Barbell)", "Hack Squats", "Hamstring machine", "Quads Machine", "Leg Press", "Calf Raises"] }
 };
-
-type Activity = {
-  type: 'workout' | 'upskill';
-  details: string;
-  completed: boolean;
-};
-type DailySchedule = Record<string, Activity>; // Slot name -> Activity
-type FullSchedule = Record<string, DailySchedule>; // Date key -> DailySchedule
 
 function HomePageContent() {
   const { currentUser } = useAuth();
@@ -405,6 +398,9 @@ function HomePageContent() {
             </div>
         </CardContent>
       </Card>
+      
+      <ActivityHeatmap schedule={schedule} />
+
       {currentUser && (
         <TodaysWorkoutModal
             isOpen={isTodaysWorkoutModalOpen}

@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -85,3 +86,12 @@ export interface EditableMealPlan {
 }
 
 export type UserDietPlan = EditableMealPlan[];
+
+// Types for homepage schedule
+export type Activity = {
+  type: 'workout' | 'upskill';
+  details: string;
+  completed: boolean;
+};
+export type DailySchedule = Record<string, Activity>; // Slot name -> Activity
+export type FullSchedule = Record<string, DailySchedule>; // Date key -> DailySchedule
