@@ -312,13 +312,60 @@ function UpskillPageContent() {
   const handleLogSet = (exerciseId: string, reps: number, weight: number) => { // Reps will be 1, weight is duration
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
-    if (existingWorkout) {
+    if (existingWorkout && currentUser?.username) {
+      let completedExerciseDefinition: ExerciseDefinition | undefined;
+
       const newSet: LoggedSet = { id: Date.now().toString(), reps, weight, timestamp: Date.now() };
-      const updatedExercises = existingWorkout.exercises.map(ex => 
-        ex.id === exerciseId ? { ...ex, loggedSets: [...ex.loggedSets, newSet] } : ex
-      );
+      const updatedExercises = existingWorkout.exercises.map(ex => {
+        if (ex.id === exerciseId) {
+          const updatedEx = { ...ex, loggedSets: [...ex.loggedSets, newSet] };
+          
+          // Check for completion
+          if (updatedEx.loggedSets.length >= updatedEx.targetSets) {
+            completedExerciseDefinition = exerciseDefinitions.find(def => def.id === updatedEx.definitionId);
+          }
+
+          return updatedEx;
+        }
+        return ex;
+      });
+
       updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
       toast({ title: "Session Logged!", description: `Logged ${weight} minutes.`});
+
+      // If a task was completed, add it to the deep work library
+      if (completedExerciseDefinition) {
+        const deepWorkDefsKey = `deepwork_definitions_${currentUser.username}`;
+        try {
+          const storedDeepWorkDefs = localStorage.getItem(deepWorkDefsKey);
+          const deepWorkDefs: ExerciseDefinition[] = storedDeepWorkDefs ? JSON.parse(storedDeepWorkDefs) : [];
+          
+          const alreadyExists = deepWorkDefs.some(def => 
+            def.name.toLowerCase() === completedExerciseDefinition!.name.toLowerCase() &&
+            def.category.toLowerCase() === completedExerciseDefinition!.category.toLowerCase()
+          );
+
+          if (!alreadyExists) {
+            const newDeepWorkDef: ExerciseDefinition = {
+              ...completedExerciseDefinition,
+              id: `def_dw_${Date.now().toString()}`, // Give it a new unique ID for deep work
+            };
+            const updatedDeepWorkDefs = [...deepWorkDefs, newDeepWorkDef];
+            localStorage.setItem(deepWorkDefsKey, JSON.stringify(updatedDeepWorkDefs));
+            toast({
+              title: "Moved to Deep Work",
+              description: `"${completedExerciseDefinition.name}" has been added to your Deep Work library.`,
+            });
+          }
+        } catch (e) {
+          console.error("Failed to add to Deep Work library", e);
+          toast({
+            title: "Error",
+            description: "Could not add completed task to Deep Work library.",
+            variant: "destructive"
+          });
+        }
+      }
     }
   };
 

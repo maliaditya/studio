@@ -459,7 +459,7 @@ function DeepWorkPageContent() {
                       </form>
                       <div className="max-h-[calc(100vh-38rem)] overflow-y-auto pr-1">
                         {filteredExerciseDefinitions.length === 0 && exerciseDefinitions.length > 0 ? (
-                          <p className="text-muted-foreground text-sm text-center py-4">No areas match filter.</p>
+                          <p className="text-muted-foreground text-sm text-center py-4">No focus areas match filter.</p>
                         ) : filteredExerciseDefinitions.length === 0 ? (
                           <p className="text-muted-foreground text-sm text-center py-4">Library empty. Add a new topic and focus area to get started!</p>
                         ) : (
