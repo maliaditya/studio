@@ -630,33 +630,30 @@ function WorkoutPageContent() {
       const dayOfWeek = getDay(selectedDate);
       const exercisesToAdd: WorkoutExercise[] = [];
       let toastDescription = "";
-      
-      const isoWeek = getISOWeek(selectedDate);
-      const isOddWeek = isoWeek % 2 !== 0;
 
       if (workoutMode === 'two-muscle') {
-          let plan: any = null;
-          let planName = "";
-    
-          // A/B rotation within the week, with the pair of plans rotating weekly.
-          if (isOddWeek) {
-            // Odd week of the year: Mon,Wed,Fri use W1; Tue,Thu,Sat use W2
-            plan = [1, 3, 5].includes(dayOfWeek) ? workoutPlans.W1 : workoutPlans.W2;
-            planName = [1, 3, 5].includes(dayOfWeek) ? "W1" : "W2";
-          } else { // Even week
-            // Even week of the year: Mon,Wed,Fri use W3; Tue,Thu,Sat use W4
-            plan = [1, 3, 5].includes(dayOfWeek) ? workoutPlans.W3 : workoutPlans.W4;
-            planName = [1, 3, 5].includes(dayOfWeek) ? "W3" : "W4";
-          }
+          const weekOfMonth = getWeekOfMonth(selectedDate);
+          const isWeek1Or3 = weekOfMonth % 2 !== 0;
 
-          if (!plan) return prevLogs;
-    
           const muscleGroupsForDay = dailyMuscleGroups[dayOfWeek];
           if (!muscleGroupsForDay || muscleGroupsForDay.length === 0) return prevLogs;
           
+          let currentPlan: any = null;
+          let planName = "";
+
+          if (dayOfWeek >= 1 && dayOfWeek <= 3) { // Monday, Tuesday, Wednesday
+            currentPlan = isWeek1Or3 ? workoutPlans.W1 : workoutPlans.W3;
+            planName = isWeek1Or3 ? 'W1' : 'W3';
+          } else { // Thursday, Friday, Saturday
+            currentPlan = isWeek1Or3 ? workoutPlans.W2 : workoutPlans.W4;
+            planName = isWeek1Or3 ? 'W2' : 'W4';
+          }
+          
+          if (!currentPlan) return prevLogs;
+
           toastDescription = `Added ${planName} exercises for ${muscleGroupsForDay.join(' & ')}.`;
           muscleGroupsForDay.forEach(muscleGroup => {
-            const exerciseNames = (plan as any)[muscleGroup] as string[];
+            const exerciseNames = (currentPlan as any)[muscleGroup] as string[] | undefined;
             if (exerciseNames) {
               exerciseNames.forEach(exName => {
                 const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
@@ -675,6 +672,8 @@ function WorkoutPageContent() {
             }
           });
       } else { // 'one-muscle' mode
+          const isoWeek = getISOWeek(selectedDate);
+          const isOddWeek = isoWeek % 2 !== 0;
           const plan = isOddWeek ? workoutPlans.W5 : workoutPlans.W6;
           const planName = isOddWeek ? "W5" : "W6";
           const muscleGroupForDay = singleMuscleDailySchedule[dayOfWeek];

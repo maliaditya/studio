@@ -8,7 +8,7 @@ import { BrainCircuit, Sunrise, Sun, Sunset, Moon, MoonStar, CloudSun, PlusCircl
 import { useState, useEffect, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO } from 'date-fns';
+import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, getWeekOfMonth } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysLearningModal } from '@/components/TodaysLearningModal';
@@ -395,25 +395,31 @@ function HomePageContent() {
   const getTodaysWorkout = () => {
     const today = new Date();
     const dayOfWeek = getDay(today);
-    const isoWeek = getISOWeek(today);
-    const isOddWeek = isoWeek % 2 !== 0;
-
+    
     let muscleGroupsForDay: string[] = [];
     let plan: any = null;
-    
-    if (workoutMode === 'two-muscle') {
-        if (isOddWeek) {
-          plan = (dayOfWeek >= 1 && dayOfWeek <= 3) || dayOfWeek === 6 ? workoutPlans.W1 : workoutPlans.W2;
-        } else {
-          plan = (dayOfWeek >= 1 && dayOfWeek <= 3) || dayOfWeek === 6 ? workoutPlans.W3 : workoutPlans.W4;
-        }
-        muscleGroupsForDay = dailyMuscleGroups[dayOfWeek] || [];
-    } else {
-        plan = isOddWeek ? workoutPlans.W5 : workoutPlans.W6;
-        const muscleGroupForDay = singleMuscleDailySchedule[dayOfWeek];
-        if (muscleGroupForDay) muscleGroupsForDay = [muscleGroupForDay];
-    }
 
+    if (workoutMode === 'two-muscle') {
+      const weekOfMonth = getWeekOfMonth(today);
+      const isWeek1Or3 = weekOfMonth % 2 !== 0;
+
+      muscleGroupsForDay = dailyMuscleGroups[dayOfWeek] || [];
+
+      if (muscleGroupsForDay.length > 0) {
+        if (dayOfWeek >= 1 && dayOfWeek <= 3) { // Mon, Tue, Wed
+          plan = isWeek1Or3 ? workoutPlans.W1 : workoutPlans.W3;
+        } else { // Thu, Fri, Sat
+          plan = isWeek1Or3 ? workoutPlans.W2 : workoutPlans.W4;
+        }
+      }
+    } else { // 'one-muscle' mode
+      const isoWeek = getISOWeek(today);
+      const isOddWeek = isoWeek % 2 !== 0;
+      plan = isOddWeek ? workoutPlans.W5 : workoutPlans.W6;
+      const muscleGroupForDay = singleMuscleDailySchedule[dayOfWeek];
+      if (muscleGroupForDay) muscleGroupsForDay = [muscleGroupForDay];
+    }
+    
     const exercisesToAdd: WorkoutExercise[] = [];
     if (plan && muscleGroupsForDay.length > 0) {
       muscleGroupsForDay.forEach(muscleGroup => {
