@@ -4,8 +4,8 @@
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Sunrise, Sun, Sunset, Moon, MoonStar, CloudSun, PlusCircle, Trash2, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, Lightbulb, PenSquare } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { BrainCircuit, Sunrise, Sun, Sunset, Moon, MoonStar, CloudSun, PlusCircle, Trash2, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { format, getDay, getISOWeek } from 'date-fns';
@@ -71,8 +71,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
   upskill: <BookOpenCheck className="h-5 w-5 text-primary" />,
   deepwork: <Briefcase className="h-5 w-5 text-primary" />,
   planning: <ClipboardList className="h-5 w-5 text-primary" />,
-  reflection: <Lightbulb className="h-5 w-5 text-primary" />,
-  journaling: <PenSquare className="h-5 w-5 text-primary" />,
+  tracking: <ClipboardCheck className="h-5 w-5 text-primary" />,
 };
 
 function HomePageContent() {
@@ -244,11 +243,8 @@ function HomePageContent() {
       case 'planning':
         details = 'Planning Session';
         break;
-      case 'reflection':
-        details = 'Reflection';
-        break;
-      case 'journaling':
-        details = 'Journaling';
+      case 'tracking':
+        details = 'Tracking Session';
         break;
     }
 
@@ -361,6 +357,20 @@ function HomePageContent() {
 
   const todaysSchedule = schedule[todayKey] || {};
 
+  const dailyStats = useMemo(() => {
+    const todaysActivities = schedule[todayKey] || {};
+    const completedActivities = Object.values(todaysActivities)
+      .flat()
+      .filter(activity => activity && activity.completed);
+
+    const healthDone = completedActivities.some(act => act.type === 'workout');
+    const wealthDone = completedActivities.some(act => act.type === 'deepwork');
+    const directionDone = completedActivities.some(act => act.type === 'planning' || act.type === 'tracking');
+
+    return { health: healthDone, wealth: wealthDone, direction: directionDone };
+  }, [schedule, todayKey]);
+
+
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
       <Card className="max-w-5xl mx-auto shadow-lg border-0 bg-transparent">
@@ -373,7 +383,27 @@ function HomePageContent() {
             <p className="text-md text-muted-foreground pt-1">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
         </CardHeader>
         <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+            <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className={cn( "rounded-lg p-3 text-center transition-all duration-300", dailyStats.health ? "bg-green-100 dark:bg-green-900/50 border border-green-500/50" : "bg-muted/50" )}>
+                  <h3 className="font-semibold text-foreground">Health</h3>
+                  <p className={cn("text-xs font-medium", dailyStats.health ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}>
+                      {dailyStats.health ? "Complete" : "Pending"}
+                  </p>
+              </div>
+              <div className={cn( "rounded-lg p-3 text-center transition-all duration-300", dailyStats.wealth ? "bg-green-100 dark:bg-green-900/50 border border-green-500/50" : "bg-muted/50" )}>
+                  <h3 className="font-semibold text-foreground">Wealth</h3>
+                  <p className={cn("text-xs font-medium", dailyStats.wealth ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}>
+                      {dailyStats.wealth ? "Complete" : "Pending"}
+                  </p>
+              </div>
+              <div className={cn( "rounded-lg p-3 text-center transition-all duration-300", dailyStats.direction ? "bg-green-100 dark:bg-green-900/50 border border-green-500/50" : "bg-muted/50" )}>
+                  <h3 className="font-semibold text-foreground">Direction</h3>
+                  <p className={cn("text-xs font-medium", dailyStats.direction ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}>
+                      {dailyStats.direction ? "Complete" : "Pending"}
+                  </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {slots.map((slot) => {
                 const activities = todaysSchedule[slot.name];
                 return (
@@ -474,13 +504,9 @@ function HomePageContent() {
                                   <ClipboardList className="h-4 w-4 mr-2" />
                                   Add Planning
                                 </Button>
-                                <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'reflection')}>
-                                  <Lightbulb className="h-4 w-4 mr-2" />
-                                  Add Reflection
-                                </Button>
-                                <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'journaling')}>
-                                  <PenSquare className="h-4 w-4 mr-2" />
-                                  Add Journaling
+                                <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'tracking')}>
+                                  <ClipboardCheck className="h-4 w-4 mr-2" />
+                                  Add Tracking
                                 </Button>
                               </div>
                             </PopoverContent>
