@@ -277,6 +277,7 @@ function HomePageContent() {
             <CardDescription className="text-lg text-muted-foreground">
                 Hello, <span className="font-semibold text-primary">{currentUser?.username}</span>! Here's a look at your day.
             </CardDescription>
+            <p className="text-md text-muted-foreground pt-1">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
         </CardHeader>
         <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
@@ -380,3 +381,5 @@ function HomePageContent() {
 export default function Page() {
     return ( <AuthGuard> <HomePageContent /> </AuthGuard> );
 }
+
+    
