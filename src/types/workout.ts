@@ -34,7 +34,9 @@ export interface LoggedSet {
 export interface ExerciseDefinition {
   id: string;
   name: string;
-  category: ExerciseCategory; // Added category
+  category: ExerciseCategory; // This is the "Topic" in upskill
+  goalType?: 'pages' | 'hours' | null;
+  goalValue?: number | null;
 }
 
 export interface WorkoutExercise {

@@ -9,10 +9,9 @@ import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, ChevronDown, ChevronUp, Target, LineChart as LineChartIcon, BookCopy } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { format, parse, getISOWeek, isMonday, getYear, subYears, addDays, parseISO } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, WeightLog, Gender, AllWorkoutPlans } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, WeightLog, Gender } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -41,6 +40,8 @@ import {
 import { WeightChartModal } from '@/components/WeightChartModal';
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const DEFAULT_TARGET_SESSIONS = 1;
 const DEFAULT_TARGET_DURATION = "25";
@@ -57,10 +58,14 @@ function UpskillPageContent() {
   const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
   const [newSubtopicName, setNewSubtopicName] = useState('');
   const [newTopicName, setNewTopicName] = useState('');
+  const [newGoalType, setNewGoalType] = useState<'pages' | 'hours'>('pages');
+  const [newGoalValue, setNewGoalValue] = useState('');
 
   const [editingDefinition, setEditingDefinition] = useState<ExerciseDefinition | null>(null);
   const [editingDefinitionName, setEditingDefinitionName] = useState('');
   const [editingDefinitionCategory, setEditingDefinitionCategory] = useState<string>('');
+  const [editingDefinitionGoalType, setEditingDefinitionGoalType] = useState<'pages' | 'hours' | null>(null);
+  const [editingDefinitionGoalValue, setEditingDefinitionGoalValue] = useState<string>('');
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
@@ -246,11 +251,14 @@ function UpskillPageContent() {
     const newDef: ExerciseDefinition = { 
       id: `def_${Date.now().toString()}`, 
       name: newSubtopicName.trim(),
-      category: newTopicName.trim() as ExerciseCategory, // Casting, as we allow dynamic strings
+      category: newTopicName.trim() as ExerciseCategory,
+      goalType: newGoalValue.trim() ? newGoalType : null,
+      goalValue: newGoalValue.trim() ? parseInt(newGoalValue, 10) : null,
     };
     setExerciseDefinitions(prev => [...prev, newDef]);
     setNewSubtopicName('');
     setNewTopicName('');
+    setNewGoalValue('');
     toast({ title: "Success", description: `Task "${newDef.name}" added to library.` });
   };
 
@@ -267,6 +275,8 @@ function UpskillPageContent() {
     setEditingDefinition(def);
     setEditingDefinitionName(def.name);
     setEditingDefinitionCategory(def.category);
+    setEditingDefinitionGoalType(def.goalType || null);
+    setEditingDefinitionGoalValue(def.goalValue?.toString() || '');
   };
 
   const handleSaveEditDefinition = () => {
@@ -274,7 +284,13 @@ function UpskillPageContent() {
       toast({ title: "Error", description: "Topic and Subtopic cannot be empty.", variant: "destructive" });
       return;
     }
-    const updatedDef = { ...editingDefinition, name: editingDefinitionName.trim(), category: editingDefinitionCategory.trim() as ExerciseCategory };
+    const updatedDef: ExerciseDefinition = { 
+      ...editingDefinition, 
+      name: editingDefinitionName.trim(), 
+      category: editingDefinitionCategory.trim() as ExerciseCategory,
+      goalType: editingDefinitionGoalValue.trim() ? editingDefinitionGoalType : null,
+      goalValue: editingDefinitionGoalValue.trim() ? parseInt(editingDefinitionGoalValue, 10) : null,
+    };
     setExerciseDefinitions(prev => prev.map(def => def.id === editingDefinition.id ? updatedDef : def));
     setAllWorkoutLogs(prevLogs => 
       prevLogs.map(log => ({
@@ -316,7 +332,7 @@ function UpskillPageContent() {
     }
   };
   
-  const handleLogSet = (exerciseId: string, reps: number, weight: number) => { // Reps will be 1, weight is duration
+  const handleLogSet = (exerciseId: string, reps: number, weight: number) => { // Reps will be 1, weight is progress (pages/hours)
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
     if (existingWorkout && currentUser?.username) {
@@ -327,9 +343,12 @@ function UpskillPageContent() {
         if (ex.id === exerciseId) {
           const updatedEx = { ...ex, loggedSets: [...ex.loggedSets, newSet] };
           
-          // Check for completion
-          if (updatedEx.loggedSets.length >= updatedEx.targetSets) {
-            completedExerciseDefinition = exerciseDefinitions.find(def => def.id === updatedEx.definitionId);
+          const definition = exerciseDefinitions.find(def => def.id === updatedEx.definitionId);
+          if (definition?.goalValue) {
+            const totalProgress = updatedEx.loggedSets.reduce((sum, set) => sum + set.weight, 0);
+            if (totalProgress >= definition.goalValue) {
+              completedExerciseDefinition = definition;
+            }
           }
 
           return updatedEx;
@@ -338,7 +357,7 @@ function UpskillPageContent() {
       });
 
       updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
-      toast({ title: "Session Logged!", description: `Logged ${weight} minutes.`});
+      toast({ title: "Progress Logged!", description: `Logged ${weight} progress.`});
 
       // If a task was completed, add it to the deep work library
       if (completedExerciseDefinition) {
@@ -387,7 +406,7 @@ function UpskillPageContent() {
     }
   };
 
-  const handleUpdateSet = (exerciseId: string, setId: string, reps: number, weight: number) => { // Reps=1, weight=duration
+  const handleUpdateSet = (exerciseId: string, setId: string, reps: number, weight: number) => { // Reps=1, weight=progress
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
@@ -426,9 +445,6 @@ function UpskillPageContent() {
     });
     toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved.` });
   };
-
-  // Other weight/goal handlers are passed to the modal and don't need to be redefined here.
-  // ...
 
   const consistencyData = useMemo(() => {
     if (!allWorkoutLogs || !oneYearAgo || !today) return [];
@@ -538,8 +554,19 @@ function UpskillPageContent() {
                           {allTopics.map(topic => <option key={topic} value={topic} />)}
                         </datalist>
 
-                        <Input type="text" placeholder="New Subtopic" value={newSubtopicName} onChange={(e) => setNewSubtopicName(e.target.value)} aria-label="New subtopic name" className="h-10 text-sm" />
+                        <Input type="text" placeholder="New Subtopic (Book, Course, etc.)" value={newSubtopicName} onChange={(e) => setNewSubtopicName(e.target.value)} aria-label="New subtopic name" className="h-10 text-sm" />
                         
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Optional: Set a Goal</Label>
+                          <div className="flex gap-2 items-center mt-1">
+                            <RadioGroup value={newGoalType} onValueChange={(v) => setNewGoalType(v as 'pages' | 'hours')} className="flex gap-4">
+                              <div className="flex items-center space-x-2"><RadioGroupItem value="pages" id="type-pages" /><Label htmlFor="type-pages" className="font-normal">Pages</Label></div>
+                              <div className="flex items-center space-x-2"><RadioGroupItem value="hours" id="type-hours" /><Label htmlFor="type-hours" className="font-normal">Hours</Label></div>
+                            </RadioGroup>
+                            <Input type="number" placeholder="Total" value={newGoalValue} onChange={(e) => setNewGoalValue(e.target.value)} aria-label="Goal value" className="h-9" />
+                          </div>
+                        </div>
+
                         <Button type="submit" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs xl:text-sm xl:h-10 xl:px-4"> <PlusCircle className="mr-2 h-5 w-5" /> Add Task </Button>
                       </form>
                       <div className="max-h-[calc(100vh-38rem)] overflow-y-auto pr-1">
@@ -556,6 +583,16 @@ function UpskillPageContent() {
                                     <div className="space-y-2">
                                       <Input value={editingDefinitionCategory} onChange={(e) => setEditingDefinitionCategory(e.target.value)} className="h-9" aria-label="Edit topic name"/>
                                       <Input value={editingDefinitionName} onChange={(e) => setEditingDefinitionName(e.target.value)} className="h-9" aria-label="Edit subtopic name"/>
+                                      <div>
+                                        <Label className="text-xs text-muted-foreground">Goal</Label>
+                                        <div className="flex gap-2 items-center mt-1">
+                                          <RadioGroup value={editingDefinitionGoalType || undefined} onValueChange={(v) => setEditingDefinitionGoalType(v as 'pages' | 'hours')} className="flex gap-4">
+                                            <div className="flex items-center space-x-2"><RadioGroupItem value="pages" id={`edit-type-pages-${def.id}`} /><Label htmlFor={`edit-type-pages-${def.id}`} className="font-normal">Pages</Label></div>
+                                            <div className="flex items-center space-x-2"><RadioGroupItem value="hours" id={`edit-type-hours-${def.id}`} /><Label htmlFor={`edit-type-hours-${def.id}`} className="font-normal">Hours</Label></div>
+                                          </RadioGroup>
+                                          <Input type="number" placeholder="Total" value={editingDefinitionGoalValue} onChange={(e) => setEditingDefinitionGoalValue(e.target.value)} aria-label="Edit goal value" className="h-9" />
+                                        </div>
+                                      </div>
                                       <div className="flex gap-2">
                                         <Button size="sm" onClick={handleSaveEditDefinition} className="flex-grow bg-green-600 hover:bg-green-500 text-white"><Save className="h-4 w-4 mr-1"/>Save</Button>
                                         <Button size="sm" variant="ghost" onClick={() => setEditingDefinition(null)} className="flex-grow"><X className="h-4 w-4 mr-1"/>Cancel</Button>
@@ -565,7 +602,10 @@ function UpskillPageContent() {
                                     <div className="flex items-center justify-between gap-2">
                                       <div className="flex-grow min-w-0">
                                           <span className="font-medium text-foreground block" title={def.name}>{def.name}</span>
-                                          <Badge variant="secondary" className="text-xs ml-0 my-0.5">{def.category}</Badge>
+                                          <div className='flex flex-wrap gap-1 mt-0.5'>
+                                            <Badge variant="secondary" className="text-xs">{def.category}</Badge>
+                                            {def.goalValue && <Badge variant="outline" className="text-xs">Goal: {def.goalValue} {def.goalType}</Badge>}
+                                          </div>
                                       </div>
                                       <div className="flex-shrink-0 flex items-center">
                                         <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
@@ -690,6 +730,7 @@ function UpskillPageContent() {
                                 <WorkoutExerciseCard 
                                   key={exercise.id} 
                                   exercise={exercise}
+                                  definition={definition}
                                   onLogSet={handleLogSet} 
                                   onDeleteSet={handleDeleteSet} 
                                   onUpdateSet={handleUpdateSet} 
@@ -765,7 +806,3 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
-
-    
-
-    

@@ -1,17 +1,18 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Trash2, CheckSquare, Edit2, Save, X, Youtube, TrendingUp } from 'lucide-react';
-import { WorkoutExercise, LoggedSet } from '@/types/workout';
+import { WorkoutExercise, LoggedSet, ExerciseDefinition } from '@/types/workout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 interface WorkoutExerciseCardProps {
   exercise: WorkoutExercise;
+  definition?: ExerciseDefinition;
   onLogSet: (exerciseId: string, reps: number, weight: number) => void;
   onDeleteSet: (exerciseId: string, setId: string) => void;
   onUpdateSet: (exerciseId: string, setId: string, reps: number, weight: number) => void;
@@ -22,6 +23,7 @@ interface WorkoutExerciseCardProps {
 
 export function WorkoutExerciseCard({
   exercise,
+  definition,
   onLogSet,
   onDeleteSet,
   onUpdateSet,
@@ -38,6 +40,15 @@ export function WorkoutExerciseCard({
   const [editWeight, setEditWeight] = useState('');
   const [editDuration, setEditDuration] = useState('');
 
+  const placeholder = useMemo(() => {
+    if (pageType === 'upskill') {
+      return definition?.goalType ? `Log ${definition.goalType}` : 'Log Duration (min)';
+    }
+    if (pageType === 'deepwork') {
+      return 'Duration (min)';
+    }
+    return ''; // for workout, there are two inputs
+  }, [pageType, definition]);
 
   const handleLogSetSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +63,7 @@ export function WorkoutExerciseCard({
     } else { // upskill or deepwork
       const numDuration = parseInt(duration);
       if (!isNaN(numDuration) && numDuration > 0) {
-        onLogSet(exercise.id, 1, numDuration); // reps=1, weight=duration
+        onLogSet(exercise.id, 1, numDuration); // reps=1, weight=progress
         setDuration('');
       }
     }
@@ -64,7 +75,7 @@ export function WorkoutExerciseCard({
       setEditReps(set.reps.toString());
       setEditWeight(set.weight.toString());
     } else {
-      setEditDuration(set.weight.toString()); // weight stores duration for upskill/deepwork
+      setEditDuration(set.weight.toString());
     }
   };
 
@@ -93,7 +104,35 @@ export function WorkoutExerciseCard({
     window.open(url, '_blank', 'noopener,noreferrer');
   };
   
-  const isCompleted = exercise.loggedSets.length >= exercise.targetSets;
+  const isCompleted = useMemo(() => {
+    if (pageType === 'upskill' && definition?.goalValue) {
+      const totalProgress = exercise.loggedSets.reduce((sum, set) => sum + set.weight, 0);
+      return totalProgress >= definition.goalValue;
+    }
+    return exercise.loggedSets.length >= exercise.targetSets;
+  }, [exercise, definition, pageType]);
+  
+
+  const getProgressText = () => {
+    if (pageType === 'upskill' && definition?.goalValue) {
+      const totalProgress = exercise.loggedSets.reduce((sum, set) => sum + set.weight, 0);
+      return `Goal: ${definition.goalValue} ${definition.goalType}. Progress: ${totalProgress}/${definition.goalValue}`;
+    }
+    if (pageType === 'workout') {
+      return `Target: ${exercise.targetSets} sets of ${exercise.targetReps} reps. Progress: ${exercise.loggedSets.length}/${exercise.targetSets} sets.`;
+    }
+    return `Target: ${exercise.targetSets} sessions of ${exercise.targetReps} min. Progress: ${exercise.loggedSets.length}/${exercise.targetSets} sessions.`;
+  }
+
+  const getLoggedSetText = (set: LoggedSet, index: number) => {
+    if (pageType === 'workout') {
+      return `Set ${exercise.loggedSets.length - index}: <strong>${set.reps}</strong>r @ <strong>${set.weight}</strong>kg/lb`;
+    }
+    if (pageType === 'upskill' && definition?.goalType) {
+      return `Logged: <strong>${set.weight}</strong> ${definition.goalType}`;
+    }
+    return `Session ${exercise.loggedSets.length - index}: <strong>${set.weight}</strong> min`;
+  }
 
   return (
     <motion.div
@@ -126,10 +165,7 @@ export function WorkoutExerciseCard({
         </CardHeader>
         <CardContent className="p-3">
           <p className="text-xs text-muted-foreground mb-2">
-            {pageType === 'workout' 
-              ? `Target: ${exercise.targetSets} sets of ${exercise.targetReps} reps. Progress: ${exercise.loggedSets.length}/${exercise.targetSets} sets.`
-              : `Target: ${exercise.targetSets} sessions of ${exercise.targetReps} min. Progress: ${exercise.loggedSets.length}/${exercise.targetSets} sessions.`
-            }
+            {getProgressText()}
           </p>
 
           <form onSubmit={handleLogSetSubmit} className="flex gap-2 mb-3 items-end">
@@ -146,8 +182,8 @@ export function WorkoutExerciseCard({
               </>
             ) : (
               <div className="flex-1">
-                <label htmlFor={`duration-${exercise.id}`} className="sr-only">Duration (min)</label>
-                <Input id={`duration-${exercise.id}`} type="number" placeholder="Duration (min)" value={duration} onChange={(e) => setDuration(e.target.value)} className="h-9" min="1" required />
+                <label htmlFor={`duration-${exercise.id}`} className="sr-only">{placeholder}</label>
+                <Input id={`duration-${exercise.id}`} type="number" placeholder={placeholder} value={duration} onChange={(e) => setDuration(e.target.value)} className="h-9" min="1" required />
               </div>
             )}
             <Button type="submit" size="icon" className="h-9 w-9 shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground" aria-label="Log set">
@@ -157,7 +193,7 @@ export function WorkoutExerciseCard({
 
           {exercise.loggedSets.length > 0 && (
             <div>
-              <h4 className="text-sm font-medium mb-1 text-foreground">Logged Sets:</h4>
+              <h4 className="text-sm font-medium mb-1 text-foreground">Logged Progress:</h4>
               <ul className="space-y-1.5">
                 <AnimatePresence>
                   {exercise.loggedSets.slice().sort((a,b) => b.timestamp - a.timestamp).map((set, index) => (
@@ -187,12 +223,7 @@ export function WorkoutExerciseCard({
                         <>
                            <span
                             className="truncate"
-                            dangerouslySetInnerHTML={{
-                              __html:
-                                pageType === 'workout'
-                                  ? `Set ${exercise.loggedSets.length - index}: <strong>${set.reps}</strong>r @ <strong>${set.weight}</strong>kg/lb`
-                                  : `Session ${exercise.loggedSets.length - index}: <strong>${set.weight}</strong> min`,
-                            }}
+                            dangerouslySetInnerHTML={{ __html: getLoggedSetText(set, index) }}
                           />
                           <div className="flex items-center">
                              <Button variant="ghost" size="icon" onClick={() => handleEditSet(set)} className="h-6 w-6 text-muted-foreground hover:text-primary" aria-label="Edit set">
