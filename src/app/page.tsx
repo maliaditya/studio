@@ -22,6 +22,16 @@ const slots = [
   { name: 'Night', time: '8 PM - 12 AM', icon: <MoonStar className="h-6 w-6 text-indigo-500" /> }
 ];
 
+const slotEndHours: Record<string, number> = {
+  'Late Night': 4,
+  'Dawn': 8,
+  'Morning': 12,
+  'Afternoon': 16,
+  'Evening': 20,
+  'Night': 24, // Represents midnight of the next day
+};
+
+
 // Schedules for workout focus calculation
 const dailyMuscleGroups: Record<number, string[]> = {
   1: ["Chest", "Triceps"], // Monday
@@ -62,6 +72,7 @@ function HomePageContent() {
   const { currentUser } = useAuth();
   const router = useRouter();
   const [currentSlot, setCurrentSlot] = useState('');
+  const [remainingTime, setRemainingTime] = useState('');
   const [schedule, setSchedule] = useState<FullSchedule>({});
   const [todayKey, setTodayKey] = useState('');
 
@@ -131,19 +142,39 @@ function HomePageContent() {
   }, [currentUser]);
 
   useEffect(() => {
-    const getSlot = () => {
-      const currentHour = new Date().getHours();
-      if (currentHour >= 0 && currentHour < 4) return 'Late Night';
-      if (currentHour >= 4 && currentHour < 8) return 'Dawn';
-      if (currentHour >= 8 && currentHour < 12) return 'Morning';
-      if (currentHour >= 12 && currentHour < 16) return 'Afternoon';
-      if (currentHour >= 16 && currentHour < 20) return 'Evening';
-      return 'Night';
-    };
-    
-    setCurrentSlot(getSlot());
-    const interval = setInterval(() => setCurrentSlot(getSlot()), 60000);
-    return () => clearInterval(interval);
+    const timerInterval = setInterval(() => {
+        const now = new Date();
+        const currentHour = now.getHours();
+
+        let activeSlot = 'Night';
+        if (currentHour >= 0 && currentHour < 4) activeSlot = 'Late Night';
+        else if (currentHour >= 4 && currentHour < 8) activeSlot = 'Dawn';
+        else if (currentHour >= 8 && currentHour < 12) activeSlot = 'Morning';
+        else if (currentHour >= 12 && currentHour < 16) activeSlot = 'Afternoon';
+        else if (currentHour >= 16 && currentHour < 20) activeSlot = 'Evening';
+        
+        setCurrentSlot(activeSlot);
+
+        const slotEndHour = slotEndHours[activeSlot];
+        const slotEndTime = new Date();
+        slotEndTime.setHours(slotEndHour, 0, 0, 0);
+
+        const diff = slotEndTime.getTime() - now.getTime();
+
+        if (diff > 0) {
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff / 1000 / 60) % 60);
+            const seconds = Math.floor((diff / 1000) % 60);
+
+            setRemainingTime(
+                `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+            );
+        } else {
+            setRemainingTime('00:00:00');
+        }
+    }, 1000);
+
+    return () => clearInterval(timerInterval);
   }, []);
 
   const handleAddActivity = (slotName: string, type: 'workout' | 'upskill') => {
@@ -278,6 +309,11 @@ function HomePageContent() {
                                   <span className="font-semibold capitalize">{activity.type}</span>
                               </div>
                               <p className="text-xl font-bold text-foreground">{activity.details}</p>
+                              {currentSlot === slot.name && (
+                                <div className="mt-2 font-mono text-sm text-primary/80 tracking-wider">
+                                    <span className="animate-subtle-pulse">Ends in: {remainingTime}</span>
+                                </div>
+                              )}
                             </div>
                             <Button variant="ghost" size="sm" onClick={() => handleRemoveActivity(slot.name)} className="self-start p-1 h-auto text-xs text-muted-foreground hover:text-destructive mt-2">
                                 <Trash2 className="h-3 w-3 mr-1" />
@@ -286,9 +322,20 @@ function HomePageContent() {
                           </>
                         ) : (
                           <>
-                              <p className="text-sm text-muted-foreground">
-                                  {currentSlot === slot.name ? "This is your current focus block." : "Plan an activity for this block."}
-                              </p>
+                              {currentSlot === slot.name ? (
+                                <div className="flex-grow flex items-center justify-center">
+                                    <div className="text-center">
+                                        <p className="text-sm text-muted-foreground mb-1">Current Focus</p>
+                                        <div className="font-mono text-3xl font-bold text-primary tracking-widest animate-subtle-pulse">
+                                            {remainingTime}
+                                        </div>
+                                    </div>
+                                </div>
+                              ) : (
+                                <p className="text-sm text-muted-foreground flex-grow flex items-center justify-center text-center px-4">
+                                    Plan an activity for this block.
+                                </p>
+                              )}
                               <Popover>
                                   <PopoverTrigger asChild>
                                       <Button variant="outline" size="sm" className="mt-2 self-start">
