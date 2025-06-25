@@ -207,128 +207,132 @@ export function ExerciseProgressModal({
           </Button>
         </div>
 
-        {viewMode === 'table' ? (
-          <>
-            {tableData.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">
-                No sets logged for this exercise yet.
-              </p>
+        <div className="flex-grow min-h-0">
+          <ScrollArea className="h-full pr-4">
+            {viewMode === 'table' ? (
+              <>
+                {tableData.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    No sets logged for this exercise yet.
+                  </p>
+                ) : (
+                  <div className="border rounded-md">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[150px]">Date</TableHead>
+                          <TableHead>Sets Details (Reps x Weight)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tableData.map((entry) => (
+                          <TableRow key={entry.date}>
+                            <TableCell>{entry.date}</TableCell>
+                            <TableCell>
+                              {entry.sets.map((set, idx) => (
+                                <span key={set.id} className="mr-2 inline-block bg-muted/50 px-1.5 py-0.5 rounded text-xs">
+                                  {set.reps}r x {set.weight}kg/lb
+                                  {idx < entry.sets.length -1 ? "" : ""}
+                                </span>
+                              ))}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </>
             ) : (
-              <ScrollArea className="flex-grow border rounded-md">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[150px]">Date</TableHead>
-                      <TableHead>Sets Details (Reps x Weight)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tableData.map((entry) => (
-                      <TableRow key={entry.date}>
-                        <TableCell>{entry.date}</TableCell>
-                        <TableCell>
-                          {entry.sets.map((set, idx) => (
-                            <span key={set.id} className="mr-2 inline-block bg-muted/50 px-1.5 py-0.5 rounded text-xs">
-                              {set.reps}r x {set.weight}kg/lb
-                              {idx < entry.sets.length -1 ? "" : ""}
-                            </span>
-                          ))}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
+              <>
+                {graphData.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">
+                        No data available to display graph. Log some sets!
+                    </p>
+                ) : graphData.length < 2 ? (
+                     <p className="text-center text-muted-foreground py-8">
+                        Need at least two data points (workouts on different days) to draw a graph.
+                    </p>
+                ): (
+                  <ChartContainer config={chartConfig} className="min-h-[400px] w-full">
+                    <LineChart
+                      accessibilityLayer
+                      data={graphData}
+                      margin={{
+                        top: 5,
+                        right: 40, // Increased right margin for second Y-axis label
+                        left: 10,
+                        bottom: 5,
+                      }}
+                    >
+                      <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="date"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        tickFormatter={(value) => value.slice(0, 6)}
+                      />
+                      <YAxis
+                        yAxisId="left"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        domain={['dataMin - 5', 'dataMax + 5']}
+                        label={{ value: "Max Weight (kg/lb)", angle: -90, position: "insideLeft", offset: -0, style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' } }}
+                        stroke="var(--color-maxWeight)"
+                      />
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        domain={['dataMin - 50', 'dataMax + 50']} // Adjust domain for volume
+                        label={{ value: "Total Volume", angle: 90, position: "insideRight", offset: 10, style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' } }}
+                        stroke="var(--color-totalVolume)"
+                      />
+                       <RechartsTooltip
+                        cursor={true}
+                        content={<CustomChartTooltip />}
+                      />
+                      <Line
+                        yAxisId="left"
+                        dataKey="maxWeight"
+                        type="monotone"
+                        stroke="var(--color-maxWeight)"
+                        strokeWidth={2}
+                        dot={{
+                          fill: "var(--color-maxWeight)",
+                          r: 4,
+                        }}
+                        activeDot={{
+                          r: 6,
+                        }}
+                        name="maxWeight" // Name for tooltip
+                      />
+                      <Line
+                        yAxisId="right"
+                        dataKey="totalVolume"
+                        type="monotone"
+                        stroke="var(--color-totalVolume)"
+                        strokeWidth={2}
+                        dot={{
+                          fill: "var(--color-totalVolume)",
+                          r: 4,
+                        }}
+                        activeDot={{
+                          r: 6,
+                        }}
+                        name="totalVolume" // Name for tooltip
+                      />
+                    </LineChart>
+                  </ChartContainer>
+                )}
+              </>
             )}
-          </>
-        ) : (
-          <>
-            {graphData.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                    No data available to display graph. Log some sets!
-                </p>
-            ) : graphData.length < 2 ? (
-                 <p className="text-center text-muted-foreground py-8">
-                    Need at least two data points (workouts on different days) to draw a graph.
-                </p>
-            ): (
-              <ChartContainer config={chartConfig} className="min-h-[300px] w-full flex-grow">
-                <LineChart
-                  accessibilityLayer
-                  data={graphData}
-                  margin={{
-                    top: 5,
-                    right: 40, // Increased right margin for second Y-axis label
-                    left: 10,
-                    bottom: 5,
-                  }}
-                >
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="date"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    tickFormatter={(value) => value.slice(0, 6)}
-                  />
-                  <YAxis
-                    yAxisId="left"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    domain={['dataMin - 5', 'dataMax + 5']}
-                    label={{ value: "Max Weight (kg/lb)", angle: -90, position: "insideLeft", offset: -0, style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' } }}
-                    stroke="var(--color-maxWeight)"
-                  />
-                  <YAxis
-                    yAxisId="right"
-                    orientation="right"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    domain={['dataMin - 50', 'dataMax + 50']} // Adjust domain for volume
-                    label={{ value: "Total Volume", angle: 90, position: "insideRight", offset: 10, style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' } }}
-                    stroke="var(--color-totalVolume)"
-                  />
-                   <RechartsTooltip
-                    cursor={true}
-                    content={<CustomChartTooltip />}
-                  />
-                  <Line
-                    yAxisId="left"
-                    dataKey="maxWeight"
-                    type="monotone"
-                    stroke="var(--color-maxWeight)"
-                    strokeWidth={2}
-                    dot={{
-                      fill: "var(--color-maxWeight)",
-                      r: 4,
-                    }}
-                    activeDot={{
-                      r: 6,
-                    }}
-                    name="maxWeight" // Name for tooltip
-                  />
-                  <Line
-                    yAxisId="right"
-                    dataKey="totalVolume"
-                    type="monotone"
-                    stroke="var(--color-totalVolume)"
-                    strokeWidth={2}
-                    dot={{
-                      fill: "var(--color-totalVolume)",
-                      r: 4,
-                    }}
-                    activeDot={{
-                      r: 6,
-                    }}
-                    name="totalVolume" // Name for tooltip
-                  />
-                </LineChart>
-              </ChartContainer>
-            )}
-          </>
-        )}
+          </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   );
