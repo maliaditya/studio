@@ -8,7 +8,7 @@ import { BrainCircuit, Sunrise, Sun, Sunset, Moon, MoonStar, CloudSun, PlusCircl
 import { useState, useEffect, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO } from 'date-fns';
+import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subYears } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysLearningModal } from '@/components/TodaysLearningModal';
@@ -178,12 +178,19 @@ function HomePageContent() {
       description: '',
       pageType: 'upskill' as 'upskill' | 'deepwork'
   });
+  
+  // State for productivity stats
+  const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
+  const [today, setToday] = useState<Date | null>(null);
 
   const DEFAULT_TARGET_SETS = 4;
   const DEFAULT_TARGET_REPS = "8-12";
 
   useEffect(() => {
     setTodayKey(format(new Date(), 'yyyy-MM-dd'));
+    const now = new Date();
+    setToday(now);
+    setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
   }, []);
 
   const scheduleStorageKey = currentUser ? `lifeos_schedule_${currentUser.username}` : null;
@@ -595,6 +602,24 @@ function HomePageContent() {
             return topicStats;
         };
 
+        const calculateWorkoutStats = (logs: DatedWorkout[]) => {
+            const dailyData: Record<string, { volume: number }> = {};
+            logs.forEach(log => {
+                const dailyVolume = log.exercises.reduce((total, ex) =>
+                    total + ex.loggedSets.reduce((sum, set) => sum + (set.reps * set.weight), 0), 0);
+                
+                if (dailyVolume > 0) {
+                    dailyData[log.date] = { volume: (dailyData[log.date]?.volume || 0) + dailyVolume };
+                }
+            });
+
+            const daysWithWorkouts = Object.keys(dailyData).length;
+            if (daysWithWorkouts === 0) return { avgVolume: 0 };
+            
+            const totalVolume = Object.values(dailyData).reduce((sum, d) => sum + d.volume, 0);
+            return { avgVolume: Math.round(totalVolume / daysWithWorkouts) };
+        };
+
         const avgUpskillDuration = calculateAverageDuration(allUpskillLogs, 'reps');
         const avgDeepWorkDuration = calculateAverageDuration(allDeepWorkLogs, 'weight');
         
@@ -608,6 +633,25 @@ function HomePageContent() {
 
         const learningStats = calculateLearningStats(allUpskillLogs, topicGoals);
 
+        const workoutStats = calculateWorkoutStats(allWorkoutLogs);
+
+        const consistencyData: { score: number }[] = [];
+        if (oneYearAgo && today) {
+            const workoutDates = new Set(allWorkoutLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date));
+            let score = 0.5;
+            for (let d = new Date(oneYearAgo); d <= today; d = addDays(d, 1)) {
+                const dateKey = format(d, 'yyyy-MM-dd');
+                if (workoutDates.has(dateKey)) {
+                    score += (1 - score) * 0.1;
+                } else {
+                    score *= 0.95;
+                }
+                consistencyData.push({ score: Math.round(score * 100) });
+            }
+        }
+        const latestConsistency = consistencyData.length > 0 ? consistencyData[consistencyData.length - 1].score : 0;
+
+
         return {
             avgUpskillDuration,
             avgDeepWorkDuration,
@@ -615,9 +659,11 @@ function HomePageContent() {
             avgDeepWorkHours,
             totalProductiveHours,
             currentLevel,
-            learningStats
+            learningStats,
+            workoutStats,
+            latestConsistency,
         };
-    }, [allUpskillLogs, allDeepWorkLogs, topicGoals]);
+    }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today]);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -695,6 +741,27 @@ function HomePageContent() {
                                     </div>
                                 </div>
                             </div>
+                            
+                            {(productivityStats.workoutStats.avgVolume > 0 || productivityStats.latestConsistency > 0) && (
+                                <div>
+                                    <h4 className="font-semibold mb-2 flex items-center gap-2"><Dumbbell className="h-4 w-4 text-destructive" /> Workout Stats</h4>
+                                    <div className="space-y-2 text-sm">
+                                        {productivityStats.workoutStats.avgVolume > 0 && (
+                                            <div className="flex justify-between items-center p-2 rounded bg-muted/30">
+                                                <span className="flex items-center gap-2 text-muted-foreground"><BarChart3 className="h-4 w-4" /> Avg. Daily Volume</span>
+                                                <span className="font-semibold">{productivityStats.workoutStats.avgVolume.toLocaleString()} kg/lb</span>
+                                            </div>
+                                        )}
+                                        {productivityStats.latestConsistency > 0 && (
+                                            <div className="flex justify-between items-center p-2 rounded bg-muted/30">
+                                                <span className="flex items-center gap-2 text-muted-foreground"><Zap className="h-4 w-4" /> Consistency</span>
+                                                <span className="font-semibold">{productivityStats.latestConsistency}%</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             <div>
                                 <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Learning Progress</h4>
                                 <div className="text-sm">
