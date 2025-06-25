@@ -297,9 +297,9 @@ function HomePageContent() {
       <Card className="max-w-5xl mx-auto shadow-lg border-0 bg-transparent">
         <CardHeader className="text-center">
             <BrainCircuit className="mx-auto h-16 w-16 text-primary mb-4" />
-            <CardTitle className="text-3xl font-bold">Welcome to LifeOS</CardTitle>
+            <CardTitle className="text-3xl font-bold">Hello, <span className="text-primary">{currentUser?.username}</span>!</CardTitle>
             <CardDescription className="text-lg text-muted-foreground">
-                Hello, <span className="font-semibold text-primary">{currentUser?.username}</span>! Here's a look at your day.
+                Control Health, Wealth, Growth, Direction — Life Aligns.
             </CardDescription>
             <p className="text-md text-muted-foreground pt-1">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
         </CardHeader>
@@ -418,3 +418,5 @@ function HomePageContent() {
 export default function Page() {
     return ( <AuthGuard> <HomePageContent /> </AuthGuard> );
 }
+
+    
