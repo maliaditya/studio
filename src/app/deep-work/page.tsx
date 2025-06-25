@@ -449,12 +449,6 @@ function DeepWorkPageContent() {
     setIsDecompositionEditing(false);
     toast({ title: "Saved", description: "Decomposition techniques have been updated." });
   };
-  
-  const handleCancelDecompositionEdit = () => {
-    const data = selectedFocusArea?.decompositionData;
-    setEditableDecompositionData(Array.isArray(data) ? data : decompositionTechniques);
-    setIsDecompositionEditing(false);
-  };
 
   const handleLogWeight = (weight: number, date: Date) => {
     if (!currentUser) return;
@@ -807,22 +801,25 @@ function DeepWorkPageContent() {
 
       <Dialog open={isDecompositionModalOpen} onOpenChange={setIsDecompositionModalOpen}>
         <DialogContent className="sm:max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Decomposition Techniques for: {selectedFocusArea?.name}</DialogTitle>
-            <DialogDescription>
-                Key techniques for breaking down and optimizing complex scenes. Click Edit to customize.
-            </DialogDescription>
+          <DialogHeader className="flex flex-row justify-between items-center">
+            <div className="space-y-1.5">
+              <DialogTitle>Decomposition Techniques for: {selectedFocusArea?.name}</DialogTitle>
+              <DialogDescription>
+                  Key techniques for breaking down and optimizing complex scenes. Click the pencil to edit.
+              </DialogDescription>
+            </div>
+            <div className="flex-shrink-0">
+              {isDecompositionEditing ? (
+                  <Button variant="ghost" size="icon" onClick={handleSaveDecomposition} aria-label="Save Changes">
+                      <Save className="h-5 w-5 text-green-500" />
+                  </Button>
+              ) : (
+                  <Button variant="ghost" size="icon" onClick={() => setIsDecompositionEditing(true)} aria-label="Edit Techniques">
+                      <Edit3 className="h-5 w-5" />
+                  </Button>
+              )}
+            </div>
           </DialogHeader>
-          <div className="flex justify-end gap-2 py-2">
-            {isDecompositionEditing ? (
-                <>
-                    <Button onClick={handleSaveDecomposition}><Save className="mr-2 h-4 w-4" /> Save Changes</Button>
-                    <Button variant="outline" onClick={handleCancelDecompositionEdit}><X className="mr-2 h-4 w-4" /> Cancel</Button>
-                </>
-            ) : (
-                <Button onClick={() => setIsDecompositionEditing(true)}><Edit3 className="mr-2 h-4 w-4" /> Edit</Button>
-            )}
-          </div>
           <div className="max-h-[60vh] overflow-y-auto">
             <Table>
               <TableHeader>
@@ -833,7 +830,7 @@ function DeepWorkPageContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {editableDecompositionData.map((item, index) => (
+                {Array.isArray(editableDecompositionData) && editableDecompositionData.map((item, index) => (
                   <TableRow key={index}>
                     {isDecompositionEditing ? (
                       <>
