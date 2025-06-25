@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dumbbell } from 'lucide-react';
+import { BrainCircuit } from 'lucide-react';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -36,9 +36,9 @@ export default function LoginPage() {
     <div className="flex items-center justify-center min-h-screen p-4">
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="text-center">
-          <Dumbbell className="mx-auto h-14 w-14 text-primary mb-2" />
-          <CardTitle className="text-2xl lg:text-3xl font-bold text-primary">Workout Tracker</CardTitle>
-          <CardDescription className="text-muted-foreground">Access your personalized workout log.</CardDescription>
+          <BrainCircuit className="mx-auto h-14 w-14 text-primary mb-2" />
+          <CardTitle className="text-2xl lg:text-3xl font-bold text-primary">LifeOS</CardTitle>
+          <CardDescription className="text-muted-foreground">Access your personal dashboard for growth.</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login" className="w-full">
