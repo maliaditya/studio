@@ -605,108 +605,6 @@ function UpskillPageContent() {
     }
   }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, workoutMode, workoutPlans, weightLogs, goalWeight, height, dateOfBirth, gender]);
 
-
-  useEffect(() => {
-    if (!currentUser || exerciseDefinitions.length === 0 || Object.keys(workoutPlans).length === 0) return;
-  
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-  
-    setAllWorkoutLogs(prevLogs => {
-      const workoutExists = prevLogs.some(log => log.id === dateKey);
-      if (workoutExists) {
-        return prevLogs; // Don't modify if workout already exists
-      }
-  
-      const dayOfWeek = getDay(selectedDate);
-      const exercisesToAdd: WorkoutExercise[] = [];
-      let toastDescription = "";
-      
-      const isoWeek = getISOWeek(selectedDate);
-      const isOddWeek = isoWeek % 2 !== 0;
-
-      if (workoutMode === 'two-muscle') {
-          let plan: any = null;
-          let planName = "";
-    
-          // Use a consistent weekly rotation
-          if (isOddWeek) {
-            // Week A schedule
-            plan = dayOfWeek >= 1 && dayOfWeek <= 3 ? workoutPlans.W1 : workoutPlans.W2;
-            planName = dayOfWeek >= 1 && dayOfWeek <= 3 ? "W1" : "W2";
-            if (dayOfWeek === 6) { plan = workoutPlans.W1; planName = "W1"; } // Saturday mirrors Monday
-          } else {
-            // Week B schedule
-            plan = dayOfWeek >= 1 && dayOfWeek <= 3 ? workoutPlans.W3 : workoutPlans.W4;
-            planName = dayOfWeek >= 1 && dayOfWeek <= 3 ? "W3" : "W4";
-            if (dayOfWeek === 6) { plan = workoutPlans.W3; planName = "W3"; } // Saturday mirrors Monday
-          }
-
-          if (!plan) return prevLogs;
-    
-          const muscleGroupsForDay = dailyMuscleGroups[dayOfWeek];
-          if (!muscleGroupsForDay || muscleGroupsForDay.length === 0) return prevLogs;
-          
-          toastDescription = `Added ${planName} exercises for ${muscleGroupsForDay.join(' & ')}.`;
-          muscleGroupsForDay.forEach(muscleGroup => {
-            const exerciseNames = (plan as any)[muscleGroup] as string[];
-            if (exerciseNames) {
-              exerciseNames.forEach(exName => {
-                const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
-                if (definition && !exercisesToAdd.some(e => e.definitionId === definition.id)) {
-                  exercisesToAdd.push({
-                    id: `${definition.id}-${Date.now()}-${Math.random()}`,
-                    definitionId: definition.id,
-                    name: definition.name,
-                    category: definition.category,
-                    loggedSets: [],
-                    targetSets: DEFAULT_TARGET_SETS,
-                    targetReps: DEFAULT_TARGET_REPS,
-                  });
-                }
-              });
-            }
-          });
-      } else { // 'one-muscle' mode
-          const plan = isOddWeek ? workoutPlans.W5 : workoutPlans.W6;
-          const planName = isOddWeek ? "W5" : "W6";
-          const muscleGroupForDay = singleMuscleDailySchedule[dayOfWeek];
-          if (!muscleGroupForDay) return prevLogs;
-
-          const exerciseNames = (plan as any)[muscleGroupForDay] as string[] | undefined;
-          if (!exerciseNames || exerciseNames.length === 0) return prevLogs;
-          
-          toastDescription = `Added ${planName} exercises for ${muscleGroupForDay}.`;
-
-          exerciseNames.forEach(exName => {
-            const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
-            if (definition) {
-              exercisesToAdd.push({
-                id: `${definition.id}-${Date.now()}-${Math.random()}`,
-                definitionId: definition.id,
-                name: definition.name,
-                category: definition.category,
-                loggedSets: [],
-                targetSets: DEFAULT_TARGET_SETS,
-                targetReps: DEFAULT_TARGET_REPS,
-              });
-            }
-          });
-      }
-
-      if (exercisesToAdd.length > 0) {
-        const newDatedWorkout: DatedWorkout = { id: dateKey, date: dateKey, exercises: exercisesToAdd };
-        toast({ 
-          title: "Workout Autopopulated!", 
-          description: toastDescription
-        });
-        return [...prevLogs, newDatedWorkout];
-      }
-  
-      return prevLogs;
-    });
-  
-  }, [selectedDate, currentUser, exerciseDefinitions, toast, workoutMode, workoutPlans]);
-
   // Check for backup prompt on Mondays
   useEffect(() => {
       if (!currentUser) return;
@@ -1504,3 +1402,5 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
+
+    
