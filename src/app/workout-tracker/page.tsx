@@ -57,308 +57,70 @@ const DEFAULT_TARGET_SETS = 4;
 const DEFAULT_TARGET_REPS = "8-12";
 const DEFAULT_EXERCISE_CATEGORY: ExerciseCategory = "Other";
 
-// A reduced default list to fit within Vercel Edge Config free tier limits.
 const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
-    {
-      "id": "1750347357917_26_1-Arm_Dumbbell_Row",
-      "name": "1-Arm Dumbbell Row",
-      "category": "Back"
-    },
-    {
-      "id": "1750347357917_19_Back_dips",
-      "name": "Back dips",
-      "category": "Triceps"
-    },
-    {
-      "id": "1750347357917_27_Back_extensions",
-      "name": "Back extensions",
-      "category": "Back"
-    },
-    {
-      "id": "1750347357917_28_Barbell_Row",
-      "name": "Barbell Row",
-      "category": "Back"
-    },
-    {
-      "id": "1750347357917_43_Cable_Curls",
-      "name": "Cable Curls",
-      "category": "Biceps"
-    },
-    {
-      "id": "1750347357917_40_Cable_Curls_Superset",
-      "name": "Cable Curls Superset",
-      "category": "Biceps"
-    },
-    {
-      "id": "1750347357917_6_Cable_Fly",
-      "name": "Cable Fly",
-      "category": "Chest"
-    },
-    {
-      "id": "1750347357917_12_Cable_Rope_Pushdown_(Slow)",
-      "name": "Cable Rope Pushdown (Slow)",
-      "category": "Triceps"
-    },
-    {
-      "id": "1750347357917_50_Cable_Upright_Rows",
-      "name": "Cable Upright Rows",
-      "category": "Shoulders"
-    },
-    {
-      "id": "1750347357917_59_Calfs_(Bodyweight)",
-      "name": "Calfs (Bodyweight)",
-      "category": "Legs"
-    },
-    {
-      "id": "1750347357917_9_Close-Grip_Barbell_Bench_Press",
-      "name": "Close-Grip Barbell Bench Press",
-      "category": "Triceps"
-    },
-    {
-      "id": "1750347357917_30_DeadLifts",
-      "name": "DeadLifts",
-      "category": "Back"
-    },
-    {
-      "id": "1750347357917_2_Decline_Dumbbell_Press",
-      "name": "Decline Dumbbell Press",
-      "category": "Chest"
-    },
-    {
-      "id": "1750347357917_16_Double-Arm_Dumbbell_Kickback",
-      "name": "Double-Arm Dumbbell Kickback",
-      "category": "Triceps"
-    },
-    {
-      "id": "1750347357917_7_Dumbbell_Chest_Fly",
-      "name": "Dumbbell Chest Fly",
-      "category": "Chest"
-    },
-    {
-      "id": "1750347357917_4_Dumbbell_Flat_Press",
-      "name": "Dumbbell Flat Press",
-      "category": "Chest"
-    },
-    {
-      "id": "1750347357917_11_Dumbbell_Kickback",
-      "name": "Dumbbell Kickback",
-      "category": "Triceps"
-    },
-    {
-      "id": "1750347357917_51_Dumbbell_Lateral_Raise_(Lean_in)",
-      "name": "Dumbbell Lateral Raise (Lean in)",
-      "category": "Shoulders"
-    },
-    {
-      "id": "1750347357917_8_Dumbbell_Pullovers",
-      "name": "Dumbbell Pullovers",
-      "category": "Chest"
-    },
-    {
-      "id": "1750347357917_46_Face_Pulls",
-      "name": "Face Pulls",
-      "category": "Shoulders"
-    },
-    {
-      "id": "1750347357917_0_Flat_Barbell_Bench_Press",
-      "name": "Flat Barbell Bench Press",
-      "category": "Chest"
-    },
-    {
-      "id": "1750347357917_53_Front_Raise_cable",
-      "name": "Front Raise cable",
-      "category": "Shoulders"
-    },
-    {
-      "id": "1750347357917_34_Hammer_Curl_(Dumbbell)",
-      "name": "Hammer Curl (Dumbbell)",
-      "category": "Biceps"
-    },
-    {
-      "id": "1750347357917_57_Hamstring_machine",
-      "name": "Hamstring machine",
-      "category": "Legs"
-    },
-    {
-      "id": "1750347357917_1_Incline_Barbell_Press",
-      "name": "Incline Barbell Press",
-      "category": "Chest"
-    },
-    {
-      "id": "1750347357917_5_Incline_Dumbbell_Press",
-      "name": "Incline Dumbbell Press",
-      "category": "Chest"
-    },
-    {
-      "id": "1750347357917_23_Lat_Prayer_Pull",
-      "name": "Lat Prayer Pull",
-      "category": "Back"
-    },
-    {
-      "id": "1750347357917_20_Lat_Pulldown",
-      "name": "Lat Pulldown",
-      "category": "Back"
-    },
-    {
-      "id": "1750347357917_24_Lat_Pulldown_(Wide_Grip)",
-      "name": "Lat Pulldown (Wide Grip)",
-      "category": "Back"
-    },
-    {
-      "id": "1750347357917_52_Lean-Away_Cable_Lateral_Raise",
-      "name": "Lean-Away Cable Lateral Raise",
-      "category": "Shoulders"
-    },
-    {
-      "id": "1750347357917_55_Leg_Press",
-      "name": "Leg Press",
-      "category": "Legs"
-    },
-    {
-      "id": "1750347357917_21_Machine_Row",
-      "name": "Machine Row",
-      "category": "Back"
-    },
-    {
-      "id": "1750347357917_13_Overhead_Cable_Extension",
-      "name": "Overhead Cable Extension",
-      "category": "Triceps"
-    },
-    {
-      "id": "1750347357917_10_Overhead_Dumbbell_Extension",
-      "name": "Overhead Dumbbell Extension",
-      "category": "Triceps"
-    },
-    {
-      "id": "1750347357917_3_Peck_Machine",
-      "name": "Peck Machine",
-      "category": "Chest"
-    },
-    {
-      "id": "1750347357917_33_Preacher_curls_Dumbbells",
-      "name": "Preacher curls Dumbbells",
-      "category": "Biceps"
-    },
-    {
-      "id": "1750347357917_56_Quads_Machine",
-      "name": "Quads Machine",
-      "category": "Legs"
-    },
-    {
-      "id": "1750347357917_49_Rear_Delt_Fly_(Incline_Bench)",
-      "name": "Rear Delt Fly (Incline Bench)",
-      "category": "Shoulders"
-    },
-    {
-      "id": "1750347357917_18_Reverse_Bar_Pushdown",
-      "name": "Reverse Bar Pushdown",
-      "category": "Triceps"
-    },
-    {
-      "id": "1750347357917_37_Reverse_Cable",
-      "name": "Reverse Cable",
-      "category": "Biceps"
-    },
-    {
-      "id": "1750347357917_14_Reverse-grip_pushdown",
-      "name": "Reverse-grip pushdown",
-      "category": "Triceps"
-    },
-    {
-      "id": "1750347357917_41_Reversed_cable_curls",
-      "name": "Reversed cable curls",
-      "category": "Biceps"
-    },
-    {
-      "id": "1750347357917_39_Reversed_Incline_curls",
-      "name": "Reversed Incline curls",
-      "category": "Biceps"
-    },
-    {
-      "id": "1750347357917_15_Rope_Pushdown",
-      "name": "Rope Pushdown",
-      "category": "Triceps"
-    },
-    {
-      "id": "1750347357917_36_Seated_Dumbbell_Alternating_Curl",
-      "name": "Seated Dumbbell Alternating Curl",
-      "category": "Biceps"
-    },
-    {
-      "id": "1750347357917_48_Seated_Dumbbell_Lateral_Raise",
-      "name": "Seated Dumbbell Lateral Raise",
-      "category": "Shoulders"
-    },
-    {
-      "id": "1750347357917_44_Seated_Dumbbell_Shoulder_Press",
-      "name": "Seated Dumbbell Shoulder Press",
-      "category": "Shoulders"
-    },
-    {
-      "id": "1750347357917_35_Seated_Incline_Dumbbell_Curl",
-      "name": "Seated Incline Dumbbell Curl",
-      "category": "Biceps"
-    },
-    {
-      "id": "1750347357917_42_Seated_Machine_Curls",
-      "name": "Seated Machine Curls",
-      "category": "Biceps"
-    },
-    {
-      "id": "1750347357917_29_Seated_Row",
-      "name": "Seated Row",
-      "category": "Back"
-    },
-    {
-      "id": "1750347357917_47_Shrugs",
-      "name": "Shrugs",
-      "category": "Shoulders"
-    },
-    {
-      "id": "1750347357917_58_Squats_(Barbell)",
-      "name": "Squats (Barbell)",
-      "category": "Legs"
-    },
-    {
-      "id": "1750347357917_32_Standing_Dumbbell_Alternating_Curl",
-      "name": "Standing Dumbbell Alternating Curl",
-      "category": "Biceps"
-    },
-    {
-      "id": "1750347357917_31_Standing_dumbbell_curls",
-      "name": "Standing dumbbell curls",
-      "category": "Biceps"
-    },
-    {
-      "id": "1750347357917_45_Standing_Dumbbell_Lateral_Raise",
-      "name": "Standing Dumbbell Lateral Raise",
-      "category": "Shoulders"
-    },
-    {
-      "id": "1750347357917_17_Straight_bar_pushdown",
-      "name": "Straight bar pushdown",
-      "category": "Triceps"
-    },
-    {
-      "id": "1750347357917_38_Strict_bar_curls",
-      "name": "Strict bar curls",
-      "category": "Biceps"
-    },
-    {
-      "id": "1750347357917_22_T-Bar_Row",
-      "name": "T-Bar Row",
-      "category": "Back"
-    },
-    {
-      "id": "1750347357917_25_V_handle_lat_pulldown",
-      "name": "V handle lat pulldown",
-      "category": "Back"
-    },
-    {
-      "id": "1750347357917_54_Walking_Lunges_(Barbell)",
-      "name": "Walking Lunges (Barbell)",
-      "category": "Legs"
-    }
+    { id: 'def_1', name: '1-Arm Dumbbell Row', category: 'Back' },
+    { id: 'def_2', name: 'Back dips', category: 'Triceps' },
+    { id: 'def_3', name: 'Back extensions', category: 'Back' },
+    { id: 'def_4', name: 'Barbell Row', category: 'Back' },
+    { id: 'def_5', name: 'Cable Curls', category: 'Biceps' },
+    { id: 'def_6', name: 'Cable Curls Superset', category: 'Biceps' },
+    { id: 'def_7', name: 'Cable Fly', category: 'Chest' },
+    { id: 'def_8', name: 'Cable Rope Pushdown (Slow)', category: 'Triceps' },
+    { id: 'def_9', name: 'Cable Upright Rows', category: 'Shoulders' },
+    { id: 'def_10', name: 'Calfs (Bodyweight)', category: 'Legs' },
+    { id: 'def_11', name: 'Close-Grip Barbell Bench Press', category: 'Triceps' },
+    { id: 'def_12', name: 'DeadLifts', category: 'Back' },
+    { id: 'def_13', name: 'Decline Dumbbell Press', category: 'Chest' },
+    { id: 'def_14', name: 'Double-Arm Dumbbell Kickback', category: 'Triceps' },
+    { id: 'def_15', name: 'Dumbbell Chest Fly', category: 'Chest' },
+    { id: 'def_16', name: 'Dumbbell Flat Press', category: 'Chest' },
+    { id: 'def_17', name: 'Dumbbell Kickback', category: 'Triceps' },
+    { id: 'def_18', name: 'Dumbbell Lateral Raise (Lean in)', category: 'Shoulders' },
+    { id: 'def_19', name: 'Dumbbell Pullovers', category: 'Chest' },
+    { id: 'def_20', name: 'Face Pulls', category: 'Shoulders' },
+    { id: 'def_21', name: 'Flat Barbell Bench Press', category: 'Chest' },
+    { id: 'def_22', name: 'Front Raise cable', category: 'Shoulders' },
+    { id: 'def_23', name: 'Hammer Curl (Dumbbell)', category: 'Biceps' },
+    { id: 'def_24', name: 'Hamstring machine', category: 'Legs' },
+    { id: 'def_25', name: 'Incline Barbell Press', category: 'Chest' },
+    { id: 'def_26', name: 'Incline Dumbbell Press', category: 'Chest' },
+    { id: 'def_27', name: 'Lat Prayer Pull', category: 'Back' },
+    { id: 'def_28', name: 'Lat Pulldown', category: 'Back' },
+    { id: 'def_29', name: 'Lat Pulldown (Wide Grip)', category: 'Back' },
+    { id: 'def_30', name: 'Lean-Away Cable Lateral Raise', category: 'Shoulders' },
+    { id: 'def_31', name: 'Leg Press', category: 'Legs' },
+    { id: 'def_32', name: 'Machine Row', category: 'Back' },
+    { id: 'def_33', name: 'Overhead Cable Extension', category: 'Triceps' },
+    { id: 'def_34', name: 'Overhead Dumbbell Extension', category: 'Triceps' },
+    { id: 'def_35', name: 'Peck Machine', category: 'Chest' },
+    { id: 'def_36', name: 'Preacher curls Dumbbells', category: 'Biceps' },
+    { id: 'def_37', name: 'Quads Machine', category: 'Legs' },
+    { id: 'def_38', name: 'Rear Delt Fly (Incline Bench)', category: 'Shoulders' },
+    { id: 'def_39', name: 'Reverse Bar Pushdown', category: 'Triceps' },
+    { id: 'def_40', name: 'Reverse Cable', category: 'Biceps' },
+    { id: 'def_41', name: 'Reversed cable curls', category: 'Biceps' },
+    { id: 'def_42', name: 'Reversed Incline curls', category: 'Biceps' },
+    { id: 'def_43', name: 'Rope Pushdown', category: 'Triceps' },
+    { id: 'def_44', name: 'Seated Dumbbell Alternating Curl', category: 'Biceps' },
+    { id: 'def_45', name: 'Seated Dumbbell Lateral Raise', category: 'Shoulders' },
+    { id: 'def_46', name: 'Seated Dumbbell Shoulder Press', category: 'Shoulders' },
+    { id: 'def_47', name: 'Seated Incline Dumbbell Curl', category: 'Biceps' },
+    { id: 'def_48', name: 'Seated Machine Curls', category: 'Biceps' },
+    { id: 'def_49', name: 'Seated Row', category: 'Back' },
+    { id: 'def_50', name: 'Shrugs', category: 'Shoulders' },
+    { id: 'def_51', name: 'Squats (Barbell)', category: 'Legs' },
+    { id: 'def_52', name: 'Standing Dumbbell Alternating Curl', category: 'Biceps' },
+    { id: 'def_53', name: 'Standing dumbbell curls', category: 'Biceps' },
+    { id: 'def_54', name: 'Standing Dumbbell Lateral Raise', category: 'Shoulders' },
+    { id: 'def_55', name: 'Straight bar pushdown', category: 'Triceps' },
+    { id: 'def_56', name: 'Strict bar curls', category: 'Biceps' },
+    { id: 'def_57', name: 'T-Bar Row', category: 'Back' },
+    { id: 'def_58', name: 'V handle lat pulldown', category: 'Back' },
+    { id: 'def_59', name: 'Walking Lunges (Barbell)', category: 'Legs' },
+    { id: 'def_60', name: 'Concentration Curl', category: 'Biceps' },
+    { id: 'def_61', name: 'Hack Squats', category: 'Legs' },
+    { id: 'def_62', name: 'Preacher Curls Bar', category: 'Biceps' },
+    { id: 'def_63', name: 'Front Raise Dumbbells', category: 'Shoulders' },
   ];
 
 const INITIAL_PLANS: AllWorkoutPlans = {
@@ -399,16 +161,16 @@ const INITIAL_PLANS: AllWorkoutPlans = {
       "Triceps": [ "Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips" ],
       "Back": [ "Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull", "1-Arm Dumbbell Row", "DeadLifts" ],
       "Biceps": [ "Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)", "Reversed cable curls", "Reversed Incline curls" ],
-      "Shoulders": [ "Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Cable Upright Rows", "Front Raise cable", "Shrugs" ],
+      "Shoulders": [ "Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Cable Upright Rows", "Front Raise Dumbbells", "Shrugs" ],
       "Legs": [ "Squats (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine", "Walking Lunges (Barbell)", "Calfs (Bodyweight)" ]
     },
     "W6": {
       "Chest": [ "Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Peck Machine", "Dumbbell Chest Fly", "Dumbbell Pullovers" ],
       "Triceps": [ "Overhead Cable Extension", "Double-Arm Dumbbell Kickback", "Rope Pushdown", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips" ],
       "Back": [ "Lat Pulldown", "1-Arm Dumbbell Row", "V handle lat pulldown", "Barbell Row", "Lat Prayer Pull", "Back extensions" ],
-      "Biceps": [ "Strict bar curls", "Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Reverse Cable", "Standing dumbbell curls" ],
+      "Biceps": [ "Strict bar curls", "Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher Curls Bar", "Reverse Cable", "Concentration Curl" ],
       "Shoulders": [ "Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable", "Cable Upright Rows", "Shrugs" ],
-      "Legs": [ "Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine", "Leg Press", "Calfs (Bodyweight)" ]
+      "Legs": [ "Walking Lunges (Barbell)", "Hack Squats", "Hamstring machine", "Quads Machine", "Leg Press", "Calfs (Bodyweight)" ]
     }
   };
 
@@ -650,12 +412,12 @@ function WorkoutPageContent() {
           let currentPlan: WorkoutPlan;
           let planName: string;
           
-          if (isOddWeek) { // Week 1 & 3 logic
-              currentPlan = (dayOfWeek >= 1 && dayOfWeek <= 3) ? workoutPlans.W1 : workoutPlans.W2;
-              planName = (dayOfWeek >= 1 && dayOfWeek <= 3) ? 'W1' : 'W2';
-          } else { // Week 2 & 4 logic
-              currentPlan = (dayOfWeek >= 1 && dayOfWeek <= 3) ? workoutPlans.W3 : workoutPlans.W4;
-              planName = (dayOfWeek >= 1 && dayOfWeek <= 3) ? 'W3' : 'W4';
+          if (dayOfWeek >= 1 && dayOfWeek <= 3) {
+            currentPlan = isOddWeek ? workoutPlans.W1 : workoutPlans.W3;
+            planName = isOddWeek ? 'W1' : 'W3';
+          } else { // Thursday, Friday, Saturday
+            currentPlan = isOddWeek ? workoutPlans.W2 : workoutPlans.W4;
+            planName = isOddWeek ? 'W2' : 'W4';
           }
           
           if (!currentPlan) return prevLogs;
@@ -667,7 +429,8 @@ function WorkoutPageContent() {
             const exerciseNames = currentPlan[category];
 
             if (exerciseNames) {
-              for (const exName of exerciseNames) {
+              for (let i = 0; i < exerciseNames.length; i++) {
+                const exName = exerciseNames[i];
                 const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
                 if (definition && !exercisesToAdd.some(e => e.definitionId === definition.id)) {
                   exercisesToAdd.push({
@@ -696,7 +459,8 @@ function WorkoutPageContent() {
           
           toastDescription = `Added ${planName} exercises for ${muscleGroupForDay}.`;
 
-          exerciseNames.forEach(exName => {
+          for (let i = 0; i < exerciseNames.length; i++) {
+            const exName = exerciseNames[i];
             const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
             if (definition) {
               exercisesToAdd.push({
@@ -709,7 +473,7 @@ function WorkoutPageContent() {
                 targetReps: DEFAULT_TARGET_REPS,
               });
             }
-          });
+          }
       }
 
       if (exercisesToAdd.length > 0) {

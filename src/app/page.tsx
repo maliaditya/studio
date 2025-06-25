@@ -98,16 +98,16 @@ const INITIAL_PLANS: AllWorkoutPlans = {
       "Triceps": [ "Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips" ],
       "Back": [ "Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull", "1-Arm Dumbbell Row", "DeadLifts" ],
       "Biceps": [ "Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)", "Reversed cable curls", "Reversed Incline curls" ],
-      "Shoulders": [ "Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Cable Upright Rows", "Front Raise cable", "Shrugs" ],
+      "Shoulders": [ "Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Cable Upright Rows", "Front Raise Dumbbells", "Shrugs" ],
       "Legs": [ "Squats (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine", "Walking Lunges (Barbell)", "Calfs (Bodyweight)" ]
     },
     "W6": {
       "Chest": [ "Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Peck Machine", "Dumbbell Chest Fly", "Dumbbell Pullovers" ],
       "Triceps": [ "Overhead Cable Extension", "Double-Arm Dumbbell Kickback", "Rope Pushdown", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips" ],
       "Back": [ "Lat Pulldown", "1-Arm Dumbbell Row", "V handle lat pulldown", "Barbell Row", "Lat Prayer Pull", "Back extensions" ],
-      "Biceps": [ "Strict bar curls", "Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Reverse Cable", "Standing dumbbell curls" ],
+      "Biceps": [ "Strict bar curls", "Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher Curls Bar", "Reverse Cable", "Concentration Curl" ],
       "Shoulders": [ "Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable", "Cable Upright Rows", "Shrugs" ],
-      "Legs": [ "Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine", "Leg Press", "Calfs (Bodyweight)" ]
+      "Legs": [ "Walking Lunges (Barbell)", "Hack Squats", "Hamstring machine", "Quads Machine", "Leg Press", "Calfs (Bodyweight)" ]
     }
   };
 
@@ -440,23 +440,27 @@ function HomePageContent() {
     const exercisesToAdd: WorkoutExercise[] = [];
     let muscleGroupsForDay: string[] = [];
     let plan: WorkoutPlan | null = null;
-  
+    let planName: string = '';
+
     if (workoutMode === 'two-muscle') {
         const isoWeek = getISOWeek(today);
         const isOddWeek = isoWeek % 2 !== 0;
         muscleGroupsForDay = dailyMuscleGroups[dayOfWeek] || [];
 
         if (muscleGroupsForDay.length > 0) {
-             if (isOddWeek) { // Week 1 & 3 logic
-                plan = (dayOfWeek >= 1 && dayOfWeek <= 3) ? workoutPlans.W1 : workoutPlans.W2;
-            } else { // Week 2 & 4 logic
-                plan = (dayOfWeek >= 1 && dayOfWeek <= 3) ? workoutPlans.W3 : workoutPlans.W4;
+            if (dayOfWeek >= 1 && dayOfWeek <= 3) {
+                plan = isOddWeek ? workoutPlans.W1 : workoutPlans.W3;
+                planName = isOddWeek ? 'W1' : 'W3';
+            } else { // For Thursday, Friday, Saturday
+                plan = isOddWeek ? workoutPlans.W2 : workoutPlans.W4;
+                planName = isOddWeek ? 'W2' : 'W4';
             }
         }
     } else if (workoutMode === 'one-muscle') {
       const isoWeek = getISOWeek(today);
       const isOddWeek = isoWeek % 2 !== 0;
       plan = isOddWeek ? workoutPlans.W5 : workoutPlans.W6;
+      planName = isOddWeek ? 'W5' : 'W6';
       const muscleGroupForDay = singleMuscleDailySchedule[dayOfWeek];
       if (muscleGroupForDay) {
         muscleGroupsForDay = [muscleGroupForDay];
@@ -469,7 +473,8 @@ function HomePageContent() {
         const exerciseNames = (plan as WorkoutPlan)[category];
   
         if (exerciseNames) {
-          for (const exName of exerciseNames) {
+          for (let i = 0; i < exerciseNames.length; i++) {
+            const exName = exerciseNames[i];
             const definition = exerciseDefinitions.find(def => def.name.toLowerCase() === exName.toLowerCase());
             if (definition && !exercisesToAdd.some(e => e.definitionId === definition.id)) {
               const lastPerformance = findLastPerformance(definition.id);
