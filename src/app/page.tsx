@@ -296,7 +296,14 @@ function HomePageContent() {
                         <CardTitle className="text-lg font-medium">{slot.name}</CardTitle>
                         <CardDescription>{slot.time}</CardDescription>
                       </div>
-                      {slot.icon}
+                      <div className="flex items-center gap-2">
+                        {currentSlot === slot.name && (
+                            <div className="font-mono text-lg text-primary/80 tracking-wider animate-subtle-pulse">
+                                {remainingTime}
+                            </div>
+                        )}
+                        {slot.icon}
+                      </div>
                     </CardHeader>
                     <CardContent className="flex flex-col justify-between min-h-[8rem]">
                         {activity ? (
@@ -309,11 +316,6 @@ function HomePageContent() {
                                   <span className="font-semibold capitalize">{activity.type}</span>
                               </div>
                               <p className="text-xl font-bold text-foreground">{activity.details}</p>
-                              {currentSlot === slot.name && (
-                                <div className="mt-2 font-mono text-sm text-primary/80 tracking-wider">
-                                    <span className="animate-subtle-pulse">Ends in: {remainingTime}</span>
-                                </div>
-                              )}
                             </div>
                             <Button variant="ghost" size="sm" onClick={() => handleRemoveActivity(slot.name)} className="self-start p-1 h-auto text-xs text-muted-foreground hover:text-destructive mt-2">
                                 <Trash2 className="h-3 w-3 mr-1" />
@@ -325,10 +327,7 @@ function HomePageContent() {
                               {currentSlot === slot.name ? (
                                 <div className="flex-grow flex items-center justify-center">
                                     <div className="text-center">
-                                        <p className="text-sm text-muted-foreground mb-1">Current Focus</p>
-                                        <div className="font-mono text-3xl font-bold text-primary tracking-widest animate-subtle-pulse">
-                                            {remainingTime}
-                                        </div>
+                                        <p className="text-lg text-muted-foreground">Current Focus</p>
                                     </div>
                                 </div>
                               ) : (
