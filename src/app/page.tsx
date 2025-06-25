@@ -365,9 +365,10 @@ function HomePageContent() {
 
     const healthDone = completedActivities.some(act => act.type === 'workout');
     const wealthDone = completedActivities.some(act => act.type === 'deepwork');
+    const growthDone = completedActivities.some(act => act.type === 'upskill');
     const directionDone = completedActivities.some(act => act.type === 'planning' || act.type === 'tracking');
 
-    return { health: healthDone, wealth: wealthDone, direction: directionDone };
+    return { health: healthDone, wealth: wealthDone, growth: growthDone, direction: directionDone };
   }, [schedule, todayKey]);
 
 
@@ -383,7 +384,7 @@ function HomePageContent() {
             <p className="text-md text-muted-foreground pt-1">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
         </CardHeader>
         <CardContent>
-            <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className={cn( "rounded-lg p-3 text-center transition-all duration-300", dailyStats.health ? "bg-green-100 dark:bg-green-900/50 border border-green-500/50" : "bg-muted/50" )}>
                   <h3 className="font-semibold text-foreground">Health</h3>
                   <p className={cn("text-xs font-medium", dailyStats.health ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}>
@@ -394,6 +395,12 @@ function HomePageContent() {
                   <h3 className="font-semibold text-foreground">Wealth</h3>
                   <p className={cn("text-xs font-medium", dailyStats.wealth ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}>
                       {dailyStats.wealth ? "Complete" : "Pending"}
+                  </p>
+              </div>
+              <div className={cn( "rounded-lg p-3 text-center transition-all duration-300", dailyStats.growth ? "bg-green-100 dark:bg-green-900/50 border border-green-500/50" : "bg-muted/50" )}>
+                  <h3 className="font-semibold text-foreground">Growth</h3>
+                  <p className={cn("text-xs font-medium", dailyStats.growth ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}>
+                      {dailyStats.growth ? "Complete" : "Pending"}
                   </p>
               </div>
               <div className={cn( "rounded-lg p-3 text-center transition-all duration-300", dailyStats.direction ? "bg-green-100 dark:bg-green-900/50 border border-green-500/50" : "bg-muted/50" )}>
