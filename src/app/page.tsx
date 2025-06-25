@@ -71,6 +71,7 @@ function HomePageContent() {
   const [currentSlot, setCurrentSlot] = useState('');
   const [remainingTime, setRemainingTime] = useState('');
   const [schedule, setSchedule] = useState<FullSchedule>({});
+  const [isScheduleLoaded, setIsScheduleLoaded] = useState(false);
   const [todayKey, setTodayKey] = useState('');
 
   // State for workout data
@@ -110,15 +111,16 @@ function HomePageContent() {
         console.error("Failed to parse schedule from localStorage", error);
         setSchedule({});
       }
+      setIsScheduleLoaded(true);
     }
   }, [scheduleStorageKey]);
 
   // Save schedule to localStorage
   useEffect(() => {
-    if (scheduleStorageKey) {
+    if (scheduleStorageKey && isScheduleLoaded) {
       localStorage.setItem(scheduleStorageKey, JSON.stringify(schedule));
     }
-  }, [schedule, scheduleStorageKey]);
+  }, [schedule, scheduleStorageKey, isScheduleLoaded]);
 
   // Load workout data
   useEffect(() => {
