@@ -11,7 +11,13 @@ const dailyMuscleGroups: Record<number, string[]> = {
 };
 
 const singleMuscleDailySchedule: Record<number, ExerciseCategory | null> = {
-  1: "Chest", 2: "Back", 3: "Legs", 4: "Shoulders", 5: "Biceps", 6: "Triceps", 0: null,
+    1: "Chest",       // Monday
+    2: "Triceps",     // Tuesday
+    3: "Back",        // Wednesday
+    4: "Biceps",      // Thursday
+    5: "Shoulders",   // Friday
+    6: "Legs",        // Saturday
+    0: null,          // Sunday
 };
 
 /**
@@ -130,3 +136,5 @@ export const getExercisesForDay = (
     const description = `Added ${planKey} exercises for ${muscleGroups.join(' & ')}. Loaded ${allExercisesToAdd.length} exercises.`;
     return { exercises: allExercisesToAdd, description };
 };
+
+    

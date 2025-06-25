@@ -193,13 +193,13 @@ const dailyMuscleGroups: Record<number, string[]> = {
 
 // Schedule for "One Muscle / Day" mode
 const singleMuscleDailySchedule: Record<number, ExerciseCategory | null> = {
-    1: "Chest",
-    2: "Back",
-    3: "Legs",
-    4: "Shoulders",
-    5: "Biceps",
-    6: "Triceps",
-    0: null, // Sunday
+    1: "Chest",       // Monday
+    2: "Triceps",     // Tuesday
+    3: "Back",        // Wednesday
+    4: "Biceps",      // Thursday
+    5: "Shoulders",   // Friday
+    6: "Legs",        // Saturday
+    0: null,          // Sunday
 };
 
 function WorkoutPageContent() {
@@ -1357,3 +1357,5 @@ function WorkoutPageContent() {
 export default function Page() {
   return ( <AuthGuard> <WorkoutPageContent /> </AuthGuard> );
 }
+
+    
