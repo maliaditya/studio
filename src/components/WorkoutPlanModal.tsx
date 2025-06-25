@@ -210,7 +210,7 @@ export function WorkoutPlanModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[90dvb] flex flex-col">
+      <DialogContent className="sm:max-w-4xl max-h-[90dvh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>{dialogDescription}</DialogDescription>
