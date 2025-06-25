@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -20,6 +21,7 @@ export function Header() {
     { href: '/workout-tracker', label: 'Workout Tracker' },
     { href: '/upskill', label: 'Upskill' },
     { href: '/deep-work', label: 'Deep Work' },
+    { href: '/stats', label: 'Stats' },
   ];
 
   return (
