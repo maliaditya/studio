@@ -4,7 +4,7 @@
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Sunrise, Sun, Sunset, Moon, MoonStar, CloudSun, PlusCircle, Trash2, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck } from 'lucide-react';
+import { BrainCircuit, Sunrise, Sun, Sunset, Moon, MoonStar, CloudSun, PlusCircle, Trash2, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, BarChart3, Clock, TrendingUp, Zap } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -12,11 +12,12 @@ import { format, getDay, getISOWeek } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysLearningModal } from '@/components/TodaysLearningModal';
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity, ActivityType, DatedWorkout } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity, ActivityType, DatedWorkout, TopicGoal } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
 import { useToast } from '@/hooks/use-toast';
+import { Separator } from '@/components/ui/separator';
 
 const slots = [
   { name: 'Late Night', time: '12 AM - 4 AM', icon: <Moon className="h-6 w-6 text-indigo-400" /> },
@@ -74,6 +75,30 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
   tracking: <ClipboardCheck className="h-5 w-5 text-primary" />,
 };
 
+const productivityLevels = [
+    { level: 'L1', min: 15, max: 30, description: 'Just showing up', zone: '⚪️ Entry Zone' },
+    { level: 'L2', min: 30, max: 45, description: 'Light touch / spark', zone: '⚪️ Entry Zone' },
+    { level: 'L3', min: 45, max: 60, description: 'Single Pomodoro session', zone: '⚪️ Entry Zone' },
+    { level: 'L4', min: 60, max: 90, description: 'Basic learner habit', zone: '🟢 Stable Zone' },
+    { level: 'L5', min: 90, max: 120, description: 'Focused beginner phase', zone: '🟢 Stable Zone' },
+    { level: 'L6', min: 120, max: 150, description: 'Mini deep work commitment', zone: '🟢 Stable Zone' },
+    { level: 'L7', min: 150, max: 180, description: 'Structured discipline zone', zone: '🟢 Stable Zone' },
+    { level: 'L8', min: 180, max: 210, description: 'Daily scholar mode', zone: '🟡 Progress Zone' },
+    { level: 'L9', min: 210, max: 240, description: 'Solid effort / Part-time student', zone: '🟡 Progress Zone' },
+    { level: 'L10', min: 240, max: 300, description: 'Full-time learner level', zone: '🟡 Progress Zone' },
+    { level: 'L11', min: 300, max: 360, description: 'Deep learner zone', zone: '🟡 Progress Zone' },
+    { level: 'L12', min: 360, max: 420, description: 'Advanced practice / Bootcamp ready', zone: '🟠 High Intensity' },
+    { level: 'L13', min: 420, max: 480, description: 'Peak state zone', zone: '🟠 High Intensity' },
+    { level: 'L14', min: 480, max: 540, description: 'Monastic discipline', zone: '🔴 Extreme Zone' },
+    { level: 'L15', min: 540, max: 600, description: 'Total immersion day', zone: '🔴 Extreme Zone' },
+    { level: 'L16', min: 600, max: 660, description: 'Elite performer stretch', zone: '🔴 Extreme Zone' },
+    { level: 'L17', min: 660, max: 720, description: 'Near-max capacity', zone: '🔴 Extreme Zone' },
+    { level: 'L18', min: 720, max: 780, description: 'Obsessive learner', zone: '🔴 Extreme Zone' },
+    { level: 'L19', min: 780, max: 900, description: 'Burning fuel — not sustainable daily', zone: '🔥 Overdrive Zone' },
+    { level: 'L20', min: 900, max: Infinity, description: 'Legendary grind day (Rare / Purpose-driven only)', zone: '⚠️ Apex Zone' },
+];
+
+
 function HomePageContent() {
   const { currentUser } = useAuth();
   const router = useRouter();
@@ -93,6 +118,7 @@ function HomePageContent() {
   // State for upskill and deepwork data
   const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
   const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
+  const [topicGoals, setTopicGoals] = useState<Record<string, TopicGoal>>({});
 
   // State for TodaysWorkoutModal
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
@@ -168,6 +194,7 @@ function HomePageContent() {
         const logsKey = `allWorkoutLogs_${username}`;
         const upskillLogsKey = `upskill_logs_${username}`;
         const deepworkLogsKey = `deepwork_logs_${username}`;
+        const goalsKey = `upskill_topic_goals_${username}`;
 
 
         const storedMode = localStorage.getItem(modeKey);
@@ -201,6 +228,12 @@ function HomePageContent() {
             const storedDeepWorkLogs = localStorage.getItem(deepworkLogsKey);
             setAllDeepWorkLogs(storedDeepWorkLogs ? JSON.parse(storedDeepWorkLogs) : []);
         } catch (e) { console.error("Error parsing deep work logs", e); setAllDeepWorkLogs([]); }
+        
+        try {
+            const storedGoals = localStorage.getItem(goalsKey);
+            setTopicGoals(storedGoals ? JSON.parse(storedGoals) : {});
+        } catch (e) { console.error("Error parsing topic goals", e); setTopicGoals({}); }
+
     }
   }, [currentUser]);
 
@@ -451,6 +484,66 @@ function HomePageContent() {
     return { health: healthDone, wealth: wealthDone, growth: growthDone, direction: directionDone };
   }, [schedule, todayKey]);
 
+    const productivityStats = useMemo(() => {
+        const calculateAverageDuration = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
+            const dailyDurations: Record<string, number> = {};
+            logs.forEach(log => {
+                const duration = log.exercises.reduce((total, ex) => 
+                    total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
+                if (duration > 0) {
+                    dailyDurations[log.date] = (dailyDurations[log.date] || 0) + duration;
+                }
+            });
+            const daysWithActivity = Object.keys(dailyDurations).length;
+            if (daysWithActivity === 0) return 0;
+            const totalDuration = Object.values(dailyDurations).reduce((sum, d) => sum + d, 0);
+            return totalDuration / daysWithActivity;
+        };
+
+        const calculateLearningSpeed = (logs: DatedWorkout[], goals: typeof topicGoals) => {
+            const topicData: Record<string, { totalProgress: number; totalDuration: number }> = {};
+            logs.forEach(log => {
+                log.exercises.forEach(ex => {
+                    if (goals[ex.category]) {
+                        if (!topicData[ex.category]) {
+                            topicData[ex.category] = { totalProgress: 0, totalDuration: 0 };
+                        }
+                        ex.loggedSets.forEach(set => {
+                            topicData[ex.category].totalProgress += set.weight; // progress
+                            topicData[ex.category].totalDuration += set.reps; // duration
+                        });
+                    }
+                });
+            });
+            const speeds: Record<string, { speed: number; unit: string }> = {};
+            Object.keys(topicData).forEach(topic => {
+                const data = topicData[topic];
+                if (data.totalDuration > 0) {
+                    const speed = (data.totalProgress / data.totalDuration) * 60; // progress per hour
+                    speeds[topic] = { speed, unit: `${goals[topic].goalType}/hr` };
+                }
+            });
+            return speeds;
+        };
+
+        const avgUpskillDuration = calculateAverageDuration(allUpskillLogs, 'reps');
+        const avgDeepWorkDuration = calculateAverageDuration(allDeepWorkLogs, 'weight');
+        
+        const totalProductiveMinutes = avgUpskillDuration + avgDeepWorkDuration;
+        const totalProductiveHours = totalProductiveMinutes / 60;
+
+        const currentLevel = productivityLevels.find(l => totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max) || null;
+
+        const learningSpeeds = calculateLearningSpeed(allUpskillLogs, topicGoals);
+
+        return {
+            avgUpskillDuration,
+            avgDeepWorkDuration,
+            totalProductiveHours,
+            currentLevel,
+            learningSpeeds
+        };
+    }, [allUpskillLogs, allDeepWorkLogs, topicGoals]);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -490,6 +583,64 @@ function HomePageContent() {
                   </p>
               </div>
             </div>
+
+            <Card className="mb-6 bg-card/50">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-primary"><BarChart3 /> Your Productivity Snapshot</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="md:col-span-1 flex flex-col items-center justify-center text-center p-4 rounded-lg bg-muted/50">
+                            <p className="text-muted-foreground">Productivity Level</p>
+                            {productivityStats.currentLevel ? (
+                                <>
+                                    <h3 className="text-4xl font-bold text-primary">{productivityStats.currentLevel.level}</h3>
+                                    <p className="text-sm">{productivityStats.currentLevel.description}</p>
+                                    <p className="text-xs text-muted-foreground">{productivityStats.currentLevel.zone}</p>
+                                </>
+                            ) : (
+                                <p className="text-muted-foreground mt-2">Not enough data</p>
+                            )}
+                            <Separator className="my-4" />
+                            <p className="text-muted-foreground">Total Productive Hours</p>
+                            <h3 className="text-2xl font-bold">{productivityStats.totalProductiveHours.toFixed(2)}</h3>
+                            <p className="text-xs text-muted-foreground">per day (average)</p>
+                        </div>
+
+                        <div className="md:col-span-2 space-y-4">
+                            <div>
+                                <h4 className="font-semibold mb-2 flex items-center gap-2"><Clock /> Daily Averages</h4>
+                                <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between items-center p-2 rounded bg-muted/30">
+                                        <span className="flex items-center gap-2 text-muted-foreground"><BookOpenCheck className="h-4 w-4" /> Learning</span>
+                                        <span className="font-semibold">{productivityStats.avgUpskillDuration.toFixed(0)} min</span>
+                                    </div>
+                                    <div className="flex justify-between items-center p-2 rounded bg-muted/30">
+                                        <span className="flex items-center gap-2 text-muted-foreground"><Briefcase className="h-4 w-4" /> Deep Work</span>
+                                        <span className="font-semibold">{productivityStats.avgDeepWorkDuration.toFixed(0)} min</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 className="font-semibold mb-2 flex items-center gap-2"><Zap /> Learning Speed</h4>
+                                <div className="space-y-2 text-sm">
+                                    {Object.keys(productivityStats.learningSpeeds).length > 0 ? (
+                                        Object.entries(productivityStats.learningSpeeds).map(([topic, data]) => (
+                                            <div key={topic} className="flex justify-between items-center p-2 rounded bg-muted/30">
+                                                <span className="text-muted-foreground">{topic}</span>
+                                                <span className="font-semibold">{data.speed.toFixed(1)} {data.unit}</span>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground text-center py-2">No learning speed data yet. Log progress and duration in the Upskill page.</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {slots.map((slot) => {
                 const activities = todaysSchedule[slot.name];
