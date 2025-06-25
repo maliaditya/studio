@@ -150,7 +150,7 @@ const INITIAL_PLANS: AllWorkoutPlans = {
         "Close-Grip Barbell Bench Press",
         "Overhead Dumbbell Extension",
         "Dumbbell Kickback",
-        "Cable Rope Pushdown (Slow)"
+        "Rope Pushdown"
       ],
       "Back": [
         "Lat Pulldown",
@@ -186,7 +186,7 @@ const INITIAL_PLANS: AllWorkoutPlans = {
       ],
       "Triceps": [
         "Overhead Dumbbell Extension",
-        "Overhead Bar extension",
+        "Close-Grip Barbell Bench Press",
         "Rope Pushdown",
         "Dumbbell Kickback"
       ],
@@ -634,19 +634,19 @@ function WorkoutPageContent() {
       if (workoutMode === 'two-muscle') {
           const isoWeek = getISOWeek(selectedDate);
           const isOddWeek = isoWeek % 2 !== 0;
-
           const muscleGroupsForDay = dailyMuscleGroups[dayOfWeek];
+
           if (!muscleGroupsForDay || muscleGroupsForDay.length === 0) return prevLogs;
-          
+
           let currentPlan: WorkoutPlan;
           let planName: string;
-
-          if (isOddWeek) {
-            planName = (dayOfWeek <= 3) ? 'W1' : 'W2';
-            currentPlan = (dayOfWeek <= 3) ? workoutPlans.W1 : workoutPlans.W2;
-          } else { // Even week
-            planName = (dayOfWeek <= 3) ? 'W3' : 'W4';
-            currentPlan = (dayOfWeek <= 3) ? workoutPlans.W3 : workoutPlans.W4;
+          
+          if (dayOfWeek >= 1 && dayOfWeek <= 3) { // Mon, Tue, Wed
+              currentPlan = isOddWeek ? workoutPlans.W1 : workoutPlans.W3;
+              planName = isOddWeek ? 'W1' : 'W3';
+          } else { // Thu, Fri, Sat
+              currentPlan = isOddWeek ? workoutPlans.W2 : workoutPlans.W4;
+              planName = isOddWeek ? 'W2' : 'W4';
           }
           
           if (!currentPlan) return prevLogs;

@@ -61,8 +61,8 @@ const singleMuscleDailySchedule: Record<number, string | null> = {
 };
 
 const INITIAL_PLANS: AllWorkoutPlans = {
-    "W1": { "Chest": ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine"], "Triceps": ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Cable Rope Pushdown (Slow)"], "Back": ["Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull"], "Biceps": ["Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Shrugs"], "Legs": ["Walking Lunges (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine"] },
-    "W2": { "Chest": ["Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Cable Fly"], "Triceps": ["Overhead Dumbbell Extension", "Overhead Bar extension", "Rope Pushdown", "Dumbbell Kickback"], "Back": ["Lat Pulldown (Wide Grip)", "V handle lat pulldown", "1-Arm Dumbbell Row", "Back extensions"], "Biceps": ["Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Reverse Cable"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Seated Dumbbell Lateral Raise", "Rear Delt Fly (Incline Bench)", "Cable Upright Rows"], "Legs": ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"] },
+    "W1": { "Chest": ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine"], "Triceps": ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Rope Pushdown"], "Back": ["Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull"], "Biceps": ["Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Shrugs"], "Legs": ["Walking Lunges (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine"] },
+    "W2": { "Chest": ["Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Cable Fly"], "Triceps": ["Overhead Dumbbell Extension", "Close-Grip Barbell Bench Press", "Rope Pushdown", "Dumbbell Kickback"], "Back": ["Lat Pulldown (Wide Grip)", "V handle lat pulldown", "1-Arm Dumbbell Row", "Back extensions"], "Biceps": ["Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Reverse Cable"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Seated Dumbbell Lateral Raise", "Rear Delt Fly (Incline Bench)", "Cable Upright Rows"], "Legs": ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"] },
     "W3": { "Chest": ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine"], "Triceps": ["Overhead Cable Extension", "Straight bar pushdown", "Reversebar pushdown", "Back dips"], "Back": ["Lat Pulldown", "Barbell Row", "Seated Row", "Lat Prayer Pull"], "Biceps": ["Strict bar curls", "Reversed Incline curls", "Cable Curls Superset", "Reversed cable curls"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Dumbbell Lateral Raise (Lean in)", "Face Pulls", "Shrugs"], "Legs": ["Leg Press", "Quads Machine", "Hamstring machine", "Calf Raises (Bodyweight)"] },
     "W4": { "Chest": ["Dumbbell Flat Press", "Incline Dumbbell Press", "Dumbbell Pullovers", "Cable Fly"], "Triceps": ["Overhead Cable Extension", "Straight bar pushdown", "Reversebar pushdown", "Back dips"], "Back": ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle pulldown Cable", "DeadLifts"], "Biceps": ["Seated Machine Curls", "Cable Curls", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable"], "Legs": ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"] },
     "W5": { "Chest": ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine", "Cable Fly", "Dumbbell Pullovers"], "Triceps": ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Straight bar pushdown", "Reversebar pushdown", "Back dips"], "Back": ["Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull", "1-Arm Dumbbell Row", "DeadLifts"], "Biceps": ["Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)", "Reversed cable curls", "Reversed Incline curls"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Cable Upright Rows", "Front Raise Dumbbells", "Shrugs"], "Legs": ["Squats (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine", "Walking Lunges (Barbell)", "Calf Raises"] },
@@ -400,17 +400,17 @@ function HomePageContent() {
     let plan: WorkoutPlan | null = null;
   
     if (workoutMode === 'two-muscle') {
-      const isoWeek = getISOWeek(today);
-      const isOddWeek = isoWeek % 2 !== 0;
-      muscleGroupsForDay = dailyMuscleGroups[dayOfWeek] || [];
-  
-      if (muscleGroupsForDay.length > 0) {
-        if (isOddWeek) {
-          plan = (dayOfWeek <= 3) ? workoutPlans.W1 : workoutPlans.W2;
-        } else { // Even week
-          plan = (dayOfWeek <= 3) ? workoutPlans.W3 : workoutPlans.W4;
+        const isoWeek = getISOWeek(today);
+        const isOddWeek = isoWeek % 2 !== 0;
+        muscleGroupsForDay = dailyMuscleGroups[dayOfWeek] || [];
+
+        if (muscleGroupsForDay.length > 0) {
+            if (dayOfWeek >= 1 && dayOfWeek <= 3) { // Mon, Tue, Wed
+                plan = isOddWeek ? workoutPlans.W1 : workoutPlans.W3;
+            } else { // Thu, Fri, Sat
+                plan = isOddWeek ? workoutPlans.W2 : workoutPlans.W4;
+            }
         }
-      }
     } else if (workoutMode === 'one-muscle') {
       const isoWeek = getISOWeek(today);
       const isOddWeek = isoWeek % 2 !== 0;
