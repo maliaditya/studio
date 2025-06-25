@@ -8,7 +8,7 @@ import { BrainCircuit, Sunrise, Sun, Sunset, Moon, MoonStar, CloudSun, PlusCircl
 import { useState, useEffect, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { format, getDay, getISOWeek } from 'date-fns';
+import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysLearningModal } from '@/components/TodaysLearningModal';
@@ -18,6 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 
 const slots = [
   { name: 'Late Night', time: '12 AM - 4 AM', icon: <Moon className="h-6 w-6 text-indigo-400" /> },
@@ -500,30 +501,87 @@ function HomePageContent() {
             return totalDuration / daysWithActivity;
         };
 
-        const calculateLearningSpeed = (logs: DatedWorkout[], goals: typeof topicGoals) => {
-            const topicData: Record<string, { totalProgress: number; totalDuration: number }> = {};
+        const calculateLearningStats = (logs: DatedWorkout[], goals: typeof topicGoals) => {
+            const topicStats: Record<string, any> = {};
+
+            const topicData: Record<string, { totalDuration: number; logs: { date: Date; progress: number }[] }> = {};
             logs.forEach(log => {
                 log.exercises.forEach(ex => {
                     if (goals[ex.category]) {
                         if (!topicData[ex.category]) {
-                            topicData[ex.category] = { totalProgress: 0, totalDuration: 0 };
+                            topicData[ex.category] = { totalDuration: 0, logs: [] };
                         }
-                        ex.loggedSets.forEach(set => {
-                            topicData[ex.category].totalProgress += set.weight; // progress
-                            topicData[ex.category].totalDuration += set.reps; // duration
-                        });
+                        const dailyProgress = ex.loggedSets.reduce((sum, set) => sum + set.weight, 0);
+                        const dailyDuration = ex.loggedSets.reduce((sum, set) => sum + set.reps, 0);
+
+                        if (dailyProgress > 0) {
+                            topicData[ex.category].logs.push({ date: parseISO(log.date), progress: dailyProgress });
+                        }
+                        topicData[ex.category].totalDuration += dailyDuration;
                     }
                 });
             });
-            const speeds: Record<string, { speed: number; unit: string }> = {};
+
             Object.keys(topicData).forEach(topic => {
                 const data = topicData[topic];
-                if (data.totalDuration > 0) {
-                    const speed = (data.totalProgress / data.totalDuration) * 60; // progress per hour
-                    speeds[topic] = { speed, unit: `${goals[topic].goalType}/hr` };
+                const goal = goals[topic];
+                if (!goal || data.logs.length === 0) return;
+                
+                const totalProgress = data.logs.reduce((sum, log) => sum + log.progress, 0);
+                const remainingProgress = Math.max(0, goal.goalValue - totalProgress);
+                
+                const sortedLogs = data.logs.sort((a,b) => a.date.getTime() - b.date.getTime());
+                const firstDay = sortedLogs[0].date;
+                const durationInDays = differenceInDays(new Date(), firstDay) + 1;
+                const averageRatePerDay = durationInDays > 0 ? totalProgress / durationInDays : 0;
+
+                let completionStats = null;
+                if (averageRatePerDay > 0.01 && remainingProgress > 0) {
+                    const daysToCompletion = Math.ceil(remainingProgress / averageRatePerDay);
+                    const estimatedCompletionDate = addDays(new Date(), daysToCompletion);
+                    completionStats = {
+                        date: format(estimatedCompletionDate, 'PPP'),
+                        daysRemaining: daysToCompletion
+                    };
                 }
+
+                const milestones = [0.25, 0.50, 0.75, 1.0].map(m => m * goal.goalValue);
+                let nextMilestoneValue = null;
+                let nextMilestonePercent = null;
+                for (let i = 0; i < milestones.length; i++) {
+                    if (totalProgress < milestones[i]) {
+                        nextMilestoneValue = milestones[i];
+                        nextMilestonePercent = (i + 1) * 25;
+                        break;
+                    }
+                }
+                
+                let milestoneStats = null;
+                if (nextMilestoneValue && averageRatePerDay > 0.01) {
+                    const progressToMilestone = nextMilestoneValue - totalProgress;
+                    const daysToMilestone = Math.ceil(progressToMilestone / averageRatePerDay);
+                    const estimatedMilestoneDate = addDays(new Date(), daysToMilestone);
+                    milestoneStats = {
+                        percent: nextMilestonePercent,
+                        date: format(estimatedMilestoneDate, 'PPP'),
+                        daysRemaining: daysToMilestone
+                    };
+                }
+
+                const speed = data.totalDuration > 0 ? (totalProgress / data.totalDuration) * 60 : 0;
+
+                topicStats[topic] = {
+                    speed,
+                    unit: `${goal.goalType}/hr`,
+                    totalProgress: Math.round(totalProgress),
+                    remainingProgress: Math.round(remainingProgress),
+                    goalValue: goal.goalValue,
+                    completion: completionStats,
+                    nextMilestone: milestoneStats,
+                };
             });
-            return speeds;
+
+            return topicStats;
         };
 
         const avgUpskillDuration = calculateAverageDuration(allUpskillLogs, 'reps');
@@ -534,14 +592,14 @@ function HomePageContent() {
 
         const currentLevel = productivityLevels.find(l => totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max) || null;
 
-        const learningSpeeds = calculateLearningSpeed(allUpskillLogs, topicGoals);
+        const learningStats = calculateLearningStats(allUpskillLogs, topicGoals);
 
         return {
             avgUpskillDuration,
             avgDeepWorkDuration,
             totalProductiveHours,
             currentLevel,
-            learningSpeeds
+            learningStats
         };
     }, [allUpskillLogs, allDeepWorkLogs, topicGoals]);
 
@@ -622,17 +680,45 @@ function HomePageContent() {
                                 </div>
                             </div>
                             <div>
-                                <h4 className="font-semibold mb-2 flex items-center gap-2"><Zap /> Learning Speed</h4>
-                                <div className="space-y-2 text-sm">
-                                    {Object.keys(productivityStats.learningSpeeds).length > 0 ? (
-                                        Object.entries(productivityStats.learningSpeeds).map(([topic, data]) => (
-                                            <div key={topic} className="flex justify-between items-center p-2 rounded bg-muted/30">
-                                                <span className="text-muted-foreground">{topic}</span>
-                                                <span className="font-semibold">{data.speed.toFixed(1)} {data.unit}</span>
+                                <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Learning Progress</h4>
+                                <div className="space-y-4 text-sm">
+                                    {Object.keys(productivityStats.learningStats).length > 0 ? (
+                                        Object.entries(productivityStats.learningStats).map(([topic, stats]: [string, any]) => (
+                                            <div key={topic} className="p-3 rounded bg-muted/30">
+                                                <h5 className="font-bold text-foreground">{topic}</h5>
+                                                <div className="mt-2 text-xs text-muted-foreground">
+                                                    Progress: {stats.totalProgress.toLocaleString()} / {stats.goalValue.toLocaleString()} {stats.unit.split('/')[0]}
+                                                </div>
+                                                <Progress value={(stats.totalProgress / stats.goalValue) * 100} className="h-2 my-1" />
+                                                
+                                                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                                                    {stats.nextMilestone && (
+                                                        <div className="space-y-1">
+                                                            <div className="font-semibold">Next Milestone ({stats.nextMilestone.percent}%)</div>
+                                                            <div>Est. Date: <span className="font-medium text-foreground">{stats.nextMilestone.date}</span></div>
+                                                            <div>Days Left: <span className="font-medium text-foreground">{stats.nextMilestone.daysRemaining}</span></div>
+                                                        </div>
+                                                    )}
+                                                    <div className="space-y-1">
+                                                       <div className="font-semibold">Goal Completion</div>
+                                                       {stats.completion ? (
+                                                            <>
+                                                                <div>Est. Date: <span className="font-medium text-foreground">{stats.completion.date}</span></div>
+                                                                <div>Days Left: <span className="font-medium text-foreground">{stats.completion.daysRemaining}</span></div>
+                                                            </>
+                                                       ) : (stats.totalProgress >= stats.goalValue) ? <div className="text-green-500 font-bold">Completed!</div> : <div className="text-muted-foreground">Not enough data to project.</div>}
+                                                    </div>
+                                                </div>
+                                                 <div className="mt-2 pt-2 border-t text-xs">
+                                                    <div className="flex justify-between">
+                                                        <span className="text-muted-foreground">Learning Speed</span>
+                                                        <span className="font-medium text-foreground">{stats.speed.toFixed(1)} {stats.unit}</span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         ))
                                     ) : (
-                                        <p className="text-sm text-muted-foreground text-center py-2">No learning speed data yet. Log progress and duration in the Upskill page.</p>
+                                        <p className="text-sm text-muted-foreground text-center py-2">No learning stats yet. Log progress and duration in the Upskill page.</p>
                                     )}
                                 </div>
                             </div>
@@ -787,3 +873,5 @@ function HomePageContent() {
 export default function Page() {
     return ( <AuthGuard> <HomePageContent /> </AuthGuard> );
 }
+
+    
