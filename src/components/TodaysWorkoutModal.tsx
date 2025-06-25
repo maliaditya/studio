@@ -223,7 +223,7 @@ export function TodaysWorkoutModal({
           </DialogDescription>
         </DialogHeader>
         <div className="flex-grow min-h-0">
-          <ScrollArea className="h-full pr-6">
+          <ScrollArea className="h-full">
             {todaysExercises.length > 0 ? (
               <Table>
                 <TableHeader>
