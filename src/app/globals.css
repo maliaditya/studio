@@ -7,14 +7,14 @@
     --background: 250 30% 12%;
     --foreground: 250 15% 95%;
 
-    --card: 250 30% 18%;
+    --card: hsla(250, 30%, 18%, 0.6);
     --card-foreground: 250 15% 95%;
 
     --popover: 250 30% 18%;
     --popover-foreground: 250 15% 95%;
 
-    --primary: 180 90% 60%;
-    --primary-foreground: 180 15% 10%;
+    --primary: 203 90% 60%;
+    --primary-foreground: 203 10% 10%;
 
     --secondary: 250 20% 25%;
     --secondary-foreground: 250 10% 95%;
@@ -22,15 +22,15 @@
     --muted: 250 20% 22%;
     --muted-foreground: 250 10% 65%;
 
-    --accent: 203 90% 60%;
-    --accent-foreground: 203 10% 10%;
+    --accent: 300 90% 60%;
+    --accent-foreground: 300 10% 10%;
     
     --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 250 30% 30%;
+    --border: hsla(250, 30%, 30%, 0.5);
     --input: 250 30% 25%;
-    --ring: 180 90% 60%;
+    --ring: 203 90% 60%;
 
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
@@ -44,7 +44,7 @@
     --background: 0 0% 5%;
     --foreground: 120 100% 85%;
 
-    --card: 0 0% 10%;
+    --card: hsla(0, 0%, 10%, 0.6);
     --card-foreground: 120 100% 85%;
 
     --popover: 0 0% 8%;
@@ -65,13 +65,52 @@
     --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 120 10% 20%;
+    --border: hsla(120, 10%, 20%, 0.5);
     --input: 120 10% 15%;
     --ring: 120 60% 40%;
   }
 
-  #default-background-container, #matrix-canvas {
+  .theme-cloth {
+    --background: 240 10% 4%;
+    --foreground: 240 5% 95%;
+
+    --card: hsla(240, 8%, 12%, 0.6);
+    --card-foreground: 240 5% 95%;
+
+    --popover: 240 8% 12%;
+    --popover-foreground: 240 5% 95%;
+
+    --primary: 240 5% 85%;
+    --primary-foreground: 240 10% 4%;
+
+    --secondary: 240 5% 20%;
+    --secondary-foreground: 240 5% 95%;
+    
+    --muted: 240, 4%, 16%;
+    --muted-foreground: 240 5% 65%;
+
+    --accent: 240 5% 85%;
+    --accent-foreground: 240 10% 4%;
+    
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: hsla(240, 4%, 20%, 0.5);
+    --input: 240 4% 16%;
+    --ring: 240 5% 85%;
+  }
+
+  #default-background-container, #matrix-canvas, #cloth-canvas {
     display: none;
+  }
+  
+  #cloth-canvas {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: -1;
+    opacity: 0.5;
   }
 
   .theme-default #default-background-container {
@@ -87,8 +126,11 @@
   .theme-matrix #matrix-canvas {
     display: block;
   }
+  
+  .theme-cloth #cloth-canvas {
+    display: block;
+  }
 
-  /* NEW - Cross-fading gradient animation */
   .theme-default #default-background-container .first,
   .theme-default #default-background-container .second,
   .theme-default #default-background-container .third {
