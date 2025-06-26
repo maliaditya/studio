@@ -74,13 +74,39 @@ export function SmokeBackground() {
       smokeParticles.add(particle);
     }
     scene.add(smokeParticles);
+
+    // Moon Setup
+    const moonTexture = loader.load('https://s3-us-west-2.amazonaws.com/s.cdpn.io/17271/lroc_color_poles_1k.jpg');
+    const moonGeometry = new THREE.SphereGeometry(50, 32, 32);
+    const moonMaterial = new THREE.MeshPhongMaterial({
+        map: moonTexture,
+        shininess: 5
+    });
+    const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+    scene.add(moon);
     
     // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    const ambientLight = new THREE.AmbientLight(0x404040, 2); // Softer ambient for overall scene
     scene.add(ambientLight);
+    
+    const pointLight = new THREE.PointLight(0xffffff, 3, 2000); // A brighter light to illuminate the moon
+    scene.add(pointLight);
+
 
     let animationFrameId: number;
     const clock = new THREE.Clock();
+
+    const positionElements = () => {
+        // Position moon in top right corner
+        const vFOV = THREE.MathUtils.degToRad(camera.fov);
+        const height = 2 * Math.tan(vFOV / 2) * (camera.position.z);
+        const width = height * camera.aspect;
+        moon.position.set(width / 2 - 100, height / 2 - 100, 0);
+
+        // Position light source relative to camera
+        pointLight.position.set(camera.position.x + 100, camera.position.y + 100, camera.position.z);
+    };
+    positionElements();
 
     const animate = () => {
       const delta = clock.getDelta();
@@ -103,6 +129,9 @@ export function SmokeBackground() {
       stars.rotation.x += delta * 0.01;
       stars.rotation.y += delta * 0.01;
 
+      // Make moon slowly rotate
+      moon.rotation.y += delta * 0.05;
+
       renderer.render(scene, camera);
       animationFrameId = requestAnimationFrame(animate);
     };
@@ -111,6 +140,7 @@ export function SmokeBackground() {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
+      positionElements();
     };
     
     window.addEventListener('resize', handleResize);
@@ -136,6 +166,11 @@ export function SmokeBackground() {
       // Dispose star resources
       starGeometry.dispose();
       starMaterial.dispose();
+
+      // Dispose moon resources
+      moonGeometry.dispose();
+      moonMaterial.dispose();
+      moonTexture.dispose();
     };
   }, [theme]);
 
