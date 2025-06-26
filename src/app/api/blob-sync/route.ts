@@ -21,14 +21,19 @@ export async function POST(request: Request) {
 
   // Special handling for the 'demo' user.
   if (username === 'demo') {
-    // A token must be provided to update the demo account.
-    if (!process.env.DEMO_ACCOUNT_UPDATE_TOKEN || demo_override_token !== process.env.DEMO_ACCOUNT_UPDATE_TOKEN) {
-      return NextResponse.json(
-        { error: 'The demo account is read-only. A valid override token is required to update it.' },
-        { status: 403 } // 403 Forbidden
-      );
+    // If the DEMO_ACCOUNT_UPDATE_TOKEN is set on the server, it MUST be validated.
+    if (process.env.DEMO_ACCOUNT_UPDATE_TOKEN) {
+      if (!demo_override_token || demo_override_token !== process.env.DEMO_ACCOUNT_UPDATE_TOKEN) {
+        return NextResponse.json(
+          { error: 'The override token is incorrect. A valid token is required to update the demo account.' },
+          { status: 403 } // 403 Forbidden
+        );
+      }
+    } else {
+      // If the token is not set on the server, log a warning but allow the update to proceed for ease of development.
+      console.warn("WARNING: DEMO_ACCOUNT_UPDATE_TOKEN is not set. The demo account can be updated without a token.");
     }
-    // If the token is valid, the function will proceed.
+    // If the token is valid or not required, the function will proceed.
   }
 
   if (!username || data === undefined) {
