@@ -26,8 +26,6 @@ export function UserProfile() {
     return null; 
   }
 
-  const isDemoUser = currentUser.username === 'demo';
-
   const getInitials = (name: string | null | undefined) => {
     if (!name) return <UserIcon className="h-5 w-5"/>;
     return name.substring(0, 2).toUpperCase();
@@ -54,7 +52,7 @@ export function UserProfile() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={pushDataToCloud} className="cursor-pointer" disabled={isDemoUser}>
+        <DropdownMenuItem onClick={pushDataToCloud} className="cursor-pointer">
           <UploadCloud className="mr-2 h-4 w-4" />
           <span>Push to Cloud</span>
         </DropdownMenuItem>
