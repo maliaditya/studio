@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChartContainer, ChartConfig } from '@/components/ui/chart';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, AreaChart, Area, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, AreaChart, Area, Legend, ReferenceLine } from 'recharts';
 import { format, parseISO, startOfISOWeek, setISOWeek, addWeeks } from 'date-fns';
 import type { DatedWorkout, WeightLog } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
@@ -27,9 +27,8 @@ interface StatsOverviewModalProps {
   consistencyData: { date: string; fullDate: string; score: number }[];
 }
 
-const productivityChartConfig = {
-  upskill: { label: "Upskill (min)", color: "hsl(var(--chart-1))" },
-  deepwork: { label: "Deep Work (min)", color: "hsl(var(--chart-2))" },
+const totalProductivityChartConfig = {
+    totalMinutes: { label: "Productive Time (min)", color: "hsl(var(--primary))" },
 } satisfies ChartConfig;
 
 const consistencyChartConfig = {
@@ -75,6 +74,7 @@ export function StatsOverviewModal({
     return Object.values(dailyData).sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime()).map(d => ({
         ...d,
         date: format(d.dateObj, 'MMM dd'),
+        totalMinutes: d.upskill + d.deepwork,
     }));
   }, [allUpskillLogs, allDeepWorkLogs]);
 
@@ -152,15 +152,41 @@ export function StatsOverviewModal({
             <TabsContent value="productivity" className="flex-grow mt-4 min-h-0">
                 <ScrollArea className="h-full pr-4">
                   {productivityData.length > 1 ? (
-                    <ChartContainer config={productivityChartConfig} className="min-h-[400px] w-full">
+                    <ChartContainer config={totalProductivityChartConfig} className="min-h-[400px] w-full">
                        <AreaChart accessibilityLayer data={productivityData} margin={{ top: 10, right: 30, left: 0, bottom: 0, }}>
+                            <defs>
+                                <linearGradient id="fillTotalMinutesModal" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="var(--color-totalMinutes)" stopOpacity={0.8}/>
+                                    <stop offset="95%" stopColor="var(--color-totalMinutes)" stopOpacity={0.1}/>
+                                </linearGradient>
+                            </defs>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="date" />
                             <YAxis label={{ value: 'Minutes', angle: -90, position: 'insideLeft' }}/>
-                            <RechartsTooltip />
+                             <RechartsTooltip
+                                content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                        const data = payload[0].payload;
+                                        return (
+                                            <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                <div className="font-bold text-foreground">{format(data.dateObj, 'PPP')}</div>
+                                                <div className="grid gap-1.5">
+                                                    <div className="flex w-full items-center gap-2">
+                                                        <div className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: 'hsl(var(--primary))' }} />
+                                                        <div className="flex flex-1 justify-between">
+                                                            <span className="text-muted-foreground">Productive Time</span>
+                                                            <span className="font-mono font-medium text-foreground">{data.totalMinutes} min</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                }}
+                            />
                             <Legend verticalAlign="top" height={36}/>
-                            <Area type="monotone" dataKey="upskill" stackId="1" stroke="var(--color-upskill)" fill="var(--color-upskill)" name="Upskill" />
-                            <Area type="monotone" dataKey="deepwork" stackId="1" stroke="var(--color-deepwork)" fill="var(--color-deepwork)" name="Deep Work"/>
+                            <Area type="monotone" dataKey="totalMinutes" fill="url(#fillTotalMinutesModal)" stroke="var(--color-totalMinutes)" strokeWidth={2} name="Productive Time (min)" />
                         </AreaChart>
                     </ChartContainer>
                   ) : <p className="text-center text-muted-foreground py-8">Not enough data to show productivity stats.</p> }
