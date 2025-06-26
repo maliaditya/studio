@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ListChecks, ChevronRight, CalendarIcon, GripVertical, Briefcase, Share2, Loader2, Check, ChevronDown, ChevronUp, Linkedin, Trash2, PlusCircle } from 'lucide-react';
+import { ListChecks, ChevronRight, CalendarIcon, GripVertical, Briefcase, Share2, Loader2, Check, ChevronDown, ChevronUp, Linkedin, Trash2, PlusCircle, X } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format, isMonday, getYear, getISOWeek } from 'date-fns';
@@ -208,7 +208,7 @@ function PersonalBrandingPageContent() {
           }
       });
 
-      return { activeTasks: active, publishedTasks: published };
+      return { activeTasks, publishedTasks };
   }, [brandingTasks]);
 
   const markBackupPromptAsHandled = () => {
@@ -400,13 +400,17 @@ function PersonalBrandingPageContent() {
                                 </Button>
                               </div>
                             </div>
-                            <div className="mt-2 space-y-1">
+                            <div className="mt-2 flex flex-wrap gap-1">
                                 {task.focusAreas?.map(fa => (
-                                    <Badge key={fa} variant="secondary" className="w-full flex justify-between items-center px-2 py-1">
-                                        <span className='truncate' title={fa}>{fa}</span>
-                                        <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={() => handleRemoveFocusAreaFromBundle(task.id, fa)}>
-                                            <Trash2 className="h-3 w-3 text-destructive" />
-                                        </Button>
+                                    <Badge key={fa} variant="secondary" className="py-1 pl-2 pr-1 inline-flex items-center gap-1">
+                                        <span className="truncate max-w-[150px]" title={fa}>{fa}</span>
+                                        <button 
+                                            onClick={() => handleRemoveFocusAreaFromBundle(task.id, fa)}
+                                            className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
+                                            aria-label={`Remove ${fa}`}
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </button>
                                     </Badge>
                                 ))}
                             </div>
