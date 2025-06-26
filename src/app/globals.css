@@ -109,7 +109,7 @@
   }
 
   .theme-default #default-background-container .first {
-    animation: first 10s infinite;
+    animation: first 40s infinite;
     background: linear-gradient(#5ff8ca, #60e08c);
     z-index: 10;
   }
@@ -128,8 +128,8 @@
   }
 
   .theme-default #default-background-container .second {
-    animation: second 10s infinite; 
-    animation-delay: 2s;
+    animation: second 40s infinite; 
+    animation-delay: 10s;
     background: linear-gradient(#19eaa6, #00a1f0);
     z-index: 20;
   }
@@ -148,8 +148,8 @@
   }
 
   .theme-default #default-background-container .third {
-    animation: third 10s infinite;
-    animation-delay: 8s;
+    animation: third 40s infinite;
+    animation-delay: 30s;
     background: linear-gradient(#aab7f8, #ff75c6);
     z-index: 30;
   }
