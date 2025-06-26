@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/contexts/AuthContext';
 import { Header } from '@/components/Header';
 import { Analytics } from '@vercel/analytics/react';
+import { BackgroundAudioPlayer } from '@/components/BackgroundAudioPlayer';
 
 export const metadata: Metadata = {
   title: 'LifeOS',
@@ -30,6 +31,7 @@ export default function RootLayout({
           <Header />
           <main>{children}</main>
           <Toaster />
+          <BackgroundAudioPlayer />
         </AuthProvider>
         <Analytics />
       </body>
