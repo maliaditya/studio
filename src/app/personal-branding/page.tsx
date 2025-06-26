@@ -1,207 +1,253 @@
-
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, FormEvent, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Share2, Globe, Code, Linkedin, CheckCircle2, Youtube, Edit3, Loader2 } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Share2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { ExerciseDefinition, DatedWorkout, TopicBrandingInfo, SharingStatus } from '@/types/workout';
+import { format, parse, getISOWeek, isMonday, getYear, subYears, addDays } from 'date-fns';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, SharingStatus } from '@/types/workout';
+import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
+import { motion, AnimatePresence } from 'framer-motion';
+import { cn } from '@/lib/utils';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
-
-const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
-        <title>X</title>
-        <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/>
-    </svg>
-);
-
-const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
-        <title>DEV Community</title>
-        <path d="M11.472 24a1.5 1.5 0 0 1-1.06-.44L.439 13.587a1.5 1.5 0 0 1 0-2.12l9.97-9.97a1.5 1.5 0 0 1 2.12 0L22.503 11.47a1.5 1.5 0 0 1 0 2.121l-9.972 9.971a1.5 1.5 0 0 1-1.06.44Zm-8.485-11.25 8.485 8.485 8.485-8.485-8.485-8.485-8.485 8.485ZM19.5 18h-3V9h3v9Z"/>
-    </svg>
-);
-
-interface EligibleTopic {
-  topic: string;
-  focusAreas: (ExerciseDefinition & { sessionCount: number })[];
-  totalSessions: number;
-  brandingInfo: TopicBrandingInfo;
-  brandingKey: string;
-  chunkIndex: number;
-}
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 function PersonalBrandingPageContent() {
   const { toast } = useToast();
-  const { currentUser } = useAuth();
+  const { currentUser, exportData } = useAuth();
   
-  const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
-  const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
-  const [brandedTopics, setBrandedTopics] = useState<Record<string, TopicBrandingInfo>>({});
+  const [contentDefinitions, setContentDefinitions] = useState<ExerciseDefinition[]>([]);
+  const [newContentTitle, setNewContentTitle] = useState('');
+  const [newContentTopic, setNewContentTopic] = useState('');
+
+  const [editingDefinition, setEditingDefinition] = useState<ExerciseDefinition | null>(null);
+  const [editingDefinitionName, setEditingDefinitionName] = useState('');
+  const [editingDefinitionCategory, setEditingDefinitionCategory] = useState<string>('');
+
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [allBrandingLogs, setAllBrandingLogs] = useState<DatedWorkout[]>([]);
+  
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [isLoadingPage, setIsLoadingPage] = useState(true);
+  const [showBackupPrompt, setShowBackupPrompt] = useState(false);
+  const [isLibraryExpanded, setIsLibraryExpanded] = useState(true);
 
-  // State for branding modal
-  const [isBrandingModalOpen, setIsBrandingModalOpen] = useState(false);
-  const [selectedBrandingCandidate, setSelectedBrandingCandidate] = useState<EligibleTopic | null>(null);
-  const [brandingModalType, setBrandingModalType] = useState<'blog' | 'blog_demo' | null>(null);
-  const [blogUrl, setBlogUrl] = useState('');
-  const [youtubeUrl, setYoutubeUrl] = useState('');
-  const [demoUrl, setDemoUrl] = useState('');
+  const allTopics = useMemo(() => {
+    const topics = new Set(contentDefinitions.map(def => def.category));
+    return Array.from(topics).sort();
+  }, [contentDefinitions]);
 
-  // Load data from localStorage
   useEffect(() => {
     if (currentUser?.username) {
-        const username = currentUser.username;
-        const defsKey = `deepwork_definitions_${username}`;
-        const logsKey = `deepwork_logs_${username}`;
-        const brandedTopicsKey = `deepwork_branded_topics_${username}`;
+      const username = currentUser.username;
+      const defsKey = `branding_definitions_${username}`;
+      const logsKey = `branding_logs_${username}`;
 
-        try { const storedDefinitions = localStorage.getItem(defsKey); setExerciseDefinitions(storedDefinitions ? JSON.parse(storedDefinitions) : []); } catch (e) { setExerciseDefinitions([]); }
-        try { const storedLogs = localStorage.getItem(logsKey); setAllWorkoutLogs(storedLogs ? JSON.parse(storedLogs) : []); } catch (e) { setAllWorkoutLogs([]); }
-        try { const storedBrandedTopics = localStorage.getItem(brandedTopicsKey); setBrandedTopics(storedBrandedTopics ? JSON.parse(storedBrandedTopics) : {}); } catch (e) { setBrandedTopics({}); }
+      try { const storedDefs = localStorage.getItem(defsKey); setContentDefinitions(storedDefs ? JSON.parse(storedDefs) : []); } catch (e) { setContentDefinitions([]); }
+      try { const storedLogs = localStorage.getItem(logsKey); setAllBrandingLogs(storedLogs ? JSON.parse(storedLogs) : []); } catch (e) { setAllBrandingLogs([]); }
     } else {
-        setExerciseDefinitions([]);
-        setAllWorkoutLogs([]);
-        setBrandedTopics({});
+      setContentDefinitions([]);
+      setAllBrandingLogs([]);
     }
     const timer = setTimeout(() => setIsLoadingPage(false), 300);
     return () => clearTimeout(timer);
   }, [currentUser]);
 
-  // Save branding data back to localStorage
   useEffect(() => {
     if (currentUser?.username && !isLoadingPage) {
-      try {
-        const username = currentUser.username;
-        const brandedTopicsKey = `deepwork_branded_topics_${username}`;
-        localStorage.setItem(brandedTopicsKey, JSON.stringify(brandedTopics));
-      } catch (e) {
-        console.error("Error saving branding data to localStorage", e);
-        toast({ title: "Save Error", description: "Could not save branding data.", variant: "destructive"});
-      }
+      const username = currentUser.username;
+      const defsKey = `branding_definitions_${username}`;
+      const logsKey = `branding_logs_${username}`;
+      localStorage.setItem(defsKey, JSON.stringify(contentDefinitions));
+      localStorage.setItem(logsKey, JSON.stringify(allBrandingLogs));
     }
-  }, [brandedTopics, currentUser, isLoadingPage, toast]);
+  }, [contentDefinitions, allBrandingLogs, currentUser, isLoadingPage]);
 
+  useEffect(() => {
+      if (!currentUser) return;
+      const today = new Date();
+      const year = getYear(today);
+      const week = getISOWeek(today);
+      const backupPromptKey = `backupPrompt_branding_${year}-${week}`;
+      const hasBeenPrompted = localStorage.getItem(backupPromptKey);
+      if (isMonday(today) && !hasBeenPrompted) setShowBackupPrompt(true);
+  }, [currentUser]);
 
-  const brandingCandidates = useMemo((): EligibleTopic[] => {
-    // 1. Calculate session counts for every focus area
-    const sessionCounts = new Map<string, number>();
-    allWorkoutLogs.forEach(log => {
-      log.exercises.forEach(ex => {
-        if (ex.loggedSets.length > 0) {
-          const currentCount = sessionCounts.get(ex.definitionId) || 0;
-          sessionCounts.set(ex.definitionId, currentCount + ex.loggedSets.length);
-        }
-      });
-    });
-
-    // 2. Group focus areas with their session counts by topic
-    const topicsMap = new Map<string, (ExerciseDefinition & { sessionCount: number })[]>();
-    exerciseDefinitions.forEach(def => {
-      if (!topicsMap.has(def.category)) {
-        topicsMap.set(def.category, []);
-      }
-      topicsMap.get(def.category)!.push({
-        ...def,
-        sessionCount: sessionCounts.get(def.id) || 0,
-      });
-    });
-
-    const eligibleTopics: EligibleTopic[] = [];
-
-    // 3. Iterate through topics, find eligible ones, and chunk them
-    topicsMap.forEach((defs, topic) => {
-      // Find focus areas within this topic that have at least 4 sessions
-      const focusAreasWithEnoughSessions = defs.filter(d => d.sessionCount >= 4).sort((a,b) => a.name.localeCompare(b.name));
-
-      // Chunk the eligible focus areas into groups of 4
-      for (let i = 0; i < focusAreasWithEnoughSessions.length; i += 4) {
-        const chunk = focusAreasWithEnoughSessions.slice(i, i + 4);
-
-        // A chunk is only eligible if it contains exactly 4 focus areas.
-        if (chunk.length === 4) {
-          const chunkIndex = i / 4;
-          const brandingKey = `${topic}-${chunkIndex}`;
-          const brandingInfo = brandedTopics[brandingKey] || {};
-
-          eligibleTopics.push({
-            topic,
-            focusAreas: chunk,
-            totalSessions: chunk.reduce((sum, fa) => sum + fa.sessionCount, 0),
-            brandingInfo,
-            brandingKey,
-            chunkIndex,
-          });
-        }
-      }
-    });
-
-    return eligibleTopics.sort((a, b) => {
-        if (a.topic !== b.topic) return a.topic.localeCompare(b.topic);
-        return a.brandingKey.localeCompare(b.brandingKey);
-    });
-  }, [allWorkoutLogs, exerciseDefinitions, brandedTopics]);
-
-
-  const handleOpenBrandingModal = (topic: EligibleTopic, type: 'blog' | 'blog_demo') => {
-    setSelectedBrandingCandidate(topic);
-    setBrandingModalType(type);
-    setBlogUrl(topic.brandingInfo.contentUrls?.blog || '');
-    setYoutubeUrl(topic.brandingInfo.contentUrls?.youtube || '');
-    setDemoUrl(topic.brandingInfo.contentUrls?.demo || '');
-    setIsBrandingModalOpen(true);
+  const markBackupPromptAsHandled = () => {
+    const today = new Date();
+    const year = getYear(today);
+    const week = getISOWeek(today);
+    const backupPromptKey = `backupPrompt_branding_${year}-${week}`;
+    localStorage.setItem(backupPromptKey, 'true');
+    setShowBackupPrompt(false);
   };
 
-  const handleSaveBranding = () => {
-    if (!selectedBrandingCandidate) return;
-    const { brandingKey } = selectedBrandingCandidate;
-    setBrandedTopics(prev => ({
-        ...prev,
-        [brandingKey]: {
-            ...prev[brandingKey],
-            brandingStatus: 'converted',
-            contentUrls: {
-                blog: blogUrl,
-                youtube: brandingModalType === 'blog_demo' ? youtubeUrl : undefined,
-                demo: brandingModalType === 'blog_demo' ? demoUrl : undefined,
-            }
-        }
-    }));
-    setIsBrandingModalOpen(false);
-    toast({ title: "Content URLs Saved!", description: `Your links for "${selectedBrandingCandidate.topic}" have been saved.` });
+  const handleBackupConfirm = () => {
+    exportData(); // This should be adapted if branding data needs separate export
+    markBackupPromptAsHandled();
   };
   
-  const handleToggleSharing = (brandingKey: string, platform: keyof SharingStatus) => {
-    setBrandedTopics(prev => {
-        const currentTopic = prev[brandingKey] || {};
-        const newSharingStatus = { ...currentTopic.sharingStatus, [platform]: !currentTopic.sharingStatus?.[platform] };
-        const newBrandingStatus = Object.values(newSharingStatus).some(Boolean) ? 'published' : 'converted';
-        
-        return {
-            ...prev,
-            [brandingKey]: {
-                ...currentTopic,
-                sharingStatus: newSharingStatus,
-                brandingStatus: newBrandingStatus,
-            }
-        };
+  const currentDatedLog = useMemo(() => {
+    const dateKey = format(selectedDate, 'yyyy-MM-dd');
+    return allBrandingLogs.find(log => log.id === dateKey);
+  }, [selectedDate, allBrandingLogs]);
+
+  const currentSessionTasks = useMemo(() => {
+    return currentDatedLog?.exercises || [];
+  }, [currentDatedLog]);
+
+  const filteredContentDefinitions = useMemo(() => {
+    if (selectedCategories.length === 0) return contentDefinitions;
+    return contentDefinitions.filter(def => selectedCategories.includes(def.category));
+  }, [contentDefinitions, selectedCategories]);
+
+  const handleCategoryFilterChange = (category: string) => {
+    setSelectedCategories(prev => 
+      prev.includes(category) ? prev.filter(c => c !== category) : [...prev, category]
+    );
+  };
+
+  const updateOrAddLog = (updatedLog: DatedWorkout) => {
+    setAllBrandingLogs(prevLogs => {
+      const existingLogIndex = prevLogs.findIndex(log => log.id === updatedLog.id);
+      if (existingLogIndex > -1) {
+        const newLogs = [...prevLogs];
+        newLogs[existingLogIndex] = updatedLog;
+        return newLogs;
+      }
+      return [...prevLogs, updatedLog];
     });
   };
 
+  const handleAddContentDefinition = (e: FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    if (newContentTitle.trim() === '' || newContentTopic.trim() === '') {
+      toast({ title: "Error", description: "Topic and Content Idea cannot be empty.", variant: "destructive" });
+      return;
+    }
+    const newDef: ExerciseDefinition = { 
+      id: `branding_${Date.now().toString()}`, 
+      name: newContentTitle.trim(),
+      category: newContentTopic.trim() as ExerciseCategory,
+      sharingStatus: { twitter: false, linkedin: false, devto: false }
+    };
+    setContentDefinitions(prev => [...prev, newDef]);
+    setNewContentTitle('');
+    setNewContentTopic('');
+    toast({ title: "Success", description: `Content Idea "${newDef.name}" added.` });
+  };
+
+  const handleDeleteContentDefinition = (id: string) => {
+    const defToDelete = contentDefinitions.find(def => def.id === id);
+    setContentDefinitions(prev => prev.filter(def => def.id !== id));
+    setAllBrandingLogs(prevLogs => 
+      prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) }))
+    );
+    toast({ title: "Success", description: `Content Idea "${defToDelete?.name}" removed.` });
+  };
+
+  const handleStartEditDefinition = (def: ExerciseDefinition) => {
+    setEditingDefinition(def);
+    setEditingDefinitionName(def.name);
+    setEditingDefinitionCategory(def.category);
+  };
+
+  const handleSaveEditDefinition = () => {
+    if (!editingDefinition || editingDefinitionName.trim() === '' || editingDefinitionCategory.trim() === '') return;
+    
+    const updatedDef = { ...editingDefinition, name: editingDefinitionName.trim(), category: editingDefinitionCategory.trim() as ExerciseCategory };
+    setContentDefinitions(prev => prev.map(def => def.id === editingDefinition.id ? updatedDef : def));
+    
+    setAllBrandingLogs(prevLogs => 
+      prevLogs.map(log => ({
+        ...log,
+        exercises: log.exercises.map(ex => 
+          ex.definitionId === editingDefinition.id ? { ...ex, name: updatedDef.name, category: updatedDef.category } : ex
+        )
+      }))
+    );
+    toast({ title: "Success", description: "Content Idea updated." });
+    setEditingDefinition(null);
+  };
+
+  const handleAddTaskToSession = (definition: ExerciseDefinition) => {
+    const dateKey = format(selectedDate, 'yyyy-MM-dd');
+    const newSessionTask: WorkoutExercise = {
+      id: `${definition.id}-${Date.now()}`, definitionId: definition.id, name: definition.name, category: definition.category,
+      loggedSets: [], targetSets: 4, targetReps: "4 stages",
+    };
+    const existingLog = allBrandingLogs.find(log => log.id === dateKey);
+    if (existingLog) {
+      if (existingLog.exercises.some(ex => ex.definitionId === definition.id)) {
+        toast({ title: "Info", description: "This idea is already in today's session." }); return;
+      }
+      updateOrAddLog({ ...existingLog, exercises: [...existingLog.exercises, newSessionTask] });
+    } else {
+      updateOrAddLog({ id: dateKey, date: dateKey, exercises: [newSessionTask] });
+    }
+    toast({ title: "Added to Session", description: `"${definition.name}" added for ${format(selectedDate, 'PPP')}.` });
+  };
+
+  const handleRemoveTaskFromSession = (exerciseId: string) => {
+    const dateKey = format(selectedDate, 'yyyy-MM-dd');
+    const existingLog = allBrandingLogs.find(log => log.id === dateKey);
+    if (existingLog) {
+      const updatedExercises = existingLog.exercises.filter(ex => ex.id !== exerciseId);
+      if (updatedExercises.length === 0) setAllBrandingLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
+      else updateOrAddLog({ ...existingLog, exercises: updatedExercises });
+    }
+  };
+
+  const handleLogStage = (exerciseId: string, stageIndex: number) => {
+    const dateKey = format(selectedDate, 'yyyy-MM-dd');
+    const existingLog = allBrandingLogs.find(log => log.id === dateKey);
+    if (existingLog) {
+      const newSet: LoggedSet = { id: Date.now().toString(), reps: stageIndex, weight: 1, timestamp: Date.now() };
+      const updatedExercises = existingLog.exercises.map(ex => {
+        if (ex.id === exerciseId) {
+          // Prevent logging the same stage twice
+          if (ex.loggedSets.some(s => s.reps === stageIndex)) return ex;
+          return { ...ex, loggedSets: [...ex.loggedSets, newSet] };
+        }
+        return ex;
+      });
+      updateOrAddLog({ ...existingLog, exercises: updatedExercises });
+      toast({ title: "Stage Logged!" });
+    }
+  };
+
+  const handleUpdateSharingStatus = (definitionId: string, newStatus: SharingStatus) => {
+    setContentDefinitions(prevDefs => 
+      prevDefs.map(def => 
+        def.id === definitionId ? { ...def, sharingStatus: newStatus } : def
+      )
+    );
+  };
+  
   if (isLoadingPage) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
@@ -214,139 +260,174 @@ function PersonalBrandingPageContent() {
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg text-primary">
-                    <Share2 /> Personal Branding Pipeline
-                </CardTitle>
-                <CardDescription>
-                    Convert deep work into content. A topic becomes a brandable bundle when it has 4 focus areas with 4+ sessions each.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                {brandingCandidates.length === 0 ? (
-                    <div className="text-center py-6 text-sm text-muted-foreground">
-                        Log 4+ sessions on at least 4 focus areas within the same topic to unlock your first brandable content bundle.
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+          <section aria-labelledby="content-library-heading" className="md:col-span-1 space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle id="content-library-heading" className="flex items-center gap-2 text-lg text-primary">
+                    <Share2 /> Content Library
+                  </CardTitle>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8">
+                          <FilterIcon className="h-4 w-4 mr-2" />
+                          Filter ({selectedCategories.length > 0 ? selectedCategories.length : "All"})
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuLabel>Filter by Topic</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {allTopics.map((category) => (
+                          <DropdownMenuCheckboxItem
+                            key={category} checked={selectedCategories.includes(category)}
+                            onCheckedChange={() => handleCategoryFilterChange(category)}
+                            onSelect={(e) => e.preventDefault()} 
+                          > {category} </DropdownMenuCheckboxItem>
+                        ))}
+                        {selectedCategories.length > 0 && (
+                          <> <DropdownMenuSeparator />
+                            <Button variant="ghost" size="sm" className="w-full justify-start text-sm" onClick={() => setSelectedCategories([])}> Clear Filters </Button>
+                          </>)}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button variant="ghost" size="icon" onClick={() => setIsLibraryExpanded(!isLibraryExpanded)} className="h-8 w-8" aria-label={isLibraryExpanded ? "Collapse library" : "Expand library"}>
+                      {isLibraryExpanded ? <ChevronUp className="h-5 w-5 text-primary" /> : <ChevronDown className="h-5 w-5 text-primary" />}
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4">
+                <AnimatePresence>
+                  {isLibraryExpanded && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.3 }}
+                      style={{ overflow: 'hidden' }}
+                      className="space-y-4"
+                    >
+                      <form onSubmit={handleAddContentDefinition} className="space-y-3">
+                        <Input type="text" placeholder="New Topic" value={newContentTopic} onChange={(e) => setNewContentTopic(e.target.value)} list="topics-datalist" aria-label="New topic name" className="h-10 text-sm" />
+                        <datalist id="topics-datalist">
+                          {allTopics.map(topic => <option key={topic} value={topic} />)}
+                        </datalist>
+                        <Input type="text" placeholder="New Content Idea" value={newContentTitle} onChange={(e) => setNewContentTitle(e.target.value)} aria-label="New content idea" className="h-10 text-sm" />
+                        <Button type="submit" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs xl:text-sm xl:h-10 xl:px-4"> <PlusCircle className="mr-2 h-5 w-5" /> Add Content Idea </Button>
+                      </form>
+                      <div className="max-h-[calc(100vh-38rem)] overflow-y-auto pr-1">
+                        {filteredContentDefinitions.length === 0 ? (
+                          <p className="text-muted-foreground text-sm text-center py-4">Library empty. Add a new topic and content idea to get started!</p>
+                        ) : (
+                          <ul className="space-y-2">
+                            {filteredContentDefinitions.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
+                              <motion.li key={def.id} layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} className="p-3 bg-card border rounded-lg shadow-sm">
+                                {editingDefinition?.id === def.id ? (
+                                  <div className="space-y-2">
+                                    <Input value={editingDefinitionCategory} onChange={(e) => setEditingDefinitionCategory(e.target.value)} className="h-9" aria-label="Edit topic"/>
+                                    <Input value={editingDefinitionName} onChange={(e) => setEditingDefinitionName(e.target.value)} className="h-9" aria-label="Edit content idea"/>
+                                    <div className="flex gap-2">
+                                      <Button size="sm" onClick={handleSaveEditDefinition} className="flex-grow bg-green-600 hover:bg-green-500 text-white"><Save className="h-4 w-4 mr-1"/>Save</Button>
+                                      <Button size="sm" variant="ghost" onClick={() => setEditingDefinition(null)} className="flex-grow"><X className="h-4 w-4 mr-1"/>Cancel</Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex-grow min-w-0">
+                                        <span className="font-medium text-foreground block" title={def.name}>{def.name}</span>
+                                        <Badge variant="secondary" className="text-xs ml-0 my-0.5">{def.category}</Badge>
+                                    </div>
+                                    <div className="flex-shrink-0 flex items-center">
+                                      <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8 text-muted-foreground hover:text-primary" aria-label={`Edit ${def.name}`}> <Edit3 className="h-4 w-4" /> </Button>
+                                      <Button variant="ghost" size="icon" onClick={() => handleDeleteContentDefinition(def.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label={`Delete ${def.name}`}> <Trash2 className="h-4 w-4" /> </Button>
+                                      <Button variant="ghost" size="icon" onClick={() => handleAddTaskToSession(def)} className="h-8 w-8 text-muted-foreground hover:text-accent" aria-label={`Add ${def.name} to session`}> <ChevronRight className="h-5 w-5" /> </Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </motion.li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </CardContent>
+            </Card>
+          </section>
+
+          <section aria-labelledby="branding-session-heading" className="md:col-span-2 space-y-6">
+              <Card>
+                  <CardHeader className="flex flex-row items-center justify-between p-4">
+                      <div className="flex-grow">
+                          <CardTitle id="branding-session-heading" className="flex items-center gap-2 text-lg text-accent">
+                              <ListChecks /> Branding Session for: {format(selectedDate, 'PPP')}
+                          </CardTitle>
+                      </div>
+                      <Popover>
+                          <PopoverTrigger asChild>
+                          <Button variant={"outline"} className={cn("w-[200px] justify-start text-left font-normal h-10",!selectedDate && "text-muted-foreground")}>
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+                          </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                          <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus />
+                          </PopoverContent>
+                      </Popover>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <div className="max-h-[calc(100vh-16rem)] overflow-y-auto pr-2">
+                      {currentSessionTasks.length === 0 ? (
+                        <div className="text-center py-10">
+                            <GripVertical className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
+                            <p className="text-muted-foreground">No content ideas for {format(selectedDate, 'PPP')}.</p>
+                            <p className="text-sm text-muted-foreground/80">Add ideas from the library to get started!</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                          <AnimatePresence>
+                          {currentSessionTasks.map(task => {
+                              const definition = contentDefinitions.find(def => def.id === task.definitionId);
+                              return (
+                                <WorkoutExerciseCard 
+                                  key={task.id} 
+                                  exercise={{...task, sharingStatus: definition?.sharingStatus}}
+                                  onLogSet={handleLogStage} 
+                                  onDeleteSet={() => {}} 
+                                  onUpdateSet={() => {}}
+                                  onUpdateSharingStatus={handleUpdateSharingStatus}
+                                  onRemoveExercise={handleRemoveTaskFromSession}
+                                  pageType="branding"
+                                />
+                              );
+                          })}
+                          </AnimatePresence>
+                        </div>
+                      )}
                     </div>
-                ) : (
-                    <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {brandingCandidates.map(topic => {
-                            const bundlesForThisTopic = brandingCandidates.filter(t => t.topic === topic.topic);
-                            const showBundleNumber = bundlesForThisTopic.length > 1;
-
-                            return (
-                            <li key={topic.brandingKey} className="p-4 bg-muted/30 rounded-lg space-y-4 text-sm flex flex-col">
-                                <div className="flex-grow space-y-4">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <h4 className="font-semibold text-foreground text-base">
-                                                {topic.topic} {showBundleNumber && `- Bundle #${topic.chunkIndex + 1}`}
-                                            </h4>
-                                            <div className="flex flex-wrap gap-1 mt-1">
-                                                <Badge variant="outline">{topic.focusAreas.length} Focus Areas</Badge>
-                                                <Badge variant="secondary">{topic.totalSessions} Total Sessions</Badge>
-                                            </div>
-                                        </div>
-                                        {topic.brandingInfo.brandingStatus === 'published' && (
-                                            <div className="flex items-center gap-1.5 text-green-600">
-                                                <CheckCircle2 className="h-4 w-4" />
-                                                <span className="font-medium">Published</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <p className="font-medium text-muted-foreground">Included Focus Areas:</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {topic.focusAreas.map(fa => <Badge key={fa.id} variant="default" className='bg-primary/20 text-primary-foreground hover:bg-primary/30'>{fa.name}</Badge>)}
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div className="mt-auto pt-4 border-t">
-                                  {topic.brandingInfo.brandingStatus === 'converted' || topic.brandingInfo.brandingStatus === 'published' ? (
-                                      <div className="space-y-4">
-                                          {topic.brandingInfo.contentUrls && (
-                                              <div className="space-y-2">
-                                                  <h5 className="font-medium text-muted-foreground">Content Links</h5>
-                                                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                                                      {topic.brandingInfo.contentUrls.blog && <a href={topic.brandingInfo.contentUrls.blog} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary hover:underline"><Globe className="h-4 w-4" /> Blog Post</a>}
-                                                      {topic.brandingInfo.contentUrls.youtube && <a href={topic.brandingInfo.contentUrls.youtube} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary hover:underline"><Youtube className="h-4 w-4" /> YouTube</a>}
-                                                      {topic.brandingInfo.contentUrls.demo && <a href={topic.brandingInfo.contentUrls.demo} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary hover:underline"><Code className="h-4 w-4" /> Demo</a>}
-                                                        <Button variant="ghost" size="icon" onClick={() => handleOpenBrandingModal(topic, topic.brandingInfo.contentUrls?.youtube ? 'blog_demo' : 'blog')} className="h-7 w-7"><Edit3 className="h-4 w-4 text-muted-foreground" /></Button>
-                                                  </div>
-                                              </div>
-                                          )}
-                                          <div className="space-y-2">
-                                                <h5 className="font-medium text-muted-foreground">Sharing Checklist</h5>
-                                                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-                                                  <div className="flex items-center space-x-2">
-                                                      <Checkbox id={`share-twitter-${topic.brandingKey}`} checked={topic.brandingInfo.sharingStatus?.twitter} onCheckedChange={() => handleToggleSharing(topic.brandingKey, 'twitter')} />
-                                                      <label htmlFor={`share-twitter-${topic.brandingKey}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                                          <TwitterIcon className="h-4 w-4" /> X / Twitter
-                                                      </label>
-                                                  </div>
-                                                    <div className="flex items-center space-x-2">
-                                                      <Checkbox id={`share-linkedin-${topic.brandingKey}`} checked={topic.brandingInfo.sharingStatus?.linkedin} onCheckedChange={() => handleToggleSharing(topic.brandingKey, 'linkedin')} />
-                                                      <label htmlFor={`share-linkedin-${topic.brandingKey}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                                          <Linkedin className="h-4 w-4" /> LinkedIn
-                                                      </label>
-                                                  </div>
-                                                  <div className="flex items-center space-x-2">
-                                                      <Checkbox id={`share-devto-${topic.brandingKey}`} checked={topic.brandingInfo.sharingStatus?.devto} onCheckedChange={() => handleToggleSharing(topic.brandingKey, 'devto')} />
-                                                      <label htmlFor={`share-devto-${topic.brandingKey}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                                          <DevToIcon className="h-4 w-4" /> DEV.to
-                                                      </label>
-                                                  </div>
-                                                </div>
-                                          </div>
-                                      </div>
-                                  ) : (
-                                        <div className="flex items-center gap-2">
-                                          <Button size="sm" onClick={() => handleOpenBrandingModal(topic, 'blog')} className="flex-1">Create Blog</Button>
-                                          <Button size="sm" onClick={() => handleOpenBrandingModal(topic, 'blog_demo')} className="flex-1">Blog + Demo</Button>
-                                      </div>
-                                  )}
-                                </div>
-                            </li>
-                        )})}
-                    </ul>
-                )}
-            </CardContent>
-        </Card>
+                  </CardContent>
+              </Card>>
+          </section>
+        </div>
       </div>
 
-       <Dialog open={isBrandingModalOpen} onOpenChange={setIsBrandingModalOpen}>
-        <DialogContent>
-            <DialogHeader>
-            <DialogTitle>Convert to Content: {selectedBrandingCandidate?.topic}</DialogTitle>
-            <DialogDescription>
-                Add the URLs for your created content. Click save when you're done.
-            </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                    <Label htmlFor="blog-url">Blog Post URL</Label>
-                    <Input id="blog-url" value={blogUrl} onChange={e => setBlogUrl(e.target.value)} placeholder="https://my.blog/post-title" />
-                </div>
-                {brandingModalType === 'blog_demo' && (
-                    <>
-                        <div className="space-y-2">
-                            <Label htmlFor="youtube-url">YouTube Video URL</Label>
-                            <Input id="youtube-url" value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} placeholder="https://youtube.com/watch?v=..." />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="demo-url">Live Demo URL</Label>
-                            <Input id="demo-url" value={demoUrl} onChange={e => setDemoUrl(e.target.value)} placeholder="https://my-demo.vercel.app" />
-                        </div>
-                    </>
-                )}
-            </div>
-            <DialogFooter>
-                <Button onClick={handleSaveBranding}>Save URLs</Button>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AlertDialog open={showBackupPrompt} onOpenChange={setShowBackupPrompt}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Weekly Backup Reminder</AlertDialogTitle>
+            <AlertDialogDescription>
+              It's Monday! Would you like to back up your branding data? This will download a file to your computer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={markBackupPromptAsHandled}>Maybe Later</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBackupConfirm}>Yes, Back Up Now</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

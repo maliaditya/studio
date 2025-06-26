@@ -1,14 +1,28 @@
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Trash2, CheckSquare, Edit2, Save, X, Youtube, TrendingUp } from 'lucide-react';
-import { WorkoutExercise, LoggedSet, TopicGoal } from '@/types/workout';
+import { PlusCircle, Trash2, CheckSquare, Edit2, Save, X, Youtube, TrendingUp, Check, Linkedin } from 'lucide-react';
+import { WorkoutExercise, LoggedSet, TopicGoal, SharingStatus } from '@/types/workout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { Checkbox } from './ui/checkbox';
+
+const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
+        <title>X</title>
+        <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/>
+    </svg>
+);
+
+const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
+        <title>DEV Community</title>
+        <path d="M11.472 24a1.5 1.5 0 0 1-1.06-.44L.439 13.587a1.5 1.5 0 0 1 0-2.12l9.97-9.97a1.5 1.5 0 0 1 2.12 0L22.503 11.47a1.5 1.5 0 0 1 0 2.121l-9.972 9.971a1.5 1.5 0 0 1-1.06.44Zm-8.485-11.25 8.485 8.485 8.485-8.485-8.485-8.485-8.485 8.485ZM19.5 18h-3V9h3v9Z"/>
+    </svg>
+);
 
 interface WorkoutExerciseCardProps {
   exercise: WorkoutExercise;
@@ -18,7 +32,8 @@ interface WorkoutExerciseCardProps {
   onUpdateSet: (exerciseId: string, setId: string, reps: number, weight: number) => void;
   onRemoveExercise: (exerciseId: string) => void;
   onViewProgress?: () => void;
-  pageType?: 'workout' | 'upskill' | 'deepwork';
+  onUpdateSharingStatus?: (definitionId: string, newStatus: SharingStatus) => void;
+  pageType?: 'workout' | 'upskill' | 'deepwork' | 'branding';
 }
 
 export function WorkoutExerciseCard({
@@ -29,6 +44,7 @@ export function WorkoutExerciseCard({
   onUpdateSet,
   onRemoveExercise,
   onViewProgress,
+  onUpdateSharingStatus,
   pageType = 'workout'
 }: WorkoutExerciseCardProps) {
   const [reps, setReps] = useState('');
@@ -41,15 +57,21 @@ export function WorkoutExerciseCard({
   const [editWeight, setEditWeight] = useState('');
   const [editDuration, setEditDuration] = useState('');
   const [editProgress, setEditProgress] = useState('');
+  
+  const handleSharingChange = (platform: keyof SharingStatus) => {
+    if (!onUpdateSharingStatus || !exercise.sharingStatus) return;
+    const newStatus = { ...exercise.sharingStatus, [platform]: !exercise.sharingStatus[platform] };
+    onUpdateSharingStatus(exercise.definitionId, newStatus);
+  }
 
   const placeholder = useMemo(() => {
     if (pageType === 'upskill') {
       return definitionGoal?.goalType ? `Log ${definitionGoal.goalType}` : 'Log Progress';
     }
-    if (pageType === 'deepwork') {
+    if (pageType === 'deepwork' || pageType === 'branding') {
       return 'Duration (min)';
     }
-    return ''; // for workout, there are two inputs
+    return '';
   }, [pageType, definitionGoal]);
 
   const handleLogSetSubmit = (e: React.FormEvent) => {
@@ -66,14 +88,14 @@ export function WorkoutExerciseCard({
       const numProgress = parseInt(progress);
       const numDuration = parseInt(duration);
       if (!isNaN(numProgress) && numProgress > 0 && !isNaN(numDuration) && numDuration > 0) {
-        onLogSet(exercise.id, numDuration, numProgress); // reps = duration, weight = progress
+        onLogSet(exercise.id, numDuration, numProgress);
         setProgress('');
         setDuration('');
       }
-    } else { // deepwork
+    } else { 
       const numDuration = parseInt(duration);
       if (!isNaN(numDuration) && numDuration > 0) {
-        onLogSet(exercise.id, 1, numDuration); // reps=1, weight=duration
+        onLogSet(exercise.id, 1, numDuration);
         setDuration('');
       }
     }
@@ -108,7 +130,7 @@ export function WorkoutExerciseCard({
             onUpdateSet(exercise.id, editingSet.id, numDuration, numProgress);
             setEditingSet(null);
         }
-      } else { // deepwork
+      } else {
         const numDuration = parseInt(editDuration);
         if (!isNaN(numDuration) && numDuration > 0) {
           onUpdateSet(exercise.id, editingSet.id, 1, numDuration);
@@ -125,10 +147,11 @@ export function WorkoutExerciseCard({
   };
   
   const isCompleted = useMemo(() => {
-    // Card-level completion is only for workout sets for now.
-    // Topic-level completion for upskill is handled in the progress modal.
     if (pageType === 'workout') {
         return exercise.loggedSets.length >= exercise.targetSets;
+    }
+    if (pageType === 'branding') {
+        return exercise.loggedSets.length >= 4;
     }
     return false;
   }, [exercise, pageType]);
@@ -142,6 +165,9 @@ export function WorkoutExerciseCard({
     if (pageType === 'workout') {
       return `Target: ${exercise.targetSets} sets of ${exercise.targetReps} reps. Progress: ${exercise.loggedSets.length}/${exercise.targetSets} sets.`;
     }
+    if (pageType === 'branding') {
+        return `Progress: ${exercise.loggedSets.length} / 4 stages complete.`
+    }
     return `Target: ${exercise.targetSets} sessions of ${exercise.targetReps} min. Progress: ${exercise.loggedSets.length}/${exercise.targetSets} sessions.`;
   }
 
@@ -152,8 +178,159 @@ export function WorkoutExerciseCard({
     if (pageType === 'upskill' && definitionGoal?.goalType) {
       return `Progress: <strong>${set.weight}</strong> ${definitionGoal.goalType} in <strong>${set.reps}</strong> min`;
     }
+    if (pageType === 'branding') {
+        const stages = ['Create', 'Optimize', 'Review', 'Final Review'];
+        return `Stage complete: <strong>${stages[set.reps - 1]}</strong>`;
+    }
     return `Session ${exercise.loggedSets.length - index}: <strong>${set.weight}</strong> min`;
   }
+  
+  const renderBrandingContent = () => {
+      const STAGES = ['Create', 'Optimize', 'Review', 'Final Review'];
+      const loggedStageIndices = new Set(exercise.loggedSets.map(s => s.reps));
+      const isReadyToPublish = loggedStageIndices.size === 4;
+
+      return (
+        <div className='space-y-4'>
+            <div className="flex flex-wrap gap-2">
+                {STAGES.map((stage, index) => (
+                <Button
+                    key={stage}
+                    variant={loggedStageIndices.has(index + 1) ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => onLogSet(exercise.id, index + 1, 1)}
+                    disabled={loggedStageIndices.has(index + 1)}
+                    className={cn("flex-1", loggedStageIndices.has(index + 1) ? 'bg-green-600 hover:bg-green-700' : '')}
+                >
+                    {loggedStageIndices.has(index + 1) && <Check className="mr-2 h-4 w-4" />}
+                    {stage}
+                </Button>
+                ))}
+            </div>
+            {isReadyToPublish && onUpdateSharingStatus && exercise.sharingStatus && (
+                <div className='pt-4 border-t'>
+                    <h4 className="text-sm font-medium mb-2 text-foreground">Sharing Checklist:</h4>
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                        <div className="flex items-center space-x-2">
+                            <Checkbox id={`share-twitter-${exercise.id}`} checked={exercise.sharingStatus.twitter} onCheckedChange={() => handleSharingChange('twitter')} />
+                            <label htmlFor={`share-twitter-${exercise.id}`} className="flex items-center gap-1.5 font-medium leading-none">
+                                <TwitterIcon className="h-4 w-4" /> X / Twitter
+                            </label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <Checkbox id={`share-linkedin-${exercise.id}`} checked={exercise.sharingStatus.linkedin} onCheckedChange={() => handleSharingChange('linkedin')} />
+                            <label htmlFor={`share-linkedin-${exercise.id}`} className="flex items-center gap-1.5 font-medium leading-none">
+                                <Linkedin className="h-4 w-4" /> LinkedIn
+                            </label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <Checkbox id={`share-devto-${exercise.id}`} checked={exercise.sharingStatus.devto} onCheckedChange={() => handleSharingChange('devto')} />
+                            <label htmlFor={`share-devto-${exercise.id}`} className="flex items-center gap-1.5 font-medium leading-none">
+                                <DevToIcon className="h-4 w-4" /> DEV.to
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+      )
+  }
+
+  const renderDefaultContent = () => (
+      <>
+        <form onSubmit={handleLogSetSubmit} className="flex gap-2 mb-3 items-end">
+            {pageType === 'workout' ? (
+            <>
+                <div className="flex-1">
+                <label htmlFor={`reps-${exercise.id}`} className="sr-only">Reps</label>
+                <Input id={`reps-${exercise.id}`} type="number" placeholder="Reps" value={reps} onChange={(e) => setReps(e.target.value)} className="h-9" min="1" required />
+                </div>
+                <div className="flex-1">
+                <label htmlFor={`weight-${exercise.id}`} className="sr-only">Weight (kg/lb)</label>
+                <Input id={`weight-${exercise.id}`} type="number" placeholder="Weight" value={weight} onChange={(e) => setWeight(e.target.value)} className="h-9" min="0" step="0.1" required />
+                </div>
+            </>
+            ) : pageType === 'upskill' ? (
+                <>
+                    <div className="flex-1">
+                        <label htmlFor={`progress-${exercise.id}`} className="sr-only">{placeholder}</label>
+                        <Input id={`progress-${exercise.id}`} type="number" placeholder={placeholder.replace('Log ', '')} value={progress} onChange={(e) => setProgress(e.target.value)} className="h-9" min="1" required />
+                    </div>
+                    <div className="flex-1">
+                        <label htmlFor={`duration-${exercise.id}`} className="sr-only">Duration (min)</label>
+                        <Input id={`duration-${exercise.id}`} type="number" placeholder="Duration (min)" value={duration} onChange={(e) => setDuration(e.target.value)} className="h-9" min="1" required />
+                    </div>
+                </>
+            ) : (
+            <div className="flex-1">
+                <label htmlFor={`duration-${exercise.id}`} className="sr-only">{placeholder}</label>
+                <Input id={`duration-${exercise.id}`} type="number" placeholder={placeholder} value={duration} onChange={(e) => setDuration(e.target.value)} className="h-9" min="1" required />
+            </div>
+            )}
+            <Button type="submit" size="icon" className="h-9 w-9 shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground" aria-label="Log set">
+            <PlusCircle className="h-5 w-5" />
+            </Button>
+        </form>
+
+        {exercise.loggedSets.length > 0 && (
+        <div>
+            <h4 className="text-sm font-medium mb-1 text-foreground">Logged Progress:</h4>
+            <ul className="space-y-1.5">
+            <AnimatePresence>
+                {exercise.loggedSets.slice().sort((a,b) => b.timestamp - a.timestamp).map((set, index) => (
+                <motion.li
+                    key={set.id}
+                    layout
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ duration: 0.2, delay: index * 0.05 }}
+                    className="flex items-center justify-between p-2 bg-muted/50 rounded-md text-xs"
+                >
+                    {editingSet?.id === set.id ? (
+                    <>
+                        {pageType === 'workout' ? (
+                        <>
+                            <Input type="number" value={editReps} onChange={(e) => setEditReps(e.target.value)} className="w-14 h-7 mr-1 text-xs" /> reps
+                            <Input type="number" value={editWeight} onChange={(e) => setEditWeight(e.target.value)} className="w-16 h-7 mx-1 text-xs" /> kg/lb
+                        </>
+                        ) : pageType === 'upskill' ? (
+                        <>
+                            <Input type="number" value={editProgress} onChange={(e) => setEditProgress(e.target.value)} className="w-16 h-7 text-xs" />
+                            <span className="mx-1">{definitionGoal?.goalType} in</span>
+                            <Input type="number" value={editDuration} onChange={(e) => setEditDuration(e.target.value)} className="w-16 h-7 text-xs" />
+                            <span className="ml-1">min</span>
+                        </>
+                        ) : (
+                        <Input type="number" value={editDuration} onChange={(e) => setEditDuration(e.target.value)} className="w-20 h-7 mr-1 text-xs" /> 
+                        )}
+                        <Button size="icon" variant="ghost" onClick={handleSaveEditSet} className="h-7 w-7 text-green-600"><Save className="h-4 w-4" /></Button>
+                        <Button size="icon" variant="ghost" onClick={() => setEditingSet(null)} className="h-7 w-7 text-gray-600"><X className="h-4 w-4" /></Button>
+                    </>
+                    ) : (
+                    <>
+                        <span
+                        className="truncate"
+                        dangerouslySetInnerHTML={{ __html: getLoggedSetText(set, index) }}
+                        />
+                        <div className="flex items-center">
+                            <Button variant="ghost" size="icon" onClick={() => handleEditSet(set)} className="h-6 w-6 text-muted-foreground hover:text-primary" aria-label="Edit set">
+                            <Edit2 className="h-3 w-3" />
+                            </Button>
+                        <Button variant="ghost" size="icon" onClick={() => onDeleteSet(exercise.id, set.id)} className="h-6 w-6 text-muted-foreground hover:text-destructive" aria-label="Delete set">
+                            <Trash2 className="h-3 w-3" />
+                        </Button>
+                        </div>
+                    </>
+                    )}
+                </motion.li>
+                ))}
+            </AnimatePresence>
+            </ul>
+        </div>
+        )}
+    </>
+  )
 
   return (
     <motion.div
@@ -188,98 +365,7 @@ export function WorkoutExerciseCard({
           <p className="text-xs text-muted-foreground mb-2">
             {getProgressText()}
           </p>
-
-          <form onSubmit={handleLogSetSubmit} className="flex gap-2 mb-3 items-end">
-             {pageType === 'workout' ? (
-              <>
-                <div className="flex-1">
-                  <label htmlFor={`reps-${exercise.id}`} className="sr-only">Reps</label>
-                  <Input id={`reps-${exercise.id}`} type="number" placeholder="Reps" value={reps} onChange={(e) => setReps(e.target.value)} className="h-9" min="1" required />
-                </div>
-                <div className="flex-1">
-                  <label htmlFor={`weight-${exercise.id}`} className="sr-only">Weight (kg/lb)</label>
-                  <Input id={`weight-${exercise.id}`} type="number" placeholder="Weight" value={weight} onChange={(e) => setWeight(e.target.value)} className="h-9" min="0" step="0.1" required />
-                </div>
-              </>
-            ) : pageType === 'upskill' ? (
-                <>
-                    <div className="flex-1">
-                        <label htmlFor={`progress-${exercise.id}`} className="sr-only">{placeholder}</label>
-                        <Input id={`progress-${exercise.id}`} type="number" placeholder={placeholder.replace('Log ', '')} value={progress} onChange={(e) => setProgress(e.target.value)} className="h-9" min="1" required />
-                    </div>
-                    <div className="flex-1">
-                        <label htmlFor={`duration-${exercise.id}`} className="sr-only">Duration (min)</label>
-                        <Input id={`duration-${exercise.id}`} type="number" placeholder="Duration (min)" value={duration} onChange={(e) => setDuration(e.target.value)} className="h-9" min="1" required />
-                    </div>
-                </>
-            ) : (
-              <div className="flex-1">
-                <label htmlFor={`duration-${exercise.id}`} className="sr-only">{placeholder}</label>
-                <Input id={`duration-${exercise.id}`} type="number" placeholder={placeholder} value={duration} onChange={(e) => setDuration(e.target.value)} className="h-9" min="1" required />
-              </div>
-            )}
-            <Button type="submit" size="icon" className="h-9 w-9 shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground" aria-label="Log set">
-              <PlusCircle className="h-5 w-5" />
-            </Button>
-          </form>
-
-          {exercise.loggedSets.length > 0 && (
-            <div>
-              <h4 className="text-sm font-medium mb-1 text-foreground">Logged Progress:</h4>
-              <ul className="space-y-1.5">
-                <AnimatePresence>
-                  {exercise.loggedSets.slice().sort((a,b) => b.timestamp - a.timestamp).map((set, index) => (
-                    <motion.li
-                      key={set.id}
-                      layout
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 20 }}
-                      transition={{ duration: 0.2, delay: index * 0.05 }}
-                      className="flex items-center justify-between p-2 bg-muted/50 rounded-md text-xs"
-                    >
-                      {editingSet?.id === set.id ? (
-                        <>
-                          {pageType === 'workout' ? (
-                            <>
-                              <Input type="number" value={editReps} onChange={(e) => setEditReps(e.target.value)} className="w-14 h-7 mr-1 text-xs" /> reps
-                              <Input type="number" value={editWeight} onChange={(e) => setEditWeight(e.target.value)} className="w-16 h-7 mx-1 text-xs" /> kg/lb
-                            </>
-                          ) : pageType === 'upskill' ? (
-                            <>
-                               <Input type="number" value={editProgress} onChange={(e) => setEditProgress(e.target.value)} className="w-16 h-7 text-xs" />
-                               <span className="mx-1">{definitionGoal?.goalType} in</span>
-                               <Input type="number" value={editDuration} onChange={(e) => setEditDuration(e.target.value)} className="w-16 h-7 text-xs" />
-                               <span className="ml-1">min</span>
-                            </>
-                          ) : (
-                            <Input type="number" value={editDuration} onChange={(e) => setEditDuration(e.target.value)} className="w-20 h-7 mr-1 text-xs" /> 
-                          )}
-                          <Button size="icon" variant="ghost" onClick={handleSaveEditSet} className="h-7 w-7 text-green-600"><Save className="h-4 w-4" /></Button>
-                          <Button size="icon" variant="ghost" onClick={() => setEditingSet(null)} className="h-7 w-7 text-gray-600"><X className="h-4 w-4" /></Button>
-                        </>
-                      ) : (
-                        <>
-                           <span
-                            className="truncate"
-                            dangerouslySetInnerHTML={{ __html: getLoggedSetText(set, index) }}
-                          />
-                          <div className="flex items-center">
-                             <Button variant="ghost" size="icon" onClick={() => handleEditSet(set)} className="h-6 w-6 text-muted-foreground hover:text-primary" aria-label="Edit set">
-                               <Edit2 className="h-3 w-3" />
-                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => onDeleteSet(exercise.id, set.id)} className="h-6 w-6 text-muted-foreground hover:text-destructive" aria-label="Delete set">
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </>
-                      )}
-                    </motion.li>
-                  ))}
-                </AnimatePresence>
-              </ul>
-            </div>
-          )}
+          {pageType === 'branding' ? renderBrandingContent() : renderDefaultContent()}
         </CardContent>
       </Card>
     </motion.div>
