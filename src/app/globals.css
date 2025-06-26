@@ -71,25 +71,25 @@
   }
 
   .theme-smoke {
-    --background: 220 20% 10%;
-    --foreground: 220 10% 95%;
-    --card: hsla(220, 15%, 15%, 0.6);
-    --card-foreground: 220 10% 95%;
-    --popover: 220 15% 12%;
-    --popover-foreground: 220 10% 95%;
-    --primary: 220 80% 70%;
-    --primary-foreground: 220 20% 10%;
-    --secondary: 220 15% 25%;
-    --secondary-foreground: 220 10% 95%;
-    --muted: 220, 15%, 20%;
-    --muted-foreground: 220 10% 65%;
-    --accent: 220 80% 70%;
-    --accent-foreground: 220 20% 10%;
+    --background: 0 0% 95%;
+    --foreground: 0 0% 10%;
+    --card: hsla(0, 0%, 100%, 0.6);
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 220 90% 55%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 90%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 0 0% 85%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 220 90% 55%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: hsla(220, 15%, 25%, 0.5);
-    --input: 220 15% 20%;
-    --ring: 220 80% 70%;
+    --border: hsla(0, 0%, 10%, 0.1);
+    --input: 0 0% 90%;
+    --ring: 220 90% 55%;
   }
 
   #default-background-container, #matrix-canvas, #smoke-canvas {
@@ -120,6 +120,11 @@
     display: block;
   }
   
+  html.theme-smoke {
+    background: radial-gradient(ellipse at bottom left, black, white);
+    background-attachment: fixed;
+  }
+
   .theme-smoke #smoke-canvas {
     display: block;
   }

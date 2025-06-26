@@ -37,7 +37,7 @@ export function SmokeBackground() {
       transparent: true,
       opacity: 0.1,
       blending: THREE.NormalBlending, // Using NormalBlending for a more realistic smoke look
-      color: 0xffffff,
+      color: 0x555555,
     });
     const smokeGeo = new THREE.PlaneGeometry(300, 300);
 
@@ -101,7 +101,9 @@ export function SmokeBackground() {
       smokeGeo.dispose();
       smokeParticles.children.forEach(child => {
           const mesh = child as THREE.Mesh;
-          mesh.material.dispose();
+          if(mesh.material && typeof (mesh.material as any).dispose === 'function') {
+            (mesh.material as any).dispose();
+          }
       });
     };
   }, [theme]);
