@@ -275,10 +275,11 @@ export function ClothBackground() {
         update();
     };
 
-    canvas.addEventListener('mousedown', mouseDown);
-    canvas.addEventListener('mousemove', setMouse);
-    canvas.addEventListener('mouseup', mouseUp);
-    canvas.addEventListener('contextmenu', contextMenu);
+    // Attach listeners to the window to capture events anywhere on the page
+    window.addEventListener('mousedown', mouseDown);
+    window.addEventListener('mousemove', setMouse);
+    window.addEventListener('mouseup', mouseUp);
+    window.addEventListener('contextmenu', contextMenu);
     window.addEventListener('resize', handleResize);
     
     start();
@@ -287,10 +288,10 @@ export function ClothBackground() {
     // Cleanup
     return () => {
       window.cancelAnimationFrame(animationFrameId);
-      canvas.removeEventListener('mousedown', mouseDown);
-      canvas.removeEventListener('mousemove', setMouse);
-      canvas.removeEventListener('mouseup', mouseUp);
-      canvas.removeEventListener('contextmenu', contextMenu);
+      window.removeEventListener('mousedown', mouseDown);
+      window.removeEventListener('mousemove', setMouse);
+      window.removeEventListener('mouseup', mouseUp);
+      window.removeEventListener('contextmenu', contextMenu);
       window.removeEventListener('resize', handleResize);
     };
   }, [theme]); // Rerun effect if theme changes
