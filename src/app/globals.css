@@ -97,7 +97,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-gradient-to-br from-background via-secondary/30 to-accent/30 bg-400% animate-gradient text-foreground font-body antialiased;
+    @apply bg-gradient-to-br from-purple-200 via-pink-200 to-orange-200 bg-400% animate-gradient text-foreground font-body antialiased;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-headline;
