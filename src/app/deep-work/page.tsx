@@ -245,7 +245,6 @@ function DeepWorkPageContent() {
         return;
     }
 
-    // Find all upskill definition IDs that have been logged at least once.
     const loggedUpskillDefIds = new Set<string>();
     allUpskillLogs.forEach(log => {
         log.exercises.forEach(ex => {
@@ -255,36 +254,30 @@ function DeepWorkPageContent() {
         });
     });
 
-    setExerciseDefinitions(currentDeepWorkDefs => {
-        const newlyPromoted: ExerciseDefinition[] = [];
-        const currentFocusAreaNames = new Set(currentDeepWorkDefs.map(def => `${def.name.toLowerCase()}|${def.category.toLowerCase()}`));
+    const currentFocusAreaNames = new Set(exerciseDefinitions.map(def => `${def.name.toLowerCase()}|${def.category.toLowerCase()}`));
+    const newlyPromoted: ExerciseDefinition[] = [];
 
-        upskillDefinitions.forEach(upskillDef => {
-            const uniqueName = `${upskillDef.name.toLowerCase()}|${upskillDef.category.toLowerCase()}`;
-            
-            // Promote if it has been logged and is not already in deep work
-            if (loggedUpskillDefIds.has(upskillDef.id) && !currentFocusAreaNames.has(uniqueName)) {
-                const newFocusArea: ExerciseDefinition = {
-                    ...upskillDef,
-                    id: `def_dw_${Date.now()}_${Math.random()}`, // Create a new unique ID for the deep work item
-                };
-                newlyPromoted.push(newFocusArea);
-                currentFocusAreaNames.add(uniqueName); // Add to set to handle duplicates within the same run
-            }
-        });
-
-        if (newlyPromoted.length > 0) {
-            toast({
-                title: "Focus Areas Promoted!",
-                description: `${newlyPromoted.length} learning task(s) have been added to your Focus Area Library.`,
-            });
-            return [...currentDeepWorkDefs, ...newlyPromoted];
+    upskillDefinitions.forEach(upskillDef => {
+        const uniqueName = `${upskillDef.name.toLowerCase()}|${upskillDef.category.toLowerCase()}`;
+        
+        if (loggedUpskillDefIds.has(upskillDef.id) && !currentFocusAreaNames.has(uniqueName)) {
+            const newFocusArea: ExerciseDefinition = {
+                ...upskillDef,
+                id: `def_dw_${Date.now()}_${Math.random()}`,
+            };
+            newlyPromoted.push(newFocusArea);
+            currentFocusAreaNames.add(uniqueName);
         }
-
-        return currentDeepWorkDefs; // No changes
     });
 
-  }, [upskillDefinitions, allUpskillLogs, currentUser, isLoadingPage, toast]);
+    if (newlyPromoted.length > 0) {
+        toast({
+            title: "Focus Areas Promoted!",
+            description: `${newlyPromoted.length} learning task(s) have been added to your Focus Area Library.`,
+        });
+        setExerciseDefinitions(currentDefs => [...currentDefs, ...newlyPromoted]);
+    }
+  }, [upskillDefinitions, allUpskillLogs, currentUser, isLoadingPage, toast, exerciseDefinitions]);
 
 
   // Check for backup prompt on Mondays
