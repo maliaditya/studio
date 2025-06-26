@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
  * The user's data is stored as a single JSON file.
  */
 export async function POST(request: Request) {
-  const { username, data } = await request.json();
+  const { username, data, demo_override_token } = await request.json();
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     return NextResponse.json(
@@ -19,11 +19,16 @@ export async function POST(request: Request) {
     );
   }
 
+  // Special handling for the 'demo' user.
   if (username === 'demo') {
-    return NextResponse.json(
-      { error: 'The demo account is read-only and cannot be synced to the cloud.' },
-      { status: 403 } // 403 Forbidden
-    );
+    // A token must be provided to update the demo account.
+    if (!process.env.DEMO_ACCOUNT_UPDATE_TOKEN || demo_override_token !== process.env.DEMO_ACCOUNT_UPDATE_TOKEN) {
+      return NextResponse.json(
+        { error: 'The demo account is read-only. A valid override token is required to update it.' },
+        { status: 403 } // 403 Forbidden
+      );
+    }
+    // If the token is valid, the function will proceed.
   }
 
   if (!username || data === undefined) {

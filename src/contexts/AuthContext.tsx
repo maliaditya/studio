@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
@@ -54,6 +55,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Deep Work
     localStorage.setItem(`deepWorkDefinitions_${username}`, JSON.stringify(data.deepWorkDefinitions || []));
     localStorage.setItem(`deepWorkLogs_${username}`, JSON.stringify(data.deepWorkLogs || []));
+    localStorage.setItem(`deepwork_manual_deletes_${username}`, JSON.stringify(data.deepworkManualDeletes || []));
 
     // Personal Branding
     localStorage.setItem(`branding_tasks_${username}`, JSON.stringify(data.brandingTasks || []));
@@ -134,10 +136,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
         return;
     }
+
+    let demoOverrideToken: string | null = null;
     if (currentUser.username === 'demo') {
-        toast({ title: "Action Disabled", description: "The demo account data is read-only.", variant: "default" });
-        return;
+        demoOverrideToken = window.prompt(
+            "You are updating the read-only 'demo' account.\nPlease provide the override token to proceed.\n(Check your .env file for DEMO_ACCOUNT_UPDATE_TOKEN)"
+        );
+        if (!demoOverrideToken) {
+            toast({ title: "Update Cancelled", description: "No override token was provided.", variant: "default" });
+            return;
+        }
     }
+
     toast({ title: "Syncing...", description: "Pushing your local data to the cloud." });
 
     try {
@@ -158,6 +168,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // Deep Work
             deepWorkDefinitions: JSON.parse(localStorage.getItem(`deepwork_definitions_${username}`) || '[]'),
             deepWorkLogs: JSON.parse(localStorage.getItem(`deepwork_logs_${username}`) || '[]'),
+            deepworkManualDeletes: JSON.parse(localStorage.getItem(`deepwork_manual_deletes_${username}`) || '[]'),
 
             // Personal Branding
             brandingTasks: JSON.parse(localStorage.getItem(`branding_tasks_${username}`) || '[]'),
@@ -174,11 +185,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             dateOfBirth: localStorage.getItem(`dateOfBirth_${username}`) || null,
             gender: localStorage.getItem(`gender_${username}`) || null,
         };
+        
+        const requestBody: { username: string; data: typeof allUserData; demo_override_token?: string } = {
+            username,
+            data: allUserData,
+        };
+
+        if (demoOverrideToken) {
+            requestBody.demo_override_token = demoOverrideToken;
+        }
 
         const response = await fetch('/api/blob-sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, data: allUserData }),
+            body: JSON.stringify(requestBody),
         });
         
         const result = await response.json();
@@ -276,6 +296,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // Deep Work
             deepWorkDefinitions: JSON.parse(localStorage.getItem(`deepwork_definitions_${username}`) || '[]'),
             deepWorkLogs: JSON.parse(localStorage.getItem(`deepwork_logs_${username}`) || '[]'),
+            deepworkManualDeletes: JSON.parse(localStorage.getItem(`deepwork_manual_deletes_${username}`) || '[]'),
 
             // Personal Branding
             brandingTasks: JSON.parse(localStorage.getItem(`branding_tasks_${username}`) || '[]'),
