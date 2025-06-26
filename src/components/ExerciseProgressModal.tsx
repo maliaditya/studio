@@ -266,6 +266,7 @@ export function ExerciseProgressModal({
                     date: 'Reached',
                     daysRemaining: 0,
                     isReached: true,
+                    progressNeeded: 0,
                 };
             }
             const progressToMilestone = milestoneValue - totalProgress;
@@ -278,6 +279,7 @@ export function ExerciseProgressModal({
                 date: format(estimatedMilestoneDate, 'PPP'),
                 daysRemaining: daysToMilestone,
                 isReached: false,
+                progressNeeded: Math.round(progressToMilestone),
             };
         });
     }
@@ -437,7 +439,8 @@ export function ExerciseProgressModal({
                       <TableHeader>
                         <TableRow>
                           <TableHead>Milestone</TableHead>
-                          <TableHead>Target ({topicGoal.goalType})</TableHead>
+                          <TableHead>Goal ({topicGoal.goalType})</TableHead>
+                          <TableHead>Needed</TableHead>
                           <TableHead>Est. Date</TableHead>
                           <TableHead className="text-right">Days Left</TableHead>
                         </TableRow>
@@ -447,6 +450,7 @@ export function ExerciseProgressModal({
                           <TableRow key={m.percent} className={m.isReached ? 'opacity-60' : ''}>
                             <TableCell className="font-medium">{m.percent}%</TableCell>
                             <TableCell>{m.value.toLocaleString()}</TableCell>
+                            <TableCell>{m.isReached ? '-' : m.progressNeeded.toLocaleString()}</TableCell>
                             <TableCell>{m.date}</TableCell>
                             <TableCell className="text-right">{m.isReached ? <Check className="h-4 w-4 text-green-500 ml-auto" /> : m.daysRemaining}</TableCell>
                           </TableRow>
