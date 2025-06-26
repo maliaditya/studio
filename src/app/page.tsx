@@ -863,33 +863,6 @@ function HomePageContent() {
                             <div>
                                 <CardTitle className="flex items-center gap-2 text-primary"><BarChart3 /> Your Productivity Snapshot</CardTitle>
                             </div>
-                            {productivityStats.overallNextMilestone && (
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button variant="ghost" className="text-right h-auto p-0 flex flex-col items-end space-y-0.5" aria-label="View next milestone">
-                                            <span className="text-xs text-muted-foreground font-semibold flex items-center gap-1"><Target className="h-3 w-3" /> Next Milestone</span>
-                                            <span className="font-bold text-lg text-accent">{productivityStats.overallNextMilestone.daysRemaining} days</span>
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-64" align="end">
-                                        <div className="space-y-3 text-sm">
-                                            <div className="space-y-1">
-                                                <p className="font-bold text-base leading-tight">{productivityStats.overallNextMilestone.topic}</p>
-                                                <p className="text-xs text-muted-foreground">Next Milestone ({productivityStats.overallNextMilestone.percent}%)</p>
-                                            </div>
-                                            <Separator />
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-muted-foreground">Progress Needed:</span>
-                                                <span className="font-semibold">{productivityStats.overallNextMilestone.progressNeeded} {productivityStats.overallNextMilestone.unit}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-muted-foreground">Est. Date:</span>
-                                                <span className="font-semibold">{productivityStats.overallNextMilestone.date}</span>
-                                            </div>
-                                        </div>
-                                    </PopoverContent>
-                                </Popover>
-                            )}
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -968,6 +941,7 @@ function HomePageContent() {
                                                                             <div className="font-semibold">Next Milestone ({stats.nextMilestone.percent}%)</div>
                                                                             <div>Est. Date: <span className="font-medium text-foreground">{stats.nextMilestone.date}</span></div>
                                                                             <div>Days Left: <span className="font-medium text-foreground">{stats.nextMilestone.daysRemaining}</span></div>
+                                                                            <div>Needed: <span className="font-medium text-foreground">{stats.nextMilestone.progressNeeded} {stats.nextMilestone.unit}</span></div>
                                                                         </div>
                                                                     )}
                                                                     <div className="space-y-1">
