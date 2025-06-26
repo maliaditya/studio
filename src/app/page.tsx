@@ -602,13 +602,16 @@ function HomePageContent() {
                     milestoneStats = {
                         percent: nextMilestonePercent,
                         date: format(estimatedMilestoneDate, 'PPP'),
-                        daysRemaining: daysToMilestone
+                        daysRemaining: daysToMilestone,
+                        progressNeeded: Math.round(progressToMilestone),
+                        unit: goal.goalType,
                     };
                 }
 
                 const speed = data.totalDuration > 0 ? (totalProgress / data.totalDuration) * 60 : 0;
 
                 topicStats[topic] = {
+                    topic,
                     speed,
                     unit: `${goal.goalType}/hr`,
                     totalProgress: Math.round(totalProgress),
@@ -729,10 +732,17 @@ function HomePageContent() {
             }
         }
         
+        const allNextMilestones = Object.values(learningStats)
+            .map(stats => stats.nextMilestone ? { ...stats.nextMilestone, topic: stats.topic } : null)
+            .filter((m): m is NonNullable<typeof m> => m !== null)
+            .sort((a, b) => a.daysRemaining - b.daysRemaining);
+
+        const overallNextMilestone = allNextMilestones.length > 0 ? allNextMilestones[0] : null;
+
         return {
             avgUpskillDuration, avgDeepWorkDuration, avgUpskillHours, avgDeepWorkHours,
             totalProductiveHours, currentLevel, learningStats, workoutStats, latestConsistency,
-            healthMetrics, projectionSummary
+            healthMetrics, projectionSummary, overallNextMilestone
         };
     }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, dietPlan, weightLogs, dateOfBirth, height, gender, goalWeight]);
     
@@ -849,8 +859,37 @@ function HomePageContent() {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
                 <div className="lg:col-span-3">
                     <Card className="h-full bg-card/50">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-primary"><BarChart3 /> Your Productivity Snapshot</CardTitle>
+                        <CardHeader className="flex flex-row items-start justify-between">
+                            <div>
+                                <CardTitle className="flex items-center gap-2 text-primary"><BarChart3 /> Your Productivity Snapshot</CardTitle>
+                            </div>
+                            {productivityStats.overallNextMilestone && (
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="ghost" className="text-right h-auto p-0 flex flex-col items-end space-y-0.5" aria-label="View next milestone">
+                                            <span className="text-xs text-muted-foreground font-semibold flex items-center gap-1"><Target className="h-3 w-3" /> Next Milestone</span>
+                                            <span className="font-bold text-lg text-accent">{productivityStats.overallNextMilestone.daysRemaining} days</span>
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-64" align="end">
+                                        <div className="space-y-3 text-sm">
+                                            <div className="space-y-1">
+                                                <p className="font-bold text-base leading-tight">{productivityStats.overallNextMilestone.topic}</p>
+                                                <p className="text-xs text-muted-foreground">Next Milestone ({productivityStats.overallNextMilestone.percent}%)</p>
+                                            </div>
+                                            <Separator />
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-muted-foreground">Progress Needed:</span>
+                                                <span className="font-semibold">{productivityStats.overallNextMilestone.progressNeeded} {productivityStats.overallNextMilestone.unit}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-muted-foreground">Est. Date:</span>
+                                                <span className="font-semibold">{productivityStats.overallNextMilestone.date}</span>
+                                            </div>
+                                        </div>
+                                    </PopoverContent>
+                                </Popover>
+                            )}
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
