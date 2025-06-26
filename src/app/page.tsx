@@ -837,31 +837,83 @@ function HomePageContent() {
             <p className="text-md text-muted-foreground pt-1">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
         </CardHeader>
         <CardContent>
-            <div className="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className={cn( "rounded-lg p-3 text-center transition-all duration-300", dailyStats.health ? "bg-green-100 dark:bg-green-900/50 border border-green-500/50" : "bg-muted/50" )}>
-                  <h3 className="font-semibold text-foreground">Health</h3>
-                  <p className={cn("text-xs font-medium", dailyStats.health ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}>
-                      {dailyStats.health ? "Complete" : "Pending"}
-                  </p>
-              </div>
-              <div className={cn( "rounded-lg p-3 text-center transition-all duration-300", dailyStats.wealth ? "bg-green-100 dark:bg-green-900/50 border border-green-500/50" : "bg-muted/50" )}>
-                  <h3 className="font-semibold text-foreground">Wealth</h3>
-                  <p className={cn("text-xs font-medium", dailyStats.wealth ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}>
-                      {dailyStats.wealth ? "Complete" : "Pending"}
-                  </p>
-              </div>
-              <div className={cn( "rounded-lg p-3 text-center transition-all duration-300", dailyStats.growth ? "bg-green-100 dark:bg-green-900/50 border border-green-500/50" : "bg-muted/50" )}>
-                  <h3 className="font-semibold text-foreground">Growth</h3>
-                  <p className={cn("text-xs font-medium", dailyStats.growth ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}>
-                      {dailyStats.growth ? "Complete" : "Pending"}
-                  </p>
-              </div>
-              <div className={cn( "rounded-lg p-3 text-center transition-all duration-300", dailyStats.direction ? "bg-green-100 dark:bg-green-900/50 border border-green-500/50" : "bg-muted/50" )}>
-                  <h3 className="font-semibold text-foreground">Direction</h3>
-                  <p className={cn("text-xs font-medium", dailyStats.direction ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}>
-                      {dailyStats.direction ? "Complete" : "Pending"}
-                  </p>
-              </div>
+            <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="cursor-pointer hover:bg-muted/50" onClick={() => router.push('/workout-tracker')}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Health</CardTitle>
+                  <HeartPulse className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{productivityStats.latestConsistency}%</div>
+                  <p className="text-xs text-muted-foreground">Workout Consistency</p>
+                </CardContent>
+              </Card>
+
+              <Card className="cursor-pointer hover:bg-muted/50" onClick={() => router.push('/deep-work')}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Wealth</CardTitle>
+                  <Briefcase className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{productivityStats.avgDeepWorkHours.toFixed(1)} hrs</div>
+                  <p className="text-xs text-muted-foreground">Avg. Daily Deep Work</p>
+                </CardContent>
+              </Card>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Card className="cursor-pointer hover:bg-muted/50">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Growth</CardTitle>
+                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      {productivityStats.overallNextMilestone ? (
+                        <>
+                          <div className="text-2xl font-bold">{productivityStats.overallNextMilestone.daysRemaining} days</div>
+                          <p className="text-xs text-muted-foreground">To next milestone</p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-2xl font-bold">{productivityStats.avgUpskillHours.toFixed(1)} hrs</div>
+                          <p className="text-xs text-muted-foreground">Avg. Daily Learning</p>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                </PopoverTrigger>
+                {productivityStats.overallNextMilestone && (
+                    <PopoverContent className="w-60" align="end">
+                        <div className="space-y-2">
+                            <h4 className="font-medium leading-none">Next Milestone</h4>
+                            <p className="text-sm text-muted-foreground">
+                                Your closest goal is for <span className="font-bold text-foreground">{productivityStats.overallNextMilestone.topic}</span>.
+                            </p>
+                            <div className="grid gap-2">
+                                <div className="grid grid-cols-2 items-center">
+                                    <span className="text-sm text-muted-foreground">Progress Needed:</span>
+                                    <span className="font-bold text-right">{productivityStats.overallNextMilestone.progressNeeded} {productivityStats.overallNextMilestone.unit}</span>
+                                </div>
+                                <div className="grid grid-cols-2 items-center">
+                                    <span className="text-sm text-muted-foreground">Est. Date:</span>
+                                    <span className="font-bold text-right">{productivityStats.overallNextMilestone.date}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </PopoverContent>
+                )}
+              </Popover>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Direction</CardTitle>
+                  <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-2xl font-bold ${dailyStats.direction ? 'text-green-500' : ''}`}>{dailyStats.direction ? 'Aligned' : 'Pending'}</div>
+                  <p className="text-xs text-muted-foreground">Daily Planning & Tracking</p>
+                </CardContent>
+              </Card>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
@@ -892,40 +944,6 @@ function HomePageContent() {
                                 </div>
 
                                 <div className="md:col-span-2 space-y-4">
-                                    <div>
-                                        <h4 className="font-semibold mb-2 flex items-center gap-2"><Clock /> Daily Averages</h4>
-                                        <div className="space-y-2 text-sm">
-                                            <div className="flex justify-between items-center p-2 rounded bg-muted/30">
-                                                <span className="flex items-center gap-2 text-muted-foreground"><BookOpenCheck className="h-4 w-4" /> Learning</span>
-                                                <span className="font-semibold">{productivityStats.avgUpskillHours.toFixed(2)} hr</span>
-                                            </div>
-                                            <div className="flex justify-between items-center p-2 rounded bg-muted/30">
-                                                <span className="flex items-center gap-2 text-muted-foreground"><Briefcase className="h-4 w-4" /> Deep Work</span>
-                                                <span className="font-semibold">{productivityStats.avgDeepWorkHours.toFixed(2)} hr</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    {(productivityStats.workoutStats.avgVolume > 0 || productivityStats.latestConsistency > 0) && (
-                                        <div>
-                                            <h4 className="font-semibold mb-2 flex items-center gap-2"><Dumbbell className="h-4 w-4 text-destructive" /> Workout Stats</h4>
-                                            <div className="space-y-2 text-sm">
-                                                {productivityStats.workoutStats.avgVolume > 0 && (
-                                                    <div className="flex justify-between items-center p-2 rounded bg-muted/30">
-                                                        <span className="flex items-center gap-2 text-muted-foreground"><BarChart3 className="h-4 w-4" /> Avg. Daily Volume</span>
-                                                        <span className="font-semibold">{productivityStats.workoutStats.avgVolume.toLocaleString()} kg/lb</span>
-                                                    </div>
-                                                )}
-                                                {productivityStats.latestConsistency > 0 && (
-                                                    <div className="flex justify-between items-center p-2 rounded bg-muted/30">
-                                                        <span className="flex items-center gap-2 text-muted-foreground"><Zap className="h-4 w-4" /> Consistency</span>
-                                                        <span className="font-semibold">{productivityStats.latestConsistency}%</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
                                     <div>
                                         <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Learning Progress</h4>
                                         <div className="text-sm">
