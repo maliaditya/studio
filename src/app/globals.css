@@ -90,9 +90,81 @@
     width: 100%;
     height: 100vh;
     z-index: -1;
-    background: linear-gradient(125deg, hsl(var(--primary)/.15), hsl(var(--accent)/.15), hsl(var(--secondary)/.2));
-    background-size: 400% 400%;
-    animation: mood-lighting 20s ease infinite;
+  }
+
+  /* NEW - Cross-fading gradient animation */
+  .theme-default #default-background-container .first,
+  .theme-default #default-background-container .second,
+  .theme-default #default-background-container .third {
+    height: 100vh;
+    width: 100vw;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .theme-default #default-background-container .second,
+  .theme-default #default-background-container .third {
+    opacity: 0;
+  }
+
+  .theme-default #default-background-container .first {
+    animation: first 10s infinite;
+    background: linear-gradient(#5ff8ca, #60e08c);
+    z-index: 10;
+  }
+  @keyframes first {
+    0% {opacity: 1.0;}
+    10% {opacity: 0.8;}
+    20% {opacity: 0.6;}
+    30% {opacity: 0.4;}
+    40% {opacity: 0.2;}
+    50% {opacity: 0.1;}
+    60% {opacity: 0.2;}
+    70% {opacity: 0.4;}
+    80% {opacity: 0.6;}
+    90% {opacity: 0.8;}
+    100% {opacity: 1.0;}
+  }
+
+  .theme-default #default-background-container .second {
+    animation: second 10s infinite; 
+    animation-delay: 2s;
+    background: linear-gradient(#19eaa6, #00a1f0);
+    z-index: 20;
+  }
+  @keyframes second {
+    0% {opacity: 0;}
+    10% {opacity: 0.2;}
+    20% {opacity: 0.4;}
+    30% {opacity: 0.6;}
+    40% {opacity: 0.8;}
+    50% {opacity: 1.0;}
+    60% {opacity: 0.8;}
+    70% {opacity: 0.6;}
+    80% {opacity: 0.4;}
+    90% {opacity: 0.2;}
+    100% {opacity: 0;}
+  }
+
+  .theme-default #default-background-container .third {
+    animation: third 10s infinite;
+    animation-delay: 8s;
+    background: linear-gradient(#aab7f8, #ff75c6);
+    z-index: 30;
+  }
+  @keyframes third {
+    0% {opacity: 0;}
+    10% {opacity: 0.2;}
+    20% {opacity: 0.4;}
+    30% {opacity: 0.6;}
+    40% {opacity: 0.8;}
+    50% {opacity: 1.0;}
+    60% {opacity: 0.8;}
+    70% {opacity: 0.6;}
+    80% {opacity: 0.4;}
+    90% {opacity: 0.2;}
+    100% {opacity: 0;}
   }
 }
 
@@ -108,20 +180,6 @@
     @apply font-headline;
   }
 }
-
-/* New Default Theme Background Animation */
-@keyframes mood-lighting {
-	0% {
-		background-position: 0% 50%;
-	}
-	50% {
-		background-position: 100% 50%;
-	}
-	100% {
-		background-position: 0% 50%;
-	}
-}
-
 
 /* React Calendar Heatmap Styles */
 .react-calendar-heatmap text {
