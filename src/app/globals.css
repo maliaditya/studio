@@ -70,19 +70,55 @@
     --ring: 120 60% 40%;
   }
 
-  #matrix-canvas {
+  .theme-smoke {
+    --background: 240 4% 12%;
+    --foreground: 240 5% 95%;
+
+    --card: 240 4% 18%;
+    --card-foreground: 240 5% 95%;
+
+    --popover: 240 4% 16%;
+    --popover-foreground: 240 5% 95%;
+
+    --primary: 210 80% 60%;
+    --primary-foreground: 210 10% 10%;
+
+    --secondary: 240 4% 25%;
+    --secondary-foreground: 240 5% 95%;
+
+    --muted: 240 4% 22%;
+    --muted-foreground: 240 5% 65%;
+
+    --accent: 210 80% 50%;
+    --accent-foreground: 210 10% 10%;
+
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 4% 30%;
+    --input: 240 4% 25%;
+    --ring: 210 80% 60%;
+  }
+  
+  #default-background-container, #matrix-canvas, #smoke-canvas {
     display: none;
+  }
+
+  .theme-default #default-background-container {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    z-index: -1;
   }
 
   .theme-matrix #matrix-canvas {
     display: block;
   }
-  
-  #default-background-container {
-    display: none;
-  }
 
-  .theme-default #default-background-container {
+  .theme-smoke #smoke-canvas {
     display: block;
     position: fixed;
     top: 0;

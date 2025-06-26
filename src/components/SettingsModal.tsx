@@ -73,7 +73,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
     setTheme(newTheme);
     toast({
         title: "Theme Changed",
-        description: `Switched to ${newTheme.charAt(0).toUpperCase() + newTheme.slice(1)} theme.`,
+        description: `Switched to the new theme.`,
     });
   };
 
@@ -106,6 +106,10 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="matrix" id="theme-matrix" />
                 <Label htmlFor="theme-matrix" className="font-normal">Matrix</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="smoke" id="theme-smoke" />
+                <Label htmlFor="theme-smoke" className="font-normal">Smoke</Label>
               </div>
             </RadioGroup>
           </div>
