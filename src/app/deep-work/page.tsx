@@ -66,6 +66,10 @@ function DeepWorkPageContent() {
   const [newSubtopicName, setNewSubtopicName] = useState('');
   const [newTopicName, setNewTopicName] = useState('');
 
+  // State to handle promotion from Upskill
+  const [upskillDefinitions, setUpskillDefinitions] = useState<ExerciseDefinition[]>([]);
+  const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
+
   const [editingDefinition, setEditingDefinition] = useState<ExerciseDefinition | null>(null);
   const [editingDefinitionName, setEditingDefinitionName] = useState('');
   const [editingDefinitionCategory, setEditingDefinitionCategory] = useState<string>('');
@@ -169,6 +173,12 @@ function DeepWorkPageContent() {
         const dobKey = `dateOfBirth_${username}`;
         const genderKey = `gender_${username}`;
 
+        // Load upskill data for promotion logic
+        const upskillDefsKey = `upskill_definitions_${username}`;
+        const upskillLogsKey = `upskill_logs_${username}`;
+        try { const stored = localStorage.getItem(upskillDefsKey); setUpskillDefinitions(stored ? JSON.parse(stored) : []); } catch (e) { setUpskillDefinitions([]); }
+        try { const stored = localStorage.getItem(upskillLogsKey); setAllUpskillLogs(stored ? JSON.parse(stored) : []); } catch (e) { setAllUpskillLogs([]); }
+
         try { const storedDefinitions = localStorage.getItem(defsKey); setExerciseDefinitions(storedDefinitions ? JSON.parse(storedDefinitions) : []); } catch (e) { setExerciseDefinitions([]); }
         try { const storedLogs = localStorage.getItem(logsKey); setAllWorkoutLogs(storedLogs ? JSON.parse(storedLogs) : []); } catch (e) { setAllWorkoutLogs([]); }
         
@@ -190,6 +200,8 @@ function DeepWorkPageContent() {
       // Clear all state for logged-out user
       setExerciseDefinitions([]);
       setAllWorkoutLogs([]);
+      setUpskillDefinitions([]);
+      setAllUpskillLogs([]);
       setWeightLogs([]);
       setGoalWeight(null);
       setHeight(null);
@@ -226,6 +238,63 @@ function DeepWorkPageContent() {
       }
     }
   }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, weightLogs, goalWeight, height, dateOfBirth, gender]);
+
+  // Logic to promote Upskill tasks to Deep Work focus areas
+  useEffect(() => {
+      if (!currentUser?.username || isLoadingPage || upskillDefinitions.length === 0 || allUpskillLogs.length === 0) {
+          return;
+      }
+
+      // A session is one day with logged sets for a specific exercise def
+      const upskillSessionCounts: Record<string, number> = {};
+      const uniqueDaysPerDef: Record<string, Set<string>> = {};
+
+      allUpskillLogs.forEach(log => {
+          log.exercises.forEach(ex => {
+              if (ex.loggedSets.length > 0) {
+                  if (!uniqueDaysPerDef[ex.definitionId]) {
+                      uniqueDaysPerDef[ex.definitionId] = new Set();
+                  }
+                  uniqueDaysPerDef[ex.definitionId].add(log.date);
+              }
+          });
+      });
+
+      Object.keys(uniqueDaysPerDef).forEach(defId => {
+          upskillSessionCounts[defId] = uniqueDaysPerDef[defId].size;
+      });
+
+      setExerciseDefinitions(currentDeepWorkDefs => {
+          const newlyPromoted: ExerciseDefinition[] = [];
+          const currentFocusAreaNames = new Set(currentDeepWorkDefs.map(def => `${def.name.toLowerCase()}|${def.category.toLowerCase()}`));
+
+          upskillDefinitions.forEach(upskillDef => {
+              const sessionCount = upskillSessionCounts[upskillDef.id] || 0;
+              const uniqueName = `${upskillDef.name.toLowerCase()}|${upskillDef.category.toLowerCase()}`;
+              
+              if (sessionCount >= 4 && !currentFocusAreaNames.has(uniqueName)) {
+                  const newFocusArea: ExerciseDefinition = {
+                      ...upskillDef,
+                      id: `def_dw_${Date.now()}_${Math.random()}`,
+                  };
+                  newlyPromoted.push(newFocusArea);
+                  currentFocusAreaNames.add(uniqueName); 
+              }
+          });
+
+          if (newlyPromoted.length > 0) {
+              toast({
+                  title: "Focus Areas Promoted!",
+                  description: `${newlyPromoted.length} learning task(s) have been added to your Focus Area Library.`,
+              });
+              return [...currentDeepWorkDefs, ...newlyPromoted];
+          }
+
+          return currentDeepWorkDefs; // No changes
+      });
+
+  }, [upskillDefinitions, allUpskillLogs, currentUser, isLoadingPage, toast]);
+
 
   // Check for backup prompt on Mondays
   useEffect(() => {
