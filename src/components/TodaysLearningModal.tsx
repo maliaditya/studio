@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { WorkoutExercise } from '@/types/workout';
-import { BookOpenCheck, Briefcase } from 'lucide-react';
+import { BookOpenCheck, Briefcase, Share2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from './ui/button';
 
@@ -29,7 +29,7 @@ interface TodaysLearningModalProps {
   tasks: WorkoutExercise[];
   title: string;
   description: string;
-  pageType: 'upskill' | 'deepwork';
+  pageType: 'upskill' | 'deepwork' | 'branding';
 }
 
 export function TodaysLearningModal({
@@ -44,8 +44,18 @@ export function TodaysLearningModal({
 
   const handleGoToPage = () => {
     onOpenChange(false);
-    router.push(`/${pageType}`);
+    const path = pageType === 'branding' ? '/personal-branding' : `/${pageType}`;
+    router.push(path);
   };
+
+  const icon = pageType === 'upskill' 
+    ? <BookOpenCheck className="h-12 w-12 mb-4" /> 
+    : pageType === 'deepwork' 
+    ? <Briefcase className="h-12 w-12 mb-4" /> 
+    : <Share2 className="h-12 w-12 mb-4" />;
+  
+  const pageName = pageType === 'upskill' ? 'Upskill' : pageType === 'deepwork' ? 'Deep Work' : 'Personal Branding';
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -75,11 +85,11 @@ export function TodaysLearningModal({
               </Table>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8">
-                {pageType === 'upskill' ? <BookOpenCheck className="h-12 w-12 mb-4" /> : <Briefcase className="h-12 w-12 mb-4" />}
+                {icon}
                 <p className="font-semibold">No sessions planned for today!</p>
                 <p className="text-sm">You can add tasks on the dedicated page.</p>
                 <Button onClick={handleGoToPage} variant="link" className="mt-2">
-                  Go to {pageType === 'upskill' ? 'Upskill' : 'Deep Work'} page
+                  Go to {pageName} page
                 </Button>
               </div>
             )}

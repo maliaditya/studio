@@ -12,7 +12,7 @@ import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subYea
 import { useRouter } from 'next/navigation';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysLearningModal } from '@/components/TodaysLearningModal';
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity, ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
@@ -124,6 +124,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
   deepwork: <Briefcase className="h-5 w-5 text-primary" />,
   planning: <ClipboardList className="h-5 w-5 text-primary" />,
   tracking: <ClipboardCheck className="h-5 w-5 text-primary" />,
+  branding: <Share2 className="h-5 w-5 text-primary" />,
 };
 
 const productivityLevels = [
@@ -198,7 +199,7 @@ function HomePageContent() {
       tasks: [] as WorkoutExercise[],
       title: '',
       description: '',
-      pageType: 'upskill' as 'upskill' | 'deepwork'
+      pageType: 'upskill' as 'upskill' | 'deepwork' | 'branding'
   });
   
   // State for productivity stats
@@ -230,7 +231,7 @@ function HomePageContent() {
               const slotContent = parsedSchedule[dateKey][slotName];
               if (slotContent && !Array.isArray(slotContent)) {
                 // This is old data (a single activity object). Convert to an array.
-                const activity = slotContent as Activity;
+                const activity = slotContent as ActivityType;
                 parsedSchedule[dateKey][slotName] = [{
                   ...activity,
                   id: activity.id || `${activity.type}-${Date.now()}-${Math.random()}`,
@@ -407,9 +408,12 @@ function HomePageContent() {
       case 'tracking':
         details = 'Tracking Session';
         break;
+      case 'branding':
+        details = 'Branding Session';
+        break;
     }
 
-    const newActivity: Activity = {
+    const newActivity: ActivityType = {
       id: `${type}-${Date.now()}`,
       type,
       details,
@@ -496,7 +500,7 @@ function HomePageContent() {
     return { exercises, muscleGroups };
   };
 
-  const handleActivityClick = (activity: Activity) => {
+  const handleActivityClick = (activity: ActivityType) => {
     if (activity.completed) return; // Don't open modal for completed tasks
 
     if (activity.type === 'workout') {
@@ -520,6 +524,15 @@ function HomePageContent() {
             title: "Today's Deep Work Session",
             description: "Here are the focus areas planned for today.",
             pageType: 'deepwork'
+        });
+        setIsLearningModalOpen(true);
+    } else if (activity.type === 'branding') {
+        const todayLog = brandingLogs.find(log => log.date === todayKey);
+        setLearningModalProps({
+            tasks: todayLog?.exercises || [],
+            title: "Today's Branding Session",
+            description: "Here are the content creation tasks for today.",
+            pageType: 'branding'
         });
         setIsLearningModalOpen(true);
     }
@@ -814,8 +827,9 @@ function HomePageContent() {
                 task.sharingStatus.twitter && 
                 task.sharingStatus.linkedin && 
                 task.sharingStatus.devto;
-
-            const nextTask = brandingTasks.find(task => !isFullyShared(task));
+            
+            const activeTasks = brandingTasks.filter(task => !isFullyShared(task));
+            const nextTask = activeTasks[0];
     
             if (nextTask) {
                 let loggedStagesCount = 0;
@@ -1381,7 +1395,7 @@ function HomePageContent() {
                                       {activity.details}
                                     </p>
                                     <p className="text-xs text-muted-foreground capitalize">
-                                      {activity.type === 'deepwork' ? 'Deep Work' : activity.type}
+                                      {activity.type === 'deepwork' ? 'Deep Work' : activity.type === 'branding' ? 'Personal Branding' : activity.type}
                                     </p>
                                   </div>
                                 </div>
@@ -1435,6 +1449,11 @@ function HomePageContent() {
                                   <Briefcase className="h-4 w-4 mr-2" />
                                   Add Deep Work
                                 </Button>
+                                <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'branding')}>
+                                  <Share2 className="h-4 w-4 mr-2" />
+                                  Add Branding
+                                </Button>
+                                <Separator className="my-1" />
                                 <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleAddActivity(slot.name, 'planning')}>
                                   <ClipboardList className="h-4 w-4 mr-2" />
                                   Add Planning
@@ -1519,3 +1538,4 @@ export default function Page() {
 }
 
     
+
