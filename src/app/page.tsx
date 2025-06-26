@@ -4,7 +4,7 @@
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Sunrise, Sun, Sunset, Moon, MoonStar, CloudSun, PlusCircle, Trash2, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, BarChart3, Clock, TrendingUp, Zap, Target, LineChart as LineChartIcon, BookCopy, Activity, CalendarDays, Flame, HeartPulse, Utensils } from 'lucide-react';
+import { BrainCircuit, Sunrise, Sun, Sunset, Moon, MoonStar, CloudSun, PlusCircle, Trash2, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, BarChart3, Clock, TrendingUp, Zap, Target, LineChart as LineChartIcon, BookCopy, Activity, CalendarDays, Flame, HeartPulse, Utensils, ArrowUp, ArrowDown } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -547,6 +547,34 @@ function HomePageContent() {
     }, [allWorkoutLogs, oneYearAgo, today]);
 
     const productivityStats = useMemo(() => {
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const yesterdayStr = format(addDays(new Date(), -1), 'yyyy-MM-dd');
+
+        const getDailyDuration = (logs: DatedWorkout[], dateStr: string, durationField: 'reps' | 'weight') => {
+            const logForDay = logs.find(log => log.date === dateStr);
+            if (!logForDay) return 0;
+            return logForDay.exercises.reduce((total, ex) => 
+                total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
+        };
+        
+        const todayDeepWork = getDailyDuration(allDeepWorkLogs, todayStr, 'weight');
+        const yesterdayDeepWork = getDailyDuration(allDeepWorkLogs, yesterdayStr, 'weight');
+        const todayUpskill = getDailyDuration(allUpskillLogs, todayStr, 'reps');
+        const yesterdayUpskill = getDailyDuration(allUpskillLogs, yesterdayStr, 'reps');
+
+        const calculateChange = (todayVal: number, yesterdayVal: number) => {
+            if (yesterdayVal === 0) return todayVal > 0 ? 100 : 0;
+            if (todayVal === 0 && yesterdayVal > 0) return -100;
+            return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
+        };
+
+        const deepWorkChange = calculateChange(todayDeepWork, yesterdayDeepWork);
+        const upskillChange = calculateChange(todayUpskill, yesterdayUpskill);
+
+        const latestConsistency = consistencyData.length > 0 ? consistencyData[consistencyData.length - 1].score : 0;
+        const previousConsistency = consistencyData.length > 1 ? consistencyData[consistencyData.length - 2].score : latestConsistency;
+        const consistencyChange = latestConsistency - previousConsistency;
+
         const calculateAverageDuration = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
             const dailyDurations: Record<string, number> = {};
             logs.forEach(log => {
@@ -674,14 +702,10 @@ function HomePageContent() {
             return { avgVolume: Math.round(totalVolume / daysWithWorkouts) };
         };
         
-        const latestConsistency = consistencyData.length > 0 ? consistencyData[consistencyData.length - 1].score : 0;
-
         const avgUpskillDuration = calculateAverageDuration(allUpskillLogs, 'reps');
         const avgDeepWorkDuration = calculateAverageDuration(allDeepWorkLogs, 'weight');
         const totalProductiveMinutes = avgUpskillDuration + avgDeepWorkDuration;
         const totalProductiveHours = totalProductiveMinutes / 60;
-        const avgUpskillHours = avgUpskillDuration / 60;
-        const avgDeepWorkHours = avgDeepWorkDuration / 60;
         const currentLevel = productivityLevels.find(l => totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max) || null;
         const learningStats = calculateLearningStats(allUpskillLogs, topicGoals);
         const workoutStats = calculateWorkoutStats(allWorkoutLogs);
@@ -757,7 +781,13 @@ function HomePageContent() {
         const overallNextMilestone = allNextMilestones.length > 0 ? allNextMilestones[0] : null;
 
         return {
-            avgUpskillDuration, avgDeepWorkDuration, avgUpskillHours, avgDeepWorkHours,
+            todayDeepWorkHours: todayDeepWork / 60,
+            deepWorkChange,
+            todayUpskillHours: todayUpskill / 60,
+            upskillChange,
+            consistencyChange,
+            avgUpskillHours: avgUpskillDuration / 60, 
+            avgDeepWorkHours: avgDeepWorkDuration / 60,
             totalProductiveHours, currentLevel, learningStats, workoutStats, latestConsistency,
             healthMetrics, projectionSummary, overallNextMilestone
         };
@@ -855,6 +885,12 @@ function HomePageContent() {
                 <CardContent>
                   <div className="text-2xl font-bold">{productivityStats.latestConsistency}%</div>
                   <p className="text-xs text-muted-foreground">Workout Consistency</p>
+                  {productivityStats.consistencyChange !== 0 && (
+                    <p className={cn("text-xs text-muted-foreground mt-1 flex items-center", productivityStats.consistencyChange > 0 ? "text-emerald-500" : "text-red-500")}>
+                        {productivityStats.consistencyChange > 0 ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+                        {productivityStats.consistencyChange.toFixed(1)} points vs yesterday
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -864,8 +900,14 @@ function HomePageContent() {
                   <Briefcase className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{productivityStats.avgDeepWorkHours.toFixed(1)} hrs</div>
-                  <p className="text-xs text-muted-foreground">Avg. Daily Deep Work</p>
+                  <div className="text-2xl font-bold">{productivityStats.todayDeepWorkHours.toFixed(1)} hrs</div>
+                  <p className="text-xs text-muted-foreground">Today's Deep Work</p>
+                  {productivityStats.deepWorkChange !== 0 && (
+                    <p className={cn("text-xs text-muted-foreground mt-1 flex items-center", productivityStats.deepWorkChange > 0 ? "text-emerald-500" : "text-red-500")}>
+                        {productivityStats.deepWorkChange > 0 ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+                        {Math.abs(productivityStats.deepWorkChange).toFixed(0)}% vs yesterday
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -877,16 +919,13 @@ function HomePageContent() {
                       <TrendingUp className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      {productivityStats.overallNextMilestone ? (
-                        <>
-                          <div className="text-2xl font-bold">{productivityStats.overallNextMilestone.daysRemaining} days</div>
-                          <p className="text-xs text-muted-foreground">To next milestone</p>
-                        </>
-                      ) : (
-                        <>
-                          <div className="text-2xl font-bold">{productivityStats.avgUpskillHours.toFixed(1)} hrs</div>
-                          <p className="text-xs text-muted-foreground">Avg. Daily Learning</p>
-                        </>
+                      <div className="text-2xl font-bold">{productivityStats.todayUpskillHours.toFixed(1)} hrs</div>
+                      <p className="text-xs text-muted-foreground">Today's Learning</p>
+                      {productivityStats.upskillChange !== 0 && (
+                        <p className={cn("text-xs text-muted-foreground mt-1 flex items-center", productivityStats.upskillChange > 0 ? "text-emerald-500" : "text-red-500")}>
+                            {productivityStats.upskillChange > 0 ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+                            {Math.abs(productivityStats.upskillChange).toFixed(0)}% vs yesterday
+                        </p>
                       )}
                     </CardContent>
                   </Card>
