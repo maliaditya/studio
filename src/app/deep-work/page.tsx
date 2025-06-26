@@ -101,6 +101,7 @@ function DeepWorkPageContent() {
   const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
   const [isDecompositionEditing, setIsDecompositionEditing] = useState(false);
   const [editableDecompositionData, setEditableDecompositionData] = useState<DecompositionRow[]>([]);
+  const [manuallyDeletedIds, setManuallyDeletedIds] = useState<string[]>([]);
 
 
   const decompositionTechniques: DecompositionRow[] = [
@@ -172,6 +173,7 @@ function DeepWorkPageContent() {
         const heightKey = `height_${username}`;
         const dobKey = `dateOfBirth_${username}`;
         const genderKey = `gender_${username}`;
+        const deletesKey = `deepwork_manual_deletes_${username}`;
 
         // Load upskill data for promotion logic
         const upskillDefsKey = `upskill_definitions_${username}`;
@@ -181,6 +183,7 @@ function DeepWorkPageContent() {
 
         try { const storedDefinitions = localStorage.getItem(defsKey); setExerciseDefinitions(storedDefinitions ? JSON.parse(storedDefinitions) : []); } catch (e) { setExerciseDefinitions([]); }
         try { const storedLogs = localStorage.getItem(logsKey); setAllWorkoutLogs(storedLogs ? JSON.parse(storedLogs) : []); } catch (e) { setAllWorkoutLogs([]); }
+        try { const storedDeletes = localStorage.getItem(deletesKey); setManuallyDeletedIds(storedDeletes ? JSON.parse(storedDeletes) : []); } catch (e) { setManuallyDeletedIds([]); }
         
         // Weight/Health data can be shared
         const storedGoal = localStorage.getItem(goalWeightKey);
@@ -207,6 +210,7 @@ function DeepWorkPageContent() {
       setHeight(null);
       setDateOfBirth(null);
       setGender(null);
+      setManuallyDeletedIds([]);
     }
     const timer = setTimeout(() => setIsLoadingPage(false), 300);
     return () => clearTimeout(timer);
@@ -223,10 +227,12 @@ function DeepWorkPageContent() {
         const heightKey = `height_${username}`;
         const dobKey = `dateOfBirth_${username}`;
         const genderKey = `gender_${username}`;
+        const deletesKey = `deepwork_manual_deletes_${username}`;
         
         localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
         localStorage.setItem(logsKey, JSON.stringify(allWorkoutLogs));
         localStorage.setItem(weightLogsKey, JSON.stringify(weightLogs));
+        localStorage.setItem(deletesKey, JSON.stringify(manuallyDeletedIds));
 
         if (goalWeight !== null) localStorage.setItem(goalWeightKey, goalWeight.toString()); else localStorage.removeItem(goalWeightKey);
         if (height !== null) localStorage.setItem(heightKey, height.toString()); else localStorage.removeItem(heightKey);
@@ -237,7 +243,7 @@ function DeepWorkPageContent() {
         toast({ title: "Save Error", description: "Could not save data locally.", variant: "destructive"});
       }
     }
-  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, weightLogs, goalWeight, height, dateOfBirth, gender]);
+  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, weightLogs, goalWeight, height, dateOfBirth, gender, manuallyDeletedIds]);
 
   // Logic to promote Upskill tasks to Deep Work focus areas
   useEffect(() => {
@@ -254,30 +260,33 @@ function DeepWorkPageContent() {
         });
     });
 
-    const currentFocusAreaNames = new Set(exerciseDefinitions.map(def => `${def.name.toLowerCase()}|${def.category.toLowerCase()}`));
+    const currentDeepWorkIds = new Set(exerciseDefinitions.map(def => def.id));
     const newlyPromoted: ExerciseDefinition[] = [];
 
     upskillDefinitions.forEach(upskillDef => {
-        const uniqueName = `${upskillDef.name.toLowerCase()}|${upskillDef.category.toLowerCase()}`;
+        const newDeepWorkId = `dw-${upskillDef.id}`;
+        const wasManuallyDeleted = manuallyDeletedIds.includes(upskillDef.id);
+        const isAlreadyPromoted = currentDeepWorkIds.has(newDeepWorkId);
         
-        if (loggedUpskillDefIds.has(upskillDef.id) && !currentFocusAreaNames.has(uniqueName)) {
+        if (loggedUpskillDefIds.has(upskillDef.id) && !isAlreadyPromoted && !wasManuallyDeleted) {
             const newFocusArea: ExerciseDefinition = {
                 ...upskillDef,
-                id: `def_dw_${Date.now()}_${Math.random()}`,
+                id: newDeepWorkId,
+                sourceUpskillId: upskillDef.id,
             };
             newlyPromoted.push(newFocusArea);
-            currentFocusAreaNames.add(uniqueName);
+            currentDeepWorkIds.add(newDeepWorkId);
         }
     });
 
     if (newlyPromoted.length > 0) {
-        toast({
-            title: "Focus Areas Promoted!",
-            description: `${newlyPromoted.length} learning task(s) have been added to your Focus Area Library.`,
-        });
-        setExerciseDefinitions(currentDefs => [...currentDefs, ...newlyPromoted]);
+      toast({
+          title: "Focus Areas Promoted!",
+          description: `${newlyPromoted.length} learning task(s) have been added to your Focus Area Library.`,
+      });
+      setExerciseDefinitions(currentDefs => [...currentDefs, ...newlyPromoted]);
     }
-  }, [upskillDefinitions, allUpskillLogs, currentUser, isLoadingPage, toast, exerciseDefinitions]);
+  }, [upskillDefinitions, allUpskillLogs, currentUser, isLoadingPage, toast, exerciseDefinitions, manuallyDeletedIds]);
 
 
   // Check for backup prompt on Mondays
@@ -361,6 +370,11 @@ function DeepWorkPageContent() {
 
   const handleDeleteExerciseDefinition = (id: string) => {
     const defToDelete = exerciseDefinitions.find(def => def.id === id);
+
+    if (defToDelete?.sourceUpskillId) {
+        setManuallyDeletedIds(prev => [...new Set([...prev, defToDelete!.sourceUpskillId])]);
+    }
+
     setExerciseDefinitions(prev => prev.filter(def => def.id !== id));
     setAllWorkoutLogs(prevLogs => 
       prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) }))

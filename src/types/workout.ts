@@ -50,6 +50,7 @@ export interface ExerciseDefinition {
   category: ExerciseCategory; // Topic for upskill
   decompositionData?: DecompositionRow[];
   focusAreas?: string[];
+  sourceUpskillId?: string;
   // Personal Branding
   brandingStatus?: 'converted' | 'published';
   contentUrls?: {
