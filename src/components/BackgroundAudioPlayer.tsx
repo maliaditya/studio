@@ -1,45 +1,103 @@
 "use client";
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Button } from './ui/button';
+import { Play, Pause, Volume1, Volume2, VolumeX } from 'lucide-react';
+import { Slider } from './ui/slider';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 export function BackgroundAudioPlayer() {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [volume, setVolume] = useState(0.2); // Start at 20% volume
 
+  // Effect to sync audio element's playing state with component state
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    // Set the volume to a lower level (e.g., 20%)
-    audio.volume = 0.2;
+    if (isPlaying) {
+      audio.play().catch(error => {
+        console.log("Autoplay was prevented. User interaction needed.");
+        // If play fails (e.g. before user interaction), revert state.
+        // The user can then click the play button to start.
+        setIsPlaying(false);
+      });
+    } else {
+      audio.pause();
+    }
+  }, [isPlaying]);
 
-    // We need to handle browsers' autoplay policies.
-    // Most browsers require a user interaction to play audio with sound.
-    const playAudio = async () => {
-      try {
-        await audio.play();
-        // If audio starts playing, we don't need the interaction listener anymore.
-        document.removeEventListener('click', playAudio);
-      } catch (error) {
-        // This is expected if the user hasn't interacted with the page yet.
-        console.log('Autoplay was prevented. Audio will start after the first click.');
+  // Effect to sync audio element's volume with component state
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.volume = volume;
+    }
+  }, [volume]);
+  
+  // Effect for initial setup and handling first play interaction
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    
+    // This allows the user to start playback with the play button
+    // even if autoplay is blocked initially.
+    const handleFirstPlay = () => {
+      if (!isPlaying) {
+        setIsPlaying(true);
       }
     };
 
-    // Attempt to play immediately. This might work or might be blocked.
-    playAudio();
-
-    // Add a one-time event listener for any click on the document as a fallback.
-    // This ensures the music will start once the user interacts with the page.
-    document.addEventListener('click', playAudio, { once: true });
-
-    // Cleanup the event listener when the component unmounts.
+    document.addEventListener('click', handleFirstPlay, { once: true });
+    
     return () => {
-      document.removeEventListener('click', playAudio);
+        document.removeEventListener('click', handleFirstPlay);
+        if (audio) {
+            audio.pause();
+            audio.src = '';
+        }
     };
-  }, []);
+  }, [isPlaying]);
 
-  // The audio element itself. `controls` is omitted for background play.
+  const togglePlayPause = () => {
+    setIsPlaying(prev => !prev);
+  };
+
+  const handleVolumeChange = (newVolume: number[]) => {
+    setVolume(newVolume[0]);
+  };
+  
+  const getVolumeIcon = () => {
+    if (volume === 0) return <VolumeX className="h-5 w-5" />;
+    if (volume < 0.5) return <Volume1 className="h-5 w-5" />;
+    return <Volume2 className="h-5 w-5" />;
+  };
+
   return (
-    <audio ref={audioRef} src="/40 Hz Study Music.mp3" loop />
+    <>
+      <audio ref={audioRef} src="/40 Hz Study Music.mp3" loop />
+      <div className="fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-full border bg-background/80 p-2 shadow-lg backdrop-blur-sm">
+        <Button onClick={togglePlayPause} variant="ghost" size="icon" className="h-10 w-10 rounded-full">
+          {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+        </Button>
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
+                    {getVolumeIcon()}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent side="top" align="center" className="w-auto p-2">
+                <Slider
+                    defaultValue={[volume]}
+                    max={1}
+                    step={0.05}
+                    onValueChange={handleVolumeChange}
+                    className="w-32"
+                />
+            </PopoverContent>
+        </Popover>
+      </div>
+    </>
   );
 }
