@@ -24,6 +24,8 @@ import { getExercisesForDay } from '@/lib/workoutUtils';
 import { WeightChartModal } from '@/components/WeightChartModal';
 import { DietPlanModal } from '@/components/DietPlanModal';
 import { StatsOverviewModal } from '@/components/StatsOverviewModal';
+import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, AreaChart, Area } from 'recharts';
 
 const slots = [
   { name: 'Late Night', time: '12 AM - 4 AM', icon: <Moon className="h-6 w-6 text-indigo-400" /> },
@@ -79,7 +81,7 @@ const INITIAL_PLANS: AllWorkoutPlans = {
       "Back": ["Lat Pulldown (Wide Grip)", "V handle lat pulldown", "1-Arm Dumbbell Row", "Back extensions"],
       "Biceps": ["Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Reverse Cable"],
       "Shoulders": ["Seated Dumbbell Shoulder Press", "Seated Dumbbell Lateral Raise", "Rear Delt Fly (Incline Bench)", "Cable Upright Rows"],
-      "Legs": ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"]
+      "Legs": ["Walking Lunges (Barbell)", "Squats (Barbell)", "hamstring machine", "Quads Machine"]
     },
     "W3": {
       "Chest": ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine"],
@@ -145,6 +147,10 @@ const productivityLevels = [
     { level: 'L19', min: 780, max: 900, description: 'Burning fuel — not sustainable daily', zone: '🔥 Overdrive Zone' },
     { level: 'L20', min: 900, max: Infinity, description: 'Legendary grind day (Rare / Purpose-driven only)', zone: '⚠️ Apex Zone' },
 ];
+
+const dailyProductivityChartConfig = {
+  totalMinutes: { label: "Minutes", color: "hsl(var(--primary))" },
+} satisfies ChartConfig;
 
 
 function HomePageContent() {
@@ -803,6 +809,34 @@ function HomePageContent() {
             avgProductiveHoursChange,
         };
     }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, dietPlan, weightLogs, dateOfBirth, height, gender, goalWeight, consistencyData]);
+
+    const dailyProductiveHoursData = useMemo(() => {
+        const dailyData: Record<string, { upskill: number, deepwork: number }> = {};
+
+        allUpskillLogs.forEach(log => {
+            const duration = log.exercises.reduce((sum, ex) => sum + ex.loggedSets.reduce((s, set) => s + set.reps, 0), 0);
+            if (duration > 0) {
+                if (!dailyData[log.date]) dailyData[log.date] = { upskill: 0, deepwork: 0 };
+                dailyData[log.date].upskill += duration;
+            }
+        });
+
+        allDeepWorkLogs.forEach(log => {
+            const duration = log.exercises.reduce((sum, ex) => sum + ex.loggedSets.reduce((s, set) => s + set.weight, 0), 0);
+            if (duration > 0) {
+                if (!dailyData[log.date]) dailyData[log.date] = { upskill: 0, deepwork: 0 };
+                dailyData[log.date].deepwork += duration;
+            }
+        });
+
+        return Object.entries(dailyData)
+            .map(([dateString, data]) => ({
+                dateObj: parseISO(dateString),
+                totalMinutes: data.upskill + data.deepwork,
+                date: format(parseISO(dateString), 'MMM dd'),
+            }))
+            .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+    }, [allUpskillLogs, allDeepWorkLogs]);
     
     // MODAL HANDLERS
     const handleDietModalOpenChange = (isOpen: boolean) => {
@@ -1073,6 +1107,60 @@ function HomePageContent() {
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                            <Separator className="my-6" />
+                            <div>
+                                <h4 className="font-semibold mb-2 flex items-center gap-2 text-muted-foreground"><Clock /> Daily Productive Time</h4>
+                                {dailyProductiveHoursData.length > 1 ? (
+                                    <ChartContainer config={dailyProductivityChartConfig} className="h-[200px] w-full">
+                                        <ResponsiveContainer>
+                                            <AreaChart data={dailyProductiveHoursData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                                <defs>
+                                                    <linearGradient id="fillTotalMinutes" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="var(--color-totalMinutes)" stopOpacity={0.8}/>
+                                                    <stop offset="95%" stopColor="var(--color-totalMinutes)" stopOpacity={0.1}/>
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid vertical={false} />
+                                                <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
+                                                <YAxis 
+                                                    tickLine={false} 
+                                                    axisLine={false} 
+                                                    tickMargin={8}
+                                                    fontSize={12}
+                                                    domain={['auto', 'auto']}
+                                                />
+                                                <RechartsTooltip
+                                                    content={({ active, payload }) => {
+                                                        if (active && payload && payload.length) {
+                                                            const data = payload[0].payload;
+                                                            return (
+                                                                <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                                    <div className="font-bold text-foreground">{format(data.dateObj, 'PPP')}</div>
+                                                                    <div className="grid gap-1.5">
+                                                                        <div className="flex w-full items-center gap-2">
+                                                                            <div className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: 'hsl(var(--primary))' }} />
+                                                                            <div className="flex flex-1 justify-between">
+                                                                                <span className="text-muted-foreground">Productive Time</span>
+                                                                                <span className="font-mono font-medium text-foreground">{data.totalMinutes} min</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    }}
+                                                />
+                                                <Area type="monotone" dataKey="totalMinutes" fill="url(#fillTotalMinutes)" stroke="var(--color-totalMinutes)" strokeWidth={2} name="totalMinutes" />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
+                                    </ChartContainer>
+                                ) : (
+                                    <div className="flex h-[200px] items-center justify-center text-center text-sm text-muted-foreground">
+                                        <p>Log productive time on multiple days to see your daily trend chart.</p>
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -1363,3 +1451,5 @@ function HomePageContent() {
 export default function Page() {
     return ( <AuthGuard> <HomePageContent /> </AuthGuard> );
 }
+
+    
