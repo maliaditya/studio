@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
@@ -53,8 +52,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem(`upskill_topic_goals_${username}`, JSON.stringify(data.upskillTopicGoals || {}));
 
     // Deep Work
-    localStorage.setItem(`deepwork_definitions_${username}`, JSON.stringify(data.deepWorkDefinitions || []));
-    localStorage.setItem(`deepwork_logs_${username}`, JSON.stringify(data.deepWorkLogs || []));
+    localStorage.setItem(`deepWorkDefinitions_${username}`, JSON.stringify(data.deepWorkDefinitions || []));
+    localStorage.setItem(`deepWorkLogs_${username}`, JSON.stringify(data.deepWorkLogs || []));
 
     // Personal Branding
     localStorage.setItem(`branding_tasks_${username}`, JSON.stringify(data.brandingTasks || []));
