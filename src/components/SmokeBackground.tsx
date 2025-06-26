@@ -35,9 +35,9 @@ export function SmokeBackground() {
     const smokeMaterial = new THREE.MeshLambertMaterial({
       map: smokeTexture,
       transparent: true,
-      opacity: 0.1,
+      opacity: 0.15,
       blending: THREE.NormalBlending, // Using NormalBlending for a more realistic smoke look
-      color: 0x555555,
+      color: 0xffffff,
     });
     const smokeGeo = new THREE.PlaneGeometry(300, 300);
 

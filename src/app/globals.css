@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -71,25 +72,25 @@
   }
 
   .theme-smoke {
-    --background: 0 0% 95%;
-    --foreground: 0 0% 10%;
-    --card: hsla(0, 0%, 100%, 0.8);
-    --card-foreground: 0 0% 10%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
-    --primary: 220 90% 55%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 90%;
-    --secondary-foreground: 0 0% 10%;
-    --muted: 0 0% 85%;
-    --muted-foreground: 0 0% 40%;
-    --accent: 220 90% 55%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 70% 50%;
+    --background: 0 0% 5%;
+    --foreground: 0 0% 95%;
+    --card: hsla(0, 0%, 12%, 0.7);
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 220 90% 60%;
+    --primary-foreground: 0 0% 10%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 220 80% 65%;
+    --accent-foreground: 0 0% 10%;
+    --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 98%;
-    --border: hsla(0, 0%, 10%, 0.1);
-    --input: 0 0% 90%;
-    --ring: 220 90% 55%;
+    --border: hsla(0, 0%, 20%, 0.5);
+    --input: 0 0% 15%;
+    --ring: 220 90% 60%;
   }
 
   .theme-cloth {
@@ -151,13 +152,9 @@
     background-color: hsl(var(--background));
   }
   
-  html.theme-smoke {
-    background: radial-gradient(ellipse at bottom left, black, white);
-    background-attachment: fixed;
-  }
-
   .theme-smoke #smoke-canvas {
     display: block;
+    background-color: hsl(var(--background));
   }
 
   .theme-default #default-background-container .first,
