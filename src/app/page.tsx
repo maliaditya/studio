@@ -4,7 +4,7 @@
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Sunrise, Sun, Sunset, Moon, MoonStar, CloudSun, PlusCircle, Trash2, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, BarChart3, Clock, TrendingUp, Zap, Target, LineChart as LineChartIcon, BookCopy, Activity, CalendarDays, Flame, HeartPulse, Utensils, ArrowUp, ArrowDown } from 'lucide-react';
+import { BrainCircuit, Sunrise, Sun, Sunset, Moon, MoonStar, CloudSun, PlusCircle, Trash2, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, BarChart3, Clock, TrendingUp, Zap, Target, LineChart as LineChartIcon, BookCopy, Activity, CalendarDays, Flame, HeartPulse, Utensils, ArrowUp, ArrowDown, Share2 } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ import { DietPlanModal } from '@/components/DietPlanModal';
 import { StatsOverviewModal } from '@/components/StatsOverviewModal';
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, AreaChart, Area } from 'recharts';
+import { Badge } from '@/components/ui/badge';
 
 const slots = [
   { name: 'Late Night', time: '12 AM - 4 AM', icon: <Moon className="h-6 w-6 text-indigo-400" /> },
@@ -97,7 +98,7 @@ const INITIAL_PLANS: AllWorkoutPlans = {
       "Back": ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle lat pulldown", "DeadLifts"],
       "Biceps": ["Seated Machine Curls", "Cable Curls", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"],
       "Shoulders": ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable"],
-      "Legs": ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"]
+      "Legs": ["Walking Lunges (Barbell)", "Squats (Barbell)", "hamstring machine", "Quads Machine"]
     },
     "W5": {
       "Chest": ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine", "Cable Fly", "Dumbbell Pullovers"],
@@ -168,7 +169,12 @@ function HomePageContent() {
   // State for upskill and deepwork data
   const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
   const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
+  const [deepWorkDefinitions, setDeepWorkDefinitions] = useState<ExerciseDefinition[]>([]);
   const [topicGoals, setTopicGoals] = useState<Record<string, TopicGoal>>({});
+
+  // State for personal branding data
+  const [brandingTasks, setBrandingTasks] = useState<ExerciseDefinition[]>([]);
+  const [brandingLogs, setAllBrandingLogs] = useState<DatedWorkout[]>([]);
 
   // State for health data
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
@@ -266,8 +272,13 @@ function HomePageContent() {
         const logsKey = `allWorkoutLogs_${username}`;
         // Upskill
         const upskillLogsKey = `upskill_logs_${username}`;
-        const deepworkLogsKey = `deepwork_logs_${username}`;
         const goalsKey = `upskill_topic_goals_${username}`;
+        // Deep Work
+        const deepworkDefsKey = `deepwork_definitions_${username}`;
+        const deepworkLogsKey = `deepwork_logs_${username}`;
+        // Personal Branding
+        const brandingTasksKey = `branding_tasks_${username}`;
+        const brandingLogsKey = `branding_logs_${username}`;
         // Health
         const weightLogsKey = `weightLogs_${username}`;
         const goalWeightKey = `goalWeight_${username}`;
@@ -286,7 +297,12 @@ function HomePageContent() {
         // Load upskill/deepwork
         try { const d = localStorage.getItem(upskillLogsKey); setAllUpskillLogs(d ? JSON.parse(d) : []); } catch (e) { setAllUpskillLogs([]); }
         try { const d = localStorage.getItem(deepworkLogsKey); setAllDeepWorkLogs(d ? JSON.parse(d) : []); } catch (e) { setAllDeepWorkLogs([]); }
+        try { const d = localStorage.getItem(deepworkDefsKey); setDeepWorkDefinitions(d ? JSON.parse(d) : []); } catch (e) { setDeepWorkDefinitions([]); }
         try { const d = localStorage.getItem(goalsKey); setTopicGoals(d ? JSON.parse(d) : {}); } catch (e) { setTopicGoals({}); }
+
+        // Load branding
+        try { const d = localStorage.getItem(brandingTasksKey); setBrandingTasks(d ? JSON.parse(d) : []); } catch (e) { setBrandingTasks([]); }
+        try { const d = localStorage.getItem(brandingLogsKey); setAllBrandingLogs(d ? JSON.parse(d) : []); } catch (e) { setAllBrandingLogs([]); }
         
         // Load health
         try { const d = localStorage.getItem(dietPlanKey); setDietPlan(d ? JSON.parse(d) : []); } catch(e) { setDietPlan([]); }
@@ -792,6 +808,99 @@ function HomePageContent() {
 
         const overallNextMilestone = allNextMilestones.length > 0 ? allNextMilestones[0] : null;
 
+        const calculateBrandingStatus = () => {
+            const nextTask = brandingTasks.find(task => {
+                const isFullyShared = task.sharingStatus && Object.values(task.sharingStatus).every(s => s === true);
+                return !isFullyShared;
+            });
+    
+            if (nextTask) {
+                let loggedStagesCount = 0;
+                for (const log of brandingLogs) {
+                    const taskInLog = log.exercises.find(ex => ex.definitionId === nextTask.id);
+                    if (taskInLog) {
+                        loggedStagesCount = Math.max(loggedStagesCount, taskInLog.loggedSets.length);
+                    }
+                }
+    
+                const stages = ['Create', 'Optimize', 'Review', 'Final Review'];
+                return {
+                    status: 'in_progress' as const,
+                    taskName: nextTask.name,
+                    stage: loggedStagesCount < 4 ? stages[loggedStagesCount] : 'Ready to Share',
+                    progress: `${loggedStagesCount}/4`,
+                };
+            }
+    
+            const focusAreaSessionCounts: Record<string, number> = {};
+            allDeepWorkLogs.forEach(log => {
+                log.exercises.forEach(ex => {
+                    const currentSets = ex.loggedSets.length;
+                    focusAreaSessionCounts[ex.definitionId] = (focusAreaSessionCounts[ex.definitionId] || 0) + currentSets;
+                });
+            });
+    
+            const eligibleFocusAreas = deepWorkDefinitions.filter(def => (focusAreaSessionCounts[def.id] || 0) >= 4);
+            const topics: Record<string, { eligibleCount: number, focusAreas: ExerciseDefinition[] }> = {};
+            
+            deepWorkDefinitions.forEach(def => {
+                if (!topics[def.category]) topics[def.category] = { eligibleCount: 0, focusAreas: [] };
+                topics[def.category].focusAreas.push(def);
+            });
+            eligibleFocusAreas.forEach(def => {
+                if (topics[def.category]) {
+                    topics[def.category].eligibleCount++;
+                }
+            });
+    
+            let closestTopic = { name: '', needed: 4 };
+            Object.entries(topics).forEach(([topicName, data]) => {
+                if (data.eligibleCount > 0 && data.eligibleCount < 4) {
+                    const needed = 4 - data.eligibleCount;
+                    if (needed < closestTopic.needed) {
+                        closestTopic = { name: topicName, needed };
+                    }
+                }
+            });
+    
+            if (closestTopic.name) {
+                return {
+                    status: 'pending' as const,
+                    message: `Need ${closestTopic.needed} more eligible focus areas in "${closestTopic.name}" to form a bundle.`,
+                    subMessage: `(An area is eligible after 4 deep work sessions).`,
+                    eligibleFocusAreas: eligibleFocusAreas.map(fa => `${fa.name} (${fa.category})`),
+                };
+            }
+    
+            let closestFocusArea = { name: '', needed: 5 };
+            deepWorkDefinitions.forEach(def => {
+                const sessions = focusAreaSessionCounts[def.id] || 0;
+                if (sessions < 4) {
+                    const needed = 4 - sessions;
+                    if (needed < closestFocusArea.needed) {
+                        closestFocusArea = { name: def.name, needed };
+                    }
+                }
+            });
+            
+            if (closestFocusArea.name) {
+                 return {
+                    status: 'pending' as const,
+                    message: `Log ${closestFocusArea.needed} more session(s) for "${closestFocusArea.name}" to make it eligible.`,
+                    subMessage: 'Then, group 4 eligible areas in one topic to form a bundle.',
+                    eligibleFocusAreas: eligibleFocusAreas.map(fa => `${fa.name} (${fa.category})`),
+                };
+            }
+    
+            return {
+                status: 'pending' as const,
+                message: 'Log 4 sessions on 4 focus areas within the same topic.',
+                subMessage: 'This will create your first branding bundle.',
+                eligibleFocusAreas: [],
+            };
+        };
+        const brandingStatus = calculateBrandingStatus();
+
         return {
             todayDeepWorkHours: todayDeepWork / 60,
             deepWorkChange,
@@ -803,8 +912,9 @@ function HomePageContent() {
             totalProductiveHours, currentLevel, learningStats, workoutStats, latestConsistency,
             healthMetrics, projectionSummary, overallNextMilestone,
             avgProductiveHoursChange,
+            brandingStatus,
         };
-    }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, dietPlan, weightLogs, dateOfBirth, height, gender, goalWeight, consistencyData]);
+    }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, dietPlan, weightLogs, dateOfBirth, height, gender, goalWeight, consistencyData, brandingTasks, brandingLogs, deepWorkDefinitions]);
     
     // MODAL HANDLERS
     const handleDietModalOpenChange = (isOpen: boolean) => {
@@ -1073,6 +1183,31 @@ function HomePageContent() {
                                                 <p className="text-sm text-muted-foreground text-center py-2">No learning stats yet. Log progress and duration in the Upskill page.</p>
                                             )}
                                         </div>
+                                    </div>
+                                    <Separator className="my-2" />
+                                    <div>
+                                        <h4 className="font-semibold mb-2 flex items-center gap-2"><Share2 /> Personal Branding</h4>
+                                        {productivityStats.brandingStatus && (
+                                            productivityStats.brandingStatus.status === 'in_progress' ? (
+                                                <div className="text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md" onClick={() => router.push('/personal-branding')}>
+                                                    <p>Next up: <span className="font-bold text-foreground">{productivityStats.brandingStatus.taskName}</span></p>
+                                                    <p>Current Stage: <span className="font-bold text-foreground">{productivityStats.brandingStatus.stage} ({productivityStats.brandingStatus.progress})</span></p>
+                                                </div>
+                                            ) : (
+                                                <div className="text-sm text-muted-foreground p-2">
+                                                    <p>{productivityStats.brandingStatus.message}</p>
+                                                    <p className="text-xs mt-1">{productivityStats.brandingStatus.subMessage}</p>
+                                                    {productivityStats.brandingStatus.eligibleFocusAreas.length > 0 && (
+                                                        <div className="mt-2">
+                                                            <p className="font-medium text-foreground text-xs">Eligible Areas:</p>
+                                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                                {productivityStats.brandingStatus.eligibleFocusAreas.map(area => <Badge key={area} variant="secondary" className="text-xs">{area}</Badge>)}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )
+                                        )}
                                     </div>
                                 </div>
                             </div>
