@@ -8,7 +8,7 @@ import { Analytics } from '@vercel/analytics/react';
 import { BackgroundAudioPlayer } from '@/components/BackgroundAudioPlayer';
 import { MatrixBackground } from '@/components/MatrixBackground';
 import { DefaultBackground } from '@/components/DefaultBackground';
-import { ClothBackground } from '@/components/ClothBackground';
+import { SmokeBackground } from '@/components/SmokeBackground';
 
 export const metadata: Metadata = {
   title: 'LifeOS',
@@ -33,7 +33,7 @@ export default function RootLayout({
         <AuthProvider>
           <DefaultBackground />
           <MatrixBackground />
-          <ClothBackground />
+          <SmokeBackground />
           <Header />
           <main>{children}</main>
           <Toaster />

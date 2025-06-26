@@ -53,12 +53,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Effect to apply theme changes to the DOM and save to localStorage
   useEffect(() => {
     const root = window.document.documentElement;
-    root.classList.remove('theme-default', 'theme-matrix', 'theme-cloth');
+    root.classList.remove('theme-default', 'theme-matrix', 'theme-smoke');
     
     if (theme === 'matrix') {
       root.classList.add('theme-matrix');
-    } else if (theme === 'cloth') {
-      root.classList.add('theme-cloth');
+    } else if (theme === 'smoke') {
+      root.classList.add('theme-smoke');
     } else {
       root.classList.add('theme-default');
     }
