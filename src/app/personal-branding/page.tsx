@@ -499,7 +499,7 @@ function PersonalBrandingPageContent() {
               <Card>
                   <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
-                          <CardTitle id="branding-session-heading" className="flex items-center gap-2 text-lg text-accent">
+                          <CardTitle id="branding-session-heading" className="flex items-center gap-2 text-lg text-primary">
                               <ListChecks /> Branding Session for: {format(selectedDate, 'PPP')}
                           </CardTitle>
                       </div>

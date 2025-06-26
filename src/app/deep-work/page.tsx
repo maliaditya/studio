@@ -753,7 +753,7 @@ function DeepWorkPageContent() {
               <Card>
                   <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
-                          <CardTitle id="current-learning-heading" className="flex items-center gap-2 text-lg text-accent">
+                          <CardTitle id="current-learning-heading" className="flex items-center gap-2 text-lg text-primary">
                               <ListChecks /> Deep Work Session for: {format(selectedDate, 'PPP')}
                           </CardTitle>
                       </div>

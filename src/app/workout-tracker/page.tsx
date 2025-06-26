@@ -143,7 +143,7 @@ const INITIAL_PLANS: AllWorkoutPlans = {
     "Back": ["Lat Pulldown (Wide Grip)", "V handle lat pulldown", "1-Arm Dumbbell Row", "Back extensions"],
     "Biceps": ["Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Reverse Cable"],
     "Shoulders": ["Seated Dumbbell Shoulder Press", "Seated Dumbbell Lateral Raise", "Rear Delt Fly (Incline Bench)", "Cable Upright Rows"],
-    "Legs": ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"]
+    "Legs": ["Walking Lunges (Barbell)", "Squats (Barbell)", "hamstring machine", "Quads Machine"]
   },
   "W3": {
     "Chest": ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine"],
@@ -159,7 +159,7 @@ const INITIAL_PLANS: AllWorkoutPlans = {
     "Back": ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle lat pulldown", "DeadLifts"],
     "Biceps": ["Seated Machine Curls", "Cable Curls", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"],
     "Shoulders": ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable"],
-    "Legs": ["Walking Lunges (Barbell)", "Squats (Barbell)", "Hamstring machine", "Quads Machine"]
+    "Legs": ["Walking Lunges (Barbell)", "Squats (Barbell)", "hamstring machine", "Quads Machine"]
   },
   "W5": {
     "Chest": ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine", "Cable Fly", "Dumbbell Pullovers"],
@@ -1254,7 +1254,7 @@ function WorkoutPageContent() {
               <Card>
                   <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
-                          <CardTitle id="current-workout-heading" className="flex items-center gap-2 text-lg text-accent">
+                          <CardTitle id="current-workout-heading" className="flex items-center gap-2 text-lg text-primary">
                               <ListChecks /> Workout for: {format(selectedDate, 'PPP')}
                           </CardTitle>
                           {muscleGroupsForSelectedDay.length > 0 && (
@@ -1380,3 +1380,4 @@ function WorkoutPageContent() {
 export default function Page() {
   return ( <AuthGuard> <WorkoutPageContent /> </AuthGuard> );
 }
+
