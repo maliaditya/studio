@@ -272,7 +272,7 @@ function DeepWorkPageContent() {
               const sessionCount = upskillSessionCounts[upskillDef.id] || 0;
               const uniqueName = `${upskillDef.name.toLowerCase()}|${upskillDef.category.toLowerCase()}`;
               
-              if (sessionCount >= 4 && !currentFocusAreaNames.has(uniqueName)) {
+              if (sessionCount >= 1 && !currentFocusAreaNames.has(uniqueName)) {
                   const newFocusArea: ExerciseDefinition = {
                       ...upskillDef,
                       id: `def_dw_${Date.now()}_${Math.random()}`,
