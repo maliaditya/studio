@@ -53,8 +53,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem(`upskill_topic_goals_${username}`, JSON.stringify(data.upskillTopicGoals || {}));
 
     // Deep Work
-    localStorage.setItem(`deepWorkDefinitions_${username}`, JSON.stringify(data.deepWorkDefinitions || []));
-    localStorage.setItem(`deepWorkLogs_${username}`, JSON.stringify(data.deepWorkLogs || []));
+    localStorage.setItem(`deepwork_definitions_${username}`, JSON.stringify(data.deepWorkDefinitions || []));
+    localStorage.setItem(`deepwork_logs_${username}`, JSON.stringify(data.deepWorkLogs || []));
     localStorage.setItem(`deepwork_manual_deletes_${username}`, JSON.stringify(data.deepworkManualDeletes || []));
 
     // Personal Branding
@@ -137,46 +137,84 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
     }
 
-    let demoOverrideToken: string | null = null;
-    if (currentUser.username === 'demo') {
-        demoOverrideToken = window.prompt(
+    const username = currentUser.username;
+
+    // --- DEMO USER LOGIC ---
+    if (username === 'demo') {
+        const demoOverrideToken = window.prompt(
             "You are updating the read-only 'demo' account.\nPlease provide the override token to proceed.\n(Check your .env file for DEMO_ACCOUNT_UPDATE_TOKEN)"
         );
+        
         if (demoOverrideToken === null || demoOverrideToken.trim() === '') {
             toast({ title: "Update Cancelled", description: "No override token was provided.", variant: "default" });
             return;
         }
+        
+        toast({ title: "Syncing...", description: "Pushing your local data to the cloud." });
+        try {
+            const allUserData = {
+                // ... (data collection as before)
+                exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
+                workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
+                allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
+                workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
+                upskillDefinitions: JSON.parse(localStorage.getItem(`upskill_definitions_${username}`) || '[]'),
+                upskillLogs: JSON.parse(localStorage.getItem(`upskill_logs_${username}`) || '[]'),
+                upskillTopicGoals: JSON.parse(localStorage.getItem(`upskill_topic_goals_${username}`) || '{}'),
+                deepWorkDefinitions: JSON.parse(localStorage.getItem(`deepwork_definitions_${username}`) || '[]'),
+                deepWorkLogs: JSON.parse(localStorage.getItem(`deepwork_logs_${username}`) || '[]'),
+                deepworkManualDeletes: JSON.parse(localStorage.getItem(`deepwork_manual_deletes_${username}`) || '[]'),
+                brandingTasks: JSON.parse(localStorage.getItem(`branding_tasks_${username}`) || '[]'),
+                brandingLogs: JSON.parse(localStorage.getItem(`branding_logs_${username}`) || '[]'),
+                schedule: JSON.parse(localStorage.getItem(`lifeos_schedule_${username}`) || '{}'),
+                dietPlan: JSON.parse(localStorage.getItem(`dietPlan_${username}`) || '[]'),
+                weightLogs: JSON.parse(localStorage.getItem(`weightLogs_${username}`) || '[]'),
+                goalWeight: localStorage.getItem(`goalWeight_${username}`) || null,
+                height: localStorage.getItem(`height_${username}`) || null,
+                dateOfBirth: localStorage.getItem(`dateOfBirth_${username}`) || null,
+                gender: localStorage.getItem(`gender_${username}`) || null,
+            };
+
+            const requestBody = { username, data: allUserData, demo_override_token: demoOverrideToken };
+            const response = await fetch('/api/blob-sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody),
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to push data.');
+            }
+            toast({ title: "Success", description: "Your data has been saved to the cloud." });
+        } catch (error) {
+            console.error("Push to cloud for demo user failed:", error);
+            toast({
+                title: "Sync Failed",
+                description: error instanceof Error ? error.message : "An unknown error occurred.",
+                variant: "destructive",
+            });
+        }
+        return; // IMPORTANT: Exit the function after handling the demo user case.
     }
     
+    // --- REGULAR USER LOGIC ---
+    toast({ title: "Syncing...", description: "Pushing your local data to the cloud." });
     try {
-        toast({ title: "Syncing...", description: "Pushing your local data to the cloud." });
-        const username = currentUser.username;
-        
         const allUserData = {
-            // Workout
+            // ... (data collection as before)
             exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
             workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
             allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
             workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
-            
-            // Upskill
             upskillDefinitions: JSON.parse(localStorage.getItem(`upskill_definitions_${username}`) || '[]'),
             upskillLogs: JSON.parse(localStorage.getItem(`upskill_logs_${username}`) || '[]'),
             upskillTopicGoals: JSON.parse(localStorage.getItem(`upskill_topic_goals_${username}`) || '{}'),
-            
-            // Deep Work
             deepWorkDefinitions: JSON.parse(localStorage.getItem(`deepwork_definitions_${username}`) || '[]'),
             deepWorkLogs: JSON.parse(localStorage.getItem(`deepwork_logs_${username}`) || '[]'),
             deepworkManualDeletes: JSON.parse(localStorage.getItem(`deepwork_manual_deletes_${username}`) || '[]'),
-
-            // Personal Branding
             brandingTasks: JSON.parse(localStorage.getItem(`branding_tasks_${username}`) || '[]'),
             brandingLogs: JSON.parse(localStorage.getItem(`branding_logs_${username}`) || '[]'),
-            
-            // Homepage Schedule
             schedule: JSON.parse(localStorage.getItem(`lifeos_schedule_${username}`) || '{}'),
-
-            // Health
             dietPlan: JSON.parse(localStorage.getItem(`dietPlan_${username}`) || '[]'),
             weightLogs: JSON.parse(localStorage.getItem(`weightLogs_${username}`) || '[]'),
             goalWeight: localStorage.getItem(`goalWeight_${username}`) || null,
@@ -184,34 +222,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             dateOfBirth: localStorage.getItem(`dateOfBirth_${username}`) || null,
             gender: localStorage.getItem(`gender_${username}`) || null,
         };
-        
-        const requestBody: { username: string; data: typeof allUserData; demo_override_token?: string } = {
-            username,
-            data: allUserData,
-        };
-
-        if (currentUser.username === 'demo') {
-            requestBody.demo_override_token = demoOverrideToken ?? undefined;
-        }
-
+        const requestBody = { username, data: allUserData };
         const response = await fetch('/api/blob-sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody),
         });
-        
         const result = await response.json();
         if (!response.ok) {
-            throw new Error(result.error || `Failed to push data.`);
+            throw new Error(result.error || 'Failed to push data.');
         }
-
         toast({ title: "Success", description: "Your data has been saved to the cloud." });
     } catch (error) {
         console.error("Push to cloud failed:", error);
         toast({
-          title: "Sync Failed",
-          description: error instanceof Error ? error.message : "An unknown error occurred.",
-          variant: "destructive",
+            title: "Sync Failed",
+            description: error instanceof Error ? error.message : "An unknown error occurred.",
+            variant: "destructive",
         });
     }
   };
