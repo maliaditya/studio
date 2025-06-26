@@ -1292,21 +1292,21 @@ function HomePageContent() {
                                         </>
                                     )}
                                     
-                                    {(healthMetrics.averageIntake || healthMetrics.maintenanceCalories) && (
+                                    {(productivityStats.healthMetrics.averageIntake || productivityStats.healthMetrics.maintenanceCalories) && (
                                     <div className="space-y-2 text-sm pt-4 border-t">
-                                        {healthMetrics.averageIntake && (
+                                        {productivityStats.healthMetrics.averageIntake && (
                                             <div className="flex justify-between items-center">
                                                 <span className="text-muted-foreground flex items-center gap-2"><Flame className="h-4 w-4" /> Current Avg. Daily Intake</span>
-                                                <span className="font-bold">{healthMetrics.averageIntake} kcal</span>
+                                                <span className="font-bold">{productivityStats.healthMetrics.averageIntake} kcal</span>
                                             </div>
                                         )}
-                                        {healthMetrics.maintenanceCalories && (
+                                        {productivityStats.healthMetrics.maintenanceCalories && (
                                             <div className="flex justify-between items-center">
                                                 <span className="text-muted-foreground flex items-center gap-2"><HeartPulse className="h-4 w-4" /> Est. Maintenance</span>
-                                                <span className="font-bold">{healthMetrics.maintenanceCalories} kcal</span>
+                                                <span className="font-bold">{productivityStats.healthMetrics.maintenanceCalories} kcal</span>
                                             </div>
                                         )}
-                                        {healthMetrics.averageIntake && healthMetrics.maintenanceCalories && healthMetrics.averageIntake < healthMetrics.maintenanceCalories && (
+                                        {productivityStats.healthMetrics.averageIntake && productivityStats.healthMetrics.maintenanceCalories && productivityStats.healthMetrics.averageIntake < productivityStats.healthMetrics.maintenanceCalories && (
                                             <p className="text-xs text-orange-500 mt-2">
                                                 ⚠️ You’re eating below maintenance — watch for fatigue, low mood, or muscle loss.
                                             </p>
