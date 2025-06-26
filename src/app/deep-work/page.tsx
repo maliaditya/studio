@@ -178,13 +178,66 @@ function DeepWorkPageContent() {
     return Array.from(topics).sort();
   }, [exerciseDefinitions]);
 
-  const subtopicCountsPerTopic = useMemo(() => {
-    const counts = new Map<string, number>();
-    exerciseDefinitions.forEach(def => {
-      counts.set(def.category, (counts.get(def.category) || 0) + 1);
+  const brandingCandidates = useMemo(() => {
+    // 1. Calculate session counts for every focus area
+    const sessionCounts = new Map<string, number>();
+    allWorkoutLogs.forEach(log => {
+        log.exercises.forEach(ex => {
+            if (ex.loggedSets.length > 0) {
+                const currentCount = sessionCounts.get(ex.definitionId) || 0;
+                sessionCounts.set(ex.definitionId, currentCount + ex.loggedSets.length);
+            }
+        });
     });
-    return counts;
-  }, [exerciseDefinitions]);
+
+    // 2. Group focus areas by topic (category)
+    const topicsMap = new Map<string, ExerciseDefinition[]>();
+    exerciseDefinitions.forEach(def => {
+        if (!topicsMap.has(def.category)) {
+            topicsMap.set(def.category, []);
+        }
+        topicsMap.get(def.category)!.push(def);
+    });
+
+    // 3. Identify topics that are "brandable"
+    const brandableTopics = new Set<string>();
+    topicsMap.forEach((defs, topic) => {
+        // A topic must have at least 4 focus areas to even be considered.
+        if (defs.length < 4) return;
+        
+        // Count how many focus areas within this topic have at least 4 sessions.
+        const focusAreasWithEnoughSessions = defs.filter(def => {
+            const count = sessionCounts.get(def.id) || 0;
+            return count >= 4;
+        });
+
+        // If at least 4 focus areas have 4+ sessions, the topic is brandable.
+        if (focusAreasWithEnoughSessions.length >= 4) {
+            brandableTopics.add(topic);
+        }
+    });
+
+    // 4. Filter the final list of eligible focus areas
+    return exerciseDefinitions
+        .map(def => ({
+            ...def,
+            sessionCount: sessionCounts.get(def.id) || 0,
+        }))
+        .filter(def => {
+            // An item is eligible if:
+            // a) It has already been converted/published (has branding status)
+            if (def.brandingStatus) {
+                return true;
+            }
+            
+            // b) Its topic is brandable AND it has at least 4 sessions itself.
+            const isTopicBrandable = brandableTopics.has(def.category);
+            const hasEnoughSessions = def.sessionCount >= 4;
+
+            return isTopicBrandable && hasEnoughSessions;
+        })
+        .sort((a, b) => b.sessionCount - a.sessionCount);
+  }, [allWorkoutLogs, exerciseDefinitions]);
 
   useEffect(() => {
     const now = new Date();
@@ -309,33 +362,6 @@ function DeepWorkPageContent() {
     if (selectedCategories.length === 0) return exerciseDefinitions;
     return exerciseDefinitions.filter(def => selectedCategories.includes(def.category));
   }, [exerciseDefinitions, selectedCategories]);
-
-  const brandingCandidates = useMemo(() => {
-    const sessionCounts = new Map<string, number>();
-    allWorkoutLogs.forEach(log => {
-      log.exercises.forEach(ex => {
-        if (ex.loggedSets.length > 0) {
-          const currentCount = sessionCounts.get(ex.definitionId) || 0;
-          sessionCounts.set(ex.definitionId, currentCount + ex.loggedSets.length);
-        }
-      });
-    });
-
-    return exerciseDefinitions
-      .map(def => ({
-        ...def,
-        sessionCount: sessionCounts.get(def.id) || 0,
-      }))
-      .filter(def => {
-        const topicSubtopicCount = subtopicCountsPerTopic.get(def.category) || 0;
-        const hasEnoughSessions = def.sessionCount >= 4;
-        const hasEnoughSubtopics = topicSubtopicCount >= 4;
-        // A focus area is a candidate if it has branding info already,
-        // OR if it meets the new criteria of 4+ sessions AND 4+ subtopics in its category.
-        return def.brandingStatus || (hasEnoughSessions && hasEnoughSubtopics);
-      })
-      .sort((a, b) => (b.sessionCount) - (a.sessionCount));
-  }, [allWorkoutLogs, exerciseDefinitions, subtopicCountsPerTopic]);
 
   const handleCategoryFilterChange = (category: string) => {
     setSelectedCategories(prev => 
@@ -741,7 +767,7 @@ function DeepWorkPageContent() {
                         <Share2 /> Personal Branding Pipeline
                     </CardTitle>
                     <CardDescription>
-                       Convert deep work into content. A focus area appears here once it has 4+ sessions and its topic has at least 4 focus areas.
+                       Convert deep work into content. When a topic has at least 4 focus areas that each have 4+ sessions, they become eligible here.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
