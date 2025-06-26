@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { BrainCircuit, Heart } from 'lucide-react';
+import { BrainCircuit, Heart, Settings } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from './ui/button';
@@ -11,12 +11,14 @@ import { useRouter, usePathname } from 'next/navigation';
 import { SupportModal } from './SupportModal';
 import { cn } from '@/lib/utils';
 import { DemoTokenModal } from './DemoTokenModal';
+import { SettingsModal } from './SettingsModal';
 
 export function Header() {
   const { currentUser, loading, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   const navLinks = [
     { href: '/workout-tracker', label: 'Workout Tracker' },
@@ -64,7 +66,7 @@ export function Header() {
                <div className="h-8 w-20 animate-pulse bg-muted rounded-md"></div>
             ) : currentUser ? (
               <div>
-                <UserProfile />
+                <UserProfile onSettingsClick={() => setIsSettingsModalOpen(true)} />
               </div>
             ) : (
               <Button onClick={() => router.push('/login')} variant="outline">
@@ -83,6 +85,7 @@ export function Header() {
         onOpenChange={setIsDemoTokenModalOpen}
         onSubmit={pushDemoDataWithToken}
       />
+      <SettingsModal isOpen={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen} />
     </>
   );
 }

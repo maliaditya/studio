@@ -5,7 +5,7 @@ import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { LogOut, User as UserIcon, UploadCloud, DownloadCloud, Upload, Download } from 'lucide-react';
+import { LogOut, User as UserIcon, UploadCloud, DownloadCloud, Upload, Download, Settings } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +15,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export function UserProfile() {
+interface UserProfileProps {
+  onSettingsClick: () => void;
+}
+
+export function UserProfile({ onSettingsClick }: UserProfileProps) {
   const { currentUser, signOut: localSignOut, loading, pushDataToCloud, pullDataFromCloud, exportData, importData } = useAuth();
 
   if (loading) {
@@ -51,6 +55,11 @@ export function UserProfile() {
             </p>
           </div>
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onSettingsClick} className="cursor-pointer">
+          <Settings className="mr-2 h-4 w-4" />
+          <span>Settings</span>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={pushDataToCloud} className="cursor-pointer">
           <UploadCloud className="mr-2 h-4 w-4" />
