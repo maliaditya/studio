@@ -153,14 +153,14 @@ function PersonalBrandingPageContent() {
           task.sharingStatus.linkedin && 
           task.sharingStatus.devto;
       
-      const active: ExerciseDefinition[] = [];
-      const published: ExerciseDefinition[] = [];
+      const activeTasks: ExerciseDefinition[] = [];
+      const publishedTasks: ExerciseDefinition[] = [];
 
       brandingTasks.forEach(task => {
           if (isFullyShared(task)) {
-              published.push(task);
+              publishedTasks.push(task);
           } else {
-              active.push(task);
+              activeTasks.push(task);
           }
       });
 
