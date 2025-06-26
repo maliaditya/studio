@@ -565,6 +565,7 @@ function HomePageContent() {
         const calculateChange = (todayVal: number, yesterdayVal: number) => {
             if (yesterdayVal === 0) return todayVal > 0 ? 100 : 0;
             if (todayVal === 0 && yesterdayVal > 0) return -100;
+            if (isNaN(todayVal) || isNaN(yesterdayVal)) return 0;
             return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
         };
 
@@ -575,9 +576,10 @@ function HomePageContent() {
         const previousConsistency = consistencyData.length > 1 ? consistencyData[consistencyData.length - 2].score : latestConsistency;
         const consistencyChange = latestConsistency - previousConsistency;
 
-        const calculateAverageDuration = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
+        const calculateAverageDuration = (logs: DatedWorkout[], durationField: 'reps' | 'weight', excludeToday: boolean = false) => {
             const dailyDurations: Record<string, number> = {};
             logs.forEach(log => {
+                if (excludeToday && log.date === todayStr) return;
                 const duration = log.exercises.reduce((total, ex) => 
                     total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
                 if (duration > 0) {
@@ -706,6 +708,14 @@ function HomePageContent() {
         const avgDeepWorkDuration = calculateAverageDuration(allDeepWorkLogs, 'weight');
         const totalProductiveMinutes = avgUpskillDuration + avgDeepWorkDuration;
         const totalProductiveHours = totalProductiveMinutes / 60;
+        
+        const yesterdayAvgUpskillDuration = calculateAverageDuration(allUpskillLogs, 'reps', true);
+        const yesterdayAvgDeepWorkDuration = calculateAverageDuration(allDeepWorkLogs, 'weight', true);
+        const yesterdayTotalProductiveMinutes = yesterdayAvgUpskillDuration + yesterdayAvgDeepWorkDuration;
+        const yesterdayTotalProductiveHours = yesterdayTotalProductiveMinutes / 60;
+        
+        const avgProductiveHoursChange = calculateChange(totalProductiveHours, yesterdayTotalProductiveHours);
+
         const currentLevel = productivityLevels.find(l => totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max) || null;
         const learningStats = calculateLearningStats(allUpskillLogs, topicGoals);
         const workoutStats = calculateWorkoutStats(allWorkoutLogs);
@@ -789,7 +799,8 @@ function HomePageContent() {
             avgUpskillHours: avgUpskillDuration / 60, 
             avgDeepWorkHours: avgDeepWorkDuration / 60,
             totalProductiveHours, currentLevel, learningStats, workoutStats, latestConsistency,
-            healthMetrics, projectionSummary, overallNextMilestone
+            healthMetrics, projectionSummary, overallNextMilestone,
+            avgProductiveHoursChange,
         };
     }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, dietPlan, weightLogs, dateOfBirth, height, gender, goalWeight, consistencyData]);
     
@@ -992,7 +1003,13 @@ function HomePageContent() {
                                     <Separator className="my-4" />
                                     <p className="text-muted-foreground">Total Productive Hours</p>
                                     <h3 className="text-2xl font-bold">{productivityStats.totalProductiveHours.toFixed(2)}</h3>
-                                    <p className="text-xs text-muted-foreground">per day (average)</p>
+                                    <p className="text-xs text-muted-foreground mb-1">per day (average)</p>
+                                    {productivityStats.avgProductiveHoursChange !== 0 && (
+                                        <p className={cn("text-xs text-muted-foreground flex items-center justify-center", productivityStats.avgProductiveHoursChange > 0 ? "text-emerald-500" : "text-red-500")}>
+                                            {productivityStats.avgProductiveHoursChange > 0 ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+                                            {Math.abs(productivityStats.avgProductiveHoursChange).toFixed(0)}% vs previous average
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="md:col-span-2 space-y-4">
