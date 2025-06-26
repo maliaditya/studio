@@ -178,6 +178,14 @@ function DeepWorkPageContent() {
     return Array.from(topics).sort();
   }, [exerciseDefinitions]);
 
+  const subtopicCountsPerTopic = useMemo(() => {
+    const counts = new Map<string, number>();
+    exerciseDefinitions.forEach(def => {
+      counts.set(def.category, (counts.get(def.category) || 0) + 1);
+    });
+    return counts;
+  }, [exerciseDefinitions]);
+
   useEffect(() => {
     const now = new Date();
     setToday(now);
@@ -318,9 +326,16 @@ function DeepWorkPageContent() {
         ...def,
         sessionCount: sessionCounts.get(def.id) || 0,
       }))
-      .filter(def => def.sessionCount >= 4 || def.brandingStatus)
+      .filter(def => {
+        const topicSubtopicCount = subtopicCountsPerTopic.get(def.category) || 0;
+        const hasEnoughSessions = def.sessionCount >= 4;
+        const hasEnoughSubtopics = topicSubtopicCount >= 4;
+        // A focus area is a candidate if it has branding info already,
+        // OR if it meets the new criteria of 4+ sessions AND 4+ subtopics in its category.
+        return def.brandingStatus || (hasEnoughSessions && hasEnoughSubtopics);
+      })
       .sort((a, b) => (b.sessionCount) - (a.sessionCount));
-  }, [allWorkoutLogs, exerciseDefinitions]);
+  }, [allWorkoutLogs, exerciseDefinitions, subtopicCountsPerTopic]);
 
   const handleCategoryFilterChange = (category: string) => {
     setSelectedCategories(prev => 
@@ -726,13 +741,13 @@ function DeepWorkPageContent() {
                         <Share2 /> Personal Branding Pipeline
                     </CardTitle>
                     <CardDescription>
-                       Convert completed deep work (4+ sessions) into content.
+                       Convert deep work into content. A focus area appears here once it has 4+ sessions and its topic has at least 4 focus areas.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     {brandingCandidates.length === 0 ? (
                         <div className="text-center py-6 text-sm text-muted-foreground">
-                            Log 4 sessions on a focus area to get started.
+                            Log 4+ sessions on a focus area within a topic that has 4+ focus areas to get started.
                         </div>
                     ) : (
                         <ul className="space-y-4">
