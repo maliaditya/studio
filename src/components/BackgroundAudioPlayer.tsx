@@ -17,16 +17,21 @@ export function BackgroundAudioPlayer() {
     if (!audio) return;
 
     if (isPlaying) {
-      audio.play().catch(error => {
-        console.log("Autoplay was prevented. User interaction needed.");
-        // If play fails (e.g. before user interaction), revert state.
-        // The user can then click the play button to start.
-        setIsPlaying(false);
-      });
+      // Attempt to play the audio. This returns a promise.
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          // Autoplay was prevented. This is expected on first load in most browsers.
+          // We'll set isPlaying to false so the UI reflects the actual state.
+          // The user can then click the play button to start it manually.
+          console.log("Audio playback failed. User interaction is required.", error);
+          setIsPlaying(false);
+        });
+      }
     } else {
       audio.pause();
     }
-  }, [isPlaying]);
+  }, [isPlaying]); // This effect runs whenever isPlaying state changes.
 
   // Effect to sync audio element's volume with component state
   useEffect(() => {
@@ -36,29 +41,19 @@ export function BackgroundAudioPlayer() {
     }
   }, [volume]);
   
-  // Effect for initial setup and handling first play interaction
+  // Effect for component cleanup
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
-    
-    // This allows the user to start playback with the play button
-    // even if autoplay is blocked initially.
-    const handleFirstPlay = () => {
-      if (!isPlaying) {
-        setIsPlaying(true);
-      }
-    };
-
-    document.addEventListener('click', handleFirstPlay, { once: true });
-    
+    // The return function of useEffect serves as a cleanup function.
     return () => {
-        document.removeEventListener('click', handleFirstPlay);
         if (audio) {
+            // Pause and clean up the audio source when the component unmounts
+            // to prevent memory leaks.
             audio.pause();
             audio.src = '';
         }
     };
-  }, [isPlaying]);
+  }, []); // Empty dependency array means this runs once on mount and cleans up on unmount.
 
   const togglePlayPause = () => {
     setIsPlaying(prev => !prev);
