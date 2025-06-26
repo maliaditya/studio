@@ -60,5 +60,5 @@ export function MatrixBackground() {
     }
   }, []);
 
-  return <canvas ref={canvasRef} style={{ position: 'fixed', top: 0, left: 0, zIndex: -1, background: '#000' }} />;
+  return <canvas ref={canvasRef} id="matrix-canvas" style={{ position: 'fixed', top: 0, left: 0, zIndex: -1, background: '#000' }} />;
 }

@@ -26,6 +26,8 @@ interface AuthContextType {
   isDemoTokenModalOpen: boolean;
   setIsDemoTokenModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   pushDemoDataWithToken: (token: string) => Promise<void>;
+  theme: string;
+  setTheme: React.Dispatch<React.SetStateAction<string>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,6 +36,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<LocalUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDemoTokenModalOpen, setIsDemoTokenModalOpen] = useState(false);
+  const [theme, setTheme] = useState('default');
   const router = useRouter();
   const { toast } = useToast();
 
@@ -42,14 +45,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setCurrentUser(user);
     setLoading(false);
     
-    // Apply theme on initial load
+    // Load theme from localStorage on initial mount
     const savedTheme = localStorage.getItem('lifeos_theme') || 'default';
-    const root = window.document.documentElement;
-    root.classList.remove('theme-matrix'); // Clean up any previous theme
-    if (savedTheme === 'matrix') {
-        root.classList.add('theme-matrix');
-    }
+    setTheme(savedTheme);
   }, []);
+
+  // Effect to apply theme changes to the DOM and save to localStorage
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove('theme-matrix');
+    
+    if (theme === 'matrix') {
+      root.classList.add('theme-matrix');
+    }
+    
+    localStorage.setItem('lifeos_theme', theme);
+  }, [theme]);
 
   const loadDataIntoLocalStorage = (data: any, username: string) => {
     if (!data) return;
@@ -431,6 +442,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isDemoTokenModalOpen,
     setIsDemoTokenModalOpen,
     pushDemoDataWithToken,
+    theme,
+    setTheme,
   };
 
   return (

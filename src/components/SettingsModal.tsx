@@ -26,31 +26,25 @@ interface UserSettings {
 }
 
 export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
-  const { currentUser } = useAuth();
+  const { currentUser, theme, setTheme } = useAuth();
   const { toast } = useToast();
   const [settings, setSettings] = useState<UserSettings>({ carryForward: false });
-  const [theme, setTheme] = useState('default');
 
   const settingsKey = currentUser ? `lifeos_settings_${currentUser.username}` : null;
-  const themeKey = 'lifeos_theme'; // Theme is global, not user-specific for now
 
   useEffect(() => {
-    if (isOpen) {
-      if (settingsKey) {
-        try {
-          const storedSettings = localStorage.getItem(settingsKey);
-          if (storedSettings) {
-            setSettings(JSON.parse(storedSettings));
-          } else {
-            setSettings({ carryForward: false });
-          }
-        } catch (error) {
-          console.error("Failed to load settings from localStorage", error);
+    if (isOpen && settingsKey) {
+      try {
+        const storedSettings = localStorage.getItem(settingsKey);
+        if (storedSettings) {
+          setSettings(JSON.parse(storedSettings));
+        } else {
           setSettings({ carryForward: false });
         }
+      } catch (error) {
+        console.error("Failed to load settings from localStorage", error);
+        setSettings({ carryForward: false });
       }
-      const storedTheme = localStorage.getItem(themeKey) || 'default';
-      setTheme(storedTheme);
     }
   }, [isOpen, settingsKey]);
 
@@ -77,16 +71,6 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
 
   const handleThemeChange = (newTheme: string) => {
     setTheme(newTheme);
-    localStorage.setItem(themeKey, newTheme);
-    const root = window.document.documentElement;
-    
-    // Remove all theme classes before adding the new one
-    root.classList.remove('theme-matrix');
-    
-    if (newTheme === 'matrix') {
-      root.classList.add('theme-matrix');
-    }
-
     toast({
         title: "Theme Changed",
         description: `Switched to ${newTheme.charAt(0).toUpperCase() + newTheme.slice(1)} theme.`,
