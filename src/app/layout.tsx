@@ -6,6 +6,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { Header } from '@/components/Header';
 import { Analytics } from '@vercel/analytics/react';
 import { BackgroundAudioPlayer } from '@/components/BackgroundAudioPlayer';
+import { MatrixBackground } from '@/components/MatrixBackground';
 
 export const metadata: Metadata = {
   title: 'LifeOS',
@@ -27,6 +28,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
+        <MatrixBackground />
         <AuthProvider>
           <Header />
           <main>{children}</main>
