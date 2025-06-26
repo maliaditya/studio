@@ -16,28 +16,26 @@ export function ClothBackground() {
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
+
     // Polyfill for requestAnimationFrame
-    window.requestAnimFrame =
+    (window as any).requestAnimFrame =
       window.requestAnimationFrame ||
-      window.webkitRequestAnimationFrame ||
-      function (callback) {
+      (window as any).webkitRequestAnimationFrame ||
+      function (callback: any) {
         window.setTimeout(callback, 1e3 / 60);
       };
 
     // Simulation settings
     const accuracy = 5;
     const gravity = 400;
-    const clothY = 25;
-    const clothX = 50;
-    const spacing = 8;
+    const spacing = 12; // Increased spacing for performance on larger screens
     const tearDist = 60;
     const friction = 0.99;
     const bounce = 0.5;
+    let cloth: Cloth;
+    let animationFrameId: number;
 
-    canvas.width = Math.min(800, window.innerWidth);
-    canvas.height = 500;
-    ctx.strokeStyle = '#888';
+    ctx.strokeStyle = '#555';
 
     const mouse = {
       cut: 8,
@@ -203,15 +201,18 @@ export function ClothBackground() {
         constructor(free?: boolean) {
             this.points = [];
             if (!canvas) return;
+            
+            const clothXCount = Math.floor(canvas.width / spacing);
+            const clothYCount = Math.floor(canvas.height / spacing) - 5; // Start a bit higher
 
-            let startX = canvas.width / 2 - clothX * spacing / 2;
+            let startX = canvas.width / 2 - clothXCount * spacing / 2;
 
-            for (let y = 0; y <= clothY; y++) {
-                for (let x = 0; x <= clothX; x++) {
+            for (let y = 0; y <= clothYCount; y++) {
+                for (let x = 0; x <= clothXCount; x++) {
                     let point = new Point(startX + x * spacing, 20 + y * spacing);
                     if (!free && y === 0) point.pin(point.x, point.y);
                     if (x !== 0) point.attach(this.points[this.points.length - 1]);
-                    if (y !== 0) point.attach(this.points[x + (y - 1) * (clothX + 1)]);
+                    if (y !== 0) point.attach(this.points[x + (y - 1) * (clothXCount + 1)]);
 
                     this.points.push(point);
                 }
@@ -254,21 +255,33 @@ export function ClothBackground() {
     const mouseUp = () => (mouse.down = false);
     const contextMenu = (e: MouseEvent) => e.preventDefault();
 
-    canvas.addEventListener('mousedown', mouseDown);
-    canvas.addEventListener('mousemove', setMouse);
-    canvas.addEventListener('mouseup', mouseUp);
-    canvas.addEventListener('contextmenu', contextMenu);
-
-    let cloth = new Cloth();
-    let animationFrameId: number;
+    const start = () => {
+        if (!canvas) return;
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        cloth = new Cloth();
+    }
     
     const update = () => {
       if (!ctx || !canvas) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       cloth.update(0.016);
-      animationFrameId = window.requestAnimFrame(update);
+      animationFrameId = (window as any).requestAnimFrame(update);
+    };
+    
+    const handleResize = () => {
+        window.cancelAnimationFrame(animationFrameId);
+        start();
+        update();
     };
 
+    canvas.addEventListener('mousedown', mouseDown);
+    canvas.addEventListener('mousemove', setMouse);
+    canvas.addEventListener('mouseup', mouseUp);
+    canvas.addEventListener('contextmenu', contextMenu);
+    window.addEventListener('resize', handleResize);
+    
+    start();
     update();
     
     // Cleanup
@@ -278,6 +291,7 @@ export function ClothBackground() {
       canvas.removeEventListener('mousemove', setMouse);
       canvas.removeEventListener('mouseup', mouseUp);
       canvas.removeEventListener('contextmenu', contextMenu);
+      window.removeEventListener('resize', handleResize);
     };
   }, [theme]); // Rerun effect if theme changes
 
