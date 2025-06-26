@@ -1,17 +1,16 @@
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, ChevronDown, ChevronUp, Target, LineChart as LineChartIcon, Briefcase, Puzzle, Share2, Globe, Code, Linkedin, CheckCircle2 } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Puzzle, ChevronDown, ChevronUp, Briefcase } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, parse, getISOWeek, isMonday, getYear, subYears, addDays, parseISO } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, WeightLog, Gender, DecompositionRow, SharingStatus, TopicBrandingInfo } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, WeightLog, Gender, DecompositionRow } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -43,45 +42,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { WeightChartModal } from '@/components/WeightChartModal';
-import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 
 
 const DEFAULT_TARGET_SESSIONS = 1;
 const DEFAULT_TARGET_DURATION = "25";
-
-const durationChartConfig = {
-  totalDuration: { label: "Duration (min)", color: "hsl(var(--primary))" },
-} satisfies ChartConfig;
-
-const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
-        <title>X</title>
-        <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/>
-    </svg>
-);
-
-const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
-        <title>DEV Community</title>
-        <path d="M11.472 24a1.5 1.5 0 0 1-1.06-.44L.439 13.587a1.5 1.5 0 0 1 0-2.12l9.97-9.97a1.5 1.5 0 0 1 2.12 0L22.503 11.47a1.5 1.5 0 0 1 0 2.121l-9.972 9.971a1.5 1.5 0 0 1-1.06.44Zm-8.485-11.25 8.485 8.485 8.485-8.485-8.485-8.485-8.485 8.485ZM19.5 18h-3V9h3v9Z"/>
-    </svg>
-);
-
-// New Type for branding candidates
-interface EligibleTopic {
-  topic: string;
-  focusAreas: (ExerciseDefinition & { sessionCount: number })[];
-  totalSessions: number;
-  brandingInfo: TopicBrandingInfo;
-}
 
 function DeepWorkPageContent() {
   const { toast } = useToast();
@@ -122,15 +90,6 @@ function DeepWorkPageContent() {
   const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
   const [isDecompositionEditing, setIsDecompositionEditing] = useState(false);
   const [editableDecompositionData, setEditableDecompositionData] = useState<DecompositionRow[]>([]);
-
-  // State for branding
-  const [brandedTopics, setBrandedTopics] = useState<Record<string, TopicBrandingInfo>>({});
-  const [isBrandingModalOpen, setIsBrandingModalOpen] = useState(false);
-  const [selectedBrandingCandidate, setSelectedBrandingCandidate] = useState<EligibleTopic | null>(null);
-  const [brandingModalType, setBrandingModalType] = useState<'blog' | 'blog_demo' | null>(null);
-  const [blogUrl, setBlogUrl] = useState('');
-  const [youtubeUrl, setYoutubeUrl] = useState('');
-  const [demoUrl, setDemoUrl] = useState('');
 
 
   const decompositionTechniques: DecompositionRow[] = [
@@ -186,57 +145,6 @@ function DeepWorkPageContent() {
     return Array.from(topics).sort();
   }, [exerciseDefinitions]);
 
-  const brandingCandidates = useMemo((): EligibleTopic[] => {
-    // 1. Calculate session counts for every focus area
-    const sessionCounts = new Map<string, number>();
-    allWorkoutLogs.forEach(log => {
-        log.exercises.forEach(ex => {
-            if (ex.loggedSets.length > 0) {
-                const currentCount = sessionCounts.get(ex.definitionId) || 0;
-                sessionCounts.set(ex.definitionId, currentCount + ex.loggedSets.length);
-            }
-        });
-    });
-
-    // 2. Group focus areas with their session counts by topic
-    const topicsMap = new Map<string, (ExerciseDefinition & { sessionCount: number })[]>();
-    exerciseDefinitions.forEach(def => {
-        if (!topicsMap.has(def.category)) {
-            topicsMap.set(def.category, []);
-        }
-        topicsMap.get(def.category)!.push({
-            ...def,
-            sessionCount: sessionCounts.get(def.id) || 0,
-        });
-    });
-
-    const eligibleTopics: EligibleTopic[] = [];
-
-    // 3. Iterate through topics to find eligible ones
-    topicsMap.forEach((defs, topic) => {
-        // Find focus areas within this topic that have at least 4 sessions
-        const focusAreasWithEnoughSessions = defs.filter(d => d.sessionCount >= 4);
-        
-        // A topic is eligible if it has at least 4 such focus areas.
-        const isEligible = focusAreasWithEnoughSessions.length >= 4;
-        
-        const brandingInfo = brandedTopics[topic] || {};
-        const isBranded = !!brandingInfo.brandingStatus;
-
-        if (isEligible || isBranded) {
-             eligibleTopics.push({
-                topic,
-                focusAreas: focusAreasWithEnoughSessions,
-                totalSessions: focusAreasWithEnoughSessions.reduce((sum, fa) => sum + fa.sessionCount, 0),
-                brandingInfo,
-            });
-        }
-    });
-
-    return eligibleTopics.sort((a, b) => b.totalSessions - a.totalSessions);
-  }, [allWorkoutLogs, exerciseDefinitions, brandedTopics]);
-
-
   useEffect(() => {
     const now = new Date();
     setToday(now);
@@ -248,7 +156,6 @@ function DeepWorkPageContent() {
         const username = currentUser.username;
         const defsKey = `deepwork_definitions_${username}`;
         const logsKey = `deepwork_logs_${username}`;
-        const brandedTopicsKey = `deepwork_branded_topics_${username}`;
         const weightLogsKey = `weightLogs_${username}`;
         const goalWeightKey = `goalWeight_${username}`;
         const heightKey = `height_${username}`;
@@ -257,7 +164,6 @@ function DeepWorkPageContent() {
 
         try { const storedDefinitions = localStorage.getItem(defsKey); setExerciseDefinitions(storedDefinitions ? JSON.parse(storedDefinitions) : []); } catch (e) { setExerciseDefinitions([]); }
         try { const storedLogs = localStorage.getItem(logsKey); setAllWorkoutLogs(storedLogs ? JSON.parse(storedLogs) : []); } catch (e) { setAllWorkoutLogs([]); }
-        try { const storedBrandedTopics = localStorage.getItem(brandedTopicsKey); setBrandedTopics(storedBrandedTopics ? JSON.parse(storedBrandedTopics) : {}); } catch (e) { setBrandedTopics({}); }
         
         // Weight/Health data can be shared
         const storedGoal = localStorage.getItem(goalWeightKey);
@@ -277,7 +183,6 @@ function DeepWorkPageContent() {
       // Clear all state for logged-out user
       setExerciseDefinitions([]);
       setAllWorkoutLogs([]);
-      setBrandedTopics({});
       setWeightLogs([]);
       setGoalWeight(null);
       setHeight(null);
@@ -294,7 +199,6 @@ function DeepWorkPageContent() {
         const username = currentUser.username;
         const defsKey = `deepwork_definitions_${username}`;
         const logsKey = `deepwork_logs_${username}`;
-        const brandedTopicsKey = `deepwork_branded_topics_${username}`;
         const weightLogsKey = `weightLogs_${username}`;
         const goalWeightKey = `goalWeight_${username}`;
         const heightKey = `height_${username}`;
@@ -303,7 +207,6 @@ function DeepWorkPageContent() {
         
         localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
         localStorage.setItem(logsKey, JSON.stringify(allWorkoutLogs));
-        localStorage.setItem(brandedTopicsKey, JSON.stringify(brandedTopics));
         localStorage.setItem(weightLogsKey, JSON.stringify(weightLogs));
 
         if (goalWeight !== null) localStorage.setItem(goalWeightKey, goalWeight.toString()); else localStorage.removeItem(goalWeightKey);
@@ -315,7 +218,7 @@ function DeepWorkPageContent() {
         toast({ title: "Save Error", description: "Could not save data locally.", variant: "destructive"});
       }
     }
-  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, weightLogs, goalWeight, height, dateOfBirth, gender, brandedTopics]);
+  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, weightLogs, goalWeight, height, dateOfBirth, gender]);
 
   // Check for backup prompt on Mondays
   useEffect(() => {
@@ -548,51 +451,6 @@ function DeepWorkPageContent() {
     toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved.` });
   };
 
-  const handleOpenBrandingModal = (topic: EligibleTopic, type: 'blog' | 'blog_demo') => {
-    setSelectedBrandingCandidate(topic);
-    setBrandingModalType(type);
-    setBlogUrl(topic.brandingInfo.contentUrls?.blog || '');
-    setYoutubeUrl(topic.brandingInfo.contentUrls?.youtube || '');
-    setDemoUrl(topic.brandingInfo.contentUrls?.demo || '');
-    setIsBrandingModalOpen(true);
-  };
-
-  const handleSaveBranding = () => {
-    if (!selectedBrandingCandidate) return;
-    const topicName = selectedBrandingCandidate.topic;
-    setBrandedTopics(prev => ({
-        ...prev,
-        [topicName]: {
-            ...prev[topicName],
-            brandingStatus: 'converted',
-            contentUrls: {
-                blog: blogUrl,
-                youtube: brandingModalType === 'blog_demo' ? youtubeUrl : undefined,
-                demo: brandingModalType === 'blog_demo' ? demoUrl : undefined,
-            }
-        }
-    }));
-    setIsBrandingModalOpen(false);
-    toast({ title: "Content URLs Saved!", description: `Your links for "${topicName}" have been saved.` });
-  };
-  
-  const handleToggleSharing = (topicName: string, platform: keyof SharingStatus) => {
-    setBrandedTopics(prev => {
-        const currentTopic = prev[topicName] || {};
-        const newSharingStatus = { ...currentTopic.sharingStatus, [platform]: !currentTopic.sharingStatus?.[platform] };
-        const newBrandingStatus = Object.values(newSharingStatus).some(Boolean) ? 'published' : 'converted';
-        
-        return {
-            ...prev,
-            [topicName]: {
-                ...currentTopic,
-                sharingStatus: newSharingStatus,
-                brandingStatus: newBrandingStatus,
-            }
-        };
-    });
-  };
-
   const consistencyData = useMemo(() => {
     if (!allWorkoutLogs || !oneYearAgo || !today) return [];
     const workoutDates = new Set(allWorkoutLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date));
@@ -606,32 +464,6 @@ function DeepWorkPageContent() {
     }
     return data;
   }, [allWorkoutLogs, oneYearAgo, today]);
-
-  const dailyDurationData = useMemo(() => {
-    const dailyData: Record<string, { totalDuration: number, topics: Set<string> }> = {};
-
-    allWorkoutLogs.forEach(log => {
-        log.exercises.forEach(exercise => {
-            const duration = exercise.loggedSets.reduce((sum, set) => sum + set.weight, 0);
-            if (duration > 0) {
-                if (!dailyData[log.date]) {
-                    dailyData[log.date] = { totalDuration: 0, topics: new Set() };
-                }
-                dailyData[log.date].totalDuration += duration;
-                dailyData[log.date].topics.add(exercise.name);
-            }
-        });
-    });
-
-    return Object.entries(dailyData)
-        .map(([dateString, data]) => ({
-            dateObj: parseISO(dateString),
-            totalDuration: data.totalDuration,
-            topics: Array.from(data.topics).join(', '),
-            date: format(parseISO(dateString), 'MMM dd'),
-        }))
-        .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
-  }, [allWorkoutLogs]);
   
   if (isLoadingPage) {
     return (
@@ -749,97 +581,6 @@ function DeepWorkPageContent() {
                   )}
                 </AnimatePresence>
               </CardContent>
-            </Card>
-
-             <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg text-primary">
-                        <Share2 /> Personal Branding Pipeline
-                    </CardTitle>
-                    <CardDescription>
-                       Convert deep work into content. A topic with 4+ focus areas, each with 4+ sessions, becomes a brandable bundle here.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {brandingCandidates.length === 0 ? (
-                        <div className="text-center py-6 text-sm text-muted-foreground">
-                            Log 4+ sessions on at least 4 focus areas within the same topic to get started.
-                        </div>
-                    ) : (
-                        <ul className="space-y-4">
-                            {brandingCandidates.map(topic => (
-                                <li key={topic.topic} className="p-3 bg-muted/30 rounded-lg space-y-3 text-sm">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <h4 className="font-semibold text-foreground">{topic.topic}</h4>
-                                            <div className="flex flex-wrap gap-1 mt-1">
-                                                <Badge variant="outline">{topic.focusAreas.length} Focus Areas</Badge>
-                                                <Badge variant="secondary">{topic.totalSessions} Total Sessions</Badge>
-                                            </div>
-                                        </div>
-                                        {topic.brandingInfo.brandingStatus === 'published' && (
-                                            <div className="flex items-center gap-1.5 text-green-600">
-                                                <CheckCircle2 className="h-4 w-4" />
-                                                <span className="font-medium">Published</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <p className="font-medium text-muted-foreground">Included Focus Areas:</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {topic.focusAreas.map(fa => <Badge key={fa.id} variant="default" className='bg-primary/20 text-primary-foreground hover:bg-primary/30'>{fa.name}</Badge>)}
-                                        </div>
-                                    </div>
-                                    
-                                    {topic.brandingInfo.brandingStatus === 'converted' || topic.brandingInfo.brandingStatus === 'published' ? (
-                                        <div className="space-y-4 pt-2 border-t">
-                                            {topic.brandingInfo.contentUrls && (
-                                                <div className="space-y-2">
-                                                    <h5 className="font-medium text-muted-foreground">Content Links</h5>
-                                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                                                        {topic.brandingInfo.contentUrls.blog && <a href={topic.brandingInfo.contentUrls.blog} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary hover:underline"><Globe className="h-4 w-4" /> Blog Post</a>}
-                                                        {topic.brandingInfo.contentUrls.youtube && <a href={topic.brandingInfo.contentUrls.youtube} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary hover:underline"><Youtube className="h-4 w-4" /> YouTube</a>}
-                                                        {topic.brandingInfo.contentUrls.demo && <a href={topic.brandingInfo.contentUrls.demo} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary hover:underline"><Code className="h-4 w-4" /> Demo</a>}
-                                                         <Button variant="ghost" size="icon" onClick={() => handleOpenBrandingModal(topic, topic.brandingInfo.contentUrls?.youtube ? 'blog_demo' : 'blog')} className="h-7 w-7"><Edit3 className="h-4 w-4 text-muted-foreground" /></Button>
-                                                    </div>
-                                                </div>
-                                            )}
-                                            <div className="space-y-2">
-                                                 <h5 className="font-medium text-muted-foreground">Sharing Checklist</h5>
-                                                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-                                                    <div className="flex items-center space-x-2">
-                                                        <Checkbox id={`share-twitter-${topic.topic}`} checked={topic.brandingInfo.sharingStatus?.twitter} onCheckedChange={() => handleToggleSharing(topic.topic, 'twitter')} />
-                                                        <label htmlFor={`share-twitter-${topic.topic}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                                            <TwitterIcon className="h-4 w-4" /> X / Twitter
-                                                        </label>
-                                                    </div>
-                                                     <div className="flex items-center space-x-2">
-                                                        <Checkbox id={`share-linkedin-${topic.topic}`} checked={topic.brandingInfo.sharingStatus?.linkedin} onCheckedChange={() => handleToggleSharing(topic.topic, 'linkedin')} />
-                                                        <label htmlFor={`share-linkedin-${topic.topic}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                                            <Linkedin className="h-4 w-4" /> LinkedIn
-                                                        </label>
-                                                    </div>
-                                                    <div className="flex items-center space-x-2">
-                                                        <Checkbox id={`share-devto-${topic.topic}`} checked={topic.brandingInfo.sharingStatus?.devto} onCheckedChange={() => handleToggleSharing(topic.topic, 'devto')} />
-                                                        <label htmlFor={`share-devto-${topic.topic}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                                            <DevToIcon className="h-4 w-4" /> DEV.to
-                                                        </label>
-                                                    </div>
-                                                 </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                         <div className="flex items-center gap-2 pt-2 border-t">
-                                            <Button size="sm" onClick={() => handleOpenBrandingModal(topic, 'blog')} className="flex-1">Create Blog</Button>
-                                            <Button size="sm" onClick={() => handleOpenBrandingModal(topic, 'blog_demo')} className="flex-1">Blog + Demo</Button>
-                                        </div>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </CardContent>
             </Card>
           </section>
 
@@ -1004,39 +745,6 @@ function DeepWorkPageContent() {
           </div>
         </DialogContent>
       </Dialog>
-      
-       <Dialog open={isBrandingModalOpen} onOpenChange={setIsBrandingModalOpen}>
-        <DialogContent>
-            <DialogHeader>
-            <DialogTitle>Convert to Content: {selectedBrandingCandidate?.topic}</DialogTitle>
-            <DialogDescription>
-                Add the URLs for your created content. Click save when you're done.
-            </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                    <Label htmlFor="blog-url">Blog Post URL</Label>
-                    <Input id="blog-url" value={blogUrl} onChange={e => setBlogUrl(e.target.value)} placeholder="https://my.blog/post-title" />
-                </div>
-                {brandingModalType === 'blog_demo' && (
-                    <>
-                        <div className="space-y-2">
-                            <Label htmlFor="youtube-url">YouTube Video URL</Label>
-                            <Input id="youtube-url" value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} placeholder="https://youtube.com/watch?v=..." />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="demo-url">Live Demo URL</Label>
-                            <Input id="demo-url" value={demoUrl} onChange={e => setDemoUrl(e.target.value)} placeholder="https://my-demo.vercel.app" />
-                        </div>
-                    </>
-                )}
-            </div>
-            <DialogFooter>
-                <Button onClick={handleSaveBranding}>Save URLs</Button>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
     </>
   );
 }
