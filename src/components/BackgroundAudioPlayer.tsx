@@ -77,7 +77,7 @@ export function BackgroundAudioPlayer() {
   return (
     <>
       <audio ref={audioRef} src="/40 Hz Study Music.mp3" loop />
-      <div className="fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-full border bg-background/80 p-2 shadow-lg backdrop-blur-sm">
+      <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full border bg-background/80 p-2 shadow-lg backdrop-blur-sm">
         <Button onClick={togglePlayPause} variant="ghost" size="icon" className="h-10 w-10 rounded-full">
           {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
         </Button>
@@ -87,7 +87,7 @@ export function BackgroundAudioPlayer() {
                     {getVolumeIcon()}
                 </Button>
             </PopoverTrigger>
-            <PopoverContent side="top" align="center" className="w-auto p-2">
+            <PopoverContent side="top" align="end" className="w-auto p-2">
                 <Slider
                     defaultValue={[volume]}
                     max={1}
