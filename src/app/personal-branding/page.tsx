@@ -25,6 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from '@/components/ui/badge';
 
 function PersonalBrandingPageContent() {
   const { toast } = useToast();
@@ -77,16 +78,21 @@ function PersonalBrandingPageContent() {
               const bundleNumber = Math.floor(i / 4) + 1;
               const bundleId = `branding_${topicName.replace(/\s+/g, '_')}_bundle_${bundleNumber}`;
               const bundleName = `${topicName} - Bundle #${bundleNumber}`;
+              const bundleFocusAreas = bundle.map(def => def.name);
               
               const existingTask = storedBrandingTasks.find(t => t.id === bundleId);
               if (existingTask) {
-                newGeneratedTasks.push(existingTask);
+                newGeneratedTasks.push({
+                  ...existingTask,
+                  focusAreas: bundleFocusAreas,
+                });
               } else {
                 newGeneratedTasks.push({
                   id: bundleId,
                   name: bundleName,
                   category: 'Personal Branding' as ExerciseCategory,
                   sharingStatus: { twitter: false, linkedin: false, devto: false },
+                  focusAreas: bundleFocusAreas,
                 });
               }
             }
@@ -169,6 +175,7 @@ function PersonalBrandingPageContent() {
       loggedSets: [],
       targetSets: 4,
       targetReps: "4 stages",
+      focusAreas: definition.focusAreas,
     };
     const existingLog = allBrandingLogs.find(log => log.id === dateKey);
     if (existingLog) {
@@ -258,6 +265,11 @@ function PersonalBrandingPageContent() {
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex-grow min-w-0">
                                   <span className="font-medium text-foreground block" title={task.name}>{task.name}</span>
+                                   {task.focusAreas && (
+                                    <div className="mt-1 flex flex-wrap gap-1">
+                                      {task.focusAreas.map(fa => <Badge key={fa} variant="secondary" className="text-xs">{fa}</Badge>)}
+                                    </div>
+                                  )}
                               </div>
                               <div className="flex-shrink-0 flex items-center">
                                 <Button variant="ghost" size="icon" onClick={() => handleAddTaskToSession(task)} className="h-8 w-8 text-muted-foreground hover:text-accent" aria-label={`Add ${task.name} to session`}>

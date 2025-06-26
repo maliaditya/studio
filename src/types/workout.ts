@@ -49,6 +49,7 @@ export interface ExerciseDefinition {
   name: string; // Subtopic for upskill
   category: ExerciseCategory; // Topic for upskill
   decompositionData?: DecompositionRow[];
+  focusAreas?: string[];
   // Personal Branding
   brandingStatus?: 'converted' | 'published';
   contentUrls?: {
@@ -82,10 +83,12 @@ export interface WorkoutExercise {
   loggedSets: LoggedSet[];
   targetSets: number;
   targetReps: string; // e.g., "10-15"
+  focusAreas?: string[];
   lastPerformance?: {
     reps: number;
     weight: number;
   } | null;
+  sharingStatus?: SharingStatus;
 }
 
 export interface DatedWorkout {

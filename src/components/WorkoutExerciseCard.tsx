@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -9,6 +10,7 @@ import { WorkoutExercise, LoggedSet, TopicGoal, SharingStatus } from '@/types/wo
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Checkbox } from './ui/checkbox';
+import { Badge } from './ui/badge';
 
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -192,6 +194,16 @@ export function WorkoutExerciseCard({
 
       return (
         <div className='space-y-4'>
+            {exercise.focusAreas && exercise.focusAreas.length > 0 && (
+              <div className='mb-3'>
+                <h4 className="text-sm font-medium mb-2 text-foreground">Included Focus Areas:</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {exercise.focusAreas.map(fa => (
+                    <Badge key={fa} variant="outline">{fa}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
                 {STAGES.map((stage, index) => (
                 <Button
