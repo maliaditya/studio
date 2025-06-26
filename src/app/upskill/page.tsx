@@ -73,6 +73,7 @@ function UpskillPageContent() {
   const [viewingProgressExercise, setViewingProgressExercise] = useState<ExerciseDefinition | null>(null);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [showLoggedTasks, setShowLoggedTasks] = useState(false);
   
   const [isLoadingPage, setIsLoadingPage] = useState(true);
   
@@ -92,6 +93,32 @@ function UpskillPageContent() {
     const topics = new Set(exerciseDefinitions.map(def => def.category));
     return Array.from(topics).sort();
   }, [exerciseDefinitions]);
+
+  const loggedDefinitionIds = useMemo(() => {
+    const ids = new Set<string>();
+    allWorkoutLogs.forEach(log => {
+      log.exercises.forEach(ex => {
+        if (ex.loggedSets.length > 0) {
+          ids.add(ex.definitionId);
+        }
+      });
+    });
+    return ids;
+  }, [allWorkoutLogs]);
+  
+  const filteredExerciseDefinitions = useMemo(() => {
+    let definitions = [...exerciseDefinitions];
+
+    if (selectedCategories.length > 0) {
+      definitions = definitions.filter(def => selectedCategories.includes(def.category));
+    }
+
+    if (!showLoggedTasks) {
+      definitions = definitions.filter(def => !loggedDefinitionIds.has(def.id));
+    }
+
+    return definitions;
+  }, [exerciseDefinitions, selectedCategories, showLoggedTasks, loggedDefinitionIds]);
 
   useEffect(() => {
     const now = new Date();
@@ -220,11 +247,6 @@ function UpskillPageContent() {
   const currentWorkoutExercises = useMemo(() => {
     return currentDatedWorkout?.exercises || [];
   }, [currentDatedWorkout]);
-
-  const filteredExerciseDefinitions = useMemo(() => {
-    if (selectedCategories.length === 0) return exerciseDefinitions;
-    return exerciseDefinitions.filter(def => selectedCategories.includes(def.category));
-  }, [exerciseDefinitions, selectedCategories]);
 
   const handleCategoryFilterChange = (category: string) => {
     setSelectedCategories(prev => 
@@ -496,6 +518,15 @@ function UpskillPageContent() {
                           <> <DropdownMenuSeparator />
                             <Button variant="ghost" size="sm" className="w-full justify-start text-sm" onClick={() => setSelectedCategories([])}> Clear Filters </Button>
                           </>)}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>View Options</DropdownMenuLabel>
+                        <DropdownMenuCheckboxItem
+                            checked={showLoggedTasks}
+                            onCheckedChange={setShowLoggedTasks}
+                            onSelect={(e) => e.preventDefault()}
+                        >
+                            Show Logged Tasks
+                        </DropdownMenuCheckboxItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                     <Button variant="ghost" size="icon" onClick={() => setIsLibraryExpanded(!isLibraryExpanded)} className="h-8 w-8" aria-label={isLibraryExpanded ? "Collapse task library" : "Expand task library"}>
@@ -548,6 +579,7 @@ function UpskillPageContent() {
                             <AnimatePresence>
                               {filteredExerciseDefinitions.sort((a,b) => a.name.localeCompare(b.name)).map(def => {
                                 const topicGoal = topicGoals[def.category];
+                                const isLogged = loggedDefinitionIds.has(def.id);
                                 return (
                                 <motion.li key={def.id} layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} className="p-3 bg-card border rounded-lg shadow-sm">
                                   {editingDefinition?.id === def.id ? (
@@ -567,6 +599,7 @@ function UpskillPageContent() {
                                           <div className='flex flex-wrap gap-1 mt-0.5'>
                                             <Badge variant="secondary" className="text-xs">{def.category}</Badge>
                                             {topicGoal && <Badge variant="outline" className="text-xs">Goal: {topicGoal.goalValue} {topicGoal.goalType}</Badge>}
+                                            {isLogged && <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700">Logged</Badge>}
                                           </div>
                                       </div>
                                       <div className="flex-shrink-0 flex items-center">
