@@ -12,6 +12,7 @@ import {
   getCurrentLocalUser,
 } from '@/lib/localAuth';
 
+
 interface AuthContextType {
   currentUser: LocalUser | null;
   loading: boolean;
@@ -40,6 +41,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const user = getCurrentLocalUser();
     setCurrentUser(user);
     setLoading(false);
+    
+    // Apply theme on initial load
+    const savedTheme = localStorage.getItem('lifeos_theme') || 'default';
+    const root = window.document.documentElement;
+    root.classList.remove('theme-matrix'); // Clean up any previous theme
+    if (savedTheme === 'matrix') {
+        root.classList.add('theme-matrix');
+    }
   }, []);
 
   const loadDataIntoLocalStorage = (data: any, username: string) => {
@@ -424,7 +433,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pushDemoDataWithToken,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = (): AuthContextType => {
