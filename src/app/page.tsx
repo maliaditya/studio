@@ -1087,14 +1087,9 @@ function HomePageContent() {
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-      <Card className="max-w-5xl mx-auto shadow-lg border-0 bg-transparent">
-        <CardHeader className="text-center">
-            <BrainCircuit className="mx-auto h-16 w-16 text-primary mb-4" />
-            <CardTitle className="text-3xl font-bold">Hello, <span className="text-primary">{currentUser?.username}</span>!</CardTitle>
-            <CardDescription className="text-lg text-muted-foreground">
-                Control Health, Wealth, Growth, Direction — Life Aligns.
-            </CardDescription>
-            <p className="text-md text-muted-foreground pt-1">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+      <Card className="max-w-5xl mx-auto shadow-lg bg-card/60 border-border/20 backdrop-blur-sm">
+        <CardHeader className="text-center py-4">
+            <p className="text-sm text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
         </CardHeader>
         <CardContent>
             <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
