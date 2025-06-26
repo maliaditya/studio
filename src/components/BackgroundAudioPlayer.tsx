@@ -9,6 +9,9 @@ export function BackgroundAudioPlayer() {
     const audio = audioRef.current;
     if (!audio) return;
 
+    // Set the volume to a lower level (e.g., 20%)
+    audio.volume = 0.2;
+
     // We need to handle browsers' autoplay policies.
     // Most browsers require a user interaction to play audio with sound.
     const playAudio = async () => {
