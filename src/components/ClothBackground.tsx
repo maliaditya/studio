@@ -27,7 +27,7 @@ export function ClothBackground() {
     // Simulation settings
     const accuracy = 5;
     const gravity = 400;
-    const spacing = 8;
+    const spacing = 5;
     const tearDist = 60;
     const friction = 0.99;
     const bounce = 0.5;
