@@ -99,14 +99,6 @@ export default {
           '0%, 100%': { transform: 'scaleY(0.2)' },
           '50%': { transform: 'scaleY(1)' },
         },
-        'gradient-animation': {
-          '0%, 100%': {
-            'background-position': '0% 50%',
-          },
-          '50%': {
-            'background-position': '100% 50%',
-          },
-        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -115,7 +107,6 @@ export default {
         'audio-wave-1': 'audio-wave 1.2s ease-in-out infinite',
         'audio-wave-2': 'audio-wave 1.5s ease-in-out infinite reverse',
         'audio-wave-3': 'audio-wave 1.0s ease-in-out infinite',
-        'gradient': 'gradient-animation 15s ease infinite',
       },
     },
   },
