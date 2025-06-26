@@ -41,8 +41,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loadDataIntoLocalStorage = (data: any, username: string) => {
     if (!data) return;
 
-    localStorage.setItem(`dietPlan_${username}`, JSON.stringify(data.dietPlan || []));
+    // Workout
+    localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(data.exerciseDefinitions || []));
+    localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(data.workoutPlans || {}));
+    localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(data.allWorkoutLogs || []));
     localStorage.setItem(`workoutMode_${username}`, data.workoutMode || 'two-muscle');
+
+    // Upskill
+    localStorage.setItem(`upskill_definitions_${username}`, JSON.stringify(data.upskillDefinitions || []));
+    localStorage.setItem(`upskill_logs_${username}`, JSON.stringify(data.upskillLogs || []));
+    localStorage.setItem(`upskill_topic_goals_${username}`, JSON.stringify(data.upskillTopicGoals || {}));
+
+    // Deep Work
+    localStorage.setItem(`deepwork_definitions_${username}`, JSON.stringify(data.deepWorkDefinitions || []));
+    localStorage.setItem(`deepwork_logs_${username}`, JSON.stringify(data.deepWorkLogs || []));
+
+    // Personal Branding
+    localStorage.setItem(`branding_tasks_${username}`, JSON.stringify(data.brandingTasks || []));
+    localStorage.setItem(`branding_logs_${username}`, JSON.stringify(data.brandingLogs || []));
+    
+    // Homepage Schedule
+    localStorage.setItem(`lifeos_schedule_${username}`, JSON.stringify(data.schedule || '{}'));
+
+    // Health
+    localStorage.setItem(`dietPlan_${username}`, JSON.stringify(data.dietPlan || []));
     localStorage.setItem(`weightLogs_${username}`, JSON.stringify(data.weightLogs || []));
     if (data.goalWeight) {
         localStorage.setItem(`goalWeight_${username}`, data.goalWeight.toString());
@@ -64,9 +86,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } else {
         localStorage.removeItem(`gender_${username}`);
     }
-    localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(data.exerciseDefinitions || []));
-    localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(data.workoutPlans || {}));
-    localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(data.allWorkoutLogs || []));
   };
   
   const register = async (username: string, password: string) => {
@@ -126,16 +145,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const username = currentUser.username;
         
         const allUserData = {
-            dietPlan: JSON.parse(localStorage.getItem(`dietPlan_${username}`) || '[]'),
+            // Workout
+            exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
+            workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
+            allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
             workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
+            
+            // Upskill
+            upskillDefinitions: JSON.parse(localStorage.getItem(`upskill_definitions_${username}`) || '[]'),
+            upskillLogs: JSON.parse(localStorage.getItem(`upskill_logs_${username}`) || '[]'),
+            upskillTopicGoals: JSON.parse(localStorage.getItem(`upskill_topic_goals_${username}`) || '{}'),
+            
+            // Deep Work
+            deepWorkDefinitions: JSON.parse(localStorage.getItem(`deepwork_definitions_${username}`) || '[]'),
+            deepWorkLogs: JSON.parse(localStorage.getItem(`deepwork_logs_${username}`) || '[]'),
+
+            // Personal Branding
+            brandingTasks: JSON.parse(localStorage.getItem(`branding_tasks_${username}`) || '[]'),
+            brandingLogs: JSON.parse(localStorage.getItem(`branding_logs_${username}`) || '[]'),
+            
+            // Homepage Schedule
+            schedule: JSON.parse(localStorage.getItem(`lifeos_schedule_${username}`) || '{}'),
+
+            // Health
+            dietPlan: JSON.parse(localStorage.getItem(`dietPlan_${username}`) || '[]'),
             weightLogs: JSON.parse(localStorage.getItem(`weightLogs_${username}`) || '[]'),
             goalWeight: localStorage.getItem(`goalWeight_${username}`) || null,
             height: localStorage.getItem(`height_${username}`) || null,
             dateOfBirth: localStorage.getItem(`dateOfBirth_${username}`) || null,
             gender: localStorage.getItem(`gender_${username}`) || null,
-            exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
-            workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
-            allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
         };
 
         const response = await fetch('/api/blob-sync', {
@@ -169,7 +207,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const isDemo = username === 'demo';
     
-    // Only show toast for non-demo users
     if (!isDemo) {
       toast({ 
         title: "Syncing...", 
@@ -191,7 +228,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (!isDemo) {
               toast({ title: "No Cloud Data", description: "No data was found in the cloud for this user." });
             }
-            // For demo user, if no data found, it will just proceed to an empty page, which is fine.
             return;
         }
 
@@ -202,16 +238,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             title: "Sync Successful",
             description: "Data pulled from the cloud. The app will now reload.",
           });
-          // Reload for non-demo users to ensure all components refresh with new data.
           setTimeout(() => {
               window.location.reload();
           }, 1500);
         }
-        // For demo users, we don't toast or reload. The `signIn` function handles redirection.
 
     } catch (error) {
         console.error("Pull from cloud failed:", error);
-        if (!isDemo) { // Only show error for non-demo sync
+        if (!isDemo) {
           toast({
             title: "Sync Failed",
             description: error instanceof Error ? error.message : "An unknown error occurred.",
@@ -229,11 +263,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
         const username = currentUser.username;
         const dataToExport = {
-            dietPlan: JSON.parse(localStorage.getItem(`dietPlan_${username}`) || '[]'),
+            // Workout
             exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
+            workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
             allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
             workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
-            workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
+            
+            // Upskill
+            upskillDefinitions: JSON.parse(localStorage.getItem(`upskill_definitions_${username}`) || '[]'),
+            upskillLogs: JSON.parse(localStorage.getItem(`upskill_logs_${username}`) || '[]'),
+            upskillTopicGoals: JSON.parse(localStorage.getItem(`upskill_topic_goals_${username}`) || '{}'),
+            
+            // Deep Work
+            deepWorkDefinitions: JSON.parse(localStorage.getItem(`deepwork_definitions_${username}`) || '[]'),
+            deepWorkLogs: JSON.parse(localStorage.getItem(`deepwork_logs_${username}`) || '[]'),
+
+            // Personal Branding
+            brandingTasks: JSON.parse(localStorage.getItem(`branding_tasks_${username}`) || '[]'),
+            brandingLogs: JSON.parse(localStorage.getItem(`branding_logs_${username}`) || '[]'),
+            
+            // Homepage Schedule
+            schedule: JSON.parse(localStorage.getItem(`lifeos_schedule_${username}`) || '{}'),
+
+            // Health
+            dietPlan: JSON.parse(localStorage.getItem(`dietPlan_${username}`) || '[]'),
             weightLogs: JSON.parse(localStorage.getItem(`weightLogs_${username}`) || '[]'),
             goalWeight: localStorage.getItem(`goalWeight_${username}`) || null,
             height: localStorage.getItem(`height_${username}`) || null,
@@ -246,7 +299,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         )}`;
         const link = document.createElement("a");
         link.href = jsonString;
-        link.download = `workout_tracker_backup_${username}_${new Date().toISOString().split('T')[0]}.json`;
+        link.download = `lifeos_backup_${username}_${new Date().toISOString().split('T')[0]}.json`;
         link.click();
         toast({ title: "Export Successful", description: "Your data has been downloaded." });
     } catch (error) {
@@ -276,17 +329,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                       const data = JSON.parse(text);
                       const username = currentUser.username;
 
-                      if (
-                          data.dietPlan === undefined ||
-                          data.exerciseDefinitions === undefined ||
-                          data.allWorkoutLogs === undefined ||
-                          data.workoutMode === undefined ||
-                          data.workoutPlans === undefined ||
-                          data.weightLogs === undefined ||
-                          data.height === undefined ||
-                          data.dateOfBirth === undefined
-                      ) {
-                          throw new Error("Invalid backup file format. Some required fields are missing.");
+                       const requiredKeys = [
+                          'exerciseDefinitions', 'workoutPlans', 'allWorkoutLogs', 'workoutMode',
+                          'upskillDefinitions', 'upskillLogs', 'upskillTopicGoals',
+                          'deepWorkDefinitions', 'deepWorkLogs',
+                          'brandingTasks', 'brandingLogs',
+                          'schedule', 'dietPlan', 'weightLogs'
+                      ];
+
+                      const missingKeys = requiredKeys.filter(key => data[key] === undefined);
+
+                      if (missingKeys.length > 0) {
+                          throw new Error(`Invalid backup file. Missing keys: ${missingKeys.join(', ')}.`);
                       }
 
                       loadDataIntoLocalStorage(data, username);
