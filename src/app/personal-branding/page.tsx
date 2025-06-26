@@ -208,7 +208,7 @@ function PersonalBrandingPageContent() {
           }
       });
 
-      return { activeTasks, publishedTasks };
+      return { activeTasks: active, publishedTasks: published };
   }, [brandingTasks]);
 
   const markBackupPromptAsHandled = () => {
