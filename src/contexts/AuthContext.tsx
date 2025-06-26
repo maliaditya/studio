@@ -142,15 +142,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         demoOverrideToken = window.prompt(
             "You are updating the read-only 'demo' account.\nPlease provide the override token to proceed.\n(Check your .env file for DEMO_ACCOUNT_UPDATE_TOKEN)"
         );
-        if (!demoOverrideToken) {
+        if (demoOverrideToken === null || demoOverrideToken.trim() === '') {
             toast({ title: "Update Cancelled", description: "No override token was provided.", variant: "default" });
             return;
         }
     }
-
-    toast({ title: "Syncing...", description: "Pushing your local data to the cloud." });
-
+    
     try {
+        toast({ title: "Syncing...", description: "Pushing your local data to the cloud." });
         const username = currentUser.username;
         
         const allUserData = {
@@ -191,8 +190,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             data: allUserData,
         };
 
-        if (demoOverrideToken) {
-            requestBody.demo_override_token = demoOverrideToken;
+        if (currentUser.username === 'demo') {
+            requestBody.demo_override_token = demoOverrideToken ?? undefined;
         }
 
         const response = await fetch('/api/blob-sync', {
