@@ -76,6 +76,13 @@ export function BackgroundAudioPlayer() {
         <Button onClick={togglePlayPause} variant="ghost" size="icon" className="h-10 w-10 rounded-full">
           {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
         </Button>
+        {isPlaying && (
+          <div className="flex h-5 w-5 items-end justify-between gap-0.5">
+            <div className="h-full w-1 origin-bottom animate-audio-wave-1 rounded-full bg-primary"></div>
+            <div className="h-full w-1 origin-bottom animate-audio-wave-2 rounded-full bg-primary"></div>
+            <div className="h-full w-1 origin-bottom animate-audio-wave-3 rounded-full bg-primary"></div>
+          </div>
+        )}
         <Popover>
             <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
