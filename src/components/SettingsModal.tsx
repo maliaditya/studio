@@ -107,10 +107,6 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                 <RadioGroupItem value="matrix" id="theme-matrix" />
                 <Label htmlFor="theme-matrix" className="font-normal">Matrix</Label>
               </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="smoke" id="theme-smoke" />
-                <Label htmlFor="theme-smoke" className="font-normal">Smoke</Label>
-              </div>
             </RadioGroup>
           </div>
           <div className="space-y-4 rounded-lg border p-4">

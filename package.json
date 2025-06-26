@@ -1,7 +1,7 @@
 {
   "name": "nextn",
   "version": "0.1.0",
-  "private": true,
+  "private": "true",
   "scripts": {
     "dev": "next dev --turbopack -p 9002",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
@@ -53,10 +53,8 @@
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.54.2",
     "recharts": "^2.15.1",
-    "stats.js": "^0.17.0",
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
-    "three": "^0.165.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -64,8 +62,6 @@
     "@types/react": "^18",
     "@types/react-calendar-heatmap": "^1.6.7",
     "@types/react-dom": "^18",
-    "@types/stats.js": "^0.17.3",
-    "@types/three": "^0.165.0",
     "genkit-cli": "^1.8.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
