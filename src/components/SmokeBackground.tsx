@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useRef, useEffect } from 'react';
@@ -26,6 +25,28 @@ export function SmokeBackground() {
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
 
+    // Starfield setup
+    const starVertices: number[] = [];
+    for (let i = 0; i < 10000; i++) {
+        const x = THREE.MathUtils.randFloatSpread(2000);
+        const y = THREE.MathUtils.randFloatSpread(2000);
+        const z = THREE.MathUtils.randFloatSpread(2000);
+        starVertices.push(x, y, z);
+    }
+
+    const starGeometry = new THREE.BufferGeometry();
+    starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+    
+    const starMaterial = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 0.7,
+        transparent: true,
+        opacity: 0.8
+    });
+
+    const stars = new THREE.Points(starGeometry, starMaterial);
+    scene.add(stars);
+
     // Smoke particles setup
     const loader = new THREE.TextureLoader();
     const smokeTexture = loader.load('https://s3-us-west-2.amazonaws.com/s.cdpn.io/95637/Smoke-Element.png');
@@ -37,7 +58,7 @@ export function SmokeBackground() {
       transparent: true,
       opacity: 0.15,
       blending: THREE.NormalBlending, // Using NormalBlending for a more realistic smoke look
-      color: 0xffffff,
+      color: 0xffffff, // White smoke
     });
     const smokeGeo = new THREE.PlaneGeometry(300, 300);
 
@@ -78,6 +99,10 @@ export function SmokeBackground() {
         }
       });
       
+      // Make stars slowly rotate
+      stars.rotation.x += delta * 0.01;
+      stars.rotation.y += delta * 0.01;
+
       renderer.render(scene, camera);
       animationFrameId = requestAnimationFrame(animate);
     };
@@ -96,6 +121,8 @@ export function SmokeBackground() {
     return () => {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
+      
+      // Dispose smoke resources
       smokeMaterial.dispose();
       smokeTexture.dispose();
       smokeGeo.dispose();
@@ -105,6 +132,10 @@ export function SmokeBackground() {
             (mesh.material as any).dispose();
           }
       });
+
+      // Dispose star resources
+      starGeometry.dispose();
+      starMaterial.dispose();
     };
   }, [theme]);
 
