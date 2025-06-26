@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ListChecks, ChevronRight, CalendarIcon, GripVertical, Briefcase, Share2, Loader2, Check, ChevronDown, ChevronUp, Linkedin } from 'lucide-react';
+import { ListChecks, ChevronRight, CalendarIcon, GripVertical, Briefcase, Share2, Loader2, Check, ChevronDown, ChevronUp, Linkedin, Trash2, PlusCircle } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format, isMonday, getYear, getISOWeek } from 'date-fns';
@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -47,6 +48,8 @@ function PersonalBrandingPageContent() {
   const { currentUser, exportData } = useAuth();
   
   const [brandingTasks, setBrandingTasks] = useState<ExerciseDefinition[]>([]);
+  const [deepWorkDefinitions, setDeepWorkDefinitions] = useState<ExerciseDefinition[]>([]);
+  const [deepWorkLogs, setDeepWorkLogs] = useState<DatedWorkout[]>([]);
   
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [allBrandingLogs, setAllBrandingLogs] = useState<DatedWorkout[]>([]);
@@ -54,6 +57,7 @@ function PersonalBrandingPageContent() {
   const [isLoadingPage, setIsLoadingPage] = useState(true);
   const [showBackupPrompt, setShowBackupPrompt] = useState(false);
   const [isPublishedExpanded, setIsPublishedExpanded] = useState(false);
+  const [addSelection, setAddSelection] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (currentUser?.username) {
@@ -63,6 +67,8 @@ function PersonalBrandingPageContent() {
       const deepWorkLogsKey = `deepwork_logs_${username}`;
       const storedDeepWorkDefs: ExerciseDefinition[] = JSON.parse(localStorage.getItem(deepWorkDefsKey) || '[]');
       const storedDeepWorkLogs: DatedWorkout[] = JSON.parse(localStorage.getItem(deepWorkLogsKey) || '[]');
+      setDeepWorkDefinitions(storedDeepWorkDefs);
+      setDeepWorkLogs(storedDeepWorkLogs);
 
       const brandingTasksKey = `branding_tasks_${username}`;
       const brandingLogsKey = `branding_logs_${username}`;
@@ -95,47 +101,50 @@ function PersonalBrandingPageContent() {
         topics[def.category].push(def);
       });
 
-      const newGeneratedTasks: ExerciseDefinition[] = [];
+      const newGeneratedTasks: ExerciseDefinition[] = [...storedBrandingTasks];
+      const newlyBundledNames = new Set<string>();
+
       Object.keys(topics).forEach(topicName => {
-        const focusAreas = topics[topicName];
-        if (focusAreas.length >= 4) {
-          for (let i = 0; i < focusAreas.length; i += 4) {
-            const bundle = focusAreas.slice(i, i + 4);
+        const focusAreasInTopic = topics[topicName];
+        if (focusAreasInTopic.length >= 4) {
+          for (let i = 0; i < focusAreasInTopic.length; i += 4) {
+            const bundle = focusAreasInTopic.slice(i, i + 4);
             if (bundle.length === 4) {
-              const bundleNumber = Math.floor(i / 4) + 1;
-              const bundleId = `branding_${topicName.replace(/\s+/g, '_')}_bundle_${bundleNumber}`;
+              const existingBundlesForTopic = newGeneratedTasks.filter(t => t.name.startsWith(`${topicName} - Bundle`)).length;
+              const bundleNumber = existingBundlesForTopic + 1;
+              const bundleId = `branding_${topicName.replace(/\s+/g, '_')}_bundle_${bundleNumber}_${Date.now()}`;
               const bundleName = `${topicName} - Bundle #${bundleNumber}`;
               const bundleFocusAreas = bundle.map(def => def.name);
               
-              const existingTask = storedBrandingTasks.find(t => t.id === bundleId);
-              if (existingTask) {
-                newGeneratedTasks.push({
-                  ...existingTask,
-                  focusAreas: bundleFocusAreas,
-                });
-              } else {
-                newGeneratedTasks.push({
-                  id: bundleId,
-                  name: bundleName,
-                  category: 'Personal Branding' as ExerciseCategory,
-                  sharingStatus: { twitter: false, linkedin: false, devto: false },
-                  focusAreas: bundleFocusAreas,
-                });
-              }
+              newGeneratedTasks.push({
+                id: bundleId,
+                name: bundleName,
+                category: 'Personal Branding' as ExerciseCategory,
+                sharingStatus: { twitter: false, linkedin: false, devto: false },
+                focusAreas: bundleFocusAreas,
+              });
+              
+              bundleFocusAreas.forEach(name => newlyBundledNames.add(name));
             }
           }
         }
       });
+      
+      if(newlyBundledNames.size > 0) {
+        toast({ title: 'New Content Bundles Created!', description: `${newlyBundledNames.size} focus areas have been bundled into new content ideas.` });
+      }
 
       setBrandingTasks(newGeneratedTasks);
       setAllBrandingLogs(storedBrandingLogs);
     } else {
       setBrandingTasks([]);
       setAllBrandingLogs([]);
+      setDeepWorkDefinitions([]);
+      setDeepWorkLogs([]);
     }
     const timer = setTimeout(() => setIsLoadingPage(false), 300);
     return () => clearTimeout(timer);
-  }, [currentUser]);
+  }, [currentUser, toast]);
 
   useEffect(() => {
     if (currentUser?.username && !isLoadingPage) {
@@ -146,6 +155,30 @@ function PersonalBrandingPageContent() {
       localStorage.setItem(brandingLogsKey, JSON.stringify(allBrandingLogs));
     }
   }, [brandingTasks, allBrandingLogs, currentUser, isLoadingPage]);
+  
+  const availableFocusAreas = useMemo(() => {
+    if (!deepWorkDefinitions.length || !deepWorkLogs.length) {
+      return [];
+    }
+
+    const focusAreaSessionCounts: Record<string, number> = {};
+    deepWorkLogs.forEach(log => {
+      log.exercises.forEach(ex => {
+        focusAreaSessionCounts[ex.definitionId] = (focusAreaSessionCounts[ex.definitionId] || 0) + ex.loggedSets.length;
+      });
+    });
+
+    const allEligibleFocusAreas = deepWorkDefinitions.filter(def => 
+        (focusAreaSessionCounts[def.id] || 0) >= 4
+    );
+    
+    const usedFocusAreaNames = new Set<string>();
+    brandingTasks.forEach(task => {
+      task.focusAreas?.forEach(name => usedFocusAreaNames.add(name));
+    });
+    
+    return allEligibleFocusAreas.filter(def => !usedFocusAreaNames.has(def.name));
+  }, [deepWorkDefinitions, deepWorkLogs, brandingTasks]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -273,6 +306,53 @@ function PersonalBrandingPageContent() {
     );
   };
   
+  const handleRemoveFocusAreaFromBundle = (bundleId: string, focusAreaName: string) => {
+    setBrandingTasks(prevTasks => {
+        const newTasks = prevTasks.map(task => {
+            if (task.id === bundleId) {
+                return {
+                    ...task,
+                    focusAreas: task.focusAreas?.filter(fa => fa !== focusAreaName)
+                };
+            }
+            return task;
+        }).filter(task => task.focusAreas && task.focusAreas.length > 0); 
+
+        if (newTasks.length < prevTasks.length) {
+            toast({ title: "Bundle Removed", description: "The bundle was removed as it became empty." });
+        } else {
+            toast({ title: "Focus Area Removed" });
+        }
+        return newTasks;
+    });
+  };
+
+  const handleAddFocusAreaToBundle = (bundleId: string) => {
+    const focusAreaName = addSelection[bundleId];
+    if (!focusAreaName) {
+        toast({ title: "No Selection", description: "Please select a focus area to add.", variant: "destructive" });
+        return;
+    }
+
+    setBrandingTasks(prevTasks => prevTasks.map(task => {
+        if (task.id === bundleId) {
+            const existingFocusAreas = Array.isArray(task.focusAreas) ? task.focusAreas : [];
+            if (existingFocusAreas.includes(focusAreaName)) {
+                toast({ title: "Already Exists", description: `"${focusAreaName}" is already in this bundle.` });
+                return task;
+            }
+            return {
+                ...task,
+                focusAreas: [...existingFocusAreas, focusAreaName]
+            };
+        }
+        return task;
+    }));
+
+    setAddSelection(prev => ({ ...prev, [bundleId]: '' }));
+    toast({ title: "Focus Area Added" });
+  };
+  
   if (isLoadingPage) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
@@ -293,7 +373,7 @@ function PersonalBrandingPageContent() {
                     <Share2 /> Branding Pipeline
                   </CardTitle>
                   <CardDescription>
-                    These topic bundles are automatically generated from your Deep Work sessions. Add them to a branding session to start content creation.
+                    Topic bundles are automatically generated from your Deep Work. Add them to a session to start content creation.
                   </CardDescription>
               </CardHeader>
               <CardContent className="p-4">
@@ -307,23 +387,45 @@ function PersonalBrandingPageContent() {
                         </p>
                       </div>
                     ) : (
-                      <ul className="space-y-2">
+                      <ul className="space-y-3">
                         {activeTasks.map(task => (
                           <motion.li key={task.id} layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} className="p-3 bg-card border rounded-lg shadow-sm">
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex-grow min-w-0">
                                   <span className="font-medium text-foreground block" title={task.name}>{task.name}</span>
-                                   {task.focusAreas && (
-                                    <div className="mt-1 flex flex-wrap gap-1">
-                                      {task.focusAreas.map(fa => <Badge key={fa} variant="secondary" className="text-xs">{fa}</Badge>)}
-                                    </div>
-                                  )}
                               </div>
                               <div className="flex-shrink-0 flex items-center">
                                 <Button variant="ghost" size="icon" onClick={() => handleAddTaskToSession(task)} className="h-8 w-8 text-muted-foreground hover:text-accent" aria-label={`Add ${task.name} to session`}>
                                     <ChevronRight className="h-5 w-5" />
                                 </Button>
                               </div>
+                            </div>
+                            <div className="mt-2 space-y-1">
+                                {task.focusAreas?.map(fa => (
+                                    <Badge key={fa} variant="secondary" className="w-full flex justify-between items-center px-2 py-1">
+                                        <span className='truncate' title={fa}>{fa}</span>
+                                        <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={() => handleRemoveFocusAreaFromBundle(task.id, fa)}>
+                                            <Trash2 className="h-3 w-3 text-destructive" />
+                                        </Button>
+                                    </Badge>
+                                ))}
+                            </div>
+                            <div className="mt-3 pt-3 border-t flex gap-2">
+                                <Select value={addSelection[task.id] || ''} onValueChange={(value) => setAddSelection(prev => ({ ...prev, [task.id]: value }))}>
+                                    <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Add eligible area..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {availableFocusAreas.length > 0 ? (
+                                            availableFocusAreas.map(def => (
+                                                <SelectItem key={def.id} value={def.name}>{def.name} ({def.category})</SelectItem>
+                                            ))
+                                        ) : (
+                                            <div className="p-2 text-xs text-muted-foreground">No eligible areas found.</div>
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                                <Button size="icon" className="h-9 w-9 shrink-0" onClick={() => handleAddFocusAreaToBundle(task.id)} disabled={!addSelection[task.id]}>
+                                    <PlusCircle className="h-4 w-4" />
+                                </Button>
                             </div>
                           </motion.li>
                         ))}
