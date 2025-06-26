@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -9,9 +10,10 @@ import { Button } from './ui/button';
 import { useRouter, usePathname } from 'next/navigation';
 import { SupportModal } from './SupportModal';
 import { cn } from '@/lib/utils';
+import { DemoTokenModal } from './DemoTokenModal';
 
 export function Header() {
-  const { currentUser, loading } = useAuth();
+  const { currentUser, loading, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
@@ -75,6 +77,11 @@ export function Header() {
       <SupportModal 
         isOpen={isSupportModalOpen} 
         onOpenChange={setIsSupportModalOpen} 
+      />
+      <DemoTokenModal
+        isOpen={isDemoTokenModalOpen}
+        onOpenChange={setIsDemoTokenModalOpen}
+        onSubmit={pushDemoDataWithToken}
       />
     </>
   );

@@ -22,6 +22,9 @@ interface AuthContextType {
   pullDataFromCloud: (usernameOverride?: string) => Promise<void>;
   exportData: () => void;
   importData: () => void;
+  isDemoTokenModalOpen: boolean;
+  setIsDemoTokenModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  pushDemoDataWithToken: (token: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,6 +32,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<LocalUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isDemoTokenModalOpen, setIsDemoTokenModalOpen] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -131,6 +135,58 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(false);
   };
 
+  const pushDemoDataWithToken = async (token: string) => {
+    const username = 'demo';
+    if (!token || token.trim() === '') {
+        toast({ title: "Update Cancelled", description: "No override token was provided.", variant: "default" });
+        return;
+    }
+    
+    toast({ title: "Syncing...", description: "Pushing demo data to the cloud." });
+    try {
+      const allUserData = {
+        exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
+        workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
+        allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
+        workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
+        upskillDefinitions: JSON.parse(localStorage.getItem(`upskill_definitions_${username}`) || '[]'),
+        upskillLogs: JSON.parse(localStorage.getItem(`upskill_logs_${username}`) || '[]'),
+        upskillTopicGoals: JSON.parse(localStorage.getItem(`upskill_topic_goals_${username}`) || '{}'),
+        deepWorkDefinitions: JSON.parse(localStorage.getItem(`deepwork_definitions_${username}`) || '[]'),
+        deepWorkLogs: JSON.parse(localStorage.getItem(`deepwork_logs_${username}`) || '[]'),
+        deepworkManualDeletes: JSON.parse(localStorage.getItem(`deepwork_manual_deletes_${username}`) || '[]'),
+        brandingTasks: JSON.parse(localStorage.getItem(`branding_tasks_${username}`) || '[]'),
+        brandingLogs: JSON.parse(localStorage.getItem(`branding_logs_${username}`) || '[]'),
+        schedule: JSON.parse(localStorage.getItem(`lifeos_schedule_${username}`) || '{}'),
+        dietPlan: JSON.parse(localStorage.getItem(`dietPlan_${username}`) || '[]'),
+        weightLogs: JSON.parse(localStorage.getItem(`weightLogs_${username}`) || '[]'),
+        goalWeight: localStorage.getItem(`goalWeight_${username}`) || null,
+        height: localStorage.getItem(`height_${username}`) || null,
+        dateOfBirth: localStorage.getItem(`dateOfBirth_${username}`) || null,
+        gender: localStorage.getItem(`gender_${username}`) || null,
+    };
+        const requestBody = { username, data: allUserData, demo_override_token: token };
+        const response = await fetch('/api/blob-sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to push data.');
+        }
+        toast({ title: "Success", description: "Demo data has been saved to the cloud." });
+    } catch (error) {
+        console.error("Push to cloud for demo user failed:", error);
+        toast({
+            title: "Sync Failed",
+            description: error instanceof Error ? error.message : "An unknown error occurred.",
+            variant: "destructive",
+        });
+    }
+  };
+
+
   const pushDataToCloud = async () => {
     if (!currentUser?.username) {
         toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
@@ -141,67 +197,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // --- DEMO USER LOGIC ---
     if (username === 'demo') {
-        const demoOverrideToken = window.prompt(
-            "You are updating the read-only 'demo' account.\nPlease provide the override token to proceed.\n(Check your .env file for DEMO_ACCOUNT_UPDATE_TOKEN)"
-        );
-        
-        if (demoOverrideToken === null || demoOverrideToken.trim() === '') {
-            toast({ title: "Update Cancelled", description: "No override token was provided.", variant: "default" });
-            return;
-        }
-        
-        toast({ title: "Syncing...", description: "Pushing your local data to the cloud." });
-        try {
-            const allUserData = {
-                // ... (data collection as before)
-                exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
-                workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
-                allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
-                workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
-                upskillDefinitions: JSON.parse(localStorage.getItem(`upskill_definitions_${username}`) || '[]'),
-                upskillLogs: JSON.parse(localStorage.getItem(`upskill_logs_${username}`) || '[]'),
-                upskillTopicGoals: JSON.parse(localStorage.getItem(`upskill_topic_goals_${username}`) || '{}'),
-                deepWorkDefinitions: JSON.parse(localStorage.getItem(`deepwork_definitions_${username}`) || '[]'),
-                deepWorkLogs: JSON.parse(localStorage.getItem(`deepwork_logs_${username}`) || '[]'),
-                deepworkManualDeletes: JSON.parse(localStorage.getItem(`deepwork_manual_deletes_${username}`) || '[]'),
-                brandingTasks: JSON.parse(localStorage.getItem(`branding_tasks_${username}`) || '[]'),
-                brandingLogs: JSON.parse(localStorage.getItem(`branding_logs_${username}`) || '[]'),
-                schedule: JSON.parse(localStorage.getItem(`lifeos_schedule_${username}`) || '{}'),
-                dietPlan: JSON.parse(localStorage.getItem(`dietPlan_${username}`) || '[]'),
-                weightLogs: JSON.parse(localStorage.getItem(`weightLogs_${username}`) || '[]'),
-                goalWeight: localStorage.getItem(`goalWeight_${username}`) || null,
-                height: localStorage.getItem(`height_${username}`) || null,
-                dateOfBirth: localStorage.getItem(`dateOfBirth_${username}`) || null,
-                gender: localStorage.getItem(`gender_${username}`) || null,
-            };
-
-            const requestBody = { username, data: allUserData, demo_override_token: demoOverrideToken };
-            const response = await fetch('/api/blob-sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody),
-            });
-            const result = await response.json();
-            if (!response.ok) {
-                throw new Error(result.error || 'Failed to push data.');
-            }
-            toast({ title: "Success", description: "Your data has been saved to the cloud." });
-        } catch (error) {
-            console.error("Push to cloud for demo user failed:", error);
-            toast({
-                title: "Sync Failed",
-                description: error instanceof Error ? error.message : "An unknown error occurred.",
-                variant: "destructive",
-            });
-        }
-        return; // IMPORTANT: Exit the function after handling the demo user case.
+        setIsDemoTokenModalOpen(true);
+        return;
     }
     
     // --- REGULAR USER LOGIC ---
     toast({ title: "Syncing...", description: "Pushing your local data to the cloud." });
     try {
         const allUserData = {
-            // ... (data collection as before)
             exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
             workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
             allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
@@ -416,6 +419,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pullDataFromCloud,
     exportData,
     importData,
+    isDemoTokenModalOpen,
+    setIsDemoTokenModalOpen,
+    pushDemoDataWithToken,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
