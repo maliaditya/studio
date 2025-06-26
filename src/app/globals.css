@@ -73,7 +73,7 @@
   .theme-smoke {
     --background: 0 0% 95%;
     --foreground: 0 0% 10%;
-    --card: hsla(0, 0%, 100%, 0.6);
+    --card: hsla(0, 0%, 100%, 0.8);
     --card-foreground: 0 0% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 10%;
@@ -92,7 +92,29 @@
     --ring: 220 90% 55%;
   }
 
-  #default-background-container, #matrix-canvas, #smoke-canvas {
+  .theme-cloth {
+    --background: 0 0% 10%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 15%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 5%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 210 90% 60%;
+    --primary-foreground: 210 10% 10%;
+    --secondary: 210 20% 25%;
+    --secondary-foreground: 210 10% 95%;
+    --muted: 210 20% 22%;
+    --muted-foreground: 210 10% 65%;
+    --accent: 280 90% 60%;
+    --accent-foreground: 280 10% 10%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 210 20% 30%;
+    --input: 210 30% 25%;
+    --ring: 210 90% 60%;
+  }
+
+  #default-background-container, #matrix-canvas, #smoke-canvas, #cloth-canvas {
     display: none;
   }
   
@@ -118,6 +140,15 @@
 
   .theme-matrix #matrix-canvas {
     display: block;
+  }
+
+  .theme-cloth #cloth-canvas {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: -1;
+    background-color: hsl(var(--background));
   }
   
   html.theme-smoke {
