@@ -608,6 +608,13 @@ function HomePageContent() {
                     };
                 }
 
+                let requiredDailyRate = 0;
+                if (milestoneStats && milestoneStats.daysRemaining > 0) {
+                    requiredDailyRate = milestoneStats.progressNeeded / milestoneStats.daysRemaining;
+                } else if (completionStats && completionStats.daysRemaining > 0) {
+                    requiredDailyRate = remainingProgress / completionStats.daysRemaining;
+                }
+
                 const speed = data.totalDuration > 0 ? (totalProgress / data.totalDuration) * 60 : 0;
 
                 topicStats[topic] = {
@@ -619,6 +626,7 @@ function HomePageContent() {
                     goalValue: goal.goalValue,
                     completion: completionStats,
                     nextMilestone: milestoneStats,
+                    requiredDailyRate: requiredDailyRate,
                 };
             });
 
@@ -932,6 +940,14 @@ function HomePageContent() {
                                                                         Progress: {stats.totalProgress.toLocaleString()} / {stats.goalValue.toLocaleString()} {stats.unit.split('/')[0]}
                                                                     </div>
                                                                 </div>
+                                                                {stats.requiredDailyRate > 0 && (
+                                                                    <div className="text-right text-xs ml-4 flex-shrink-0">
+                                                                        <div className="font-semibold text-foreground whitespace-nowrap">Needed Today</div>
+                                                                        <div className="text-muted-foreground whitespace-nowrap">
+                                                                            {stats.requiredDailyRate.toFixed(1)} {stats.unit.split('/')[0]}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
                                                             </AccordionTrigger>
                                                             <AccordionContent className="pt-2">
                                                                 <Progress value={(stats.totalProgress / stats.goalValue) * 100} className="h-2 my-2" />
