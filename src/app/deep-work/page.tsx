@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, ChevronDown, ChevronUp, Target, LineChart as LineChartIcon, Briefcase, Puzzle } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, ChevronDown, ChevronUp, Target, LineChart as LineChartIcon, Briefcase, Puzzle, Share2, Globe, Code, Linkedin, CheckCircle2 } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, parse, getISOWeek, isMonday, getYear, subYears, addDays, parseISO } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, WeightLog, Gender, DecompositionRow } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, WeightLog, Gender, DecompositionRow, SharingStatus } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -43,12 +43,15 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { WeightChartModal } from '@/components/WeightChartModal';
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 const DEFAULT_TARGET_SESSIONS = 1;
@@ -57,6 +60,20 @@ const DEFAULT_TARGET_DURATION = "25";
 const durationChartConfig = {
   totalDuration: { label: "Duration (min)", color: "hsl(var(--primary))" },
 } satisfies ChartConfig;
+
+const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
+        <title>X</title>
+        <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/>
+    </svg>
+);
+
+const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
+        <title>DEV Community</title>
+        <path d="M11.472 24a1.5 1.5 0 0 1-1.06-.44L.439 13.587a1.5 1.5 0 0 1 0-2.12l9.97-9.97a1.5 1.5 0 0 1 2.12 0L22.503 11.47a1.5 1.5 0 0 1 0 2.121l-9.972 9.971a1.5 1.5 0 0 1-1.06.44Zm-8.485-11.25 8.485 8.485 8.485-8.485-8.485-8.485-8.485 8.485ZM19.5 18h-3V9h3v9Z"/>
+    </svg>
+);
 
 
 function DeepWorkPageContent() {
@@ -98,6 +115,14 @@ function DeepWorkPageContent() {
   const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
   const [isDecompositionEditing, setIsDecompositionEditing] = useState(false);
   const [editableDecompositionData, setEditableDecompositionData] = useState<DecompositionRow[]>([]);
+
+  // State for branding modal
+  const [isBrandingModalOpen, setIsBrandingModalOpen] = useState(false);
+  const [selectedBrandingCandidate, setSelectedBrandingCandidate] = useState<ExerciseDefinition | null>(null);
+  const [brandingModalType, setBrandingModalType] = useState<'blog' | 'blog_demo' | null>(null);
+  const [blogUrl, setBlogUrl] = useState('');
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [demoUrl, setDemoUrl] = useState('');
 
 
   const decompositionTechniques: DecompositionRow[] = [
@@ -276,6 +301,26 @@ function DeepWorkPageContent() {
     if (selectedCategories.length === 0) return exerciseDefinitions;
     return exerciseDefinitions.filter(def => selectedCategories.includes(def.category));
   }, [exerciseDefinitions, selectedCategories]);
+
+  const brandingCandidates = useMemo(() => {
+    const sessionCounts = new Map<string, number>();
+    allWorkoutLogs.forEach(log => {
+      log.exercises.forEach(ex => {
+        if (ex.loggedSets.length > 0) {
+          const currentCount = sessionCounts.get(ex.definitionId) || 0;
+          sessionCounts.set(ex.definitionId, currentCount + ex.loggedSets.length);
+        }
+      });
+    });
+
+    return exerciseDefinitions
+      .map(def => ({
+        ...def,
+        sessionCount: sessionCounts.get(def.id) || 0,
+      }))
+      .filter(def => def.sessionCount >= 4 || def.brandingStatus)
+      .sort((a, b) => (b.sessionCount) - (a.sessionCount));
+  }, [allWorkoutLogs, exerciseDefinitions]);
 
   const handleCategoryFilterChange = (category: string) => {
     setSelectedCategories(prev => 
@@ -469,6 +514,54 @@ function DeepWorkPageContent() {
     toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved.` });
   };
 
+  const handleOpenBrandingModal = (def: ExerciseDefinition, type: 'blog' | 'blog_demo') => {
+    setSelectedBrandingCandidate(def);
+    setBrandingModalType(type);
+    setBlogUrl(def.contentUrls?.blog || '');
+    setYoutubeUrl(def.contentUrls?.youtube || '');
+    setDemoUrl(def.contentUrls?.demo || '');
+    setIsBrandingModalOpen(true);
+  };
+
+  const handleSaveBranding = () => {
+    if (!selectedBrandingCandidate) return;
+
+    setExerciseDefinitions(prevDefs => prevDefs.map(def => {
+      if (def.id === selectedBrandingCandidate.id) {
+        return {
+          ...def,
+          brandingStatus: 'converted',
+          contentUrls: {
+            blog: blogUrl,
+            youtube: brandingModalType === 'blog_demo' ? youtubeUrl : undefined,
+            demo: brandingModalType === 'blog_demo' ? demoUrl : undefined,
+          }
+        };
+      }
+      return def;
+    }));
+
+    setIsBrandingModalOpen(false);
+    toast({ title: "Content URLs Saved!", description: `Your links for "${selectedBrandingCandidate.name}" have been saved.` });
+  };
+  
+  const handleToggleSharing = (defId: string, platform: keyof SharingStatus) => {
+    setExerciseDefinitions(prevDefs => prevDefs.map(def => {
+      if (def.id === defId) {
+        const newSharingStatus = { ...def.sharingStatus, [platform]: !def.sharingStatus?.[platform] };
+        
+        const newBrandingStatus = Object.values(newSharingStatus).some(Boolean) ? 'published' : 'converted';
+
+        return {
+          ...def,
+          sharingStatus: newSharingStatus,
+          brandingStatus: newBrandingStatus,
+        };
+      }
+      return def;
+    }));
+  };
+
   const consistencyData = useMemo(() => {
     if (!allWorkoutLogs || !oneYearAgo || !today) return [];
     const workoutDates = new Set(allWorkoutLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date));
@@ -627,66 +720,86 @@ function DeepWorkPageContent() {
               </CardContent>
             </Card>
 
-            <Card>
+             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg text-primary">
-                        <LineChartIcon /> Daily Focus Duration
+                        <Share2 /> Personal Branding Pipeline
                     </CardTitle>
                     <CardDescription>
-                       Total minutes of deep work logged each day.
+                       Convert completed deep work (4+ sessions) into content.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {dailyDurationData.length > 1 ? (
-                      <ChartContainer config={durationChartConfig} className="h-[200px] w-full">
-                        <ResponsiveContainer>
-                          <LineChart data={dailyDurationData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                            <CartesianGrid vertical={false} />
-                            <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
-                            <YAxis 
-                                tickLine={false} 
-                                axisLine={false} 
-                                tickMargin={8}
-                                fontSize={12}
-                                domain={['auto', 'auto']}
-                                label={{ value: "Minutes", angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' }}}
-                            />
-                            <RechartsTooltip
-                                content={({ active, payload }) => {
-                                    if (active && payload && payload.length) {
-                                        const data = payload[0].payload;
-                                        return (
-                                            <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                <div className="font-bold text-foreground">{format(data.dateObj, 'PPP')}</div>
-                                                <div className="grid gap-1.5">
-                                                    <div className="flex w-full items-center gap-2">
-                                                        <div className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: 'hsl(var(--primary))' }} />
-                                                        <div className="flex flex-1 justify-between">
-                                                            <span className="text-muted-foreground">Duration</span>
-                                                            <span className="font-mono font-medium text-foreground">{data.totalDuration} min</span>
-                                                        </div>
-                                                    </div>
-                                                    {data.topics && (
-                                                        <div className="mt-1 pt-1.5 border-t">
-                                                            <p className="font-medium text-foreground mb-1">Focus Areas:</p>
-                                                            <p className="text-muted-foreground whitespace-normal">{data.topics}</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    }
-                                    return null;
-                                }}
-                            />
-                            <Line type="monotone" dataKey="totalDuration" stroke="var(--color-totalDuration)" strokeWidth={2} dot={false} name="totalDuration" />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </ChartContainer>
+                    {brandingCandidates.length === 0 ? (
+                        <div className="text-center py-6 text-sm text-muted-foreground">
+                            Log 4 sessions on a focus area to get started.
+                        </div>
                     ) : (
-                      <div className="flex h-[200px] items-center justify-center text-center text-sm text-muted-foreground">
-                        <p>Log deep work sessions on multiple days to see a chart of your daily duration.</p>
-                      </div>
+                        <ul className="space-y-4">
+                            {brandingCandidates.map(def => (
+                                <li key={def.id} className="p-3 bg-muted/30 rounded-lg space-y-3 text-sm">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h4 className="font-semibold text-foreground">{def.name}</h4>
+                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                <Badge variant="outline">{def.category}</Badge>
+                                                <Badge variant="secondary">{def.sessionCount} sessions</Badge>
+                                            </div>
+                                        </div>
+                                        {def.brandingStatus === 'published' && (
+                                            <div className="flex items-center gap-1.5 text-green-600">
+                                                <CheckCircle2 className="h-4 w-4" />
+                                                <span className="font-medium">Published</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {def.brandingStatus === 'converted' || def.brandingStatus === 'published' ? (
+                                        <div className="space-y-4">
+                                            {def.contentUrls && (
+                                                <div className="space-y-2">
+                                                    <h5 className="font-medium text-muted-foreground">Content Links</h5>
+                                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                                                        {def.contentUrls.blog && <a href={def.contentUrls.blog} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary hover:underline"><Globe className="h-4 w-4" /> Blog Post</a>}
+                                                        {def.contentUrls.youtube && <a href={def.contentUrls.youtube} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary hover:underline"><Youtube className="h-4 w-4" /> YouTube</a>}
+                                                        {def.contentUrls.demo && <a href={def.contentUrls.demo} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary hover:underline"><Code className="h-4 w-4" /> Demo</a>}
+                                                         <Button variant="ghost" size="icon" onClick={() => handleOpenBrandingModal(def, def.contentUrls.youtube ? 'blog_demo' : 'blog')} className="h-7 w-7"><Edit3 className="h-4 w-4 text-muted-foreground" /></Button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div className="space-y-2">
+                                                 <h5 className="font-medium text-muted-foreground">Sharing Checklist</h5>
+                                                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                                                    <div className="flex items-center space-x-2">
+                                                        <Checkbox id={`share-twitter-${def.id}`} checked={def.sharingStatus?.twitter} onCheckedChange={() => handleToggleSharing(def.id, 'twitter')} />
+                                                        <label htmlFor={`share-twitter-${def.id}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                                            <TwitterIcon className="h-4 w-4" /> X / Twitter
+                                                        </label>
+                                                    </div>
+                                                     <div className="flex items-center space-x-2">
+                                                        <Checkbox id={`share-linkedin-${def.id}`} checked={def.sharingStatus?.linkedin} onCheckedChange={() => handleToggleSharing(def.id, 'linkedin')} />
+                                                        <label htmlFor={`share-linkedin-${def.id}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                                            <Linkedin className="h-4 w-4" /> LinkedIn
+                                                        </label>
+                                                    </div>
+                                                    <div className="flex items-center space-x-2">
+                                                        <Checkbox id={`share-devto-${def.id}`} checked={def.sharingStatus?.devto} onCheckedChange={() => handleToggleSharing(def.id, 'devto')} />
+                                                        <label htmlFor={`share-devto-${def.id}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                                            <DevToIcon className="h-4 w-4" /> DEV.to
+                                                        </label>
+                                                    </div>
+                                                 </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                         <div className="flex items-center gap-2 pt-2 border-t">
+                                            <Button size="sm" onClick={() => handleOpenBrandingModal(def, 'blog')} className="flex-1">Create Blog</Button>
+                                            <Button size="sm" onClick={() => handleOpenBrandingModal(def, 'blog_demo')} className="flex-1">Blog + Demo</Button>
+                                        </div>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
                     )}
                 </CardContent>
             </Card>
@@ -853,6 +966,39 @@ function DeepWorkPageContent() {
           </div>
         </DialogContent>
       </Dialog>
+      
+       <Dialog open={isBrandingModalOpen} onOpenChange={setIsBrandingModalOpen}>
+        <DialogContent>
+            <DialogHeader>
+            <DialogTitle>Convert to Content: {selectedBrandingCandidate?.name}</DialogTitle>
+            <DialogDescription>
+                Add the URLs for your created content. Click save when you're done.
+            </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                    <Label htmlFor="blog-url">Blog Post URL</Label>
+                    <Input id="blog-url" value={blogUrl} onChange={e => setBlogUrl(e.target.value)} placeholder="https://my.blog/post-title" />
+                </div>
+                {brandingModalType === 'blog_demo' && (
+                    <>
+                        <div className="space-y-2">
+                            <Label htmlFor="youtube-url">YouTube Video URL</Label>
+                            <Input id="youtube-url" value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} placeholder="https://youtube.com/watch?v=..." />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="demo-url">Live Demo URL</Label>
+                            <Input id="demo-url" value={demoUrl} onChange={e => setDemoUrl(e.target.value)} placeholder="https://my-demo.vercel.app" />
+                        </div>
+                    </>
+                )}
+            </div>
+            <DialogFooter>
+                <Button onClick={handleSaveBranding}>Save URLs</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </>
   );
 }
@@ -860,5 +1006,3 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
-
-    

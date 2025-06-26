@@ -31,6 +31,13 @@ export interface LoggedSet {
   timestamp: number;
 }
 
+export interface SharingStatus {
+  twitter?: boolean;
+  linkedin?: boolean;
+  devto?: boolean;
+  youtube?: boolean;
+}
+
 export interface DecompositionRow {
   technique: string;
   description: string;
@@ -42,6 +49,14 @@ export interface ExerciseDefinition {
   name: string; // Subtopic for upskill
   category: ExerciseCategory; // Topic for upskill
   decompositionData?: DecompositionRow[];
+  // Personal Branding
+  brandingStatus?: 'converted' | 'published';
+  contentUrls?: {
+    blog?: string;
+    youtube?: string;
+    demo?: string;
+  };
+  sharingStatus?: SharingStatus;
 }
 
 export interface TopicGoal {
