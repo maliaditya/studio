@@ -1,11 +1,12 @@
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Puzzle, ChevronDown, ChevronUp, Briefcase } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Puzzle, ChevronDown, ChevronUp, Briefcase, LineChart as LineChartIcon } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -46,10 +47,16 @@ import {
 import { WeightChartModal } from '@/components/WeightChartModal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from '@/components/ui/textarea';
+import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 
 
 const DEFAULT_TARGET_SESSIONS = 1;
 const DEFAULT_TARGET_DURATION = "25";
+
+const durationChartConfig = {
+  totalDuration: { label: "Duration (min)", color: "hsl(var(--primary))" },
+} satisfies ChartConfig;
 
 function DeepWorkPageContent() {
   const { toast } = useToast();
@@ -465,6 +472,33 @@ function DeepWorkPageContent() {
     return data;
   }, [allWorkoutLogs, oneYearAgo, today]);
   
+  const dailyDurationData = useMemo(() => {
+    const dailyData: Record<string, { totalDuration: number; topics: Set<string> }> = {};
+
+    allWorkoutLogs.forEach(log => {
+        log.exercises.forEach(exercise => {
+            // In deep work, `weight` is the duration in minutes.
+            const duration = exercise.loggedSets.reduce((sum, set) => sum + set.weight, 0);
+            if (duration > 0) {
+                if (!dailyData[log.date]) {
+                    dailyData[log.date] = { totalDuration: 0, topics: new Set() };
+                }
+                dailyData[log.date].totalDuration += duration;
+                dailyData[log.date].topics.add(exercise.name);
+            }
+        });
+    });
+
+    return Object.entries(dailyData)
+        .map(([dateString, data]) => ({
+            dateObj: parseISO(dateString),
+            totalDuration: data.totalDuration,
+            topics: Array.from(data.topics).join(', '),
+            date: format(parseISO(dateString), 'MMM dd'),
+        }))
+        .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+  }, [allWorkoutLogs]);
+
   if (isLoadingPage) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
@@ -581,6 +615,70 @@ function DeepWorkPageContent() {
                   )}
                 </AnimatePresence>
               </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg text-primary">
+                        <LineChartIcon /> Daily Deep Work Duration
+                    </CardTitle>
+                    <CardDescription>
+                       Total minutes of deep work logged each day.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {dailyDurationData.length > 1 ? (
+                      <ChartContainer config={durationChartConfig} className="h-[200px] w-full">
+                        <ResponsiveContainer>
+                          <LineChart data={dailyDurationData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                            <CartesianGrid vertical={false} />
+                            <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
+                            <YAxis 
+                                tickLine={false} 
+                                axisLine={false} 
+                                tickMargin={8}
+                                fontSize={12}
+                                domain={['auto', 'auto']}
+                                label={{ value: "Minutes", angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' }}}
+                            />
+                            <RechartsTooltip
+                                content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                        const data = payload[0].payload;
+                                        return (
+                                            <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                <div className="font-bold text-foreground">{format(data.dateObj, 'PPP')}</div>
+                                                <div className="grid gap-1.5">
+                                                    <div className="flex w-full items-center gap-2">
+                                                        <div className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: 'hsl(var(--primary))' }} />
+                                                        <div className="flex flex-1 justify-between">
+                                                            <span className="text-muted-foreground">Duration</span>
+                                                            <span className="font-mono font-medium text-foreground">{data.totalDuration} min</span>
+                                                        </div>
+                                                    </div>
+                                                    {data.topics && (
+                                                        <div className="mt-1 pt-1.5 border-t">
+                                                            <p className="font-medium text-foreground mb-1">Focus Areas:</p>
+                                                            <p className="text-muted-foreground whitespace-normal">{data.topics}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                }}
+                            />
+                            <Line type="monotone" dataKey="totalDuration" stroke="var(--color-totalDuration)" strokeWidth={2} dot={false} name="totalDuration" />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </ChartContainer>
+                    ) : (
+                      <div className="flex h-[200px] items-center justify-center text-center text-sm text-muted-foreground">
+                        <p>Log deep work sessions on multiple days to see a chart of your daily duration.</p>
+                      </div>
+                    )}
+                </CardContent>
             </Card>
           </section>
 
