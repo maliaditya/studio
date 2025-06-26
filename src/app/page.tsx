@@ -23,6 +23,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { WeightChartModal } from '@/components/WeightChartModal';
 import { DietPlanModal } from '@/components/DietPlanModal';
+import { StatsOverviewModal } from '@/components/StatsOverviewModal';
 
 const slots = [
   { name: 'Late Night', time: '12 AM - 4 AM', icon: <Moon className="h-6 w-6 text-indigo-400" /> },
@@ -180,6 +181,7 @@ function HomePageContent() {
   const [isLearningModalOpen, setIsLearningModalOpen] = useState(false);
   const [isWeightChartModalOpen, setIsWeightChartModalOpen] = useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
+  const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   
   // State for Modal content
   const [todaysExercises, setTodaysExercises] = useState<WorkoutExercise[]>([]);
@@ -523,6 +525,27 @@ function HomePageContent() {
     return { health: healthDone, wealth: wealthDone, growth: growthDone, direction: directionDone };
   }, [schedule, todayKey]);
 
+    const consistencyData = useMemo(() => {
+      if (!allWorkoutLogs || !oneYearAgo || !today) return [];
+      const workoutDates = new Set(allWorkoutLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date));
+      const data: { date: string; fullDate: string; score: number }[] = [];
+      let score = 0.5;
+      for (let d = new Date(oneYearAgo); d <= today; d = addDays(d, 1)) {
+          const dateKey = format(d, 'yyyy-MM-dd');
+          if (workoutDates.has(dateKey)) {
+              score += (1 - score) * 0.1;
+          } else {
+              score *= 0.95;
+          }
+          data.push({ 
+            date: format(d, 'MMM dd'), 
+            fullDate: format(d, 'PPP'), 
+            score: Math.round(score * 100) 
+          });
+      }
+      return data;
+    }, [allWorkoutLogs, oneYearAgo, today]);
+
     const productivityStats = useMemo(() => {
         const calculateAverageDuration = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
             const dailyDurations: Record<string, number> = {};
@@ -650,21 +673,7 @@ function HomePageContent() {
             const totalVolume = Object.values(dailyData).reduce((sum, d) => sum + d.volume, 0);
             return { avgVolume: Math.round(totalVolume / daysWithWorkouts) };
         };
-
-        const consistencyData: { score: number }[] = [];
-        if (oneYearAgo && today) {
-            const workoutDates = new Set(allWorkoutLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date));
-            let score = 0.5;
-            for (let d = new Date(oneYearAgo); d <= today; d = addDays(d, 1)) {
-                const dateKey = format(d, 'yyyy-MM-dd');
-                if (workoutDates.has(dateKey)) {
-                    score += (1 - score) * 0.1;
-                } else {
-                    score *= 0.95;
-                }
-                consistencyData.push({ score: Math.round(score * 100) });
-            }
-        }
+        
         const latestConsistency = consistencyData.length > 0 ? consistencyData[consistencyData.length - 1].score : 0;
 
         const avgUpskillDuration = calculateAverageDuration(allUpskillLogs, 'reps');
@@ -752,7 +761,7 @@ function HomePageContent() {
             totalProductiveHours, currentLevel, learningStats, workoutStats, latestConsistency,
             healthMetrics, projectionSummary, overallNextMilestone
         };
-    }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, dietPlan, weightLogs, dateOfBirth, height, gender, goalWeight]);
+    }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, dietPlan, weightLogs, dateOfBirth, height, gender, goalWeight, consistencyData]);
     
     // MODAL HANDLERS
     const handleDietModalOpenChange = (isOpen: boolean) => {
@@ -921,8 +930,12 @@ function HomePageContent() {
                     <Card className="h-full bg-card/50">
                         <CardHeader className="flex flex-row items-start justify-between">
                             <div>
-                                <CardTitle className="flex items-center gap-2 text-primary"><BarChart3 /> Your Productivity Snapshot</CardTitle>
+                                <CardTitle className="flex items-center gap-2 text-primary">Your Productivity Snapshot</CardTitle>
                             </div>
+                             <Button variant="outline" size="icon" onClick={() => setIsStatsModalOpen(true)}>
+                                <BarChart3 className="h-4 w-4" />
+                                <span className="sr-only">Open Stats Overview</span>
+                            </Button>
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1275,6 +1288,17 @@ function HomePageContent() {
       <DietPlanModal
         isOpen={isDietPlanModalOpen}
         onOpenChange={handleDietModalOpenChange}
+      />
+
+      <StatsOverviewModal
+        isOpen={isStatsModalOpen}
+        onOpenChange={setIsStatsModalOpen}
+        allWorkoutLogs={allWorkoutLogs}
+        allUpskillLogs={allUpskillLogs}
+        allDeepWorkLogs={allDeepWorkLogs}
+        weightLogs={weightLogs}
+        goalWeight={goalWeight}
+        consistencyData={consistencyData}
       />
     </div>
   );
