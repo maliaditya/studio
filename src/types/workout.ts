@@ -64,6 +64,16 @@ export interface TopicGoal {
   goalValue: number;
 }
 
+export interface TopicBrandingInfo {
+  brandingStatus?: 'converted' | 'published';
+  contentUrls?: {
+    blog?: string;
+    youtube?: string;
+    demo?: string;
+  };
+  sharingStatus?: SharingStatus;
+}
+
 export interface WorkoutExercise {
   id: string; // Unique instance ID for this exercise in this workout
   definitionId: string; // Links to ExerciseDefinition

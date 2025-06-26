@@ -11,7 +11,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, parse, getISOWeek, isMonday, getYear, subYears, addDays, parseISO } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, WeightLog, Gender, DecompositionRow, SharingStatus } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, WeightLog, Gender, DecompositionRow, SharingStatus, TopicBrandingInfo } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -75,6 +75,13 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
+// New Type for branding candidates
+interface EligibleTopic {
+  topic: string;
+  focusAreas: (ExerciseDefinition & { sessionCount: number })[];
+  totalSessions: number;
+  brandingInfo: TopicBrandingInfo;
+}
 
 function DeepWorkPageContent() {
   const { toast } = useToast();
@@ -116,9 +123,10 @@ function DeepWorkPageContent() {
   const [isDecompositionEditing, setIsDecompositionEditing] = useState(false);
   const [editableDecompositionData, setEditableDecompositionData] = useState<DecompositionRow[]>([]);
 
-  // State for branding modal
+  // State for branding
+  const [brandedTopics, setBrandedTopics] = useState<Record<string, TopicBrandingInfo>>({});
   const [isBrandingModalOpen, setIsBrandingModalOpen] = useState(false);
-  const [selectedBrandingCandidate, setSelectedBrandingCandidate] = useState<ExerciseDefinition | null>(null);
+  const [selectedBrandingCandidate, setSelectedBrandingCandidate] = useState<EligibleTopic | null>(null);
   const [brandingModalType, setBrandingModalType] = useState<'blog' | 'blog_demo' | null>(null);
   const [blogUrl, setBlogUrl] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -178,7 +186,7 @@ function DeepWorkPageContent() {
     return Array.from(topics).sort();
   }, [exerciseDefinitions]);
 
-  const brandingCandidates = useMemo(() => {
+  const brandingCandidates = useMemo((): EligibleTopic[] => {
     // 1. Calculate session counts for every focus area
     const sessionCounts = new Map<string, number>();
     allWorkoutLogs.forEach(log => {
@@ -190,54 +198,44 @@ function DeepWorkPageContent() {
         });
     });
 
-    // 2. Group focus areas by topic (category)
-    const topicsMap = new Map<string, ExerciseDefinition[]>();
+    // 2. Group focus areas with their session counts by topic
+    const topicsMap = new Map<string, (ExerciseDefinition & { sessionCount: number })[]>();
     exerciseDefinitions.forEach(def => {
         if (!topicsMap.has(def.category)) {
             topicsMap.set(def.category, []);
         }
-        topicsMap.get(def.category)!.push(def);
+        topicsMap.get(def.category)!.push({
+            ...def,
+            sessionCount: sessionCounts.get(def.id) || 0,
+        });
     });
 
-    // 3. Identify topics that are "brandable"
-    const brandableTopics = new Set<string>();
-    topicsMap.forEach((defs, topic) => {
-        // A topic must have at least 4 focus areas to even be considered.
-        if (defs.length < 4) return;
-        
-        // Count how many focus areas within this topic have at least 4 sessions.
-        const focusAreasWithEnoughSessions = defs.filter(def => {
-            const count = sessionCounts.get(def.id) || 0;
-            return count >= 4;
-        });
+    const eligibleTopics: EligibleTopic[] = [];
 
-        // If at least 4 focus areas have 4+ sessions, the topic is brandable.
-        if (focusAreasWithEnoughSessions.length >= 4) {
-            brandableTopics.add(topic);
+    // 3. Iterate through topics to find eligible ones
+    topicsMap.forEach((defs, topic) => {
+        // Find focus areas within this topic that have at least 4 sessions
+        const focusAreasWithEnoughSessions = defs.filter(d => d.sessionCount >= 4);
+        
+        // A topic is eligible if it has at least 4 such focus areas.
+        const isEligible = focusAreasWithEnoughSessions.length >= 4;
+        
+        const brandingInfo = brandedTopics[topic] || {};
+        const isBranded = !!brandingInfo.brandingStatus;
+
+        if (isEligible || isBranded) {
+             eligibleTopics.push({
+                topic,
+                focusAreas: focusAreasWithEnoughSessions,
+                totalSessions: focusAreasWithEnoughSessions.reduce((sum, fa) => sum + fa.sessionCount, 0),
+                brandingInfo,
+            });
         }
     });
 
-    // 4. Filter the final list of eligible focus areas
-    return exerciseDefinitions
-        .map(def => ({
-            ...def,
-            sessionCount: sessionCounts.get(def.id) || 0,
-        }))
-        .filter(def => {
-            // An item is eligible if:
-            // a) It has already been converted/published (has branding status)
-            if (def.brandingStatus) {
-                return true;
-            }
-            
-            // b) Its topic is brandable AND it has at least 4 sessions itself.
-            const isTopicBrandable = brandableTopics.has(def.category);
-            const hasEnoughSessions = def.sessionCount >= 4;
+    return eligibleTopics.sort((a, b) => b.totalSessions - a.totalSessions);
+  }, [allWorkoutLogs, exerciseDefinitions, brandedTopics]);
 
-            return isTopicBrandable && hasEnoughSessions;
-        })
-        .sort((a, b) => b.sessionCount - a.sessionCount);
-  }, [allWorkoutLogs, exerciseDefinitions]);
 
   useEffect(() => {
     const now = new Date();
@@ -250,21 +248,16 @@ function DeepWorkPageContent() {
         const username = currentUser.username;
         const defsKey = `deepwork_definitions_${username}`;
         const logsKey = `deepwork_logs_${username}`;
+        const brandedTopicsKey = `deepwork_branded_topics_${username}`;
         const weightLogsKey = `weightLogs_${username}`;
         const goalWeightKey = `goalWeight_${username}`;
         const heightKey = `height_${username}`;
         const dobKey = `dateOfBirth_${username}`;
         const genderKey = `gender_${username}`;
 
-        try {
-            const storedDefinitions = localStorage.getItem(defsKey);
-            setExerciseDefinitions(storedDefinitions ? JSON.parse(storedDefinitions) : []);
-        } catch (e) { setExerciseDefinitions([]); }
-        
-        try {
-            const storedLogs = localStorage.getItem(logsKey);
-            setAllWorkoutLogs(storedLogs ? JSON.parse(storedLogs) : []);
-        } catch (e) { setAllWorkoutLogs([]); }
+        try { const storedDefinitions = localStorage.getItem(defsKey); setExerciseDefinitions(storedDefinitions ? JSON.parse(storedDefinitions) : []); } catch (e) { setExerciseDefinitions([]); }
+        try { const storedLogs = localStorage.getItem(logsKey); setAllWorkoutLogs(storedLogs ? JSON.parse(storedLogs) : []); } catch (e) { setAllWorkoutLogs([]); }
+        try { const storedBrandedTopics = localStorage.getItem(brandedTopicsKey); setBrandedTopics(storedBrandedTopics ? JSON.parse(storedBrandedTopics) : {}); } catch (e) { setBrandedTopics({}); }
         
         // Weight/Health data can be shared
         const storedGoal = localStorage.getItem(goalWeightKey);
@@ -279,14 +272,12 @@ function DeepWorkPageContent() {
         const storedGender = localStorage.getItem(genderKey);
         if (storedGender === 'male' || storedGender === 'female') setGender(storedGender as Gender);
 
-        try {
-            const storedWeightLogs = localStorage.getItem(weightLogsKey);
-            setWeightLogs(storedWeightLogs ? JSON.parse(storedWeightLogs) : []);
-        } catch (e) { setWeightLogs([]); }
+        try { const storedWeightLogs = localStorage.getItem(weightLogsKey); setWeightLogs(storedWeightLogs ? JSON.parse(storedWeightLogs) : []); } catch (e) { setWeightLogs([]); }
     } else {
       // Clear all state for logged-out user
       setExerciseDefinitions([]);
       setAllWorkoutLogs([]);
+      setBrandedTopics({});
       setWeightLogs([]);
       setGoalWeight(null);
       setHeight(null);
@@ -303,6 +294,7 @@ function DeepWorkPageContent() {
         const username = currentUser.username;
         const defsKey = `deepwork_definitions_${username}`;
         const logsKey = `deepwork_logs_${username}`;
+        const brandedTopicsKey = `deepwork_branded_topics_${username}`;
         const weightLogsKey = `weightLogs_${username}`;
         const goalWeightKey = `goalWeight_${username}`;
         const heightKey = `height_${username}`;
@@ -311,6 +303,7 @@ function DeepWorkPageContent() {
         
         localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
         localStorage.setItem(logsKey, JSON.stringify(allWorkoutLogs));
+        localStorage.setItem(brandedTopicsKey, JSON.stringify(brandedTopics));
         localStorage.setItem(weightLogsKey, JSON.stringify(weightLogs));
 
         if (goalWeight !== null) localStorage.setItem(goalWeightKey, goalWeight.toString()); else localStorage.removeItem(goalWeightKey);
@@ -322,7 +315,7 @@ function DeepWorkPageContent() {
         toast({ title: "Save Error", description: "Could not save data locally.", variant: "destructive"});
       }
     }
-  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, weightLogs, goalWeight, height, dateOfBirth, gender]);
+  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, weightLogs, goalWeight, height, dateOfBirth, gender, brandedTopics]);
 
   // Check for backup prompt on Mondays
   useEffect(() => {
@@ -555,52 +548,49 @@ function DeepWorkPageContent() {
     toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved.` });
   };
 
-  const handleOpenBrandingModal = (def: ExerciseDefinition, type: 'blog' | 'blog_demo') => {
-    setSelectedBrandingCandidate(def);
+  const handleOpenBrandingModal = (topic: EligibleTopic, type: 'blog' | 'blog_demo') => {
+    setSelectedBrandingCandidate(topic);
     setBrandingModalType(type);
-    setBlogUrl(def.contentUrls?.blog || '');
-    setYoutubeUrl(def.contentUrls?.youtube || '');
-    setDemoUrl(def.contentUrls?.demo || '');
+    setBlogUrl(topic.brandingInfo.contentUrls?.blog || '');
+    setYoutubeUrl(topic.brandingInfo.contentUrls?.youtube || '');
+    setDemoUrl(topic.brandingInfo.contentUrls?.demo || '');
     setIsBrandingModalOpen(true);
   };
 
   const handleSaveBranding = () => {
     if (!selectedBrandingCandidate) return;
-
-    setExerciseDefinitions(prevDefs => prevDefs.map(def => {
-      if (def.id === selectedBrandingCandidate.id) {
-        return {
-          ...def,
-          brandingStatus: 'converted',
-          contentUrls: {
-            blog: blogUrl,
-            youtube: brandingModalType === 'blog_demo' ? youtubeUrl : undefined,
-            demo: brandingModalType === 'blog_demo' ? demoUrl : undefined,
-          }
-        };
-      }
-      return def;
+    const topicName = selectedBrandingCandidate.topic;
+    setBrandedTopics(prev => ({
+        ...prev,
+        [topicName]: {
+            ...prev[topicName],
+            brandingStatus: 'converted',
+            contentUrls: {
+                blog: blogUrl,
+                youtube: brandingModalType === 'blog_demo' ? youtubeUrl : undefined,
+                demo: brandingModalType === 'blog_demo' ? demoUrl : undefined,
+            }
+        }
     }));
-
     setIsBrandingModalOpen(false);
-    toast({ title: "Content URLs Saved!", description: `Your links for "${selectedBrandingCandidate.name}" have been saved.` });
+    toast({ title: "Content URLs Saved!", description: `Your links for "${topicName}" have been saved.` });
   };
   
-  const handleToggleSharing = (defId: string, platform: keyof SharingStatus) => {
-    setExerciseDefinitions(prevDefs => prevDefs.map(def => {
-      if (def.id === defId) {
-        const newSharingStatus = { ...def.sharingStatus, [platform]: !def.sharingStatus?.[platform] };
-        
+  const handleToggleSharing = (topicName: string, platform: keyof SharingStatus) => {
+    setBrandedTopics(prev => {
+        const currentTopic = prev[topicName] || {};
+        const newSharingStatus = { ...currentTopic.sharingStatus, [platform]: !currentTopic.sharingStatus?.[platform] };
         const newBrandingStatus = Object.values(newSharingStatus).some(Boolean) ? 'published' : 'converted';
-
+        
         return {
-          ...def,
-          sharingStatus: newSharingStatus,
-          brandingStatus: newBrandingStatus,
+            ...prev,
+            [topicName]: {
+                ...currentTopic,
+                sharingStatus: newSharingStatus,
+                brandingStatus: newBrandingStatus,
+            }
         };
-      }
-      return def;
-    }));
+    });
   };
 
   const consistencyData = useMemo(() => {
@@ -767,27 +757,27 @@ function DeepWorkPageContent() {
                         <Share2 /> Personal Branding Pipeline
                     </CardTitle>
                     <CardDescription>
-                       Convert deep work into content. When a topic has at least 4 focus areas that each have 4+ sessions, they become eligible here.
+                       Convert deep work into content. A topic with 4+ focus areas, each with 4+ sessions, becomes a brandable bundle here.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     {brandingCandidates.length === 0 ? (
                         <div className="text-center py-6 text-sm text-muted-foreground">
-                            Log 4+ sessions on a focus area within a topic that has 4+ focus areas to get started.
+                            Log 4+ sessions on at least 4 focus areas within the same topic to get started.
                         </div>
                     ) : (
                         <ul className="space-y-4">
-                            {brandingCandidates.map(def => (
-                                <li key={def.id} className="p-3 bg-muted/30 rounded-lg space-y-3 text-sm">
+                            {brandingCandidates.map(topic => (
+                                <li key={topic.topic} className="p-3 bg-muted/30 rounded-lg space-y-3 text-sm">
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <h4 className="font-semibold text-foreground">{def.name}</h4>
+                                            <h4 className="font-semibold text-foreground">{topic.topic}</h4>
                                             <div className="flex flex-wrap gap-1 mt-1">
-                                                <Badge variant="outline">{def.category}</Badge>
-                                                <Badge variant="secondary">{def.sessionCount} sessions</Badge>
+                                                <Badge variant="outline">{topic.focusAreas.length} Focus Areas</Badge>
+                                                <Badge variant="secondary">{topic.totalSessions} Total Sessions</Badge>
                                             </div>
                                         </div>
-                                        {def.brandingStatus === 'published' && (
+                                        {topic.brandingInfo.brandingStatus === 'published' && (
                                             <div className="flex items-center gap-1.5 text-green-600">
                                                 <CheckCircle2 className="h-4 w-4" />
                                                 <span className="font-medium">Published</span>
@@ -795,16 +785,23 @@ function DeepWorkPageContent() {
                                         )}
                                     </div>
 
-                                    {def.brandingStatus === 'converted' || def.brandingStatus === 'published' ? (
-                                        <div className="space-y-4">
-                                            {def.contentUrls && (
+                                    <div className="space-y-2">
+                                        <p className="font-medium text-muted-foreground">Included Focus Areas:</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {topic.focusAreas.map(fa => <Badge key={fa.id} variant="default" className='bg-primary/20 text-primary-foreground hover:bg-primary/30'>{fa.name}</Badge>)}
+                                        </div>
+                                    </div>
+                                    
+                                    {topic.brandingInfo.brandingStatus === 'converted' || topic.brandingInfo.brandingStatus === 'published' ? (
+                                        <div className="space-y-4 pt-2 border-t">
+                                            {topic.brandingInfo.contentUrls && (
                                                 <div className="space-y-2">
                                                     <h5 className="font-medium text-muted-foreground">Content Links</h5>
                                                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                                                        {def.contentUrls.blog && <a href={def.contentUrls.blog} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary hover:underline"><Globe className="h-4 w-4" /> Blog Post</a>}
-                                                        {def.contentUrls.youtube && <a href={def.contentUrls.youtube} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary hover:underline"><Youtube className="h-4 w-4" /> YouTube</a>}
-                                                        {def.contentUrls.demo && <a href={def.contentUrls.demo} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary hover:underline"><Code className="h-4 w-4" /> Demo</a>}
-                                                         <Button variant="ghost" size="icon" onClick={() => handleOpenBrandingModal(def, def.contentUrls.youtube ? 'blog_demo' : 'blog')} className="h-7 w-7"><Edit3 className="h-4 w-4 text-muted-foreground" /></Button>
+                                                        {topic.brandingInfo.contentUrls.blog && <a href={topic.brandingInfo.contentUrls.blog} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary hover:underline"><Globe className="h-4 w-4" /> Blog Post</a>}
+                                                        {topic.brandingInfo.contentUrls.youtube && <a href={topic.brandingInfo.contentUrls.youtube} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary hover:underline"><Youtube className="h-4 w-4" /> YouTube</a>}
+                                                        {topic.brandingInfo.contentUrls.demo && <a href={topic.brandingInfo.contentUrls.demo} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary hover:underline"><Code className="h-4 w-4" /> Demo</a>}
+                                                         <Button variant="ghost" size="icon" onClick={() => handleOpenBrandingModal(topic, topic.brandingInfo.contentUrls?.youtube ? 'blog_demo' : 'blog')} className="h-7 w-7"><Edit3 className="h-4 w-4 text-muted-foreground" /></Button>
                                                     </div>
                                                 </div>
                                             )}
@@ -812,20 +809,20 @@ function DeepWorkPageContent() {
                                                  <h5 className="font-medium text-muted-foreground">Sharing Checklist</h5>
                                                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                                                     <div className="flex items-center space-x-2">
-                                                        <Checkbox id={`share-twitter-${def.id}`} checked={def.sharingStatus?.twitter} onCheckedChange={() => handleToggleSharing(def.id, 'twitter')} />
-                                                        <label htmlFor={`share-twitter-${def.id}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                                        <Checkbox id={`share-twitter-${topic.topic}`} checked={topic.brandingInfo.sharingStatus?.twitter} onCheckedChange={() => handleToggleSharing(topic.topic, 'twitter')} />
+                                                        <label htmlFor={`share-twitter-${topic.topic}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                                                             <TwitterIcon className="h-4 w-4" /> X / Twitter
                                                         </label>
                                                     </div>
                                                      <div className="flex items-center space-x-2">
-                                                        <Checkbox id={`share-linkedin-${def.id}`} checked={def.sharingStatus?.linkedin} onCheckedChange={() => handleToggleSharing(def.id, 'linkedin')} />
-                                                        <label htmlFor={`share-linkedin-${def.id}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                                        <Checkbox id={`share-linkedin-${topic.topic}`} checked={topic.brandingInfo.sharingStatus?.linkedin} onCheckedChange={() => handleToggleSharing(topic.topic, 'linkedin')} />
+                                                        <label htmlFor={`share-linkedin-${topic.topic}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                                                             <Linkedin className="h-4 w-4" /> LinkedIn
                                                         </label>
                                                     </div>
                                                     <div className="flex items-center space-x-2">
-                                                        <Checkbox id={`share-devto-${def.id}`} checked={def.sharingStatus?.devto} onCheckedChange={() => handleToggleSharing(def.id, 'devto')} />
-                                                        <label htmlFor={`share-devto-${def.id}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                                        <Checkbox id={`share-devto-${topic.topic}`} checked={topic.brandingInfo.sharingStatus?.devto} onCheckedChange={() => handleToggleSharing(topic.topic, 'devto')} />
+                                                        <label htmlFor={`share-devto-${topic.topic}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                                                             <DevToIcon className="h-4 w-4" /> DEV.to
                                                         </label>
                                                     </div>
@@ -834,8 +831,8 @@ function DeepWorkPageContent() {
                                         </div>
                                     ) : (
                                          <div className="flex items-center gap-2 pt-2 border-t">
-                                            <Button size="sm" onClick={() => handleOpenBrandingModal(def, 'blog')} className="flex-1">Create Blog</Button>
-                                            <Button size="sm" onClick={() => handleOpenBrandingModal(def, 'blog_demo')} className="flex-1">Blog + Demo</Button>
+                                            <Button size="sm" onClick={() => handleOpenBrandingModal(topic, 'blog')} className="flex-1">Create Blog</Button>
+                                            <Button size="sm" onClick={() => handleOpenBrandingModal(topic, 'blog_demo')} className="flex-1">Blog + Demo</Button>
                                         </div>
                                     )}
                                 </li>
@@ -1011,7 +1008,7 @@ function DeepWorkPageContent() {
        <Dialog open={isBrandingModalOpen} onOpenChange={setIsBrandingModalOpen}>
         <DialogContent>
             <DialogHeader>
-            <DialogTitle>Convert to Content: {selectedBrandingCandidate?.name}</DialogTitle>
+            <DialogTitle>Convert to Content: {selectedBrandingCandidate?.topic}</DialogTitle>
             <DialogDescription>
                 Add the URLs for your created content. Click save when you're done.
             </DialogDescription>
