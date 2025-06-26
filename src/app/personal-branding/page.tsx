@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ListChecks, ChevronRight, CalendarIcon, GripVertical, Briefcase, Share2, Loader2 } from 'lucide-react';
+import { ListChecks, ChevronRight, CalendarIcon, GripVertical, Briefcase, Share2, Loader2, Check, ChevronDown, ChevronUp, Linkedin } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format, isMonday, getYear, getISOWeek } from 'date-fns';
@@ -27,6 +27,21 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
 
+const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
+        <title>X</title>
+        <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/>
+    </svg>
+);
+
+const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
+        <title>DEV Community</title>
+        <path d="M11.472 24a1.5 1.5 0 0 1-1.06-.44L.439 13.587a1.5 1.5 0 0 1 0-2.12l9.97-9.97a1.5 1.5 0 0 1 2.12 0L22.503 11.47a1.5 1.5 0 0 1 0 2.121l-9.972 9.971a1.5 1.5 0 0 1-1.06.44Zm-8.485-11.25 8.485 8.485 8.485-8.485-8.485-8.485-8.485 8.485ZM19.5 18h-3V9h3v9Z"/>
+    </svg>
+);
+
+
 function PersonalBrandingPageContent() {
   const { toast } = useToast();
   const { currentUser, exportData } = useAuth();
@@ -38,6 +53,7 @@ function PersonalBrandingPageContent() {
   
   const [isLoadingPage, setIsLoadingPage] = useState(true);
   const [showBackupPrompt, setShowBackupPrompt] = useState(false);
+  const [isPublishedExpanded, setIsPublishedExpanded] = useState(false);
 
   useEffect(() => {
     if (currentUser?.username) {
@@ -129,6 +145,27 @@ function PersonalBrandingPageContent() {
     const hasBeenPrompted = localStorage.getItem(backupPromptKey);
     if (isMonday(today) && !hasBeenPrompted) setShowBackupPrompt(true);
   }, [currentUser]);
+
+  const { activeTasks, publishedTasks } = useMemo(() => {
+      const isFullyShared = (task: ExerciseDefinition) => 
+          task.sharingStatus && 
+          task.sharingStatus.twitter && 
+          task.sharingStatus.linkedin && 
+          task.sharingStatus.devto;
+      
+      const active: ExerciseDefinition[] = [];
+      const published: ExerciseDefinition[] = [];
+
+      brandingTasks.forEach(task => {
+          if (isFullyShared(task)) {
+              published.push(task);
+          } else {
+              active.push(task);
+          }
+      });
+
+      return { activeTasks, publishedTasks };
+  }, [brandingTasks]);
 
   const markBackupPromptAsHandled = () => {
     const today = new Date();
@@ -250,17 +287,17 @@ function PersonalBrandingPageContent() {
               </CardHeader>
               <CardContent className="p-4">
                   <div className="max-h-[calc(100vh-20rem)] overflow-y-auto pr-1">
-                    {brandingTasks.length === 0 ? (
+                    {activeTasks.length === 0 ? (
                       <div className="text-center py-10">
                         <Briefcase className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
                         <p className="text-muted-foreground">Your pipeline is empty.</p>
                         <p className="text-sm text-muted-foreground/80">
-                          A topic appears here when it has 4 focus areas with at least 4 logged sessions each in Deep Work.
+                          A topic bundle appears here when it has 4 focus areas with at least 4 logged sessions each in Deep Work.
                         </p>
                       </div>
                     ) : (
                       <ul className="space-y-2">
-                        {brandingTasks.map(task => (
+                        {activeTasks.map(task => (
                           <motion.li key={task.id} layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} className="p-3 bg-card border rounded-lg shadow-sm">
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex-grow min-w-0">
@@ -284,6 +321,61 @@ function PersonalBrandingPageContent() {
                   </div>
               </CardContent>
             </Card>
+
+            <Card>
+                <CardHeader className="cursor-pointer p-4" onClick={() => setIsPublishedExpanded(!isPublishedExpanded)}>
+                    <div className="flex justify-between items-center">
+                        <div className='flex-grow'>
+                            <CardTitle className="flex items-center gap-2 text-lg text-primary">
+                                <Check /> Published Content
+                            </CardTitle>
+                            <CardDescription className='mt-1'>
+                                A log of your successfully published bundles.
+                            </CardDescription>
+                        </div>
+                        {isPublishedExpanded ? <ChevronUp className="h-5 w-5 text-primary" /> : <ChevronDown className="h-5 w-5 text-primary" />}
+                    </div>
+                </CardHeader>
+                <AnimatePresence>
+                    {isPublishedExpanded && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3 }}
+                        style={{ overflow: 'hidden' }}
+                    >
+                        <CardContent className="p-4 pt-0">
+                        <div className="max-h-[300px] overflow-y-auto pr-1">
+                            {publishedTasks.length === 0 ? (
+                            <p className="text-muted-foreground text-sm text-center py-4">No published content yet.</p>
+                            ) : (
+                            <ul className="space-y-3">
+                                {publishedTasks.map(task => (
+                                <li key={task.id} className="p-3 bg-card border rounded-lg">
+                                    <p className="font-semibold text-foreground">{task.name}</p>
+                                    <div className="mt-2 flex flex-wrap gap-1">
+                                        {task.focusAreas?.map(fa => <Badge key={fa} variant="outline" className="text-xs">{fa}</Badge>)}
+                                    </div>
+                                    <div className="mt-3 pt-2 border-t flex items-center gap-4 text-muted-foreground">
+                                        <span className="text-xs font-semibold">SHARED ON:</span>
+                                        <div className="flex items-center gap-3">
+                                          {task.sharingStatus?.twitter && <TwitterIcon className="h-4 w-4" title="Shared on X/Twitter"/>}
+                                          {task.sharingStatus?.linkedin && <Linkedin className="h-4 w-4" title="Shared on LinkedIn" />}
+                                          {task.sharingStatus?.devto && <DevToIcon className="h-4 w-4" title="Shared on DEV.to" />}
+                                        </div>
+                                    </div>
+                                </li>
+                                ))}
+                            </ul>
+                            )}
+                        </div>
+                        </CardContent>
+                    </motion.div>
+                    )}
+                </AnimatePresence>
+            </Card>
+
           </section>
 
           <section aria-labelledby="branding-session-heading" className="md:col-span-2 space-y-6">
