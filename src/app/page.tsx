@@ -834,6 +834,13 @@ function HomePageContent() {
                     progress: `${loggedStagesCount}/4`,
                 };
             }
+
+            const bundledFocusAreaNames = new Set<string>();
+            brandingTasks.forEach(task => {
+                if (task.focusAreas) {
+                    task.focusAreas.forEach(name => bundledFocusAreaNames.add(name));
+                }
+            });
     
             const focusAreaSessionCounts: Record<string, number> = {};
             allDeepWorkLogs.forEach(log => {
@@ -843,13 +850,19 @@ function HomePageContent() {
                 });
             });
     
-            const eligibleFocusAreas = deepWorkDefinitions.filter(def => (focusAreaSessionCounts[def.id] || 0) >= 4);
+            const eligibleFocusAreas = deepWorkDefinitions.filter(def => {
+                const hasEnoughSessions = (focusAreaSessionCounts[def.id] || 0) >= 4;
+                const isAlreadyBundled = bundledFocusAreaNames.has(def.name);
+                return hasEnoughSessions && !isAlreadyBundled;
+            });
+
             const topics: Record<string, { eligibleCount: number, focusAreas: ExerciseDefinition[] }> = {};
             
             deepWorkDefinitions.forEach(def => {
                 if (!topics[def.category]) topics[def.category] = { eligibleCount: 0, focusAreas: [] };
                 topics[def.category].focusAreas.push(def);
             });
+    
             eligibleFocusAreas.forEach(def => {
                 if (topics[def.category]) {
                     topics[def.category].eligibleCount++;
@@ -878,7 +891,8 @@ function HomePageContent() {
             let closestFocusArea = { name: '', needed: 5 };
             deepWorkDefinitions.forEach(def => {
                 const sessions = focusAreaSessionCounts[def.id] || 0;
-                if (sessions < 4) {
+                const isBundled = bundledFocusAreaNames.has(def.name);
+                if (sessions < 4 && !isBundled) {
                     const needed = 4 - sessions;
                     if (needed < closestFocusArea.needed) {
                         closestFocusArea = { name: def.name, needed };

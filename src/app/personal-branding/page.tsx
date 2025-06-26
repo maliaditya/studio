@@ -69,6 +69,13 @@ function PersonalBrandingPageContent() {
       const storedBrandingTasks: ExerciseDefinition[] = JSON.parse(localStorage.getItem(brandingTasksKey) || '[]');
       const storedBrandingLogs: DatedWorkout[] = JSON.parse(localStorage.getItem(brandingLogsKey) || '[]');
 
+      const bundledFocusAreaNames = new Set<string>();
+      storedBrandingTasks.forEach(task => {
+          if (task.focusAreas) {
+              task.focusAreas.forEach(name => bundledFocusAreaNames.add(name));
+          }
+      });
+
       const focusAreaSessionCounts: Record<string, number> = {};
       storedDeepWorkLogs.forEach(log => {
         log.exercises.forEach(ex => {
@@ -76,7 +83,11 @@ function PersonalBrandingPageContent() {
         });
       });
 
-      const eligibleFocusAreas = storedDeepWorkDefs.filter(def => (focusAreaSessionCounts[def.id] || 0) >= 4);
+      const eligibleFocusAreas = storedDeepWorkDefs.filter(def => {
+        const hasEnoughSessions = (focusAreaSessionCounts[def.id] || 0) >= 4;
+        const isAlreadyBundled = bundledFocusAreaNames.has(def.name);
+        return hasEnoughSessions && !isAlreadyBundled;
+      });
       
       const topics: Record<string, ExerciseDefinition[]> = {};
       eligibleFocusAreas.forEach(def => {
@@ -153,18 +164,18 @@ function PersonalBrandingPageContent() {
           task.sharingStatus.linkedin && 
           task.sharingStatus.devto;
       
-      const activeTasks: ExerciseDefinition[] = [];
-      const publishedTasks: ExerciseDefinition[] = [];
+      const active: ExerciseDefinition[] = [];
+      const published: ExerciseDefinition[] = [];
 
       brandingTasks.forEach(task => {
           if (isFullyShared(task)) {
-              publishedTasks.push(task);
+              published.push(task);
           } else {
-              activeTasks.push(task);
+              active.push(task);
           }
       });
 
-      return { activeTasks, publishedTasks };
+      return { activeTasks: active, publishedTasks: published };
   }, [brandingTasks]);
 
   const markBackupPromptAsHandled = () => {
