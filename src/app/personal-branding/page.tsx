@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -40,6 +41,8 @@ interface EligibleTopic {
   focusAreas: (ExerciseDefinition & { sessionCount: number })[];
   totalSessions: number;
   brandingInfo: TopicBrandingInfo;
+  brandingKey: string;
+  chunkIndex: number;
 }
 
 function PersonalBrandingPageContent() {
@@ -98,50 +101,59 @@ function PersonalBrandingPageContent() {
     // 1. Calculate session counts for every focus area
     const sessionCounts = new Map<string, number>();
     allWorkoutLogs.forEach(log => {
-        log.exercises.forEach(ex => {
-            if (ex.loggedSets.length > 0) {
-                const currentCount = sessionCounts.get(ex.definitionId) || 0;
-                sessionCounts.set(ex.definitionId, currentCount + ex.loggedSets.length);
-            }
-        });
+      log.exercises.forEach(ex => {
+        if (ex.loggedSets.length > 0) {
+          const currentCount = sessionCounts.get(ex.definitionId) || 0;
+          sessionCounts.set(ex.definitionId, currentCount + ex.loggedSets.length);
+        }
+      });
     });
 
     // 2. Group focus areas with their session counts by topic
     const topicsMap = new Map<string, (ExerciseDefinition & { sessionCount: number })[]>();
     exerciseDefinitions.forEach(def => {
-        if (!topicsMap.has(def.category)) {
-            topicsMap.set(def.category, []);
-        }
-        topicsMap.get(def.category)!.push({
-            ...def,
-            sessionCount: sessionCounts.get(def.id) || 0,
-        });
+      if (!topicsMap.has(def.category)) {
+        topicsMap.set(def.category, []);
+      }
+      topicsMap.get(def.category)!.push({
+        ...def,
+        sessionCount: sessionCounts.get(def.id) || 0,
+      });
     });
 
     const eligibleTopics: EligibleTopic[] = [];
 
-    // 3. Iterate through topics to find eligible ones
+    // 3. Iterate through topics, find eligible ones, and chunk them
     topicsMap.forEach((defs, topic) => {
-        // Find focus areas within this topic that have at least 4 sessions
-        const focusAreasWithEnoughSessions = defs.filter(d => d.sessionCount >= 4);
-        
-        // A topic is eligible if it has at least 4 such focus areas.
-        const isEligible = focusAreasWithEnoughSessions.length >= 4;
-        
-        const brandingInfo = brandedTopics[topic] || {};
-        const isBranded = !!brandingInfo.brandingStatus;
+      // Find focus areas within this topic that have at least 4 sessions
+      const focusAreasWithEnoughSessions = defs.filter(d => d.sessionCount >= 4).sort((a,b) => a.name.localeCompare(b.name));
 
-        if (isEligible || isBranded) {
-             eligibleTopics.push({
-                topic,
-                focusAreas: focusAreasWithEnoughSessions,
-                totalSessions: focusAreasWithEnoughSessions.reduce((sum, fa) => sum + fa.sessionCount, 0),
-                brandingInfo,
-            });
+      // Chunk the eligible focus areas into groups of 4
+      for (let i = 0; i < focusAreasWithEnoughSessions.length; i += 4) {
+        const chunk = focusAreasWithEnoughSessions.slice(i, i + 4);
+
+        // A chunk is only eligible if it contains exactly 4 focus areas.
+        if (chunk.length === 4) {
+          const chunkIndex = i / 4;
+          const brandingKey = `${topic}-${chunkIndex}`;
+          const brandingInfo = brandedTopics[brandingKey] || {};
+
+          eligibleTopics.push({
+            topic,
+            focusAreas: chunk,
+            totalSessions: chunk.reduce((sum, fa) => sum + fa.sessionCount, 0),
+            brandingInfo,
+            brandingKey,
+            chunkIndex,
+          });
         }
+      }
     });
 
-    return eligibleTopics.sort((a, b) => b.totalSessions - a.totalSessions);
+    return eligibleTopics.sort((a, b) => {
+        if (a.topic !== b.topic) return a.topic.localeCompare(b.topic);
+        return a.brandingKey.localeCompare(b.brandingKey);
+    });
   }, [allWorkoutLogs, exerciseDefinitions, brandedTopics]);
 
 
@@ -156,11 +168,11 @@ function PersonalBrandingPageContent() {
 
   const handleSaveBranding = () => {
     if (!selectedBrandingCandidate) return;
-    const topicName = selectedBrandingCandidate.topic;
+    const { brandingKey } = selectedBrandingCandidate;
     setBrandedTopics(prev => ({
         ...prev,
-        [topicName]: {
-            ...prev[topicName],
+        [brandingKey]: {
+            ...prev[brandingKey],
             brandingStatus: 'converted',
             contentUrls: {
                 blog: blogUrl,
@@ -170,18 +182,18 @@ function PersonalBrandingPageContent() {
         }
     }));
     setIsBrandingModalOpen(false);
-    toast({ title: "Content URLs Saved!", description: `Your links for "${topicName}" have been saved.` });
+    toast({ title: "Content URLs Saved!", description: `Your links for "${selectedBrandingCandidate.topic}" have been saved.` });
   };
   
-  const handleToggleSharing = (topicName: string, platform: keyof SharingStatus) => {
+  const handleToggleSharing = (brandingKey: string, platform: keyof SharingStatus) => {
     setBrandedTopics(prev => {
-        const currentTopic = prev[topicName] || {};
+        const currentTopic = prev[brandingKey] || {};
         const newSharingStatus = { ...currentTopic.sharingStatus, [platform]: !currentTopic.sharingStatus?.[platform] };
         const newBrandingStatus = Object.values(newSharingStatus).some(Boolean) ? 'published' : 'converted';
         
         return {
             ...prev,
-            [topicName]: {
+            [brandingKey]: {
                 ...currentTopic,
                 sharingStatus: newSharingStatus,
                 brandingStatus: newBrandingStatus,
@@ -208,7 +220,7 @@ function PersonalBrandingPageContent() {
                     <Share2 /> Personal Branding Pipeline
                 </CardTitle>
                 <CardDescription>
-                    Convert deep work into content. A topic with 4+ focus areas, each with 4+ sessions, becomes a brandable bundle here.
+                    Convert deep work into content. A topic becomes a brandable bundle when it has 4 focus areas with 4+ sessions each.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -218,12 +230,18 @@ function PersonalBrandingPageContent() {
                     </div>
                 ) : (
                     <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {brandingCandidates.map(topic => (
-                            <li key={topic.topic} className="p-4 bg-muted/30 rounded-lg space-y-4 text-sm flex flex-col">
+                        {brandingCandidates.map(topic => {
+                            const bundlesForThisTopic = brandingCandidates.filter(t => t.topic === topic.topic);
+                            const showBundleNumber = bundlesForThisTopic.length > 1;
+
+                            return (
+                            <li key={topic.brandingKey} className="p-4 bg-muted/30 rounded-lg space-y-4 text-sm flex flex-col">
                                 <div className="flex-grow space-y-4">
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <h4 className="font-semibold text-foreground text-base">{topic.topic}</h4>
+                                            <h4 className="font-semibold text-foreground text-base">
+                                                {topic.topic} {showBundleNumber && `- Bundle #${topic.chunkIndex + 1}`}
+                                            </h4>
                                             <div className="flex flex-wrap gap-1 mt-1">
                                                 <Badge variant="outline">{topic.focusAreas.length} Focus Areas</Badge>
                                                 <Badge variant="secondary">{topic.totalSessions} Total Sessions</Badge>
@@ -263,20 +281,20 @@ function PersonalBrandingPageContent() {
                                                 <h5 className="font-medium text-muted-foreground">Sharing Checklist</h5>
                                                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                                                   <div className="flex items-center space-x-2">
-                                                      <Checkbox id={`share-twitter-${topic.topic}`} checked={topic.brandingInfo.sharingStatus?.twitter} onCheckedChange={() => handleToggleSharing(topic.topic, 'twitter')} />
-                                                      <label htmlFor={`share-twitter-${topic.topic}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                                      <Checkbox id={`share-twitter-${topic.brandingKey}`} checked={topic.brandingInfo.sharingStatus?.twitter} onCheckedChange={() => handleToggleSharing(topic.brandingKey, 'twitter')} />
+                                                      <label htmlFor={`share-twitter-${topic.brandingKey}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                                                           <TwitterIcon className="h-4 w-4" /> X / Twitter
                                                       </label>
                                                   </div>
                                                     <div className="flex items-center space-x-2">
-                                                      <Checkbox id={`share-linkedin-${topic.topic}`} checked={topic.brandingInfo.sharingStatus?.linkedin} onCheckedChange={() => handleToggleSharing(topic.topic, 'linkedin')} />
-                                                      <label htmlFor={`share-linkedin-${topic.topic}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                                      <Checkbox id={`share-linkedin-${topic.brandingKey}`} checked={topic.brandingInfo.sharingStatus?.linkedin} onCheckedChange={() => handleToggleSharing(topic.brandingKey, 'linkedin')} />
+                                                      <label htmlFor={`share-linkedin-${topic.brandingKey}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                                                           <Linkedin className="h-4 w-4" /> LinkedIn
                                                       </label>
                                                   </div>
                                                   <div className="flex items-center space-x-2">
-                                                      <Checkbox id={`share-devto-${topic.topic}`} checked={topic.brandingInfo.sharingStatus?.devto} onCheckedChange={() => handleToggleSharing(topic.topic, 'devto')} />
-                                                      <label htmlFor={`share-devto-${topic.topic}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                                      <Checkbox id={`share-devto-${topic.brandingKey}`} checked={topic.brandingInfo.sharingStatus?.devto} onCheckedChange={() => handleToggleSharing(topic.brandingKey, 'devto')} />
+                                                      <label htmlFor={`share-devto-${topic.brandingKey}`} className="flex items-center gap-1.5 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                                                           <DevToIcon className="h-4 w-4" /> DEV.to
                                                       </label>
                                                   </div>
@@ -291,7 +309,7 @@ function PersonalBrandingPageContent() {
                                   )}
                                 </div>
                             </li>
-                        ))}
+                        )})}
                     </ul>
                 )}
             </CardContent>
