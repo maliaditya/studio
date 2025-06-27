@@ -45,7 +45,7 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
         <CardContent>
           <div className="text-2xl font-bold">{latestConsistency}%</div>
           <p className="text-xs text-muted-foreground">Workout Consistency</p>
-          {consistencyChange !== 0 && (
+          {consistencyChange !== undefined && consistencyChange !== 0 && (
             <p className={cn("text-xs text-muted-foreground mt-1 flex items-center", consistencyChange > 0 ? "text-emerald-500" : "text-red-500")}>
               {consistencyChange > 0 ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
               {consistencyChange.toFixed(1)} points vs yesterday
@@ -62,7 +62,7 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
         <CardContent>
           <div className="text-2xl font-bold">{todayDeepWorkHours.toFixed(1)} hrs</div>
           <p className="text-xs text-muted-foreground">Today's Deep Work</p>
-          {deepWorkChange !== 0 && (
+          {deepWorkChange !== undefined && deepWorkChange !== 0 && (
             <p className={cn("text-xs text-muted-foreground mt-1 flex items-center", deepWorkChange > 0 ? "text-emerald-500" : "text-red-500")}>
               {deepWorkChange > 0 ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
               {Math.abs(deepWorkChange).toFixed(0)}% vs yesterday
@@ -81,7 +81,7 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
             <CardContent>
               <div className="text-2xl font-bold">{todayUpskillHours.toFixed(1)} hrs</div>
               <p className="text-xs text-muted-foreground">Today's Learning</p>
-              {upskillChange !== 0 && (
+              {upskillChange !== undefined && upskillChange !== 0 && (
                 <p className={cn("text-xs text-muted-foreground mt-1 flex items-center", upskillChange > 0 ? "text-emerald-500" : "text-red-500")}>
                   {upskillChange > 0 ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
                   {Math.abs(upskillChange).toFixed(0)}% vs yesterday

@@ -69,12 +69,12 @@ const productivityLevels = [
 function HomePageContent() {
   const { 
     currentUser, 
-    weightLogs, setWeightLogs, 
-    goalWeight, setGoalWeight, 
-    height, setHeight, 
-    dateOfBirth, setDateOfBirth, 
-    gender, setGender,
-    dietPlan, setDietPlan,
+    weightLogs, 
+    goalWeight, 
+    height, 
+    dateOfBirth, 
+    gender,
+    dietPlan,
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -439,6 +439,23 @@ function HomePageContent() {
           if (closestFocusArea.name) return { status: 'pending' as const, message: `Log ${closestFocusArea.needed} more session(s) for "${closestFocusArea.name}" to make it eligible.`, subMessage: 'Then, group 4 eligible areas in one topic to form a bundle.', eligibleFocusAreas: eligibleFocusAreas.map(fa => `${fa.name} (${fa.category})`) };
           return { status: 'pending' as const, message: 'Log 4 sessions on 4 focus areas within the same topic.', subMessage: 'This will create your first branding bundle.', eligibleFocusAreas: [] };
       };
+
+      const learningStats = calculateLearningStats(allUpskillLogs, topicGoals);
+
+      const milestones = Object.values(learningStats)
+        .map((s: any) => s.nextMilestone)
+        .filter(m => m)
+        .sort((a, b) => a.daysRemaining - b.daysRemaining);
+    
+      let overallNextMilestone = null;
+      if (milestones.length > 0) {
+          const closestMilestone = milestones[0];
+          const topic = Object.keys(learningStats).find(
+              (t: string) => learningStats[t].nextMilestone === closestMilestone
+          );
+          overallNextMilestone = { ...closestMilestone, topic };
+      }
+
       const totalProductiveMinutes = calculateAverageDuration(allUpskillLogs, 'reps') + calculateAverageDuration(allDeepWorkLogs, 'weight');
       const getHours = (logs: DatedWorkout[], field: 'reps' | 'weight') => logs.reduce((total, log) => total + log.exercises.reduce((exTotal, ex) => exTotal + ex.loggedSets.reduce((setTotal, set) => setTotal + (field === 'reps' ? set.reps : set.weight), 0), 0), 0) / 60;
       const totalHoursData = [
@@ -468,7 +485,8 @@ function HomePageContent() {
           totalProductiveHours: avgProductiveHours,
           avgProductiveHoursChange: calculateChange(avgProductiveHours, yesterdayTotalProductiveMinutes / 60),
           currentLevel: productivityLevels.find(l => totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max) || null,
-          learningStats: calculateLearningStats(allUpskillLogs, topicGoals),
+          learningStats: learningStats,
+          overallNextMilestone: overallNextMilestone,
           latestConsistency: consistencyData[consistencyData.length - 1]?.score || 0,
           brandingStatus: calculateBrandingStatus(),
           totalHoursData, todayHoursData,
@@ -489,18 +507,6 @@ function HomePageContent() {
   const handleDietModalOpenChange = (isOpen: boolean) => {
       setIsDietPlanModalOpen(isOpen);
   };
-  
-  const handleLogWeight = (weight: number, date: Date) => {
-    if (!currentUser || isNaN(weight) || weight <= 0) { toast({ title: "Invalid Input", description: "Please enter a valid weight.", variant: "destructive" }); return; }
-    const weekKey = `${getISOWeekYear(date)}-W${getISOWeek(date).toString().padStart(2, '0')}`;
-    setWeightLogs(prevLogs => {
-        const logIndex = prevLogs.findIndex(log => log.date === weekKey);
-        const newLog: WeightLog = { date: weekKey, weight: weight };
-        if (logIndex > -1) { const updatedLogs = [...prevLogs]; updatedLogs[logIndex] = newLog; return updatedLogs; } 
-        else { return [...prevLogs, newLog].sort((a,b) => a.date.localeCompare(b.date)); }
-    });
-    toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved.` });
-  };
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -509,7 +515,7 @@ function HomePageContent() {
             <p className="text-sm text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
         </CardHeader>
         <CardContent>
-          <DashboardStats stats={dailyStats} />
+          <DashboardStats stats={{ ...productivityStats, direction: dailyStats.direction }} />
           <ProductivitySnapshot stats={productivityStats} timeAllocationData={timeAllocationData} onOpenStatsModal={() => setIsStatsModalOpen(true)} />
           <TimeSlots 
             schedule={todaysSchedule}
@@ -549,18 +555,6 @@ function HomePageContent() {
       <WeightChartModal
         isOpen={isWeightChartModalOpen}
         onOpenChange={setIsWeightChartModalOpen}
-        weightLogs={weightLogs}
-        goalWeight={goalWeight}
-        height={height}
-        dateOfBirth={dateOfBirth}
-        gender={gender}
-        onLogWeight={handleLogWeight}
-        onUpdateWeightLog={() => {}}
-        onDeleteWeightLog={() => {}}
-        onSetGoalWeight={setGoalWeight}
-        onSetHeight={setHeight}
-        onSetDateOfBirth={setDateOfBirth}
-        onSetGender={setGender}
       />
 
       <DietPlanModal
