@@ -9,12 +9,14 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, TrendingUp, Activity, Target, Save } from 'lucide-react';
+import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon } from 'lucide-react';
 import type { WeightLog, Gender } from '@/types/workout';
 import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import { ChartContainer, ChartConfig } from './ui/chart';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine } from 'recharts';
 
 
 interface WeightGoalCardProps {
@@ -28,6 +30,27 @@ interface WeightGoalCardProps {
   onSetDateOfBirth: (dob: string | null) => void;
   onSetGender: (gender: Gender | null) => void;
   onSetGoalWeight: (goal: number | null) => void;
+}
+
+const weightChartConfig = {
+  historicalWeight: { label: "Weight", color: "hsl(var(--chart-2))" },
+  projectedWeight: { label: "Projection", color: "hsl(var(--chart-2))" },
+} satisfies ChartConfig;
+
+const SimpleTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+        const data = payload[0].payload;
+        const value = data.historicalWeight ?? data.projectedWeight;
+        return (
+            <div className="rounded-lg border bg-background p-2 shadow-sm">
+                <div className="flex flex-col">
+                    <span className="text-xs text-muted-foreground">{format(data.dateObj, 'PPP')}</span>
+                    <span className="font-bold">{value.toFixed(1)} kg/lb</span>
+                </div>
+            </div>
+        );
+    }
+    return null;
 }
 
 export function WeightGoalCard({ 
@@ -46,6 +69,7 @@ export function WeightGoalCard({
     const [newWeight, setNewWeight] = useState('');
     const [weightDate, setWeightDate] = useState<Date | undefined>(new Date());
     const [showLogForm, setShowLogForm] = useState(false);
+    const [isChartVisible, setIsChartVisible] = useState(false);
 
     const [heightInput, setHeightInput] = useState('');
     const [dobInput, setDobInput] = useState<Date | undefined>();
@@ -84,6 +108,102 @@ export function WeightGoalCard({
             setShowLogForm(false);
         }
     }, [weightLogs, areDetailsSet]);
+
+    const weightChartData = useMemo(() => {
+        if (!weightLogs) return [];
+        const sortedLogs = weightLogs
+        .map(log => {
+            const [year, weekNum] = log.date.split('-W');
+            const dateObj = startOfISOWeek(setISOWeek(new Date(parseInt(year), 0, 4), parseInt(weekNum)));
+            return { ...log, dateObj };
+        })
+        .sort((a,b) => a.dateObj.getTime() - b.dateObj.getTime());
+
+        return sortedLogs.map((log, index, arr) => {
+            let weeklyChange = null;
+            if (index > 0) {
+                const prevWeight = arr[index - 1].weight;
+                weeklyChange = log.weight - prevWeight;
+            }
+
+            return {
+                weight: log.weight,
+                fullWeek: log.date,
+                dateObj: log.dateObj,
+                weeklyChange: weeklyChange,
+                timestamp: log.dateObj.getTime(),
+            }
+        });
+    }, [weightLogs]);
+
+    const combinedChartData = useMemo(() => {
+        let allData = weightChartData.map(log => ({
+            ...log,
+            historicalWeight: log.weight,
+            projectedWeight: null,
+            isProjection: false,
+        }));
+
+        if (!goalWeight || weightChartData.length < 1) {
+            return allData;
+        }
+        
+        const lastLog = weightChartData[weightChartData.length - 1];
+        const weightToChange = goalWeight - lastLog.weight;
+        
+        if (Math.abs(weightToChange) < 0.1) return allData;
+
+        const changes = weightChartData
+            .map(d => d.weeklyChange)
+            .filter((c): c is number => c !== null && c !== 0);
+        
+        let averageWeeklyChange = changes.length > 0 ? changes.reduce((a, b) => a + b, 0) / changes.length : 0;
+
+        let projectionRate = averageWeeklyChange;
+
+        if (weightToChange < 0) { 
+            if (projectionRate >= 0) projectionRate = -0.5;
+        } else {
+            if (projectionRate <= 0) projectionRate = 0.25;
+        }
+        
+        if (Math.abs(projectionRate) < 0.01) return allData;
+
+        const weeksToGo = Math.ceil(Math.abs(weightToChange / projectionRate));
+        if (weeksToGo <= 0) return allData;
+        
+        const lastLogIndex = allData.findIndex(d => d.timestamp === lastLog.timestamp);
+        if (lastLogIndex !== -1) {
+            allData[lastLogIndex].projectedWeight = lastLog.weight;
+        }
+
+        for (let i = 1; i <= weeksToGo; i++) {
+            const projectedDate = addWeeks(lastLog.dateObj, i);
+            const projectedWeight = lastLog.weight + (i * projectionRate);
+            const daysToGo = differenceInDays(projectedDate, new Date());
+
+            allData.push({
+                weight: null,
+                historicalWeight: null,
+                projectedWeight: parseFloat(projectedWeight.toFixed(1)),
+                timestamp: projectedDate.getTime(),
+                dateObj: projectedDate,
+                isProjection: true,
+                daysToGo: daysToGo,
+                rate: Math.abs(projectionRate),
+                weeklyChange: null,
+                fullWeek: null
+            });
+        }
+        
+        if (allData.length > weightChartData.length) {
+            const lastPoint = allData[allData.length - 1];
+            lastPoint.projectedWeight = goalWeight;
+        }
+
+        return allData;
+    }, [goalWeight, weightChartData]);
+
 
     const projectionSummary = useMemo(() => {
         if (!areDetailsSet || !goalWeight || !weightLogs || weightLogs.length < 2) {
@@ -228,13 +348,39 @@ export function WeightGoalCard({
         <Card className="bg-card/50">
             {areDetailsSet ? (
                 <>
-                    <CardHeader>
+                    <CardHeader className="flex flex-row items-start justify-between">
                         <CardTitle className="flex items-center gap-2 text-primary">
                             <Target /> Weight Goal
                         </CardTitle>
+                        <Button variant="outline" size="icon" onClick={() => setIsChartVisible(!isChartVisible)} className="h-8 w-8">
+                            <LineChartIcon className="h-4 w-4" />
+                            <span className="sr-only">Toggle Chart View</span>
+                        </Button>
                     </CardHeader>
                     <CardContent>
-                        {projectionSummary && (
+                       {isChartVisible ? (
+                           <div className="h-[300px] w-full -ml-4">
+                               {combinedChartData.length < 1 ? (
+                                   <div className="flex justify-center items-center h-full text-muted-foreground text-sm">
+                                       Log weight to see chart.
+                                   </div>
+                               ) : (
+                                    <ChartContainer config={weightChartConfig} className="min-h-[300px] w-full">
+                                        <ResponsiveContainer>
+                                            <LineChart accessibilityLayer data={combinedChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5, }}>
+                                                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                                                <XAxis dataKey="timestamp" type="number" domain={['dataMin', 'dataMax']} tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')} tickLine={false} axisLine={false} tickMargin={8} fontSize={10}/>
+                                                <YAxis tickLine={false} axisLine={false} tickMargin={8} domain={['dataMin - 2', 'dataMax + 2']} fontSize={10} />
+                                                <RechartsTooltip cursor={true} content={<SimpleTooltip />} />
+                                                {goalWeight !== null && <ReferenceLine y={goalWeight} stroke="hsl(var(--primary))" strokeDasharray="4 4" />}
+                                                <Line dataKey="historicalWeight" type="monotone" stroke="var(--color-historicalWeight)" strokeWidth={2} dot={true} name="Weight" connectNulls={false} />
+                                                <Line dataKey="projectedWeight" type="monotone" stroke="var(--color-projectedWeight)" strokeDasharray="5 5" strokeWidth={2} dot={{r: 4}} name="Projection" connectNulls={false} />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    </ChartContainer>
+                               )}
+                           </div>
+                       ) : projectionSummary ? (
                             <div className="space-y-4">
                                 <div className="grid grid-cols-3 gap-2 text-center text-sm">
                                     <div>
@@ -288,9 +434,13 @@ export function WeightGoalCard({
                                     )}
                                 </div>
                             </div>
+                        ) : (
+                            <p className="text-sm text-muted-foreground text-center py-8">
+                                Log weight for at least two weeks and set a goal to see projections.
+                            </p>
                         )}
 
-                        {showLogForm && (
+                        {showLogForm && !isChartVisible && (
                             <div className="mt-4 pt-4 border-t space-y-3">
                                 <CardDescription>It's time for your weekly weigh-in.</CardDescription>
                                 <div className="flex gap-2 items-center">
@@ -315,11 +465,6 @@ export function WeightGoalCard({
                             </div>
                         )}
                         
-                        {!projectionSummary && !showLogForm && (
-                            <p className="text-sm text-muted-foreground text-center py-8">
-                                Log weight for at least two weeks and set a goal to see projections.
-                            </p>
-                        )}
                     </CardContent>
                 </>
             ) : (

@@ -12,7 +12,6 @@ import { useToast } from '@/hooks/use-toast';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysLearningModal } from '@/components/TodaysLearningModal';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
-import { WeightChartModal } from '@/components/WeightChartModal';
 import { DietPlanModal } from '@/components/DietPlanModal';
 import { StatsOverviewModal } from '@/components/StatsOverviewModal';
 import { DashboardStats } from '@/components/DashboardStats';
@@ -109,7 +108,6 @@ function HomePageContent() {
   // State for Modals
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
   const [isLearningModalOpen, setIsLearningModalOpen] = useState(false);
-  const [isWeightChartModalOpen, setIsWeightChartModalOpen] = useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   
@@ -536,29 +534,6 @@ function HomePageContent() {
     toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
   };
 
-  const handleUpdateWeightLog = (dateKey: string, newWeight: number) => {
-    if (!currentUser || isNaN(newWeight) || newWeight <= 0) {
-      toast({ title: "Invalid Input", description: "Please enter a valid weight.", variant: "destructive" });
-      return;
-    }
-    setWeightLogs(prevLogs => {
-      const logIndex = prevLogs.findIndex(log => log.date === dateKey);
-      if (logIndex > -1) {
-        const updatedLogs = [...prevLogs];
-        updatedLogs[logIndex] = { ...updatedLogs[logIndex], weight: newWeight };
-        toast({ title: "Weight Updated", description: `Weight for week ${dateKey} updated.` });
-        return updatedLogs.sort((a,b) => a.date.localeCompare(b.date));
-      }
-      return prevLogs;
-    });
-  };
-
-  const handleDeleteWeightLog = (dateKey: string) => {
-    if (!currentUser) return;
-    setWeightLogs(prevLogs => prevLogs.filter(log => log.date !== dateKey));
-    toast({ title: "Weight Deleted", description: `Weight log for week ${dateKey} has been removed.` });
-  };
-
   const handleSetGoalWeight = (goal: number | null) => {
     if (!currentUser?.username) {
         toast({ title: "Error", description: "You must be logged in to set a goal.", variant: "destructive" });
@@ -677,23 +652,6 @@ function HomePageContent() {
             pageType={learningModalProps.pageType}
         />
       )}
-
-      <WeightChartModal
-        isOpen={isWeightChartModalOpen}
-        onOpenChange={setIsWeightChartModalOpen}
-        weightLogs={weightLogs}
-        goalWeight={goalWeight}
-        height={height}
-        dateOfBirth={dateOfBirth}
-        gender={gender}
-        onLogWeight={handleLogWeight}
-        onUpdateWeightLog={handleUpdateWeightLog}
-        onDeleteWeightLog={handleDeleteWeightLog}
-        onSetGoalWeight={handleSetGoalWeight}
-        onSetHeight={handleSetHeight}
-        onSetDateOfBirth={handleSetDateOfBirth}
-        onSetGender={handleSetGender}
-      />
 
       <DietPlanModal
         isOpen={isDietPlanModalOpen}
