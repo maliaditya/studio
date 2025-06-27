@@ -741,7 +741,7 @@ function HomePageContent() {
 
                 const speed = data.totalDuration > 0 ? (totalProgress / data.totalDuration) * 60 : 0; // units per hour
                 const speedPerMinute = speed / 60; // units per minute
-                const timeForTodaysProgress = speed > 0 ? (todaysProgress / speed) : null; // in hours
+                const timeForTodaysProgress = speed > 0 && todaysProgress > 0 ? (todaysProgress / speed) * 60 : null; // in minutes -> converted to hours later
 
                 let completionStats = null;
                 if (averageRatePerDay > 0.01 && remainingProgress > 0) {
@@ -790,7 +790,6 @@ function HomePageContent() {
                 }
 
                 const remainingForToday = Math.max(0, requiredDailyRate - todaysProgress);
-                const timeNeededForToday = speedPerMinute > 0 && remainingForToday > 0 ? Math.ceil(remainingForToday / speedPerMinute) : null;
 
                 topicStats[topic] = {
                     topic,
@@ -803,8 +802,9 @@ function HomePageContent() {
                     nextMilestone: milestoneStats,
                     requiredDailyRate: requiredDailyRate,
                     todaysProgress: todaysProgress,
-                    timeNeededForToday,
                     timeForTodaysProgress,
+                    progressUnit: goal.goalType,
+                    remainingForToday: parseFloat(remainingForToday.toFixed(1)),
                 };
             });
 
@@ -1316,20 +1316,23 @@ function HomePageContent() {
                                                                         <div className="font-semibold text-foreground whitespace-nowrap">Today</div>
                                                                         {stats.todaysProgress > 0 ? (
                                                                             <div className="text-muted-foreground whitespace-nowrap text-green-500">
-                                                                                +{stats.todaysProgress.toLocaleString()} {stats.unit.split('/')[0]}
-                                                                                {stats.timeForTodaysProgress !== null && ` (est. ${stats.timeForTodaysProgress.toFixed(1)} hr)`}
+                                                                                +{stats.todaysProgress.toLocaleString()} {stats.todaysProgress === 1 ? stats.progressUnit.slice(0, -1) : stats.progressUnit}
+                                                                                {stats.timeForTodaysProgress !== null && ` (est. ${(stats.timeForTodaysProgress / 60).toFixed(1)} hr)`}
                                                                             </div>
-                                                                        ) : stats.timeNeededForToday !== null && (
+                                                                        ) : null}
+                                                                        {stats.remainingForToday > 0 ? (
                                                                             <div className="text-muted-foreground whitespace-nowrap">
-                                                                                Est. {(stats.timeNeededForToday / 60).toFixed(1)} hr left
+                                                                                {stats.remainingForToday.toLocaleString()} {stats.remainingForToday === 1 ? stats.progressUnit.slice(0, -1) : stats.progressUnit} left
                                                                             </div>
-                                                                        )}
-                                                                        
-                                                                        {stats.todaysProgress > 0 && stats.timeNeededForToday !== null && (
+                                                                        ) : (stats.todaysProgress > 0 && stats.requiredDailyRate > 0) ? (
+                                                                            <div className="text-muted-foreground whitespace-nowrap text-green-500">
+                                                                                Daily goal met!
+                                                                            </div>
+                                                                        ) : (stats.todaysProgress === 0 && stats.requiredDailyRate === 0) ? (
                                                                             <div className="text-muted-foreground whitespace-nowrap">
-                                                                                Est. {(stats.timeNeededForToday / 60).toFixed(1)} hr left
+                                                                                -
                                                                             </div>
-                                                                        )}
+                                                                        ) : null}
                                                                     </div>
                                                                 )}
                                                             </AccordionTrigger>
@@ -1738,6 +1741,8 @@ export default function Page() {
 
 
 
+
+    
 
     
 
