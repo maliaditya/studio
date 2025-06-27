@@ -1019,29 +1019,29 @@ function HomePageContent() {
             { name: 'Workout', hours: totalWorkoutHours },
             { name: 'Branding', hours: parseFloat((totalBrandingMinutes / 60).toFixed(1)) },
         ];
+        
+        const todaysLearningMinutes = allUpskillLogs
+            .find(log => log.date === todayStr)
+            ?.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + set.reps, 0), 0) || 0;
 
-        const dailyProductivityData = (() => {
-            const dailyData: Record<string, { dateObj: Date, upskill: number, deepwork: number }> = {};
-            allUpskillLogs.forEach(log => {
-                const duration = log.exercises.reduce((sum, ex) => sum + ex.loggedSets.reduce((s, set) => s + set.reps, 0), 0);
-                if (duration > 0) {
-                    if (!dailyData[log.date]) dailyData[log.date] = { dateObj: parseISO(log.date), upskill: 0, deepwork: 0 };
-                    dailyData[log.date].upskill += duration;
-                }
-            });
-            allDeepWorkLogs.forEach(log => {
-                const duration = log.exercises.reduce((sum, ex) => sum + ex.loggedSets.reduce((s, set) => s + set.weight, 0), 0);
-                if (duration > 0) {
-                    if (!dailyData[log.date]) dailyData[log.date] = { dateObj: parseISO(log.date), upskill: 0, deepwork: 0 };
-                    dailyData[log.date].deepwork += duration;
-                }
-            });
-            return Object.values(dailyData).sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime()).map(d => ({
-                ...d,
-                date: format(d.dateObj, 'MMM dd'),
-                totalMinutes: d.upskill + d.deepwork,
-            }));
-        })();
+        const todaysDeepWorkMinutes = allDeepWorkLogs
+            .find(log => log.date === todayStr)
+            ?.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + set.weight, 0), 0) || 0;
+
+        const todaysWorkoutHours = allWorkoutLogs
+            .some(log => log.date === todayStr && log.exercises.some(ex => ex.loggedSets.length > 0)) ? 1 : 0;
+            
+        const todaysBrandingStages = brandingLogs
+            .find(log => log.date === todayStr)
+            ?.exercises.reduce((total, ex) => total + ex.loggedSets.length, 0) || 0;
+        const todaysBrandingHours = todaysBrandingStages * 0.5;
+
+        const todayHoursData = [
+            { name: 'Learning', hours: parseFloat((todaysLearningMinutes / 60).toFixed(1)) },
+            { name: 'Deep Work', hours: parseFloat((todaysDeepWorkMinutes / 60).toFixed(1)) },
+            { name: 'Workout', hours: todaysWorkoutHours },
+            { name: 'Branding', hours: todaysBrandingHours },
+        ];
 
         return {
             todayDeepWorkHours: todayDeepWork / 60,
@@ -1056,7 +1056,7 @@ function HomePageContent() {
             avgProductiveHoursChange,
             brandingStatus,
             totalHoursData,
-            dailyProductivityData,
+            todayHoursData,
         };
     }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, dietPlan, weightLogs, dateOfBirth, height, gender, goalWeight, consistencyData, brandingTasks, brandingLogs, deepWorkDefinitions]);
     
@@ -1387,65 +1387,36 @@ function HomePageContent() {
                             </div>
                             <Separator className="my-6" />
                             <div>
-                                <h4 className="font-semibold mb-4 text-center md:text-left">Daily Productive Time</h4>
-                                {productivityStats.dailyProductivityData.length > 1 ? (
-                                    <ChartContainer
-                                        config={dailyProductivityChartConfig}
-                                        className="h-[200px] w-full"
-                                    >
-                                        <AreaChart accessibilityLayer data={productivityStats.dailyProductivityData} margin={{ left: 12, right: 12 }}>
-                                            <defs>
-                                                <linearGradient id="fillTotalMinutes" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="var(--color-totalMinutes)" stopOpacity={0.8}/>
-                                                    <stop offset="95%" stopColor="var(--color-totalMinutes)" stopOpacity={0.1}/>
-                                                </linearGradient>
-                                            </defs>
-                                            <CartesianGrid vertical={false} />
-                                            <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
-                                            <YAxis tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
-                                            <RechartsTooltip
-                                                cursor={{ fill: "hsl(var(--muted))" }}
-                                                content={({ active, payload }) => {
-                                                    if (active && payload && payload.length) {
-                                                        const data = payload[0].payload;
-                                                        return (
-                                                            <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                                <p className="font-bold text-foreground">{format(data.dateObj, 'PPP')}</p>
-                                                                <div className="grid gap-1.5">
-                                                                    <div className="flex w-full items-center gap-2">
-                                                                        <div className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: "hsl(var(--chart-1))" }} />
-                                                                        <div className="flex flex-1 justify-between">
-                                                                            <span className="text-muted-foreground">Total Time</span>
-                                                                            <span className="font-mono font-medium text-foreground">{data.totalMinutes} min</span>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="flex w-full items-center gap-2">
-                                                                        <div className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: "hsl(var(--chart-4))" }} />
-                                                                        <div className="flex flex-1 justify-between">
-                                                                            <span className="text-muted-foreground">Learning</span>
-                                                                            <span className="font-mono font-medium text-foreground">{data.upskill} min</span>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="flex w-full items-center gap-2">
-                                                                        <div className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: "hsl(var(--chart-5))" }} />
-                                                                        <div className="flex flex-1 justify-between">
-                                                                            <span className="text-muted-foreground">Deep Work</span>
-                                                                            <span className="font-mono font-medium text-foreground">{data.deepwork} min</span>
-                                                                        </div>
-                                                                    </div>
+                                <h4 className="font-semibold mb-4 text-center md:text-left">Hours Spent Today</h4>
+                                {productivityStats.todayHoursData.some(d => d.hours > 0) ? (
+                                    <ChartContainer config={totalHoursChartConfig} className="h-[200px] w-full">
+                                        <ResponsiveContainer>
+                                            <BarChart accessibilityLayer data={productivityStats.todayHoursData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+                                                <CartesianGrid vertical={false} />
+                                                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
+                                                <YAxis tickLine={false} axisLine={false} tickMargin={8} fontSize={12} label={{ value: "Hours", angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' }}} />
+                                                <RechartsTooltip
+                                                    cursor={{ fill: "hsl(var(--muted))" }}
+                                                    content={({ active, payload }) => {
+                                                        if (active && payload && payload.length) {
+                                                            const data = payload[0].payload;
+                                                            return (
+                                                                <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                                    <p className="font-bold text-foreground">{data.name}</p>
+                                                                    <p className="text-muted-foreground">{data.hours.toLocaleString()} hours</p>
                                                                 </div>
-                                                            </div>
-                                                        );
-                                                    }
-                                                    return null;
-                                                }}
-                                            />
-                                            <Area dataKey="totalMinutes" type="natural" fill="url(#fillTotalMinutes)" stroke="var(--color-totalMinutes)" stackId="a" />
-                                        </AreaChart>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    }}
+                                                />
+                                                <Bar dataKey="hours" fill="var(--color-hours)" radius={[4, 4, 0, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
                                     </ChartContainer>
                                 ) : (
                                     <div className="flex h-[200px] items-center justify-center text-center text-sm text-muted-foreground">
-                                        <p>Log learning or deep work on multiple days to see your daily trends.</p>
+                                        <p>Log some activities today to see your hours spent.</p>
                                     </div>
                                 )}
                             </div>
@@ -1743,5 +1714,7 @@ function HomePageContent() {
 export default function Page() {
     return ( <AuthGuard> <HomePageContent /> </AuthGuard> );
 }
+
+    
 
     
