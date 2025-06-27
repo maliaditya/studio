@@ -18,6 +18,7 @@ import { StatsOverviewModal } from '@/components/StatsOverviewModal';
 import { DashboardStats } from '@/components/DashboardStats';
 import { ProductivitySnapshot } from '@/components/ProductivitySnapshot';
 import { TimeSlots } from '@/components/TimeSlots';
+import { WeightGoalCard } from '@/components/WeightGoalCard';
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -619,7 +620,18 @@ function HomePageContent() {
         </CardHeader>
         <CardContent>
           <DashboardStats stats={productivityStats} />
-          <ProductivitySnapshot stats={productivityStats} timeAllocationData={timeAllocationData} onOpenStatsModal={() => setIsStatsModalOpen(true)} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <ProductivitySnapshot 
+              stats={productivityStats} 
+              timeAllocationData={timeAllocationData} 
+              onOpenStatsModal={() => setIsStatsModalOpen(true)} 
+            />
+            <WeightGoalCard 
+              weightLogs={weightLogs}
+              goalWeight={goalWeight}
+              onLogWeight={handleLogWeight}
+            />
+          </div>
           <TimeSlots 
             schedule={todaysSchedule}
             currentSlot={currentSlot}
