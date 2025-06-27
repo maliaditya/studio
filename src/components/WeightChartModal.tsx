@@ -4,8 +4,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { addWeeks, format, parseISO, setISOWeek, startOfISOWeek, differenceInDays } from 'date-fns';
 import type { WeightLog, Gender } from '@/types/workout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDescriptionComponent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
 import { Button } from './ui/button';
 import { Weight as WeightIcon, Edit2, Trash2, Save, X, ZoomOut, CalendarIcon, Target } from 'lucide-react';
@@ -413,7 +413,7 @@ export function WeightChartModal({
                  <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Target/> Your Details</CardTitle>
-                        <CardDescription>Provide these details for more accurate health and goal projections.</CardDescription>
+                        <CardDescriptionComponent>Provide these details for more accurate health and goal projections.</CardDescriptionComponent>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
