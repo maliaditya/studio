@@ -11,7 +11,7 @@ import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown } from 'lucide-react'
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ChartContainer } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, CartesianGrid, XAxis, YAxis } from 'recharts';
 
 interface ProductivitySnapshotProps {
   stats: any;
