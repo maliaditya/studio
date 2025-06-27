@@ -732,6 +732,12 @@ function HomePageContent() {
                 const firstDay = sortedLogs[0].date;
                 const durationInDays = differenceInDays(new Date(), firstDay) + 1;
                 const averageRatePerDay = durationInDays > 0 ? totalProgress / durationInDays : 0;
+                
+                const todaysProgress = logs
+                  .find(log => log.date === todayStr)
+                  ?.exercises
+                  .filter(ex => ex.category === topic)
+                  .reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + set.weight, 0), 0) || 0;
 
                 let completionStats = null;
                 if (averageRatePerDay > 0.01 && remainingProgress > 0) {
@@ -787,6 +793,7 @@ function HomePageContent() {
                     completion: completionStats,
                     nextMilestone: milestoneStats,
                     requiredDailyRate: requiredDailyRate,
+                    todaysProgress: todaysProgress
                 };
             });
 
@@ -1291,11 +1298,11 @@ function HomePageContent() {
                                                                         Progress: {stats.totalProgress.toLocaleString()} / {stats.goalValue.toLocaleString()} {stats.unit.split('/')[0]}
                                                                     </div>
                                                                 </div>
-                                                                {stats.requiredDailyRate > 0 && (
+                                                                {stats.todaysProgress > 0 && (
                                                                     <div className="text-right text-xs ml-4 flex-shrink-0">
-                                                                        <div className="font-semibold text-foreground whitespace-nowrap">Needed Today</div>
-                                                                        <div className="text-muted-foreground whitespace-nowrap">
-                                                                            {stats.requiredDailyRate.toFixed(1)} {stats.unit.split('/')[0]}
+                                                                        <div className="font-semibold text-foreground whitespace-nowrap">Today</div>
+                                                                        <div className="text-muted-foreground whitespace-nowrap text-green-500">
+                                                                            +{stats.todaysProgress.toLocaleString()} {stats.unit.split('/')[0]}
                                                                         </div>
                                                                     </div>
                                                                 )}
@@ -1698,3 +1705,6 @@ export default function Page() {
     
 
 
+
+
+    
