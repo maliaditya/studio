@@ -245,6 +245,22 @@ function WorkoutPageContent() {
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   const [today, setToday] = useState<Date | null>(null);
 
+  // State for the details form
+  const [goalWeightInput, setGoalWeightInput] = useState('');
+  const [heightInput, setHeightInput] = useState('');
+  const [dobInput, setDobInput] = useState<Date | undefined>();
+  const [genderInput, setGenderInput] = useState<Gender | null>(null);
+
+  useEffect(() => {
+    if (currentUser) {
+        setGoalWeightInput(goalWeight ? String(goalWeight) : '');
+        setHeightInput(height ? String(height) : '');
+        setDobInput(dateOfBirth ? parseISO(dateOfBirth) : undefined);
+        setGenderInput(gender || null);
+    }
+  }, [currentUser, goalWeight, height, dateOfBirth, gender]);
+
+
   useEffect(() => {
     const now = new Date();
     setToday(now);
@@ -859,6 +875,58 @@ function WorkoutPageContent() {
     return dietPlan.find(plan => plan.day === dayName);
   }, [dietPlan]);
 
+  const handleSaveDetails = () => {
+    // Validate and set goal weight
+    if (goalWeightInput) {
+        const goal = parseFloat(goalWeightInput);
+        if (!isNaN(goal) && goal > 0) {
+            setGoalWeight(goal);
+        } else {
+            toast({ title: "Invalid Goal Weight", description: "Please enter a valid number.", variant: "destructive" });
+            return;
+        }
+    } else {
+        setGoalWeight(null);
+    }
+
+    // Validate and set height
+    if (heightInput) {
+        const h = parseFloat(heightInput);
+        if (!isNaN(h) && h > 0) {
+            setHeight(h);
+        } else {
+            toast({ title: "Invalid Height", description: "Please enter a valid number.", variant: "destructive" });
+            return;
+        }
+    } else {
+        setHeight(null);
+        toast({ title: "Missing Detail", description: "Please enter your height.", variant: "destructive" });
+        return;
+    }
+
+    // Set DOB
+    if (dobInput) {
+        setDateOfBirth(format(dobInput, 'yyyy-MM-dd'));
+    } else {
+        setDateOfBirth(null);
+        toast({ title: "Missing Detail", description: "Please enter your date of birth.", variant: "destructive" });
+        return;
+    }
+
+    // Set gender
+    if (genderInput) {
+        setGender(genderInput);
+    } else {
+        setGender(null);
+        toast({ title: "Missing Detail", description: "Please select your gender.", variant: "destructive" });
+        return;
+    }
+
+    toast({ title: "Details Saved", description: "Your profile details have been updated." });
+  };
+
+  const areDetailsSet = height && dateOfBirth && gender;
+
 
   if (isLoadingPage) {
     return (
@@ -1058,117 +1126,198 @@ function WorkoutPageContent() {
                 </CardContent>
             </Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg text-primary">
-                        <Target /> Weight Goal
-                    </CardTitle>
-                    <CardDescription>
-                       Track your progress and stay consistent.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <Button onClick={() => setIsWeightChartModalOpen(true)} className="w-full text-xs xl:text-sm">
-                            <LineChartIcon className="mr-2 h-4 w-4" />
-                            Chart & Goal
-                        </Button>
-                        <Button onClick={() => handleDietModalOpenChange(true)} variant="outline" className="w-full text-xs xl:text-sm">
-                            <BookCopy className="mr-2 h-4 w-4" />
-                            Diet Plan
-                        </Button>
-                    </div>
-                    {(projectionSummary || latestConsistency || healthMetrics.averageIntake || healthMetrics.maintenanceCalories) && (
-                        <div className="space-y-4 pt-4 border-t">
-                            {projectionSummary && (
-                                <>
-                                    <div className="grid grid-cols-3 gap-2 text-center text-sm">
-                                        <div>
-                                            <div className="text-muted-foreground">Current</div>
-                                            <div className="font-bold text-lg">{projectionSummary.currentWeight}</div>
-                                            <div className="text-xs text-muted-foreground">kg/lb</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-muted-foreground">Goal</div>
-                                            <div className="font-bold text-lg">{projectionSummary.goalWeight}</div>
-                                            <div className="text-xs text-muted-foreground">kg/lb</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-muted-foreground">{projectionSummary.weightDifference > 0 ? "To Gain" : "To Lose"}</div>
-                                            <div className={`font-bold text-lg ${projectionSummary.weightDifference > 0 ? "text-orange-500" : "text-green-500"}`}>{Math.abs(projectionSummary.weightDifference)}</div>
-                                            <div className="text-xs text-muted-foreground">kg/lb</div>
-                                        </div>
-                                    </div>
-
-                                    <Separator />
-                                    
-                                    <div className="space-y-2 text-sm">
-                                      {projectionSummary.averageWeeklyChange !== undefined && (
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-muted-foreground flex items-center gap-2"><Activity className="h-4 w-4" /> Avg. Weekly Change</span>
-                                            <span className={`font-bold ${projectionSummary.averageWeeklyChange > 0 ? "text-orange-500" : projectionSummary.averageWeeklyChange < 0 ? "text-green-500" : ""}`}>
-                                                {projectionSummary.averageWeeklyChange > 0 ? '+' : ''}{projectionSummary.averageWeeklyChange.toFixed(2)} kg/lb
-                                            </span>
-                                        </div>
-                                      )}
-                                      {projectionSummary.projectedDate && (
-                                        <>
-                                          <div className="flex justify-between items-center">
-                                              <span className="text-muted-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Next Week Est.</span>
-                                              <span className="font-bold">{projectionSummary.nextProjectedWeight} kg/lb</span>
-                                          </div>
-                                          <div className="flex justify-between items-center">
-                                              <span className="text-muted-foreground pl-6">Days Remaining</span>
-                                              <span className="font-bold">{projectionSummary.daysToNextWeek > 0 ? `${projectionSummary.daysToNextWeek} days` : 'Past'}</span>
-                                          </div>
-                                          <div className="flex justify-between items-center pt-2 mt-2 border-t">
-                                              <span className="text-muted-foreground flex items-center gap-2"><CalendarDays className="h-4 w-4" /> Est. Goal Date</span>
-                                              <span className="font-bold">{projectionSummary.projectedDate}</span>
-                                          </div>
-                                          <div className="flex justify-between items-center">
-                                              <span className="text-muted-foreground pl-6">Days Remaining</span>
-                                              <span className="font-bold">{projectionSummary.daysToGoal > 0 ? `${projectionSummary.daysToGoal} days` : 'N/A'}</span>
-                                          </div>
-                                        </>
-                                      )}
-                                    </div>
-                                </>
-                            )}
-                            
-                            {(healthMetrics.averageIntake || healthMetrics.maintenanceCalories) && (
-                              <div className="space-y-2 text-sm pt-4 border-t">
-                                  {healthMetrics.averageIntake && (
-                                      <div className="flex justify-between items-center">
-                                          <span className="text-muted-foreground flex items-center gap-2"><Flame className="h-4 w-4" /> Current Avg. Daily Intake</span>
-                                          <span className="font-bold">{healthMetrics.averageIntake} kcal</span>
-                                      </div>
-                                  )}
-                                  {healthMetrics.maintenanceCalories && (
-                                      <div className="flex justify-between items-center">
-                                          <span className="text-muted-foreground flex items-center gap-2"><HeartPulse className="h-4 w-4" /> Est. Maintenance</span>
-                                          <span className="font-bold">{healthMetrics.maintenanceCalories} kcal</span>
-                                      </div>
-                                  )}
-                                  {healthMetrics.averageIntake && healthMetrics.maintenanceCalories && healthMetrics.averageIntake < healthMetrics.maintenanceCalories && (
-                                      <p className="text-xs text-orange-500 mt-2">
-                                          ⚠️ You’re eating below maintenance — watch for fatigue, low mood, or muscle loss.
-                                      </p>
-                                  )}
-                              </div>
-                            )}
-
-                            {latestConsistency !== null && (
-                                <div className="space-y-1 text-sm pt-4 border-t">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-muted-foreground flex items-center gap-2"><Activity className="h-4 w-4" /> Workout Consistency</span>
-                                        <span className="font-bold text-lg">{latestConsistency}%</span>
-                                    </div>
-                                </div>
-                            )}
+            {areDetailsSet ? (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg text-primary">
+                            <Target /> Weight Goal
+                        </CardTitle>
+                        <CardDescription>
+                           Track your progress and stay consistent.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <Button onClick={() => setIsWeightChartModalOpen(true)} className="w-full text-xs xl:text-sm">
+                                <LineChartIcon className="mr-2 h-4 w-4" />
+                                Chart & Goal
+                            </Button>
+                            <Button onClick={() => handleDietModalOpenChange(true)} variant="outline" className="w-full text-xs xl:text-sm">
+                                <BookCopy className="mr-2 h-4 w-4" />
+                                Diet Plan
+                            </Button>
                         </div>
-                    )}
-                </CardContent>
-            </Card>
+                        {(projectionSummary || latestConsistency || healthMetrics.averageIntake || healthMetrics.maintenanceCalories) && (
+                            <div className="space-y-4 pt-4 border-t">
+                                {projectionSummary && (
+                                    <>
+                                        <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                                            <div>
+                                                <div className="text-muted-foreground">Current</div>
+                                                <div className="font-bold text-lg">{projectionSummary.currentWeight}</div>
+                                                <div className="text-xs text-muted-foreground">kg/lb</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-muted-foreground">Goal</div>
+                                                <div className="font-bold text-lg">{projectionSummary.goalWeight}</div>
+                                                <div className="text-xs text-muted-foreground">kg/lb</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-muted-foreground">{projectionSummary.weightDifference > 0 ? "To Gain" : "To Lose"}</div>
+                                                <div className={`font-bold text-lg ${projectionSummary.weightDifference > 0 ? "text-orange-500" : "text-green-500"}`}>{Math.abs(projectionSummary.weightDifference)}</div>
+                                                <div className="text-xs text-muted-foreground">kg/lb</div>
+                                            </div>
+                                        </div>
+
+                                        <Separator />
+                                        
+                                        <div className="space-y-2 text-sm">
+                                          {projectionSummary.averageWeeklyChange !== undefined && (
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-muted-foreground flex items-center gap-2"><Activity className="h-4 w-4" /> Avg. Weekly Change</span>
+                                                <span className={`font-bold ${projectionSummary.averageWeeklyChange > 0 ? "text-orange-500" : projectionSummary.averageWeeklyChange < 0 ? "text-green-500" : ""}`}>
+                                                    {projectionSummary.averageWeeklyChange > 0 ? '+' : ''}{projectionSummary.averageWeeklyChange.toFixed(2)} kg/lb
+                                                </span>
+                                            </div>
+                                          )}
+                                          {projectionSummary.projectedDate && (
+                                            <>
+                                              <div className="flex justify-between items-center">
+                                                  <span className="text-muted-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Next Week Est.</span>
+                                                  <span className="font-bold">{projectionSummary.nextProjectedWeight} kg/lb</span>
+                                              </div>
+                                              <div className="flex justify-between items-center">
+                                                  <span className="text-muted-foreground pl-6">Days Remaining</span>
+                                                  <span className="font-bold">{projectionSummary.daysToNextWeek > 0 ? `${projectionSummary.daysToNextWeek} days` : 'Past'}</span>
+                                              </div>
+                                              <div className="flex justify-between items-center pt-2 mt-2 border-t">
+                                                  <span className="text-muted-foreground flex items-center gap-2"><CalendarDays className="h-4 w-4" /> Est. Goal Date</span>
+                                                  <span className="font-bold">{projectionSummary.projectedDate}</span>
+                                              </div>
+                                              <div className="flex justify-between items-center">
+                                                  <span className="text-muted-foreground pl-6">Days Remaining</span>
+                                                  <span className="font-bold">{projectionSummary.daysToGoal > 0 ? `${projectionSummary.daysToGoal} days` : 'N/A'}</span>
+                                              </div>
+                                            </>
+                                          )}
+                                        </div>
+                                    </>
+                                )}
+                                
+                                {(healthMetrics.averageIntake || healthMetrics.maintenanceCalories) && (
+                                  <div className="space-y-2 text-sm pt-4 border-t">
+                                      {healthMetrics.averageIntake && (
+                                          <div className="flex justify-between items-center">
+                                              <span className="text-muted-foreground flex items-center gap-2"><Flame className="h-4 w-4" /> Current Avg. Daily Intake</span>
+                                              <span className="font-bold">{healthMetrics.averageIntake} kcal</span>
+                                          </div>
+                                      )}
+                                      {healthMetrics.maintenanceCalories && (
+                                          <div className="flex justify-between items-center">
+                                              <span className="text-muted-foreground flex items-center gap-2"><HeartPulse className="h-4 w-4" /> Est. Maintenance</span>
+                                              <span className="font-bold">{healthMetrics.maintenanceCalories} kcal</span>
+                                          </div>
+                                      )}
+                                      {healthMetrics.averageIntake && healthMetrics.maintenanceCalories && healthMetrics.averageIntake < healthMetrics.maintenanceCalories && (
+                                          <p className="text-xs text-orange-500 mt-2">
+                                              ⚠️ You’re eating below maintenance — watch for fatigue, low mood, or muscle loss.
+                                          </p>
+                                      )}
+                                  </div>
+                                )}
+
+                                {latestConsistency !== null && (
+                                    <div className="space-y-1 text-sm pt-4 border-t">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-muted-foreground flex items-center gap-2"><Activity className="h-4 w-4" /> Workout Consistency</span>
+                                            <span className="font-bold text-lg">{latestConsistency}%</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            ) : (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg text-primary"><Target/> Your Details</CardTitle>
+                        <CardDescription>Provide these details first for accurate health and goal projections.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <Label className="text-xs text-muted-foreground">Gender (for BMR)</Label>
+                                <RadioGroup
+                                    value={genderInput || ""}
+                                    onValueChange={(value) => setGenderInput(value as Gender)}
+                                    className="flex gap-4 pt-2"
+                                >
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="male" id="gender-male-page" />
+                                        <Label htmlFor="gender-male-page" className="font-normal">Male</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="female" id="gender-female-page" />
+                                        <Label htmlFor="gender-female-page" className="font-normal">Female</Label>
+                                    </div>
+                                </RadioGroup>
+                            </div>
+                            <div>
+                                <Label htmlFor="dob-input-page" className="text-xs text-muted-foreground">Date of Birth</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                    <Button id="dob-input-page" variant={"outline"} className={cn("h-9 w-full justify-start text-left font-normal", !dobInput && "text-muted-foreground")}>
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {dobInput ? format(dobInput, "PPP") : <span>Pick a date</span>}
+                                    </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                    <Calendar
+                                        mode="single"
+                                        selected={dobInput}
+                                        onSelect={setDobInput}
+                                        captionLayout="dropdown-buttons"
+                                        fromYear={1950}
+                                        toYear={new Date().getFullYear()}
+                                        disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                        initialFocus
+                                    />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                            <div>
+                                <Label htmlFor="height-input-page" className="text-xs text-muted-foreground">Height (cm)</Label>
+                                <Input
+                                    id="height-input-page"
+                                    type="number"
+                                    placeholder="e.g., 180"
+                                    value={heightInput}
+                                    onChange={(e) => setHeightInput(e.target.value)}
+                                    className="h-9"
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="goal-weight-input-page" className="text-xs text-muted-foreground">Goal Weight (kg/lb)</Label>
+                                <Input
+                                    id="goal-weight-input-page"
+                                    type="number"
+                                    placeholder="e.g., 75 (Optional)"
+                                    value={goalWeightInput}
+                                    onChange={(e) => setGoalWeightInput(e.target.value)}
+                                    className="h-9"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex justify-end pt-4">
+                            <Button onClick={handleSaveDetails}>
+                                <Save className="mr-2 h-4 w-4"/>
+                                Save Details
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
           </section>
 
