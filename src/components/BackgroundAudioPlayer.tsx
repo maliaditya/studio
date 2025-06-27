@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 export function BackgroundAudioPlayer() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolume] = useState(0.2); // Start at 20% volume
+  const [volume, setVolume] = useState(0.1); // Start at 10% volume
 
   // Effect to sync audio element's playing state with component state
   useEffect(() => {
