@@ -209,44 +209,49 @@ export function StatsOverviewModal({
             A graphical summary of your key metrics over time.
           </DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue="productivity" className="w-full flex-grow min-h-0 flex flex-col">
-            <TabsList className="grid w-full grid-cols-5">
-                <TabsTrigger value="productivity">Productivity</TabsTrigger>
+        <Tabs defaultValue="daily-trend" className="w-full flex-grow min-h-0 flex flex-col">
+            <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 md:grid-cols-7">
+                <TabsTrigger value="daily-trend">Daily Trend</TabsTrigger>
+                <TabsTrigger value="total-hours">Total Hours</TabsTrigger>
+                <TabsTrigger value="todays-hours">Today's Hours</TabsTrigger>
                 <TabsTrigger value="consistency">Consistency</TabsTrigger>
                 <TabsTrigger value="weight">Weight</TabsTrigger>
                 <TabsTrigger value="learning">Learning</TabsTrigger>
                 <TabsTrigger value="deepwork">Deep Work</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="productivity" className="flex-grow mt-4 min-h-0">
+            <TabsContent value="daily-trend" className="flex-grow mt-4 min-h-0">
                 <ScrollArea className="h-full pr-4">
-                  <div className='space-y-8'>
-                    {productivityData.length > 1 ? (
-                      <div>
-                        <h4 className="font-semibold mb-4 text-center md:text-left">Daily Productive Time</h4>
-                        <ChartContainer config={totalProductivityChartConfig} className="min-h-[250px] w-full">
-                          <AreaChart accessibilityLayer data={productivityData} margin={{ top: 10, right: 30, left: 0, bottom: 0, }}>
-                                <defs>
-                                    <linearGradient id="fillTotalMinutesModal" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="var(--color-totalMinutes)" stopOpacity={0.8}/>
-                                        <stop offset="95%" stopColor="var(--color-totalMinutes)" stopOpacity={0.1}/>
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="date" />
-                                <YAxis label={{ value: 'Minutes', angle: -90, position: 'insideLeft' }}/>
-                                <RechartsTooltip content={renderProductivityTooltip} />
-                                <Legend verticalAlign="top" height={36}/>
-                                <Area type="monotone" dataKey="totalMinutes" fill="url(#fillTotalMinutesModal)" stroke="var(--color-totalMinutes)" strokeWidth={2} name="Productive Time (min)" />
-                            </AreaChart>
-                        </ChartContainer>
-                      </div>
-                    ) : <p className="text-center text-muted-foreground py-8">Not enough data to show productivity stats.</p> }
-                    
+                  {productivityData.length > 1 ? (
+                    <div>
+                      <h4 className="font-semibold mb-4 text-center md:text-left">Daily Productive Time</h4>
+                      <ChartContainer config={totalProductivityChartConfig} className="min-h-[400px] w-full">
+                        <AreaChart accessibilityLayer data={productivityData} margin={{ top: 10, right: 30, left: 0, bottom: 0, }}>
+                              <defs>
+                                  <linearGradient id="fillTotalMinutesModal" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor="var(--color-totalMinutes)" stopOpacity={0.8}/>
+                                      <stop offset="95%" stopColor="var(--color-totalMinutes)" stopOpacity={0.1}/>
+                                  </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="date" />
+                              <YAxis label={{ value: 'Minutes', angle: -90, position: 'insideLeft' }}/>
+                              <RechartsTooltip content={renderProductivityTooltip} />
+                              <Legend verticalAlign="top" height={36}/>
+                              <Area type="monotone" dataKey="totalMinutes" fill="url(#fillTotalMinutesModal)" stroke="var(--color-totalMinutes)" strokeWidth={2} name="Productive Time (min)" />
+                          </AreaChart>
+                      </ChartContainer>
+                    </div>
+                  ) : <p className="text-center text-muted-foreground py-8">Not enough data to show productivity stats.</p> }
+                </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="total-hours" className="flex-grow mt-4 min-h-0">
+                <ScrollArea className="h-full pr-4">
                     <div>
                         <h4 className="font-semibold mb-4 text-center md:text-left">Total Hours Logged</h4>
                         {totalHoursData.some(d => d.hours > 0) ? (
-                            <ChartContainer config={totalHoursChartConfig} className="h-[250px] w-full">
+                            <ChartContainer config={totalHoursChartConfig} className="h-[400px] w-full">
                                 <ResponsiveContainer>
                                     <BarChart accessibilityLayer data={totalHoursData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
                                         <CartesianGrid vertical={false} />
@@ -272,50 +277,53 @@ export function StatsOverviewModal({
                                 </ResponsiveContainer>
                             </ChartContainer>
                         ) : (
-                            <div className="flex h-[250px] items-center justify-center text-center text-sm text-muted-foreground">
+                            <div className="flex h-[400px] items-center justify-center text-center text-sm text-muted-foreground">
                                 <p>Log some activities to see your total hours spent.</p>
                             </div>
                         )}
                     </div>
-                    
-                    <div>
-                        <h4 className="font-semibold mb-4 text-center md:text-left">Hours Spent Today</h4>
-                        {todayHoursData.some(d => d.hours > 0) ? (
-                            <ChartContainer config={totalHoursChartConfig} className="h-[250px] w-full">
-                                <ResponsiveContainer>
-                                    <BarChart accessibilityLayer data={todayHoursData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
-                                        <CartesianGrid vertical={false} />
-                                        <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
-                                        <YAxis tickLine={false} axisLine={false} tickMargin={8} fontSize={12} label={{ value: "Hours", angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' }}} />
-                                        <RechartsTooltip
-                                            cursor={{ fill: "hsl(var(--muted))" }}
-                                            content={({ active, payload }) => {
-                                                if (active && payload && payload.length) {
-                                                    const data = payload[0].payload;
-                                                    return (
-                                                        <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                            <p className="font-bold text-foreground">{data.name}</p>
-                                                            <p className="text-muted-foreground">{data.hours.toLocaleString()} hours</p>
-                                                        </div>
-                                                    );
-                                                }
-                                                return null;
-                                            }}
-                                        />
-                                        <Bar dataKey="hours" fill="var(--color-hours)" radius={[4, 4, 0, 0]} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </ChartContainer>
-                        ) : (
-                            <div className="flex h-[250px] items-center justify-center text-center text-sm text-muted-foreground">
-                                <p>Log some activities today to see your hours spent.</p>
-                            </div>
-                        )}
-                    </div>
-                  </div>
                 </ScrollArea>
             </TabsContent>
             
+            <TabsContent value="todays-hours" className="flex-grow mt-4 min-h-0">
+                <ScrollArea className="h-full pr-4">
+                  <div>
+                      <h4 className="font-semibold mb-4 text-center md:text-left">Hours Spent Today</h4>
+                      {todayHoursData.some(d => d.hours > 0) ? (
+                          <ChartContainer config={totalHoursChartConfig} className="h-[400px] w-full">
+                              <ResponsiveContainer>
+                                  <BarChart accessibilityLayer data={todayHoursData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+                                      <CartesianGrid vertical={false} />
+                                      <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
+                                      <YAxis tickLine={false} axisLine={false} tickMargin={8} fontSize={12} label={{ value: "Hours", angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' }}} />
+                                      <RechartsTooltip
+                                          cursor={{ fill: "hsl(var(--muted))" }}
+                                          content={({ active, payload }) => {
+                                              if (active && payload && payload.length) {
+                                                  const data = payload[0].payload;
+                                                  return (
+                                                      <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                          <p className="font-bold text-foreground">{data.name}</p>
+                                                          <p className="text-muted-foreground">{data.hours.toLocaleString()} hours</p>
+                                                      </div>
+                                                  );
+                                              }
+                                              return null;
+                                          }}
+                                      />
+                                      <Bar dataKey="hours" fill="var(--color-hours)" radius={[4, 4, 0, 0]} />
+                                  </BarChart>
+                              </ResponsiveContainer>
+                          </ChartContainer>
+                      ) : (
+                          <div className="flex h-[400px] items-center justify-center text-center text-sm text-muted-foreground">
+                              <p>Log some activities today to see your hours spent.</p>
+                          </div>
+                      )}
+                  </div>
+                </ScrollArea>
+            </TabsContent>
+
             <TabsContent value="consistency" className="flex-grow mt-4 min-h-0">
                  <ScrollArea className="h-full pr-4">
                   {consistencyData.length > 0 ? (
@@ -324,7 +332,7 @@ export function StatsOverviewModal({
                             <CartesianGrid vertical={false} strokeDasharray="3 3" />
                             <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value, index) => (index % 30 !== 0 ? '' : value.split(' ')[0])} />
                             <YAxis tickLine={false} axisLine={false} tickMargin={8} domain={[0, 100]} tickFormatter={(value) => `${value}%`} />
-                            <RechartsTooltip cursor={true} content={({ active, payload }) => active && payload?.length ? (
+                            <RechartsTooltip cursor={true} content={({ active, payload, label }) => active && payload?.length ? (
                                 <div className="rounded-lg border bg-background p-2.5 shadow-sm">
                                     <p className="font-bold">{payload[0].payload.fullDate}</p>
                                     <p>Consistency: {payload[0].value}%</p>
