@@ -25,7 +25,7 @@ import { WeightChartModal } from '@/components/WeightChartModal';
 import { DietPlanModal } from '@/components/DietPlanModal';
 import { StatsOverviewModal } from '@/components/StatsOverviewModal';
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, AreaChart, Area, BarChart, Bar } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, AreaChart, Area, BarChart, Bar, Cell } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -1060,6 +1060,19 @@ function HomePageContent() {
         };
     }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, dietPlan, weightLogs, dateOfBirth, height, gender, goalWeight, consistencyData, brandingTasks, brandingLogs, deepWorkDefinitions]);
     
+  const timeAllocationData = useMemo(() => {
+    if (!productivityStats.todayHoursData) return [];
+    const dailyTime = productivityStats.todayHoursData.reduce((sum, d) => sum + d.hours, 0);
+    const idealTime = 12; // 6 (Deep Work) + 3 (Learning) + 1 (Workout) + 2 (Branding)
+    const autopilotTime = Math.max(0, 24 - dailyTime);
+
+    return [
+      { name: 'Productive', time: dailyTime, fill: 'hsl(var(--primary))' },
+      { name: 'Ideal', time: idealTime, fill: 'hsl(var(--chart-2))' },
+      { name: 'Autopilot', time: autopilotTime, fill: 'hsl(var(--muted))' },
+    ];
+  }, [productivityStats.todayHoursData]);
+
     // MODAL HANDLERS
     const handleDietModalOpenChange = (isOpen: boolean) => {
         setIsDietPlanModalOpen(isOpen);
@@ -1349,6 +1362,39 @@ function HomePageContent() {
                                         )}
                                     </div>
                                 </div>
+                            </div>
+                             <Separator className="my-6" />
+                            <div>
+                                <h4 className="font-semibold mb-4 text-center">Daily Time Allocation (24h)</h4>
+                                <ChartContainer config={{}} className="h-[150px] w-full">
+                                    <ResponsiveContainer>
+                                        <BarChart data={timeAllocationData} layout="vertical" margin={{ left: 10, right: 10 }}>
+                                            <CartesianGrid horizontal={false} />
+                                            <XAxis type="number" dataKey="time" domain={[0, 24]} tickCount={7} fontSize={12} />
+                                            <YAxis type="category" dataKey="name" width={70} tickLine={false} axisLine={false} fontSize={12} />
+                                            <RechartsTooltip
+                                                cursor={{ fill: "hsl(var(--muted))" }}
+                                                content={({ active, payload }) => {
+                                                    if (active && payload && payload.length) {
+                                                        const data = payload[0].payload;
+                                                        return (
+                                                            <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                                <p className="font-bold text-foreground">{data.name}</p>
+                                                                <p className="text-muted-foreground">{data.time.toFixed(1)} hours</p>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                }}
+                                            />
+                                            <Bar dataKey="time" radius={[0, 4, 4, 0]}>
+                                                {timeAllocationData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </ChartContainer>
                             </div>
                         </CardContent>
                     </Card>
@@ -1650,3 +1696,4 @@ export default function Page() {
     
 
     
+

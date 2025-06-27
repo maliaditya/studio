@@ -196,18 +196,6 @@ export function StatsOverviewModal({
     }));
   }, [todayHoursData]);
 
-  const timeAllocationData = useMemo(() => {
-    const dailyTime = todayHoursData.reduce((sum, d) => sum + d.hours, 0);
-    const idealTime = 12; // 6 (Deep Work) + 3 (Learning) + 1 (Workout) + 2 (Branding)
-    const autopilotTime = Math.max(0, 24 - dailyTime);
-
-    return [
-      { name: 'Productive', time: dailyTime, fill: 'hsl(var(--primary))' },
-      { name: 'Ideal', time: idealTime, fill: 'hsl(var(--chart-2))' },
-      { name: 'Autopilot', time: autopilotTime, fill: 'hsl(var(--muted))' },
-    ];
-  }, [todayHoursData]);
-
   const renderProductivityTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
@@ -239,9 +227,8 @@ export function StatsOverviewModal({
           </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="radar" className="w-full flex-grow min-h-0 flex flex-col">
-            <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 lg:grid-cols-9">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-8">
                 <TabsTrigger value="radar">Radar</TabsTrigger>
-                <TabsTrigger value="allocation">Allocation</TabsTrigger>
                 <TabsTrigger value="daily-trend">Daily Trend</TabsTrigger>
                 <TabsTrigger value="total-hours">Total Hours</TabsTrigger>
                 <TabsTrigger value="todays-hours">Today's Hours</TabsTrigger>
@@ -277,43 +264,6 @@ export function StatsOverviewModal({
                                     <Radar name="Today" dataKey="today" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.6} />
                                     <Radar name="Ideal" dataKey="ideal" stroke="hsl(var(--chart-2))" fill="hsl(var(--chart-2))" fillOpacity={0.4} />
                                 </RadarChart>
-                            </ResponsiveContainer>
-                        </ChartContainer>
-                    </div>
-                </ScrollArea>
-            </TabsContent>
-            
-            <TabsContent value="allocation" className="flex-grow mt-4 min-h-0">
-                <ScrollArea className="h-full pr-4">
-                    <div>
-                        <h4 className="font-semibold mb-4 text-center md:text-left">Daily Time Allocation (24h)</h4>
-                        <ChartContainer config={{}} className="min-h-[400px] w-full">
-                            <ResponsiveContainer>
-                                <BarChart data={timeAllocationData} layout="vertical" margin={{ left: 10 }}>
-                                    <CartesianGrid horizontal={false} />
-                                    <XAxis type="number" dataKey="time" domain={[0, 24]} tickCount={7} />
-                                    <YAxis type="category" dataKey="name" width={80} tickLine={false} axisLine={false} />
-                                    <RechartsTooltip
-                                        cursor={{ fill: "hsl(var(--muted))" }}
-                                        content={({ active, payload }) => {
-                                            if (active && payload && payload.length) {
-                                                const data = payload[0].payload;
-                                                return (
-                                                    <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                        <p className="font-bold text-foreground">{data.name}</p>
-                                                        <p className="text-muted-foreground">{data.time.toFixed(1)} hours</p>
-                                                    </div>
-                                                );
-                                            }
-                                            return null;
-                                        }}
-                                    />
-                                    <Bar dataKey="time" radius={[0, 4, 4, 0]}>
-                                        {timeAllocationData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
                             </ResponsiveContainer>
                         </ChartContainer>
                     </div>
