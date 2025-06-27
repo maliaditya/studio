@@ -165,6 +165,7 @@ export function WeightChartModal({
   }, [goalWeight, height, dateOfBirth, isOpen]);
 
   const weightChartData = useMemo(() => {
+    if (!weightLogs) return [];
     const sortedLogs = weightLogs
     .map(log => {
         const [year, weekNum] = log.date.split('-W');

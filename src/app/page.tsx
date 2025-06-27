@@ -70,10 +70,15 @@ function HomePageContent() {
   const { 
     currentUser, 
     weightLogs, 
+    setWeightLogs,
     goalWeight, 
+    setGoalWeight,
     height, 
+    setHeight,
     dateOfBirth, 
+    setDateOfBirth,
     gender,
+    setGender,
     dietPlan,
   } = useAuth();
   const { toast } = useToast();
@@ -503,6 +508,104 @@ function HomePageContent() {
     ];
   }, [productivityStats.todayHoursData]);
 
+  const handleLogWeight = (weight: number, date: Date) => {
+    if (!currentUser || isNaN(weight) || weight <= 0) {
+      toast({ title: "Invalid Input", description: "Please enter a valid weight.", variant: "destructive" });
+      return;
+    }
+    const year = getISOWeekYear(date);
+    const week = getISOWeek(date).toString().padStart(2, '0');
+    const weekKey = `${year}-W${week}`;
+
+    setWeightLogs(prevLogs => {
+        const logIndex = prevLogs.findIndex(log => log.date === weekKey);
+        const newLog: WeightLog = { date: weekKey, weight: weight };
+        
+        if (logIndex > -1) {
+            const updatedLogs = [...prevLogs];
+            updatedLogs[logIndex] = newLog;
+            return updatedLogs;
+        } else {
+            return [...prevLogs, newLog].sort((a,b) => a.date.localeCompare(b.date));
+        }
+    });
+
+    toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
+  };
+
+  const handleUpdateWeightLog = (dateKey: string, newWeight: number) => {
+    if (!currentUser || isNaN(newWeight) || newWeight <= 0) {
+      toast({ title: "Invalid Input", description: "Please enter a valid weight.", variant: "destructive" });
+      return;
+    }
+    setWeightLogs(prevLogs => {
+      const logIndex = prevLogs.findIndex(log => log.date === dateKey);
+      if (logIndex > -1) {
+        const updatedLogs = [...prevLogs];
+        updatedLogs[logIndex] = { ...updatedLogs[logIndex], weight: newWeight };
+        toast({ title: "Weight Updated", description: `Weight for week ${dateKey} updated.` });
+        return updatedLogs.sort((a,b) => a.date.localeCompare(b.date));
+      }
+      return prevLogs;
+    });
+  };
+
+  const handleDeleteWeightLog = (dateKey: string) => {
+    if (!currentUser) return;
+    setWeightLogs(prevLogs => prevLogs.filter(log => log.date !== dateKey));
+    toast({ title: "Weight Deleted", description: `Weight log for week ${dateKey} has been removed.` });
+  };
+
+  const handleSetGoalWeight = (goal: number) => {
+    if (!isNaN(goal) && goal > 0) {
+        if (currentUser?.username) {
+            setGoalWeight(goal);
+            toast({ title: "Goal Set!", description: `Your new goal weight is ${goal} kg/lb.` });
+        } else {
+            toast({ title: "Error", description: "You must be logged in to set a goal.", variant: "destructive" });
+        }
+    } else {
+        toast({ title: "Invalid Input", description: "Please enter a valid goal weight.", variant: "destructive" });
+    }
+  };
+
+  const handleSetHeight = (h: number) => {
+    if (!isNaN(h) && h > 0) {
+        if (currentUser?.username) {
+            setHeight(h);
+            toast({ title: "Height Set!", description: `Your height has been saved as ${h} cm.` });
+        } else {
+            toast({ title: "Error", description: "You must be logged in to set your height.", variant: "destructive" });
+        }
+    } else {
+        toast({ title: "Invalid Input", description: "Please enter a valid height.", variant: "destructive" });
+    }
+  };
+
+  const handleSetDateOfBirth = (dob: string) => {
+    if (dob) {
+        if (currentUser?.username) {
+            setDateOfBirth(dob);
+            toast({ title: "Date of Birth Set", description: `Your DoB has been saved.` });
+        } else {
+            toast({ title: "Error", description: "You must be logged in to set your date of birth.", variant: "destructive" });
+        }
+    } else {
+        toast({ title: "Invalid Input", description: "Please select a valid date.", variant: "destructive" });
+    }
+  };
+
+  const handleSetGender = (g: Gender) => {
+    if (g) {
+      if (currentUser?.username) {
+        setGender(g);
+        toast({ title: "Gender Set!", description: `Your gender has been saved.` });
+      } else {
+        toast({ title: "Error", description: "You must be logged in to set your gender.", variant: "destructive" });
+      }
+    }
+  };
+
   // MODAL HANDLERS
   const handleDietModalOpenChange = (isOpen: boolean) => {
       setIsDietPlanModalOpen(isOpen);
@@ -515,7 +618,7 @@ function HomePageContent() {
             <p className="text-sm text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
         </CardHeader>
         <CardContent>
-          <DashboardStats stats={{ ...productivityStats, direction: dailyStats.direction }} />
+          <DashboardStats stats={productivityStats} />
           <ProductivitySnapshot stats={productivityStats} timeAllocationData={timeAllocationData} onOpenStatsModal={() => setIsStatsModalOpen(true)} />
           <TimeSlots 
             schedule={todaysSchedule}
@@ -555,6 +658,18 @@ function HomePageContent() {
       <WeightChartModal
         isOpen={isWeightChartModalOpen}
         onOpenChange={setIsWeightChartModalOpen}
+        weightLogs={weightLogs}
+        goalWeight={goalWeight}
+        height={height}
+        dateOfBirth={dateOfBirth}
+        gender={gender}
+        onLogWeight={handleLogWeight}
+        onUpdateWeightLog={handleUpdateWeightLog}
+        onDeleteWeightLog={handleDeleteWeightLog}
+        onSetGoalWeight={handleSetGoalWeight}
+        onSetHeight={handleSetHeight}
+        onSetDateOfBirth={handleSetDateOfBirth}
+        onSetGender={handleSetGender}
       />
 
       <DietPlanModal
