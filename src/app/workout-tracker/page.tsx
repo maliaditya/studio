@@ -52,6 +52,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { WeightChartModal } from '@/components/WeightChartModal';
 import { DietPlanModal } from '@/components/DietPlanModal';
+import { TodaysDietCard } from '@/components/TodaysDietCard';
 
 
 const DEFAULT_TARGET_SETS = 4;
@@ -655,53 +656,39 @@ function WorkoutPageContent() {
     toast({ title: "Weight Deleted", description: `Weight log for week ${dateKey} has been removed.` });
   };
 
-  const handleSetGoalWeight = (goal: number) => {
-    if (!isNaN(goal) && goal > 0) {
-        if (currentUser?.username) {
-            setGoalWeight(goal);
-            toast({ title: "Goal Set!", description: `Your new goal weight is ${goal} kg/lb.` });
-        } else {
-            toast({ title: "Error", description: "You must be logged in to set a goal.", variant: "destructive" });
-        }
+  const handleSetGoalWeight = (goal: number | null) => {
+    if (goal === null || (!isNaN(goal) && goal > 0)) {
+        setGoalWeight(goal);
+        if(goal !== null) toast({ title: "Goal Set!", description: `Your new goal weight is ${goal} kg/lb.` });
     } else {
         toast({ title: "Invalid Input", description: "Please enter a valid goal weight.", variant: "destructive" });
     }
   };
 
-  const handleSetHeight = (h: number) => {
-    if (!isNaN(h) && h > 0) {
-        if (currentUser?.username) {
-            setHeight(h);
-            toast({ title: "Height Set!", description: `Your height has been saved as ${h} cm.` });
-        } else {
-            toast({ title: "Error", description: "You must be logged in to set your height.", variant: "destructive" });
-        }
+  const handleSetHeight = (h: number | null) => {
+    if (h === null || (!isNaN(h) && h > 0)) {
+        setHeight(h);
+        if (h !== null) toast({ title: "Height Set!", description: `Your height has been saved as ${h} cm.` });
     } else {
         toast({ title: "Invalid Input", description: "Please enter a valid height.", variant: "destructive" });
     }
   };
 
-  const handleSetDateOfBirth = (dob: string) => {
+  const handleSetDateOfBirth = (dob: string | null) => {
     if (dob) {
-        if (currentUser?.username) {
-            setDateOfBirth(dob);
-            toast({ title: "Date of Birth Set", description: `Your DoB has been saved.` });
-        } else {
-            toast({ title: "Error", description: "You must be logged in to set your date of birth.", variant: "destructive" });
-        }
+        setDateOfBirth(dob);
+        toast({ title: "Date of Birth Set", description: `Your DoB has been saved.` });
     } else {
-        toast({ title: "Invalid Input", description: "Please select a valid date.", variant: "destructive" });
+      setDateOfBirth(null);
     }
   };
 
-  const handleSetGender = (g: Gender) => {
+  const handleSetGender = (g: Gender | null) => {
     if (g) {
-      if (currentUser?.username) {
-        setGender(g);
-        toast({ title: "Gender Set!", description: `Your gender has been saved.` });
-      } else {
-        toast({ title: "Error", description: "You must be logged in to set your gender.", variant: "destructive" });
-      }
+      setGender(g);
+      toast({ title: "Gender Set!", description: `Your gender has been saved.` });
+    } else {
+      setGender(null);
     }
   };
 
@@ -758,172 +745,6 @@ function WorkoutPageContent() {
 
     return data;
   }, [allWorkoutLogs, oneYearAgo, today]);
-
-  const latestConsistency = useMemo(() => {
-    if (!consistencyData.length) return null;
-    return consistencyData[consistencyData.length - 1].score;
-  }, [consistencyData]);
-
-  const healthMetrics = useMemo(() => {
-    const calories = dietPlan.length > 0
-        ? dietPlan
-            .map(d => d.totalCalories)
-            .filter((c): c is number => c !== null && c > 0)
-        : [];
-    const averageIntake = calories.length > 0 ? calories.reduce((sum, c) => sum + c, 0) / calories.length : null;
-
-    const currentWeight = weightLogs.length > 0 ? weightLogs[weightLogs.length - 1].weight : null;
-    const age = dateOfBirth ? differenceInYears(new Date(), parseISO(dateOfBirth)) : null;
-    
-    let bmr = null;
-    if (currentWeight && height && age && gender) {
-        if (gender === 'male') {
-            // Mifflin-St Jeor Equation for men
-            bmr = (10 * currentWeight) + (6.25 * height) - (5 * age) + 5;
-        } else {
-            // Mifflin-St Jeor Equation for women
-            bmr = (10 * currentWeight) + (6.25 * height) - (5 * age) - 161;
-        }
-    }
-
-    return {
-        averageIntake: averageIntake ? Math.round(averageIntake) : null,
-        maintenanceCalories: bmr ? Math.round(bmr) : null,
-    };
-  }, [dietPlan, weightLogs, height, dateOfBirth, gender]);
-
-  const projectionSummary = useMemo(() => {
-    if (!goalWeight || weightLogs.length < 2) {
-        return null;
-    }
-
-    const sortedLogs = weightLogs
-        .map(log => {
-            const [year, weekNum] = log.date.split('-W');
-            const dateObj = startOfISOWeek(setISOWeek(new Date(parseInt(year), 0, 4), parseInt(weekNum)));
-            return { ...log, dateObj };
-        })
-        .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
-
-    const weightChartData = sortedLogs.map((log, index, arr) => {
-        let weeklyChange = null;
-        if (index > 0) {
-            const prevWeight = arr[index - 1].weight;
-            weeklyChange = log.weight - prevWeight;
-        }
-        return {
-            weight: log.weight,
-            dateObj: log.dateObj,
-            weeklyChange: weeklyChange,
-        };
-    });
-
-    const lastLog = weightChartData[weightChartData.length - 1];
-    if (!lastLog) return null;
-
-    const currentWeight = lastLog.weight;
-    const weightDifference = goalWeight - currentWeight;
-
-    const changes = weightChartData
-        .map(d => d.weeklyChange)
-        .filter((c): c is number => c !== null && c !== 0);
-
-    let averageWeeklyChange = changes.length > 0 ? changes.reduce((a, b) => a + b, 0) / changes.length : 0;
-
-    const baseSummary = {
-        currentWeight: parseFloat(currentWeight.toFixed(1)),
-        goalWeight,
-        weightDifference: parseFloat(weightDifference.toFixed(1)),
-        averageWeeklyChange: parseFloat(averageWeeklyChange.toFixed(2)),
-    };
-
-    let projectionRate = averageWeeklyChange;
-    if (weightDifference < 0) { // Need to lose weight
-        if (projectionRate >= 0) projectionRate = -0.5; // Assume 0.5 kg/lb loss per week if current trend is gain/stagnant
-    } else { // Need to gain weight
-        if (projectionRate <= 0) projectionRate = 0.25; // Assume 0.25 kg/lb gain per week
-    }
-
-    if (Math.abs(projectionRate) < 0.01) {
-        return baseSummary;
-    }
-
-    const weeksToGo = Math.ceil(Math.abs(weightDifference / projectionRate));
-    if (weeksToGo <= 0 || weeksToGo > 520) {
-        return baseSummary;
-    }
-
-    const projectedDate = addWeeks(lastLog.dateObj, weeksToGo);
-    const nextProjectedWeight = currentWeight + projectionRate;
-    const nextWeekDate = addWeeks(lastLog.dateObj, 1);
-    const daysToNextWeek = differenceInDays(nextWeekDate, new Date());
-    const daysToGoal = differenceInDays(projectedDate, new Date());
-
-    return {
-        ...baseSummary,
-        projectedDate: format(projectedDate, 'PPP'),
-        nextProjectedWeight: parseFloat(nextProjectedWeight.toFixed(1)),
-        weeksToGo,
-        daysToNextWeek,
-        daysToGoal,
-    };
-  }, [goalWeight, weightLogs]);
-  
-  const todaysDiet = useMemo(() => {
-    if (!dietPlan || dietPlan.length === 0) return null;
-    const dayName = format(new Date(), 'EEEE'); // "Monday", "Tuesday", etc.
-    return dietPlan.find(plan => plan.day === dayName);
-  }, [dietPlan]);
-
-  const handleSaveDetails = () => {
-    // Validate and set goal weight
-    if (goalWeightInput) {
-        const goal = parseFloat(goalWeightInput);
-        if (!isNaN(goal) && goal > 0) {
-            setGoalWeight(goal);
-        } else {
-            toast({ title: "Invalid Goal Weight", description: "Please enter a valid number.", variant: "destructive" });
-            return;
-        }
-    } else {
-        setGoalWeight(null);
-    }
-
-    // Validate and set height
-    if (heightInput) {
-        const h = parseFloat(heightInput);
-        if (!isNaN(h) && h > 0) {
-            setHeight(h);
-        } else {
-            toast({ title: "Invalid Height", description: "Please enter a valid number.", variant: "destructive" });
-            return;
-        }
-    } else {
-        setHeight(null);
-        toast({ title: "Missing Detail", description: "Please enter your height.", variant: "destructive" });
-        return;
-    }
-
-    // Set DOB
-    if (dobInput) {
-        setDateOfBirth(format(dobInput, 'yyyy-MM-dd'));
-    } else {
-        setDateOfBirth(null);
-        toast({ title: "Missing Detail", description: "Please enter your date of birth.", variant: "destructive" });
-        return;
-    }
-
-    // Set gender
-    if (genderInput) {
-        setGender(genderInput);
-    } else {
-        setGender(null);
-        toast({ title: "Missing Detail", description: "Please select your gender.", variant: "destructive" });
-        return;
-    }
-
-    toast({ title: "Details Saved", description: "Your profile details have been updated." });
-  };
 
   const areDetailsSet = height && dateOfBirth && gender;
 
@@ -1070,61 +891,10 @@ function WorkoutPageContent() {
               </CardContent>
             </Card>
 
-            <Card>
-                <CardHeader className="flex flex-row items-start justify-between">
-                    <div>
-                        <CardTitle className="flex items-center gap-2 text-lg text-primary">
-                            <Utensils /> Today's Diet
-                        </CardTitle>
-                        <CardDescription>
-                           Your planned meals for {format(new Date(), 'EEEE')}.
-                        </CardDescription>
-                    </div>
-                    {todaysDiet?.totalCalories != null && todaysDiet.totalCalories > 0 && (
-                        <div className="text-right">
-                            <span className="font-bold text-xl text-primary">{todaysDiet.totalCalories.toLocaleString()}</span>
-                            <p className="text-xs text-muted-foreground -mt-1">kcal</p>
-                        </div>
-                    )}
-                </CardHeader>
-                <CardContent>
-                    {todaysDiet ? (
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                                <div>
-                                    <h4 className="font-semibold text-foreground">Meal 1</h4>
-                                    <p className="text-muted-foreground whitespace-pre-wrap mt-1">{todaysDiet.meal1 || 'Not planned.'}</p>
-                                </div>
-                                <div>
-                                    <h4 className="font-semibold text-foreground">Meal 2</h4>
-                                    <p className="text-muted-foreground whitespace-pre-wrap mt-1">{todaysDiet.meal2 || 'Not planned.'}</p>
-                                </div>
-                                <div>
-                                    <h4 className="font-semibold text-foreground">Meal 3</h4>
-                                    <p className="text-muted-foreground whitespace-pre-wrap mt-1">{todaysDiet.meal3 || 'Not planned.'}</p>
-                                </div>
-                                <div>
-                                    <h4 className="font-semibold text-foreground">Supplements</h4>
-                                    <p className="text-muted-foreground whitespace-pre-wrap mt-1">{todaysDiet.supplements || 'Not planned.'}</p>
-                                </div>
-                            </div>
-
-                            {todaysDiet.totalCalories != null && todaysDiet.totalCalories > 0 && (
-                                <div className="pt-4 border-t">
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1">
-                                        <div className="flex justify-between"><span>Protein</span> <span className="font-medium text-foreground">{todaysDiet.protein?.toFixed(0) ?? '-'}g</span></div>
-                                        <div className="flex justify-between"><span>Carbs</span> <span className="font-medium text-foreground">{todaysDiet.carbs?.toFixed(0) ?? '-'}g</span></div>
-                                        <div className="flex justify-between"><span>Fat</span> <span className="font-medium text-foreground">{todaysDiet.fat?.toFixed(0) ?? '-'}g</span></div>
-                                        <div className="flex justify-between"><span>Fiber</span> <span className="font-medium text-foreground">{todaysDiet.fiber?.toFixed(0) ?? '-'}g</span></div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <p className="text-muted-foreground text-center py-4">No diet plan set up for today.</p>
-                    )}
-                </CardContent>
-            </Card>
+            <TodaysDietCard 
+                dietPlan={dietPlan}
+                onEditClick={() => setIsDietPlanModalOpen(true)}
+            />
 
             {areDetailsSet ? (
                 <Card>
@@ -1132,110 +902,12 @@ function WorkoutPageContent() {
                         <CardTitle className="flex items-center gap-2 text-lg text-primary">
                             <Target /> Weight Goal
                         </CardTitle>
-                        <CardDescription>
-                           Track your progress and stay consistent.
-                        </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <Button onClick={() => setIsWeightChartModalOpen(true)} className="w-full text-xs xl:text-sm">
-                                <LineChartIcon className="mr-2 h-4 w-4" />
-                                Chart & Goal
-                            </Button>
-                            <Button onClick={() => handleDietModalOpenChange(true)} variant="outline" className="w-full text-xs xl:text-sm">
-                                <BookCopy className="mr-2 h-4 w-4" />
-                                Diet Plan
-                            </Button>
-                        </div>
-                        {(projectionSummary || latestConsistency || healthMetrics.averageIntake || healthMetrics.maintenanceCalories) && (
-                            <div className="space-y-4 pt-4 border-t">
-                                {projectionSummary && (
-                                    <>
-                                        <div className="grid grid-cols-3 gap-2 text-center text-sm">
-                                            <div>
-                                                <div className="text-muted-foreground">Current</div>
-                                                <div className="font-bold text-lg">{projectionSummary.currentWeight}</div>
-                                                <div className="text-xs text-muted-foreground">kg/lb</div>
-                                            </div>
-                                            <div>
-                                                <div className="text-muted-foreground">Goal</div>
-                                                <div className="font-bold text-lg">{projectionSummary.goalWeight}</div>
-                                                <div className="text-xs text-muted-foreground">kg/lb</div>
-                                            </div>
-                                            <div>
-                                                <div className="text-muted-foreground">{projectionSummary.weightDifference > 0 ? "To Gain" : "To Lose"}</div>
-                                                <div className={`font-bold text-lg ${projectionSummary.weightDifference > 0 ? "text-orange-500" : "text-green-500"}`}>{Math.abs(projectionSummary.weightDifference)}</div>
-                                                <div className="text-xs text-muted-foreground">kg/lb</div>
-                                            </div>
-                                        </div>
-
-                                        <Separator />
-                                        
-                                        <div className="space-y-2 text-sm">
-                                          {projectionSummary.averageWeeklyChange !== undefined && (
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-muted-foreground flex items-center gap-2"><Activity className="h-4 w-4" /> Avg. Weekly Change</span>
-                                                <span className={`font-bold ${projectionSummary.averageWeeklyChange > 0 ? "text-orange-500" : projectionSummary.averageWeeklyChange < 0 ? "text-green-500" : ""}`}>
-                                                    {projectionSummary.averageWeeklyChange > 0 ? '+' : ''}{projectionSummary.averageWeeklyChange.toFixed(2)} kg/lb
-                                                </span>
-                                            </div>
-                                          )}
-                                          {projectionSummary.projectedDate && (
-                                            <>
-                                              <div className="flex justify-between items-center">
-                                                  <span className="text-muted-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Next Week Est.</span>
-                                                  <span className="font-bold">{projectionSummary.nextProjectedWeight} kg/lb</span>
-                                              </div>
-                                              <div className="flex justify-between items-center">
-                                                  <span className="text-muted-foreground pl-6">Days Remaining</span>
-                                                  <span className="font-bold">{projectionSummary.daysToNextWeek > 0 ? `${projectionSummary.daysToNextWeek} days` : 'Past'}</span>
-                                              </div>
-                                              <div className="flex justify-between items-center pt-2 mt-2 border-t">
-                                                  <span className="text-muted-foreground flex items-center gap-2"><CalendarDays className="h-4 w-4" /> Est. Goal Date</span>
-                                                  <span className="font-bold">{projectionSummary.projectedDate}</span>
-                                              </div>
-                                              <div className="flex justify-between items-center">
-                                                  <span className="text-muted-foreground pl-6">Days Remaining</span>
-                                                  <span className="font-bold">{projectionSummary.daysToGoal > 0 ? `${projectionSummary.daysToGoal} days` : 'N/A'}</span>
-                                              </div>
-                                            </>
-                                          )}
-                                        </div>
-                                    </>
-                                )}
-                                
-                                {(healthMetrics.averageIntake || healthMetrics.maintenanceCalories) && (
-                                  <div className="space-y-2 text-sm pt-4 border-t">
-                                      {healthMetrics.averageIntake && (
-                                          <div className="flex justify-between items-center">
-                                              <span className="text-muted-foreground flex items-center gap-2"><Flame className="h-4 w-4" /> Current Avg. Daily Intake</span>
-                                              <span className="font-bold">{healthMetrics.averageIntake} kcal</span>
-                                          </div>
-                                      )}
-                                      {healthMetrics.maintenanceCalories && (
-                                          <div className="flex justify-between items-center">
-                                              <span className="text-muted-foreground flex items-center gap-2"><HeartPulse className="h-4 w-4" /> Est. Maintenance</span>
-                                              <span className="font-bold">{healthMetrics.maintenanceCalories} kcal</span>
-                                          </div>
-                                      )}
-                                      {healthMetrics.averageIntake && healthMetrics.maintenanceCalories && healthMetrics.averageIntake < healthMetrics.maintenanceCalories && (
-                                          <p className="text-xs text-orange-500 mt-2">
-                                              ⚠️ You’re eating below maintenance — watch for fatigue, low mood, or muscle loss.
-                                          </p>
-                                      )}
-                                  </div>
-                                )}
-
-                                {latestConsistency !== null && (
-                                    <div className="space-y-1 text-sm pt-4 border-t">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-muted-foreground flex items-center gap-2"><Activity className="h-4 w-4" /> Workout Consistency</span>
-                                            <span className="font-bold text-lg">{latestConsistency}%</span>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                        <Button onClick={() => setIsWeightChartModalOpen(true)} className="w-full text-xs xl:text-sm">
+                            <LineChartIcon className="mr-2 h-4 w-4" />
+                            View Chart & History
+                        </Button>
                     </CardContent>
                 </Card>
             ) : (
@@ -1310,7 +982,12 @@ function WorkoutPageContent() {
                             </div>
                         </div>
                         <div className="flex justify-end pt-4">
-                            <Button onClick={handleSaveDetails}>
+                            <Button onClick={() => {
+                              handleSetHeight(parseFloat(heightInput));
+                              if (dobInput) handleSetDateOfBirth(format(dobInput, 'yyyy-MM-dd'));
+                              if (genderInput) handleSetGender(genderInput);
+                              if (goalWeightInput) handleSetGoalWeight(parseFloat(goalWeightInput)); else handleSetGoalWeight(null);
+                            }}>
                                 <Save className="mr-2 h-4 w-4"/>
                                 Save Details
                             </Button>

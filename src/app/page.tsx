@@ -19,6 +19,7 @@ import { DashboardStats } from '@/components/DashboardStats';
 import { ProductivitySnapshot } from '@/components/ProductivitySnapshot';
 import { TimeSlots } from '@/components/TimeSlots';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
+import { TodaysDietCard } from '@/components/TodaysDietCard';
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -621,18 +622,24 @@ function HomePageContent() {
               timeAllocationData={timeAllocationData} 
               onOpenStatsModal={() => setIsStatsModalOpen(true)} 
             />
-            <WeightGoalCard 
-              weightLogs={weightLogs}
-              goalWeight={goalWeight}
-              onLogWeight={handleLogWeight}
-              height={height}
-              dateOfBirth={dateOfBirth}
-              gender={gender}
-              onSetHeight={setHeight}
-              onSetDateOfBirth={setDateOfBirth}
-              onSetGender={setGender}
-              onSetGoalWeight={setGoalWeight}
-            />
+            <div className="space-y-6">
+                <WeightGoalCard 
+                  weightLogs={weightLogs}
+                  goalWeight={goalWeight}
+                  onLogWeight={handleLogWeight}
+                  height={height}
+                  dateOfBirth={dateOfBirth}
+                  gender={gender}
+                  onSetHeight={setHeight}
+                  onSetDateOfBirth={setDateOfBirth}
+                  onSetGender={setGender}
+                  onSetGoalWeight={setGoalWeight}
+                />
+                <TodaysDietCard 
+                    dietPlan={dietPlan}
+                    onEditClick={() => setIsDietPlanModalOpen(true)}
+                />
+            </div>
           </div>
           <TimeSlots 
             schedule={todaysSchedule}
