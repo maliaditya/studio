@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChartContainer, ChartConfig } from '@/components/ui/chart';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, AreaChart, Area, Legend, ReferenceLine, Bar, BarChart } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, AreaChart, Area, Legend, ReferenceLine, Bar, BarChart, RadarChart, PolarGrid, PolarAngleAxis, Radar } from 'recharts';
 import { format, parseISO, startOfISOWeek, setISOWeek, addWeeks } from 'date-fns';
 import type { DatedWorkout, WeightLog } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
@@ -179,6 +179,23 @@ export function StatsOverviewModal({
     return allData;
   }, [goalWeight, weightLogs]);
 
+  const radarData = useMemo(() => {
+    const idealHours: Record<string, number> = {
+      'Deep Work': 6,
+      'Learning': 3,
+      'Workout': 1,
+      'Branding': 2,
+    };
+
+    const todayMap = new Map(todayHoursData.map(d => [d.name, d.hours]));
+
+    return Object.keys(idealHours).map(subject => ({
+      subject,
+      today: todayMap.get(subject) || 0,
+      ideal: idealHours[subject],
+    }));
+  }, [todayHoursData]);
+
   const renderProductivityTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
@@ -209,8 +226,9 @@ export function StatsOverviewModal({
             A graphical summary of your key metrics over time.
           </DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue="daily-trend" className="w-full flex-grow min-h-0 flex flex-col">
-            <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 md:grid-cols-7">
+        <Tabs defaultValue="radar" className="w-full flex-grow min-h-0 flex flex-col">
+            <TabsList className="grid w-full grid-cols-4 sm:grid-cols-4 md:grid-cols-8">
+                <TabsTrigger value="radar">Radar</TabsTrigger>
                 <TabsTrigger value="daily-trend">Daily Trend</TabsTrigger>
                 <TabsTrigger value="total-hours">Total Hours</TabsTrigger>
                 <TabsTrigger value="todays-hours">Today's Hours</TabsTrigger>
@@ -219,6 +237,38 @@ export function StatsOverviewModal({
                 <TabsTrigger value="learning">Learning</TabsTrigger>
                 <TabsTrigger value="deepwork">Deep Work</TabsTrigger>
             </TabsList>
+            
+            <TabsContent value="radar" className="flex-grow mt-4 min-h-0">
+                <ScrollArea className="h-full pr-4">
+                    <div>
+                        <h4 className="font-semibold mb-4 text-center md:text-left">Today vs. Ideal Hours</h4>
+                        <ChartContainer config={{}} className="min-h-[400px] w-full">
+                            <ResponsiveContainer>
+                                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+                                    <PolarGrid />
+                                    <PolarAngleAxis dataKey="subject" />
+                                    <RechartsTooltip content={({ active, payload }) => {
+                                        if (active && payload && payload.length) {
+                                            const data = payload[0].payload;
+                                            return (
+                                                <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                    <p className="font-bold text-foreground">{data.subject}</p>
+                                                    <p className="text-muted-foreground">Today: {data.today.toLocaleString()} hours</p>
+                                                    <p className="text-muted-foreground">Ideal: {data.ideal.toLocaleString()} hours</p>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    }} />
+                                    <Legend />
+                                    <Radar name="Today" dataKey="today" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.6} />
+                                    <Radar name="Ideal" dataKey="ideal" stroke="hsl(var(--muted-foreground))" fill="hsl(var(--muted-foreground))" fillOpacity={0.4} />
+                                </RadarChart>
+                            </ResponsiveContainer>
+                        </ChartContainer>
+                    </div>
+                </ScrollArea>
+            </TabsContent>
 
             <TabsContent value="daily-trend" className="flex-grow mt-4 min-h-0">
                 <ScrollArea className="h-full pr-4">
