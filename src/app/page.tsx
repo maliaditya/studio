@@ -616,7 +616,7 @@ function HomePageContent() {
         <CardContent>
           <DashboardStats stats={productivityStats} />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 mr-5">
               <ProductivitySnapshot 
                 stats={productivityStats} 
                 timeAllocationData={timeAllocationData} 
@@ -718,3 +718,5 @@ function HomePageContent() {
 export default function Page() {
     return ( <AuthGuard> <HomePageContent /> </AuthGuard> );
 }
+
+    
