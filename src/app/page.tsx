@@ -67,7 +67,15 @@ const productivityLevels = [
 ];
 
 function HomePageContent() {
-  const { currentUser } = useAuth();
+  const { 
+    currentUser, 
+    weightLogs, setWeightLogs, 
+    goalWeight, setGoalWeight, 
+    height, setHeight, 
+    dateOfBirth, setDateOfBirth, 
+    gender, setGender,
+    dietPlan, setDietPlan,
+  } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
   const [remainingTime, setRemainingTime] = useState('');
@@ -90,14 +98,6 @@ function HomePageContent() {
   // State for personal branding data
   const [brandingTasks, setBrandingTasks] = useState<ExerciseDefinition[]>([]);
   const [brandingLogs, setAllBrandingLogs] = useState<DatedWorkout[]>([]);
-
-  // State for health data
-  const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
-  const [goalWeight, setGoalWeight] = useState<number | null>(null);
-  const [height, setHeight] = useState<number | null>(null);
-  const [dateOfBirth, setDateOfBirth] = useState<string | null>(null);
-  const [gender, setGender] = useState<Gender | null>(null);
-  const [dietPlan, setDietPlan] = useState<UserDietPlan>([]);
 
   // State for Modals
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
@@ -174,7 +174,6 @@ function HomePageContent() {
             upskill: { logs: `upskill_logs_${username}`, goals: `upskill_topic_goals_${username}` },
             deepwork: { defs: `deepwork_definitions_${username}`, logs: `deepwork_logs_${username}` },
             branding: { tasks: `branding_tasks_${username}`, logs: `branding_logs_${username}` },
-            health: { weight: `weightLogs_${username}`, goal: `goalWeight_${username}`, height: `height_${username}`, dob: `dateOfBirth_${username}`, gender: `gender_${username}`, diet: `dietPlan_${username}` }
         };
         const loadItem = (key: string, isJson: boolean = true) => localStorage.getItem(key);
 
@@ -188,28 +187,8 @@ function HomePageContent() {
         try { const d = loadItem(keys.upskill.goals); setTopicGoals(d ? JSON.parse(d) : {}); } catch (e) { setTopicGoals({}); }
         try { const d = loadItem(keys.branding.tasks); setBrandingTasks(d ? JSON.parse(d) : []); } catch (e) { setBrandingTasks([]); }
         try { const d = loadItem(keys.branding.logs); setAllBrandingLogs(d ? JSON.parse(d) : []); } catch (e) { setAllBrandingLogs([]); }
-        try { const d = loadItem(keys.health.diet); setDietPlan(d ? JSON.parse(d) : []); } catch(e) { setDietPlan([]); }
-        try { const d = loadItem(keys.health.weight); setWeightLogs(d ? JSON.parse(d) : []); } catch(e) { setWeightLogs([]); }
-        
-        const storedGoal = loadItem(keys.health.goal, false); if (storedGoal) setGoalWeight(parseFloat(storedGoal));
-        const storedHeight = loadItem(keys.health.height, false); if (storedHeight) setHeight(parseFloat(storedHeight));
-        const storedDob = loadItem(keys.health.dob, false); if (storedDob) setDateOfBirth(storedDob);
-        const storedGender = loadItem(keys.health.gender, false); if (storedGender === 'male' || storedGender === 'female') setGender(storedGender as Gender);
     }
   }, [currentUser]);
-
-  // Save health data back to local storage on change
-  useEffect(() => {
-    if (currentUser?.username) {
-        const username = currentUser.username;
-        localStorage.setItem(`weightLogs_${username}`, JSON.stringify(weightLogs));
-        localStorage.setItem(`dietPlan_${username}`, JSON.stringify(dietPlan));
-        if (goalWeight !== null) localStorage.setItem(`goalWeight_${username}`, goalWeight.toString()); else localStorage.removeItem(`goalWeight_${username}`);
-        if (height !== null) localStorage.setItem(`height_${username}`, height.toString()); else localStorage.removeItem(`height_${username}`);
-        if (dateOfBirth) localStorage.setItem(`dateOfBirth_${username}`, dateOfBirth); else localStorage.removeItem(`dateOfBirth_${username}`);
-        if (gender) localStorage.setItem(`gender_${username}`, gender); else localStorage.removeItem(`gender_${username}`);
-    }
-  }, [weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, currentUser]);
 
 
   useEffect(() => {
@@ -283,7 +262,7 @@ function HomePageContent() {
       case 'tracking': details = 'Tracking Session'; break;
       case 'branding': details = 'Branding Session'; break;
     }
-    const newActivity: ActivityType = { id: `${type}-${Date.now()}`, type, details, completed: false };
+    const newActivity: Activity = { id: `${type}-${Date.now()}`, type, details, completed: false };
     setSchedule(prev => ({ ...prev, [todayKey]: { ...(prev[todayKey] || {}), [slotName]: [...(prev[todayKey]?.[slotName] || []), newActivity] } }));
   };
 
@@ -509,12 +488,8 @@ function HomePageContent() {
   // MODAL HANDLERS
   const handleDietModalOpenChange = (isOpen: boolean) => {
       setIsDietPlanModalOpen(isOpen);
-      if (!isOpen && currentUser?.username) {
-          const planKey = `dietPlan_${currentUser.username}`;
-          const storedPlan = localStorage.getItem(planKey);
-          if (storedPlan) { try { setDietPlan(JSON.parse(storedPlan)); } catch (e) { console.error("Error parsing diet plan on modal close", e); } }
-      }
   };
+  
   const handleLogWeight = (weight: number, date: Date) => {
     if (!currentUser || isNaN(weight) || weight <= 0) { toast({ title: "Invalid Input", description: "Please enter a valid weight.", variant: "destructive" }); return; }
     const weekKey = `${getISOWeekYear(date)}-W${getISOWeek(date).toString().padStart(2, '0')}`;
@@ -534,7 +509,7 @@ function HomePageContent() {
             <p className="text-sm text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
         </CardHeader>
         <CardContent>
-          <DashboardStats stats={{...dailyStats, ...productivityStats}} />
+          <DashboardStats stats={dailyStats} />
           <ProductivitySnapshot stats={productivityStats} timeAllocationData={timeAllocationData} onOpenStatsModal={() => setIsStatsModalOpen(true)} />
           <TimeSlots 
             schedule={todaysSchedule}

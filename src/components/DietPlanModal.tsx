@@ -47,46 +47,10 @@ export function DietPlanModal({
   isOpen,
   onOpenChange,
 }: DietPlanModalProps) {
-  const { currentUser } = useAuth();
-  const [plan, setPlan] = useState<UserDietPlan>(getDefaultPlan());
-
-  const planStorageKey = currentUser ? `dietPlan_${currentUser.username}` : null;
-
-  useEffect(() => {
-    if (isOpen && planStorageKey) {
-      try {
-        const storedPlan = localStorage.getItem(planStorageKey);
-        if (storedPlan) {
-          const parsedPlan = JSON.parse(storedPlan);
-          if (Array.isArray(parsedPlan) && parsedPlan.length === 7 && parsedPlan[0].meal1 !== undefined) {
-             setPlan(parsedPlan);
-          } else {
-             setPlan(getDefaultPlan());
-          }
-        } else {
-          setPlan(getDefaultPlan());
-        }
-      } catch (error) {
-        console.error("Failed to load diet plan from localStorage", error);
-        setPlan(getDefaultPlan());
-      }
-    }
-  }, [isOpen, planStorageKey]);
-
-  useEffect(() => {
-    // Only save when the modal is open to avoid overwriting on initial load
-    if (isOpen && planStorageKey) {
-      try {
-        localStorage.setItem(planStorageKey, JSON.stringify(plan));
-      } catch (error) {
-        console.error("Failed to save diet plan to localStorage", error);
-      }
-    }
-  }, [plan, planStorageKey, isOpen]);
-
-
+  const { dietPlan, setDietPlan } = useAuth();
+  
   const handleTextChange = (day: string, field: keyof Pick<EditableMealPlan, 'meal1' | 'meal2' | 'meal3' | 'supplements'>, value: string) => {
-    setPlan(currentPlan =>
+    setDietPlan(currentPlan =>
       currentPlan.map(dayPlan => {
         if (dayPlan.day === day) {
           return { ...dayPlan, [field]: value };
@@ -97,7 +61,7 @@ export function DietPlanModal({
   };
   
   const handleTotalsChange = (day: string, field: keyof ManualTotals, value: string) => {
-    setPlan(currentPlan =>
+    setDietPlan(currentPlan =>
       currentPlan.map(dayPlan => {
         if (dayPlan.day === day) {
           const numericValue = value === '' ? null : parseFloat(value);
@@ -108,6 +72,7 @@ export function DietPlanModal({
     );
   };
 
+  const plan = Array.isArray(dietPlan) && dietPlan.length === 7 ? dietPlan : getDefaultPlan();
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>

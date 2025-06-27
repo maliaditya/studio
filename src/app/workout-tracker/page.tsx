@@ -204,7 +204,16 @@ const singleMuscleDailySchedule: Record<number, ExerciseCategory | null> = {
 
 function WorkoutPageContent() {
   const { toast } = useToast();
-  const { currentUser, exportData } = useAuth();
+  const { 
+    currentUser, 
+    exportData,
+    weightLogs, setWeightLogs,
+    goalWeight, setGoalWeight,
+    height, setHeight,
+    dateOfBirth, setDateOfBirth,
+    gender, setGender,
+    dietPlan
+  } = useAuth();
 
   const [workoutMode, setWorkoutMode] = useState<WorkoutMode>('two-muscle');
   const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
@@ -217,8 +226,6 @@ function WorkoutPageContent() {
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
-  const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
-  const [dietPlan, setDietPlan] = useState<UserDietPlan>([]);
 
   const [viewingProgressExercise, setViewingProgressExercise] = useState<ExerciseDefinition | null>(null);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
@@ -232,10 +239,6 @@ function WorkoutPageContent() {
   const [showBackupPrompt, setShowBackupPrompt] = useState(false);
   const [isLibraryExpanded, setIsLibraryExpanded] = useState(false);
 
-  const [goalWeight, setGoalWeight] = useState<number | null>(null);
-  const [height, setHeight] = useState<number | null>(null);
-  const [dateOfBirth, setDateOfBirth] = useState<string | null>(null);
-  const [gender, setGender] = useState<Gender | null>(null);
   const [isWeightChartModalOpen, setIsWeightChartModalOpen] = useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
 
@@ -255,14 +258,7 @@ function WorkoutPageContent() {
         const plansKey = `workoutPlans_${username}`;
         const logsKey = `allWorkoutLogs_${username}`;
         const modeKey = `workoutMode_${username}`;
-        const weightLogsKey = `weightLogs_${username}`;
-        const goalWeightKey = `goalWeight_${username}`;
-        const heightKey = `height_${username}`;
-        const dobKey = `dateOfBirth_${username}`;
-        const genderKey = `gender_${username}`;
-        const dietPlanKey = `dietPlan_${username}`;
 
-        // Load workout mode or initialize
         const storedMode = localStorage.getItem(modeKey);
         if (storedMode === 'one-muscle' || storedMode === 'two-muscle') {
             setWorkoutMode(storedMode as WorkoutMode);
@@ -271,7 +267,6 @@ function WorkoutPageContent() {
             localStorage.setItem(modeKey, 'two-muscle');
         }
 
-        // Load workout plans or initialize with defaults AND save
         try {
             const storedPlans = localStorage.getItem(plansKey);
             if (storedPlans) {
@@ -286,7 +281,6 @@ function WorkoutPageContent() {
             localStorage.setItem(plansKey, JSON.stringify(INITIAL_PLANS));
         }
 
-        // Load exercise definitions or initialize with defaults AND save
         try {
             const storedDefinitions = localStorage.getItem(defsKey);
             if (storedDefinitions) {
@@ -306,55 +300,20 @@ function WorkoutPageContent() {
             localStorage.setItem(defsKey, JSON.stringify(DEFAULT_EXERCISE_DEFINITIONS));
         }
         
-        // Load remaining user data
-        const storedGoal = localStorage.getItem(goalWeightKey);
-        if (storedGoal) setGoalWeight(parseFloat(storedGoal));
-        
-        const storedHeight = localStorage.getItem(heightKey);
-        if (storedHeight) setHeight(parseFloat(storedHeight));
-        
-        const storedDob = localStorage.getItem(dobKey);
-        if (storedDob) setDateOfBirth(storedDob);
-        
-        const storedGender = localStorage.getItem(genderKey);
-        if (storedGender === 'male' || storedGender === 'female') {
-            setGender(storedGender as Gender);
-        }
-
-        try {
-            const storedDietPlan = localStorage.getItem(dietPlanKey);
-            setDietPlan(storedDietPlan ? JSON.parse(storedDietPlan) : []);
-        } catch (e) { console.error("Error parsing diet plan", e); setDietPlan([]); }
-
-        try {
-            const storedWeightLogs = localStorage.getItem(weightLogsKey);
-            setWeightLogs(storedWeightLogs ? JSON.parse(storedWeightLogs) : []);
-        } catch (e) { console.error("Error parsing weight logs", e); setWeightLogs([]); }
-
         try {
             const storedLogs = localStorage.getItem(logsKey);
             setAllWorkoutLogs(storedLogs ? JSON.parse(storedLogs) : []);
         } catch (e) { console.error("Error parsing workout logs", e); setAllWorkoutLogs([]); }
 
     } else {
-      // Clear all state for logged-out user
       setExerciseDefinitions([]);
       setAllWorkoutLogs([]);
       setWorkoutPlans(INITIAL_PLANS);
-      setWeightLogs([]);
-      setGoalWeight(null);
-      setHeight(null);
-      setDateOfBirth(null);
-      setGender(null);
-      setDietPlan([]);
     }
     const timer = setTimeout(() => setIsLoadingPage(false), 300);
     return () => clearTimeout(timer);
 }, [currentUser]);
 
-  // Split useEffects for better state management and to prevent data overwrites.
-  
-  // Effect for saving primary workout data
   useEffect(() => {
     if (currentUser?.username && !isLoadingPage) {
       try {
@@ -374,40 +333,7 @@ function WorkoutPageContent() {
     }
   }, [exerciseDefinitions, allWorkoutLogs, workoutMode, workoutPlans, currentUser, isLoadingPage, toast]);
 
-  // Effect for saving health and weight data, which is shared across pages
   useEffect(() => {
-    if (currentUser?.username && !isLoadingPage) {
-      try {
-        const weightLogsKey = `weightLogs_${currentUser.username}`;
-        const goalWeightKey = `goalWeight_${currentUser.username}`;
-        const heightKey = `height_${currentUser.username}`;
-        const dobKey = `dateOfBirth_${currentUser.username}`;
-        const genderKey = `gender_${currentUser.username}`;
-
-        localStorage.setItem(weightLogsKey, JSON.stringify(weightLogs));
-
-        if (goalWeight !== null) localStorage.setItem(goalWeightKey, goalWeight.toString());
-        else localStorage.removeItem(goalWeightKey);
-
-        if (height !== null) localStorage.setItem(heightKey, height.toString());
-        else localStorage.removeItem(heightKey);
-        
-        if (dateOfBirth) localStorage.setItem(dobKey, dateOfBirth);
-        else localStorage.removeItem(dobKey);
-
-        if (gender) localStorage.setItem(genderKey, gender);
-        else localStorage.removeItem(genderKey);
-      } catch (e) {
-        console.error("Error saving health data to localStorage", e);
-        toast({ title: "Save Error", description: "Could not save health data locally.", variant: "destructive"});
-      }
-    }
-  }, [weightLogs, goalWeight, height, dateOfBirth, gender, currentUser, isLoadingPage, toast]);
-
-  // This useEffect is responsible for auto-populating the workout for the selected date
-  // if one doesn't already exist.
-  useEffect(() => {
-    // Guard clauses to prevent running with incomplete data or on a non-logged-in user
     if (!currentUser || exerciseDefinitions.length === 0 || Object.keys(workoutPlans).length === 0 || !workoutMode) {
       return;
     }
@@ -415,7 +341,6 @@ function WorkoutPageContent() {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const workoutExists = allWorkoutLogs.some(log => log.id === dateKey);
 
-    // Only populate if no workout exists for the selected date
     if (!workoutExists) {
         const { exercises, description } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
         
@@ -430,7 +355,6 @@ function WorkoutPageContent() {
     }
   }, [selectedDate, currentUser, exerciseDefinitions, workoutMode, workoutPlans, allWorkoutLogs, toast]);
 
-  // Check for backup prompt on Mondays
   useEffect(() => {
       if (!currentUser) return;
       
@@ -449,21 +373,6 @@ function WorkoutPageContent() {
 
   const handleDietModalOpenChange = (isOpen: boolean) => {
     setIsDietPlanModalOpen(isOpen);
-    if (!isOpen && currentUser?.username) {
-      // When modal closes, reload diet plan from storage to update parent state for calculations
-      const planKey = `dietPlan_${currentUser.username}`;
-      const storedPlan = localStorage.getItem(planKey);
-      if (storedPlan) {
-        try {
-          const parsedPlan = JSON.parse(storedPlan);
-          if (Array.isArray(parsedPlan)) {
-            setDietPlan(parsedPlan);
-          }
-        } catch (e) {
-          console.error("Error parsing diet plan from localStorage on modal close", e);
-        }
-      }
-    }
   };
 
   const markBackupPromptAsHandled = () => {

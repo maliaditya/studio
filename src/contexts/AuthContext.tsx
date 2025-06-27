@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -28,6 +28,19 @@ interface AuthContextType {
   pushDemoDataWithToken: (token: string) => Promise<void>;
   theme: string;
   setTheme: React.Dispatch<React.SetStateAction<string>>;
+  // Shared health state
+  weightLogs: WeightLog[];
+  setWeightLogs: React.Dispatch<React.SetStateAction<WeightLog[]>>;
+  goalWeight: number | null;
+  setGoalWeight: React.Dispatch<React.SetStateAction<number | null>>;
+  height: number | null;
+  setHeight: React.Dispatch<React.SetStateAction<number | null>>;
+  dateOfBirth: string | null;
+  setDateOfBirth: React.Dispatch<React.SetStateAction<string | null>>;
+  gender: Gender | null;
+  setGender: React.Dispatch<React.SetStateAction<Gender | null>>;
+  dietPlan: UserDietPlan;
+  setDietPlan: React.Dispatch<React.SetStateAction<UserDietPlan>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,17 +53,69 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const { toast } = useToast();
 
+  // Shared Health State
+  const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
+  const [goalWeight, setGoalWeight] = useState<number | null>(null);
+  const [height, setHeight] = useState<number | null>(null);
+  const [dateOfBirth, setDateOfBirth] = useState<string | null>(null);
+  const [gender, setGender] = useState<Gender | null>(null);
+  const [dietPlan, setDietPlan] = useState<UserDietPlan>([]);
+
   useEffect(() => {
     const user = getCurrentLocalUser();
     setCurrentUser(user);
     setLoading(false);
     
-    // Load theme from localStorage on initial mount
     const savedTheme = localStorage.getItem('lifeos_theme') || 'default';
     setTheme(savedTheme);
   }, []);
 
-  // Effect to apply theme changes to the DOM and save to localStorage
+  // Effect to load user-specific data (including health data) when currentUser changes
+  useEffect(() => {
+    if (currentUser?.username) {
+      const username = currentUser.username;
+      const loadItem = (key: string, isJson: boolean = true) => localStorage.getItem(key);
+      
+      // Health Data
+      const weightLogsKey = `weightLogs_${username}`;
+      const goalWeightKey = `goalWeight_${username}`;
+      const heightKey = `height_${username}`;
+      const dobKey = `dateOfBirth_${username}`;
+      const genderKey = `gender_${username}`;
+      const dietPlanKey = `dietPlan_${username}`;
+      
+      try { const d = loadItem(weightLogsKey); setWeightLogs(d ? JSON.parse(d) : []); } catch (e) { setWeightLogs([]); }
+      try { const d = loadItem(dietPlanKey); setDietPlan(d ? JSON.parse(d) : []); } catch (e) { setDietPlan([]); }
+      
+      const storedGoal = loadItem(goalWeightKey, false); if (storedGoal) setGoalWeight(parseFloat(storedGoal)); else setGoalWeight(null);
+      const storedHeight = loadItem(heightKey, false); if (storedHeight) setHeight(parseFloat(storedHeight)); else setHeight(null);
+      const storedDob = loadItem(dobKey, false); if (storedDob) setDateOfBirth(storedDob); else setDateOfBirth(null);
+      const storedGender = loadItem(genderKey, false); if (storedGender === 'male' || storedGender === 'female') setGender(storedGender as Gender); else setGender(null);
+    } else {
+      // Clear data on logout
+      setWeightLogs([]);
+      setGoalWeight(null);
+      setHeight(null);
+      setDateOfBirth(null);
+      setGender(null);
+      setDietPlan([]);
+    }
+  }, [currentUser]);
+
+  // Effect to save health data to localStorage whenever it changes
+  useEffect(() => {
+    if (currentUser?.username && !loading) {
+      const username = currentUser.username;
+      localStorage.setItem(`weightLogs_${username}`, JSON.stringify(weightLogs));
+      localStorage.setItem(`dietPlan_${username}`, JSON.stringify(dietPlan));
+      if (goalWeight !== null) localStorage.setItem(`goalWeight_${username}`, goalWeight.toString()); else localStorage.removeItem(`goalWeight_${username}`);
+      if (height !== null) localStorage.setItem(`height_${username}`, height.toString()); else localStorage.removeItem(`height_${username}`);
+      if (dateOfBirth) localStorage.setItem(`dateOfBirth_${username}`, dateOfBirth); else localStorage.removeItem(`dateOfBirth_${username}`);
+      if (gender) localStorage.setItem(`gender_${username}`, gender); else localStorage.removeItem(`gender_${username}`);
+    }
+  }, [weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, currentUser, loading]);
+
+
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('theme-default', 'theme-matrix');
@@ -90,29 +155,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Homepage Schedule
     localStorage.setItem(`lifeos_schedule_${username}`, JSON.stringify(data.schedule || '{}'));
 
-    // Health
-    localStorage.setItem(`dietPlan_${username}`, JSON.stringify(data.dietPlan || []));
-    localStorage.setItem(`weightLogs_${username}`, JSON.stringify(data.weightLogs || []));
-    if (data.goalWeight) {
-        localStorage.setItem(`goalWeight_${username}`, data.goalWeight.toString());
-    } else {
-        localStorage.removeItem(`goalWeight_${username}`);
-    }
-    if (data.height) {
-        localStorage.setItem(`height_${username}`, data.height.toString());
-    } else {
-        localStorage.removeItem(`height_${username}`);
-    }
-    if (data.dateOfBirth) {
-        localStorage.setItem(`dateOfBirth_${username}`, data.dateOfBirth);
-    } else {
-        localStorage.removeItem(`dateOfBirth_${username}`);
-    }
-    if (data.gender) {
-        localStorage.setItem(`gender_${username}`, data.gender);
-    } else {
-        localStorage.removeItem(`gender_${username}`);
-    }
+    // Health - This data will now be loaded into the context's state instead
+    setDietPlan(data.dietPlan || []);
+    setWeightLogs(data.weightLogs || []);
+    setGoalWeight(data.goalWeight ? parseFloat(data.goalWeight) : null);
+    setHeight(data.height ? parseFloat(data.height) : null);
+    setDateOfBirth(data.dateOfBirth || null);
+    setGender(data.gender || null);
   };
   
   const register = async (username: string, password: string) => {
@@ -135,7 +184,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setCurrentUser(user);
 
       if (user.username === 'demo') {
-        // For demo user, automatically pull data silently and then redirect.
         await pullDataFromCloud(user.username);
         router.push('/');
       } else {
@@ -180,12 +228,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         brandingTasks: JSON.parse(localStorage.getItem(`branding_tasks_${username}`) || '[]'),
         brandingLogs: JSON.parse(localStorage.getItem(`branding_logs_${username}`) || '[]'),
         schedule: JSON.parse(localStorage.getItem(`lifeos_schedule_${username}`) || '{}'),
-        dietPlan: JSON.parse(localStorage.getItem(`dietPlan_${username}`) || '[]'),
-        weightLogs: JSON.parse(localStorage.getItem(`weightLogs_${username}`) || '[]'),
-        goalWeight: localStorage.getItem(`goalWeight_${username}`) || null,
-        height: localStorage.getItem(`height_${username}`) || null,
-        dateOfBirth: localStorage.getItem(`dateOfBirth_${username}`) || null,
-        gender: localStorage.getItem(`gender_${username}`) || null,
+        dietPlan: dietPlan,
+        weightLogs: weightLogs,
+        goalWeight: goalWeight,
+        height: height,
+        dateOfBirth: dateOfBirth,
+        gender: gender,
     };
         const requestBody = { username, data: allUserData, demo_override_token: token };
         const response = await fetch('/api/blob-sync', {
@@ -217,13 +265,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const username = currentUser.username;
 
-    // --- DEMO USER LOGIC ---
     if (username === 'demo') {
         setIsDemoTokenModalOpen(true);
         return;
     }
     
-    // --- REGULAR USER LOGIC ---
     toast({ title: "Syncing...", description: "Pushing your local data to the cloud." });
     try {
         const allUserData = {
@@ -240,12 +286,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             brandingTasks: JSON.parse(localStorage.getItem(`branding_tasks_${username}`) || '[]'),
             brandingLogs: JSON.parse(localStorage.getItem(`branding_logs_${username}`) || '[]'),
             schedule: JSON.parse(localStorage.getItem(`lifeos_schedule_${username}`) || '{}'),
-            dietPlan: JSON.parse(localStorage.getItem(`dietPlan_${username}`) || '[]'),
-            weightLogs: JSON.parse(localStorage.getItem(`weightLogs_${username}`) || '[]'),
-            goalWeight: localStorage.getItem(`goalWeight_${username}`) || null,
-            height: localStorage.getItem(`height_${username}`) || null,
-            dateOfBirth: localStorage.getItem(`dateOfBirth_${username}`) || null,
-            gender: localStorage.getItem(`gender_${username}`) || null,
+            dietPlan: dietPlan,
+            weightLogs: weightLogs,
+            goalWeight: goalWeight,
+            height: height,
+            dateOfBirth: dateOfBirth,
+            gender: gender,
         };
         const requestBody = { username, data: allUserData };
         const response = await fetch('/api/blob-sync', {
@@ -357,12 +403,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             schedule: JSON.parse(localStorage.getItem(`lifeos_schedule_${username}`) || '{}'),
 
             // Health
-            dietPlan: JSON.parse(localStorage.getItem(`dietPlan_${username}`) || '[]'),
-            weightLogs: JSON.parse(localStorage.getItem(`weightLogs_${username}`) || '[]'),
-            goalWeight: localStorage.getItem(`goalWeight_${username}`) || null,
-            height: localStorage.getItem(`height_${username}`) || null,
-            dateOfBirth: localStorage.getItem(`dateOfBirth_${username}`) || null,
-            gender: localStorage.getItem(`gender_${username}`) || null,
+            dietPlan: dietPlan,
+            weightLogs: weightLogs,
+            goalWeight: goalWeight,
+            height: height,
+            dateOfBirth: dateOfBirth,
+            gender: gender,
         };
 
         const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
@@ -446,6 +492,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pushDemoDataWithToken,
     theme,
     setTheme,
+    // Health State
+    weightLogs,
+    setWeightLogs,
+    goalWeight,
+    setGoalWeight,
+    height,
+    setHeight,
+    dateOfBirth,
+    setDateOfBirth,
+    gender,
+    setGender,
+    dietPlan,
+    setDietPlan,
   };
 
   return (

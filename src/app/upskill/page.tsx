@@ -53,7 +53,15 @@ const durationChartConfig = {
 
 function UpskillPageContent() {
   const { toast } = useToast();
-  const { currentUser, exportData } = useAuth();
+  const { 
+    currentUser, 
+    exportData,
+    weightLogs, setWeightLogs,
+    goalWeight, setGoalWeight,
+    height, setHeight,
+    dateOfBirth, setDateOfBirth,
+    gender, setGender
+  } = useAuth();
 
   const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
   const [topicGoals, setTopicGoals] = useState<Record<string, TopicGoal>>({});
@@ -68,7 +76,6 @@ function UpskillPageContent() {
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
-  const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
 
   const [viewingProgressExercise, setViewingProgressExercise] = useState<ExerciseDefinition | null>(null);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
@@ -80,10 +87,6 @@ function UpskillPageContent() {
   const [showBackupPrompt, setShowBackupPrompt] = useState(false);
   const [isLibraryExpanded, setIsLibraryExpanded] = useState(true);
 
-  const [goalWeight, setGoalWeight] = useState<number | null>(null);
-  const [height, setHeight] = useState<number | null>(null);
-  const [dateOfBirth, setDateOfBirth] = useState<string | null>(null);
-  const [gender, setGender] = useState<Gender | null>(null);
   const [isWeightChartModalOpen, setIsWeightChartModalOpen] = useState(false);
 
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
@@ -132,13 +135,6 @@ function UpskillPageContent() {
         const defsKey = `upskill_definitions_${username}`;
         const logsKey = `upskill_logs_${username}`;
         const goalsKey = `upskill_topic_goals_${username}`;
-        
-        // Shared health data
-        const weightLogsKey = `weightLogs_${username}`;
-        const goalWeightKey = `goalWeight_${username}`;
-        const heightKey = `height_${username}`;
-        const dobKey = `dateOfBirth_${username}`;
-        const genderKey = `gender_${username}`;
 
         try {
             const storedDefinitions = localStorage.getItem(defsKey);
@@ -155,37 +151,15 @@ function UpskillPageContent() {
             setAllWorkoutLogs(storedLogs ? JSON.parse(storedLogs) : []);
         } catch (e) { setAllWorkoutLogs([]); }
         
-        const storedGoal = localStorage.getItem(goalWeightKey);
-        if (storedGoal) setGoalWeight(parseFloat(storedGoal));
-        
-        const storedHeight = localStorage.getItem(heightKey);
-        if (storedHeight) setHeight(parseFloat(storedHeight));
-        
-        const storedDob = localStorage.getItem(dobKey);
-        if (storedDob) setDateOfBirth(storedDob);
-        
-        const storedGender = localStorage.getItem(genderKey);
-        if (storedGender === 'male' || storedGender === 'female') setGender(storedGender as Gender);
-
-        try {
-            const storedWeightLogs = localStorage.getItem(weightLogsKey);
-            setWeightLogs(storedWeightLogs ? JSON.parse(storedWeightLogs) : []);
-        } catch (e) { setWeightLogs([]); }
     } else {
       setExerciseDefinitions([]);
       setAllWorkoutLogs([]);
       setTopicGoals({});
-      setWeightLogs([]);
-      setGoalWeight(null);
-      setHeight(null);
-      setDateOfBirth(null);
-      setGender(null);
     }
     const timer = setTimeout(() => setIsLoadingPage(false), 300);
     return () => clearTimeout(timer);
 }, [currentUser]);
 
-  // Split useEffects for better state management
   useEffect(() => {
     if (currentUser?.username && !isLoadingPage) {
       try {
@@ -203,28 +177,6 @@ function UpskillPageContent() {
       }
     }
   }, [exerciseDefinitions, allWorkoutLogs, topicGoals, currentUser, isLoadingPage, toast]);
-
-  // Effect for saving health and weight data, which is shared across pages
-  useEffect(() => {
-    if (currentUser?.username && !isLoadingPage) {
-      try {
-        const username = currentUser.username;
-        const weightLogsKey = `weightLogs_${username}`;
-        const goalWeightKey = `goalWeight_${username}`;
-        const heightKey = `height_${username}`;
-        const dobKey = `dateOfBirth_${username}`;
-        const genderKey = `gender_${username}`;
-        localStorage.setItem(weightLogsKey, JSON.stringify(weightLogs));
-        if (goalWeight !== null) localStorage.setItem(goalWeightKey, goalWeight.toString()); else localStorage.removeItem(goalWeightKey);
-        if (height !== null) localStorage.setItem(heightKey, height.toString()); else localStorage.removeItem(heightKey);
-        if (dateOfBirth) localStorage.setItem(dobKey, dateOfBirth); else localStorage.removeItem(dobKey);
-        if (gender) localStorage.setItem(genderKey, gender); else localStorage.removeItem(genderKey);
-      } catch (e) {
-        console.error("Error saving health data to localStorage", e);
-        toast({ title: "Save Error", description: "Could not save health data locally.", variant: "destructive"});
-      }
-    }
-  }, [weightLogs, goalWeight, height, dateOfBirth, gender, currentUser, isLoadingPage, toast]);
 
   useEffect(() => {
       if (!currentUser) return;
