@@ -25,7 +25,7 @@ import { WeightChartModal } from '@/components/WeightChartModal';
 import { DietPlanModal } from '@/components/DietPlanModal';
 import { StatsOverviewModal } from '@/components/StatsOverviewModal';
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, AreaChart, Area } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, AreaChart, Area, BarChart, Bar } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -151,8 +151,8 @@ const productivityLevels = [
     { level: 'L20', min: 900, max: Infinity, description: 'Legendary grind day (Rare / Purpose-driven only)', zone: '⚠️ Apex Zone' },
 ];
 
-const durationChartConfig = {
-  totalDuration: { label: "Duration (min)", color: "hsl(var(--primary))" },
+const totalHoursChartConfig = {
+  hours: { label: "Hours", color: "hsl(var(--primary))" },
 } satisfies ChartConfig;
 
 
@@ -649,54 +649,6 @@ function HomePageContent() {
       return data;
     }, [allWorkoutLogs, oneYearAgo, today]);
 
-    const dailyUpskillData = useMemo(() => {
-      const dailyData: Record<string, { totalDuration: number; topics: Set<string> }> = {};
-      allUpskillLogs.forEach(log => {
-          log.exercises.forEach(exercise => {
-              const duration = exercise.loggedSets.reduce((sum, set) => sum + set.reps, 0);
-              if (duration > 0) {
-                  if (!dailyData[log.date]) {
-                      dailyData[log.date] = { totalDuration: 0, topics: new Set() };
-                  }
-                  dailyData[log.date].totalDuration += duration;
-                  dailyData[log.date].topics.add(exercise.name);
-              }
-          });
-      });
-      return Object.entries(dailyData)
-          .map(([dateString, data]) => ({
-              dateObj: parseISO(dateString),
-              totalDuration: data.totalDuration,
-              topics: Array.from(data.topics).join(', '),
-              date: format(parseISO(dateString), 'MMM dd'),
-          }))
-          .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
-    }, [allUpskillLogs]);
-
-    const dailyDeepWorkData = useMemo(() => {
-        const dailyData: Record<string, { totalDuration: number; topics: Set<string> }> = {};
-        allDeepWorkLogs.forEach(log => {
-            log.exercises.forEach(exercise => {
-                const duration = exercise.loggedSets.reduce((sum, set) => sum + set.weight, 0);
-                if (duration > 0) {
-                    if (!dailyData[log.date]) {
-                        dailyData[log.date] = { totalDuration: 0, topics: new Set() };
-                    }
-                    dailyData[log.date].totalDuration += duration;
-                    dailyData[log.date].topics.add(exercise.name);
-                }
-            });
-        });
-        return Object.entries(dailyData)
-            .map(([dateString, data]) => ({
-                dateObj: parseISO(dateString),
-                totalDuration: data.totalDuration,
-                topics: Array.from(data.topics).join(', '),
-                date: format(parseISO(dateString), 'MMM dd'),
-            }))
-            .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
-    }, [allDeepWorkLogs]);
-
     const productivityStats = useMemo(() => {
         const todayStr = format(new Date(), 'yyyy-MM-dd');
         const yesterdayStr = format(addDays(new Date(), -1), 'yyyy-MM-dd');
@@ -1052,6 +1004,19 @@ function HomePageContent() {
         };
         const brandingStatus = calculateBrandingStatus();
 
+        const totalLearningMinutes = allUpskillLogs.reduce((total, log) => total + log.exercises.reduce((exTotal, ex) => exTotal + ex.loggedSets.reduce((setTotal, set) => setTotal + set.reps, 0), 0), 0);
+        const totalDeepWorkMinutes = allDeepWorkLogs.reduce((total, log) => total + log.exercises.reduce((exTotal, ex) => exTotal + ex.loggedSets.reduce((setTotal, set) => setTotal + set.weight, 0), 0), 0);
+        const totalWorkoutHours = new Set(allWorkoutLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date)).size;
+        const totalBrandingMinutes = brandingLogs.reduce((total, log) => total + log.exercises.reduce((exTotal, ex) => exTotal + ex.loggedSets.length, 0), 0) * 30; // Assuming each stage is 30 mins
+
+        const totalHoursData = [
+            { name: 'Learning', hours: parseFloat((totalLearningMinutes / 60).toFixed(1)) },
+            { name: 'Deep Work', hours: parseFloat((totalDeepWorkMinutes / 60).toFixed(1)) },
+            { name: 'Workout', hours: totalWorkoutHours },
+            { name: 'Branding', hours: parseFloat((totalBrandingMinutes / 60).toFixed(1)) },
+        ];
+
+
         return {
             todayDeepWorkHours: todayDeepWork / 60,
             deepWorkChange,
@@ -1064,6 +1029,7 @@ function HomePageContent() {
             healthMetrics, projectionSummary, overallNextMilestone,
             avgProductiveHoursChange,
             brandingStatus,
+            totalHoursData,
         };
     }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, dietPlan, weightLogs, dateOfBirth, height, gender, goalWeight, consistencyData, brandingTasks, brandingLogs, deepWorkDefinitions]);
     
@@ -1359,101 +1325,38 @@ function HomePageContent() {
                             </div>
                             <Separator className="my-6" />
                             <div>
-                                <h4 className="font-semibold mb-4 text-center md:text-left">Daily Duration Trends</h4>
-                                <Tabs defaultValue="learning" className="w-full">
-                                    <TabsList className="grid w-full grid-cols-2">
-                                        <TabsTrigger value="learning">Learning</TabsTrigger>
-                                        <TabsTrigger value="deepwork">Deep Work</TabsTrigger>
-                                    </TabsList>
-                                    <TabsContent value="learning">
-                                        {dailyUpskillData.length > 1 ? (
-                                            <ChartContainer config={durationChartConfig} className="h-[200px] w-full">
-                                                <ResponsiveContainer>
-                                                    <LineChart data={dailyUpskillData} margin={{ top: 10, right: 20, left: -10, bottom: 5 }}>
-                                                        <CartesianGrid vertical={false} />
-                                                        <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
-                                                        <YAxis tickLine={false} axisLine={false} tickMargin={8} fontSize={12} domain={['auto', 'auto']} label={{ value: "Minutes", angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' }}} />
-                                                        <RechartsTooltip content={({ active, payload }) => {
-                                                          if (active && payload && payload.length) {
-                                                              const data = payload[0].payload;
-                                                              return (
-                                                                  <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                                      <div className="font-bold text-foreground">{format(data.dateObj, 'PPP')}</div>
-                                                                      <div className="grid gap-1.5">
-                                                                          <div className="flex w-full items-center gap-2">
-                                                                              <div className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: 'hsl(var(--primary))' }} />
-                                                                              <div className="flex flex-1 justify-between">
-                                                                                  <span className="text-muted-foreground">Duration</span>
-                                                                                  <span className="font-mono font-medium text-foreground">{data.totalDuration} min</span>
-                                                                              </div>
-                                                                          </div>
-                                                                          {data.topics && (
-                                                                              <div className="mt-1 pt-1.5 border-t">
-                                                                                  <p className="font-medium text-foreground mb-1">Focus Areas:</p>
-                                                                                  <p className="text-muted-foreground whitespace-normal">{data.topics}</p>
-                                                                              </div>
-                                                                          )}
-                                                                      </div>
-                                                                  </div>
-                                                              );
-                                                          }
-                                                          return null;
-                                                        }} />
-                                                        <Line type="monotone" dataKey="totalDuration" stroke="var(--color-totalDuration)" strokeWidth={2} dot={false} name="totalDuration" />
-                                                    </LineChart>
-                                                </ResponsiveContainer>
-                                            </ChartContainer>
-                                        ) : (
-                                            <div className="flex h-[200px] items-center justify-center text-center text-sm text-muted-foreground">
-                                                <p>Log learning sessions on multiple days to see a chart of your daily duration.</p>
-                                            </div>
-                                        )}
-                                    </TabsContent>
-                                    <TabsContent value="deepwork">
-                                         {dailyDeepWorkData.length > 1 ? (
-                                            <ChartContainer config={durationChartConfig} className="h-[200px] w-full">
-                                                <ResponsiveContainer>
-                                                    <LineChart data={dailyDeepWorkData} margin={{ top: 10, right: 20, left: -10, bottom: 5 }}>
-                                                        <CartesianGrid vertical={false} />
-                                                        <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
-                                                        <YAxis tickLine={false} axisLine={false} tickMargin={8} fontSize={12} domain={['auto', 'auto']} label={{ value: "Minutes", angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' }}} />
-                                                        <RechartsTooltip content={({ active, payload }) => {
-                                                          if (active && payload && payload.length) {
-                                                              const data = payload[0].payload;
-                                                              return (
-                                                                  <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                                      <div className="font-bold text-foreground">{format(data.dateObj, 'PPP')}</div>
-                                                                      <div className="grid gap-1.5">
-                                                                          <div className="flex w-full items-center gap-2">
-                                                                              <div className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: 'hsl(var(--primary))' }} />
-                                                                              <div className="flex flex-1 justify-between">
-                                                                                  <span className="text-muted-foreground">Duration</span>
-                                                                                  <span className="font-mono font-medium text-foreground">{data.totalDuration} min</span>
-                                                                              </div>
-                                                                          </div>
-                                                                          {data.topics && (
-                                                                              <div className="mt-1 pt-1.5 border-t">
-                                                                                  <p className="font-medium text-foreground mb-1">Focus Areas:</p>
-                                                                                  <p className="text-muted-foreground whitespace-normal">{data.topics}</p>
-                                                                              </div>
-                                                                          )}
-                                                                      </div>
-                                                                  </div>
-                                                              );
-                                                          }
-                                                          return null;
-                                                        }} />
-                                                        <Line type="monotone" dataKey="totalDuration" stroke="var(--color-totalDuration)" strokeWidth={2} dot={false} name="totalDuration" />
-                                                    </LineChart>
-                                                </ResponsiveContainer>
-                                            </ChartContainer>
-                                        ) : (
-                                            <div className="flex h-[200px] items-center justify-center text-center text-sm text-muted-foreground">
-                                                <p>Log deep work sessions on multiple days to see a chart of your daily duration.</p>
-                                            </div>
-                                        )}
-                                    </TabsContent>
-                                </Tabs>
+                                <h4 className="font-semibold mb-4 text-center md:text-left">Total Hours Logged</h4>
+                                {productivityStats.totalHoursData.some(d => d.hours > 0) ? (
+                                    <ChartContainer config={totalHoursChartConfig} className="h-[200px] w-full">
+                                        <ResponsiveContainer>
+                                            <BarChart accessibilityLayer data={productivityStats.totalHoursData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+                                                <CartesianGrid vertical={false} />
+                                                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
+                                                <YAxis tickLine={false} axisLine={false} tickMargin={8} fontSize={12} label={{ value: "Hours", angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' }}} />
+                                                <RechartsTooltip
+                                                    cursor={{ fill: "hsl(var(--muted))" }}
+                                                    content={({ active, payload }) => {
+                                                        if (active && payload && payload.length) {
+                                                            const data = payload[0].payload;
+                                                            return (
+                                                                <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                                    <p className="font-bold text-foreground">{data.name}</p>
+                                                                    <p className="text-muted-foreground">{data.hours.toLocaleString()} hours</p>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    }}
+                                                />
+                                                <Bar dataKey="hours" fill="var(--color-hours)" radius={[4, 4, 0, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </ChartContainer>
+                                ) : (
+                                    <div className="flex h-[200px] items-center justify-center text-center text-sm text-muted-foreground">
+                                        <p>Log some activities to see your total hours spent.</p>
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
