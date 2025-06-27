@@ -355,8 +355,8 @@ export function WeightGoalCard({
                             <Target /> Weight Goal
                         </CardTitle>
                         <Button variant="outline" size="icon" onClick={() => setIsChartVisible(!isChartVisible)} className="h-8 w-8">
-                            <LineChartIcon className="h-4 w-4" />
-                            <span className="sr-only">Toggle Chart View</span>
+                            {isChartVisible ? <Target className="h-4 w-4" /> : <LineChartIcon className="h-4 w-4" />}
+                            <span className="sr-only">Toggle View</span>
                         </Button>
                     </CardHeader>
                     <CardContent>
