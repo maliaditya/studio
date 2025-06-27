@@ -1257,8 +1257,8 @@ function HomePageContent() {
               </Card>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
-                <div className="lg:col-span-3">
+            <div className="grid grid-cols-1 gap-6 mb-6">
+                <div>
                     <Card className="h-full bg-card/50">
                         <CardHeader className="flex flex-row items-start justify-between">
                             <div>
@@ -1438,111 +1438,6 @@ function HomePageContent() {
                                     </ResponsiveContainer>
                                 </ChartContainer>
                             </div>
-                        </CardContent>
-                    </Card>
-                </div>
-                <div className="lg:col-span-2">
-                    <Card className="h-full bg-card/50">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-primary">
-                                <Target /> Weight Goal
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <Button onClick={() => setIsWeightChartModalOpen(true)} className="w-full text-xs xl:text-sm">
-                                    <LineChartIcon className="mr-2 h-4 w-4" />
-                                    Chart & Goal
-                                </Button>
-                                <Button onClick={() => handleDietModalOpenChange(true)} variant="outline" className="w-full text-xs xl:text-sm">
-                                    <BookCopy className="mr-2 h-4 w-4" />
-                                    Diet Plan
-                                </Button>
-                            </div>
-                            {(productivityStats.projectionSummary || productivityStats.latestConsistency || (productivityStats.healthMetrics && (productivityStats.healthMetrics.averageIntake || productivityStats.healthMetrics.maintenanceCalories))) ? (
-                                <div className="space-y-4 pt-4 border-t">
-                                    {productivityStats.projectionSummary && (
-                                        <>
-                                            <div className="grid grid-cols-3 gap-2 text-center text-sm">
-                                                <div>
-                                                    <div className="text-muted-foreground">Current</div>
-                                                    <div className="font-bold text-lg">{productivityStats.projectionSummary.currentWeight}</div>
-                                                    <div className="text-xs text-muted-foreground">kg/lb</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-muted-foreground">Goal</div>
-                                                    <div className="font-bold text-lg">{productivityStats.projectionSummary.goalWeight}</div>
-                                                    <div className="text-xs text-muted-foreground">kg/lb</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-muted-foreground">{productivityStats.projectionSummary.weightDifference > 0 ? "To Gain" : "To Lose"}</div>
-                                                    <div className={`font-bold text-lg ${productivityStats.projectionSummary.weightDifference > 0 ? "text-orange-500" : "text-green-500"}`}>{Math.abs(productivityStats.projectionSummary.weightDifference)}</div>
-                                                    <div className="text-xs text-muted-foreground">kg/lb</div>
-                                                </div>
-                                            </div>
-
-                                            <Separator />
-                                            
-                                            <div className="space-y-2 text-sm">
-                                            {productivityStats.projectionSummary.averageWeeklyChange !== undefined && (
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-muted-foreground flex items-center gap-2"><Activity className="h-4 w-4" /> Avg. Weekly Change</span>
-                                                    <span className={`font-bold ${productivityStats.projectionSummary.averageWeeklyChange > 0 ? "text-orange-500" : productivityStats.projectionSummary.averageWeeklyChange < 0 ? "text-green-500" : ""}`}>
-                                                        {productivityStats.projectionSummary.averageWeeklyChange > 0 ? '+' : ''}{productivityStats.projectionSummary.averageWeeklyChange.toFixed(2)} kg/lb
-                                                    </span>
-                                                </div>
-                                            )}
-                                            {productivityStats.projectionSummary.projectedDate && (
-                                                <>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-muted-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Next Week Est.</span>
-                                                    <span className="font-bold">{productivityStats.projectionSummary.nextProjectedWeight} kg/lb</span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-muted-foreground pl-6">Days Remaining</span>
-                                                    <span className="font-bold">{productivityStats.projectionSummary.daysToNextWeek > 0 ? `${productivityStats.projectionSummary.daysToNextWeek} days` : 'Past'}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center pt-2 mt-2 border-t">
-                                                    <span className="text-muted-foreground flex items-center gap-2"><CalendarDays className="h-4 w-4" /> Est. Goal Date</span>
-                                                    <span className="font-bold">{productivityStats.projectionSummary.projectedDate}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-muted-foreground pl-6">Days Remaining</span>
-                                                    <span className="font-bold">{productivityStats.projectionSummary.daysToGoal > 0 ? `${productivityStats.projectionSummary.daysToGoal} days` : 'N/A'}</span>
-                                                </div>
-                                                </>
-                                            )}
-                                            </div>
-                                        </>
-                                    )}
-                                    
-                                    {(productivityStats.healthMetrics.averageIntake || productivityStats.healthMetrics.maintenanceCalories) && (
-                                    <div className="space-y-2 text-sm pt-4 border-t">
-                                        {productivityStats.healthMetrics.averageIntake && (
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-muted-foreground flex items-center gap-2"><Flame className="h-4 w-4" /> Current Avg. Daily Intake</span>
-                                                <span className="font-bold">{productivityStats.healthMetrics.averageIntake} kcal</span>
-                                            </div>
-                                        )}
-                                        {productivityStats.healthMetrics.maintenanceCalories && (
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-muted-foreground flex items-center gap-2"><HeartPulse className="h-4 w-4" /> Est. Maintenance</span>
-                                                <span className="font-bold">{productivityStats.healthMetrics.maintenanceCalories} kcal</span>
-                                            </div>
-                                        )}
-                                        {productivityStats.healthMetrics.averageIntake && productivityStats.healthMetrics.maintenanceCalories && productivityStats.healthMetrics.averageIntake < productivityStats.healthMetrics.maintenanceCalories && (
-                                            <p className="text-xs text-orange-500 mt-2">
-                                                ⚠️ You’re eating below maintenance — watch for fatigue, low mood, or muscle loss.
-                                            </p>
-                                        )}
-                                    </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <p className="text-sm text-muted-foreground text-center py-4">
-                                  Log your weight and set a goal on the Workout Tracker page to see your projection here.
-                                </p>
-                            )}
                         </CardContent>
                     </Card>
                 </div>
