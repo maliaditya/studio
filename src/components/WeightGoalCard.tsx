@@ -69,7 +69,7 @@ export function WeightGoalCard({
     const [newWeight, setNewWeight] = useState('');
     const [weightDate, setWeightDate] = useState<Date | undefined>(new Date());
     const [showLogForm, setShowLogForm] = useState(false);
-    const [isChartVisible, setIsChartVisible] = useState(false);
+    const [isChartVisible, setIsChartVisible] = useState(true);
 
     const [heightInput, setHeightInput] = useState('');
     const [dobInput, setDobInput] = useState<Date | undefined>();
@@ -170,7 +170,9 @@ export function WeightGoalCard({
         if (Math.abs(projectionRate) < 0.01) return allData;
 
         const weeksToGo = Math.ceil(Math.abs(weightToChange / projectionRate));
-        if (weeksToGo <= 0) return allData;
+        if (weeksToGo <= 0 || weeksToGo > 520) { // Cap at 10 years
+            return allData;
+        }
         
         const lastLogIndex = allData.findIndex(d => d.timestamp === lastLog.timestamp);
         if (lastLogIndex !== -1) {
