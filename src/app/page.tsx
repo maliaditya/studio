@@ -1,4 +1,3 @@
-
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -616,12 +615,14 @@ function HomePageContent() {
         </CardHeader>
         <CardContent>
           <DashboardStats stats={productivityStats} />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <ProductivitySnapshot 
-              stats={productivityStats} 
-              timeAllocationData={timeAllocationData} 
-              onOpenStatsModal={() => setIsStatsModalOpen(true)} 
-            />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div className="lg:col-span-2">
+              <ProductivitySnapshot 
+                stats={productivityStats} 
+                timeAllocationData={timeAllocationData} 
+                onOpenStatsModal={() => setIsStatsModalOpen(true)} 
+              />
+            </div>
             <div className="space-y-6">
                 <WeightGoalCard 
                   weightLogs={weightLogs}
