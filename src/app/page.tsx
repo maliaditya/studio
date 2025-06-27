@@ -1322,7 +1322,7 @@ function HomePageContent() {
                                                                             <div>Days Left: <span className="font-medium text-foreground">{stats.nextMilestone.daysRemaining}</span></div>
                                                                             <div>Needed: <span className="font-medium text-foreground">{stats.nextMilestone.progressNeeded} {stats.nextMilestone.unit}</span></div>
                                                                             {stats.nextMilestone.timeNeeded !== null && (
-                                                                                <div>Est. Time: <span className="font-medium text-foreground">{stats.nextMilestone.timeNeeded} min</span></div>
+                                                                                <div>Est. Time: <span className="font-medium text-foreground">{(stats.nextMilestone.timeNeeded / 60).toFixed(1)} hr</span></div>
                                                                             )}
                                                                         </div>
                                                                     )}
@@ -1333,7 +1333,7 @@ function HomePageContent() {
                                                                                 <div>Est. Date: <span className="font-medium text-foreground">{stats.completion.date}</span></div>
                                                                                 <div>Days Left: <span className="font-medium text-foreground">{stats.completion.daysRemaining}</span></div>
                                                                                  {stats.completion.timeNeeded !== null && (
-                                                                                    <div>Est. Time: <span className="font-medium text-foreground">{stats.completion.timeNeeded} min</span></div>
+                                                                                    <div>Est. Time: <span className="font-medium text-foreground">{(stats.completion.timeNeeded / 60).toFixed(1)} hr</span></div>
                                                                                 )}
                                                                             </>
                                                                     ) : (stats.totalProgress >= stats.goalValue) ? <div className="text-green-500 font-bold">Completed!</div> : <div className="text-muted-foreground">Not enough data to project.</div>}
@@ -1717,5 +1717,7 @@ export default function Page() {
 
 
 
+
+    
 
     
