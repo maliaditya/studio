@@ -19,6 +19,9 @@ interface WorkoutHeatmapProps {
   consistencyData: { date: string; fullDate: string; score: number }[];
   oneYearAgo: Date | null;
   today: Date | null;
+  title?: string;
+  description?: string;
+  graphDescription?: string;
 }
 
 interface HeatmapValue {
@@ -46,7 +49,10 @@ export function WorkoutHeatmap({
   onDateSelect, 
   consistencyData,
   oneYearAgo,
-  today
+  today,
+  title = "Activity",
+  description = "Your consistency over the last year. Click a square to view that day's log.",
+  graphDescription = "Your probability of being active, based on recent consistency."
 }: WorkoutHeatmapProps) {
   
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
@@ -115,10 +121,10 @@ export function WorkoutHeatmap({
         <CardHeader>
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle>Workout Activity</CardTitle>
+              <CardTitle>{title}</CardTitle>
               <CardDescription>
-                {view === 'heatmap' && "Your workout consistency over the last year. Click a square to view that day's log."}
-                {view === 'graph' && 'Your probability of working out, based on recent consistency.'}
+                {view === 'heatmap' && description}
+                {view === 'graph' && graphDescription}
               </CardDescription>
             </div>
              <div className='flex items-center gap-2'>

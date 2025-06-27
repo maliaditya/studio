@@ -705,6 +705,9 @@ function UpskillPageContent() {
               </Card>
               <div>
                 <WorkoutHeatmap
+                  title="Learning Activity"
+                  description="Your learning consistency over the last year. Click a square to view that day's log."
+                  graphDescription="Your probability of learning, based on recent consistency."
                   allWorkoutLogs={allWorkoutLogs}
                   onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
                   consistencyData={consistencyData}

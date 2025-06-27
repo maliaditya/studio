@@ -773,6 +773,9 @@ function DeepWorkPageContent() {
 
               <div>
                 <WorkoutHeatmap
+                  title="Deep Work Activity"
+                  description="Your deep work consistency over the last year. Click a square to view that day's log."
+                  graphDescription="Your probability of doing deep work, based on recent consistency."
                   allWorkoutLogs={allWorkoutLogs}
                   onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
                   consistencyData={consistencyData}

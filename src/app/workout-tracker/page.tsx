@@ -1056,6 +1056,9 @@ function WorkoutPageContent() {
               </Card>
               <div>
                 <WorkoutHeatmap
+                  title="Workout Activity"
+                  description="Your workout consistency over the last year. Click a square to view that day's log."
+                  graphDescription="Your probability of working out, based on recent consistency."
                   allWorkoutLogs={allWorkoutLogs}
                   onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
                   consistencyData={consistencyData}
