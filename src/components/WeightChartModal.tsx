@@ -4,8 +4,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { addWeeks, format, parseISO, setISOWeek, startOfISOWeek, differenceInDays } from 'date-fns';
 import type { WeightLog, Gender } from '@/types/workout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
 import { Button } from './ui/button';
 import { Weight as WeightIcon, Edit2, Trash2, Save, X, ZoomOut, CalendarIcon, Target } from 'lucide-react';
@@ -31,10 +31,10 @@ interface WeightChartModalProps {
   onLogWeight: (weight: number, date: Date) => void;
   onUpdateWeightLog: (dateKey: string, newWeight: number) => void;
   onDeleteWeightLog: (dateKey: string) => void;
-  onSetGoalWeight: (goal: number) => void;
-  onSetHeight: (height: number) => void;
-  onSetDateOfBirth: (dob: string) => void;
-  onSetGender: (gender: Gender) => void;
+  onSetGoalWeight: (goal: number | null) => void;
+  onSetHeight: (height: number | null) => void;
+  onSetDateOfBirth: (dob: string | null) => void;
+  onSetGender: (gender: Gender | null) => void;
 }
 
 const weightChartConfig = {
@@ -139,6 +139,7 @@ export function WeightChartModal({
   const [goalWeightInput, setGoalWeightInput] = useState('');
   const [heightInput, setHeightInput] = useState('');
   const [dobInput, setDobInput] = useState<Date | undefined>();
+  const [genderInput, setGenderInput] = useState<Gender | null>(null);
   const [weightDate, setWeightDate] = useState<Date | undefined>(new Date());
   
   const [editingLog, setEditingLog] = useState<{ date: string; weight: string } | null>(null);
@@ -147,22 +148,13 @@ export function WeightChartModal({
   const [brushIndex, setBrushIndex] = useState<{ startIndex?: number; endIndex?: number }>({});
 
   useEffect(() => {
-    if (goalWeight) {
-      setGoalWeightInput(String(goalWeight));
-    } else {
-      setGoalWeightInput('');
+    if (isOpen) {
+      setGoalWeightInput(goalWeight ? String(goalWeight) : '');
+      setHeightInput(height ? String(height) : '');
+      setDobInput(dateOfBirth ? parseISO(dateOfBirth) : undefined);
+      setGenderInput(gender || null);
     }
-    if (height) {
-        setHeightInput(String(height));
-    } else {
-        setHeightInput('');
-    }
-    if (dateOfBirth) {
-        setDobInput(parseISO(dateOfBirth));
-    } else {
-        setDobInput(undefined);
-    }
-  }, [goalWeight, height, dateOfBirth, isOpen]);
+  }, [goalWeight, height, dateOfBirth, gender, isOpen]);
 
   const weightChartData = useMemo(() => {
     if (!weightLogs) return [];
@@ -281,30 +273,48 @@ export function WeightChartModal({
     }
   };
 
-  const handleSetGoalWeightClick = () => {
-    const goal = parseFloat(goalWeightInput);
-    if (!isNaN(goal) && goal > 0) {
-      onSetGoalWeight(goal);
+  const handleSaveDetails = () => {
+    // Validate and set goal weight
+    if (goalWeightInput) {
+        const goal = parseFloat(goalWeightInput);
+        if (!isNaN(goal) && goal > 0) {
+            onSetGoalWeight(goal);
+        } else {
+            toast({ title: "Invalid Goal Weight", description: "Please enter a valid number.", variant: "destructive" });
+            return; // Stop if invalid
+        }
     } else {
-      toast({ title: "Invalid Input", description: "Please enter a valid goal weight.", variant: "destructive" });
+        onSetGoalWeight(null); // Allow clearing the goal
     }
-  };
 
-  const handleSetHeightClick = () => {
-    const h = parseFloat(heightInput);
-    if (!isNaN(h) && h > 0) {
-      onSetHeight(h);
+    // Validate and set height
+    if (heightInput) {
+        const h = parseFloat(heightInput);
+        if (!isNaN(h) && h > 0) {
+            onSetHeight(h);
+        } else {
+            toast({ title: "Invalid Height", description: "Please enter a valid number.", variant: "destructive" });
+            return;
+        }
     } else {
-      toast({ title: "Invalid Input", description: "Please enter a valid height in cm.", variant: "destructive" });
+        onSetHeight(null);
     }
-  };
 
-  const handleSetDobClick = () => {
+    // Set DOB
     if (dobInput) {
-      onSetDateOfBirth(format(dobInput, 'yyyy-MM-dd'));
+        onSetDateOfBirth(format(dobInput, 'yyyy-MM-dd'));
     } else {
-      toast({ title: "Invalid Input", description: "Please select a date.", variant: "destructive" });
+        onSetDateOfBirth(null);
     }
+
+    // Set gender
+    if (genderInput) {
+        onSetGender(genderInput);
+    } else {
+        onSetGender(null);
+    }
+
+    toast({ title: "Details Saved", description: "Your profile details have been updated." });
   };
 
   const isZoomed = useMemo(() => {
@@ -400,64 +410,32 @@ export function WeightChartModal({
             </Card>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
+                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Target/> Your Details</CardTitle>
+                        <CardDescription>Provide these details for more accurate health and goal projections.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                         <div>
-                            <Label className="text-xs text-muted-foreground">Gender (for BMR calculation)</Label>
-                            <RadioGroup
-                                value={gender || undefined}
-                                onValueChange={(value) => onSetGender(value as Gender)}
-                                className="flex gap-4 pt-2"
-                            >
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="male" id="gender-male" />
-                                    <Label htmlFor="gender-male" className="font-normal">Male</Label>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="female" id="gender-female" />
-                                    <Label htmlFor="gender-female" className="font-normal">Female</Label>
-                                </div>
-                            </RadioGroup>
-                        </div>
-                        <div className="grid grid-cols-1 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <Label htmlFor="goal-weight-input" className="text-xs text-muted-foreground">Goal Weight (kg/lb)</Label>
-                                <div className="flex gap-2">
-                                    <Input
-                                        id="goal-weight-input"
-                                        type="number"
-                                        placeholder="e.g., 75"
-                                        value={goalWeightInput}
-                                        onChange={(e) => setGoalWeightInput(e.target.value)}
-                                        className="h-9 flex-grow"
-                                    />
-                                    <Button onClick={handleSetGoalWeightClick} disabled={!goalWeightInput} className="h-9">
-                                        Set
-                                    </Button>
-                                </div>
-                            </div>
-                            <div>
-                                <Label htmlFor="height-input" className="text-xs text-muted-foreground">Height (cm)</Label>
-                                <div className="flex gap-2">
-                                    <Input
-                                        id="height-input"
-                                        type="number"
-                                        placeholder="e.g., 180"
-                                        value={heightInput}
-                                        onChange={(e) => setHeightInput(e.target.value)}
-                                        className="h-9 flex-grow"
-                                    />
-                                    <Button onClick={handleSetHeightClick} disabled={!heightInput} className="h-9">
-                                        Set
-                                    </Button>
-                                </div>
+                                <Label className="text-xs text-muted-foreground">Gender (for BMR)</Label>
+                                <RadioGroup
+                                    value={genderInput || ""}
+                                    onValueChange={(value) => setGenderInput(value as Gender)}
+                                    className="flex gap-4 pt-2"
+                                >
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="male" id="gender-male" />
+                                        <Label htmlFor="gender-male" className="font-normal">Male</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="female" id="gender-female" />
+                                        <Label htmlFor="gender-female" className="font-normal">Female</Label>
+                                    </div>
+                                </RadioGroup>
                             </div>
                             <div>
                                 <Label htmlFor="dob-input" className="text-xs text-muted-foreground">Date of Birth</Label>
-                                <div className="flex gap-2">
                                 <Popover>
                                     <PopoverTrigger asChild>
                                     <Button id="dob-input" variant={"outline"} className={cn("h-9 w-full justify-start text-left font-normal", !dobInput && "text-muted-foreground")}>
@@ -478,11 +456,35 @@ export function WeightChartModal({
                                     />
                                     </PopoverContent>
                                 </Popover>
-                                <Button onClick={handleSetDobClick} disabled={!dobInput} className="h-9">
-                                    Set
-                                </Button>
-                                </div>
                             </div>
+                            <div>
+                                <Label htmlFor="height-input" className="text-xs text-muted-foreground">Height (cm)</Label>
+                                <Input
+                                    id="height-input"
+                                    type="number"
+                                    placeholder="e.g., 180"
+                                    value={heightInput}
+                                    onChange={(e) => setHeightInput(e.target.value)}
+                                    className="h-9"
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="goal-weight-input" className="text-xs text-muted-foreground">Goal Weight (kg/lb)</Label>
+                                <Input
+                                    id="goal-weight-input"
+                                    type="number"
+                                    placeholder="e.g., 75"
+                                    value={goalWeightInput}
+                                    onChange={(e) => setGoalWeightInput(e.target.value)}
+                                    className="h-9"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex justify-end pt-4">
+                            <Button onClick={handleSaveDetails}>
+                                <Save className="mr-2 h-4 w-4"/>
+                                Save Details
+                            </Button>
                         </div>
                     </CardContent>
                 </Card>
@@ -559,8 +561,8 @@ export function WeightChartModal({
                                                     <TableCell className="font-medium">{format(log.dateObj, 'MMM dd, yyyy')}</TableCell>
                                                     <TableCell>{log.weight}</TableCell>
                                                     <TableCell className="text-right">
-                                                        <Button variant="ghost" size="icon" onClick={() => setEditingLog({ date: log.fullWeek, weight: log.weight.toString() })} className="h-8 w-8"><Edit2 className="h-4 w-4" /></Button>
-                                                        <Button variant="ghost" size="icon" onClick={() => onDeleteWeightLog(log.fullWeek)} className="h-8 w-8 text-destructive hover:text-destructive/90"><Trash2 className="h-4 w-4" /></Button>
+                                                        <Button variant="ghost" size="icon" onClick={() => setEditingLog({ date: log.fullWeek!, weight: log.weight.toString() })} className="h-8 w-8"><Edit2 className="h-4 w-4" /></Button>
+                                                        <Button variant="ghost" size="icon" onClick={() => onDeleteWeightLog(log.fullWeek!)} className="h-8 w-8 text-destructive hover:text-destructive/90"><Trash2 className="h-4 w-4" /></Button>
                                                     </TableCell>
                                                 </>
                                             )}
