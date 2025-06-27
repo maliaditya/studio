@@ -177,8 +177,8 @@ function HomePageContent() {
         const username = currentUser.username;
         const keys = {
             workout: { defs: `exerciseDefinitions_${username}`, plans: `workoutPlans_${username}`, mode: `workoutMode_${username}`, logs: `allWorkoutLogs_${username}` },
-            upskill: { logs: `upskill_logs_${username}`, goals: `upskill_topic_goals_${username}` },
-            deepwork: { defs: `deepwork_definitions_${username}`, logs: `deepwork_logs_${username}` },
+            upskill: { defs: `upskill_definitions_${username}`, logs: `upskill_logs_${username}`, goals: `upskill_topic_goals_${username}` },
+            deepwork: { defs: `deepwork_definitions_${username}`, logs: `deepwork_logs_${username}`, deletes: `deepwork_manual_deletes_${username}` },
             branding: { tasks: `branding_tasks_${username}`, logs: `branding_logs_${username}` },
         };
         const loadItem = (key: string, isJson: boolean = true) => localStorage.getItem(key);
@@ -404,9 +404,10 @@ function HomePageContent() {
                   if (totalProgress < milestones[i]) {
                       const progressToMilestone = milestones[i] - totalProgress;
                       const daysToMilestone = Math.ceil(progressToMilestone / averageRatePerDay);
+                      const unitType = goal.goalType.endsWith('s') && progressToMilestone === 1 ? goal.goalType.slice(0, -1) : goal.goalType;
                       milestoneStats = {
                           percent: (i + 1) * 25, date: format(addDays(new Date(), daysToMilestone), 'PPP'), daysRemaining: daysToMilestone,
-                          progressNeeded: Math.round(progressToMilestone), unit: goal.goalType, timeNeeded: (progressToMilestone / (speed / 60)) || null,
+                          progressNeeded: Math.round(progressToMilestone), unit: unitType, timeNeeded: (progressToMilestone / (speed / 60)) || null,
                       };
                       break;
                   }
@@ -557,54 +558,48 @@ function HomePageContent() {
     toast({ title: "Weight Deleted", description: `Weight log for week ${dateKey} has been removed.` });
   };
 
-  const handleSetGoalWeight = (goal: number) => {
-    if (!isNaN(goal) && goal > 0) {
-        if (currentUser?.username) {
-            setGoalWeight(goal);
-            toast({ title: "Goal Set!", description: `Your new goal weight is ${goal} kg/lb.` });
-        } else {
-            toast({ title: "Error", description: "You must be logged in to set a goal.", variant: "destructive" });
-        }
+  const handleSetGoalWeight = (goal: number | null) => {
+    if (!currentUser?.username) {
+        toast({ title: "Error", description: "You must be logged in to set a goal.", variant: "destructive" });
+        return;
+    }
+    if (goal === null || (!isNaN(goal) && goal > 0)) {
+        setGoalWeight(goal);
+        if(goal !== null) toast({ title: "Goal Set!", description: `Your new goal weight is ${goal} kg/lb.` });
     } else {
         toast({ title: "Invalid Input", description: "Please enter a valid goal weight.", variant: "destructive" });
     }
   };
 
-  const handleSetHeight = (h: number) => {
-    if (!isNaN(h) && h > 0) {
-        if (currentUser?.username) {
-            setHeight(h);
-            toast({ title: "Height Set!", description: `Your height has been saved as ${h} cm.` });
-        } else {
-            toast({ title: "Error", description: "You must be logged in to set your height.", variant: "destructive" });
-        }
+  const handleSetHeight = (h: number | null) => {
+    if (!currentUser?.username) {
+        toast({ title: "Error", description: "You must be logged in to set your height.", variant: "destructive" });
+        return;
+    }
+    if (h === null || (!isNaN(h) && h > 0)) {
+        setHeight(h);
+        if (h !== null) toast({ title: "Height Set!", description: `Your height has been saved as ${h} cm.` });
     } else {
         toast({ title: "Invalid Input", description: "Please enter a valid height.", variant: "destructive" });
     }
   };
 
-  const handleSetDateOfBirth = (dob: string) => {
-    if (dob) {
-        if (currentUser?.username) {
-            setDateOfBirth(dob);
-            toast({ title: "Date of Birth Set", description: `Your DoB has been saved.` });
-        } else {
-            toast({ title: "Error", description: "You must be logged in to set your date of birth.", variant: "destructive" });
-        }
-    } else {
-        toast({ title: "Invalid Input", description: "Please select a valid date.", variant: "destructive" });
+  const handleSetDateOfBirth = (dob: string | null) => {
+    if (!currentUser?.username) {
+        toast({ title: "Error", description: "You must be logged in to set your date of birth.", variant: "destructive" });
+        return;
     }
+    setDateOfBirth(dob);
+    if(dob) toast({ title: "Date of Birth Set", description: `Your DoB has been saved.` });
   };
 
-  const handleSetGender = (g: Gender) => {
-    if (g) {
-      if (currentUser?.username) {
-        setGender(g);
-        toast({ title: "Gender Set!", description: `Your gender has been saved.` });
-      } else {
+  const handleSetGender = (g: Gender | null) => {
+    if (!currentUser?.username) {
         toast({ title: "Error", description: "You must be logged in to set your gender.", variant: "destructive" });
-      }
+        return;
     }
+    setGender(g);
+    if(g) toast({ title: "Gender Set!", description: `Your gender has been saved.` });
   };
 
   // MODAL HANDLERS
@@ -630,6 +625,13 @@ function HomePageContent() {
               weightLogs={weightLogs}
               goalWeight={goalWeight}
               onLogWeight={handleLogWeight}
+              height={height}
+              dateOfBirth={dateOfBirth}
+              gender={gender}
+              onSetHeight={setHeight}
+              onSetDateOfBirth={setDateOfBirth}
+              onSetGender={setGender}
+              onSetGoalWeight={setGoalWeight}
             />
           </div>
           <TimeSlots 
