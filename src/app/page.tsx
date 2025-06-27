@@ -1350,76 +1350,6 @@ function HomePageContent() {
                                     </div>
                                 </div>
                             </div>
-                            <Separator className="my-6" />
-                            <div>
-                                <h4 className="font-semibold mb-4 text-center md:text-left">Total Hours Logged</h4>
-                                {productivityStats.totalHoursData.some(d => d.hours > 0) ? (
-                                    <ChartContainer config={totalHoursChartConfig} className="h-[200px] w-full">
-                                        <ResponsiveContainer>
-                                            <BarChart accessibilityLayer data={productivityStats.totalHoursData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
-                                                <CartesianGrid vertical={false} />
-                                                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
-                                                <YAxis tickLine={false} axisLine={false} tickMargin={8} fontSize={12} label={{ value: "Hours", angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' }}} />
-                                                <RechartsTooltip
-                                                    cursor={{ fill: "hsl(var(--muted))" }}
-                                                    content={({ active, payload }) => {
-                                                        if (active && payload && payload.length) {
-                                                            const data = payload[0].payload;
-                                                            return (
-                                                                <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                                    <p className="font-bold text-foreground">{data.name}</p>
-                                                                    <p className="text-muted-foreground">{data.hours.toLocaleString()} hours</p>
-                                                                </div>
-                                                            );
-                                                        }
-                                                        return null;
-                                                    }}
-                                                />
-                                                <Bar dataKey="hours" fill="var(--color-hours)" radius={[4, 4, 0, 0]} />
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    </ChartContainer>
-                                ) : (
-                                    <div className="flex h-[200px] items-center justify-center text-center text-sm text-muted-foreground">
-                                        <p>Log some activities to see your total hours spent.</p>
-                                    </div>
-                                )}
-                            </div>
-                            <Separator className="my-6" />
-                            <div>
-                                <h4 className="font-semibold mb-4 text-center md:text-left">Hours Spent Today</h4>
-                                {productivityStats.todayHoursData.some(d => d.hours > 0) ? (
-                                    <ChartContainer config={totalHoursChartConfig} className="h-[200px] w-full">
-                                        <ResponsiveContainer>
-                                            <BarChart accessibilityLayer data={productivityStats.todayHoursData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
-                                                <CartesianGrid vertical={false} />
-                                                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
-                                                <YAxis tickLine={false} axisLine={false} tickMargin={8} fontSize={12} label={{ value: "Hours", angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' }}} />
-                                                <RechartsTooltip
-                                                    cursor={{ fill: "hsl(var(--muted))" }}
-                                                    content={({ active, payload }) => {
-                                                        if (active && payload && payload.length) {
-                                                            const data = payload[0].payload;
-                                                            return (
-                                                                <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                                    <p className="font-bold text-foreground">{data.name}</p>
-                                                                    <p className="text-muted-foreground">{data.hours.toLocaleString()} hours</p>
-                                                                </div>
-                                                            );
-                                                        }
-                                                        return null;
-                                                    }}
-                                                />
-                                                <Bar dataKey="hours" fill="var(--color-hours)" radius={[4, 4, 0, 0]} />
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    </ChartContainer>
-                                ) : (
-                                    <div className="flex h-[200px] items-center justify-center text-center text-sm text-muted-foreground">
-                                        <p>Log some activities today to see your hours spent.</p>
-                                    </div>
-                                )}
-                            </div>
                         </CardContent>
                     </Card>
                 </div>
@@ -1706,6 +1636,8 @@ function HomePageContent() {
         weightLogs={weightLogs}
         goalWeight={goalWeight}
         consistencyData={consistencyData}
+        totalHoursData={productivityStats.totalHoursData}
+        todayHoursData={productivityStats.todayHoursData}
       />
     </div>
   );
