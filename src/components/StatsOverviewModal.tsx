@@ -262,7 +262,7 @@ export function StatsOverviewModal({
                                     }} />
                                     <Legend />
                                     <Radar name="Today" dataKey="today" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.6} />
-                                    <Radar name="Ideal" dataKey="ideal" stroke="hsl(var(--muted-foreground))" fill="hsl(var(--muted-foreground))" fillOpacity={0.4} />
+                                    <Radar name="Ideal" dataKey="ideal" stroke="hsl(var(--chart-2))" fill="hsl(var(--chart-2))" fillOpacity={0.4} />
                                 </RadarChart>
                             </ResponsiveContainer>
                         </ChartContainer>
