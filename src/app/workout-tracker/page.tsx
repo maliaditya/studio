@@ -352,7 +352,9 @@ function WorkoutPageContent() {
     return () => clearTimeout(timer);
 }, [currentUser]);
 
-
+  // Split useEffects for better state management and to prevent data overwrites.
+  
+  // Effect for saving primary workout data
   useEffect(() => {
     if (currentUser?.username && !isLoadingPage) {
       try {
@@ -360,16 +362,28 @@ function WorkoutPageContent() {
         const logsKey = `allWorkoutLogs_${currentUser.username}`;
         const modeKey = `workoutMode_${currentUser.username}`;
         const plansKey = `workoutPlans_${currentUser.username}`;
-        const weightLogsKey = `weightLogs_${currentUser.username}`;
-        const goalWeightKey = `goalWeight_${currentUser.username}`;
-        const heightKey = `height_${currentUser.username}`;
-        const dobKey = `dateOfBirth_${currentUser.username}`;
-        const genderKey = `gender_${currentUser.username}`;
         
         localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
         localStorage.setItem(logsKey, JSON.stringify(allWorkoutLogs));
         localStorage.setItem(modeKey, workoutMode);
         localStorage.setItem(plansKey, JSON.stringify(workoutPlans));
+      } catch (e) {
+        console.error("Error saving workout data to localStorage", e);
+        toast({ title: "Save Error", description: "Could not save workout data locally.", variant: "destructive"});
+      }
+    }
+  }, [exerciseDefinitions, allWorkoutLogs, workoutMode, workoutPlans, currentUser, isLoadingPage, toast]);
+
+  // Effect for saving health and weight data, which is shared across pages
+  useEffect(() => {
+    if (currentUser?.username && !isLoadingPage) {
+      try {
+        const weightLogsKey = `weightLogs_${currentUser.username}`;
+        const goalWeightKey = `goalWeight_${currentUser.username}`;
+        const heightKey = `height_${currentUser.username}`;
+        const dobKey = `dateOfBirth_${currentUser.username}`;
+        const genderKey = `gender_${currentUser.username}`;
+
         localStorage.setItem(weightLogsKey, JSON.stringify(weightLogs));
 
         if (goalWeight !== null) localStorage.setItem(goalWeightKey, goalWeight.toString());
@@ -383,13 +397,12 @@ function WorkoutPageContent() {
 
         if (gender) localStorage.setItem(genderKey, gender);
         else localStorage.removeItem(genderKey);
-
       } catch (e) {
-        console.error("Error saving data to localStorage", e);
-        toast({ title: "Save Error", description: "Could not save data locally. Storage might be full.", variant: "destructive"});
+        console.error("Error saving health data to localStorage", e);
+        toast({ title: "Save Error", description: "Could not save health data locally.", variant: "destructive"});
       }
     }
-  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, workoutMode, workoutPlans, weightLogs, goalWeight, height, dateOfBirth, gender]);
+  }, [weightLogs, goalWeight, height, dateOfBirth, gender, currentUser, isLoadingPage, toast]);
 
   // This useEffect is responsible for auto-populating the workout for the selected date
   // if one doesn't already exist.
@@ -1380,4 +1393,3 @@ function WorkoutPageContent() {
 export default function Page() {
   return ( <AuthGuard> <WorkoutPageContent /> </AuthGuard> );
 }
-

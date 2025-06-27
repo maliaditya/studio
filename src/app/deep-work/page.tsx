@@ -216,34 +216,49 @@ function DeepWorkPageContent() {
     return () => clearTimeout(timer);
 }, [currentUser]);
 
+  // Split useEffects for better state management
   useEffect(() => {
     if (currentUser?.username && !isLoadingPage) {
       try {
         const username = currentUser.username;
         const defsKey = `deepwork_definitions_${username}`;
         const logsKey = `deepwork_logs_${username}`;
+        const deletesKey = `deepwork_manual_deletes_${username}`;
+        
+        localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
+        localStorage.setItem(logsKey, JSON.stringify(allWorkoutLogs));
+        localStorage.setItem(deletesKey, JSON.stringify(manuallyDeletedIds));
+
+      } catch (e) {
+        console.error("Error saving deep work data to localStorage", e);
+        toast({ title: "Save Error", description: "Could not save deep work data locally.", variant: "destructive"});
+      }
+    }
+  }, [exerciseDefinitions, allWorkoutLogs, manuallyDeletedIds, currentUser, isLoadingPage, toast]);
+
+  // Effect for saving health and weight data, which is shared across pages
+  useEffect(() => {
+    if (currentUser?.username && !isLoadingPage) {
+      try {
+        const username = currentUser.username;
         const weightLogsKey = `weightLogs_${username}`;
         const goalWeightKey = `goalWeight_${username}`;
         const heightKey = `height_${username}`;
         const dobKey = `dateOfBirth_${username}`;
         const genderKey = `gender_${username}`;
-        const deletesKey = `deepwork_manual_deletes_${username}`;
         
-        localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
-        localStorage.setItem(logsKey, JSON.stringify(allWorkoutLogs));
         localStorage.setItem(weightLogsKey, JSON.stringify(weightLogs));
-        localStorage.setItem(deletesKey, JSON.stringify(manuallyDeletedIds));
 
         if (goalWeight !== null) localStorage.setItem(goalWeightKey, goalWeight.toString()); else localStorage.removeItem(goalWeightKey);
         if (height !== null) localStorage.setItem(heightKey, height.toString()); else localStorage.removeItem(heightKey);
         if (dateOfBirth) localStorage.setItem(dobKey, dateOfBirth); else localStorage.removeItem(dobKey);
         if (gender) localStorage.setItem(genderKey, gender); else localStorage.removeItem(genderKey);
       } catch (e) {
-        console.error("Error saving deep work data to localStorage", e);
-        toast({ title: "Save Error", description: "Could not save data locally.", variant: "destructive"});
+        console.error("Error saving health data to localStorage", e);
+        toast({ title: "Save Error", description: "Could not save health data locally.", variant: "destructive"});
       }
     }
-  }, [exerciseDefinitions, allWorkoutLogs, currentUser, isLoadingPage, toast, weightLogs, goalWeight, height, dateOfBirth, gender, manuallyDeletedIds]);
+  }, [weightLogs, goalWeight, height, dateOfBirth, gender, currentUser, isLoadingPage, toast]);
 
   // Logic to promote Upskill tasks to Deep Work focus areas
   useEffect(() => {

@@ -185,6 +185,7 @@ function UpskillPageContent() {
     return () => clearTimeout(timer);
 }, [currentUser]);
 
+  // Split useEffects for better state management
   useEffect(() => {
     if (currentUser?.username && !isLoadingPage) {
       try {
@@ -196,8 +197,18 @@ function UpskillPageContent() {
         localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
         localStorage.setItem(logsKey, JSON.stringify(allWorkoutLogs));
         localStorage.setItem(goalsKey, JSON.stringify(topicGoals));
+      } catch (e) {
+        console.error("Error saving upskill data to localStorage", e);
+        toast({ title: "Save Error", description: "Could not save upskill data locally.", variant: "destructive"});
+      }
+    }
+  }, [exerciseDefinitions, allWorkoutLogs, topicGoals, currentUser, isLoadingPage, toast]);
 
-        // Shared data - avoid duplicating this logic if possible, but keep for standalone page functionality
+  // Effect for saving health and weight data, which is shared across pages
+  useEffect(() => {
+    if (currentUser?.username && !isLoadingPage) {
+      try {
+        const username = currentUser.username;
         const weightLogsKey = `weightLogs_${username}`;
         const goalWeightKey = `goalWeight_${username}`;
         const heightKey = `height_${username}`;
@@ -209,11 +220,11 @@ function UpskillPageContent() {
         if (dateOfBirth) localStorage.setItem(dobKey, dateOfBirth); else localStorage.removeItem(dobKey);
         if (gender) localStorage.setItem(genderKey, gender); else localStorage.removeItem(genderKey);
       } catch (e) {
-        console.error("Error saving upskill data to localStorage", e);
-        toast({ title: "Save Error", description: "Could not save data locally.", variant: "destructive"});
+        console.error("Error saving health data to localStorage", e);
+        toast({ title: "Save Error", description: "Could not save health data locally.", variant: "destructive"});
       }
     }
-  }, [exerciseDefinitions, allWorkoutLogs, topicGoals, currentUser, isLoadingPage, toast, weightLogs, goalWeight, height, dateOfBirth, gender]);
+  }, [weightLogs, goalWeight, height, dateOfBirth, gender, currentUser, isLoadingPage, toast]);
 
   useEffect(() => {
       if (!currentUser) return;
