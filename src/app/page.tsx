@@ -739,13 +739,18 @@ function HomePageContent() {
                   .filter(ex => ex.category === topic)
                   .reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + set.weight, 0), 0) || 0;
 
+                const speed = data.totalDuration > 0 ? (totalProgress / data.totalDuration) * 60 : 0; // units per hour
+                const speedPerMinute = speed / 60; // units per minute
+
                 let completionStats = null;
                 if (averageRatePerDay > 0.01 && remainingProgress > 0) {
                     const daysToCompletion = Math.ceil(remainingProgress / averageRatePerDay);
                     const estimatedCompletionDate = addDays(new Date(), daysToCompletion);
+                    const timeNeededForCompletion = speedPerMinute > 0 ? Math.ceil(remainingProgress / speedPerMinute) : null;
                     completionStats = {
                         date: format(estimatedCompletionDate, 'PPP'),
-                        daysRemaining: daysToCompletion
+                        daysRemaining: daysToCompletion,
+                        timeNeeded: timeNeededForCompletion,
                     };
                 }
 
@@ -765,12 +770,14 @@ function HomePageContent() {
                     const progressToMilestone = nextMilestoneValue - totalProgress;
                     const daysToMilestone = Math.ceil(progressToMilestone / averageRatePerDay);
                     const estimatedMilestoneDate = addDays(new Date(), daysToMilestone);
+                    const timeNeededForMilestone = speedPerMinute > 0 ? Math.ceil(progressToMilestone / speedPerMinute) : null;
                     milestoneStats = {
                         percent: nextMilestonePercent,
                         date: format(estimatedMilestoneDate, 'PPP'),
                         daysRemaining: daysToMilestone,
                         progressNeeded: Math.round(progressToMilestone),
                         unit: goal.goalType,
+                        timeNeeded: timeNeededForMilestone,
                     };
                 }
 
@@ -780,8 +787,6 @@ function HomePageContent() {
                 } else if (completionStats && completionStats.daysRemaining > 0) {
                     requiredDailyRate = remainingProgress / completionStats.daysRemaining;
                 }
-
-                const speed = data.totalDuration > 0 ? (totalProgress / data.totalDuration) * 60 : 0;
 
                 topicStats[topic] = {
                     topic,
@@ -1316,6 +1321,9 @@ function HomePageContent() {
                                                                             <div>Est. Date: <span className="font-medium text-foreground">{stats.nextMilestone.date}</span></div>
                                                                             <div>Days Left: <span className="font-medium text-foreground">{stats.nextMilestone.daysRemaining}</span></div>
                                                                             <div>Needed: <span className="font-medium text-foreground">{stats.nextMilestone.progressNeeded} {stats.nextMilestone.unit}</span></div>
+                                                                            {stats.nextMilestone.timeNeeded !== null && (
+                                                                                <div>Est. Time: <span className="font-medium text-foreground">{stats.nextMilestone.timeNeeded} min</span></div>
+                                                                            )}
                                                                         </div>
                                                                     )}
                                                                     <div className="space-y-1">
@@ -1324,6 +1332,9 @@ function HomePageContent() {
                                                                             <>
                                                                                 <div>Est. Date: <span className="font-medium text-foreground">{stats.completion.date}</span></div>
                                                                                 <div>Days Left: <span className="font-medium text-foreground">{stats.completion.daysRemaining}</span></div>
+                                                                                 {stats.completion.timeNeeded !== null && (
+                                                                                    <div>Est. Time: <span className="font-medium text-foreground">{stats.completion.timeNeeded} min</span></div>
+                                                                                )}
                                                                             </>
                                                                     ) : (stats.totalProgress >= stats.goalValue) ? <div className="text-green-500 font-bold">Completed!</div> : <div className="text-muted-foreground">Not enough data to project.</div>}
                                                                     </div>
