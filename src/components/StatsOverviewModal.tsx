@@ -40,6 +40,14 @@ const weightChartConfig = {
   projectedWeight: { label: "Projection", color: "hsl(var(--chart-2))" },
 } satisfies ChartConfig;
 
+const learningChartConfig = {
+    totalMinutes: { label: "Learning Time (min)", color: "hsl(var(--chart-4))" },
+} satisfies ChartConfig;
+
+const deepWorkChartConfig = {
+    totalMinutes: { label: "Deep Work Time (min)", color: "hsl(var(--chart-5))" },
+} satisfies ChartConfig;
+
 
 export function StatsOverviewModal({
   isOpen,
@@ -77,6 +85,36 @@ export function StatsOverviewModal({
         totalMinutes: d.upskill + d.deepwork,
     }));
   }, [allUpskillLogs, allDeepWorkLogs]);
+  
+  const learningData = useMemo(() => {
+    const dailyData: Record<string, { dateObj: Date, totalMinutes: number }> = {};
+    allUpskillLogs.forEach(log => {
+        const duration = log.exercises.reduce((sum, ex) => sum + ex.loggedSets.reduce((s, set) => s + set.reps, 0), 0);
+        if (duration > 0) {
+            if (!dailyData[log.date]) dailyData[log.date] = { dateObj: parseISO(log.date), totalMinutes: 0 };
+            dailyData[log.date].totalMinutes += duration;
+        }
+    });
+    return Object.values(dailyData).sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime()).map(d => ({
+        ...d,
+        date: format(d.dateObj, 'MMM dd'),
+    }));
+  }, [allUpskillLogs]);
+
+  const deepWorkData = useMemo(() => {
+    const dailyData: Record<string, { dateObj: Date, totalMinutes: number }> = {};
+    allDeepWorkLogs.forEach(log => {
+        const duration = log.exercises.reduce((sum, ex) => sum + ex.loggedSets.reduce((s, set) => s + set.weight, 0), 0);
+        if (duration > 0) {
+            if (!dailyData[log.date]) dailyData[log.date] = { dateObj: parseISO(log.date), totalMinutes: 0 };
+            dailyData[log.date].totalMinutes += duration;
+        }
+    });
+    return Object.values(dailyData).sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime()).map(d => ({
+        ...d,
+        date: format(d.dateObj, 'MMM dd'),
+    }));
+  }, [allDeepWorkLogs]);
 
   const combinedWeightData = useMemo(() => {
      const sortedLogs = weightLogs
@@ -133,9 +171,30 @@ export function StatsOverviewModal({
     return allData;
   }, [goalWeight, weightLogs]);
 
+  const renderProductivityTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+        const data = payload[0].payload;
+        return (
+            <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                <div className="font-bold text-foreground">{format(data.dateObj, 'PPP')}</div>
+                <div className="grid gap-1.5">
+                    <div className="flex w-full items-center gap-2">
+                        <div className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: payload[0].color }} />
+                        <div className="flex flex-1 justify-between">
+                            <span className="text-muted-foreground">{payload[0].name}</span>
+                            <span className="font-mono font-medium text-foreground">{data.totalMinutes} min</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+    return null;
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[90dvh] flex flex-col">
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Statistics Overview</DialogTitle>
           <DialogDescription>
@@ -143,10 +202,12 @@ export function StatsOverviewModal({
           </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="productivity" className="w-full flex-grow min-h-0 flex flex-col">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="productivity">Productivity</TabsTrigger>
-                <TabsTrigger value="consistency">Workout Consistency</TabsTrigger>
-                <TabsTrigger value="weight">Weight Trend</TabsTrigger>
+                <TabsTrigger value="consistency">Consistency</TabsTrigger>
+                <TabsTrigger value="weight">Weight</TabsTrigger>
+                <TabsTrigger value="learning">Learning</TabsTrigger>
+                <TabsTrigger value="deepwork">Deep Work</TabsTrigger>
             </TabsList>
 
             <TabsContent value="productivity" className="flex-grow mt-4 min-h-0">
@@ -163,28 +224,7 @@ export function StatsOverviewModal({
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="date" />
                             <YAxis label={{ value: 'Minutes', angle: -90, position: 'insideLeft' }}/>
-                             <RechartsTooltip
-                                content={({ active, payload }) => {
-                                    if (active && payload && payload.length) {
-                                        const data = payload[0].payload;
-                                        return (
-                                            <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                <div className="font-bold text-foreground">{format(data.dateObj, 'PPP')}</div>
-                                                <div className="grid gap-1.5">
-                                                    <div className="flex w-full items-center gap-2">
-                                                        <div className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: 'hsl(var(--primary))' }} />
-                                                        <div className="flex flex-1 justify-between">
-                                                            <span className="text-muted-foreground">Productive Time</span>
-                                                            <span className="font-mono font-medium text-foreground">{data.totalMinutes} min</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    }
-                                    return null;
-                                }}
-                            />
+                             <RechartsTooltip content={renderProductivityTooltip} />
                             <Legend verticalAlign="top" height={36}/>
                             <Area type="monotone" dataKey="totalMinutes" fill="url(#fillTotalMinutesModal)" stroke="var(--color-totalMinutes)" strokeWidth={2} name="Productive Time (min)" />
                         </AreaChart>
@@ -229,6 +269,52 @@ export function StatsOverviewModal({
                         </LineChart>
                     </ChartContainer>
                   ) : <p className="text-center text-muted-foreground py-8">Not enough data for weight graph.</p> }
+                </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="learning" className="flex-grow mt-4 min-h-0">
+                <ScrollArea className="h-full pr-4">
+                  {learningData.length > 1 ? (
+                    <ChartContainer config={learningChartConfig} className="min-h-[400px] w-full">
+                       <AreaChart accessibilityLayer data={learningData} margin={{ top: 10, right: 30, left: 0, bottom: 0, }}>
+                            <defs>
+                                <linearGradient id="fillLearningTime" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="var(--color-totalMinutes)" stopOpacity={0.8}/>
+                                    <stop offset="95%" stopColor="var(--color-totalMinutes)" stopOpacity={0.1}/>
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="date" />
+                            <YAxis label={{ value: 'Minutes', angle: -90, position: 'insideLeft' }}/>
+                             <RechartsTooltip content={renderProductivityTooltip} />
+                            <Legend verticalAlign="top" height={36}/>
+                            <Area type="monotone" dataKey="totalMinutes" fill="url(#fillLearningTime)" stroke="var(--color-totalMinutes)" strokeWidth={2} name="Learning Time (min)" />
+                        </AreaChart>
+                    </ChartContainer>
+                  ) : <p className="text-center text-muted-foreground py-8">Not enough data to show learning stats.</p> }
+                </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="deepwork" className="flex-grow mt-4 min-h-0">
+                <ScrollArea className="h-full pr-4">
+                  {deepWorkData.length > 1 ? (
+                    <ChartContainer config={deepWorkChartConfig} className="min-h-[400px] w-full">
+                       <AreaChart accessibilityLayer data={deepWorkData} margin={{ top: 10, right: 30, left: 0, bottom: 0, }}>
+                            <defs>
+                                <linearGradient id="fillDeepWorkTime" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="var(--color-totalMinutes)" stopOpacity={0.8}/>
+                                    <stop offset="95%" stopColor="var(--color-totalMinutes)" stopOpacity={0.1}/>
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="date" />
+                            <YAxis label={{ value: 'Minutes', angle: -90, position: 'insideLeft' }}/>
+                             <RechartsTooltip content={renderProductivityTooltip} />
+                            <Legend verticalAlign="top" height={36}/>
+                            <Area type="monotone" dataKey="totalMinutes" fill="url(#fillDeepWorkTime)" stroke="var(--color-totalMinutes)" strokeWidth={2} name="Deep Work Time (min)" />
+                        </AreaChart>
+                    </ChartContainer>
+                  ) : <p className="text-center text-muted-foreground py-8">Not enough data to show deep work stats.</p> }
                 </ScrollArea>
             </TabsContent>
 
