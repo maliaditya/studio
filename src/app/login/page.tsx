@@ -41,6 +41,13 @@ export default function LoginPage() {
           <CardDescription className="text-muted-foreground">Access your personal dashboard for growth.</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="text-center text-sm text-muted-foreground p-3 mb-4 border rounded-md bg-muted/50">
+            <p>To check out the app with dummy data, log in with:</p>
+            <p className="font-mono text-foreground my-1">
+                user: <strong className="text-primary">demo</strong> / pass: <strong className="text-primary">demo</strong>
+            </p>
+            <p>Alternatively, register your own account to start fresh.</p>
+          </div>
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Login</TabsTrigger>
