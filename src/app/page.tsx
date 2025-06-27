@@ -788,6 +788,9 @@ function HomePageContent() {
                     requiredDailyRate = remainingProgress / completionStats.daysRemaining;
                 }
 
+                const remainingForToday = Math.max(0, requiredDailyRate - todaysProgress);
+                const timeNeededForToday = speedPerMinute > 0 && remainingForToday > 0 ? Math.ceil(remainingForToday / speedPerMinute) : null;
+
                 topicStats[topic] = {
                     topic,
                     speed,
@@ -798,7 +801,8 @@ function HomePageContent() {
                     completion: completionStats,
                     nextMilestone: milestoneStats,
                     requiredDailyRate: requiredDailyRate,
-                    todaysProgress: todaysProgress
+                    todaysProgress: todaysProgress,
+                    timeNeededForToday,
                 };
             });
 
@@ -1294,7 +1298,9 @@ function HomePageContent() {
                                         <div className="text-sm">
                                             {Object.keys(productivityStats.learningStats).length > 0 ? (
                                                 <Accordion type="single" collapsible className="w-full space-y-2">
-                                                    {Object.entries(productivityStats.learningStats).map(([topic, stats]: [string, any]) => (
+                                                    {Object.entries(productivityStats.learningStats).map(([topic, stats]: [string, any]) => {
+                                                        const showTodayStats = stats.todaysProgress > 0 || (stats.requiredDailyRate && stats.requiredDailyRate > 0.01);
+                                                        return (
                                                         <AccordionItem key={topic} value={topic} className="p-3 rounded-md bg-muted/30 border-0">
                                                             <AccordionTrigger className="py-0 text-left hover:no-underline">
                                                                 <div className="flex flex-col items-start">
@@ -1303,12 +1309,19 @@ function HomePageContent() {
                                                                         Progress: {stats.totalProgress.toLocaleString()} / {stats.goalValue.toLocaleString()} {stats.unit.split('/')[0]}
                                                                     </div>
                                                                 </div>
-                                                                {stats.todaysProgress > 0 && (
+                                                                {showTodayStats && (
                                                                     <div className="text-right text-xs ml-4 flex-shrink-0">
                                                                         <div className="font-semibold text-foreground whitespace-nowrap">Today</div>
-                                                                        <div className="text-muted-foreground whitespace-nowrap text-green-500">
-                                                                            +{stats.todaysProgress.toLocaleString()} {stats.unit.split('/')[0]}
-                                                                        </div>
+                                                                        {stats.todaysProgress > 0 && (
+                                                                            <div className="text-muted-foreground whitespace-nowrap text-green-500">
+                                                                                +{stats.todaysProgress.toLocaleString()} {stats.unit.split('/')[0]}
+                                                                            </div>
+                                                                        )}
+                                                                        {stats.timeNeededForToday !== null && (
+                                                                            <div className="text-muted-foreground whitespace-nowrap">
+                                                                                Est. {(stats.timeNeededForToday / 60).toFixed(1)} hr left
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 )}
                                                             </AccordionTrigger>
@@ -1347,7 +1360,7 @@ function HomePageContent() {
                                                                 </div>
                                                             </AccordionContent>
                                                         </AccordionItem>
-                                                    ))}
+                                                    )})}
                                                 </Accordion>
                                             ) : (
                                                 <p className="text-sm text-muted-foreground text-center py-2">No learning stats yet. Log progress and duration in the Upskill page.</p>
