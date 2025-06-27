@@ -225,7 +225,7 @@ export function WeightGoalCard({
     };
 
     return (
-        <Card className="h-full bg-card/50">
+        <Card className="bg-card/50">
             {areDetailsSet ? (
                 <>
                     <CardHeader>
