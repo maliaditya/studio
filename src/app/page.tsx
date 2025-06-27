@@ -741,6 +741,7 @@ function HomePageContent() {
 
                 const speed = data.totalDuration > 0 ? (totalProgress / data.totalDuration) * 60 : 0; // units per hour
                 const speedPerMinute = speed / 60; // units per minute
+                const timeForTodaysProgress = speed > 0 ? (todaysProgress / speed) : null; // in hours
 
                 let completionStats = null;
                 if (averageRatePerDay > 0.01 && remainingProgress > 0) {
@@ -803,6 +804,7 @@ function HomePageContent() {
                     requiredDailyRate: requiredDailyRate,
                     todaysProgress: todaysProgress,
                     timeNeededForToday,
+                    timeForTodaysProgress,
                 };
             });
 
@@ -1312,12 +1314,18 @@ function HomePageContent() {
                                                                 {showTodayStats && (
                                                                     <div className="text-right text-xs ml-4 flex-shrink-0">
                                                                         <div className="font-semibold text-foreground whitespace-nowrap">Today</div>
-                                                                        {stats.todaysProgress > 0 && (
+                                                                        {stats.todaysProgress > 0 ? (
                                                                             <div className="text-muted-foreground whitespace-nowrap text-green-500">
                                                                                 +{stats.todaysProgress.toLocaleString()} {stats.unit.split('/')[0]}
+                                                                                {stats.timeForTodaysProgress !== null && ` (est. ${stats.timeForTodaysProgress.toFixed(1)} hr)`}
+                                                                            </div>
+                                                                        ) : stats.timeNeededForToday !== null && (
+                                                                            <div className="text-muted-foreground whitespace-nowrap">
+                                                                                Est. {(stats.timeNeededForToday / 60).toFixed(1)} hr left
                                                                             </div>
                                                                         )}
-                                                                        {stats.timeNeededForToday !== null && (
+                                                                        
+                                                                        {stats.todaysProgress > 0 && stats.timeNeededForToday !== null && (
                                                                             <div className="text-muted-foreground whitespace-nowrap">
                                                                                 Est. {(stats.timeNeededForToday / 60).toFixed(1)} hr left
                                                                             </div>
@@ -1730,6 +1738,8 @@ export default function Page() {
 
 
 
+
+    
 
     
 
