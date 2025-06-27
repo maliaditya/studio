@@ -1069,7 +1069,7 @@ function HomePageContent() {
     return [
       { name: 'Productive', time: dailyTime, fill: 'hsl(var(--primary))' },
       { name: 'Ideal', time: idealTime, fill: 'hsl(var(--chart-2))' },
-      { name: 'Autopilot', time: autopilotTime, fill: 'hsl(var(--muted))' },
+      { name: 'Autopilot', time: autopilotTime, fill: 'hsl(var(--border))' },
     ];
   }, [productivityStats.todayHoursData]);
 
@@ -1417,7 +1417,7 @@ function HomePageContent() {
                                     Diet Plan
                                 </Button>
                             </div>
-                            {(productivityStats.projectionSummary || productivityStats.latestConsistency || productivityStats.healthMetrics.averageIntake || productivityStats.healthMetrics.maintenanceCalories) ? (
+                            {(productivityStats.projectionSummary || productivityStats.latestConsistency || (productivityStats.healthMetrics && (productivityStats.healthMetrics.averageIntake || productivityStats.healthMetrics.maintenanceCalories))) ? (
                                 <div className="space-y-4 pt-4 border-t">
                                     {productivityStats.projectionSummary && (
                                         <>
@@ -1696,4 +1696,5 @@ export default function Page() {
     
 
     
+
 
