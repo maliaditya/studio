@@ -18,6 +18,7 @@ import { DashboardStats } from '@/components/DashboardStats';
 import { ProductivitySnapshot } from '@/components/ProductivitySnapshot';
 import { TimeSlots } from '@/components/TimeSlots';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
+import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -92,8 +93,15 @@ function HomePageContent() {
     schedule,
     setSchedule,
     allUpskillLogs,
+    setAllUpskillLogs,
     allDeepWorkLogs,
+    setAllDeepWorkLogs,
     setActivityDurations,
+    isAgendaDocked,
+    setIsAgendaDocked,
+    handleToggleComplete,
+    handleLogLearning,
+    activityDurations,
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -509,7 +517,7 @@ function HomePageContent() {
       };
   }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, consistencyData, brandingTasks, brandingLogs, deepWorkDefinitions]);
     
-  const activityDurations = useMemo(() => {
+  const _activityDurations = useMemo(() => {
     const durations: Record<string, string> = {};
     if (!schedule[todayKey] || !productivityStats.learningStats) return durations;
 
@@ -561,8 +569,8 @@ function HomePageContent() {
 
   // Push calculated durations to the global context
   useEffect(() => {
-    setActivityDurations(activityDurations);
-  }, [activityDurations, setActivityDurations]);
+    setActivityDurations(_activityDurations);
+  }, [_activityDurations, setActivityDurations]);
 
   const handleLogWeight = (weight: number, date: Date) => {
     if (!currentUser || isNaN(weight) || weight <= 0) {
@@ -700,6 +708,16 @@ function HomePageContent() {
                 />
               </div>
               <div className="lg:col-span-2 space-y-6">
+                 {currentUser && isAgendaDocked && (
+                    <TodaysScheduleCard
+                        schedule={todaysSchedule}
+                        activityDurations={activityDurations}
+                        isAgendaDocked={isAgendaDocked}
+                        onToggleDock={() => setIsAgendaDocked(prev => !prev)}
+                        onToggleComplete={handleToggleComplete}
+                        onLogLearning={handleLogLearning}
+                    />
+                )}
                 <WeightGoalCard 
                   weightLogs={weightLogs}
                   goalWeight={goalWeight}
@@ -722,13 +740,24 @@ function HomePageContent() {
               remainingTime={remainingTime}
               onAddActivity={handleAddActivity}
               onRemoveActivity={handleRemoveActivity}
-              onToggleComplete={()=>{}}
+              onToggleComplete={handleToggleComplete}
               onActivityClick={handleActivityClick}
             />
           </CardContent>
         </Card>
         
         <ActivityHeatmap schedule={schedule} />
+
+        {currentUser && !isAgendaDocked && (
+            <TodaysScheduleCard
+                schedule={todaysSchedule}
+                activityDurations={activityDurations}
+                isAgendaDocked={isAgendaDocked}
+                onToggleDock={() => setIsAgendaDocked(prev => !prev)}
+                onToggleComplete={handleToggleComplete}
+                onLogLearning={handleLogLearning}
+            />
+        )}
 
         {currentUser && (
           <TodaysWorkoutModal

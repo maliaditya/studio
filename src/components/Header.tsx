@@ -12,8 +12,6 @@ import { SupportModal } from './SupportModal';
 import { cn } from '@/lib/utils';
 import { DemoTokenModal } from './DemoTokenModal';
 import { SettingsModal } from './SettingsModal';
-import { TodaysScheduleCard } from './TodaysScheduleCard';
-import { format } from 'date-fns';
 
 export function Header() {
   const { 
@@ -22,12 +20,6 @@ export function Header() {
     isDemoTokenModalOpen, 
     setIsDemoTokenModalOpen, 
     pushDemoDataWithToken,
-    schedule,
-    activityDurations,
-    isAgendaDocked,
-    setIsAgendaDocked,
-    handleToggleComplete,
-    handleLogLearning,
   } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -100,17 +92,6 @@ export function Header() {
         onSubmit={pushDemoDataWithToken}
       />
       <SettingsModal isOpen={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen} />
-
-      {currentUser && (
-        <TodaysScheduleCard
-            schedule={schedule[format(new Date(), 'yyyy-MM-dd')] || {}}
-            activityDurations={activityDurations}
-            isAgendaDocked={isAgendaDocked}
-            onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-            onToggleComplete={handleToggleComplete}
-            onLogLearning={handleLogLearning}
-        />
-      )}
     </>
   );
 }
