@@ -160,7 +160,7 @@ export function TodaysLearningModal({
                       <div className="space-y-2">
                         {scheduledTasks.map(task => (
                            <ScheduledTaskItem 
-                            key={task.definitionId} 
+                            key={task.id} 
                             task={task} 
                             isDisabled={disabledTaskIds.includes(task.definitionId)}
                             selected={selectedDefIds.includes(task.definitionId)}
@@ -177,7 +177,7 @@ export function TodaysLearningModal({
                         <div className="space-y-2">
                            {libraryTasks.map(task => (
                              <LibraryTaskItem 
-                              key={task.definitionId} 
+                              key={task.id} 
                               task={task} 
                               onAdd={() => handleAddTaskToDay(task)}
                             />
