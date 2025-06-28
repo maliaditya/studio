@@ -63,20 +63,20 @@ function PersonalBrandingPageContent() {
   useEffect(() => {
     if (currentUser?.username) {
       const bundledFocusAreaNames = new Set<string>();
-      brandingTasks.forEach(task => {
+      (brandingTasks || []).forEach(task => {
           if (task.focusAreas) {
               task.focusAreas.forEach(name => bundledFocusAreaNames.add(name));
           }
       });
 
       const focusAreaSessionCounts: Record<string, number> = {};
-      deepWorkLogs.forEach(log => {
+      (deepWorkLogs || []).forEach(log => {
         log.exercises.forEach(ex => {
           focusAreaSessionCounts[ex.definitionId] = (focusAreaSessionCounts[ex.definitionId] || 0) + ex.loggedSets.length;
         });
       });
 
-      const eligibleFocusAreas = deepWorkDefinitions.filter(def => {
+      const eligibleFocusAreas = (deepWorkDefinitions || []).filter(def => {
         const hasEnoughSessions = (focusAreaSessionCounts[def.id] || 0) >= 4;
         const isAlreadyBundled = bundledFocusAreaNames.has(def.name);
         return hasEnoughSessions && !isAlreadyBundled;
@@ -88,7 +88,7 @@ function PersonalBrandingPageContent() {
         topics[def.category].push(def);
       });
 
-      const newGeneratedTasks: ExerciseDefinition[] = [...brandingTasks];
+      const newGeneratedTasks: ExerciseDefinition[] = [...(brandingTasks || [])];
       let wasChanged = false;
       const newlyBundledNames = new Set<string>();
 
@@ -129,7 +129,7 @@ function PersonalBrandingPageContent() {
   }, [currentUser, deepWorkDefinitions, deepWorkLogs, brandingTasks, setBrandingTasks, toast]);
   
   const availableFocusAreas = useMemo(() => {
-    if (!deepWorkDefinitions.length || !deepWorkLogs.length) {
+    if (!deepWorkDefinitions || !deepWorkLogs || !brandingTasks) {
       return [];
     }
 
@@ -172,7 +172,7 @@ function PersonalBrandingPageContent() {
       const active: ExerciseDefinition[] = [];
       const published: ExerciseDefinition[] = [];
 
-      brandingTasks.forEach(task => {
+      (brandingTasks || []).forEach(task => {
           if (isFullyShared(task)) {
               published.push(task);
           } else {
