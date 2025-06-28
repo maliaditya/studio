@@ -1,11 +1,16 @@
+
 "use client";
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Check, Magnet, Package, MessageCircle } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Separator } from '@/components/ui/separator';
 
 function MonetizationEnginePageContent() {
+  const { brandingTasks } = useAuth();
+
   const leadGenItems = [
     "Post CTAs (“DM me”, “Link in bio”)",
     "Join job boards, freelance platforms",
@@ -24,6 +29,14 @@ function MonetizationEnginePageContent() {
     "Pricing sheet or calendar link",
     "Portfolio/demo breakdown to convert leads",
   ];
+  
+  const publishedBundles = useMemo(() => {
+    return (brandingTasks || []).filter(task => 
+        task.sharingStatus?.twitter &&
+        task.sharingStatus?.linkedin &&
+        task.sharingStatus?.devto
+    );
+  }, [brandingTasks]);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
@@ -47,6 +60,21 @@ function MonetizationEnginePageContent() {
             <CardDescription>Attract and capture opportunities.</CardDescription>
           </CardHeader>
           <CardContent>
+            <h4 className="font-semibold mb-2 text-md text-foreground/90">Published Content to Promote</h4>
+            {publishedBundles.length > 0 ? (
+                <ul className="space-y-2 mb-6 max-h-48 overflow-y-auto pr-2">
+                    {publishedBundles.map(bundle => (
+                        <li key={bundle.id} className="flex items-center gap-3 text-sm p-2 rounded-md bg-muted/50">
+                            <Package className="h-4 w-4 text-green-500 flex-shrink-0" />
+                            <span>{bundle.name}</span>
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <p className="text-sm text-muted-foreground mb-6">No published content bundles yet. Publish content from the Personal Branding page to see it here.</p>
+            )}
+            <Separator className="my-4"/>
+            <h4 className="font-semibold mb-3 text-md text-foreground/90">Lead Generation Actions</h4>
             <ul className="space-y-3">
               {leadGenItems.map((item, index) => (
                 <li key={index} className="flex items-start gap-3">

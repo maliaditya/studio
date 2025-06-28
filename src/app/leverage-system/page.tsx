@@ -1,11 +1,16 @@
+
 "use client";
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Package, Wrench, Repeat, Handshake, Check } from 'lucide-react';
+import { Package, Wrench, Repeat, Handshake, Check, Briefcase } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Separator } from '@/components/ui/separator';
 
 function LeverageSystemPageContent() {
+  const { deepWorkDefinitions, brandingTasks } = useAuth();
+
   const productizationItems = [
     "Convert OpenGL/CUDA demos to paid courses, kits, templates",
   ];
@@ -23,6 +28,14 @@ function LeverageSystemPageContent() {
     "Collaborate with creators or companies",
     "Revenue share, cross-promotion, affiliate",
   ];
+
+  const publishedBundles = useMemo(() => {
+    return (brandingTasks || []).filter(task => 
+        task.sharingStatus?.twitter &&
+        task.sharingStatus?.linkedin &&
+        task.sharingStatus?.devto
+    );
+  }, [brandingTasks]);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
@@ -46,6 +59,22 @@ function LeverageSystemPageContent() {
             <CardDescription>Convert demos into paid products.</CardDescription>
           </CardHeader>
           <CardContent>
+            <h4 className="font-semibold mb-2 text-md text-foreground/90">Completed Deep Work Projects</h4>
+            <p className="text-sm text-muted-foreground mb-4">These projects are potential candidates for courses, templates, or kits.</p>
+            {deepWorkDefinitions.length > 0 ? (
+                <ul className="space-y-2 mb-6 max-h-48 overflow-y-auto pr-2">
+                    {deepWorkDefinitions.map(def => (
+                        <li key={def.id} className="flex items-center gap-3 text-sm p-2 rounded-md bg-muted/50">
+                            <Briefcase className="h-4 w-4 text-primary flex-shrink-0" />
+                            <span className="truncate" title={`${def.name} (${def.category})`}>{def.name} <span className="text-muted-foreground/80">({def.category})</span></span>
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <p className="text-sm text-muted-foreground mb-6">No deep work projects found. Complete projects on the Deep Work page.</p>
+            )}
+            <Separator className="my-4"/>
+            <h4 className="font-semibold mb-3 text-md text-foreground/90">Productization Ideas</h4>
             <ul className="space-y-3">
               {productizationItems.map((item, index) => (
                 <li key={index} className="flex items-start gap-3">
@@ -88,6 +117,21 @@ function LeverageSystemPageContent() {
             <CardDescription>Repurpose content for passive lead generation.</CardDescription>
           </CardHeader>
           <CardContent>
+            <h4 className="font-semibold mb-2 text-md text-foreground/90">Published Content for Repurposing</h4>
+            {publishedBundles.length > 0 ? (
+                <ul className="space-y-2 mb-6 max-h-48 overflow-y-auto pr-2">
+                    {publishedBundles.map(bundle => (
+                        <li key={bundle.id} className="flex items-center gap-3 text-sm p-2 rounded-md bg-muted/50">
+                            <Package className="h-4 w-4 text-green-500 flex-shrink-0" />
+                            <span>{bundle.name}</span>
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <p className="text-sm text-muted-foreground mb-6">No published content yet. Publish content from the Personal Branding page to see it here.</p>
+            )}
+            <Separator className="my-4"/>
+            <h4 className="font-semibold mb-3 text-md text-foreground/90">Leverage Strategies</h4>
             <ul className="space-y-3">
               {contentLeverageItems.map((item, index) => (
                 <li key={index} className="flex items-start gap-3">
