@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { DemoTokenModal } from './DemoTokenModal';
 import { SettingsModal } from './SettingsModal';
 import { TodaysScheduleCard } from './TodaysScheduleCard';
+import { format } from 'date-fns';
 
 export function Header() {
   const { 
