@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { WorkoutExercise } from '@/types/workout';
-import { BookOpenCheck, Briefcase, Share2, Save } from 'lucide-react';
+import { BookOpenCheck, Briefcase, Share2, Save, PlusCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
@@ -25,24 +25,24 @@ interface TodaysLearningModalProps {
   onOpenChange: (isOpen: boolean) => void;
   availableTasks: WorkoutExercise[];
   initialSelectedIds: string[];
-  onSave: (selectedIds: string[]) => void;
+  onSave: (allTodaysDefIds: string[], selectedDefIdsForSlot: string[]) => void;
   pageType: 'upskill' | 'deepwork' | 'branding';
   isAddingNewTasks: boolean;
   disabledTaskIds?: string[];
 }
 
-const TaskItem = ({ task, isDisabled, selected, onToggle }: { task: WorkoutExercise; isDisabled: boolean; selected: boolean; onToggle: () => void; }) => (
+const ScheduledTaskItem = ({ task, isDisabled, selected, onToggle }: { task: WorkoutExercise; isDisabled: boolean; selected: boolean; onToggle: () => void; }) => (
   <div
     className="flex items-center space-x-3 p-3 rounded-md border has-[:checked]:bg-muted/50 transition-colors"
   >
     <Checkbox
-      id={`task-${task.id}`}
+      id={`task-${task.definitionId}`}
       checked={selected}
       onCheckedChange={onToggle}
       disabled={isDisabled}
     />
     <Label
-      htmlFor={`task-${task.id}`}
+      htmlFor={`task-${task.definitionId}`}
       className={cn(
         "font-normal w-full",
         isDisabled ? "cursor-not-allowed text-muted-foreground/50" : "cursor-pointer"
@@ -52,6 +52,18 @@ const TaskItem = ({ task, isDisabled, selected, onToggle }: { task: WorkoutExerc
       <p className="text-xs text-muted-foreground">{task.category}</p>
     </Label>
   </div>
+);
+
+const LibraryTaskItem = ({ task, onAdd }: { task: WorkoutExercise; onAdd: () => void; }) => (
+    <div className="flex items-center justify-between space-x-3 p-3 rounded-md border transition-colors">
+        <Label htmlFor={`task-${task.definitionId}`} className="font-normal w-full cursor-default">
+            <p className="font-medium">{task.name}</p>
+            <p className="text-xs text-muted-foreground">{task.category}</p>
+        </Label>
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-accent-foreground" onClick={onAdd} aria-label={`Add ${task.name} to today's session`}>
+            <PlusCircle className="h-5 w-5" />
+        </Button>
+    </div>
 );
 
 
@@ -65,33 +77,42 @@ export function TodaysLearningModal({
   isAddingNewTasks,
   disabledTaskIds = [],
 }: TodaysLearningModalProps) {
-  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>(initialSelectedIds);
+  const [scheduledTasks, setScheduledTasks] = useState<WorkoutExercise[]>([]);
+  const [libraryTasks, setLibraryTasks] = useState<WorkoutExercise[]>([]);
+  const [selectedDefIds, setSelectedDefIds] = useState<string[]>([]);
+
 
   useEffect(() => {
     if(isOpen) {
-      setSelectedTaskIds(initialSelectedIds);
-    }
-  }, [initialSelectedIds, isOpen]);
+      const todaysDefIds = new Set(initialSelectedIds.concat(disabledTaskIds));
+      
+      const initialScheduled = availableTasks.filter(task => todaysDefIds.has(task.definitionId));
+      const initialLibrary = availableTasks.filter(task => !todaysDefIds.has(task.definitionId));
 
-  const handleToggleTask = (defId: string) => {
-    setSelectedTaskIds(prev =>
+      setScheduledTasks(initialScheduled);
+      setLibraryTasks(initialLibrary);
+      setSelectedDefIds(initialSelectedIds);
+    }
+  }, [isOpen, availableTasks, initialSelectedIds, disabledTaskIds]);
+
+  const handleAddTaskToDay = (taskToAdd: WorkoutExercise) => {
+    setLibraryTasks(prev => prev.filter(t => t.id !== taskToAdd.id));
+    setScheduledTasks(prev => [...prev, taskToAdd]);
+  };
+
+  const handleToggleScheduledTask = (defId: string) => {
+    setSelectedDefIds(prev => 
       prev.includes(defId)
         ? prev.filter(id => id !== defId)
         : [...prev, defId]
     );
   };
-
+  
   const handleSaveChanges = () => {
-    onSave(selectedTaskIds);
+    const allTodaysDefIds = scheduledTasks.map(t => t.definitionId);
+    onSave(allTodaysDefIds, selectedDefIds);
     onOpenChange(false);
   };
-
-  const [scheduledToday, fromLibrary] = useMemo(() => {
-    const scheduledDefIds = new Set([...initialSelectedIds, ...disabledTaskIds]);
-    const todays = availableTasks.filter(task => scheduledDefIds.has(task.definitionId));
-    const library = availableTasks.filter(task => !scheduledDefIds.has(task.definitionId));
-    return [todays, library];
-  }, [availableTasks, initialSelectedIds, disabledTaskIds]);
 
   const pageInfo = {
     upskill: {
@@ -133,34 +154,32 @@ export function TodaysLearningModal({
           <ScrollArea className="h-full pr-4">
             {availableTasks.length > 0 ? (
               <div className="space-y-4">
-                {scheduledToday.length > 0 && (
+                {scheduledTasks.length > 0 && (
                   <div>
                       <h4 className="mb-2 text-sm font-medium text-muted-foreground">Scheduled for Today</h4>
                       <div className="space-y-2">
-                        {scheduledToday.map(task => (
-                           <TaskItem 
-                            key={task.id} 
+                        {scheduledTasks.map(task => (
+                           <ScheduledTaskItem 
+                            key={task.definitionId} 
                             task={task} 
                             isDisabled={disabledTaskIds.includes(task.definitionId)}
-                            selected={selectedTaskIds.includes(task.definitionId)}
-                            onToggle={() => handleToggleTask(task.definitionId)}
+                            selected={selectedDefIds.includes(task.definitionId)}
+                            onToggle={() => handleToggleScheduledTask(task.definitionId)}
                           />
                         ))}
                       </div>
                   </div>
                 )}
                 
-                {fromLibrary.length > 0 && (
+                {libraryTasks.length > 0 && (
                      <div>
-                        <h4 className="mb-2 text-sm font-medium text-muted-foreground">Available from Library</h4>
+                        <h4 className="mb-2 mt-4 text-sm font-medium text-muted-foreground">Available from Library</h4>
                         <div className="space-y-2">
-                           {fromLibrary.map(task => (
-                             <TaskItem 
-                              key={task.id} 
+                           {libraryTasks.map(task => (
+                             <LibraryTaskItem 
+                              key={task.definitionId} 
                               task={task} 
-                              isDisabled={false}
-                              selected={selectedTaskIds.includes(task.definitionId)}
-                              onToggle={() => handleToggleTask(task.definitionId)}
+                              onAdd={() => handleAddTaskToDay(task)}
                             />
                           ))}
                         </div>

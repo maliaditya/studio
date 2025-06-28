@@ -304,7 +304,7 @@ function HomePageContent() {
     }
   };
 
-  const handleSaveTaskSelection = (selectedDefIds: string[]) => {
+  const handleSaveTaskSelection = (allTodaysDefIds: string[], checkedDefIdsForSlot: string[]) => {
     if (!editingActivity) return;
 
     const { slotName, activity } = editingActivity;
@@ -316,9 +316,8 @@ function HomePageContent() {
 
     // 1. Determine which exercises need to be created.
     const logForDay = logSource.find(log => log.date === todayKey);
-    const existingExercisesForDay = logForDay?.exercises || [];
-    const existingDefIdsForDay = new Set(existingExercisesForDay.map(ex => ex.definitionId));
-    const defIdsToCreate = selectedDefIds.filter(id => !existingDefIdsForDay.has(id));
+    const existingDefIdsForDay = new Set(logForDay?.exercises.map(ex => ex.definitionId) || []);
+    const defIdsToCreate = allTodaysDefIds.filter(id => !existingDefIdsForDay.has(id));
 
     const newExercises: WorkoutExercise[] = defIdsToCreate.length > 0
       ? definitionSource
@@ -340,16 +339,16 @@ function HomePageContent() {
           if (logIndex > -1) {
               newLogs[logIndex].exercises.push(...newExercises);
           } else {
-              newLogs.push({ id: todayKey, date: todayKey, exercises: [...existingExercisesForDay, ...newExercises] });
+              newLogs.push({ id: todayKey, date: todayKey, exercises: [...(logForDay?.exercises || []), ...newExercises] });
           }
           return newLogs;
       });
     }
 
     // 3. Update the schedule with the correct task IDs.
-    const allRelevantExercises = [...existingExercisesForDay, ...newExercises];
+    const allRelevantExercises = [...(logForDay?.exercises || []), ...newExercises];
     const finalTaskIdsForSlot = allRelevantExercises
-      .filter(ex => selectedDefIds.includes(ex.definitionId))
+      .filter(ex => checkedDefIdsForSlot.includes(ex.definitionId))
       .map(ex => ex.id);
 
     const newDetails = allRelevantExercises
