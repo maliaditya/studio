@@ -93,7 +93,9 @@ function HomePageContent() {
     schedule,
     setSchedule,
     allUpskillLogs,
+    setAllUpskillLogs,
     allDeepWorkLogs,
+    setAllDeepWorkLogs,
     allWorkoutLogs,
     setActivityDurations,
     isAgendaDocked,
@@ -115,6 +117,7 @@ function HomePageContent() {
   
   // State for upskill and deepwork data (now using context, but some local state might be needed for modals etc)
   const [deepWorkDefinitions, setDeepWorkDefinitions] = useState<ExerciseDefinition[]>([]);
+  const [upskillDefinitions, setUpskillDefinitions] = useState<ExerciseDefinition[]>([]);
   const [topicGoals, setTopicGoals] = useState<Record<string, TopicGoal>>({});
 
   // State for personal branding data
@@ -150,7 +153,7 @@ function HomePageContent() {
         const username = currentUser.username;
         const keys = {
             workout: { defs: `exerciseDefinitions_${username}`, plans: `workoutPlans_${username}`, mode: `workoutMode_${username}` },
-            upskill: { goals: `upskill_topic_goals_${username}` },
+            upskill: { defs: `upskill_definitions_${username}`, goals: `upskill_topic_goals_${username}` },
             deepwork: { defs: `deepwork_definitions_${username}` },
             branding: { tasks: `branding_tasks_${username}`, logs: `branding_logs_${username}` },
         };
@@ -159,6 +162,7 @@ function HomePageContent() {
         setWorkoutMode((loadItem(keys.workout.mode, false) as WorkoutMode) || 'two-muscle');
         try { const d = loadItem(keys.workout.plans); setWorkoutPlans(d ? JSON.parse(d) : INITIAL_PLANS); } catch (e) { setWorkoutPlans(INITIAL_PLANS); }
         try { const d = loadItem(keys.workout.defs); setExerciseDefinitions(d ? JSON.parse(d) : []); } catch (e) { setExerciseDefinitions([]); }
+        try { const d = loadItem(keys.upskill.defs); setUpskillDefinitions(d ? JSON.parse(d) : []); } catch (e) { setUpskillDefinitions([]); }
         try { const d = loadItem(keys.deepwork.defs); setDeepWorkDefinitions(d ? JSON.parse(d) : []); } catch (e) { setDeepWorkDefinitions([]); }
         try { const d = loadItem(keys.upskill.goals); setTopicGoals(d ? JSON.parse(d) : {}); } catch (e) { setTopicGoals({}); }
         try { const d = loadItem(keys.branding.tasks); setBrandingTasks(d ? JSON.parse(d) : []); } catch (e) { setBrandingTasks([]); }
@@ -176,12 +180,13 @@ function HomePageContent() {
     localStorage.setItem(`workoutMode_${username}`, workoutMode);
     localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(workoutPlans));
     localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(exerciseDefinitions));
+    localStorage.setItem(`upskill_definitions_${username}`, JSON.stringify(upskillDefinitions));
     localStorage.setItem(`upskill_topic_goals_${username}`, JSON.stringify(topicGoals));
     localStorage.setItem(`deepwork_definitions_${username}`, JSON.stringify(deepWorkDefinitions));
     localStorage.setItem(`branding_tasks_${username}`, JSON.stringify(brandingTasks));
     localStorage.setItem(`branding_logs_${username}`, JSON.stringify(brandingLogs));
 
-  }, [workoutMode, workoutPlans, exerciseDefinitions, topicGoals, deepWorkDefinitions, brandingTasks, brandingLogs, currentUser, isScheduleLoaded]);
+  }, [workoutMode, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, brandingTasks, brandingLogs, currentUser, isScheduleLoaded]);
 
   useEffect(() => {
     const timerInterval = setInterval(() => {
@@ -301,37 +306,87 @@ function HomePageContent() {
 
   const handleSaveTaskSelection = (selectedIds: string[]) => {
     if (!editingActivity) return;
-
+  
     const { slotName, activity } = editingActivity;
+    const pageType = activity.type as 'upskill' | 'deepwork' | 'branding';
     
-    // Find all tasks for the day for the given pageType
-    const logSource = activity.type === 'upskill' ? allUpskillLogs : activity.type === 'deepwork' ? allDeepWorkLogs : brandingLogs;
+    // Determine if we are adding new tasks or selecting from existing daily tasks
+    const logSource = pageType === 'upskill' ? allUpskillLogs : pageType === 'deepwork' ? allDeepWorkLogs : brandingLogs;
     const allTasksForDay = logSource.find(log => log.date === todayKey)?.exercises || [];
+    const isAddingNewTasks = allTasksForDay.length === 0;
 
-    // Filter tasks based on selected IDs to get the full task objects
-    const selectedTasks = allTasksForDay.filter(task => selectedIds.includes(task.id));
-    
-    // Generate new details string
-    let newDetails = selectedTasks.map(t => t.name).join(', ');
-    if (!newDetails) {
-        newDetails = activity.type === 'upskill' ? 'Learning Session'
-                   : activity.type === 'deepwork' ? 'Deep Work Session'
-                   : activity.type === 'branding' ? 'Branding Session'
-                   : 'Session';
-    }
-
-    // Update the schedule
-    setSchedule(prev => {
+    if (isAddingNewTasks) {
+      // Logic for adding new tasks to the day's log
+      const definitionSource = pageType === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
+      const logsUpdater = pageType === 'upskill' ? setAllUpskillLogs : setAllDeepWorkLogs;
+      
+      const selectedDefinitions = definitionSource.filter(def => selectedIds.includes(def.id));
+      if (selectedDefinitions.length === 0) {
+        setEditingActivity(null);
+        return;
+      }
+      
+      const newExercises: WorkoutExercise[] = selectedDefinitions.map(def => ({
+        id: `${def.id}-${Date.now()}-${Math.random()}`,
+        definitionId: def.id,
+        name: def.name,
+        category: def.category,
+        loggedSets: [],
+        targetSets: 1, // Default
+        targetReps: '25', // Default
+      }));
+      
+      logsUpdater(prevLogs => {
+        const newLogs = [...prevLogs];
+        const logIndex = newLogs.findIndex(log => log.date === todayKey);
+        
+        if (logIndex > -1) {
+          newLogs[logIndex].exercises.push(...newExercises);
+        } else {
+          newLogs.push({ id: todayKey, date: todayKey, exercises: newExercises });
+        }
+        return newLogs;
+      });
+      
+      // Update the agenda item
+      const newDetails = newExercises.map(t => t.name).join(', ');
+      const newTaskIds = newExercises.map(t => t.id);
+      
+      setSchedule(prev => {
         const newTodaySchedule = { ...(prev[todayKey] || {}) };
         const activitiesInSlot = (newTodaySchedule[slotName] || []).map(act => {
             if (act.id === activity.id) {
-                return { ...act, taskIds: selectedIds, details: newDetails };
+                return { ...act, taskIds: newTaskIds, details: newDetails };
             }
             return act;
         });
         newTodaySchedule[slotName] = activitiesInSlot;
         return { ...prev, [todayKey]: newTodaySchedule };
-    });
+      });
+
+    } else {
+      // Existing logic for selecting from already-scheduled tasks
+      const selectedTasks = allTasksForDay.filter(task => selectedIds.includes(task.id));
+      let newDetails = selectedTasks.map(t => t.name).join(', ');
+      if (!newDetails) {
+          newDetails = activity.type === 'upskill' ? 'Learning Session'
+                     : activity.type === 'deepwork' ? 'Deep Work Session'
+                     : activity.type === 'branding' ? 'Branding Session'
+                     : 'Session';
+      }
+
+      setSchedule(prev => {
+          const newTodaySchedule = { ...(prev[todayKey] || {}) };
+          const activitiesInSlot = (newTodaySchedule[slotName] || []).map(act => {
+              if (act.id === activity.id) {
+                  return { ...act, taskIds: selectedIds, details: newDetails };
+              }
+              return act;
+          });
+          newTodaySchedule[slotName] = activitiesInSlot;
+          return { ...prev, [todayKey]: newTodaySchedule };
+      });
+    }
 
     setEditingActivity(null);
   };
@@ -650,37 +705,54 @@ function HomePageContent() {
   
   const learningModalProps = useMemo(() => {
     if (!editingActivity) {
-      return { availableTasks: [], initialSelectedIds: [], pageType: 'upskill' as const };
+      return { availableTasks: [], initialSelectedIds: [], pageType: 'upskill' as const, isAddingNewTasks: false };
     }
 
     const { activity } = editingActivity;
     const pageType = activity.type as 'upskill' | 'deepwork' | 'branding';
 
-    // 1. Get all tasks scheduled for the day for this activity type
     const logSource = pageType === 'upskill' ? allUpskillLogs : pageType === 'deepwork' ? allDeepWorkLogs : brandingLogs;
     const allTasksForDay = logSource.find(log => log.date === todayKey)?.exercises || [];
-    if (allTasksForDay.length === 0) {
-      return { availableTasks: [], initialSelectedIds: activity.taskIds || [], pageType };
+    
+    if (allTasksForDay.length > 0) {
+      // User is selecting from tasks already scheduled for the day.
+      const todaysActivitiesForType = Object.values(schedule[todayKey] || {}).flat();
+      const scheduledIdsInOtherSlots = new Set<string>();
+      todaysActivitiesForType.forEach(act => {
+        if (act && act.type === pageType && act.id !== activity.id && act.taskIds) {
+          act.taskIds.forEach(id => scheduledIdsInOtherSlots.add(id));
+        }
+      });
+      const availableTasks = allTasksForDay.filter(task => !scheduledIdsInOtherSlots.has(task.id));
+      const initialSelectedIds = activity.taskIds || [];
+      return { availableTasks, initialSelectedIds, pageType, isAddingNewTasks: false };
+    } else {
+      // Day has no scheduled tasks, so present unlogged definitions to be added.
+      const definitionSource = pageType === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
+      const allLogs = pageType === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
+      
+      const loggedDefinitionIds = new Set<string>();
+      allLogs.forEach(log => {
+        log.exercises.forEach(ex => {
+          if (ex.loggedSets.length > 0) {
+            loggedDefinitionIds.add(ex.definitionId);
+          }
+        });
+      });
+      
+      const availableDefinitions = definitionSource.filter(def => !loggedDefinitionIds.has(def.id));
+
+      const availableTasks = availableDefinitions.map(def => ({
+        id: def.id, // Use definitionId as the key here for selection
+        definitionId: def.id,
+        name: def.name,
+        category: def.category,
+        loggedSets: [], targetSets: 0, targetReps: '' // Dummy data
+      }));
+
+      return { availableTasks, initialSelectedIds: [], pageType, isAddingNewTasks: true };
     }
-
-    // 2. Find all task IDs that are already scheduled in *other* slots of the same type
-    const todaysActivitiesForType = Object.values(schedule[todayKey] || {}).flat();
-    const scheduledIdsInOtherSlots = new Set<string>();
-    todaysActivitiesForType.forEach(act => {
-      if (act && act.type === pageType && act.id !== activity.id && act.taskIds) {
-        act.taskIds.forEach(id => scheduledIdsInOtherSlots.add(id));
-      }
-    });
-
-    // 3. The available tasks for this modal are all tasks for the day, MINUS those scheduled in other slots
-    const availableTasks = allTasksForDay.filter(task => !scheduledIdsInOtherSlots.has(task.id));
-
-    // 4. The initially selected tasks are the ones already associated with the activity being edited
-    const initialSelectedIds = activity.taskIds || [];
-
-    return { availableTasks, initialSelectedIds, pageType };
-
-}, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, todayKey, schedule]);
+}, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, todayKey, schedule, upskillDefinitions, deepWorkDefinitions]);
 
   const timeAllocationData = useMemo(() => {
     if (!productivityStats.todayHoursData) return [];
@@ -786,6 +858,7 @@ function HomePageContent() {
               initialSelectedIds={learningModalProps.initialSelectedIds}
               onSave={handleSaveTaskSelection}
               pageType={learningModalProps.pageType}
+              isAddingNewTasks={learningModalProps.isAddingNewTasks}
           />
         )}
 

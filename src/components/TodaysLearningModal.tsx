@@ -16,6 +16,7 @@ import { BookOpenCheck, Briefcase, Share2, Save } from 'lucide-react';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
+import Link from 'next/link';
 
 interface TodaysLearningModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ interface TodaysLearningModalProps {
   initialSelectedIds: string[];
   onSave: (selectedIds: string[]) => void;
   pageType: 'upskill' | 'deepwork' | 'branding';
+  isAddingNewTasks: boolean;
 }
 
 export function TodaysLearningModal({
@@ -32,7 +34,8 @@ export function TodaysLearningModal({
   availableTasks,
   initialSelectedIds,
   onSave,
-  pageType
+  pageType,
+  isAddingNewTasks,
 }: TodaysLearningModalProps) {
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>(initialSelectedIds);
 
@@ -59,19 +62,25 @@ export function TodaysLearningModal({
       icon: <BookOpenCheck className="h-12 w-12 mb-4" />,
       title: 'Upskill Session Tasks',
       description: 'Select the tasks you plan to focus on for this session slot.',
-      emptyText: 'No learning tasks scheduled for today.'
+      emptyText: 'No learning tasks scheduled for today.',
+      pageLink: '/upskill',
+      pageName: 'Upskill'
     },
     deepwork: {
       icon: <Briefcase className="h-12 w-12 mb-4" />,
       title: 'Deep Work Session Tasks',
       description: 'Select the focus areas for this session slot.',
-      emptyText: 'No focus areas added to the session for today.'
+      emptyText: 'No focus areas added to the session for today.',
+      pageLink: '/deep-work',
+      pageName: 'Deep Work'
     },
     branding: {
       icon: <Share2 className="h-12 w-12 mb-4" />,
       title: 'Branding Session Tasks',
       description: 'Select the content bundles to work on for this session slot.',
-      emptyText: 'No branding tasks scheduled for today.'
+      emptyText: 'No branding tasks scheduled for today.',
+      pageLink: '/personal-branding',
+      pageName: 'Personal Branding'
     }
   };
 
@@ -111,13 +120,22 @@ export function TodaysLearningModal({
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8">
                 {info.icon}
-                <p className="font-semibold">{info.emptyText}</p>
+                <p className="font-semibold">{isAddingNewTasks ? 'No Available Tasks' : info.emptyText}</p>
+                 {isAddingNewTasks && (
+                    <p className="text-sm mt-2">
+                        No unlogged tasks were found. Visit the{' '}
+                        <Link href={info.pageLink} className="font-medium text-primary underline underline-offset-4">
+                            {info.pageName} page
+                        </Link>
+                        {' '}to add new tasks to your library.
+                    </p>
+                )}
               </div>
             )}
           </ScrollArea>
         </div>
         <DialogFooter>
-            <Button onClick={handleSaveChanges}>
+            <Button onClick={handleSaveChanges} disabled={availableTasks.length === 0}>
                 <Save className="mr-2 h-4 w-4" />
                 Save Selections
             </Button>
