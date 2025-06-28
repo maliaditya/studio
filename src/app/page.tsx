@@ -41,7 +41,7 @@ const INITIAL_PLANS: AllWorkoutPlans = {
     "W3": { "Chest": ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine"], "Triceps": ["Overhead Cable Extension", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips"], "Back": ["Lat Pulldown", "Barbell Row", "Seated Row", "Lat Prayer Pull"], "Biceps": ["Strict bar curls", "Reversed Incline curls", "Cable Curls Superset", "Reversed cable curls"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Dumbbell Lateral Raise (Lean in)", "Face Pulls", "Shrugs"], "Legs": ["Leg Press", "Quads Machine", "Hamstring machine", "Calfs (Bodyweight)"] },
     "W4": { "Chest": ["Dumbbell Flat Press", "Incline Dumbbell Press", "Dumbbell Pullovers", "Cable Fly"], "Triceps": ["Overhead Cable Extension", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips"], "Back": ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle lat pulldown", "DeadLifts"], "Biceps": ["Seated Machine Curls", "Cable Curls", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable"], "Legs": ["Walking Lunges (Barbell)", "Squats (Barbell)", "hamstring machine", "Quads Machine"] },
     "W5": { "Chest": ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine", "Cable Fly", "Dumbbell Pullovers"], "Triceps": ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips"], "Back": ["Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull", "1-Arm Dumbbell Row", "DeadLifts"], "Biceps": ["Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)", "Reversed cable curls", "Reversed Incline curls"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Cable Upright Rows", "Front Raise Dumbbells", "Shrugs"], "Legs": ["Squats (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine", "Walking Lunges (Barbell)", "Calfs (Bodyweight)"] },
-    "W6": { "Chest": ["Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Peck Machine", "Flat Bench Chest Fly", "Dumbbell Pullovers"], "Triceps": ["Overhead Cable Extension", "Single Arm Dumbbell Extensions", "Rope Pushdown", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips"], "Back": ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle lat pulldown", "Barbell Row", "Lat Prayer Pull", "Back extensions"], "Biceps": ["Strict bar curls", "Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher Curls Bar", "Reverse Cable", "Concentration Curl"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable", "Cable Upright Rows", "Shrugs"], "Legs": ["Walking Lunges (Barbell)", "Hack Squats", "Hamstring machine", "Quads Machine", "Leg Press", "Calfs (Bodyweight)"] }
+    "W6": { "Chest": ["Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Peck Machine", "Flat Bench Chest Fly", "Dumbbell Pullovers"], "Triceps": ["Overhead Cable Extension", "Single Arm Dumbbell Extensions", "Rope Pushdown", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips"], "Back": ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle lat pulldown", "Barbell Row", "Lat Prayer Pull", "Back extensions"], "Biceps": ["Strict bar curls", "Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher Curls Bar", "Reverse Cable", "Concentration Curl"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable", "Cable Upright Rows", "Shrugs"], "Legs": ["Walking Lunges (Barbell)", "Hack Squats", "hamstring machine", "Quads Machine", "Leg Press", "Calfs (Bodyweight)"] }
 };
 
 const productivityLevels = [
@@ -127,10 +127,9 @@ function HomePageContent() {
     setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
   }, []);
 
-  const scheduleStorageKey = currentUser ? `lifeos_schedule_${currentUser.username}` : null;
-
   // Load schedule from localStorage
   useEffect(() => {
+    const scheduleStorageKey = currentUser ? `lifeos_schedule_${currentUser.username}` : null;
     if (scheduleStorageKey) {
       try {
         const storedSchedule = localStorage.getItem(scheduleStorageKey);
@@ -156,14 +155,15 @@ function HomePageContent() {
       }
       setIsScheduleLoaded(true);
     }
-  }, [scheduleStorageKey]);
+  }, [currentUser]);
 
   // Save schedule to localStorage
   useEffect(() => {
+    const scheduleStorageKey = currentUser ? `lifeos_schedule_${currentUser.username}` : null;
     if (scheduleStorageKey && isScheduleLoaded) {
       localStorage.setItem(scheduleStorageKey, JSON.stringify(schedule));
     }
-  }, [schedule, scheduleStorageKey, isScheduleLoaded]);
+  }, [schedule, currentUser, isScheduleLoaded]);
 
   // Load all other data from local storage
   useEffect(() => {
@@ -666,6 +666,7 @@ function HomePageContent() {
               />
             </div>
             <div className="space-y-6 lg:col-span-2">
+                <TodaysScheduleCard schedule={todaysSchedule} />
                 <WeightGoalCard 
                   weightLogs={weightLogs}
                   goalWeight={goalWeight}
@@ -680,7 +681,6 @@ function HomePageContent() {
                   dietPlan={dietPlan}
                   onEditDietClick={() => setIsDietPlanModalOpen(true)}
                 />
-                <TodaysScheduleCard schedule={todaysSchedule} />
             </div>
           </div>
           <TimeSlots 
