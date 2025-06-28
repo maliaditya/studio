@@ -60,7 +60,8 @@ function UpskillPageContent() {
     goalWeight, setGoalWeight,
     height, setHeight,
     dateOfBirth, setDateOfBirth,
-    gender, setGender
+    gender, setGender,
+    allUpskillLogs, setAllUpskillLogs
   } = useAuth();
 
   const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
@@ -75,7 +76,6 @@ function UpskillPageContent() {
   const [editingDefinitionCategory, setEditingDefinitionCategory] = useState<string>('');
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
 
   const [viewingProgressExercise, setViewingProgressExercise] = useState<ExerciseDefinition | null>(null);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
@@ -99,7 +99,7 @@ function UpskillPageContent() {
 
   const loggedDefinitionIds = useMemo(() => {
     const ids = new Set<string>();
-    allWorkoutLogs.forEach(log => {
+    allUpskillLogs.forEach(log => {
       log.exercises.forEach(ex => {
         if (ex.loggedSets.length > 0) {
           ids.add(ex.definitionId);
@@ -107,7 +107,7 @@ function UpskillPageContent() {
       });
     });
     return ids;
-  }, [allWorkoutLogs]);
+  }, [allUpskillLogs]);
   
   const filteredExerciseDefinitions = useMemo(() => {
     let definitions = [...exerciseDefinitions];
@@ -133,7 +133,6 @@ function UpskillPageContent() {
     if (currentUser?.username) {
         const username = currentUser.username;
         const defsKey = `upskill_definitions_${username}`;
-        const logsKey = `upskill_logs_${username}`;
         const goalsKey = `upskill_topic_goals_${username}`;
 
         try {
@@ -146,14 +145,8 @@ function UpskillPageContent() {
             setTopicGoals(storedGoals ? JSON.parse(storedGoals) : {});
         } catch (e) { setTopicGoals({}); }
         
-        try {
-            const storedLogs = localStorage.getItem(logsKey);
-            setAllWorkoutLogs(storedLogs ? JSON.parse(storedLogs) : []);
-        } catch (e) { setAllWorkoutLogs([]); }
-        
     } else {
       setExerciseDefinitions([]);
-      setAllWorkoutLogs([]);
       setTopicGoals({});
     }
     const timer = setTimeout(() => setIsLoadingPage(false), 300);
@@ -165,18 +158,16 @@ function UpskillPageContent() {
       try {
         const username = currentUser.username;
         const defsKey = `upskill_definitions_${username}`;
-        const logsKey = `upskill_logs_${username}`;
         const goalsKey = `upskill_topic_goals_${username}`;
 
         localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
-        localStorage.setItem(logsKey, JSON.stringify(allWorkoutLogs));
         localStorage.setItem(goalsKey, JSON.stringify(topicGoals));
       } catch (e) {
         console.error("Error saving upskill data to localStorage", e);
         toast({ title: "Save Error", description: "Could not save upskill data locally.", variant: "destructive"});
       }
     }
-  }, [exerciseDefinitions, allWorkoutLogs, topicGoals, currentUser, isLoadingPage, toast]);
+  }, [exerciseDefinitions, topicGoals, currentUser, isLoadingPage, toast]);
 
   useEffect(() => {
       if (!currentUser) return;
@@ -204,8 +195,8 @@ function UpskillPageContent() {
 
   const currentDatedWorkout = useMemo(() => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    return allWorkoutLogs.find(log => log.id === dateKey);
-  }, [selectedDate, allWorkoutLogs]);
+    return allUpskillLogs.find(log => log.id === dateKey);
+  }, [selectedDate, allUpskillLogs]);
 
   const currentWorkoutExercises = useMemo(() => {
     return currentDatedWorkout?.exercises || [];
@@ -218,7 +209,7 @@ function UpskillPageContent() {
   };
 
   const updateOrAddWorkoutLog = (updatedWorkout: DatedWorkout) => {
-    setAllWorkoutLogs(prevLogs => {
+    setAllUpskillLogs(prevLogs => {
       const existingLogIndex = prevLogs.findIndex(log => log.id === updatedWorkout.id);
       if (existingLogIndex > -1) {
         const newLogs = [...prevLogs];
@@ -271,7 +262,7 @@ function UpskillPageContent() {
   const handleDeleteExerciseDefinition = (id: string) => {
     const defToDelete = exerciseDefinitions.find(def => def.id === id);
     setExerciseDefinitions(prev => prev.filter(def => def.id !== id));
-    setAllWorkoutLogs(prevLogs => 
+    setAllUpskillLogs(prevLogs => 
       prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) }))
     );
     toast({ title: "Success", description: `Task "${defToDelete?.name}" removed.` });
@@ -294,7 +285,7 @@ function UpskillPageContent() {
       category: editingDefinitionCategory.trim() as ExerciseCategory,
     };
     setExerciseDefinitions(prev => prev.map(def => def.id === editingDefinition.id ? updatedDef : def));
-    setAllWorkoutLogs(prevLogs => 
+    setAllUpskillLogs(prevLogs => 
       prevLogs.map(log => ({
         ...log,
         exercises: log.exercises.map(ex => 
@@ -312,7 +303,7 @@ function UpskillPageContent() {
       id: `${definition.id}-${Date.now()}`, definitionId: definition.id, name: definition.name, category: definition.category,
       loggedSets: [], targetSets: parseInt(DEFAULT_TARGET_SESSIONS.toString(), 10), targetReps: DEFAULT_TARGET_DURATION,
     };
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    const existingWorkout = allUpskillLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
       if (existingWorkout.exercises.some(ex => ex.definitionId === definition.id)) {
         toast({ title: "Info", description: `"${definition.name}" is already in this session.` }); return;
@@ -326,17 +317,17 @@ function UpskillPageContent() {
 
   const handleRemoveExerciseFromWorkout = (exerciseId: string) => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    const existingWorkout = allUpskillLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
       const updatedExercises = existingWorkout.exercises.filter(ex => ex.id !== exerciseId);
-      if (updatedExercises.length === 0) setAllWorkoutLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
+      if (updatedExercises.length === 0) setAllUpskillLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
       else updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
     }
   };
   
   const handleLogSet = (exerciseId: string, reps: number, weight: number) => { // Reps will be duration, weight is progress
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    const existingWorkout = allUpskillLogs.find(log => log.id === dateKey);
     if (existingWorkout && currentUser?.username) {
       const newSet: LoggedSet = { id: Date.now().toString(), reps, weight, timestamp: Date.now() };
       const updatedExercises = existingWorkout.exercises.map(ex => 
@@ -349,7 +340,7 @@ function UpskillPageContent() {
 
   const handleDeleteSet = (exerciseId: string, setId: string) => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    const existingWorkout = allUpskillLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
       const updatedExercises = existingWorkout.exercises.map(ex =>
         ex.id === exerciseId ? { ...ex, loggedSets: ex.loggedSets.filter(s => s.id !== setId) } : ex
@@ -360,7 +351,7 @@ function UpskillPageContent() {
 
   const handleUpdateSet = (exerciseId: string, setId: string, reps: number, weight: number) => { // Reps=duration, weight=progress
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    const existingWorkout = allUpskillLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
       const updatedExercises = existingWorkout.exercises.map(ex => {
         if (ex.id === exerciseId) {
@@ -399,8 +390,8 @@ function UpskillPageContent() {
   };
 
   const consistencyData = useMemo(() => {
-    if (!allWorkoutLogs || !oneYearAgo || !today) return [];
-    const workoutDates = new Set(allWorkoutLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date));
+    if (!allUpskillLogs || !oneYearAgo || !today) return [];
+    const workoutDates = new Set(allUpskillLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date));
     const data = [];
     let score = 0.5;
     for (let d = new Date(oneYearAgo); d <= today; d = addDays(d, 1)) {
@@ -410,12 +401,12 @@ function UpskillPageContent() {
         data.push({ date: format(d, 'MMM dd'), fullDate: format(d, 'PPP'), score: Math.round(score * 100) });
     }
     return data;
-  }, [allWorkoutLogs, oneYearAgo, today]);
+  }, [allUpskillLogs, oneYearAgo, today]);
 
   const dailyDurationData = useMemo(() => {
     const dailyData: Record<string, { totalDuration: number; topics: Set<string> }> = {};
 
-    allWorkoutLogs.forEach(log => {
+    allUpskillLogs.forEach(log => {
         log.exercises.forEach(exercise => {
             const duration = exercise.loggedSets.reduce((sum, set) => sum + set.reps, 0);
             if (duration > 0) {
@@ -436,7 +427,7 @@ function UpskillPageContent() {
             date: format(parseISO(dateString), 'MMM dd'),
         }))
         .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
-  }, [allWorkoutLogs]);
+  }, [allUpskillLogs]);
   
   if (isLoadingPage) {
     return (
@@ -708,7 +699,7 @@ function UpskillPageContent() {
                   title="Learning Activity"
                   description="Your learning consistency over the last year. Click a square to view that day's log."
                   graphDescription="Your probability of learning, based on recent consistency."
-                  allWorkoutLogs={allWorkoutLogs}
+                  allWorkoutLogs={allUpskillLogs}
                   onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
                   consistencyData={consistencyData}
                   oneYearAgo={oneYearAgo}
@@ -722,7 +713,7 @@ function UpskillPageContent() {
             isOpen={isProgressModalOpen} 
             onOpenChange={setIsProgressModalOpen}
             exercise={viewingProgressExercise} 
-            allWorkoutLogs={allWorkoutLogs}
+            allWorkoutLogs={allUpskillLogs}
             topicGoals={topicGoals}
             pageType="upskill"
           />

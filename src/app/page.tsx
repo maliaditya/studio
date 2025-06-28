@@ -18,7 +18,6 @@ import { DashboardStats } from '@/components/DashboardStats';
 import { ProductivitySnapshot } from '@/components/ProductivitySnapshot';
 import { TimeSlots } from '@/components/TimeSlots';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
-import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -90,11 +89,15 @@ function HomePageContent() {
     gender,
     setGender,
     dietPlan,
+    schedule,
+    setSchedule,
+    allUpskillLogs,
+    allDeepWorkLogs,
+    setActivityDurations,
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
   const [remainingTime, setRemainingTime] = useState('');
-  const [schedule, setSchedule] = useState<FullSchedule>({});
   const [isScheduleLoaded, setIsScheduleLoaded] = useState(false);
   const [todayKey, setTodayKey] = useState('');
 
@@ -104,9 +107,7 @@ function HomePageContent() {
   const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
   const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
   
-  // State for upskill and deepwork data
-  const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
-  const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
+  // State for upskill and deepwork data (now using context, but some local state might be needed for modals etc)
   const [deepWorkDefinitions, setDeepWorkDefinitions] = useState<ExerciseDefinition[]>([]);
   const [topicGoals, setTopicGoals] = useState<Record<string, TopicGoal>>({});
 
@@ -129,9 +130,6 @@ function HomePageContent() {
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   const [today, setToday] = useState<Date | null>(null);
 
-  // State for Agenda Widget
-  const [isAgendaDocked, setIsAgendaDocked] = useState(false);
-
   useEffect(() => {
     setTodayKey(format(new Date(), 'yyyy-MM-dd'));
     const now = new Date();
@@ -139,52 +137,14 @@ function HomePageContent() {
     setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
   }, []);
 
-  // Load schedule from localStorage
-  useEffect(() => {
-    if (!currentUser) return;
-    const scheduleStorageKey = `lifeos_schedule_${currentUser.username}`;
-    try {
-      const storedSchedule = localStorage.getItem(scheduleStorageKey);
-      if (storedSchedule) {
-        const parsedSchedule: FullSchedule = JSON.parse(storedSchedule);
-        // Data migration: ensure all slots have arrays of activities with IDs.
-        Object.keys(parsedSchedule).forEach(dateKey => {
-          Object.keys(parsedSchedule[dateKey]).forEach(slotName => {
-            const slotContent = parsedSchedule[dateKey][slotName];
-            if (slotContent && !Array.isArray(slotContent)) {
-              const activity = slotContent as ActivityType;
-              parsedSchedule[dateKey][slotName] = [{ ...activity, id: activity.id || `${activity.type}-${Date.now()}-${Math.random()}` }];
-            } else if (Array.isArray(slotContent)) {
-              parsedSchedule[dateKey][slotName] = slotContent.map(activity => ({ ...activity, id: activity.id || `${activity.type}-${Date.now()}-${Math.random()}` }));
-            }
-          });
-        });
-        setSchedule(parsedSchedule);
-      }
-    } catch (error) {
-      console.error("Failed to parse schedule from localStorage", error);
-      setSchedule({});
-    }
-    setIsScheduleLoaded(true);
-  }, [currentUser]);
-
-  // Save schedule to localStorage
-  useEffect(() => {
-    if (!currentUser) return;
-    const scheduleStorageKey = `lifeos_schedule_${currentUser.username}`;
-    if (isScheduleLoaded) {
-      localStorage.setItem(scheduleStorageKey, JSON.stringify(schedule));
-    }
-  }, [schedule, currentUser, isScheduleLoaded]);
-
-  // Load all other data from local storage
+  // Effect to load data specific to this page from local storage
   useEffect(() => {
     if (currentUser?.username) {
         const username = currentUser.username;
         const keys = {
             workout: { defs: `exerciseDefinitions_${username}`, plans: `workoutPlans_${username}`, mode: `workoutMode_${username}`, logs: `allWorkoutLogs_${username}` },
-            upskill: { defs: `upskill_definitions_${username}`, logs: `upskill_logs_${username}`, goals: `upskill_topic_goals_${username}` },
-            deepwork: { defs: `deepwork_definitions_${username}`, logs: `deepwork_logs_${username}`, deletes: `deepwork_manual_deletes_${username}` },
+            upskill: { goals: `upskill_topic_goals_${username}` },
+            deepwork: { defs: `deepwork_definitions_${username}` },
             branding: { tasks: `branding_tasks_${username}`, logs: `branding_logs_${username}` },
         };
         const loadItem = (key: string, isJson: boolean = true) => localStorage.getItem(key);
@@ -193,15 +153,30 @@ function HomePageContent() {
         try { const d = loadItem(keys.workout.plans); setWorkoutPlans(d ? JSON.parse(d) : INITIAL_PLANS); } catch (e) { setWorkoutPlans(INITIAL_PLANS); }
         try { const d = loadItem(keys.workout.defs); setExerciseDefinitions(d ? JSON.parse(d) : []); } catch (e) { setExerciseDefinitions([]); }
         try { const d = loadItem(keys.workout.logs); setAllWorkoutLogs(d ? JSON.parse(d) : []); } catch (e) { setAllWorkoutLogs([]); }
-        try { const d = loadItem(keys.upskill.logs); setAllUpskillLogs(d ? JSON.parse(d) : []); } catch (e) { setAllUpskillLogs([]); }
-        try { const d = loadItem(keys.deepwork.logs); setAllDeepWorkLogs(d ? JSON.parse(d) : []); } catch (e) { setAllDeepWorkLogs([]); }
         try { const d = loadItem(keys.deepwork.defs); setDeepWorkDefinitions(d ? JSON.parse(d) : []); } catch (e) { setDeepWorkDefinitions([]); }
         try { const d = loadItem(keys.upskill.goals); setTopicGoals(d ? JSON.parse(d) : {}); } catch (e) { setTopicGoals({}); }
         try { const d = loadItem(keys.branding.tasks); setBrandingTasks(d ? JSON.parse(d) : []); } catch (e) { setBrandingTasks([]); }
         try { const d = loadItem(keys.branding.logs); setAllBrandingLogs(d ? JSON.parse(d) : []); } catch (e) { setAllBrandingLogs([]); }
     }
+     setIsScheduleLoaded(true);
   }, [currentUser]);
 
+   // Effect to save page-specific data
+  useEffect(() => {
+    if (!currentUser || !isScheduleLoaded) return;
+    const username = currentUser.username;
+    // Note: schedule, upskillLogs, deepWorkLogs are saved via context now.
+    // We only save data managed locally on this page.
+    localStorage.setItem(`workoutMode_${username}`, workoutMode);
+    localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(workoutPlans));
+    localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(exerciseDefinitions));
+    localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(allWorkoutLogs));
+    localStorage.setItem(`upskill_topic_goals_${username}`, JSON.stringify(topicGoals));
+    localStorage.setItem(`deepwork_definitions_${username}`, JSON.stringify(deepWorkDefinitions));
+    localStorage.setItem(`branding_tasks_${username}`, JSON.stringify(brandingTasks));
+    localStorage.setItem(`branding_logs_${username}`, JSON.stringify(brandingLogs));
+
+  }, [workoutMode, workoutPlans, exerciseDefinitions, allWorkoutLogs, topicGoals, deepWorkDefinitions, brandingTasks, brandingLogs, currentUser, isScheduleLoaded]);
 
   useEffect(() => {
     const timerInterval = setInterval(() => {
@@ -259,7 +234,7 @@ function HomePageContent() {
         toast({ title: "Activities Carried Over", description: "Yesterday's activities have been added to today's schedule." });
     }
     localStorage.setItem(lastCarryForwardKey, todayKey);
-  }, [currentUser, isScheduleLoaded, schedule, toast]);
+  }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast]);
 
   const handleAddActivity = (slotName: string, type: ActivityType) => {
     if (!currentUser?.username || !todayKey) return;
@@ -292,16 +267,6 @@ function HomePageContent() {
       const updatedActivities = activities.filter(act => act.id !== activityId);
       if (updatedActivities.length > 0) { newTodaySchedule[slotName] = updatedActivities; } else { delete newTodaySchedule[slotName]; }
       return { ...prev, [todayKey]: newTodaySchedule };
-    });
-  };
-
-  const handleToggleComplete = (slotName: string, activityId: string) => {
-    if (!todayKey) return;
-    setSchedule(prev => {
-      const todaySchedule = { ...(prev[todayKey] || {}) };
-      const activities = todaySchedule[slotName] || [];
-      if (activities.length > 0) { todaySchedule[slotName] = activities.map(act => act.id === activityId ? { ...act, completed: !act.completed } : act); }
-      return { ...prev, [todayKey]: todaySchedule };
     });
   };
 
@@ -401,6 +366,7 @@ function HomePageContent() {
           return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
       };
       const calculateAverageDuration = (logs: DatedWorkout[], durationField: 'reps' | 'weight', excludeToday: boolean = false) => {
+          if (!logs) return 0;
           const dailyDurations: Record<string, number> = {};
           logs.forEach(log => {
               if (excludeToday && log.date === todayStr) return;
@@ -543,16 +509,6 @@ function HomePageContent() {
       };
   }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, consistencyData, brandingTasks, brandingLogs, deepWorkDefinitions]);
     
-  const timeAllocationData = useMemo(() => {
-    if (!productivityStats.todayHoursData) return [];
-    const dailyTime = productivityStats.todayHoursData.reduce((sum, d) => sum + d.hours, 0);
-    return [
-      { name: 'Productive', time: dailyTime, fill: 'hsl(var(--primary))' },
-      { name: 'Ideal', time: 12, fill: 'hsl(var(--chart-2))' },
-      { name: 'Autopilot', time: Math.max(0, 24 - dailyTime), fill: 'hsl(var(--border))' },
-    ];
-  }, [productivityStats.todayHoursData]);
-
   const activityDurations = useMemo(() => {
     const durations: Record<string, string> = {};
     if (!schedule[todayKey] || !productivityStats.learningStats) return durations;
@@ -602,6 +558,11 @@ function HomePageContent() {
     }
     return durations;
   }, [schedule, todayKey, productivityStats.learningStats, allUpskillLogs]);
+
+  // Push calculated durations to the global context
+  useEffect(() => {
+    setActivityDurations(activityDurations);
+  }, [activityDurations, setActivityDurations]);
 
   const handleLogWeight = (weight: number, date: Date) => {
     if (!currentUser || isNaN(weight) || weight <= 0) {
@@ -711,6 +672,16 @@ function HomePageContent() {
 
 }, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, todayKey, schedule]);
 
+  const timeAllocationData = useMemo(() => {
+    if (!productivityStats.todayHoursData) return [];
+    const dailyTime = productivityStats.todayHoursData.reduce((sum, d) => sum + d.hours, 0);
+    return [
+      { name: 'Productive', time: dailyTime, fill: 'hsl(var(--primary))' },
+      { name: 'Ideal', time: 12, fill: 'hsl(var(--chart-2))' },
+      { name: 'Autopilot', time: Math.max(0, 24 - dailyTime), fill: 'hsl(var(--border))' },
+    ];
+  }, [productivityStats.todayHoursData]);
+
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -729,14 +700,6 @@ function HomePageContent() {
                 />
               </div>
               <div className="lg:col-span-2 space-y-6">
-                {isAgendaDocked && (
-                    <TodaysScheduleCard
-                        schedule={todaysSchedule}
-                        activityDurations={activityDurations}
-                        isAgendaDocked={isAgendaDocked}
-                        onToggleDock={() => setIsAgendaDocked(false)}
-                    />
-                )}
                 <WeightGoalCard 
                   weightLogs={weightLogs}
                   goalWeight={goalWeight}
@@ -759,7 +722,7 @@ function HomePageContent() {
               remainingTime={remainingTime}
               onAddActivity={handleAddActivity}
               onRemoveActivity={handleRemoveActivity}
-              onToggleComplete={handleToggleComplete}
+              onToggleComplete={()=>{}}
               onActivityClick={handleActivityClick}
             />
           </CardContent>
@@ -809,14 +772,6 @@ function HomePageContent() {
           todayHoursData={productivityStats.todayHoursData}
         />
       </div>
-      {!isAgendaDocked && (
-        <TodaysScheduleCard
-            schedule={todaysSchedule}
-            activityDurations={activityDurations}
-            isAgendaDocked={isAgendaDocked}
-            onToggleDock={() => setIsAgendaDocked(true)}
-        />
-      )}
     </>
   );
 }

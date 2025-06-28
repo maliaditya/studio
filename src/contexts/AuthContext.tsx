@@ -4,13 +4,14 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
 } from '@/lib/localAuth';
+import { format } from 'date-fns';
 
 
 interface AuthContextType {
@@ -28,6 +29,7 @@ interface AuthContextType {
   pushDemoDataWithToken: (token: string) => Promise<void>;
   theme: string;
   setTheme: React.Dispatch<React.SetStateAction<string>>;
+  
   // Shared health state
   weightLogs: WeightLog[];
   setWeightLogs: React.Dispatch<React.SetStateAction<WeightLog[]>>;
@@ -41,6 +43,22 @@ interface AuthContextType {
   setGender: React.Dispatch<React.SetStateAction<Gender | null>>;
   dietPlan: UserDietPlan;
   setDietPlan: React.Dispatch<React.SetStateAction<UserDietPlan>>;
+
+  // Global Schedule & Agenda State
+  schedule: FullSchedule;
+  setSchedule: React.Dispatch<React.SetStateAction<FullSchedule>>;
+  isAgendaDocked: boolean;
+  setIsAgendaDocked: React.Dispatch<React.SetStateAction<boolean>>;
+  activityDurations: Record<string, string>;
+  setActivityDurations: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  handleToggleComplete: (slotName: string, activityId: string) => void;
+  handleLogLearning: (activity: Activity, progress: number, duration: number) => void;
+
+  // Global Logs State
+  allUpskillLogs: DatedWorkout[];
+  setAllUpskillLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
+  allDeepWorkLogs: DatedWorkout[];
+  setAllDeepWorkLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -61,6 +79,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [gender, setGender] = useState<Gender | null>(null);
   const [dietPlan, setDietPlan] = useState<UserDietPlan>([]);
 
+  // Global Schedule & Logs
+  const [schedule, setSchedule] = useState<FullSchedule>({});
+  const [isAgendaDocked, setIsAgendaDocked] = useState(false); // Default to widget
+  const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
+  const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
+  const [activityDurations, setActivityDurations] = useState<Record<string, string>>({});
+
+
   useEffect(() => {
     const user = getCurrentLocalUser();
     setCurrentUser(user);
@@ -70,7 +96,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setTheme(savedTheme);
   }, []);
 
-  // Effect to load user-specific data (including health data) when currentUser changes
+  // Effect to load all user-specific data when currentUser changes
   useEffect(() => {
     if (currentUser?.username) {
       const username = currentUser.username;
@@ -86,34 +112,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       try { const d = loadItem(weightLogsKey); setWeightLogs(d ? JSON.parse(d) : []); } catch (e) { setWeightLogs([]); }
       try { const d = loadItem(dietPlanKey); setDietPlan(d ? JSON.parse(d) : []); } catch (e) { setDietPlan([]); }
-      
       const storedGoal = loadItem(goalWeightKey, false); if (storedGoal) setGoalWeight(parseFloat(storedGoal)); else setGoalWeight(null);
       const storedHeight = loadItem(heightKey, false); if (storedHeight) setHeight(parseFloat(storedHeight)); else setHeight(null);
       const storedDob = loadItem(dobKey, false); if (storedDob) setDateOfBirth(storedDob); else setDateOfBirth(null);
       const storedGender = loadItem(genderKey, false); if (storedGender === 'male' || storedGender === 'female') setGender(storedGender as Gender); else setGender(null);
+
+      // Schedule & Logs
+      const scheduleKey = `lifeos_schedule_${username}`;
+      const upskillLogsKey = `upskill_logs_${username}`;
+      const deepworkLogsKey = `deepwork_logs_${username}`;
+
+      try { const d = localStorage.getItem(scheduleKey); setSchedule(d ? JSON.parse(d) : {}); } catch (e) { setSchedule({}); }
+      try { const d = localStorage.getItem(upskillLogsKey); setAllUpskillLogs(d ? JSON.parse(d) : []); } catch (e) { setAllUpskillLogs([]); }
+      try { const d = localStorage.getItem(deepworkLogsKey); setAllDeepWorkLogs(d ? JSON.parse(d) : []); } catch (e) { setAllDeepWorkLogs([]); }
+
     } else {
-      // Clear data on logout
+      // Clear all data on logout
       setWeightLogs([]);
       setGoalWeight(null);
       setHeight(null);
       setDateOfBirth(null);
       setGender(null);
       setDietPlan([]);
+      setSchedule({});
+      setAllUpskillLogs([]);
+      setAllDeepWorkLogs([]);
     }
   }, [currentUser]);
 
-  // Effect to save health data to localStorage whenever it changes
+  // Effect to save all data to localStorage whenever it changes
   useEffect(() => {
     if (currentUser?.username && !loading) {
       const username = currentUser.username;
+      // Health
       localStorage.setItem(`weightLogs_${username}`, JSON.stringify(weightLogs));
       localStorage.setItem(`dietPlan_${username}`, JSON.stringify(dietPlan));
       if (goalWeight !== null) localStorage.setItem(`goalWeight_${username}`, goalWeight.toString()); else localStorage.removeItem(`goalWeight_${username}`);
       if (height !== null) localStorage.setItem(`height_${username}`, height.toString()); else localStorage.removeItem(`height_${username}`);
       if (dateOfBirth) localStorage.setItem(`dateOfBirth_${username}`, dateOfBirth); else localStorage.removeItem(`dateOfBirth_${username}`);
       if (gender) localStorage.setItem(`gender_${username}`, gender); else localStorage.removeItem(`gender_${username}`);
+      
+      // Schedule & Logs
+      localStorage.setItem(`lifeos_schedule_${username}`, JSON.stringify(schedule));
+      localStorage.setItem(`upskill_logs_${username}`, JSON.stringify(allUpskillLogs));
+      localStorage.setItem(`deepwork_logs_${username}`, JSON.stringify(allDeepWorkLogs));
     }
-  }, [weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, currentUser, loading]);
+  }, [weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, allUpskillLogs, allDeepWorkLogs, currentUser, loading]);
 
 
   useEffect(() => {
@@ -132,6 +176,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loadDataIntoLocalStorage = (data: any, username: string) => {
     if (!data) return;
 
+    // This function now primarily sets context state, which then saves to localStorage
     // Workout
     localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(data.exerciseDefinitions || []));
     localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(data.workoutPlans || {}));
@@ -140,22 +185,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Upskill
     localStorage.setItem(`upskill_definitions_${username}`, JSON.stringify(data.upskillDefinitions || []));
-    localStorage.setItem(`upskill_logs_${username}`, JSON.stringify(data.upskillLogs || []));
+    setAllUpskillLogs(data.upskillLogs || []);
     localStorage.setItem(`upskill_topic_goals_${username}`, JSON.stringify(data.upskillTopicGoals || {}));
-
+    
     // Deep Work
     localStorage.setItem(`deepwork_definitions_${username}`, JSON.stringify(data.deepWorkDefinitions || []));
-    localStorage.setItem(`deepwork_logs_${username}`, JSON.stringify(data.deepWorkLogs || []));
+    setAllDeepWorkLogs(data.deepWorkLogs || []);
     localStorage.setItem(`deepwork_manual_deletes_${username}`, JSON.stringify(data.deepworkManualDeletes || []));
-
+    
     // Personal Branding
     localStorage.setItem(`branding_tasks_${username}`, JSON.stringify(data.brandingTasks || []));
     localStorage.setItem(`branding_logs_${username}`, JSON.stringify(data.brandingLogs || []));
     
     // Homepage Schedule
-    localStorage.setItem(`lifeos_schedule_${username}`, JSON.stringify(data.schedule || '{}'));
+    setSchedule(data.schedule || {});
 
-    // Health - This data will now be loaded into the context's state instead
+    // Health
     setDietPlan(data.dietPlan || []);
     setWeightLogs(data.weightLogs || []);
     setGoalWeight(data.goalWeight ? parseFloat(data.goalWeight) : null);
@@ -220,14 +265,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
         workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
         upskillDefinitions: JSON.parse(localStorage.getItem(`upskill_definitions_${username}`) || '[]'),
-        upskillLogs: JSON.parse(localStorage.getItem(`upskill_logs_${username}`) || '[]'),
+        upskillLogs: allUpskillLogs,
         upskillTopicGoals: JSON.parse(localStorage.getItem(`upskill_topic_goals_${username}`) || '{}'),
         deepWorkDefinitions: JSON.parse(localStorage.getItem(`deepwork_definitions_${username}`) || '[]'),
-        deepWorkLogs: JSON.parse(localStorage.getItem(`deepwork_logs_${username}`) || '[]'),
+        deepWorkLogs: allDeepWorkLogs,
         deepworkManualDeletes: JSON.parse(localStorage.getItem(`deepwork_manual_deletes_${username}`) || '[]'),
         brandingTasks: JSON.parse(localStorage.getItem(`branding_tasks_${username}`) || '[]'),
         brandingLogs: JSON.parse(localStorage.getItem(`branding_logs_${username}`) || '[]'),
-        schedule: JSON.parse(localStorage.getItem(`lifeos_schedule_${username}`) || '{}'),
+        schedule: schedule,
         dietPlan: dietPlan,
         weightLogs: weightLogs,
         goalWeight: goalWeight,
@@ -278,14 +323,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
             workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
             upskillDefinitions: JSON.parse(localStorage.getItem(`upskill_definitions_${username}`) || '[]'),
-            upskillLogs: JSON.parse(localStorage.getItem(`upskill_logs_${username}`) || '[]'),
+            upskillLogs: allUpskillLogs,
             upskillTopicGoals: JSON.parse(localStorage.getItem(`upskill_topic_goals_${username}`) || '{}'),
             deepWorkDefinitions: JSON.parse(localStorage.getItem(`deepwork_definitions_${username}`) || '[]'),
-            deepWorkLogs: JSON.parse(localStorage.getItem(`deepwork_logs_${username}`) || '[]'),
+            deepWorkLogs: allDeepWorkLogs,
             deepworkManualDeletes: JSON.parse(localStorage.getItem(`deepwork_manual_deletes_${username}`) || '[]'),
             brandingTasks: JSON.parse(localStorage.getItem(`branding_tasks_${username}`) || '[]'),
             brandingLogs: JSON.parse(localStorage.getItem(`branding_logs_${username}`) || '[]'),
-            schedule: JSON.parse(localStorage.getItem(`lifeos_schedule_${username}`) || '{}'),
+            schedule: schedule,
             dietPlan: dietPlan,
             weightLogs: weightLogs,
             goalWeight: goalWeight,
@@ -387,12 +432,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             
             // Upskill
             upskillDefinitions: JSON.parse(localStorage.getItem(`upskill_definitions_${username}`) || '[]'),
-            upskillLogs: JSON.parse(localStorage.getItem(`upskill_logs_${username}`) || '[]'),
+            upskillLogs: allUpskillLogs,
             upskillTopicGoals: JSON.parse(localStorage.getItem(`upskill_topic_goals_${username}`) || '{}'),
             
             // Deep Work
             deepWorkDefinitions: JSON.parse(localStorage.getItem(`deepwork_definitions_${username}`) || '[]'),
-            deepWorkLogs: JSON.parse(localStorage.getItem(`deepwork_logs_${username}`) || '[]'),
+            deepWorkLogs: allDeepWorkLogs,
             deepworkManualDeletes: JSON.parse(localStorage.getItem(`deepwork_manual_deletes_${username}`) || '[]'),
 
             // Personal Branding
@@ -400,7 +445,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             brandingLogs: JSON.parse(localStorage.getItem(`branding_logs_${username}`) || '[]'),
             
             // Homepage Schedule
-            schedule: JSON.parse(localStorage.getItem(`lifeos_schedule_${username}`) || '{}'),
+            schedule: schedule,
 
             // Health
             dietPlan: dietPlan,
@@ -476,6 +521,69 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       };
       input.click();
   };
+
+  const handleToggleComplete = (slotName: string, activityId: string) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    setSchedule(prev => {
+      const todaySchedule = { ...(prev[todayKey] || {}) };
+      const activities = todaySchedule[slotName] || [];
+      if (activities.length > 0) {
+        todaySchedule[slotName] = activities.map(act => 
+          act.id === activityId ? { ...act, completed: !act.completed } : act
+        );
+      }
+      return { ...prev, [todayKey]: todaySchedule };
+    });
+  };
+  
+  const handleLogLearning = (activity: Activity, progress: number, duration: number) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const isUpskill = activity.type === 'upskill';
+    const logsUpdater = isUpskill ? setAllUpskillLogs : setAllDeepWorkLogs;
+
+    logsUpdater(prevLogs => {
+      let newLogs = [...prevLogs];
+      const logIndex = newLogs.findIndex(log => log.date === todayKey);
+
+      if (logIndex === -1) { // This case should be rare, but handle it
+        toast({ title: "Error", description: "Could not find a session for today. Please add a task on the main page first.", variant: "destructive" });
+        return prevLogs;
+      }
+
+      const exerciseId = activity.taskIds?.[0];
+      if (!exerciseId) {
+        toast({ title: "Error", description: "No specific task linked to this agenda item.", variant: "destructive" });
+        return prevLogs;
+      }
+      
+      const newSet: LoggedSet = {
+        id: Date.now().toString(),
+        reps: isUpskill ? duration : 1, // Store duration in reps for upskill, 1 for deepwork
+        weight: isUpskill ? progress : duration, // Store progress in weight for upskill, duration for deepwork
+        timestamp: Date.now(),
+      };
+
+      const exerciseIndex = newLogs[logIndex].exercises.findIndex(ex => ex.id === exerciseId);
+
+      if (exerciseIndex > -1) {
+        const updatedExercises = [...newLogs[logIndex].exercises];
+        updatedExercises[exerciseIndex] = {
+          ...updatedExercises[exerciseIndex],
+          loggedSets: [...updatedExercises[exerciseIndex].loggedSets, newSet]
+        };
+        newLogs[logIndex] = {
+          ...newLogs[logIndex],
+          exercises: updatedExercises
+        };
+        toast({ title: "Progress Logged", description: "Your session has been saved." });
+      } else {
+        toast({ title: "Error", description: "Could not find the specific task to log against.", variant: "destructive" });
+        return prevLogs;
+      }
+      
+      return newLogs;
+    });
+  };
   
   const value = {
     currentUser,
@@ -505,6 +613,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setGender,
     dietPlan,
     setDietPlan,
+    // Global Schedule & Logs
+    schedule,
+    setSchedule,
+    isAgendaDocked,
+    setIsAgendaDocked,
+    activityDurations,
+    setActivityDurations,
+    handleToggleComplete,
+    handleLogLearning,
+    allUpskillLogs,
+    setAllUpskillLogs,
+    allDeepWorkLogs,
+    setAllDeepWorkLogs,
   };
 
   return (

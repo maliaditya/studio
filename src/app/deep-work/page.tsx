@@ -67,7 +67,8 @@ function DeepWorkPageContent() {
     goalWeight, setGoalWeight,
     height, setHeight,
     dateOfBirth, setDateOfBirth,
-    gender, setGender
+    gender, setGender,
+    allDeepWorkLogs, setAllDeepWorkLogs,
   } = useAuth();
 
   const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
@@ -83,8 +84,7 @@ function DeepWorkPageContent() {
   const [editingDefinitionCategory, setEditingDefinitionCategory] = useState<string>('');
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
-
+  
   const [viewingProgressExercise, setViewingProgressExercise] = useState<ExerciseDefinition | null>(null);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -170,7 +170,6 @@ function DeepWorkPageContent() {
     if (currentUser?.username) {
         const username = currentUser.username;
         const defsKey = `deepwork_definitions_${username}`;
-        const logsKey = `deepwork_logs_${username}`;
         const deletesKey = `deepwork_manual_deletes_${username}`;
 
         // Load upskill data for promotion logic
@@ -180,13 +179,11 @@ function DeepWorkPageContent() {
         try { const stored = localStorage.getItem(upskillLogsKey); setAllUpskillLogs(stored ? JSON.parse(stored) : []); } catch (e) { setAllUpskillLogs([]); }
 
         try { const storedDefinitions = localStorage.getItem(defsKey); setExerciseDefinitions(storedDefinitions ? JSON.parse(storedDefinitions) : []); } catch (e) { setExerciseDefinitions([]); }
-        try { const storedLogs = localStorage.getItem(logsKey); setAllWorkoutLogs(storedLogs ? JSON.parse(storedLogs) : []); } catch (e) { setAllWorkoutLogs([]); }
         try { const storedDeletes = localStorage.getItem(deletesKey); setManuallyDeletedIds(storedDeletes ? JSON.parse(storedDeletes) : []); } catch (e) { setManuallyDeletedIds([]); }
         
     } else {
       // Clear all state for logged-out user
       setExerciseDefinitions([]);
-      setAllWorkoutLogs([]);
       setUpskillDefinitions([]);
       setAllUpskillLogs([]);
       setManuallyDeletedIds([]);
@@ -200,11 +197,9 @@ function DeepWorkPageContent() {
       try {
         const username = currentUser.username;
         const defsKey = `deepwork_definitions_${username}`;
-        const logsKey = `deepwork_logs_${username}`;
         const deletesKey = `deepwork_manual_deletes_${username}`;
         
         localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
-        localStorage.setItem(logsKey, JSON.stringify(allWorkoutLogs));
         localStorage.setItem(deletesKey, JSON.stringify(manuallyDeletedIds));
 
       } catch (e) {
@@ -212,7 +207,7 @@ function DeepWorkPageContent() {
         toast({ title: "Save Error", description: "Could not save deep work data locally.", variant: "destructive"});
       }
     }
-  }, [exerciseDefinitions, allWorkoutLogs, manuallyDeletedIds, currentUser, isLoadingPage, toast]);
+  }, [exerciseDefinitions, manuallyDeletedIds, currentUser, isLoadingPage, toast]);
 
   // Logic to promote Upskill tasks to Deep Work focus areas
   useEffect(() => {
@@ -285,8 +280,8 @@ function DeepWorkPageContent() {
 
   const currentDatedWorkout = useMemo(() => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    return allWorkoutLogs.find(log => log.id === dateKey);
-  }, [selectedDate, allWorkoutLogs]);
+    return allDeepWorkLogs.find(log => log.id === dateKey);
+  }, [selectedDate, allDeepWorkLogs]);
 
   const currentWorkoutExercises = useMemo(() => {
     return currentDatedWorkout?.exercises || [];
@@ -304,7 +299,7 @@ function DeepWorkPageContent() {
   };
 
   const updateOrAddWorkoutLog = (updatedWorkout: DatedWorkout) => {
-    setAllWorkoutLogs(prevLogs => {
+    setAllDeepWorkLogs(prevLogs => {
       const existingLogIndex = prevLogs.findIndex(log => log.id === updatedWorkout.id);
       if (existingLogIndex > -1) {
         const newLogs = [...prevLogs];
@@ -345,7 +340,7 @@ function DeepWorkPageContent() {
     }
 
     setExerciseDefinitions(prev => prev.filter(def => def.id !== id));
-    setAllWorkoutLogs(prevLogs => 
+    setAllDeepWorkLogs(prevLogs => 
       prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) }))
     );
     toast({ title: "Success", description: `Focus Area "${defToDelete?.name}" removed.` });
@@ -364,7 +359,7 @@ function DeepWorkPageContent() {
     }
     const updatedDef = { ...editingDefinition, name: editingDefinitionName.trim(), category: editingDefinitionCategory.trim() as ExerciseCategory };
     setExerciseDefinitions(prev => prev.map(def => def.id === editingDefinition.id ? updatedDef : def));
-    setAllWorkoutLogs(prevLogs => 
+    setAllDeepWorkLogs(prevLogs => 
       prevLogs.map(log => ({
         ...log,
         exercises: log.exercises.map(ex => 
@@ -382,7 +377,7 @@ function DeepWorkPageContent() {
       id: `${definition.id}-${Date.now()}`, definitionId: definition.id, name: definition.name, category: definition.category,
       loggedSets: [], targetSets: parseInt(DEFAULT_TARGET_SESSIONS.toString(), 10), targetReps: DEFAULT_TARGET_DURATION,
     };
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    const existingWorkout = allDeepWorkLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
       if (existingWorkout.exercises.some(ex => ex.definitionId === definition.id)) {
         toast({ title: "Info", description: `"${definition.name}" is already in this session.` }); return;
@@ -396,17 +391,17 @@ function DeepWorkPageContent() {
 
   const handleRemoveExerciseFromWorkout = (exerciseId: string) => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    const existingWorkout = allDeepWorkLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
       const updatedExercises = existingWorkout.exercises.filter(ex => ex.id !== exerciseId);
-      if (updatedExercises.length === 0) setAllWorkoutLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
+      if (updatedExercises.length === 0) setAllDeepWorkLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
       else updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
     }
   };
   
   const handleLogSet = (exerciseId: string, reps: number, weight: number) => { // Reps will be 1, weight is duration
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    const existingWorkout = allDeepWorkLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
       const newSet: LoggedSet = { id: Date.now().toString(), reps, weight, timestamp: Date.now() };
       const updatedExercises = existingWorkout.exercises.map(ex => 
@@ -419,7 +414,7 @@ function DeepWorkPageContent() {
 
   const handleDeleteSet = (exerciseId: string, setId: string) => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    const existingWorkout = allDeepWorkLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
       const updatedExercises = existingWorkout.exercises.map(ex =>
         ex.id === exerciseId ? { ...ex, loggedSets: ex.loggedSets.filter(s => s.id !== setId) } : ex
@@ -430,7 +425,7 @@ function DeepWorkPageContent() {
 
   const handleUpdateSet = (exerciseId: string, setId: string, reps: number, weight: number) => { // Reps=1, weight=duration
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    const existingWorkout = allDeepWorkLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
       const updatedExercises = existingWorkout.exercises.map(ex => {
         if (ex.id === exerciseId) {
@@ -495,8 +490,8 @@ function DeepWorkPageContent() {
   };
 
   const consistencyData = useMemo(() => {
-    if (!allWorkoutLogs || !oneYearAgo || !today) return [];
-    const workoutDates = new Set(allWorkoutLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date));
+    if (!allDeepWorkLogs || !oneYearAgo || !today) return [];
+    const workoutDates = new Set(allDeepWorkLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date));
     const data = [];
     let score = 0.5;
     for (let d = new Date(oneYearAgo); d <= today; d = addDays(d, 1)) {
@@ -506,12 +501,12 @@ function DeepWorkPageContent() {
         data.push({ date: format(d, 'MMM dd'), fullDate: format(d, 'PPP'), score: Math.round(score * 100) });
     }
     return data;
-  }, [allWorkoutLogs, oneYearAgo, today]);
+  }, [allDeepWorkLogs, oneYearAgo, today]);
   
   const dailyDurationData = useMemo(() => {
     const dailyData: Record<string, { totalDuration: number; topics: Set<string> }> = {};
 
-    allWorkoutLogs.forEach(log => {
+    allDeepWorkLogs.forEach(log => {
         log.exercises.forEach(exercise => {
             // In deep work, `weight` is the duration in minutes.
             const duration = exercise.loggedSets.reduce((sum, set) => sum + set.weight, 0);
@@ -533,7 +528,7 @@ function DeepWorkPageContent() {
             date: format(parseISO(dateString), 'MMM dd'),
         }))
         .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
-  }, [allWorkoutLogs]);
+  }, [allDeepWorkLogs]);
 
   if (isLoadingPage) {
     return (
@@ -776,7 +771,7 @@ function DeepWorkPageContent() {
                   title="Deep Work Activity"
                   description="Your deep work consistency over the last year. Click a square to view that day's log."
                   graphDescription="Your probability of doing deep work, based on recent consistency."
-                  allWorkoutLogs={allWorkoutLogs}
+                  allWorkoutLogs={allDeepWorkLogs}
                   onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
                   consistencyData={consistencyData}
                   oneYearAgo={oneYearAgo}
@@ -790,7 +785,7 @@ function DeepWorkPageContent() {
             isOpen={isProgressModalOpen} 
             onOpenChange={setIsProgressModalOpen}
             exercise={viewingProgressExercise} 
-            allWorkoutLogs={allWorkoutLogs}
+            allWorkoutLogs={allDeepWorkLogs}
             pageType="deepwork"
           />
         )}
