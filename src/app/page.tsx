@@ -322,8 +322,8 @@ function HomePageContent() {
     const newExercises: WorkoutExercise[] = defIdsToCreate.length > 0
       ? definitionSource
           .filter(def => defIdsToCreate.includes(def.id))
-          .map(def => ({
-              id: `${def.id}-${Date.now()}-${Math.random()}`,
+          .map((def, index) => ({
+              id: `${def.id}-${Date.now()}-${index}`,
               definitionId: def.id,
               name: def.name,
               category: def.category,
@@ -349,7 +349,7 @@ function HomePageContent() {
     const allRelevantExercises = [...(logForDay?.exercises || []), ...newExercises];
     const finalTaskIdsForSlot = allRelevantExercises
       .filter(ex => checkedDefIdsForSlot.includes(ex.definitionId))
-      .map(ex => ex.id);
+      .map(t => t.id);
 
     const newDetails = allRelevantExercises
       .filter(ex => finalTaskIdsForSlot.includes(ex.id))
@@ -690,29 +690,25 @@ function HomePageContent() {
     const logSource = pageType === 'upskill' ? allUpskillLogs : pageType === 'deepwork' ? allDeepWorkLogs : brandingLogs;
     const definitionSource = pageType === 'upskill' ? upskillDefinitions : pageType === 'deepwork' ? deepWorkDefinitions : brandingTasks;
     
+    // These are the WorkoutExercise objects already created for today.
     const allTasksForDay = logSource.find(log => log.date === todayKey)?.exercises || [];
-    const allTodaysLoggedDefIds = allTasksForDay.map(t => t.definitionId);
-    
-    const combinedTasksMap = new Map<string, WorkoutExercise>();
+    const loggedDefinitionIds = new Set(allTasksForDay.map(task => task.definitionId));
 
-    // Add all tasks that are part of today's log
-    allTasksForDay.forEach(task => combinedTasksMap.set(task.definitionId, task));
+    // These are definitions from the library that have NOT been added to today's log at all.
+    const libraryDefinitions = definitionSource.filter(def => !loggedDefinitionIds.has(def.id));
 
-    // Add any other tasks from the library that are not yet part of today's log
-    definitionSource.forEach(def => {
-        if (!combinedTasksMap.has(def.id)) {
-            combinedTasksMap.set(def.id, {
-                id: `${def.id}-lib-${Math.random()}`,
-                definitionId: def.id,
-                name: def.name,
-                category: def.category,
-                loggedSets: [], targetSets: 0, targetReps: ''
-            });
-        }
-    });
+    // Convert library definitions to temporary WorkoutExercise objects for the modal.
+    const libraryTasks = libraryDefinitions.map(def => ({
+        id: `lib-${def.id}`, // Stable, unique ID for library items
+        definitionId: def.id,
+        name: def.name,
+        category: def.category,
+        loggedSets: [], targetSets: 0, targetReps: ''
+    }));
 
-    const availableTasks = Array.from(combinedTasksMap.values());
-    
+    const availableTasks = [...allTasksForDay, ...libraryTasks];
+    const allTodaysLoggedDefIds = Array.from(loggedDefinitionIds);
+
     const initialSelectedDefIds = new Set<string>();
     (activity.taskIds || []).forEach(taskId => {
         const task = allTasksForDay.find(t => t.id === taskId);
