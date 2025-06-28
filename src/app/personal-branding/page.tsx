@@ -68,12 +68,23 @@ function PersonalBrandingPageContent() {
               task.focusAreas.forEach(name => bundledFocusAreaNames.add(name));
           }
       });
-
+      
       const focusAreaSessionCounts: Record<string, number> = {};
+      const uniqueDaysPerDef: Record<string, Set<string>> = {};
+
       (deepWorkLogs || []).forEach(log => {
         log.exercises.forEach(ex => {
-          focusAreaSessionCounts[ex.definitionId] = (focusAreaSessionCounts[ex.definitionId] || 0) + ex.loggedSets.length;
+          if (ex.loggedSets.length > 0) {
+            if (!uniqueDaysPerDef[ex.definitionId]) {
+              uniqueDaysPerDef[ex.definitionId] = new Set();
+            }
+            uniqueDaysPerDef[ex.definitionId].add(log.date);
+          }
         });
+      });
+
+      Object.keys(uniqueDaysPerDef).forEach(defId => {
+        focusAreaSessionCounts[defId] = uniqueDaysPerDef[defId].size;
       });
 
       const eligibleFocusAreas = (deepWorkDefinitions || []).filter(def => {
@@ -345,7 +356,7 @@ function PersonalBrandingPageContent() {
                     <Share2 /> Branding Pipeline
                   </CardTitle>
                   <CardDescription>
-                    Topic bundles are automatically generated from your Deep Work. Add them to a session to start content creation.
+                    Topic bundles are automatically generated. Add them to a session to start content creation.
                   </CardDescription>
               </CardHeader>
               <CardContent className="p-4">
@@ -355,7 +366,7 @@ function PersonalBrandingPageContent() {
                         <Briefcase className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
                         <p className="text-muted-foreground">Your pipeline is empty.</p>
                         <p className="text-sm text-muted-foreground/80">
-                          A topic bundle appears here when it has 4 focus areas with at least 4 logged sessions each in Deep Work.
+                          A topic bundle appears here when it has 4 focus areas, each with at least 4 days of logged sessions in Deep Work.
                         </p>
                       </div>
                     ) : (
