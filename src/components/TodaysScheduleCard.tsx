@@ -22,9 +22,10 @@ const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Af
 
 interface TodaysScheduleCardProps {
   schedule: DailySchedule;
+  activityDurations: Record<string, string>;
 }
 
-export function TodaysScheduleCard({ schedule }: TodaysScheduleCardProps) {
+export function TodaysScheduleCard({ schedule, activityDurations }: TodaysScheduleCardProps) {
   const scheduledActivities = React.useMemo(() => {
     return slotOrder.flatMap(slot => {
       const activities = schedule[slot];
@@ -46,7 +47,9 @@ export function TodaysScheduleCard({ schedule }: TodaysScheduleCardProps) {
       <CardContent>
         {scheduledActivities.length > 0 ? (
           <ul className="space-y-3">
-            {scheduledActivities.map((activity) => (
+            {scheduledActivities.map((activity) => {
+              const duration = activityDurations[activity.id];
+              return (
               <li key={activity.id} className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/50">
                 <div className="flex items-center gap-3">
                   {activity.completed 
@@ -60,11 +63,12 @@ export function TodaysScheduleCard({ schedule }: TodaysScheduleCardProps) {
                     <Badge variant="outline" className="text-xs">{activity.slot}</Badge>
                   </div>
                 </div>
-                <div className="flex-shrink-0 text-muted-foreground" title={activity.type}>
+                <div className="flex-shrink-0 text-muted-foreground text-right w-20">
                     {activityIcons[activity.type]}
+                    {duration && <p className="text-xs font-semibold mt-1 whitespace-nowrap">{duration}</p>}
                 </div>
               </li>
-            ))}
+            )})}
           </ul>
         ) : (
           <div className="text-center text-muted-foreground py-8">

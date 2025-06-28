@@ -217,8 +217,8 @@ function HomePageContent() {
 
   // Carry forward tasks logic
   useEffect(() => {
-    if (!currentUser || !isScheduleLoaded) return;
-    const settingsKey = `lifeos_settings_${currentUser.username}`;
+    const settingsKey = currentUser ? `lifeos_settings_${currentUser.username}` : null;
+    if (!settingsKey || !isScheduleLoaded) return;
     const storedSettings = localStorage.getItem(settingsKey);
     const settings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false };
     if (!settings.carryForward) return;
@@ -541,6 +541,56 @@ function HomePageContent() {
     ];
   }, [productivityStats.todayHoursData]);
 
+  const activityDurations = useMemo(() => {
+    const durations: Record<string, string> = {};
+    if (!schedule[todayKey] || !productivityStats.learningStats) return durations;
+
+    const allTodaysActivities = Object.entries(schedule[todayKey] || {}).flatMap(([slotName, activities]) =>
+      activities.map(activity => ({ ...activity, slotName }))
+    );
+
+    const todaysUpskillTasks = allUpskillLogs.find(log => log.date === todayKey)?.exercises || [];
+    const upskillTaskMap = new Map(todaysUpskillTasks.map(task => [task.id, task]));
+
+    for (const activity of allTodaysActivities) {
+      switch (activity.type) {
+        case 'workout':
+          durations[activity.id] = '1h 30m';
+          break;
+        case 'planning':
+        case 'tracking':
+          durations[activity.id] = '30m';
+          break;
+        case 'deepwork':
+        case 'branding':
+          durations[activity.id] = activity.slotName;
+          break;
+        case 'upskill':
+          if (activity.taskIds && activity.taskIds.length > 0) {
+            const firstTask = upskillTaskMap.get(activity.taskIds[0]);
+            if (firstTask) {
+              const topic = firstTask.category;
+              const topicStats = productivityStats.learningStats[topic];
+              if (topicStats && topicStats.remainingForToday > 0 && topicStats.speed > 0) {
+                const timeInMinutes = (topicStats.remainingForToday / (topicStats.speed / 60));
+                if (timeInMinutes >= 60) {
+                  const hours = Math.floor(timeInMinutes / 60);
+                  const minutes = Math.round(timeInMinutes % 60);
+                  durations[activity.id] = `${hours}h ${minutes > 0 ? `${minutes}m` : ''}`.trim();
+                } else {
+                  durations[activity.id] = `${Math.round(timeInMinutes)}m`;
+                }
+              }
+            }
+          }
+          break;
+        default:
+          break;
+      }
+    }
+    return durations;
+  }, [schedule, todayKey, productivityStats.learningStats, allUpskillLogs]);
+
   const handleLogWeight = (weight: number, date: Date) => {
     if (!currentUser || isNaN(weight) || weight <= 0) {
       toast({ title: "Invalid Input", description: "Please enter a valid weight.", variant: "destructive" });
@@ -666,7 +716,7 @@ function HomePageContent() {
               />
             </div>
             <div className="space-y-6 lg:col-span-2">
-                <TodaysScheduleCard schedule={todaysSchedule} />
+                <TodaysScheduleCard schedule={todaysSchedule} activityDurations={activityDurations} />
                 <WeightGoalCard 
                   weightLogs={weightLogs}
                   goalWeight={goalWeight}
