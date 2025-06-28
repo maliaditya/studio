@@ -1,4 +1,3 @@
-
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -746,5 +745,3 @@ function HomePageContent() {
 export default function Page() {
     return ( <AuthGuard> <HomePageContent /> </AuthGuard> );
 }
-
-    
