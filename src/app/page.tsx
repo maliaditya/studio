@@ -129,6 +129,9 @@ function HomePageContent() {
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   const [today, setToday] = useState<Date | null>(null);
 
+  // State for Agenda Widget
+  const [isAgendaDocked, setIsAgendaDocked] = useState(true);
+
   useEffect(() => {
     setTodayKey(format(new Date(), 'yyyy-MM-dd'));
     const now = new Date();
@@ -140,38 +143,36 @@ function HomePageContent() {
   useEffect(() => {
     if (!currentUser) return;
     const scheduleStorageKey = `lifeos_schedule_${currentUser.username}`;
-    if (scheduleStorageKey) {
-      try {
-        const storedSchedule = localStorage.getItem(scheduleStorageKey);
-        if (storedSchedule) {
-          const parsedSchedule: FullSchedule = JSON.parse(storedSchedule);
-          // Data migration: ensure all slots have arrays of activities with IDs.
-          Object.keys(parsedSchedule).forEach(dateKey => {
-            Object.keys(parsedSchedule[dateKey]).forEach(slotName => {
-              const slotContent = parsedSchedule[dateKey][slotName];
-              if (slotContent && !Array.isArray(slotContent)) {
-                const activity = slotContent as ActivityType;
-                parsedSchedule[dateKey][slotName] = [{ ...activity, id: activity.id || `${activity.type}-${Date.now()}-${Math.random()}` }];
-              } else if (Array.isArray(slotContent)) {
-                parsedSchedule[dateKey][slotName] = slotContent.map(activity => ({ ...activity, id: activity.id || `${activity.type}-${Date.now()}-${Math.random()}` }));
-              }
-            });
+    try {
+      const storedSchedule = localStorage.getItem(scheduleStorageKey);
+      if (storedSchedule) {
+        const parsedSchedule: FullSchedule = JSON.parse(storedSchedule);
+        // Data migration: ensure all slots have arrays of activities with IDs.
+        Object.keys(parsedSchedule).forEach(dateKey => {
+          Object.keys(parsedSchedule[dateKey]).forEach(slotName => {
+            const slotContent = parsedSchedule[dateKey][slotName];
+            if (slotContent && !Array.isArray(slotContent)) {
+              const activity = slotContent as ActivityType;
+              parsedSchedule[dateKey][slotName] = [{ ...activity, id: activity.id || `${activity.type}-${Date.now()}-${Math.random()}` }];
+            } else if (Array.isArray(slotContent)) {
+              parsedSchedule[dateKey][slotName] = slotContent.map(activity => ({ ...activity, id: activity.id || `${activity.type}-${Date.now()}-${Math.random()}` }));
+            }
           });
-          setSchedule(parsedSchedule);
-        }
-      } catch (error) {
-        console.error("Failed to parse schedule from localStorage", error);
-        setSchedule({});
+        });
+        setSchedule(parsedSchedule);
       }
-      setIsScheduleLoaded(true);
+    } catch (error) {
+      console.error("Failed to parse schedule from localStorage", error);
+      setSchedule({});
     }
+    setIsScheduleLoaded(true);
   }, [currentUser]);
 
   // Save schedule to localStorage
   useEffect(() => {
     if (!currentUser) return;
     const scheduleStorageKey = `lifeos_schedule_${currentUser.username}`;
-    if (scheduleStorageKey && isScheduleLoaded) {
+    if (isScheduleLoaded) {
       localStorage.setItem(scheduleStorageKey, JSON.stringify(schedule));
     }
   }, [schedule, currentUser, isScheduleLoaded]);
@@ -727,21 +728,29 @@ function HomePageContent() {
                   onOpenStatsModal={() => setIsStatsModalOpen(true)} 
                 />
               </div>
-              <div className="lg:col-span-2">
-                  <WeightGoalCard 
-                    weightLogs={weightLogs}
-                    goalWeight={goalWeight}
-                    onLogWeight={handleLogWeight}
-                    height={height}
-                    dateOfBirth={dateOfBirth}
-                    gender={gender}
-                    onSetHeight={setHeight}
-                    onSetDateOfBirth={setDateOfBirth}
-                    onSetGender={setGender}
-                    onSetGoalWeight={setGoalWeight}
-                    dietPlan={dietPlan}
-                    onEditDietClick={() => setIsDietPlanModalOpen(true)}
-                  />
+              <div className="lg:col-span-2 space-y-6">
+                {isAgendaDocked && (
+                    <TodaysScheduleCard
+                        schedule={todaysSchedule}
+                        activityDurations={activityDurations}
+                        isAgendaDocked={isAgendaDocked}
+                        onToggleDock={() => setIsAgendaDocked(false)}
+                    />
+                )}
+                <WeightGoalCard 
+                  weightLogs={weightLogs}
+                  goalWeight={goalWeight}
+                  onLogWeight={handleLogWeight}
+                  height={height}
+                  dateOfBirth={dateOfBirth}
+                  gender={gender}
+                  onSetHeight={setHeight}
+                  onSetDateOfBirth={setDateOfBirth}
+                  onSetGender={setGender}
+                  onSetGoalWeight={setGoalWeight}
+                  dietPlan={dietPlan}
+                  onEditDietClick={() => setIsDietPlanModalOpen(true)}
+                />
               </div>
             </div>
             <TimeSlots 
@@ -800,10 +809,14 @@ function HomePageContent() {
           todayHoursData={productivityStats.todayHoursData}
         />
       </div>
-      <TodaysScheduleCard
-        schedule={todaysSchedule}
-        activityDurations={activityDurations}
-      />
+      {!isAgendaDocked && (
+        <TodaysScheduleCard
+            schedule={todaysSchedule}
+            activityDurations={activityDurations}
+            isAgendaDocked={isAgendaDocked}
+            onToggleDock={() => setIsAgendaDocked(true)}
+        />
+      )}
     </>
   );
 }
