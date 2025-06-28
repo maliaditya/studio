@@ -691,10 +691,14 @@ function HomePageContent() {
     const definitionSource = pageType === 'upskill' ? upskillDefinitions : pageType === 'deepwork' ? deepWorkDefinitions : brandingTasks;
     
     const allTasksForDay = logSource.find(log => log.date === todayKey)?.exercises || [];
+    const allTodaysLoggedDefIds = allTasksForDay.map(t => t.definitionId);
     
     const combinedTasksMap = new Map<string, WorkoutExercise>();
+
+    // Add all tasks that are part of today's log
     allTasksForDay.forEach(task => combinedTasksMap.set(task.definitionId, task));
 
+    // Add any other tasks from the library that are not yet part of today's log
     definitionSource.forEach(def => {
         if (!combinedTasksMap.has(def.id)) {
             combinedTasksMap.set(def.id, {
@@ -733,8 +737,6 @@ function HomePageContent() {
     const disabledTaskIds = Array.from(disabledDefIds);
 
     const isAddingNewTasks = activity.taskIds?.length === 0;
-
-    const allTodaysLoggedDefIds = allTasksForDay.map(t => t.definitionId);
 
     return { 
         availableTasks, 

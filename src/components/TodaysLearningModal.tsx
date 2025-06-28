@@ -37,13 +37,13 @@ const ScheduledTaskItem = ({ task, isDisabled, selected, onToggle }: { task: Wor
     className="flex items-center space-x-3 p-3 rounded-md border has-[:checked]:bg-muted/50 transition-colors"
   >
     <Checkbox
-      id={`task-${task.definitionId}`}
+      id={`task-${task.id}`}
       checked={selected}
       onCheckedChange={onToggle}
       disabled={isDisabled}
     />
     <Label
-      htmlFor={`task-${task.definitionId}`}
+      htmlFor={`task-${task.id}`}
       className={cn(
         "font-normal w-full",
         isDisabled ? "cursor-not-allowed text-muted-foreground/50" : "cursor-pointer"
@@ -57,7 +57,7 @@ const ScheduledTaskItem = ({ task, isDisabled, selected, onToggle }: { task: Wor
 
 const LibraryTaskItem = ({ task, onAdd }: { task: WorkoutExercise; onAdd: () => void; }) => (
     <div className="flex items-center justify-between space-x-3 p-3 rounded-md border transition-colors">
-        <Label htmlFor={`task-${task.definitionId}`} className="font-normal w-full cursor-default">
+        <Label htmlFor={`task-${task.id}`} className="font-normal w-full cursor-default">
             <p className="font-medium">{task.name}</p>
             <p className="text-xs text-muted-foreground">{task.category}</p>
         </Label>
