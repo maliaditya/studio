@@ -7,7 +7,6 @@ import { DailySchedule, Activity, ActivityType } from '@/types/workout';
 import {
   Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, CheckCircle2, Circle, Grab, Dock, Move, Save
 } from 'lucide-react';
-import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -84,11 +83,9 @@ function AgendaWidgetItem({ activity, duration, onToggleComplete, onLogLearning 
           <p className={`font-medium truncate ${activity.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`} title={activity.details}>
             {activity.details}
           </p>
-          <Badge variant="outline" className="text-xs">{activity.slot}</Badge>
         </div>
       </div>
-      <div className="flex-shrink-0 text-muted-foreground text-right w-20">
-          {activityIcons[activity.type]}
+      <div className="flex-shrink-0 text-muted-foreground text-right">
           {duration && <p className="text-xs font-semibold mt-1 whitespace-nowrap">{duration}</p>}
       </div>
     </div>
@@ -232,49 +229,17 @@ export function TodaysScheduleCard({
       </CardHeader>
       <CardContent className="p-3">
         {scheduledActivities.length > 0 ? (
-          isAgendaDocked ? (
-            // DOCKED VIEW
-            <ul className="space-y-3 max-h-96 overflow-y-auto pr-2">
-              {scheduledActivities.map((activity) => (
-                <AgendaWidgetItem
-                  key={activity.id}
-                  activity={activity}
-                  duration={activityDurations[activity.id]}
-                  onToggleComplete={onToggleComplete}
-                  onLogLearning={onLogLearning}
-                />
-              ))}
-            </ul>
-          ) : (
-            // WIDGET VIEW
-            <ul className="space-y-2 max-h-80 overflow-y-auto pr-2">
-              {scheduledActivities.map((activity) => {
-                const duration = activityDurations[activity.id];
-                return (
-                  <li key={activity.id} className="flex items-center justify-between gap-4 text-sm cursor-pointer" onClick={() => {
-                    if (activity.completed) {
-                      onToggleComplete(activity.slot, activity.id);
-                    } else if(activity.type === 'upskill' || activity.type === 'deepwork') {
-                      // Logic to open popover will go here for the widget view
-                    } else {
-                      onToggleComplete(activity.slot, activity.id);
-                    }
-                  }}>
-                    <div className="flex items-center gap-2 min-w-0">
-                       {activity.completed 
-                        ? <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
-                        : <Circle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      }
-                      <p className={`truncate ${activity.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`} title={activity.details}>
-                        {activity.details}
-                      </p>
-                    </div>
-                    {duration && <span className="text-xs font-semibold text-muted-foreground flex-shrink-0">{duration}</span>}
-                  </li>
-                )
-              })}
-            </ul>
-          )
+          <ul className="space-y-1 max-h-96 overflow-y-auto pr-2">
+            {scheduledActivities.map((activity) => (
+              <AgendaWidgetItem
+                key={activity.id}
+                activity={activity}
+                duration={activityDurations[activity.id]}
+                onToggleComplete={onToggleComplete}
+                onLogLearning={onLogLearning}
+              />
+            ))}
+          </ul>
         ) : (
           <div className="text-center text-muted-foreground py-8">
             <p className="text-sm">No activities scheduled.</p>
