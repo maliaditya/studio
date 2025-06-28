@@ -1,4 +1,3 @@
-
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -710,7 +709,7 @@ function HomePageContent() {
               <div className="lg:col-span-2 space-y-6">
                  {currentUser && isAgendaDocked && (
                     <TodaysScheduleCard
-                        schedule={todaysSchedule}
+                        schedule={schedule}
                         activityDurations={activityDurations}
                         isAgendaDocked={isAgendaDocked}
                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
@@ -750,7 +749,7 @@ function HomePageContent() {
 
         {currentUser && !isAgendaDocked && (
             <TodaysScheduleCard
-                schedule={todaysSchedule}
+                schedule={schedule}
                 activityDurations={activityDurations}
                 isAgendaDocked={isAgendaDocked}
                 onToggleDock={() => setIsAgendaDocked(prev => !prev)}

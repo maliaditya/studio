@@ -1,17 +1,19 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DailySchedule, Activity, ActivityType } from '@/types/workout';
+import { DailySchedule, Activity, ActivityType, FullSchedule } from '@/types/workout';
 import {
-  CheckCircle2, Circle, Grab, Dock, Move, Save
+  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { useAuth } from '@/contexts/AuthContext';
+import { format, addDays } from 'date-fns';
+import { ScrollArea } from './ui/scroll-area';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -123,7 +125,7 @@ function AgendaWidgetItem({ activity, duration, onToggleComplete, onLogLearning 
 
 
 interface TodaysScheduleCardProps {
-  schedule: DailySchedule;
+  schedule: FullSchedule;
   activityDurations: Record<string, string>;
   isAgendaDocked: boolean;
   onToggleDock: () => void;
@@ -139,15 +141,33 @@ export function TodaysScheduleCard({
   onToggleComplete,
   onLogLearning,
 }: TodaysScheduleCardProps) {
+  const { carryForwardTask } = useAuth();
+
+  const todaysSchedule = React.useMemo(() => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    return schedule[todayKey] || {};
+  }, [schedule]);
+
   const scheduledActivities = React.useMemo(() => {
     return slotOrder.flatMap(slot => {
-      const activities = schedule[slot];
+      const activities = todaysSchedule[slot];
       if (activities && activities.length > 0) {
         return activities.map(activity => ({ slot, ...activity }));
       }
       return [];
     });
+  }, [todaysSchedule]);
+
+  const pendingTasks = React.useMemo(() => {
+    const yesterday = addDays(new Date(), -1);
+    const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
+    const yesterdaysSchedule = schedule[yesterdayKey] || {};
+    return Object.values(yesterdaysSchedule)
+      .flat()
+      .filter((activity): activity is Activity => !!activity && !activity.completed);
   }, [schedule]);
+
+  const slotNames: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 20, y: 80 });
@@ -211,6 +231,51 @@ export function TodaysScheduleCard({
             {isAgendaDocked && <CardDescription className="text-xs mt-1">A sequential view of your scheduled activities.</CardDescription>}
           </div>
           <div className="flex items-center">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <History className="h-4 w-4" />
+                  <span className="sr-only">Pending Tasks</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80">
+                <h4 className="font-medium leading-none mb-2">Yesterday's Pending Tasks</h4>
+                {pendingTasks.length > 0 ? (
+                  <ScrollArea className="h-64">
+                    <ul className="space-y-2">
+                      {pendingTasks.map(task => (
+                        <li key={task.id} className="flex items-center justify-between text-sm">
+                          <span className="truncate pr-2" title={task.details}>{task.details}</span>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" size="sm" className="h-7"><PlusCircle className="mr-2 h-3.5 w-3.5" /> Add</Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-48 p-1">
+                              <div className="flex flex-col">
+                                {slotNames.map(slot => (
+                                  <Button
+                                    key={slot}
+                                    variant="ghost"
+                                    className="justify-start h-8 text-sm"
+                                    onClick={() => {
+                                      carryForwardTask(task, slot);
+                                    }}
+                                  >
+                                    {slot}
+                                  </Button>
+                                ))}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </li>
+                      ))}
+                    </ul>
+                  </ScrollArea>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">No pending tasks from yesterday.</p>
+                )}
+              </PopoverContent>
+            </Popover>
             <Button variant="ghost" size="icon" onClick={onToggleDock} className="h-8 w-8">
               {isAgendaDocked ? <Move className="h-4 w-4" /> : <Dock className="h-4 w-4" />}
             </Button>
@@ -260,6 +325,51 @@ export function TodaysScheduleCard({
                  Today's Agenda
               </CardTitle>
               <div className="flex items-center">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <History className="h-4 w-4" />
+                      <span className="sr-only">Pending Tasks</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80">
+                    <h4 className="font-medium leading-none mb-2">Yesterday's Pending Tasks</h4>
+                    {pendingTasks.length > 0 ? (
+                      <ScrollArea className="h-64">
+                        <ul className="space-y-2">
+                          {pendingTasks.map(task => (
+                            <li key={task.id} className="flex items-center justify-between text-sm">
+                              <span className="truncate pr-2" title={task.details}>{task.details}</span>
+                               <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button variant="outline" size="sm" className="h-7"><PlusCircle className="mr-2 h-3.5 w-3.5" /> Add</Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-48 p-1">
+                                  <div className="flex flex-col">
+                                    {slotNames.map(slot => (
+                                      <Button
+                                        key={slot}
+                                        variant="ghost"
+                                        className="justify-start h-8 text-sm"
+                                        onClick={() => {
+                                          carryForwardTask(task, slot);
+                                        }}
+                                      >
+                                        {slot}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </li>
+                          ))}
+                        </ul>
+                      </ScrollArea>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">No pending tasks from yesterday.</p>
+                    )}
+                  </PopoverContent>
+                </Popover>
                 <Button variant="ghost" size="icon" onClick={onToggleDock} className="h-8 w-8">
                   <Dock className="h-4 w-4" />
                 </Button>

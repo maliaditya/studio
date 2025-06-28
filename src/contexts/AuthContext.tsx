@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
@@ -53,6 +52,7 @@ interface AuthContextType {
   setActivityDurations: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   handleToggleComplete: (slotName: string, activityId: string) => void;
   handleLogLearning: (activity: Activity, progress: number, duration: number) => void;
+  carryForwardTask: (activity: Activity, targetSlot: string) => void;
 
   // Global Logs State
   allUpskillLogs: DatedWorkout[];
@@ -612,6 +612,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { ...prev, [todayKey]: todaySchedule };
     });
   };
+
+  const carryForwardTask = (activity: Activity, targetSlot: string) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    
+    setSchedule(prev => {
+        const newTodaySchedule = { ...(prev[todayKey] || {}) };
+        const activitiesInSlot = newTodaySchedule[targetSlot] || [];
+        
+        if (activitiesInSlot.length >= 2) {
+            toast({
+                title: "Slot Full",
+                description: "Cannot add more than two activities to a single time slot.",
+                variant: "destructive"
+            });
+            return prev; // Return previous state without changes
+        }
+
+        const newActivity: Activity = {
+            ...activity,
+            id: `${activity.type}-${Date.now()}-${Math.random()}`,
+            completed: false,
+        };
+
+        newTodaySchedule[targetSlot] = [...activitiesInSlot, newActivity];
+        
+        toast({
+            title: "Task Carried Forward",
+            description: `"${newActivity.details}" has been added to today's ${targetSlot} slot.`
+        });
+        
+        return { ...prev, [todayKey]: newTodaySchedule };
+    });
+  };
   
   const value = {
     currentUser,
@@ -650,6 +683,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setActivityDurations,
     handleToggleComplete,
     handleLogLearning,
+    carryForwardTask,
     allUpskillLogs,
     setAllUpskillLogs,
     allDeepWorkLogs,
