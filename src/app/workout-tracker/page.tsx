@@ -405,7 +405,9 @@ function WorkoutPageContent() {
   }, [selectedDate, allWorkoutLogs]);
 
   const currentWorkoutExercises = useMemo(() => {
-    return currentDatedWorkout?.exercises || [];
+    if (!currentDatedWorkout?.exercises) return [];
+    // Ensure all loaded exercises respect the current default target sets
+    return currentDatedWorkout.exercises.map(ex => ({ ...ex, targetSets: DEFAULT_TARGET_SETS }));
   }, [currentDatedWorkout]);
 
   const filteredExerciseDefinitions = useMemo(() => {
