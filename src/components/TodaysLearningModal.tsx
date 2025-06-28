@@ -29,6 +29,7 @@ interface TodaysLearningModalProps {
   pageType: 'upskill' | 'deepwork' | 'branding';
   isAddingNewTasks: boolean;
   disabledTaskIds?: string[];
+  allTodaysLoggedDefIds?: string[];
 }
 
 const ScheduledTaskItem = ({ task, isDisabled, selected, onToggle }: { task: WorkoutExercise; isDisabled: boolean; selected: boolean; onToggle: () => void; }) => (
@@ -76,6 +77,7 @@ export function TodaysLearningModal({
   pageType,
   isAddingNewTasks,
   disabledTaskIds = [],
+  allTodaysLoggedDefIds = [],
 }: TodaysLearningModalProps) {
   const [scheduledTasks, setScheduledTasks] = useState<WorkoutExercise[]>([]);
   const [libraryTasks, setLibraryTasks] = useState<WorkoutExercise[]>([]);
@@ -84,16 +86,16 @@ export function TodaysLearningModal({
 
   useEffect(() => {
     if(isOpen) {
-      const todaysDefIds = new Set(initialSelectedIds.concat(disabledTaskIds));
+      const loggedDefIdsSet = new Set(allTodaysLoggedDefIds);
       
-      const initialScheduled = availableTasks.filter(task => todaysDefIds.has(task.definitionId));
-      const initialLibrary = availableTasks.filter(task => !todaysDefIds.has(task.definitionId));
+      const initialScheduled = availableTasks.filter(task => loggedDefIdsSet.has(task.definitionId));
+      const initialLibrary = availableTasks.filter(task => !loggedDefIdsSet.has(task.definitionId));
 
       setScheduledTasks(initialScheduled);
       setLibraryTasks(initialLibrary);
       setSelectedDefIds(initialSelectedIds);
     }
-  }, [isOpen, availableTasks, initialSelectedIds, disabledTaskIds]);
+  }, [isOpen, availableTasks, initialSelectedIds, allTodaysLoggedDefIds]);
 
   const handleAddTaskToDay = (taskToAdd: WorkoutExercise) => {
     setLibraryTasks(prev => prev.filter(t => t.id !== taskToAdd.id));
