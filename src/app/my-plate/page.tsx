@@ -6,7 +6,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, getDay } from 'date-fns';
-import { Dumbbell, BrainCircuit, TrendingUp, Share2, Heart, Briefcase, Sparkles, Trophy, MessageSquareQuestion } from 'lucide-react';
+import { Dumbbell, BrainCircuit, TrendingUp, Share2, Heart, Briefcase, Sparkles, Trophy, MessageSquareQuote } from 'lucide-react';
 import type { ExerciseDefinition, AllWorkoutPlans, WorkoutMode, ExerciseCategory } from '@/types/workout';
 
 // Duplicating these from workout page for now, can be refactored to a shared util later
@@ -168,7 +168,7 @@ function MyPlatePageContent() {
       <Card className="mt-12 shadow-lg">
           <CardHeader>
               <CardTitle className="flex items-center gap-3 text-xl">
-                  <MessageSquareQuestion className="h-6 w-6 text-primary"/>
+                  <MessageSquareQuote className="h-6 w-6 text-primary"/>
                   Weekly Reflection
               </CardTitle>
               <CardDescription>Take a moment to reflect on your week and adjust your focus.</CardDescription>
