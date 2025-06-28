@@ -711,95 +711,100 @@ function HomePageContent() {
 }, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, todayKey, schedule]);
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-      <Card className="max-w-5xl mx-auto shadow-lg bg-card/60 border-border/20 backdrop-blur-sm">
-        <CardHeader className="text-center py-4">
-            <p className="text-sm text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
-        </CardHeader>
-        <CardContent>
-          <DashboardStats stats={productivityStats} />
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
-            <div className="lg:col-span-3">
-              <ProductivitySnapshot 
-                stats={productivityStats} 
-                timeAllocationData={timeAllocationData} 
-                onOpenStatsModal={() => setIsStatsModalOpen(true)} 
-              />
-            </div>
-            <div className="space-y-6 lg:col-span-2">
-                <TodaysScheduleCard schedule={todaysSchedule} activityDurations={activityDurations} />
-                <WeightGoalCard 
-                  weightLogs={weightLogs}
-                  goalWeight={goalWeight}
-                  onLogWeight={handleLogWeight}
-                  height={height}
-                  dateOfBirth={dateOfBirth}
-                  gender={gender}
-                  onSetHeight={setHeight}
-                  onSetDateOfBirth={setDateOfBirth}
-                  onSetGender={setGender}
-                  onSetGoalWeight={setGoalWeight}
-                  dietPlan={dietPlan}
-                  onEditDietClick={() => setIsDietPlanModalOpen(true)}
+    <>
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+        <Card className="max-w-5xl mx-auto shadow-lg bg-card/60 border-border/20 backdrop-blur-sm">
+          <CardHeader className="text-center py-4">
+              <p className="text-sm text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+          </CardHeader>
+          <CardContent>
+            <DashboardStats stats={productivityStats} />
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
+              <div className="lg:col-span-3">
+                <ProductivitySnapshot 
+                  stats={productivityStats} 
+                  timeAllocationData={timeAllocationData} 
+                  onOpenStatsModal={() => setIsStatsModalOpen(true)} 
                 />
+              </div>
+              <div className="lg:col-span-2">
+                  <WeightGoalCard 
+                    weightLogs={weightLogs}
+                    goalWeight={goalWeight}
+                    onLogWeight={handleLogWeight}
+                    height={height}
+                    dateOfBirth={dateOfBirth}
+                    gender={gender}
+                    onSetHeight={setHeight}
+                    onSetDateOfBirth={setDateOfBirth}
+                    onSetGender={setGender}
+                    onSetGoalWeight={setGoalWeight}
+                    dietPlan={dietPlan}
+                    onEditDietClick={() => setIsDietPlanModalOpen(true)}
+                  />
+              </div>
             </div>
-          </div>
-          <TimeSlots 
-            schedule={todaysSchedule}
-            currentSlot={currentSlot}
-            remainingTime={remainingTime}
-            onAddActivity={handleAddActivity}
-            onRemoveActivity={handleRemoveActivity}
-            onToggleComplete={handleToggleComplete}
-            onActivityClick={handleActivityClick}
+            <TimeSlots 
+              schedule={todaysSchedule}
+              currentSlot={currentSlot}
+              remainingTime={remainingTime}
+              onAddActivity={handleAddActivity}
+              onRemoveActivity={handleRemoveActivity}
+              onToggleComplete={handleToggleComplete}
+              onActivityClick={handleActivityClick}
+            />
+          </CardContent>
+        </Card>
+        
+        <ActivityHeatmap schedule={schedule} />
+
+        {currentUser && (
+          <TodaysWorkoutModal
+              isOpen={isTodaysWorkoutModalOpen}
+              onOpenChange={setIsTodaysWorkoutModalOpen}
+              todaysExercises={todaysExercises}
+              muscleGroupsForDay={todaysMuscleGroups}
+              allWorkoutLogs={allWorkoutLogs}
           />
-        </CardContent>
-      </Card>
-      
-      <ActivityHeatmap schedule={schedule} />
+        )}
 
-      {currentUser && (
-        <TodaysWorkoutModal
-            isOpen={isTodaysWorkoutModalOpen}
-            onOpenChange={setIsTodaysWorkoutModalOpen}
-            todaysExercises={todaysExercises}
-            muscleGroupsForDay={todaysMuscleGroups}
-            allWorkoutLogs={allWorkoutLogs}
+        {currentUser && editingActivity && (
+          <TodaysLearningModal
+              isOpen={isLearningModalOpen}
+              onOpenChange={(isOpen) => {
+                  if (!isOpen) setEditingActivity(null);
+                  setIsLearningModalOpen(isOpen);
+              }}
+              availableTasks={learningModalProps.availableTasks}
+              initialSelectedIds={learningModalProps.initialSelectedIds}
+              onSave={handleSaveTaskSelection}
+              pageType={learningModalProps.pageType}
+          />
+        )}
+
+        <DietPlanModal
+          isOpen={isDietPlanModalOpen}
+          onOpenChange={handleDietModalOpenChange}
         />
-      )}
 
-      {currentUser && editingActivity && (
-        <TodaysLearningModal
-            isOpen={isLearningModalOpen}
-            onOpenChange={(isOpen) => {
-                if (!isOpen) setEditingActivity(null);
-                setIsLearningModalOpen(isOpen);
-            }}
-            availableTasks={learningModalProps.availableTasks}
-            initialSelectedIds={learningModalProps.initialSelectedIds}
-            onSave={handleSaveTaskSelection}
-            pageType={learningModalProps.pageType}
+        <StatsOverviewModal
+          isOpen={isStatsModalOpen}
+          onOpenChange={setIsStatsModalOpen}
+          allWorkoutLogs={allWorkoutLogs}
+          allUpskillLogs={allUpskillLogs}
+          allDeepWorkLogs={allDeepWorkLogs}
+          weightLogs={weightLogs}
+          goalWeight={goalWeight}
+          consistencyData={consistencyData}
+          totalHoursData={productivityStats.totalHoursData}
+          todayHoursData={productivityStats.todayHoursData}
         />
-      )}
-
-      <DietPlanModal
-        isOpen={isDietPlanModalOpen}
-        onOpenChange={handleDietModalOpenChange}
+      </div>
+      <TodaysScheduleCard
+        schedule={todaysSchedule}
+        activityDurations={activityDurations}
       />
-
-      <StatsOverviewModal
-        isOpen={isStatsModalOpen}
-        onOpenChange={setIsStatsModalOpen}
-        allWorkoutLogs={allWorkoutLogs}
-        allUpskillLogs={allUpskillLogs}
-        allDeepWorkLogs={allDeepWorkLogs}
-        weightLogs={weightLogs}
-        goalWeight={goalWeight}
-        consistencyData={consistencyData}
-        totalHoursData={productivityStats.totalHoursData}
-        todayHoursData={productivityStats.todayHoursData}
-      />
-    </div>
+    </>
   );
 }
 

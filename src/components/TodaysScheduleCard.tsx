@@ -1,11 +1,11 @@
 
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType } from '@/types/workout';
 import {
-  Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, CheckCircle2, Circle
+  Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, CheckCircle2, Circle, Grab
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -36,47 +36,109 @@ export function TodaysScheduleCard({ schedule, activityDurations }: TodaysSchedu
     });
   }, [schedule]);
 
+  const [isDragging, setIsDragging] = useState(false);
+  const [position, setPosition] = useState({ x: 20, y: 80 });
+  const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const initialY = window.innerHeight - Math.min(window.innerHeight - 80, 600);
+    setPosition({ x: 20, y: initialY });
+  }, []);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    setIsDragging(true);
+    setDragStartOffset({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y,
+    });
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (isDragging) {
+      setPosition({
+        x: e.clientX - dragStartOffset.x,
+        y: e.clientY - dragStartOffset.y,
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    } else {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, dragStartOffset]);
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg text-primary">
-          <ClipboardList /> Today's Agenda
-        </CardTitle>
-        <CardDescription>A sequential view of your scheduled activities for the day.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {scheduledActivities.length > 0 ? (
-          <ul className="space-y-3">
-            {scheduledActivities.map((activity) => {
-              const duration = activityDurations[activity.id];
-              return (
-              <li key={activity.id} className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/50">
-                <div className="flex items-center gap-3">
-                  {activity.completed 
-                    ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-                    : <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                  }
-                  <div className="flex-grow">
-                    <p className={`font-medium ${activity.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                      {activity.details}
-                    </p>
-                    <Badge variant="outline" className="text-xs">{activity.slot}</Badge>
-                  </div>
-                </div>
-                <div className="flex-shrink-0 text-muted-foreground text-right w-20">
-                    {activityIcons[activity.type]}
-                    {duration && <p className="text-xs font-semibold mt-1 whitespace-nowrap">{duration}</p>}
-                </div>
-              </li>
-            )})}
-          </ul>
-        ) : (
-          <div className="text-center text-muted-foreground py-8">
-            <p>No activities scheduled for today.</p>
-            <p className="text-xs">Add tasks to your time slots to see them here.</p>
+    <div
+      className="fixed z-50 w-full max-w-sm"
+      style={{
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        userSelect: isDragging ? 'none' : 'auto',
+      }}
+    >
+      <Card className="shadow-2xl bg-background/80 backdrop-blur-sm">
+        <CardHeader
+          className="cursor-grab active:cursor-grabbing"
+          onMouseDown={handleMouseDown}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-lg text-primary">
+                <ClipboardList /> Today's Agenda
+              </CardTitle>
+              <CardDescription>A sequential view of your scheduled activities.</CardDescription>
+            </div>
+            <Grab className="text-muted-foreground" />
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </CardHeader>
+        <CardContent>
+          {scheduledActivities.length > 0 ? (
+            <ul className="space-y-3 max-h-96 overflow-y-auto pr-2">
+              {scheduledActivities.map((activity) => {
+                const duration = activityDurations[activity.id];
+                return (
+                <li key={activity.id} className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/50">
+                  <div className="flex items-center gap-3">
+                    {activity.completed 
+                      ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+                      : <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                    }
+                    <div className="flex-grow">
+                      <p className={`font-medium ${activity.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                        {activity.details}
+                      </p>
+                      <Badge variant="outline" className="text-xs">{activity.slot}</Badge>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 text-muted-foreground text-right w-20">
+                      {activityIcons[activity.type]}
+                      {duration && <p className="text-xs font-semibold mt-1 whitespace-nowrap">{duration}</p>}
+                  </div>
+                </li>
+              )})}
+            </ul>
+          ) : (
+            <div className="text-center text-muted-foreground py-8">
+              <p>No activities scheduled for today.</p>
+              <p className="text-xs">Add tasks to your time slots to see them here.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
