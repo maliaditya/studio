@@ -5,22 +5,13 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType } from '@/types/workout';
 import {
-  Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, CheckCircle2, Circle, Grab, Dock, Move, Save
+  CheckCircle2, Circle, Grab, Dock, Move, Save
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-
-const activityIcons: Record<ActivityType, React.ReactNode> = {
-  workout: <Dumbbell className="h-4 w-4" />,
-  upskill: <BookOpenCheck className="h-4 w-4" />,
-  deepwork: <Briefcase className="h-4 w-4" />,
-  planning: <ClipboardList className="h-4 w-4" />,
-  tracking: <ClipboardCheck className="h-4 w-4" />,
-  branding: <Share2 className="h-4 w-4" />,
-};
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -62,7 +53,7 @@ function AgendaWidgetItem({ activity, duration, onToggleComplete, onLogLearning 
         setProgressInput('');
         setDurationInput('');
       }
-    } else { // deepwork
+    } else { // deepwork or branding
       if(!isNaN(duration) && duration > 0) {
         onLogLearning(activity, 0, duration);
         onToggleComplete(activity.slot, activity.id);
@@ -74,7 +65,7 @@ function AgendaWidgetItem({ activity, duration, onToggleComplete, onLogLearning 
 
   const itemContent = (
     <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/50 w-full" onClick={handleItemClick}>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 min-w-0">
         {activity.completed 
           ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
           : <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
@@ -215,7 +206,7 @@ export function TodaysScheduleCard({
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2 text-base text-primary">
-              <ClipboardList className="h-5 w-5" /> Today's Agenda
+               Today's Agenda
             </CardTitle>
             {isAgendaDocked && <CardDescription className="text-xs mt-1">A sequential view of your scheduled activities.</CardDescription>}
           </div>
@@ -266,7 +257,7 @@ export function TodaysScheduleCard({
           >
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base text-primary">
-                <ClipboardList className="h-5 w-5" /> Today's Agenda
+                 Today's Agenda
               </CardTitle>
               <div className="flex items-center">
                 <Button variant="ghost" size="icon" onClick={onToggleDock} className="h-8 w-8">
