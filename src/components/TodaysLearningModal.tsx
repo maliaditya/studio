@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { Separator } from './ui/separator';
 
 interface TodaysLearningModalProps {
   isOpen: boolean;
@@ -29,6 +30,30 @@ interface TodaysLearningModalProps {
   isAddingNewTasks: boolean;
   disabledTaskIds?: string[];
 }
+
+const TaskItem = ({ task, isDisabled, selected, onToggle }: { task: WorkoutExercise; isDisabled: boolean; selected: boolean; onToggle: () => void; }) => (
+  <div
+    className="flex items-center space-x-3 p-3 rounded-md border has-[:checked]:bg-muted/50 transition-colors"
+  >
+    <Checkbox
+      id={`task-${task.id}`}
+      checked={selected}
+      onCheckedChange={onToggle}
+      disabled={isDisabled}
+    />
+    <Label
+      htmlFor={`task-${task.id}`}
+      className={cn(
+        "font-normal w-full",
+        isDisabled ? "cursor-not-allowed text-muted-foreground/50" : "cursor-pointer"
+      )}
+    >
+      <p className="font-medium">{task.name}</p>
+      <p className="text-xs text-muted-foreground">{task.category}</p>
+    </Label>
+  </div>
+);
+
 
 export function TodaysLearningModal({
   isOpen,
@@ -43,7 +68,6 @@ export function TodaysLearningModal({
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>(initialSelectedIds);
 
   useEffect(() => {
-    // Sync state if initial props change while modal is open
     if(isOpen) {
       setSelectedTaskIds(initialSelectedIds);
     }
@@ -61,6 +85,13 @@ export function TodaysLearningModal({
     onSave(selectedTaskIds);
     onOpenChange(false);
   };
+
+  const [scheduledToday, fromLibrary] = useMemo(() => {
+    const scheduledDefIds = new Set([...initialSelectedIds, ...disabledTaskIds]);
+    const todays = availableTasks.filter(task => scheduledDefIds.has(task.definitionId));
+    const library = availableTasks.filter(task => !scheduledDefIds.has(task.definitionId));
+    return [todays, library];
+  }, [availableTasks, initialSelectedIds, disabledTaskIds]);
 
   const pageInfo = {
     upskill: {
@@ -99,49 +130,54 @@ export function TodaysLearningModal({
           <DialogDescription>{info.description}</DialogDescription>
         </DialogHeader>
         <div className="flex-grow min-h-0">
-          <ScrollArea className="h-full">
+          <ScrollArea className="h-full pr-4">
             {availableTasks.length > 0 ? (
-              <div className="space-y-3 p-1">
-                {availableTasks.map((task) => {
-                  const isDisabled = disabledTaskIds.includes(task.definitionId);
-                  return (
-                    <div
-                      key={task.id}
-                      className="flex items-center space-x-3 p-3 rounded-md border has-[:checked]:bg-muted/50 transition-colors"
-                    >
-                      <Checkbox
-                        id={`task-${task.id}`}
-                        checked={selectedTaskIds.includes(task.definitionId)}
-                        onCheckedChange={() => handleToggleTask(task.definitionId)}
-                        disabled={isDisabled}
-                      />
-                      <Label
-                        htmlFor={`task-${task.id}`}
-                        className={cn(
-                          "font-normal w-full",
-                          isDisabled ? "cursor-not-allowed text-muted-foreground/50" : "cursor-pointer"
-                        )}
-                      >
-                        <p className="font-medium">{task.name}</p>
-                        <p className="text-xs text-muted-foreground">{task.category}</p>
-                      </Label>
+              <div className="space-y-4">
+                {scheduledToday.length > 0 && (
+                  <div>
+                      <h4 className="mb-2 text-sm font-medium text-muted-foreground">Scheduled for Today</h4>
+                      <div className="space-y-2">
+                        {scheduledToday.map(task => (
+                           <TaskItem 
+                            key={task.id} 
+                            task={task} 
+                            isDisabled={disabledTaskIds.includes(task.definitionId)}
+                            selected={selectedTaskIds.includes(task.definitionId)}
+                            onToggle={() => handleToggleTask(task.definitionId)}
+                          />
+                        ))}
+                      </div>
+                  </div>
+                )}
+                
+                {fromLibrary.length > 0 && (
+                     <div>
+                        <h4 className="mb-2 text-sm font-medium text-muted-foreground">Available from Library</h4>
+                        <div className="space-y-2">
+                           {fromLibrary.map(task => (
+                             <TaskItem 
+                              key={task.id} 
+                              task={task} 
+                              isDisabled={false}
+                              selected={selectedTaskIds.includes(task.definitionId)}
+                              onToggle={() => handleToggleTask(task.definitionId)}
+                            />
+                          ))}
+                        </div>
                     </div>
-                  )
-                })}
+                )}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8">
                 {info.icon}
-                <p className="font-semibold">{isAddingNewTasks ? 'No Available Tasks' : info.emptyText}</p>
-                 {isAddingNewTasks && (
-                    <p className="text-sm mt-2">
-                        No unlogged tasks were found. Visit the{' '}
-                        <Link href={info.pageLink} className="font-medium text-primary underline underline-offset-4">
-                            {info.pageName} page
-                        </Link>
-                        {' '}to add new tasks to your library.
-                    </p>
-                )}
+                <p className="font-semibold">No Available Tasks</p>
+                 <p className="text-sm mt-2">
+                    Visit the{' '}
+                    <Link href={info.pageLink} className="font-medium text-primary underline underline-offset-4">
+                        {info.pageName} page
+                    </Link>
+                    {' '}to add new tasks to your library.
+                </p>
               </div>
             )}
           </ScrollArea>

@@ -310,9 +310,9 @@ function HomePageContent() {
     const { slotName, activity } = editingActivity;
     const pageType = activity.type as 'upskill' | 'deepwork' | 'branding';
     
-    const logsUpdater = pageType === 'upskill' ? setAllUpskillLogs : setAllDeepWorkLogs;
-    const definitionSource = pageType === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
-    const logSource = pageType === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
+    const logsUpdater = pageType === 'upskill' ? setAllUpskillLogs : pageType === 'deepwork' ? setAllDeepWorkLogs : setAllBrandingLogs;
+    const definitionSource = pageType === 'upskill' ? upskillDefinitions : pageType === 'deepwork' ? deepWorkDefinitions : brandingTasks;
+    const logSource = pageType === 'upskill' ? allUpskillLogs : pageType === 'deepwork' ? allDeepWorkLogs : brandingLogs;
 
     // 1. Determine which exercises need to be created.
     const logForDay = logSource.find(log => log.date === todayKey);
@@ -693,27 +693,13 @@ function HomePageContent() {
     
     const allTasksForDay = logSource.find(log => log.date === todayKey)?.exercises || [];
     
-    // Combine today's tasks and available definitions into one list for the modal
     const combinedTasksMap = new Map<string, WorkoutExercise>();
+    allTasksForDay.forEach(task => combinedTasksMap.set(task.definitionId, task));
 
-    // Add today's scheduled tasks first
-    allTasksForDay.forEach(task => {
-        combinedTasksMap.set(task.definitionId, task);
-    });
-
-    // Add other available definitions (that haven't been logged yet)
-    const loggedDefinitionIds = new Set<string>();
-    logSource.forEach(log => {
-        log.exercises.forEach(ex => {
-            if (ex.loggedSets.length > 0) {
-                loggedDefinitionIds.add(ex.definitionId);
-            }
-        });
-    });
     definitionSource.forEach(def => {
-        if (!combinedTasksMap.has(def.id) && !loggedDefinitionIds.has(def.id)) {
+        if (!combinedTasksMap.has(def.id)) {
             combinedTasksMap.set(def.id, {
-                id: def.id,
+                id: `${def.id}-lib-${Math.random()}`,
                 definitionId: def.id,
                 name: def.name,
                 category: def.category,
@@ -721,10 +707,9 @@ function HomePageContent() {
             });
         }
     });
-    
+
     const availableTasks = Array.from(combinedTasksMap.values());
     
-    // Determine which tasks are initially selected for the current slot
     const initialSelectedDefIds = new Set<string>();
     (activity.taskIds || []).forEach(taskId => {
         const task = allTasksForDay.find(t => t.id === taskId);
@@ -734,7 +719,6 @@ function HomePageContent() {
     });
     const initialSelectedIds = Array.from(initialSelectedDefIds);
     
-    // Determine which tasks are disabled (scheduled in other slots)
     const todaysActivitiesForType = Object.values(schedule[todayKey] || {}).flat();
     const disabledDefIds = new Set<string>();
     todaysActivitiesForType.forEach(act => {
