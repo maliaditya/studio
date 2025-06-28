@@ -44,15 +44,6 @@ const singleMuscleDailySchedule: Record<number, ExerciseCategory | null> = {
     1: "Chest", 2: "Triceps", 3: "Back", 4: "Biceps", 5: "Shoulders", 6: "Legs", 0: null,
 };
 
-const INITIAL_PLANS: AllWorkoutPlans = {
-    "W1": { "Chest": ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine"], "Triceps": ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Rope Pushdown"], "Back": ["Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull"], "Biceps": ["Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Shrugs"], "Legs": ["Walking Lunges (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine"] },
-    "W2": { "Chest": ["Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Cable Fly"], "Triceps": ["Overhead Dumbbell Extension", "Overhead Bar extension", "Rope Pushdown", "Dumbbell Kickback"], "Back": ["Lat Pulldown (Wide Grip)", "V handle lat pulldown", "1-Arm Dumbbell Row", "Back extensions"], "Biceps": ["Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Reverse Cable"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Seated Dumbbell Lateral Raise", "Rear Delt Fly (Incline Bench)", "Cable Upright Rows"], "Legs": ["Walking Lunges (Barbell)", "Squats (Barbell)", "hamstring machine", "Quads Machine"] },
-    "W3": { "Chest": ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine"], "Triceps": ["Overhead Cable Extension", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips"], "Back": ["Lat Pulldown", "Barbell Row", "Seated Row", "Lat Prayer Pull"], "Biceps": ["Strict bar curls", "Reversed Incline curls", "Cable Curls Superset", "Reversed cable curls"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Dumbbell Lateral Raise (Lean in)", "Face Pulls", "Shrugs"], "Legs": ["Leg Press", "Quads Machine", "Hamstring machine", "Calfs (Bodyweight)"] },
-    "W4": { "Chest": ["Dumbbell Flat Press", "Incline Dumbbell Press", "Dumbbell Pullovers", "Cable Fly"], "Triceps": ["Overhead Cable Extension", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips"], "Back": ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle lat pulldown", "DeadLifts"], "Biceps": ["Seated Machine Curls", "Cable Curls", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable"], "Legs": ["Walking Lunges (Barbell)", "Squats (Barbell)", "hamstring machine", "Quads Machine"] },
-    "W5": { "Chest": ["Flat Barbell Bench Press", "Incline Barbell Press", "Decline Dumbbell Press", "Peck Machine", "Cable Fly", "Dumbbell Pullovers"], "Triceps": ["Close-Grip Barbell Bench Press", "Overhead Dumbbell Extension", "Dumbbell Kickback", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips"], "Back": ["Lat Pulldown", "Machine Row", "T-Bar Row", "Lat Prayer Pull", "1-Arm Dumbbell Row", "DeadLifts"], "Biceps": ["Standing dumbbell curls", "Standing Dumbbell Alternating Curl", "Preacher curls Dumbbells", "Hammer Curl (Dumbbell)", "Reversed cable curls", "Reversed Incline curls"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Standing Dumbbell Lateral Raise", "Face Pulls", "Cable Upright Rows", "Front Raise Dumbbells", "Shrugs"], "Legs": ["Squats (Barbell)", "Leg Press", "Quads Machine", "Hamstring machine", "Walking Lunges (Barbell)", "Calfs (Bodyweight)"] },
-    "W6": { "Chest": ["Dumbbell Flat Press", "Incline Dumbbell Press", "Decline Dumbbell Press", "Peck Machine", "Flat Bench Chest Fly", "Dumbbell Pullovers"], "Triceps": ["Overhead Cable Extension", "Single Arm Dumbbell Extensions", "Rope Pushdown", "Straight bar pushdown", "Reverse Bar Pushdown", "Back dips"], "Back": ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle lat pulldown", "Barbell Row", "Lat Prayer Pull", "Back extensions"], "Biceps": ["Strict bar curls", "Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher Curls Bar", "Reverse Cable", "Concentration Curl"], "Shoulders": ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable", "Cable Upright Rows", "Shrugs"], "Legs": ["Walking Lunges (Barbell)", "Hack Squats", "hamstring machine", "Quads Machine", "Leg Press", "Calfs (Bodyweight)"] }
-};
-
 const productivityLevels = [
     { level: 'L1', min: 15, max: 30, description: 'Just showing up', zone: '⚪️ Entry Zone' },
     { level: 'L2', min: 30, max: 45, description: 'Light touch / spark', zone: '⚪️ Entry Zone' },
@@ -79,50 +70,27 @@ const productivityLevels = [
 function HomePageContent() {
   const { 
     currentUser, 
-    weightLogs, 
-    setWeightLogs,
-    goalWeight, 
-    setGoalWeight,
-    height, 
-    setHeight,
-    dateOfBirth, 
-    setDateOfBirth,
-    gender,
-    setGender,
-    dietPlan,
-    schedule,
-    setSchedule,
-    allUpskillLogs,
-    setAllUpskillLogs,
-    allDeepWorkLogs,
-    setAllDeepWorkLogs,
+    weightLogs, setWeightLogs,
+    goalWeight, setGoalWeight,
+    height, setHeight,
+    dateOfBirth, setDateOfBirth,
+    gender, setGender,
+    dietPlan, setDietPlan,
+    schedule, setSchedule,
+    allUpskillLogs, setAllUpskillLogs,
+    allDeepWorkLogs, setAllDeepWorkLogs,
     allWorkoutLogs,
     setActivityDurations,
-    isAgendaDocked,
-    setIsAgendaDocked,
-    handleToggleComplete,
-    handleLogLearning,
-    activityDurations,
+    isAgendaDocked, setIsAgendaDocked,
+    handleToggleComplete, handleLogLearning,
+    workoutMode, workoutPlans, exerciseDefinitions,
+    upskillDefinitions, topicGoals, deepWorkDefinitions, brandingTasks, brandingLogs
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
   const [remainingTime, setRemainingTime] = useState('');
   const [isScheduleLoaded, setIsScheduleLoaded] = useState(false);
   const [todayKey, setTodayKey] = useState('');
-
-  // State for workout data
-  const [workoutMode, setWorkoutMode] = useState<WorkoutMode>('two-muscle');
-  const [workoutPlans, setWorkoutPlans] = useState<AllWorkoutPlans>(INITIAL_PLANS);
-  const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
-  
-  // State for upskill and deepwork data (now using context, but some local state might be needed for modals etc)
-  const [deepWorkDefinitions, setDeepWorkDefinitions] = useState<ExerciseDefinition[]>([]);
-  const [upskillDefinitions, setUpskillDefinitions] = useState<ExerciseDefinition[]>([]);
-  const [topicGoals, setTopicGoals] = useState<Record<string, TopicGoal>>({});
-
-  // State for personal branding data
-  const [brandingTasks, setBrandingTasks] = useState<ExerciseDefinition[]>([]);
-  const [brandingLogs, setAllBrandingLogs] = useState<DatedWorkout[]>([]);
 
   // State for Modals
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
@@ -147,46 +115,12 @@ function HomePageContent() {
     setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
   }, []);
 
-  // Effect to load data specific to this page from local storage
+  // Effect to set schedule as loaded once user is available
   useEffect(() => {
     if (currentUser?.username) {
-        const username = currentUser.username;
-        const keys = {
-            workout: { defs: `exerciseDefinitions_${username}`, plans: `workoutPlans_${username}`, mode: `workoutMode_${username}` },
-            upskill: { defs: `upskill_definitions_${username}`, goals: `upskill_topic_goals_${username}` },
-            deepwork: { defs: `deepwork_definitions_${username}` },
-            branding: { tasks: `branding_tasks_${username}`, logs: `branding_logs_${username}` },
-        };
-        const loadItem = (key: string, isJson: boolean = true) => localStorage.getItem(key);
-
-        setWorkoutMode((loadItem(keys.workout.mode, false) as WorkoutMode) || 'two-muscle');
-        try { const d = loadItem(keys.workout.plans); setWorkoutPlans(d ? JSON.parse(d) : INITIAL_PLANS); } catch (e) { setWorkoutPlans(INITIAL_PLANS); }
-        try { const d = loadItem(keys.workout.defs); setExerciseDefinitions(d ? JSON.parse(d) : []); } catch (e) { setExerciseDefinitions([]); }
-        try { const d = loadItem(keys.upskill.defs); setUpskillDefinitions(d ? JSON.parse(d) : []); } catch (e) { setUpskillDefinitions([]); }
-        try { const d = loadItem(keys.deepwork.defs); setDeepWorkDefinitions(d ? JSON.parse(d) : []); } catch (e) { setDeepWorkDefinitions([]); }
-        try { const d = loadItem(keys.upskill.goals); setTopicGoals(d ? JSON.parse(d) : {}); } catch (e) { setTopicGoals({}); }
-        try { const d = loadItem(keys.branding.tasks); setBrandingTasks(d ? JSON.parse(d) : []); } catch (e) { setBrandingTasks([]); }
-        try { const d = loadItem(keys.branding.logs); setAllBrandingLogs(d ? JSON.parse(d) : []); } catch (e) { setAllBrandingLogs([]); }
+        setIsScheduleLoaded(true);
     }
-     setIsScheduleLoaded(true);
   }, [currentUser]);
-
-   // Effect to save page-specific data
-  useEffect(() => {
-    if (!currentUser || !isScheduleLoaded) return;
-    const username = currentUser.username;
-    // Note: schedule, upskillLogs, deepWorkLogs are saved via context now.
-    // We only save data managed locally on this page.
-    localStorage.setItem(`workoutMode_${username}`, workoutMode);
-    localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(workoutPlans));
-    localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(exerciseDefinitions));
-    localStorage.setItem(`upskill_definitions_${username}`, JSON.stringify(upskillDefinitions));
-    localStorage.setItem(`upskill_topic_goals_${username}`, JSON.stringify(topicGoals));
-    localStorage.setItem(`deepwork_definitions_${username}`, JSON.stringify(deepWorkDefinitions));
-    localStorage.setItem(`branding_tasks_${username}`, JSON.stringify(brandingTasks));
-    localStorage.setItem(`branding_logs_${username}`, JSON.stringify(brandingLogs));
-
-  }, [workoutMode, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, brandingTasks, brandingLogs, currentUser, isScheduleLoaded]);
 
   useEffect(() => {
     const timerInterval = setInterval(() => {
@@ -292,6 +226,7 @@ function HomePageContent() {
     setTodaysExercises(exercises);
     setTodaysMuscleGroups(muscleGroups);
     setWorkoutActivityToLog(activity);
+    setIsTodaysWorkoutModalOpen(true);
   };
   
   const handleActivityClick = (slotName: string, activity: Activity) => {
@@ -310,9 +245,22 @@ function HomePageContent() {
     const { slotName, activity } = editingActivity;
     const pageType = activity.type as 'upskill' | 'deepwork' | 'branding';
     
-    const logsUpdater = pageType === 'upskill' ? setAllUpskillLogs : pageType === 'deepwork' ? setAllDeepWorkLogs : setAllBrandingLogs;
-    const definitionSource = pageType === 'upskill' ? upskillDefinitions : pageType === 'deepwork' ? deepWorkDefinitions : brandingTasks;
-    const logSource = pageType === 'upskill' ? allUpskillLogs : pageType === 'deepwork' ? allDeepWorkLogs : brandingLogs;
+    let logsUpdater;
+    let definitionSource;
+    let logSource;
+    if (pageType === 'upskill') {
+      logsUpdater = setAllUpskillLogs;
+      definitionSource = upskillDefinitions;
+      logSource = allUpskillLogs;
+    } else if (pageType === 'deepwork') {
+      logsUpdater = setAllDeepWorkLogs;
+      definitionSource = deepWorkDefinitions;
+      logSource = allDeepWorkLogs;
+    } else {
+      logsUpdater = () => {}; // Branding logs are handled on their page
+      definitionSource = brandingTasks;
+      logSource = brandingLogs;
+    }
 
     // 1. Determine which exercises need to be created.
     const logForDay = logSource.find(log => log.date === todayKey);
@@ -353,7 +301,7 @@ function HomePageContent() {
 
     const newDetails = allRelevantExercises
       .filter(ex => finalTaskIdsForSlot.includes(ex.id))
-      .map(t => t.name).join(', ') || (pageType === 'upskill' ? 'Learning Session' : 'Deep Work Session');
+      .map(t => t.name).join(', ') || (pageType === 'upskill' ? 'Learning Session' : pageType === 'deepwork' ? 'Deep Work Session' : 'Branding Session');
     
     setSchedule(prev => {
       const newTodaySchedule = { ...(prev[todayKey] || {}) };
@@ -483,7 +431,7 @@ function HomePageContent() {
           }
           const bundledFocusAreaNames = new Set(brandingTasks.flatMap(task => task.focusAreas || []));
           const focusAreaSessionCounts: Record<string, number> = {};
-          allDeepWorkLogs.forEach(log => log.exercises.forEach(ex => { focusAreaSessionCounts[ex.definitionId] = (focusAreaSessionCounts[ex.definitionId] || 0) + ex.loggedSets.length; }));
+          allDeepWorkLogs.forEach(log => log.exercises.forEach(ex => { focusAreaSessionCounts[ex.id] = (focusAreaSessionCounts[ex.id] || 0) + ex.loggedSets.length; }));
           const eligibleFocusAreas = deepWorkDefinitions.filter(def => (focusAreaSessionCounts[def.id] || 0) >= 4 && !bundledFocusAreaNames.has(def.name));
           const topics: Record<string, { eligibleCount: number, focusAreas: ExerciseDefinition[] }> = {};
           deepWorkDefinitions.forEach(def => { if (!topics[def.category]) topics[def.category] = { eligibleCount: 0, focusAreas: [] }; topics[def.category].focusAreas.push(def); });
@@ -687,8 +635,19 @@ function HomePageContent() {
     const { activity } = editingActivity;
     const pageType = activity.type as 'upskill' | 'deepwork' | 'branding';
 
-    const logSource = pageType === 'upskill' ? allUpskillLogs : pageType === 'deepwork' ? allDeepWorkLogs : brandingLogs;
-    const definitionSource = pageType === 'upskill' ? upskillDefinitions : pageType === 'deepwork' ? deepWorkDefinitions : brandingTasks;
+    let logSource: DatedWorkout[];
+    let definitionSource: ExerciseDefinition[];
+
+    if (pageType === 'upskill') {
+      logSource = allUpskillLogs;
+      definitionSource = upskillDefinitions;
+    } else if (pageType === 'deepwork') {
+      logSource = allDeepWorkLogs;
+      definitionSource = deepWorkDefinitions;
+    } else { // branding
+      logSource = brandingLogs;
+      definitionSource = brandingTasks;
+    }
     
     // These are the WorkoutExercise objects already created for today.
     const allTasksForDay = logSource.find(log => log.date === todayKey)?.exercises || [];
@@ -826,8 +785,8 @@ function HomePageContent() {
 
         {currentUser && (
           <TodaysWorkoutModal
-              isOpen={!!workoutActivityToLog}
-              onOpenChange={(isOpen) => { if(!isOpen) setWorkoutActivityToLog(null); }}
+              isOpen={isTodaysWorkoutModalOpen}
+              onOpenChange={setIsTodaysWorkoutModalOpen}
               activityToLog={workoutActivityToLog}
               todaysExercises={todaysExercises}
               muscleGroupsForDay={todaysMuscleGroups}

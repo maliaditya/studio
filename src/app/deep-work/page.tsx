@@ -69,16 +69,14 @@ function DeepWorkPageContent() {
     dateOfBirth, setDateOfBirth,
     gender, setGender,
     allDeepWorkLogs, setAllDeepWorkLogs,
+    deepWorkDefinitions, setDeepWorkDefinitions,
+    deepworkManualDeletes, setDeepworkManualDeletes,
+    upskillDefinitions, allUpskillLogs,
   } = useAuth();
 
-  const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
   const [newSubtopicName, setNewSubtopicName] = useState('');
   const [newTopicName, setNewTopicName] = useState('');
-
-  // State to handle promotion from Upskill
-  const [upskillDefinitions, setUpskillDefinitions] = useState<ExerciseDefinition[]>([]);
-  const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
-
+  
   const [editingDefinition, setEditingDefinition] = useState<ExerciseDefinition | null>(null);
   const [editingDefinitionName, setEditingDefinitionName] = useState('');
   const [editingDefinitionCategory, setEditingDefinitionCategory] = useState<string>('');
@@ -104,9 +102,7 @@ function DeepWorkPageContent() {
   const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
   const [isDecompositionEditing, setIsDecompositionEditing] = useState(false);
   const [editableDecompositionData, setEditableDecompositionData] = useState<DecompositionRow[]>([]);
-  const [manuallyDeletedIds, setManuallyDeletedIds] = useState<string[]>([]);
-
-
+  
   const decompositionTechniques: DecompositionRow[] = [
     {
       technique: "📏 Unit Consistency",
@@ -156,58 +152,16 @@ function DeepWorkPageContent() {
   ];
 
   const allTopics = useMemo(() => {
-    const topics = new Set(exerciseDefinitions.map(def => def.category));
+    const topics = new Set(deepWorkDefinitions.map(def => def.category));
     return Array.from(topics).sort();
-  }, [exerciseDefinitions]);
+  }, [deepWorkDefinitions]);
 
   useEffect(() => {
     const now = new Date();
     setToday(now);
     setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
+    setIsLoadingPage(false); // Data is loaded from context
   }, []);
-
-  useEffect(() => {
-    if (currentUser?.username) {
-        const username = currentUser.username;
-        const defsKey = `deepwork_definitions_${username}`;
-        const deletesKey = `deepwork_manual_deletes_${username}`;
-
-        // Load upskill data for promotion logic
-        const upskillDefsKey = `upskill_definitions_${username}`;
-        const upskillLogsKey = `upskill_logs_${username}`;
-        try { const stored = localStorage.getItem(upskillDefsKey); setUpskillDefinitions(stored ? JSON.parse(stored) : []); } catch (e) { setUpskillDefinitions([]); }
-        try { const stored = localStorage.getItem(upskillLogsKey); setAllUpskillLogs(stored ? JSON.parse(stored) : []); } catch (e) { setAllUpskillLogs([]); }
-
-        try { const storedDefinitions = localStorage.getItem(defsKey); setExerciseDefinitions(storedDefinitions ? JSON.parse(storedDefinitions) : []); } catch (e) { setExerciseDefinitions([]); }
-        try { const storedDeletes = localStorage.getItem(deletesKey); setManuallyDeletedIds(storedDeletes ? JSON.parse(storedDeletes) : []); } catch (e) { setManuallyDeletedIds([]); }
-        
-    } else {
-      // Clear all state for logged-out user
-      setExerciseDefinitions([]);
-      setUpskillDefinitions([]);
-      setAllUpskillLogs([]);
-      setManuallyDeletedIds([]);
-    }
-    const timer = setTimeout(() => setIsLoadingPage(false), 300);
-    return () => clearTimeout(timer);
-}, [currentUser]);
-
-  useEffect(() => {
-    if (currentUser?.username && !isLoadingPage) {
-      try {
-        const username = currentUser.username;
-        const defsKey = `deepwork_definitions_${username}`;
-        const deletesKey = `deepwork_manual_deletes_${username}`;
-        
-        localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
-        localStorage.setItem(deletesKey, JSON.stringify(manuallyDeletedIds));
-
-      } catch (e) {
-        console.error("Error saving deep work data to localStorage", e);
-        toast({ title: "Save Error", description: "Could not save deep work data locally.", variant: "destructive"});
-      }
-    }
-  }, [exerciseDefinitions, manuallyDeletedIds, currentUser, isLoadingPage, toast]);
 
   // Logic to promote Upskill tasks to Deep Work focus areas
   useEffect(() => {
@@ -224,12 +178,12 @@ function DeepWorkPageContent() {
         });
     });
 
-    const currentDeepWorkIds = new Set(exerciseDefinitions.map(def => def.id));
+    const currentDeepWorkIds = new Set(deepWorkDefinitions.map(def => def.id));
     const newlyPromoted: ExerciseDefinition[] = [];
 
     upskillDefinitions.forEach(upskillDef => {
         const newDeepWorkId = `dw-${upskillDef.id}`;
-        const wasManuallyDeleted = manuallyDeletedIds.includes(upskillDef.id);
+        const wasManuallyDeleted = deepworkManualDeletes.includes(upskillDef.id);
         const isAlreadyPromoted = currentDeepWorkIds.has(newDeepWorkId);
         
         if (loggedUpskillDefIds.has(upskillDef.id) && !isAlreadyPromoted && !wasManuallyDeleted) {
@@ -248,9 +202,9 @@ function DeepWorkPageContent() {
           title: "Focus Areas Promoted!",
           description: `${newlyPromoted.length} learning task(s) have been added to your Focus Area Library.`,
       });
-      setExerciseDefinitions(currentDefs => [...currentDefs, ...newlyPromoted]);
+      setDeepWorkDefinitions(currentDefs => [...currentDefs, ...newlyPromoted]);
     }
-  }, [upskillDefinitions, allUpskillLogs, currentUser, isLoadingPage, toast, exerciseDefinitions, manuallyDeletedIds]);
+  }, [upskillDefinitions, allUpskillLogs, currentUser, isLoadingPage, toast, deepWorkDefinitions, setDeepWorkDefinitions, deepworkManualDeletes]);
 
 
   // Check for backup prompt on Mondays
@@ -288,9 +242,9 @@ function DeepWorkPageContent() {
   }, [currentDatedWorkout]);
 
   const filteredExerciseDefinitions = useMemo(() => {
-    if (selectedCategories.length === 0) return exerciseDefinitions;
-    return exerciseDefinitions.filter(def => selectedCategories.includes(def.category));
-  }, [exerciseDefinitions, selectedCategories]);
+    if (selectedCategories.length === 0) return deepWorkDefinitions;
+    return deepWorkDefinitions.filter(def => selectedCategories.includes(def.category));
+  }, [deepWorkDefinitions, selectedCategories]);
 
   const handleCategoryFilterChange = (category: string) => {
     setSelectedCategories(prev => 
@@ -317,7 +271,7 @@ function DeepWorkPageContent() {
       toast({ title: "Error", description: "Topic and Focus Area cannot be empty.", variant: "destructive" });
       return;
     }
-    if (exerciseDefinitions.some(def => def.name.toLowerCase() === newSubtopicName.trim().toLowerCase() && def.category.toLowerCase() === newTopicName.trim().toLowerCase())) {
+    if (deepWorkDefinitions.some(def => def.name.toLowerCase() === newSubtopicName.trim().toLowerCase() && def.category.toLowerCase() === newTopicName.trim().toLowerCase())) {
       toast({ title: "Error", description: "This focus area already exists for this topic.", variant: "destructive" });
       return;
     }
@@ -326,20 +280,20 @@ function DeepWorkPageContent() {
       name: newSubtopicName.trim(),
       category: newTopicName.trim() as ExerciseCategory, // Casting, as we allow dynamic strings
     };
-    setExerciseDefinitions(prev => [...prev, newDef]);
+    setDeepWorkDefinitions(prev => [...prev, newDef]);
     setNewSubtopicName('');
     setNewTopicName('');
     toast({ title: "Success", description: `Focus Area "${newDef.name}" added to library.` });
   };
 
   const handleDeleteExerciseDefinition = (id: string) => {
-    const defToDelete = exerciseDefinitions.find(def => def.id === id);
+    const defToDelete = deepWorkDefinitions.find(def => def.id === id);
 
     if (defToDelete?.sourceUpskillId) {
-        setManuallyDeletedIds(prev => [...new Set([...prev, defToDelete!.sourceUpskillId])]);
+        setDeepworkManualDeletes(prev => [...new Set([...prev, defToDelete!.sourceUpskillId])]);
     }
 
-    setExerciseDefinitions(prev => prev.filter(def => def.id !== id));
+    setDeepWorkDefinitions(prev => prev.filter(def => def.id !== id));
     setAllDeepWorkLogs(prevLogs => 
       prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) }))
     );
@@ -358,7 +312,7 @@ function DeepWorkPageContent() {
       return;
     }
     const updatedDef = { ...editingDefinition, name: editingDefinitionName.trim(), category: editingDefinitionCategory.trim() as ExerciseCategory };
-    setExerciseDefinitions(prev => prev.map(def => def.id === editingDefinition.id ? updatedDef : def));
+    setDeepWorkDefinitions(prev => prev.map(def => def.id === editingDefinition.id ? updatedDef : def));
     setAllDeepWorkLogs(prevLogs => 
       prevLogs.map(log => ({
         ...log,
@@ -461,7 +415,7 @@ function DeepWorkPageContent() {
   
   const handleSaveDecomposition = () => {
     if (!selectedFocusArea) return;
-    setExerciseDefinitions(prevDefs => prevDefs.map(def =>
+    setDeepWorkDefinitions(prevDefs => prevDefs.map(def =>
         def.id === selectedFocusArea.id
             ? { ...def, decompositionData: editableDecompositionData }
             : def
@@ -603,7 +557,7 @@ function DeepWorkPageContent() {
                         <Button type="submit" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs xl:text-sm xl:h-10 xl:px-4"> <PlusCircle className="mr-2 h-5 w-5" /> Add Focus Area </Button>
                       </form>
                       <div className="max-h-[calc(100vh-38rem)] overflow-y-auto pr-1">
-                        {filteredExerciseDefinitions.length === 0 && exerciseDefinitions.length > 0 ? (
+                        {filteredExerciseDefinitions.length === 0 && deepWorkDefinitions.length > 0 ? (
                           <p className="text-muted-foreground text-sm text-center py-4">No focus areas match filter.</p>
                         ) : filteredExerciseDefinitions.length === 0 ? (
                           <p className="text-muted-foreground text-sm text-center py-4">Library empty. Add a new topic and focus area to get started!</p>
@@ -745,7 +699,7 @@ function DeepWorkPageContent() {
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                           <AnimatePresence>
                           {currentWorkoutExercises.map(exercise => {
-                              const definition = exerciseDefinitions.find(def => def.id === exercise.definitionId);
+                              const definition = deepWorkDefinitions.find(def => def.id === exercise.definitionId);
                               return (
                                 <WorkoutExerciseCard 
                                   key={exercise.id} 

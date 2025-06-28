@@ -6,8 +6,8 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, getDay } from 'date-fns';
-import { Dumbbell, BrainCircuit, TrendingUp, Share2, Heart, DollarSign, Trophy, MessageSquareQuote, CheckCircle2, Circle, Target } from 'lucide-react';
-import type { ExerciseDefinition, WorkoutMode, ExerciseCategory, Activity, DailySchedule } from '@/types/workout';
+import { DollarSign, Share2, Heart, Trophy, MessageSquareQuote, CheckCircle2, Circle, Target, TrendingUp } from 'lucide-react';
+import type { Activity } from '@/types/workout';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -67,7 +67,7 @@ function MyPlatePageContent() {
   }, [topicGoals, allUpskillLogs]);
   
   const brandingPipeline = useMemo(() => {
-    const activeTasks = brandingTasks.filter(task => !(task.sharingStatus?.twitter && task.sharingStatus?.linkedin && task.sharingStatus?.devto));
+    const activeTasks = (brandingTasks || []).filter(task => !(task.sharingStatus?.twitter && task.sharingStatus?.linkedin && task.sharingStatus?.devto));
     return activeTasks.slice(0, 3); // Show top 3 active bundles
   }, [brandingTasks]);
   
@@ -137,8 +137,8 @@ function MyPlatePageContent() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Health Snapshot</CardTitle>
-                    <CardDescription>Current physical wellness status.</CardDescription>
+                    <CardTitle className="flex items-center gap-2 text-xl"><Heart className="h-6 w-6 text-primary"/> Health</CardTitle>
+                    <CardDescription>Physical well-being & fitness.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div>
@@ -165,8 +165,8 @@ function MyPlatePageContent() {
         <div className="lg:col-span-2 space-y-8">
             <Card>
                 <CardHeader>
-                    <CardTitle>Long-Term Progress</CardTitle>
-                    <CardDescription>Tracking your journey across different domains.</CardDescription>
+                    <CardTitle className="flex items-center gap-2 text-xl"><DollarSign className="h-6 w-6 text-primary"/> Wealth</CardTitle>
+                    <CardDescription>Deep work & income opportunities.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div>

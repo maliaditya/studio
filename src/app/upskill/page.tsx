@@ -61,11 +61,11 @@ function UpskillPageContent() {
     height, setHeight,
     dateOfBirth, setDateOfBirth,
     gender, setGender,
-    allUpskillLogs, setAllUpskillLogs
+    allUpskillLogs, setAllUpskillLogs,
+    upskillDefinitions, setUpskillDefinitions,
+    topicGoals, setTopicGoals
   } = useAuth();
 
-  const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
-  const [topicGoals, setTopicGoals] = useState<Record<string, TopicGoal>>({});
   const [newSubtopicName, setNewSubtopicName] = useState('');
   const [newTopicName, setNewTopicName] = useState('');
   const [newTopicGoalType, setNewTopicGoalType] = useState<'pages' | 'hours'>('pages');
@@ -93,9 +93,9 @@ function UpskillPageContent() {
   const [today, setToday] = useState<Date | null>(null);
 
   const allTopics = useMemo(() => {
-    const topics = new Set(exerciseDefinitions.map(def => def.category));
+    const topics = new Set(upskillDefinitions.map(def => def.category));
     return Array.from(topics).sort();
-  }, [exerciseDefinitions]);
+  }, [upskillDefinitions]);
 
   const loggedDefinitionIds = useMemo(() => {
     const ids = new Set<string>();
@@ -110,7 +110,7 @@ function UpskillPageContent() {
   }, [allUpskillLogs]);
   
   const filteredExerciseDefinitions = useMemo(() => {
-    let definitions = [...exerciseDefinitions];
+    let definitions = [...upskillDefinitions];
 
     if (selectedCategories.length > 0) {
       definitions = definitions.filter(def => selectedCategories.includes(def.category));
@@ -121,53 +121,14 @@ function UpskillPageContent() {
     }
 
     return definitions;
-  }, [exerciseDefinitions, selectedCategories, showLoggedTasks, loggedDefinitionIds]);
+  }, [upskillDefinitions, selectedCategories, showLoggedTasks, loggedDefinitionIds]);
 
   useEffect(() => {
     const now = new Date();
     setToday(now);
     setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
+    setIsLoadingPage(false); // Data is now loaded from context
   }, []);
-
-  useEffect(() => {
-    if (currentUser?.username) {
-        const username = currentUser.username;
-        const defsKey = `upskill_definitions_${username}`;
-        const goalsKey = `upskill_topic_goals_${username}`;
-
-        try {
-            const storedDefinitions = localStorage.getItem(defsKey);
-            setExerciseDefinitions(storedDefinitions ? JSON.parse(storedDefinitions) : []);
-        } catch (e) { setExerciseDefinitions([]); }
-
-        try {
-            const storedGoals = localStorage.getItem(goalsKey);
-            setTopicGoals(storedGoals ? JSON.parse(storedGoals) : {});
-        } catch (e) { setTopicGoals({}); }
-        
-    } else {
-      setExerciseDefinitions([]);
-      setTopicGoals({});
-    }
-    const timer = setTimeout(() => setIsLoadingPage(false), 300);
-    return () => clearTimeout(timer);
-}, [currentUser]);
-
-  useEffect(() => {
-    if (currentUser?.username && !isLoadingPage) {
-      try {
-        const username = currentUser.username;
-        const defsKey = `upskill_definitions_${username}`;
-        const goalsKey = `upskill_topic_goals_${username}`;
-
-        localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
-        localStorage.setItem(goalsKey, JSON.stringify(topicGoals));
-      } catch (e) {
-        console.error("Error saving upskill data to localStorage", e);
-        toast({ title: "Save Error", description: "Could not save upskill data locally.", variant: "destructive"});
-      }
-    }
-  }, [exerciseDefinitions, topicGoals, currentUser, isLoadingPage, toast]);
 
   useEffect(() => {
       if (!currentUser) return;
@@ -230,7 +191,7 @@ function UpskillPageContent() {
     const topic = newTopicName.trim();
     const subtopic = newSubtopicName.trim();
 
-    if (exerciseDefinitions.some(def => def.name.toLowerCase() === subtopic.toLowerCase() && def.category.toLowerCase() === topic.toLowerCase())) {
+    if (upskillDefinitions.some(def => def.name.toLowerCase() === subtopic.toLowerCase() && def.category.toLowerCase() === topic.toLowerCase())) {
       toast({ title: "Error", description: "This subtopic already exists for this topic.", variant: "destructive" });
       return;
     }
@@ -252,7 +213,7 @@ function UpskillPageContent() {
       name: subtopic,
       category: topic as ExerciseCategory,
     };
-    setExerciseDefinitions(prev => [...prev, newDef]);
+    setUpskillDefinitions(prev => [...prev, newDef]);
     setNewSubtopicName('');
     setNewTopicName('');
     setNewTopicGoalValue('');
@@ -260,8 +221,8 @@ function UpskillPageContent() {
   };
 
   const handleDeleteExerciseDefinition = (id: string) => {
-    const defToDelete = exerciseDefinitions.find(def => def.id === id);
-    setExerciseDefinitions(prev => prev.filter(def => def.id !== id));
+    const defToDelete = upskillDefinitions.find(def => def.id === id);
+    setUpskillDefinitions(prev => prev.filter(def => def.id !== id));
     setAllUpskillLogs(prevLogs => 
       prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) }))
     );
@@ -284,7 +245,7 @@ function UpskillPageContent() {
       name: editingDefinitionName.trim(), 
       category: editingDefinitionCategory.trim() as ExerciseCategory,
     };
-    setExerciseDefinitions(prev => prev.map(def => def.id === editingDefinition.id ? updatedDef : def));
+    setUpskillDefinitions(prev => prev.map(def => def.id === editingDefinition.id ? updatedDef : def));
     setAllUpskillLogs(prevLogs => 
       prevLogs.map(log => ({
         ...log,
@@ -524,7 +485,7 @@ function UpskillPageContent() {
                         <Button type="submit" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs xl:text-sm xl:h-10 xl:px-4"> <PlusCircle className="mr-2 h-5 w-5" /> Add Task </Button>
                       </form>
                       <div className="max-h-[calc(100vh-38rem)] overflow-y-auto pr-1">
-                        {filteredExerciseDefinitions.length === 0 && exerciseDefinitions.length > 0 ? (
+                        {filteredExerciseDefinitions.length === 0 && upskillDefinitions.length > 0 ? (
                           <p className="text-muted-foreground text-sm text-center py-4">No tasks match filter.</p>
                         ) : filteredExerciseDefinitions.length === 0 ? (
                           <p className="text-muted-foreground text-sm text-center py-4">Library empty. Add a new topic and subtopic to get started!</p>
@@ -683,7 +644,7 @@ function UpskillPageContent() {
                                   onDeleteSet={handleDeleteSet} 
                                   onUpdateSet={handleUpdateSet} 
                                   onRemoveExercise={handleRemoveExerciseFromWorkout}
-                                  onViewProgress={() => handleViewProgress(exerciseDefinitions.find(def => def.id === exercise.definitionId)!)}
+                                  onViewProgress={() => handleViewProgress(upskillDefinitions.find(def => def.id === exercise.definitionId)!)}
                                   pageType="upskill"
                                 />
                               );

@@ -45,14 +45,15 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 function PersonalBrandingPageContent() {
   const { toast } = useToast();
-  const { currentUser, exportData } = useAuth();
-  
-  const [brandingTasks, setBrandingTasks] = useState<ExerciseDefinition[]>([]);
-  const [deepWorkDefinitions, setDeepWorkDefinitions] = useState<ExerciseDefinition[]>([]);
-  const [deepWorkLogs, setDeepWorkLogs] = useState<DatedWorkout[]>([]);
+  const { 
+    currentUser, 
+    exportData,
+    brandingTasks, setBrandingTasks,
+    brandingLogs, setAllBrandingLogs,
+    deepWorkDefinitions, deepWorkLogs
+  } = useAuth();
   
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [allBrandingLogs, setAllBrandingLogs] = useState<DatedWorkout[]>([]);
   
   const [isLoadingPage, setIsLoadingPage] = useState(true);
   const [showBackupPrompt, setShowBackupPrompt] = useState(false);
@@ -61,35 +62,21 @@ function PersonalBrandingPageContent() {
 
   useEffect(() => {
     if (currentUser?.username) {
-      const username = currentUser.username;
-      
-      const deepWorkDefsKey = `deepwork_definitions_${username}`;
-      const deepWorkLogsKey = `deepwork_logs_${username}`;
-      const storedDeepWorkDefs: ExerciseDefinition[] = JSON.parse(localStorage.getItem(deepWorkDefsKey) || '[]');
-      const storedDeepWorkLogs: DatedWorkout[] = JSON.parse(localStorage.getItem(deepWorkLogsKey) || '[]');
-      setDeepWorkDefinitions(storedDeepWorkDefs);
-      setDeepWorkLogs(storedDeepWorkLogs);
-
-      const brandingTasksKey = `branding_tasks_${username}`;
-      const brandingLogsKey = `branding_logs_${username}`;
-      const storedBrandingTasks: ExerciseDefinition[] = JSON.parse(localStorage.getItem(brandingTasksKey) || '[]');
-      const storedBrandingLogs: DatedWorkout[] = JSON.parse(localStorage.getItem(brandingLogsKey) || '[]');
-
       const bundledFocusAreaNames = new Set<string>();
-      storedBrandingTasks.forEach(task => {
+      brandingTasks.forEach(task => {
           if (task.focusAreas) {
               task.focusAreas.forEach(name => bundledFocusAreaNames.add(name));
           }
       });
 
       const focusAreaSessionCounts: Record<string, number> = {};
-      storedDeepWorkLogs.forEach(log => {
+      deepWorkLogs.forEach(log => {
         log.exercises.forEach(ex => {
           focusAreaSessionCounts[ex.definitionId] = (focusAreaSessionCounts[ex.definitionId] || 0) + ex.loggedSets.length;
         });
       });
 
-      const eligibleFocusAreas = storedDeepWorkDefs.filter(def => {
+      const eligibleFocusAreas = deepWorkDefinitions.filter(def => {
         const hasEnoughSessions = (focusAreaSessionCounts[def.id] || 0) >= 4;
         const isAlreadyBundled = bundledFocusAreaNames.has(def.name);
         return hasEnoughSessions && !isAlreadyBundled;
@@ -101,7 +88,8 @@ function PersonalBrandingPageContent() {
         topics[def.category].push(def);
       });
 
-      const newGeneratedTasks: ExerciseDefinition[] = [...storedBrandingTasks];
+      const newGeneratedTasks: ExerciseDefinition[] = [...brandingTasks];
+      let wasChanged = false;
       const newlyBundledNames = new Set<string>();
 
       Object.keys(topics).forEach(topicName => {
@@ -110,6 +98,7 @@ function PersonalBrandingPageContent() {
           for (let i = 0; i < focusAreasInTopic.length; i += 4) {
             const bundle = focusAreasInTopic.slice(i, i + 4);
             if (bundle.length === 4) {
+              wasChanged = true;
               const existingBundlesForTopic = newGeneratedTasks.filter(t => t.name.startsWith(`${topicName} - Bundle`)).length;
               const bundleNumber = existingBundlesForTopic + 1;
               const bundleId = `branding_${topicName.replace(/\s+/g, '_')}_bundle_${bundleNumber}_${Date.now()}`;
@@ -130,31 +119,14 @@ function PersonalBrandingPageContent() {
         }
       });
       
-      if(newlyBundledNames.size > 0) {
+      if(wasChanged) {
         toast({ title: 'New Content Bundles Created!', description: `${newlyBundledNames.size} focus areas have been bundled into new content ideas.` });
+        setBrandingTasks(newGeneratedTasks);
       }
-
-      setBrandingTasks(newGeneratedTasks);
-      setAllBrandingLogs(storedBrandingLogs);
-    } else {
-      setBrandingTasks([]);
-      setAllBrandingLogs([]);
-      setDeepWorkDefinitions([]);
-      setDeepWorkLogs([]);
     }
     const timer = setTimeout(() => setIsLoadingPage(false), 300);
     return () => clearTimeout(timer);
-  }, [currentUser, toast]);
-
-  useEffect(() => {
-    if (currentUser?.username && !isLoadingPage) {
-      const username = currentUser.username;
-      const brandingTasksKey = `branding_tasks_${username}`;
-      const brandingLogsKey = `branding_logs_${username}`;
-      localStorage.setItem(brandingTasksKey, JSON.stringify(brandingTasks));
-      localStorage.setItem(brandingLogsKey, JSON.stringify(allBrandingLogs));
-    }
-  }, [brandingTasks, allBrandingLogs, currentUser, isLoadingPage]);
+  }, [currentUser, deepWorkDefinitions, deepWorkLogs, brandingTasks, setBrandingTasks, toast]);
   
   const availableFocusAreas = useMemo(() => {
     if (!deepWorkDefinitions.length || !deepWorkLogs.length) {
@@ -227,8 +199,8 @@ function PersonalBrandingPageContent() {
   
   const currentDatedLog = useMemo(() => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    return allBrandingLogs.find(log => log.id === dateKey);
-  }, [selectedDate, allBrandingLogs]);
+    return brandingLogs.find(log => log.id === dateKey);
+  }, [selectedDate, brandingLogs]);
 
   const currentSessionTasks = useMemo(() => {
     return currentDatedLog?.exercises || [];
@@ -258,7 +230,7 @@ function PersonalBrandingPageContent() {
       targetReps: "4 stages",
       focusAreas: definition.focusAreas,
     };
-    const existingLog = allBrandingLogs.find(log => log.id === dateKey);
+    const existingLog = brandingLogs.find(log => log.id === dateKey);
     if (existingLog) {
       if (existingLog.exercises.some(ex => ex.definitionId === definition.id)) {
         toast({ title: "Info", description: "This task is already in today's session." });
@@ -273,7 +245,7 @@ function PersonalBrandingPageContent() {
 
   const handleRemoveTaskFromSession = (exerciseId: string) => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingLog = allBrandingLogs.find(log => log.id === dateKey);
+    const existingLog = brandingLogs.find(log => log.id === dateKey);
     if (existingLog) {
       const updatedExercises = existingLog.exercises.filter(ex => ex.id !== exerciseId);
       if (updatedExercises.length === 0) setAllBrandingLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
@@ -283,7 +255,7 @@ function PersonalBrandingPageContent() {
 
   const handleLogStage = (exerciseId: string, stageIndex: number) => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingLog = allBrandingLogs.find(log => log.id === dateKey);
+    const existingLog = brandingLogs.find(log => log.id === dateKey);
     if (existingLog) {
       const newSet: LoggedSet = { id: Date.now().toString(), reps: stageIndex, weight: 1, timestamp: Date.now() };
       const updatedExercises = existingLog.exercises.map(ex => {
