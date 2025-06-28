@@ -89,33 +89,31 @@ export function TodaysWorkoutModal({
             Log your sets for each exercise. The workout can be marked as complete once all target sets are logged.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex-grow min-h-0">
-          <ScrollArea className="h-full">
-            <div className="pr-6">
-              {exercisesInLog.length > 0 ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                   {exercisesInLog.map(exercise => (
-                      <WorkoutExerciseCard 
-                          key={exercise.id} 
-                          exercise={exercise}
-                          onLogSet={(...args) => logWorkoutSet(today, ...args)} 
-                          onDeleteSet={(...args) => deleteWorkoutSet(today, ...args)} 
-                          onUpdateSet={(...args) => updateWorkoutSet(today, ...args)} 
-                          onRemoveExercise={(...args) => removeExerciseFromWorkout(today, ...args)}
-                      />
-                   ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8">
-                  <Dumbbell className="h-12 w-12 mb-4" />
-                  <p className="font-semibold">It's a rest day!</p>
-                  <p className="text-sm">No workout is scheduled for today.</p>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-        </div>
-        <DialogFooter>
+        <ScrollArea className="flex-grow min-h-0">
+          <div className="pr-6">
+            {exercisesInLog.length > 0 ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                 {exercisesInLog.map(exercise => (
+                    <WorkoutExerciseCard 
+                        key={exercise.id} 
+                        exercise={exercise}
+                        onLogSet={(...args) => logWorkoutSet(today, ...args)} 
+                        onDeleteSet={(...args) => deleteWorkoutSet(today, ...args)} 
+                        onUpdateSet={(...args) => updateWorkoutSet(today, ...args)} 
+                        onRemoveExercise={(...args) => removeExerciseFromWorkout(today, ...args)}
+                    />
+                 ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8">
+                <Dumbbell className="h-12 w-12 mb-4" />
+                <p className="font-semibold">It's a rest day!</p>
+                <p className="text-sm">No workout is scheduled for today.</p>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+        <DialogFooter className="flex-shrink-0">
             <Button onClick={handleCompleteWorkout}>
                 Mark as Complete & Close
             </Button>
