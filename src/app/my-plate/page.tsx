@@ -6,7 +6,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, getDay } from 'date-fns';
-import { Dumbbell, BrainCircuit, TrendingUp, Share2, Heart, Briefcase, Sparkles, Trophy, MessageSquareQuote } from 'lucide-react';
+import { Dumbbell, BrainCircuit, TrendingUp, Share2, Heart, Sparkles, Trophy, MessageSquareQuote, DollarSign } from 'lucide-react';
 import type { ExerciseDefinition, AllWorkoutPlans, WorkoutMode, ExerciseCategory } from '@/types/workout';
 
 // Duplicating these from workout page for now, can be refactored to a shared util later
@@ -78,7 +78,7 @@ function MyPlatePageContent() {
     {
       title: 'Health',
       icon: <Heart className="h-8 w-8 text-red-500" />,
-      description: 'Physical well-being and fitness.',
+      description: 'Physical well-being & fitness.',
       items: [
           todaysWorkout !== 'Rest Day' && { name: 'Gym', detail: todaysWorkout, icon: <Dumbbell/> },
           { name: 'Morning Walks', detail: 'Daily Consistency', icon: <Sparkles/> }
@@ -86,20 +86,20 @@ function MyPlatePageContent() {
     },
     {
       title: 'Wealth',
-      icon: <Briefcase className="h-8 w-8 text-green-500" />,
-      description: 'Focus areas for potential income.',
+      icon: <DollarSign className="h-8 w-8 text-green-500" />,
+      description: 'Deep work & income opportunities.',
       items: deepWorkTopics.map(topic => ({ name: topic, detail: 'Deep Work Topic', icon: <BrainCircuit/> }))
     },
     {
       title: 'Growth',
       icon: <TrendingUp className="h-8 w-8 text-blue-500" />,
-      description: 'Skills and knowledge acquisition.',
+      description: 'Skills & knowledge acquisition.',
       items: upskillTopics.map(topic => ({ name: topic, detail: 'Learning Topic', icon: <TrendingUp/> }))
     },
     {
       title: 'Branding',
       icon: <Share2 className="h-8 w-8 text-purple-500" />,
-      description: 'Content creation and personal marketing.',
+      description: 'Content & personal marketing.',
       items: brandingBundles.map(bundle => ({ name: bundle, detail: 'Content Bundle', icon: <Share2/> }))
     }
   ];
