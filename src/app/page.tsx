@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -17,7 +18,7 @@ import { DashboardStats } from '@/components/DashboardStats';
 import { ProductivitySnapshot } from '@/components/ProductivitySnapshot';
 import { TimeSlots } from '@/components/TimeSlots';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
-import { TodaysDietCard } from '@/components/TodaysDietCard';
+import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -300,7 +301,7 @@ function HomePageContent() {
   };
 
   const handleActivityClick = (slotName: string, activity: Activity) => {
-    if (activity.completed) return;
+    if (!activity || activity.completed) return;
     if (activity.type === 'workout') {
       const { exercises, muscleGroups } = getTodaysWorkout();
       setTodaysExercises(exercises);
@@ -633,7 +634,7 @@ function HomePageContent() {
     const todaysActivitiesForType = Object.values(schedule[todayKey] || {}).flat();
     const scheduledIdsInOtherSlots = new Set<string>();
     todaysActivitiesForType.forEach(act => {
-      if (act.type === pageType && act.id !== activity.id && act.taskIds) {
+      if (act && act.type === pageType && act.id !== activity.id && act.taskIds) {
         act.taskIds.forEach(id => scheduledIdsInOtherSlots.add(id));
       }
     });
@@ -676,11 +677,10 @@ function HomePageContent() {
                   onSetDateOfBirth={setDateOfBirth}
                   onSetGender={setGender}
                   onSetGoalWeight={setGoalWeight}
+                  dietPlan={dietPlan}
+                  onEditDietClick={() => setIsDietPlanModalOpen(true)}
                 />
-                <TodaysDietCard 
-                    dietPlan={dietPlan}
-                    onEditClick={() => setIsDietPlanModalOpen(true)}
-                />
+                <TodaysScheduleCard schedule={todaysSchedule} />
             </div>
           </div>
           <TimeSlots 

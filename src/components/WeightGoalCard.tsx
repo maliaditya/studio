@@ -9,8 +9,8 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon } from 'lucide-react';
-import type { WeightLog, Gender } from '@/types/workout';
+import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy } from 'lucide-react';
+import type { WeightLog, Gender, UserDietPlan } from '@/types/workout';
 import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from './ui/label';
@@ -30,6 +30,8 @@ interface WeightGoalCardProps {
   onSetDateOfBirth: (dob: string | null) => void;
   onSetGender: (gender: Gender | null) => void;
   onSetGoalWeight: (goal: number | null) => void;
+  dietPlan: UserDietPlan;
+  onEditDietClick: () => void;
 }
 
 const weightChartConfig = {
@@ -63,13 +65,16 @@ export function WeightGoalCard({
     onSetHeight,
     onSetDateOfBirth,
     onSetGender,
-    onSetGoalWeight
+    onSetGoalWeight,
+    dietPlan,
+    onEditDietClick
 }: WeightGoalCardProps) {
     const { toast } = useToast();
     const [newWeight, setNewWeight] = useState('');
     const [weightDate, setWeightDate] = useState<Date | undefined>(new Date());
     const [showLogForm, setShowLogForm] = useState(false);
-    const [isChartVisible, setIsChartVisible] = useState(true);
+    const [weightView, setWeightView] = useState<'chart' | 'details'>('chart');
+    const [mainView, setMainView] = useState<'weight' | 'diet'>('weight');
 
     const [heightInput, setHeightInput] = useState('');
     const [dobInput, setDobInput] = useState<Date | undefined>();
@@ -77,6 +82,12 @@ export function WeightGoalCard({
     const [goalWeightInput, setGoalWeightInput] = useState('');
 
     const areDetailsSet = height && dateOfBirth && gender;
+
+    const todaysDiet = useMemo(() => {
+        if (!dietPlan || dietPlan.length === 0) return null;
+        const dayName = format(new Date(), 'EEEE');
+        return dietPlan.find(plan => plan.day === dayName);
+    }, [dietPlan]);
 
     useEffect(() => {
         if (!areDetailsSet) {
@@ -346,103 +357,165 @@ export function WeightGoalCard({
         toast({ title: "Details Saved", description: "Your profile has been updated." });
     };
 
+    const renderWeightContent = () => {
+        if (weightView === 'chart') {
+            return (
+                <div className="h-[250px] w-full -ml-4">
+                   {combinedChartData.length < 1 ? (
+                       <div className="flex justify-center items-center h-full text-muted-foreground text-sm">
+                           Log weight to see chart.
+                       </div>
+                   ) : (
+                        <ChartContainer config={weightChartConfig} className="min-h-[250px] w-full">
+                            <ResponsiveContainer>
+                                <LineChart accessibilityLayer data={combinedChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5, }}>
+                                    <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                                    <XAxis dataKey="timestamp" type="number" domain={['dataMin', 'dataMax']} tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')} tickLine={false} axisLine={false} tickMargin={8} fontSize={10}/>
+                                    <YAxis tickLine={false} axisLine={false} tickMargin={8} domain={['dataMin - 2', 'dataMax + 2']} fontSize={10} />
+                                    <RechartsTooltip cursor={true} content={<SimpleTooltip />} />
+                                    {goalWeight !== null && <ReferenceLine y={goalWeight} stroke="hsl(var(--primary))" strokeDasharray="4 4" />}
+                                    <Line dataKey="historicalWeight" type="monotone" stroke="var(--color-historicalWeight)" strokeWidth={2} dot={true} name="Weight" connectNulls={false} />
+                                    <Line dataKey="projectedWeight" type="monotone" stroke="var(--color-projectedWeight)" strokeDasharray="5 5" strokeWidth={2} dot={{r: 4}} name="Projection" connectNulls={false} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </ChartContainer>
+                   )}
+               </div>
+            );
+        }
+
+        if (projectionSummary) {
+            return (
+                <div className="space-y-4">
+                    <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                        <div>
+                            <div className="text-muted-foreground">Current</div>
+                            <div className="font-bold text-lg">{projectionSummary.currentWeight}</div>
+                            <div className="text-xs text-muted-foreground">kg/lb</div>
+                        </div>
+                        <div>
+                            <div className="text-muted-foreground">Goal</div>
+                            <div className="font-bold text-lg">{projectionSummary.goalWeight}</div>
+                            <div className="text-xs text-muted-foreground">kg/lb</div>
+                        </div>
+                        <div>
+                            <div className="text-muted-foreground">{projectionSummary.weightDifference > 0 ? "To Gain" : "To Lose"}</div>
+                            <div className={`font-bold text-lg ${projectionSummary.weightDifference > 0 ? "text-orange-500" : "text-green-500"}`}>{Math.abs(projectionSummary.weightDifference)}</div>
+                            <div className="text-xs text-muted-foreground">kg/lb</div>
+                        </div>
+                    </div>
+                    <Separator />
+                    <div className="space-y-2 text-sm">
+                        {projectionSummary.averageWeeklyChange !== undefined && (
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground flex items-center gap-2"><Activity className="h-4 w-4" /> Avg. Weekly Change</span>
+                            <span className={`font-bold ${projectionSummary.averageWeeklyChange > 0 ? "text-orange-500" : projectionSummary.averageWeeklyChange < 0 ? "text-green-500" : ""}`}>
+                                {projectionSummary.averageWeeklyChange > 0 ? '+' : ''}{projectionSummary.averageWeeklyChange.toFixed(2)} kg/lb
+                            </span>
+                        </div>
+                        )}
+                        {projectionSummary.projectedDate && (
+                        <>
+                            <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Next Week Est.</span>
+                                <span className="font-bold">{projectionSummary.nextProjectedWeight} kg/lb</span>
+                            </div>
+                            <Separator className="my-2"/>
+                            <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground flex items-center gap-2"><CalendarIcon className="h-4 w-4" /> Est. Goal Date</span>
+                                <span className="font-bold">{projectionSummary.projectedDate}</span>
+                            </div>
+                        </>
+                        )}
+                    </div>
+                </div>
+            )
+        }
+        
+        return (
+            <p className="text-sm text-muted-foreground text-center py-8">
+                Log weight for at least two weeks and set a goal to see projections.
+            </p>
+        );
+    };
+
+    const renderDietContent = () => {
+         if (todaysDiet) {
+             return (
+                <div className="space-y-4">
+                    <div className="text-sm">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <h4 className="font-semibold text-foreground">Meal 1</h4>
+                                <p className="text-muted-foreground whitespace-pre-wrap mt-1 text-xs">{todaysDiet.meal1 || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <h4 className="font-semibold text-foreground">Meal 2</h4>
+                                <p className="text-muted-foreground whitespace-pre-wrap mt-1 text-xs">{todaysDiet.meal2 || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <h4 className="font-semibold text-foreground">Meal 3</h4>
+                                <p className="text-muted-foreground whitespace-pre-wrap mt-1 text-xs">{todaysDiet.meal3 || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <h4 className="font-semibold text-foreground">Supplements</h4>
+                                <p className="text-muted-foreground whitespace-pre-wrap mt-1 text-xs">{todaysDiet.supplements || 'N/A'}</p>
+                            </div>
+                        </div>
+                    </div>
+                     {todaysDiet.totalCalories != null && todaysDiet.totalCalories > 0 && (
+                        <div className="pt-4 border-t">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-sm text-muted-foreground">Total Intake</span>
+                                <span className="font-bold text-lg text-primary">{todaysDiet.totalCalories.toLocaleString()} kcal</span>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1">
+                                <div className="flex justify-between"><span>Protein</span> <span className="font-medium text-foreground">{todaysDiet.protein?.toFixed(0) ?? '-'}g</span></div>
+                                <div className="flex justify-between"><span>Carbs</span> <span className="font-medium text-foreground">{todaysDiet.carbs?.toFixed(0) ?? '-'}g</span></div>
+                                <div className="flex justify-between"><span>Fat</span> <span className="font-medium text-foreground">{todaysDiet.fat?.toFixed(0) ?? '-'}g</span></div>
+                                <div className="flex justify-between"><span>Fiber</span> <span className="font-medium text-foreground">{todaysDiet.fiber?.toFixed(0) ?? '-'}g</span></div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )
+         }
+        return <p className="text-muted-foreground text-center py-4">No diet plan set up for today.</p>;
+    }
+
     return (
         <Card className="bg-card/50">
             {areDetailsSet ? (
                 <>
                     <CardHeader className="flex flex-row items-start justify-between">
-                        <CardTitle className="flex items-center gap-2 text-primary">
-                            <Target /> Weight Goal
-                        </CardTitle>
-                        <Button variant="outline" size="icon" onClick={() => setIsChartVisible(!isChartVisible)} className="h-8 w-8">
-                            {isChartVisible ? <Target className="h-4 w-4" /> : <LineChartIcon className="h-4 w-4" />}
-                            <span className="sr-only">Toggle View</span>
-                        </Button>
+                        <div>
+                            <CardTitle className="flex items-center gap-2 text-primary">
+                                {mainView === 'weight' ? <Target /> : <Utensils />}
+                                {mainView === 'weight' ? "Weight Goal" : "Today's Diet"}
+                            </CardTitle>
+                            {mainView === 'diet' && <CardDescription>Your planned meals for {format(new Date(), 'EEEE')}.</CardDescription>}
+                        </div>
+                        <div className="flex items-center gap-1">
+                            {mainView === 'weight' && (
+                                <Button variant="outline" size="icon" onClick={() => setWeightView(v => v === 'chart' ? 'details' : 'chart')} className="h-8 w-8">
+                                    {weightView === 'chart' ? <Target className="h-4 w-4" /> : <LineChartIcon className="h-4 w-4" />}
+                                    <span className="sr-only">Toggle View</span>
+                                </Button>
+                            )}
+                            <Button variant="outline" size="icon" onClick={() => setMainView(v => v === 'weight' ? 'diet' : 'weight')} className="h-8 w-8">
+                                {mainView === 'weight' ? <Utensils className="h-4 w-4" /> : <Target className="h-4 w-4" />}
+                            </Button>
+                             {mainView === 'diet' && (
+                                 <Button variant="outline" size="icon" onClick={onEditDietClick} className="h-8 w-8">
+                                    <BookCopy className="h-4 w-4" />
+                                </Button>
+                             )}
+                        </div>
                     </CardHeader>
                     <CardContent>
-                       {isChartVisible ? (
-                           <div className="h-[300px] w-full -ml-4">
-                               {combinedChartData.length < 1 ? (
-                                   <div className="flex justify-center items-center h-full text-muted-foreground text-sm">
-                                       Log weight to see chart.
-                                   </div>
-                               ) : (
-                                    <ChartContainer config={weightChartConfig} className="min-h-[300px] w-full">
-                                        <ResponsiveContainer>
-                                            <LineChart accessibilityLayer data={combinedChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5, }}>
-                                                <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                                                <XAxis dataKey="timestamp" type="number" domain={['dataMin', 'dataMax']} tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')} tickLine={false} axisLine={false} tickMargin={8} fontSize={10}/>
-                                                <YAxis tickLine={false} axisLine={false} tickMargin={8} domain={['dataMin - 2', 'dataMax + 2']} fontSize={10} />
-                                                <RechartsTooltip cursor={true} content={<SimpleTooltip />} />
-                                                {goalWeight !== null && <ReferenceLine y={goalWeight} stroke="hsl(var(--primary))" strokeDasharray="4 4" />}
-                                                <Line dataKey="historicalWeight" type="monotone" stroke="var(--color-historicalWeight)" strokeWidth={2} dot={true} name="Weight" connectNulls={false} />
-                                                <Line dataKey="projectedWeight" type="monotone" stroke="var(--color-projectedWeight)" strokeDasharray="5 5" strokeWidth={2} dot={{r: 4}} name="Projection" connectNulls={false} />
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    </ChartContainer>
-                               )}
-                           </div>
-                       ) : projectionSummary ? (
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-3 gap-2 text-center text-sm">
-                                    <div>
-                                        <div className="text-muted-foreground">Current</div>
-                                        <div className="font-bold text-lg">{projectionSummary.currentWeight}</div>
-                                        <div className="text-xs text-muted-foreground">kg/lb</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-muted-foreground">Goal</div>
-                                        <div className="font-bold text-lg">{projectionSummary.goalWeight}</div>
-                                        <div className="text-xs text-muted-foreground">kg/lb</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-muted-foreground">{projectionSummary.weightDifference > 0 ? "To Gain" : "To Lose"}</div>
-                                        <div className={`font-bold text-lg ${projectionSummary.weightDifference > 0 ? "text-orange-500" : "text-green-500"}`}>{Math.abs(projectionSummary.weightDifference)}</div>
-                                        <div className="text-xs text-muted-foreground">kg/lb</div>
-                                    </div>
-                                </div>
+                       {mainView === 'weight' ? renderWeightContent() : renderDietContent() }
 
-                                <Separator />
-                                
-                                <div className="space-y-2 text-sm">
-                                    {projectionSummary.averageWeeklyChange !== undefined && (
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-muted-foreground flex items-center gap-2"><Activity className="h-4 w-4" /> Avg. Weekly Change</span>
-                                        <span className={`font-bold ${projectionSummary.averageWeeklyChange > 0 ? "text-orange-500" : projectionSummary.averageWeeklyChange < 0 ? "text-green-500" : ""}`}>
-                                            {projectionSummary.averageWeeklyChange > 0 ? '+' : ''}{projectionSummary.averageWeeklyChange.toFixed(2)} kg/lb
-                                        </span>
-                                    </div>
-                                    )}
-                                    {projectionSummary.projectedDate && (
-                                    <>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-muted-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Next Week Est.</span>
-                                            <span className="font-bold">{projectionSummary.nextProjectedWeight} kg/lb</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-muted-foreground pl-6">Days Remaining</span>
-                                            <span className="font-bold">{projectionSummary.daysToNextWeek > 0 ? `${projectionSummary.daysToNextWeek} days` : 'Past'}</span>
-                                        </div>
-                                        <Separator className="my-2"/>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-muted-foreground flex items-center gap-2"><CalendarIcon className="h-4 w-4" /> Est. Goal Date</span>
-                                            <span className="font-bold">{projectionSummary.projectedDate}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-muted-foreground pl-6">Days Remaining</span>
-                                            <span className="font-bold">{projectionSummary.daysToGoal > 0 ? `${projectionSummary.daysToGoal} days` : 'N/A'}</span>
-                                        </div>
-                                    </>
-                                    )}
-                                </div>
-                            </div>
-                        ) : (
-                            <p className="text-sm text-muted-foreground text-center py-8">
-                                Log weight for at least two weeks and set a goal to see projections.
-                            </p>
-                        )}
-
-                        {showLogForm && !isChartVisible && (
+                        {showLogForm && mainView === 'weight' && (
                             <div className="mt-4 pt-4 border-t space-y-3">
                                 <CardDescription>It's time for your weekly weigh-in.</CardDescription>
                                 <div className="flex gap-2 items-center">
