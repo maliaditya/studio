@@ -682,7 +682,7 @@ function HomePageContent() {
   
   const learningModalProps = useMemo(() => {
     if (!editingActivity) {
-      return { availableTasks: [], initialSelectedIds: [], pageType: 'upskill' as const, disabledTaskIds: [] };
+      return { availableTasks: [], initialSelectedIds: [], pageType: 'upskill' as const, disabledTaskIds: [], isAddingNewTasks: false };
     }
 
     const { activity } = editingActivity;
@@ -749,7 +749,9 @@ function HomePageContent() {
     });
     const disabledTaskIds = Array.from(disabledDefIds);
 
-    return { availableTasks, initialSelectedIds, pageType, disabledTaskIds };
+    const isAddingNewTasks = activity.taskIds?.length === 0;
+
+    return { availableTasks, initialSelectedIds, pageType, disabledTaskIds, isAddingNewTasks };
 
 }, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, todayKey, schedule, upskillDefinitions, deepWorkDefinitions, brandingTasks]);
 
@@ -857,7 +859,7 @@ function HomePageContent() {
               initialSelectedIds={learningModalProps.initialSelectedIds}
               onSave={handleSaveTaskSelection}
               pageType={learningModalProps.pageType}
-              isAddingNewTasks={false} // This flag is less relevant with the new logic
+              isAddingNewTasks={learningModalProps.isAddingNewTasks}
               disabledTaskIds={learningModalProps.disabledTaskIds}
           />
         )}

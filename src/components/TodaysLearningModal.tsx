@@ -44,14 +44,16 @@ export function TodaysLearningModal({
 
   useEffect(() => {
     // Sync state if initial props change while modal is open
-    setSelectedTaskIds(initialSelectedIds);
+    if(isOpen) {
+      setSelectedTaskIds(initialSelectedIds);
+    }
   }, [initialSelectedIds, isOpen]);
 
-  const handleToggleTask = (taskId: string) => {
+  const handleToggleTask = (defId: string) => {
     setSelectedTaskIds(prev =>
-      prev.includes(taskId)
-        ? prev.filter(id => id !== taskId)
-        : [...prev, taskId]
+      prev.includes(defId)
+        ? prev.filter(id => id !== defId)
+        : [...prev, defId]
     );
   };
 
@@ -101,7 +103,7 @@ export function TodaysLearningModal({
             {availableTasks.length > 0 ? (
               <div className="space-y-3 p-1">
                 {availableTasks.map((task) => {
-                  const isDisabled = disabledTaskIds.includes(task.id);
+                  const isDisabled = disabledTaskIds.includes(task.definitionId);
                   return (
                     <div
                       key={task.id}
@@ -109,8 +111,8 @@ export function TodaysLearningModal({
                     >
                       <Checkbox
                         id={`task-${task.id}`}
-                        checked={selectedTaskIds.includes(task.id)}
-                        onCheckedChange={() => handleToggleTask(task.id)}
+                        checked={selectedTaskIds.includes(task.definitionId)}
+                        onCheckedChange={() => handleToggleTask(task.definitionId)}
                         disabled={isDisabled}
                       />
                       <Label
