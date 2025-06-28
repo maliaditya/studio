@@ -144,11 +144,21 @@ function PersonalBrandingPageContent() {
       return [];
     }
 
-    const focusAreaSessionCounts: Record<string, number> = {};
+    const uniqueDaysPerDef: Record<string, Set<string>> = {};
     deepWorkLogs.forEach(log => {
       log.exercises.forEach(ex => {
-        focusAreaSessionCounts[ex.definitionId] = (focusAreaSessionCounts[ex.definitionId] || 0) + ex.loggedSets.length;
+        if (ex.loggedSets.length > 0) {
+          if (!uniqueDaysPerDef[ex.definitionId]) {
+            uniqueDaysPerDef[ex.definitionId] = new Set();
+          }
+          uniqueDaysPerDef[ex.definitionId].add(log.date);
+        }
       });
+    });
+    
+    const focusAreaSessionCounts: Record<string, number> = {};
+    Object.keys(uniqueDaysPerDef).forEach(defId => {
+      focusAreaSessionCounts[defId] = uniqueDaysPerDef[defId].size;
     });
 
     const allEligibleFocusAreas = deepWorkDefinitions.filter(def => 
