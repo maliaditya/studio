@@ -17,6 +17,7 @@ import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 interface TodaysLearningModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ interface TodaysLearningModalProps {
   onSave: (selectedIds: string[]) => void;
   pageType: 'upskill' | 'deepwork' | 'branding';
   isAddingNewTasks: boolean;
+  disabledTaskIds?: string[];
 }
 
 export function TodaysLearningModal({
@@ -36,6 +38,7 @@ export function TodaysLearningModal({
   onSave,
   pageType,
   isAddingNewTasks,
+  disabledTaskIds = [],
 }: TodaysLearningModalProps) {
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>(initialSelectedIds);
 
@@ -97,25 +100,32 @@ export function TodaysLearningModal({
           <ScrollArea className="h-full">
             {availableTasks.length > 0 ? (
               <div className="space-y-3 p-1">
-                {availableTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-center space-x-3 p-3 rounded-md border has-[:checked]:bg-muted/50 transition-colors"
-                  >
-                    <Checkbox
-                      id={`task-${task.id}`}
-                      checked={selectedTaskIds.includes(task.id)}
-                      onCheckedChange={() => handleToggleTask(task.id)}
-                    />
-                    <Label
-                      htmlFor={`task-${task.id}`}
-                      className="font-normal w-full cursor-pointer"
+                {availableTasks.map((task) => {
+                  const isDisabled = disabledTaskIds.includes(task.id);
+                  return (
+                    <div
+                      key={task.id}
+                      className="flex items-center space-x-3 p-3 rounded-md border has-[:checked]:bg-muted/50 transition-colors"
                     >
-                      <p className="font-medium">{task.name}</p>
-                      <p className="text-xs text-muted-foreground">{task.category}</p>
-                    </Label>
-                  </div>
-                ))}
+                      <Checkbox
+                        id={`task-${task.id}`}
+                        checked={selectedTaskIds.includes(task.id)}
+                        onCheckedChange={() => handleToggleTask(task.id)}
+                        disabled={isDisabled}
+                      />
+                      <Label
+                        htmlFor={`task-${task.id}`}
+                        className={cn(
+                          "font-normal w-full",
+                          isDisabled ? "cursor-not-allowed text-muted-foreground/50" : "cursor-pointer"
+                        )}
+                      >
+                        <p className="font-medium">{task.name}</p>
+                        <p className="text-xs text-muted-foreground">{task.category}</p>
+                      </Label>
+                    </div>
+                  )
+                })}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8">

@@ -705,7 +705,7 @@ function HomePageContent() {
   
   const learningModalProps = useMemo(() => {
     if (!editingActivity) {
-      return { availableTasks: [], initialSelectedIds: [], pageType: 'upskill' as const, isAddingNewTasks: false };
+      return { availableTasks: [], initialSelectedIds: [], pageType: 'upskill' as const, isAddingNewTasks: false, disabledTaskIds: [] };
     }
 
     const { activity } = editingActivity;
@@ -723,9 +723,10 @@ function HomePageContent() {
           act.taskIds.forEach(id => scheduledIdsInOtherSlots.add(id));
         }
       });
-      const availableTasks = allTasksForDay.filter(task => !scheduledIdsInOtherSlots.has(task.id));
+      const availableTasks = allTasksForDay;
+      const disabledTaskIds = Array.from(scheduledIdsInOtherSlots);
       const initialSelectedIds = activity.taskIds || [];
-      return { availableTasks, initialSelectedIds, pageType, isAddingNewTasks: false };
+      return { availableTasks, initialSelectedIds, pageType, isAddingNewTasks: false, disabledTaskIds };
     } else {
       // Day has no scheduled tasks, so present unlogged definitions to be added.
       const definitionSource = pageType === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
@@ -750,7 +751,7 @@ function HomePageContent() {
         loggedSets: [], targetSets: 0, targetReps: '' // Dummy data
       }));
 
-      return { availableTasks, initialSelectedIds: [], pageType, isAddingNewTasks: true };
+      return { availableTasks, initialSelectedIds: [], pageType, isAddingNewTasks: true, disabledTaskIds: [] };
     }
 }, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, todayKey, schedule, upskillDefinitions, deepWorkDefinitions]);
 
@@ -859,6 +860,7 @@ function HomePageContent() {
               onSave={handleSaveTaskSelection}
               pageType={learningModalProps.pageType}
               isAddingNewTasks={learningModalProps.isAddingNewTasks}
+              disabledTaskIds={learningModalProps.disabledTaskIds}
           />
         )}
 
