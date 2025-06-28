@@ -31,6 +31,7 @@ export function Header() {
     { href: '/upskill', label: 'Upskill' },
     { href: '/deep-work', label: 'Deep Work' },
     { href: '/personal-branding', label: 'Personal Branding' },
+    { href: '/monetization-engine', label: 'Monetization' },
   ];
 
   return (
