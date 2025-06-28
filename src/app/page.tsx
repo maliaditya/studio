@@ -27,6 +27,15 @@ const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
 };
 
+const slotTimeRanges: Record<string, string> = {
+  'Late Night': '12 AM - 4 AM',
+  'Dawn': '4 AM - 8 AM',
+  'Morning': '8 AM - 12 PM',
+  'Afternoon': '12 PM - 4 PM',
+  'Evening': '4 PM - 8 PM',
+  'Night': '8 PM - 12 AM',
+};
+
 const dailyMuscleGroups: Record<number, string[]> = {
   1: ["Chest", "Triceps"], 2: ["Back", "Biceps"], 3: ["Shoulders", "Legs"],
   4: ["Chest", "Triceps"], 5: ["Back", "Biceps"], 6: ["Shoulders", "Legs"], 0: [],
@@ -129,7 +138,8 @@ function HomePageContent() {
 
   // Load schedule from localStorage
   useEffect(() => {
-    const scheduleStorageKey = currentUser ? `lifeos_schedule_${currentUser.username}` : null;
+    if (!currentUser) return;
+    const scheduleStorageKey = `lifeos_schedule_${currentUser.username}`;
     if (scheduleStorageKey) {
       try {
         const storedSchedule = localStorage.getItem(scheduleStorageKey);
@@ -159,7 +169,8 @@ function HomePageContent() {
 
   // Save schedule to localStorage
   useEffect(() => {
-    const scheduleStorageKey = currentUser ? `lifeos_schedule_${currentUser.username}` : null;
+    if (!currentUser) return;
+    const scheduleStorageKey = `lifeos_schedule_${currentUser.username}`;
     if (scheduleStorageKey && isScheduleLoaded) {
       localStorage.setItem(scheduleStorageKey, JSON.stringify(schedule));
     }
@@ -217,8 +228,8 @@ function HomePageContent() {
 
   // Carry forward tasks logic
   useEffect(() => {
-    const settingsKey = currentUser ? `lifeos_settings_${currentUser.username}` : null;
-    if (!settingsKey || !isScheduleLoaded) return;
+    if (!currentUser || !isScheduleLoaded) return;
+    const settingsKey = `lifeos_settings_${currentUser.username}`;
     const storedSettings = localStorage.getItem(settingsKey);
     const settings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false };
     if (!settings.carryForward) return;
@@ -563,7 +574,7 @@ function HomePageContent() {
           break;
         case 'deepwork':
         case 'branding':
-          durations[activity.id] = activity.slotName;
+          durations[activity.id] = slotTimeRanges[activity.slotName] || activity.slotName;
           break;
         case 'upskill':
           if (activity.taskIds && activity.taskIds.length > 0) {
