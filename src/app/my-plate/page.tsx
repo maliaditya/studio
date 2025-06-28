@@ -37,7 +37,7 @@ function MyPlatePageContent() {
   }, [schedule]);
 
   const { todaysMuscleGroups } = useMemo(() => {
-    if (!workoutPlans || !exerciseDefinitions) return { todaysMuscleGroups: [] };
+    if (!workoutPlans || !exerciseDefinitions || !workoutMode) return { todaysMuscleGroups: [] };
     const { exercises } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions);
     const muscleGroups = Array.from(new Set(exercises.map(ex => ex.category)));
     return { todaysMuscleGroups: muscleGroups };

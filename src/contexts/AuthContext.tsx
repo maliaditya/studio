@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -12,6 +12,7 @@ import {
   getCurrentLocalUser,
 } from '@/lib/localAuth';
 import { format } from 'date-fns';
+import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS } from '@/lib/constants';
 
 
 interface AuthContextType {
@@ -63,6 +64,14 @@ interface AuthContextType {
   allWorkoutLogs: DatedWorkout[];
   setAllWorkoutLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
 
+  // Workout Configuration
+  workoutMode: WorkoutMode;
+  setWorkoutMode: React.Dispatch<React.SetStateAction<WorkoutMode>>;
+  workoutPlans: AllWorkoutPlans;
+  setWorkoutPlans: React.Dispatch<React.SetStateAction<AllWorkoutPlans>>;
+  exerciseDefinitions: ExerciseDefinition[];
+  setExerciseDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
+  
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
   updateWorkoutSet: (date: Date, exerciseId: string, setId: string, reps: number, weight: number) => void;
@@ -106,6 +115,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
   const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
   const [activityDurations, setActivityDurations] = useState<Record<string, string>>({});
+  
+  // Workout Configuration State
+  const [workoutMode, setWorkoutMode] = useState<WorkoutMode>('two-muscle');
+  const [workoutPlans, setWorkoutPlans] = useState<AllWorkoutPlans>(INITIAL_PLANS);
+  const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>(DEFAULT_EXERCISE_DEFINITIONS);
 
 
   useEffect(() => {
@@ -155,6 +169,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = localStorage.getItem(upskillLogsKey); setAllUpskillLogs(d ? JSON.parse(d) : []); } catch (e) { setAllUpskillLogs([]); }
       try { const d = localStorage.getItem(deepworkLogsKey); setAllDeepWorkLogs(d ? JSON.parse(d) : []); } catch (e) { setAllDeepWorkLogs([]); }
       try { const d = localStorage.getItem(workoutLogsKey); setAllWorkoutLogs(d ? JSON.parse(d) : []); } catch (e) { setAllWorkoutLogs([]); }
+      
+      // Workout Configuration
+      const defsKey = `exerciseDefinitions_${username}`;
+      const plansKey = `workoutPlans_${username}`;
+      const modeKey = `workoutMode_${username}`;
+
+      const storedMode = loadItem(modeKey, false);
+      if (storedMode === 'one-muscle' || storedMode === 'two-muscle') {
+          setWorkoutMode(storedMode as WorkoutMode);
+      } else {
+          setWorkoutMode('two-muscle');
+      }
+
+      try {
+          const storedPlans = localStorage.getItem(plansKey);
+          setWorkoutPlans(storedPlans ? JSON.parse(storedPlans) : INITIAL_PLANS);
+      } catch (e) {
+          setWorkoutPlans(INITIAL_PLANS);
+      }
+
+      try {
+          const storedDefinitions = localStorage.getItem(defsKey);
+          const parsedDefs = storedDefinitions ? JSON.parse(storedDefinitions) : null;
+          setExerciseDefinitions(Array.isArray(parsedDefs) && parsedDefs.length > 0 ? parsedDefs : DEFAULT_EXERCISE_DEFINITIONS);
+      } catch (e) {
+          setExerciseDefinitions(DEFAULT_EXERCISE_DEFINITIONS);
+      }
 
     } else {
       // Clear all data on logout
@@ -168,6 +209,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setAllUpskillLogs([]);
       setAllDeepWorkLogs([]);
       setAllWorkoutLogs([]);
+      setWorkoutMode('two-muscle');
+      setWorkoutPlans(INITIAL_PLANS);
+      setExerciseDefinitions(DEFAULT_EXERCISE_DEFINITIONS);
     }
   }, [currentUser]);
 
@@ -188,8 +232,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`upskill_logs_${username}`, JSON.stringify(allUpskillLogs));
       localStorage.setItem(`deepwork_logs_${username}`, JSON.stringify(allDeepWorkLogs));
       localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(allWorkoutLogs));
+      
+      // Workout Configuration
+      localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(exerciseDefinitions));
+      localStorage.setItem(`workoutMode_${username}`, workoutMode);
+      localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(workoutPlans));
     }
-  }, [weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, currentUser, loading]);
+  }, [
+    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
+    schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs,
+    exerciseDefinitions, workoutMode, workoutPlans,
+    currentUser, loading
+  ]);
 
 
   useEffect(() => {
@@ -208,13 +262,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loadDataIntoLocalStorage = (data: any, username: string) => {
     if (!data) return;
 
-    // This function now primarily sets context state, which then saves to localStorage
-    // Workout
-    localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(data.exerciseDefinitions || []));
-    localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(data.workoutPlans || {}));
+    setExerciseDefinitions(data.exerciseDefinitions || DEFAULT_EXERCISE_DEFINITIONS);
+    setWorkoutPlans(data.workoutPlans || INITIAL_PLANS);
     setAllWorkoutLogs(data.allWorkoutLogs || []);
-    localStorage.setItem(`workoutMode_${username}`, data.workoutMode || 'two-muscle');
-
+    setWorkoutMode(data.workoutMode || 'two-muscle');
+    
     // Upskill
     localStorage.setItem(`upskill_definitions_${username}`, JSON.stringify(data.upskillDefinitions || []));
     setAllUpskillLogs(data.upskillLogs || []);
@@ -292,10 +344,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Syncing...", description: "Pushing demo data to the cloud." });
     try {
       const allUserData = {
-        exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
-        workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
+        exerciseDefinitions: exerciseDefinitions,
+        workoutPlans: workoutPlans,
         allWorkoutLogs: allWorkoutLogs,
-        workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
+        workoutMode: workoutMode,
         upskillDefinitions: JSON.parse(localStorage.getItem(`upskill_definitions_${username}`) || '[]'),
         upskillLogs: allUpskillLogs,
         upskillTopicGoals: JSON.parse(localStorage.getItem(`upskill_topic_goals_${username}`) || '{}'),
@@ -350,10 +402,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Syncing...", description: "Pushing your local data to the cloud." });
     try {
         const allUserData = {
-            exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
-            workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
+            exerciseDefinitions: exerciseDefinitions,
+            workoutPlans: workoutPlans,
             allWorkoutLogs: allWorkoutLogs,
-            workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
+            workoutMode: workoutMode,
             upskillDefinitions: JSON.parse(localStorage.getItem(`upskill_definitions_${username}`) || '[]'),
             upskillLogs: allUpskillLogs,
             upskillTopicGoals: JSON.parse(localStorage.getItem(`upskill_topic_goals_${username}`) || '{}'),
@@ -456,11 +508,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
         const username = currentUser.username;
         const dataToExport = {
-            // Workout
-            exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
-            workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
+            exerciseDefinitions: exerciseDefinitions,
+            workoutPlans: workoutPlans,
             allWorkoutLogs: allWorkoutLogs,
-            workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
+            workoutMode: workoutMode,
             
             // Upskill
             upskillDefinitions: JSON.parse(localStorage.getItem(`upskill_definitions_${username}`) || '[]'),
@@ -729,7 +780,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
   
-  const value = {
+  const value: AuthContextType = {
     currentUser,
     loading,
     register,
@@ -773,6 +824,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAllDeepWorkLogs,
     allWorkoutLogs,
     setAllWorkoutLogs,
+    // Workout Configuration
+    workoutMode,
+    setWorkoutMode,
+    workoutPlans,
+    setWorkoutPlans,
+    exerciseDefinitions,
+    setExerciseDefinitions,
     // Workout Handlers
     logWorkoutSet,
     updateWorkoutSet,
