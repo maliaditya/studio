@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet } from '@/types/workout';
@@ -63,6 +63,15 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper hook to get the previous value of a state or prop
+const usePrevious = <T,>(value: T) => {
+  const ref = useRef<T>();
+  useEffect(() => {
+    ref.current = value;
+  });
+  return ref.current;
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<LocalUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,6 +79,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [theme, setTheme] = useState('default');
   const router = useRouter();
   const { toast } = useToast();
+
+  const prevUser = usePrevious(currentUser);
 
   // Shared Health State
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
@@ -81,7 +92,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Global Schedule & Logs
   const [schedule, setSchedule] = useState<FullSchedule>({});
-  const [isAgendaDocked, setIsAgendaDocked] = useState(false); // Default to widget
+  const [isAgendaDocked, setIsAgendaDocked] = useState(true); // Default to docked
   const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
   const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
   const [activityDurations, setActivityDurations] = useState<Record<string, string>>({});
@@ -95,6 +106,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const savedTheme = localStorage.getItem('lifeos_theme') || 'default';
     setTheme(savedTheme);
   }, []);
+
+  // This effect shows a toast ONLY when a user logs out.
+  useEffect(() => {
+    if (prevUser && !currentUser) {
+        toast({ title: "Logged Out", description: "You have been successfully logged out." });
+    }
+  }, [currentUser, prevUser, toast]);
 
   // Effect to load all user-specific data when currentUser changes
   useEffect(() => {
@@ -246,7 +264,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await localLogoutUser();
     setCurrentUser(null);
     router.push('/login');
-    toast({ title: "Logged Out", description: "You have been successfully logged out." });
+    // REMOVED: toast({ title: "Logged Out", description: "You have been successfully logged out." });
     setLoading(false);
   };
 
@@ -545,7 +563,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       let newLogs = [...prevLogs];
       const logIndex = newLogs.findIndex(log => log.date === todayKey);
 
-      if (logIndex === -1) { // This case should be rare, but handle it
+      if (logIndex === -1) {
         toast({ title: "Error", description: "Could not find a session for today. Please add a task on the main page first.", variant: "destructive" });
         return prevLogs;
       }
@@ -582,6 +600,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       
       return newLogs;
+    });
+
+    // Also mark the activity as complete in the schedule
+    setSchedule(prev => {
+        const todaySchedule = { ...(prev[todayKey] || {}) };
+        const slotActivities = todaySchedule[activity.slot] || [];
+        todaySchedule[activity.slot] = slotActivities.map(act => 
+            act.id === activity.id ? { ...act, completed: true } : act
+        );
+        return { ...prev, [todayKey]: todaySchedule };
     });
   };
   
