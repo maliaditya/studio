@@ -130,7 +130,7 @@ function HomePageContent() {
   const [today, setToday] = useState<Date | null>(null);
 
   // State for Agenda Widget
-  const [isAgendaDocked, setIsAgendaDocked] = useState(true);
+  const [isAgendaDocked, setIsAgendaDocked] = useState(false);
 
   useEffect(() => {
     setTodayKey(format(new Date(), 'yyyy-MM-dd'));
