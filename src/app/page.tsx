@@ -20,7 +20,7 @@ import { TimeSlots } from '@/components/TimeSlots';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
 import { TodaysDietCard } from '@/components/TodaysDietCard';
 
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
 const slotEndHours: Record<string, number> = {
@@ -110,16 +110,11 @@ function HomePageContent() {
   const [isLearningModalOpen, setIsLearningModalOpen] = useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<{ slotName: string; activity: Activity } | null>(null);
   
   // State for Modal content
   const [todaysExercises, setTodaysExercises] = useState<WorkoutExercise[]>([]);
   const [todaysMuscleGroups, setTodaysMuscleGroups] = useState<string[]>([]);
-  const [learningModalProps, setLearningModalProps] = useState({
-      tasks: [] as WorkoutExercise[],
-      title: '',
-      description: '',
-      pageType: 'upskill' as 'upskill' | 'deepwork' | 'branding'
-  });
   
   // State for productivity stats
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
@@ -262,12 +257,18 @@ function HomePageContent() {
     switch (type) {
       case 'workout': { const dayOfWeek = getDay(new Date()); let muscleGroups: string[] = []; if (workoutMode === 'one-muscle') { const muscle = singleMuscleDailySchedule[dayOfWeek]; if (muscle) muscleGroups = [muscle]; } else { muscleGroups = dailyMuscleGroups[dayOfWeek] || []; } details = muscleGroups.join(' & ') || "Rest Day"; break; }
       case 'upskill': details = 'Learning Session'; break;
-      case 'deepwork': details = 'Deep Work'; break;
+      case 'deepwork': details = 'Deep Work Session'; break;
       case 'planning': details = 'Planning Session'; break;
       case 'tracking': details = 'Tracking Session'; break;
       case 'branding': details = 'Branding Session'; break;
     }
-    const newActivity: Activity = { id: `${type}-${Date.now()}`, type, details, completed: false };
+    const newActivity: Activity = { 
+      id: `${type}-${Date.now()}`, 
+      type, 
+      details, 
+      completed: false,
+      taskIds: [],
+    };
     setSchedule(prev => ({ ...prev, [todayKey]: { ...(prev[todayKey] || {}), [slotName]: [...(prev[todayKey]?.[slotName] || []), newActivity] } }));
   };
 
@@ -299,25 +300,56 @@ function HomePageContent() {
     return { exercises, muscleGroups };
   };
 
-  const handleActivityClick = (activity: ActivityType) => {
+  const handleActivityClick = (slotName: string, activity: Activity) => {
     if (activity.completed) return;
     if (activity.type === 'workout') {
       const { exercises, muscleGroups } = getTodaysWorkout();
       setTodaysExercises(exercises);
       setTodaysMuscleGroups(muscleGroups);
       setIsTodaysWorkoutModalOpen(true);
-    } else if (activity.type === 'upskill' || activity.type === 'deepwork' || activity.type === 'branding') {
-      const logSource = activity.type === 'upskill' ? allUpskillLogs : activity.type === 'deepwork' ? allDeepWorkLogs : brandingLogs;
-      const todayLog = logSource.find(log => log.date === todayKey);
-      setLearningModalProps({
-        tasks: todayLog?.exercises || [],
-        title: `Today's ${activity.type.charAt(0).toUpperCase() + activity.type.slice(1)} Session`,
-        description: `Here are the tasks planned for today.`,
-        pageType: activity.type
-      });
+    } else if (['upskill', 'deepwork', 'branding'].includes(activity.type)) {
+      setEditingActivity({ slotName, activity });
       setIsLearningModalOpen(true);
     }
   };
+
+  const handleSaveTaskSelection = (selectedIds: string[]) => {
+    if (!editingActivity) return;
+
+    const { slotName, activity } = editingActivity;
+    
+    // Find all tasks for the day for the given pageType
+    const logSource = activity.type === 'upskill' ? allUpskillLogs : activity.type === 'deepwork' ? allDeepWorkLogs : brandingLogs;
+    const allTasksForDay = logSource.find(log => log.date === todayKey)?.exercises || [];
+
+    // Filter tasks based on selected IDs to get the full task objects
+    const selectedTasks = allTasksForDay.filter(task => selectedIds.includes(task.id));
+    
+    // Generate new details string
+    let newDetails = selectedTasks.map(t => t.name).join(', ');
+    if (!newDetails) {
+        newDetails = activity.type === 'upskill' ? 'Learning Session'
+                   : activity.type === 'deepwork' ? 'Deep Work Session'
+                   : activity.type === 'branding' ? 'Branding Session'
+                   : 'Session';
+    }
+
+    // Update the schedule
+    setSchedule(prev => {
+        const newTodaySchedule = { ...(prev[todayKey] || {}) };
+        const activitiesInSlot = (newTodaySchedule[slotName] || []).map(act => {
+            if (act.id === activity.id) {
+                return { ...act, taskIds: selectedIds, details: newDetails };
+            }
+            return act;
+        });
+        newTodaySchedule[slotName] = activitiesInSlot;
+        return { ...prev, [todayKey]: newTodaySchedule };
+    });
+
+    setEditingActivity(null);
+  };
+
 
   const todaysSchedule = schedule[todayKey] || {};
 
@@ -582,6 +614,40 @@ function HomePageContent() {
   const handleDietModalOpenChange = (isOpen: boolean) => {
       setIsDietPlanModalOpen(isOpen);
   };
+  
+  const learningModalProps = useMemo(() => {
+    if (!editingActivity) {
+      return { availableTasks: [], initialSelectedIds: [], pageType: 'upskill' as const };
+    }
+
+    const { activity } = editingActivity;
+    const pageType = activity.type as 'upskill' | 'deepwork' | 'branding';
+
+    // 1. Get all tasks scheduled for the day for this activity type
+    const logSource = pageType === 'upskill' ? allUpskillLogs : pageType === 'deepwork' ? allDeepWorkLogs : brandingLogs;
+    const allTasksForDay = logSource.find(log => log.date === todayKey)?.exercises || [];
+    if (allTasksForDay.length === 0) {
+      return { availableTasks: [], initialSelectedIds: activity.taskIds || [], pageType };
+    }
+
+    // 2. Find all task IDs that are already scheduled in *other* slots of the same type
+    const todaysActivitiesForType = Object.values(schedule[todayKey] || {}).flat();
+    const scheduledIdsInOtherSlots = new Set<string>();
+    todaysActivitiesForType.forEach(act => {
+      if (act.type === pageType && act.id !== activity.id && act.taskIds) {
+        act.taskIds.forEach(id => scheduledIdsInOtherSlots.add(id));
+      }
+    });
+
+    // 3. The available tasks for this modal are all tasks for the day, MINUS those scheduled in other slots
+    const availableTasks = allTasksForDay.filter(task => !scheduledIdsInOtherSlots.has(task.id));
+
+    // 4. The initially selected tasks are the ones already associated with the activity being edited
+    const initialSelectedIds = activity.taskIds || [];
+
+    return { availableTasks, initialSelectedIds, pageType };
+
+}, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, todayKey, schedule]);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -642,13 +708,16 @@ function HomePageContent() {
         />
       )}
 
-      {currentUser && (
+      {currentUser && editingActivity && (
         <TodaysLearningModal
             isOpen={isLearningModalOpen}
-            onOpenChange={setIsLearningModalOpen}
-            tasks={learningModalProps.tasks}
-            title={learningModalProps.title}
-            description={learningModalProps.description}
+            onOpenChange={(isOpen) => {
+                if (!isOpen) setEditingActivity(null);
+                setIsLearningModalOpen(isOpen);
+            }}
+            availableTasks={learningModalProps.availableTasks}
+            initialSelectedIds={learningModalProps.initialSelectedIds}
+            onSave={handleSaveTaskSelection}
             pageType={learningModalProps.pageType}
         />
       )}

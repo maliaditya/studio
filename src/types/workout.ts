@@ -140,6 +140,7 @@ export type Activity = {
   type: ActivityType;
   details: string;
   completed: boolean;
+  taskIds?: string[];
 };
 
 export type DailySchedule = Record<string, Activity[]>; // Slot name -> Array of Activities
