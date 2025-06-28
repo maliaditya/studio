@@ -2,7 +2,7 @@
 import { getDay, getISOWeek } from 'date-fns';
 import type { WorkoutExercise, AllWorkoutPlans, ExerciseDefinition, WorkoutMode, ExerciseCategory } from '@/types/workout';
 
-const DEFAULT_TARGET_SETS = 4;
+const DEFAULT_TARGET_SETS = 3;
 const DEFAULT_TARGET_REPS = "8-12";
 
 const dailyMuscleGroups: Record<number, string[]> = {

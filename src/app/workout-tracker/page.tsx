@@ -55,7 +55,7 @@ import { DietPlanModal } from '@/components/DietPlanModal';
 import { TodaysDietCard } from '@/components/TodaysDietCard';
 
 
-const DEFAULT_TARGET_SETS = 4;
+const DEFAULT_TARGET_SETS = 3;
 const DEFAULT_TARGET_REPS = "8-12";
 const DEFAULT_EXERCISE_CATEGORY: ExerciseCategory = "Other";
 
