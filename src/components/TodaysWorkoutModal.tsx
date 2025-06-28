@@ -85,7 +85,7 @@ export function TodaysWorkoutModal({
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>
             Log Workout: {muscleGroupsForDay.join(' & ') || 'Rest Day'}
           </DialogTitle>
@@ -94,37 +94,35 @@ export function TodaysWorkoutModal({
           </DialogDescription>
         </DialogHeader>
         <div className="flex-grow min-h-0">
-          <ScrollArea className="h-full pr-6">
-            <div className="pr-0">
-              {exercisesInLog.length > 0 ? (
-                pendingExercises.length > 0 ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {pendingExercises.map(exercise => (
-                        <WorkoutExerciseCard 
-                            key={exercise.id} 
-                            exercise={exercise}
-                            onLogSet={(...args) => logWorkoutSet(today, ...args)} 
-                            onDeleteSet={(...args) => deleteWorkoutSet(today, ...args)} 
-                            onUpdateSet={(...args) => updateWorkoutSet(today, ...args)} 
-                            onRemoveExercise={(...args) => removeExerciseFromWorkout(today, ...args)}
-                        />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8 min-h-[300px]">
-                    <CheckCircle2 className="h-12 w-12 text-green-500 mb-4" />
-                    <p className="font-semibold text-lg">Workout Complete!</p>
-                    <p className="text-sm">All target sets have been logged.</p>
-                  </div>
-                )
+          <ScrollArea className="h-full pr-4">
+            {exercisesInLog.length > 0 ? (
+              pendingExercises.length > 0 ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {pendingExercises.map(exercise => (
+                      <WorkoutExerciseCard 
+                          key={exercise.id} 
+                          exercise={exercise}
+                          onLogSet={(...args) => logWorkoutSet(today, ...args)} 
+                          onDeleteSet={(...args) => deleteWorkoutSet(today, ...args)} 
+                          onUpdateSet={(...args) => updateWorkoutSet(today, ...args)} 
+                          onRemoveExercise={(...args) => removeExerciseFromWorkout(today, ...args)}
+                      />
+                  ))}
+                </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8 min-h-[300px]">
-                  <Dumbbell className="h-12 w-12 mb-4" />
-                  <p className="font-semibold">It's a rest day!</p>
-                  <p className="text-sm">No workout is scheduled for today.</p>
+                  <CheckCircle2 className="h-12 w-12 text-green-500 mb-4" />
+                  <p className="font-semibold text-lg">Workout Complete!</p>
+                  <p className="text-sm">All target sets have been logged.</p>
                 </div>
-              )}
-            </div>
+              )
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8 min-h-[300px]">
+                <Dumbbell className="h-12 w-12 mb-4" />
+                <p className="font-semibold">It's a rest day!</p>
+                <p className="text-sm">No workout is scheduled for today.</p>
+              </div>
+            )}
           </ScrollArea>
         </div>
         <DialogFooter className="flex-shrink-0 pt-4">
