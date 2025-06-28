@@ -735,7 +735,7 @@ function HomePageContent() {
                  {currentUser && isAgendaDocked && (
                     <TodaysScheduleCard
                         schedule={schedule}
-                        activityDurations={activityDurations}
+                        activityDurations={_activityDurations}
                         isAgendaDocked={isAgendaDocked}
                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
                         onLogLearning={handleLogLearning}
@@ -775,7 +775,7 @@ function HomePageContent() {
         {currentUser && !isAgendaDocked && (
             <TodaysScheduleCard
                 schedule={schedule}
-                activityDurations={activityDurations}
+                activityDurations={_activityDurations}
                 isAgendaDocked={isAgendaDocked}
                 onToggleDock={() => setIsAgendaDocked(prev => !prev)}
                 onLogLearning={handleLogLearning}
