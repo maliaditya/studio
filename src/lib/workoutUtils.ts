@@ -136,5 +136,3 @@ export const getExercisesForDay = (
     const description = `Added ${planKey} exercises for ${muscleGroups.join(' & ')}. Loaded ${allExercisesToAdd.length} exercises.`;
     return { exercises: allExercisesToAdd, description };
 };
-
-    

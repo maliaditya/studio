@@ -6,109 +6,83 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, getDay } from 'date-fns';
-import { Dumbbell, BrainCircuit, TrendingUp, Share2, Heart, Sparkles, Trophy, MessageSquareQuote, DollarSign } from 'lucide-react';
-import type { ExerciseDefinition, AllWorkoutPlans, WorkoutMode, ExerciseCategory } from '@/types/workout';
-
-// Duplicating these from workout page for now, can be refactored to a shared util later
-const dailyMuscleGroups: Record<number, string[]> = {
-  1: ["Chest", "Triceps"], 2: ["Back", "Biceps"], 3: ["Shoulders", "Legs"],
-  4: ["Chest", "Triceps"], 5: ["Back", "Biceps"], 6: ["Shoulders", "Legs"], 0: [],
-};
-
-const singleMuscleDailySchedule: Record<number, ExerciseCategory | null> = {
-    1: "Chest",       // Monday
-    2: "Triceps",     // Tuesday
-    3: "Back",        // Wednesday
-    4: "Biceps",      // Thursday
-    5: "Shoulders",   // Friday
-    6: "Legs",        // Saturday
-    0: null,          // Sunday
-};
+import { Dumbbell, BrainCircuit, TrendingUp, Share2, Heart, DollarSign, Trophy, MessageSquareQuote, CheckCircle2, Circle, Target } from 'lucide-react';
+import type { ExerciseDefinition, WorkoutMode, ExerciseCategory, Activity, DailySchedule } from '@/types/workout';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { getExercisesForDay } from '@/lib/workoutUtils';
 
 
 function MyPlatePageContent() {
-  const { currentUser } = useAuth();
-  
-  const [upskillTopics, setUpskillTopics] = useState<string[]>([]);
-  const [deepWorkTopics, setDeepWorkTopics] = useState<string[]>([]);
-  const [brandingBundles, setBrandingBundles] = useState<string[]>([]);
-  const [todaysWorkout, setTodaysWorkout] = useState<string | null>(null);
+  const { 
+    currentUser, 
+    schedule,
+    allUpskillLogs,
+    topicGoals, 
+    brandingTasks, 
+    workoutMode, 
+    workoutPlans, 
+    exerciseDefinitions,
+    goalWeight,
+    weightLogs,
+  } = useAuth();
   
   const [isLoading, setIsLoading] = useState(true);
 
+  // Memoized data extraction
+  const todaysActivities = useMemo(() => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const todaySchedule = schedule[todayKey] || {};
+    return Object.values(todaySchedule).flat();
+  }, [schedule]);
+
+  const { todaysMuscleGroups } = useMemo(() => {
+    if (!workoutPlans || !exerciseDefinitions) return { todaysMuscleGroups: [] };
+    const { exercises } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions);
+    const muscleGroups = Array.from(new Set(exercises.map(ex => ex.category)));
+    return { todaysMuscleGroups: muscleGroups };
+  }, [workoutMode, workoutPlans, exerciseDefinitions]);
+  
+  const upskillProgress = useMemo(() => {
+    const stats: { topic: string, progress: number, goal: number, unit: string }[] = [];
+    if (!topicGoals || !allUpskillLogs) return stats;
+
+    Object.entries(topicGoals).forEach(([topic, goal]) => {
+      let totalProgress = 0;
+      allUpskillLogs.forEach(log => {
+        log.exercises.forEach(ex => {
+          if (ex.category === topic) {
+            totalProgress += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0);
+          }
+        });
+      });
+      stats.push({
+        topic,
+        progress: totalProgress,
+        goal: goal.goalValue,
+        unit: goal.goalType,
+      });
+    });
+    return stats;
+  }, [topicGoals, allUpskillLogs]);
+  
+  const brandingPipeline = useMemo(() => {
+    const activeTasks = brandingTasks.filter(task => !(task.sharingStatus?.twitter && task.sharingStatus?.linkedin && task.sharingStatus?.devto));
+    return activeTasks.slice(0, 3); // Show top 3 active bundles
+  }, [brandingTasks]);
+  
+  const latestWeightLog = useMemo(() => {
+    if (!weightLogs || weightLogs.length === 0) return null;
+    return [...weightLogs].sort((a, b) => a.date.localeCompare(b.date)).pop();
+  }, [weightLogs]);
+
+
   useEffect(() => {
     if (currentUser?.username) {
-      const username = currentUser.username;
-      
-      // Upskill Data
-      const upskillDefsKey = `upskill_definitions_${username}`;
-      const storedUpskillDefs: ExerciseDefinition[] = JSON.parse(localStorage.getItem(upskillDefsKey) || '[]');
-      const upskillTopicSet = new Set(storedUpskillDefs.map(def => def.category));
-      setUpskillTopics(Array.from(upskillTopicSet));
-      
-      // Deep Work Data
-      const deepWorkDefsKey = `deepwork_definitions_${username}`;
-      const storedDeepWorkDefs: ExerciseDefinition[] = JSON.parse(localStorage.getItem(deepWorkDefsKey) || '[]');
-      const deepWorkTopicSet = new Set(storedDeepWorkDefs.map(def => def.category));
-      setDeepWorkTopics(Array.from(deepWorkTopicSet));
-      
-      // Branding Data
-      const brandingTasksKey = `branding_tasks_${username}`;
-      const storedBrandingTasks: ExerciseDefinition[] = JSON.parse(localStorage.getItem(brandingTasksKey) || '[]');
-      const activeBundles = storedBrandingTasks.filter(task => !(task.sharingStatus?.twitter && task.sharingStatus?.linkedin && task.sharingStatus?.devto));
-      setBrandingBundles(activeBundles.map(task => task.name));
-
-      // Workout Data
-      const modeKey = `workoutMode_${username}`;
-      const storedMode = (localStorage.getItem(modeKey) as WorkoutMode) || 'two-muscle';
-      const dayOfWeek = getDay(new Date());
-      if (storedMode === 'two-muscle') {
-        const muscles = dailyMuscleGroups[dayOfWeek] || [];
-        setTodaysWorkout(muscles.length > 0 ? muscles.join(' & ') : "Rest Day");
-      } else {
-        const muscle = singleMuscleDailySchedule[dayOfWeek];
-        setTodaysWorkout(muscle || "Rest Day");
-      }
-
       setIsLoading(false);
     }
   }, [currentUser]);
 
-  const plateItems = [
-    {
-      title: 'Health',
-      icon: <Heart className="h-8 w-8 text-red-500" />,
-      description: 'Physical well-being & fitness.',
-      items: [
-          todaysWorkout !== 'Rest Day' && { name: 'Gym', detail: todaysWorkout, icon: <Dumbbell/> },
-          { name: 'Morning Walks', detail: 'Daily Consistency', icon: <Sparkles/> }
-      ].filter(Boolean) as {name: string, detail: string | null, icon: React.ReactNode}[]
-    },
-    {
-      title: 'Wealth',
-      icon: <DollarSign className="h-8 w-8 text-green-500" />,
-      description: 'Deep work & income opportunities.',
-      items: deepWorkTopics.map(topic => ({ name: topic, detail: 'Deep Work Topic', icon: <BrainCircuit/> }))
-    },
-    {
-      title: 'Growth',
-      icon: <TrendingUp className="h-8 w-8 text-blue-500" />,
-      description: 'Skills & knowledge acquisition.',
-      items: upskillTopics.map(topic => ({ name: topic, detail: 'Learning Topic', icon: <TrendingUp/> }))
-    },
-    {
-      title: 'Branding',
-      icon: <Share2 className="h-8 w-8 text-purple-500" />,
-      description: 'Content & personal marketing.',
-      items: brandingBundles.map(bundle => ({ name: bundle, detail: 'Content Bundle', icon: <Share2/> }))
-    }
-  ];
-
-  const reflectionPrompts = [
-    "Which of these are moving you forward the most?",
-    "Which one have you neglected and why?",
-    "What do you want to add/remove from your plate this week?",
-  ];
 
   if (isLoading) {
     return (
@@ -118,69 +92,138 @@ function MyPlatePageContent() {
     )
   }
 
+  // Main render function
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-      <div className="text-center mb-12">
+    <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
+      {/* Header */}
+      <div className="text-center">
         <h1 className="text-4xl font-bold tracking-tight text-primary flex items-center justify-center gap-4">
             <Trophy className="h-10 w-10"/>
             What's On My Plate
         </h1>
         <p className="mt-4 text-lg text-muted-foreground">
-          A top-down view of your current life commitments and areas of focus.
+          A top-down dashboard of your current life commitments and focus areas.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {plateItems.map(plate => (
-            <Card key={plate.title} className="shadow-lg hover:shadow-xl transition-shadow duration-300">
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* Left Column: Today's Focus */}
+        <div className="lg:col-span-1 space-y-8">
+            <Card>
                 <CardHeader>
-                    <div className="flex items-center gap-4">
-                        {plate.icon}
-                        <div>
-                            <CardTitle className="text-2xl">{plate.title}</CardTitle>
-                            <CardDescription>{plate.description}</CardDescription>
-                        </div>
-                    </div>
+                    <CardTitle>Today's Agenda</CardTitle>
+                    <CardDescription>{format(new Date(), 'EEEE, MMMM do')}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {plate.items.length > 0 ? (
+                    {todaysActivities.length > 0 ? (
                         <ul className="space-y-3">
-                            {plate.items.map((item, index) => (
-                                <li key={index} className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
-                                    <div className="p-2 bg-background rounded-full">
-                                        {item.icon}
-                                    </div>
-                                    <div className='min-w-0'>
-                                        <p className="font-semibold text-foreground truncate" title={item.name}>{item.name}</p>
-                                        {item.detail && <p className="text-sm text-muted-foreground truncate">{item.detail}</p>}
-                                    </div>
+                            {todaysActivities.map(activity => (
+                                <li key={activity.id} className="flex items-center gap-3">
+                                    {activity.completed ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
+                                    <span className={`flex-grow truncate ${activity.completed ? 'line-through text-muted-foreground' : ''}`} title={activity.details}>
+                                        {activity.details}
+                                    </span>
+                                    <Badge variant="outline" className="capitalize">{activity.type}</Badge>
                                 </li>
                             ))}
                         </ul>
                     ) : (
-                        <p className="text-center text-muted-foreground py-4">Nothing on the plate for this area yet.</p>
+                        <p className="text-muted-foreground text-center py-4">No activities scheduled for today.</p>
                     )}
                 </CardContent>
             </Card>
-        ))}
-      </div>
 
-      <Card className="mt-12 shadow-lg">
-          <CardHeader>
-              <CardTitle className="flex items-center gap-3 text-xl">
-                  <MessageSquareQuote className="h-6 w-6 text-primary"/>
-                  Weekly Reflection
-              </CardTitle>
-              <CardDescription>Take a moment to reflect on your week and adjust your focus.</CardDescription>
-          </CardHeader>
-          <CardContent>
-              <ul className="space-y-4 text-muted-foreground list-disc pl-5">
-                  {reflectionPrompts.map((prompt, index) => (
-                    <li key={index} className="text-sm">{prompt}</li>
-                  ))}
-              </ul>
-          </CardContent>
-      </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Health Snapshot</CardTitle>
+                    <CardDescription>Current physical wellness status.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <h4 className="font-semibold text-sm mb-1">Today's Workout</h4>
+                        <p className="text-muted-foreground text-sm">{todaysMuscleGroups.length > 0 ? todaysMuscleGroups.join(' & ') : 'Rest Day'}</p>
+                    </div>
+                     <div>
+                        <h4 className="font-semibold text-sm mb-1">Weight Tracking</h4>
+                         {latestWeightLog && (
+                             <p className="text-muted-foreground text-sm">
+                                 Latest: {latestWeightLog.weight} kg/lb on week {latestWeightLog.date.split('-W')[1]}
+                            </p>
+                         )}
+                         {goalWeight && (
+                            <p className="text-muted-foreground text-sm">Goal: {goalWeight} kg/lb</p>
+                         )}
+                         {!latestWeightLog && !goalWeight && <p className="text-muted-foreground text-sm">No weight data logged.</p>}
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+
+        {/* Right Column: Long-term Progress */}
+        <div className="lg:col-span-2 space-y-8">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Long-Term Progress</CardTitle>
+                    <CardDescription>Tracking your journey across different domains.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div>
+                        <h3 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Upskill Progress</h3>
+                        {upskillProgress.length > 0 ? (
+                            <div className="space-y-4">
+                                {upskillProgress.map(item => (
+                                    <div key={item.topic}>
+                                        <div className="flex justify-between items-baseline mb-1">
+                                            <span className="font-medium text-sm">{item.topic}</span>
+                                            <span className="text-xs text-muted-foreground">{item.progress.toLocaleString()} / {item.goal.toLocaleString()} {item.unit}</span>
+                                        </div>
+                                        <Progress value={(item.progress / item.goal) * 100} />
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-muted-foreground text-sm">No upskill goals set yet.</p>
+                        )}
+                    </div>
+                     <div className="pt-6 border-t">
+                        <h3 className="font-semibold mb-2 flex items-center gap-2"><Share2 /> Branding Pipeline</h3>
+                        {brandingPipeline.length > 0 ? (
+                             <ul className="space-y-2">
+                                {brandingPipeline.map(task => (
+                                    <li key={task.id} className="text-sm p-2 rounded-md bg-muted/50 flex justify-between items-center">
+                                        <span>{task.name}</span>
+                                        <Badge variant="secondary">Active</Badge>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-muted-foreground text-sm">Branding pipeline is clear. Keep learning!</p>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
+             <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-3 text-xl">
+                        <MessageSquareQuote className="h-6 w-6 text-primary"/>
+                        Weekly Reflection
+                    </CardTitle>
+                    <CardDescription>Take a moment to reflect and adjust your focus.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <ul className="space-y-4 text-muted-foreground list-disc pl-5">
+                      <li>Which of these are moving you forward the most?</li>
+                      <li>Which one have you neglected and why?</li>
+                      <li>What do you want to add/remove from your plate this week?</li>
+                    </ul>
+                </CardContent>
+            </Card>
+        </div>
+
+      </div>
     </div>
   );
 }

@@ -181,28 +181,6 @@ const INITIAL_PLANS: AllWorkoutPlans = {
 };
 
 
-// Schedule for "Two Muscles / Day" mode
-const dailyMuscleGroups: Record<number, string[]> = {
-  1: ["Chest", "Triceps"], // Monday
-  2: ["Back", "Biceps"],   // Tuesday
-  3: ["Shoulders", "Legs"],// Wednesday
-  4: ["Chest", "Triceps"], // Thursday
-  5: ["Back", "Biceps"],   // Friday
-  6: ["Shoulders", "Legs"], // Saturday
-  0: [], // Sunday
-};
-
-// Schedule for "One Muscle / Day" mode
-const singleMuscleDailySchedule: Record<number, ExerciseCategory | null> = {
-    1: "Chest",       // Monday
-    2: "Triceps",     // Tuesday
-    3: "Back",        // Wednesday
-    4: "Biceps",      // Thursday
-    5: "Shoulders",   // Friday
-    6: "Legs",        // Saturday
-    0: null,          // Sunday
-};
-
 function WorkoutPageContent() {
   const { toast } = useToast();
   const { 
@@ -420,9 +398,16 @@ function WorkoutPageContent() {
   const muscleGroupsForSelectedDay = useMemo(() => {
     const dayOfWeek = getDay(selectedDate);
     if (workoutMode === 'one-muscle') {
+        const singleMuscleDailySchedule: Record<number, ExerciseCategory | null> = {
+            1: "Chest", 2: "Triceps", 3: "Back", 4: "Biceps", 5: "Shoulders", 6: "Legs", 0: null,
+        };
         const muscle = singleMuscleDailySchedule[dayOfWeek];
         return muscle ? [muscle] : [];
     }
+    const dailyMuscleGroups: Record<number, string[]> = {
+      1: ["Chest", "Triceps"], 2: ["Back", "Biceps"], 3: ["Shoulders", "Legs"],
+      4: ["Chest", "Triceps"], 5: ["Back", "Biceps"], 6: ["Shoulders", "Legs"], 0: [],
+    };
     return dailyMuscleGroups[dayOfWeek] || [];
   }, [selectedDate, workoutMode]);
 
