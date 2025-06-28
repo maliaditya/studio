@@ -304,89 +304,66 @@ function HomePageContent() {
     }
   };
 
-  const handleSaveTaskSelection = (selectedIds: string[]) => {
+  const handleSaveTaskSelection = (selectedDefIds: string[]) => {
     if (!editingActivity) return;
-  
+
     const { slotName, activity } = editingActivity;
     const pageType = activity.type as 'upskill' | 'deepwork' | 'branding';
     
-    // Determine if we are adding new tasks or selecting from existing daily tasks
-    const logSource = pageType === 'upskill' ? allUpskillLogs : pageType === 'deepwork' ? allDeepWorkLogs : brandingLogs;
-    const allTasksForDay = logSource.find(log => log.date === todayKey)?.exercises || [];
-    const isAddingNewTasks = allTasksForDay.length === 0;
+    const logsUpdater = pageType === 'upskill' ? setAllUpskillLogs : setAllDeepWorkLogs;
+    const definitionSource = pageType === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
+    const logSource = pageType === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
 
-    if (isAddingNewTasks) {
-      // Logic for adding new tasks to the day's log
-      const definitionSource = pageType === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
-      const logsUpdater = pageType === 'upskill' ? setAllUpskillLogs : setAllDeepWorkLogs;
-      
-      const selectedDefinitions = definitionSource.filter(def => selectedIds.includes(def.id));
-      if (selectedDefinitions.length === 0) {
-        setEditingActivity(null);
-        return;
-      }
-      
-      const newExercises: WorkoutExercise[] = selectedDefinitions.map(def => ({
-        id: `${def.id}-${Date.now()}-${Math.random()}`,
-        definitionId: def.id,
-        name: def.name,
-        category: def.category,
-        loggedSets: [],
-        targetSets: 1, // Default
-        targetReps: '25', // Default
-      }));
-      
+    // 1. Determine which exercises need to be created.
+    const logForDay = logSource.find(log => log.date === todayKey);
+    const existingExercisesForDay = logForDay?.exercises || [];
+    const existingDefIdsForDay = new Set(existingExercisesForDay.map(ex => ex.definitionId));
+    const defIdsToCreate = selectedDefIds.filter(id => !existingDefIdsForDay.has(id));
+
+    const newExercises: WorkoutExercise[] = defIdsToCreate.length > 0
+      ? definitionSource
+          .filter(def => defIdsToCreate.includes(def.id))
+          .map(def => ({
+              id: `${def.id}-${Date.now()}-${Math.random()}`,
+              definitionId: def.id,
+              name: def.name,
+              category: def.category,
+              loggedSets: [], targetSets: 1, targetReps: '25',
+          }))
+      : [];
+    
+    // 2. If new exercises were created, update the logs state.
+    if (newExercises.length > 0) {
       logsUpdater(prevLogs => {
-        const newLogs = [...prevLogs];
-        const logIndex = newLogs.findIndex(log => log.date === todayKey);
-        
-        if (logIndex > -1) {
-          newLogs[logIndex].exercises.push(...newExercises);
-        } else {
-          newLogs.push({ id: todayKey, date: todayKey, exercises: newExercises });
-        }
-        return newLogs;
-      });
-      
-      // Update the agenda item
-      const newDetails = newExercises.map(t => t.name).join(', ');
-      const newTaskIds = newExercises.map(t => t.id);
-      
-      setSchedule(prev => {
-        const newTodaySchedule = { ...(prev[todayKey] || {}) };
-        const activitiesInSlot = (newTodaySchedule[slotName] || []).map(act => {
-            if (act.id === activity.id) {
-                return { ...act, taskIds: newTaskIds, details: newDetails };
-            }
-            return act;
-        });
-        newTodaySchedule[slotName] = activitiesInSlot;
-        return { ...prev, [todayKey]: newTodaySchedule };
-      });
-
-    } else {
-      // Existing logic for selecting from already-scheduled tasks
-      const selectedTasks = allTasksForDay.filter(task => selectedIds.includes(task.id));
-      let newDetails = selectedTasks.map(t => t.name).join(', ');
-      if (!newDetails) {
-          newDetails = activity.type === 'upskill' ? 'Learning Session'
-                     : activity.type === 'deepwork' ? 'Deep Work Session'
-                     : activity.type === 'branding' ? 'Branding Session'
-                     : 'Session';
-      }
-
-      setSchedule(prev => {
-          const newTodaySchedule = { ...(prev[todayKey] || {}) };
-          const activitiesInSlot = (newTodaySchedule[slotName] || []).map(act => {
-              if (act.id === activity.id) {
-                  return { ...act, taskIds: selectedIds, details: newDetails };
-              }
-              return act;
-          });
-          newTodaySchedule[slotName] = activitiesInSlot;
-          return { ...prev, [todayKey]: newTodaySchedule };
+          const newLogs = [...prevLogs];
+          const logIndex = newLogs.findIndex(log => log.date === todayKey);
+          if (logIndex > -1) {
+              newLogs[logIndex].exercises.push(...newExercises);
+          } else {
+              newLogs.push({ id: todayKey, date: todayKey, exercises: [...existingExercisesForDay, ...newExercises] });
+          }
+          return newLogs;
       });
     }
+
+    // 3. Update the schedule with the correct task IDs.
+    const allRelevantExercises = [...existingExercisesForDay, ...newExercises];
+    const finalTaskIdsForSlot = allRelevantExercises
+      .filter(ex => selectedDefIds.includes(ex.definitionId))
+      .map(ex => ex.id);
+
+    const newDetails = allRelevantExercises
+      .filter(ex => finalTaskIdsForSlot.includes(ex.id))
+      .map(t => t.name).join(', ') || (pageType === 'upskill' ? 'Learning Session' : 'Deep Work Session');
+    
+    setSchedule(prev => {
+      const newTodaySchedule = { ...(prev[todayKey] || {}) };
+      const activitiesInSlot = (newTodaySchedule[slotName] || []).map(act =>
+        act.id === activity.id ? { ...act, taskIds: finalTaskIdsForSlot, details: newDetails } : act
+      );
+      newTodaySchedule[slotName] = activitiesInSlot;
+      return { ...prev, [todayKey]: newTodaySchedule };
+    });
 
     setEditingActivity(null);
   };
@@ -705,55 +682,76 @@ function HomePageContent() {
   
   const learningModalProps = useMemo(() => {
     if (!editingActivity) {
-      return { availableTasks: [], initialSelectedIds: [], pageType: 'upskill' as const, isAddingNewTasks: false, disabledTaskIds: [] };
+      return { availableTasks: [], initialSelectedIds: [], pageType: 'upskill' as const, disabledTaskIds: [] };
     }
 
     const { activity } = editingActivity;
     const pageType = activity.type as 'upskill' | 'deepwork' | 'branding';
 
     const logSource = pageType === 'upskill' ? allUpskillLogs : pageType === 'deepwork' ? allDeepWorkLogs : brandingLogs;
+    const definitionSource = pageType === 'upskill' ? upskillDefinitions : pageType === 'deepwork' ? deepWorkDefinitions : brandingTasks;
+    
     const allTasksForDay = logSource.find(log => log.date === todayKey)?.exercises || [];
     
-    if (allTasksForDay.length > 0) {
-      // User is selecting from tasks already scheduled for the day.
-      const todaysActivitiesForType = Object.values(schedule[todayKey] || {}).flat();
-      const scheduledIdsInOtherSlots = new Set<string>();
-      todaysActivitiesForType.forEach(act => {
-        if (act && act.type === pageType && act.id !== activity.id && act.taskIds) {
-          act.taskIds.forEach(id => scheduledIdsInOtherSlots.add(id));
-        }
-      });
-      const availableTasks = allTasksForDay;
-      const disabledTaskIds = Array.from(scheduledIdsInOtherSlots);
-      const initialSelectedIds = activity.taskIds || [];
-      return { availableTasks, initialSelectedIds, pageType, isAddingNewTasks: false, disabledTaskIds };
-    } else {
-      // Day has no scheduled tasks, so present unlogged definitions to be added.
-      const definitionSource = pageType === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
-      const allLogs = pageType === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
-      
-      const loggedDefinitionIds = new Set<string>();
-      allLogs.forEach(log => {
+    // Combine today's tasks and available definitions into one list for the modal
+    const combinedTasksMap = new Map<string, WorkoutExercise>();
+
+    // Add today's scheduled tasks first
+    allTasksForDay.forEach(task => {
+        combinedTasksMap.set(task.definitionId, task);
+    });
+
+    // Add other available definitions (that haven't been logged yet)
+    const loggedDefinitionIds = new Set<string>();
+    logSource.forEach(log => {
         log.exercises.forEach(ex => {
-          if (ex.loggedSets.length > 0) {
-            loggedDefinitionIds.add(ex.definitionId);
-          }
+            if (ex.loggedSets.length > 0) {
+                loggedDefinitionIds.add(ex.definitionId);
+            }
         });
-      });
-      
-      const availableDefinitions = definitionSource.filter(def => !loggedDefinitionIds.has(def.id));
+    });
+    definitionSource.forEach(def => {
+        if (!combinedTasksMap.has(def.id) && !loggedDefinitionIds.has(def.id)) {
+            combinedTasksMap.set(def.id, {
+                id: def.id,
+                definitionId: def.id,
+                name: def.name,
+                category: def.category,
+                loggedSets: [], targetSets: 0, targetReps: ''
+            });
+        }
+    });
+    
+    const availableTasks = Array.from(combinedTasksMap.values());
+    
+    // Determine which tasks are initially selected for the current slot
+    const initialSelectedDefIds = new Set<string>();
+    (activity.taskIds || []).forEach(taskId => {
+        const task = allTasksForDay.find(t => t.id === taskId);
+        if (task) {
+            initialSelectedDefIds.add(task.definitionId);
+        }
+    });
+    const initialSelectedIds = Array.from(initialSelectedDefIds);
+    
+    // Determine which tasks are disabled (scheduled in other slots)
+    const todaysActivitiesForType = Object.values(schedule[todayKey] || {}).flat();
+    const disabledDefIds = new Set<string>();
+    todaysActivitiesForType.forEach(act => {
+        if (act && act.type === pageType && act.id !== activity.id && act.taskIds) {
+            (act.taskIds || []).forEach(taskId => {
+                const task = allTasksForDay.find(t => t.id === taskId);
+                if (task) {
+                    disabledDefIds.add(task.definitionId);
+                }
+            });
+        }
+    });
+    const disabledTaskIds = Array.from(disabledDefIds);
 
-      const availableTasks = availableDefinitions.map(def => ({
-        id: def.id, // Use definitionId as the key here for selection
-        definitionId: def.id,
-        name: def.name,
-        category: def.category,
-        loggedSets: [], targetSets: 0, targetReps: '' // Dummy data
-      }));
+    return { availableTasks, initialSelectedIds, pageType, disabledTaskIds };
 
-      return { availableTasks, initialSelectedIds: [], pageType, isAddingNewTasks: true, disabledTaskIds: [] };
-    }
-}, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, todayKey, schedule, upskillDefinitions, deepWorkDefinitions]);
+}, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, todayKey, schedule, upskillDefinitions, deepWorkDefinitions, brandingTasks]);
 
   const timeAllocationData = useMemo(() => {
     if (!productivityStats.todayHoursData) return [];
@@ -859,7 +857,7 @@ function HomePageContent() {
               initialSelectedIds={learningModalProps.initialSelectedIds}
               onSave={handleSaveTaskSelection}
               pageType={learningModalProps.pageType}
-              isAddingNewTasks={learningModalProps.isAddingNewTasks}
+              isAddingNewTasks={false} // This flag is less relevant with the new logic
               disabledTaskIds={learningModalProps.disabledTaskIds}
           />
         )}
