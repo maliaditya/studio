@@ -46,8 +46,9 @@ export function TodaysScheduleCard({ schedule, activityDurations, isAgendaDocked
 
   useEffect(() => {
     if (!isAgendaDocked) {
-      const initialY = window.innerHeight - Math.min(window.innerHeight - 80, 600);
-      setPosition({ x: 20, y: initialY });
+      const initialY = window.innerHeight - Math.min(window.innerHeight - 80, 450);
+      const initialX = window.innerWidth - Math.min(window.innerWidth - 20, 340);
+      setPosition({ x: initialX, y: initialY });
     }
   }, [isAgendaDocked]);
 
@@ -90,54 +91,77 @@ export function TodaysScheduleCard({ schedule, activityDurations, isAgendaDocked
   const cardContent = (
     <Card className="shadow-2xl bg-background/80 backdrop-blur-sm">
       <CardHeader
-        className={cn(!isAgendaDocked && "cursor-grab active:cursor-grabbing")}
+        className={cn("p-3", !isAgendaDocked && "cursor-grab active:cursor-grabbing")}
         onMouseDown={handleMouseDown}
       >
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2 text-lg text-primary">
-              <ClipboardList /> Today's Agenda
+            <CardTitle className="flex items-center gap-2 text-base text-primary">
+              <ClipboardList className="h-5 w-5" /> Today's Agenda
             </CardTitle>
-            <CardDescription>A sequential view of your scheduled activities.</CardDescription>
+            {isAgendaDocked && <CardDescription className="text-xs mt-1">A sequential view of your scheduled activities.</CardDescription>}
           </div>
           <div className="flex items-center">
             <Button variant="ghost" size="icon" onClick={onToggleDock} className="h-8 w-8">
               {isAgendaDocked ? <Move className="h-4 w-4" /> : <Dock className="h-4 w-4" />}
             </Button>
-            {!isAgendaDocked && <Grab className="text-muted-foreground ml-1" />}
+            {!isAgendaDocked && <Grab className="text-muted-foreground ml-1 h-4 w-4" />}
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-3">
         {scheduledActivities.length > 0 ? (
-          <ul className="space-y-3 max-h-96 overflow-y-auto pr-2">
-            {scheduledActivities.map((activity) => {
-              const duration = activityDurations[activity.id];
-              return (
-              <li key={activity.id} className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/50">
-                <div className="flex items-center gap-3">
-                  {activity.completed 
-                    ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-                    : <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                  }
-                  <div className="flex-grow">
-                    <p className={`font-medium ${activity.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                      {activity.details}
-                    </p>
-                    <Badge variant="outline" className="text-xs">{activity.slot}</Badge>
+          isAgendaDocked ? (
+            // DOCKED VIEW
+            <ul className="space-y-3 max-h-96 overflow-y-auto pr-2">
+              {scheduledActivities.map((activity) => {
+                const duration = activityDurations[activity.id];
+                return (
+                <li key={activity.id} className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/50">
+                  <div className="flex items-center gap-3">
+                    {activity.completed 
+                      ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+                      : <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                    }
+                    <div className="flex-grow">
+                      <p className={`font-medium ${activity.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                        {activity.details}
+                      </p>
+                      <Badge variant="outline" className="text-xs">{activity.slot}</Badge>
+                    </div>
                   </div>
-                </div>
-                <div className="flex-shrink-0 text-muted-foreground text-right w-20">
-                    {activityIcons[activity.type]}
-                    {duration && <p className="text-xs font-semibold mt-1 whitespace-nowrap">{duration}</p>}
-                </div>
-              </li>
-            )})}
-          </ul>
+                  <div className="flex-shrink-0 text-muted-foreground text-right w-20">
+                      {activityIcons[activity.type]}
+                      {duration && <p className="text-xs font-semibold mt-1 whitespace-nowrap">{duration}</p>}
+                  </div>
+                </li>
+              )})}
+            </ul>
+          ) : (
+            // WIDGET VIEW
+            <ul className="space-y-2 max-h-80 overflow-y-auto pr-2">
+              {scheduledActivities.map((activity) => {
+                const duration = activityDurations[activity.id];
+                return (
+                  <li key={activity.id} className="flex items-center justify-between gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                       {activity.completed 
+                        ? <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                        : <Circle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      }
+                      <p className={`truncate ${activity.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`} title={activity.details}>
+                        {activity.details}
+                      </p>
+                    </div>
+                    {duration && <span className="text-xs font-semibold text-muted-foreground flex-shrink-0">{duration}</span>}
+                  </li>
+                )
+              })}
+            </ul>
+          )
         ) : (
           <div className="text-center text-muted-foreground py-8">
-            <p>No activities scheduled for today.</p>
-            <p className="text-xs">Add tasks to your time slots to see them here.</p>
+            <p className="text-sm">No activities scheduled.</p>
           </div>
         )}
       </CardContent>
@@ -147,7 +171,7 @@ export function TodaysScheduleCard({ schedule, activityDurations, isAgendaDocked
   if (!isAgendaDocked) {
     return (
       <div
-        className="fixed z-50 w-full max-w-sm"
+        className="fixed z-50 w-full max-w-xs"
         style={{
           left: `${position.x}px`,
           top: `${position.y}px`,
@@ -161,4 +185,3 @@ export function TodaysScheduleCard({ schedule, activityDurations, isAgendaDocked
 
   return cardContent;
 }
-
