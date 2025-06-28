@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -20,11 +21,12 @@ const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Af
 interface AgendaWidgetItemProps {
   activity: Activity & { slot: keyof DailySchedule };
   duration: string | undefined;
-  onToggleComplete: (slotName: string, activityId: string) => void;
   onLogLearning: (activity: Activity, progress: number, duration: number) => void;
+  onStartWorkoutLog: (activity: Activity) => void;
+  onToggleComplete: (slotName: string, activityId: string) => void;
 }
 
-function AgendaWidgetItem({ activity, duration, onToggleComplete, onLogLearning }: AgendaWidgetItemProps) {
+function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog, onToggleComplete }: AgendaWidgetItemProps) {
   const [openPopover, setOpenPopover] = useState(false);
   const [progressInput, setProgressInput] = useState('');
   const [durationInput, setDurationInput] = useState('');
@@ -34,6 +36,8 @@ function AgendaWidgetItem({ activity, duration, onToggleComplete, onLogLearning 
   const handleItemClick = () => {
     if (activity.completed) {
       onToggleComplete(activity.slot, activity.id); // Allow un-checking
+    } else if (activity.type === 'workout') {
+        onStartWorkoutLog(activity);
     } else if (canLogProgress) {
       setOpenPopover(true);
     } else {
@@ -50,7 +54,7 @@ function AgendaWidgetItem({ activity, duration, onToggleComplete, onLogLearning 
       const progress = parseInt(progressInput);
       if(!isNaN(progress) && !isNaN(duration) && progress > 0 && duration > 0) {
         onLogLearning(activity, progress, duration);
-        onToggleComplete(activity.slot, activity.id);
+        // onToggleComplete is now called inside onLogLearning
         setOpenPopover(false);
         setProgressInput('');
         setDurationInput('');
@@ -58,7 +62,7 @@ function AgendaWidgetItem({ activity, duration, onToggleComplete, onLogLearning 
     } else { // deepwork or branding
       if(!isNaN(duration) && duration > 0) {
         onLogLearning(activity, 0, duration);
-        onToggleComplete(activity.slot, activity.id);
+        // onToggleComplete is now called inside onLogLearning
         setOpenPopover(false);
         setDurationInput('');
       }
@@ -129,8 +133,8 @@ interface TodaysScheduleCardProps {
   activityDurations: Record<string, string>;
   isAgendaDocked: boolean;
   onToggleDock: () => void;
-  onToggleComplete: (slotName: string, activityId: string) => void;
   onLogLearning: (activity: Activity, progress: number, duration: number) => void;
+  onStartWorkoutLog: (activity: Activity) => void;
 }
 
 export function TodaysScheduleCard({ 
@@ -138,10 +142,10 @@ export function TodaysScheduleCard({
   activityDurations, 
   isAgendaDocked, 
   onToggleDock,
-  onToggleComplete,
   onLogLearning,
+  onStartWorkoutLog,
 }: TodaysScheduleCardProps) {
-  const { carryForwardTask } = useAuth();
+  const { carryForwardTask, handleToggleComplete } = useAuth();
 
   const todaysSchedule = React.useMemo(() => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -291,8 +295,9 @@ export function TodaysScheduleCard({
                 key={activity.id}
                 activity={activity}
                 duration={activityDurations[activity.id]}
-                onToggleComplete={onToggleComplete}
                 onLogLearning={onLogLearning}
+                onStartWorkoutLog={onStartWorkoutLog}
+                onToggleComplete={handleToggleComplete}
               />
             ))}
           </ul>
@@ -315,88 +320,7 @@ export function TodaysScheduleCard({
           userSelect: isDragging ? 'none' : 'auto',
         }}
       >
-        <Card className="shadow-2xl bg-background/80 backdrop-blur-sm">
-          <CardHeader
-            className="p-3 cursor-grab active:cursor-grabbing"
-            onMouseDown={handleMouseDown}
-          >
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-base text-primary">
-                 Today's Agenda
-              </CardTitle>
-              <div className="flex items-center">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <History className="h-4 w-4" />
-                      <span className="sr-only">Pending Tasks</span>
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-80">
-                    <h4 className="font-medium leading-none mb-2">Yesterday's Pending Tasks</h4>
-                    {pendingTasks.length > 0 ? (
-                      <ScrollArea className="h-64">
-                        <ul className="space-y-2">
-                          {pendingTasks.map(task => (
-                            <li key={task.id} className="flex items-center justify-between text-sm">
-                              <span className="truncate pr-2" title={task.details}>{task.details}</span>
-                               <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button variant="outline" size="sm" className="h-7"><PlusCircle className="mr-2 h-3.5 w-3.5" /> Add</Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-48 p-1">
-                                  <div className="flex flex-col">
-                                    {slotNames.map(slot => (
-                                      <Button
-                                        key={slot}
-                                        variant="ghost"
-                                        className="justify-start h-8 text-sm"
-                                        onClick={() => {
-                                          carryForwardTask(task, slot);
-                                        }}
-                                      >
-                                        {slot}
-                                      </Button>
-                                    ))}
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
-                            </li>
-                          ))}
-                        </ul>
-                      </ScrollArea>
-                    ) : (
-                      <p className="text-sm text-muted-foreground text-center py-4">No pending tasks from yesterday.</p>
-                    )}
-                  </PopoverContent>
-                </Popover>
-                <Button variant="ghost" size="icon" onClick={onToggleDock} className="h-8 w-8">
-                  <Dock className="h-4 w-4" />
-                </Button>
-                <Grab className="text-muted-foreground ml-1 h-4 w-4" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-3">
-            {scheduledActivities.length > 0 ? (
-                <ul className="space-y-1 max-h-80 overflow-y-auto pr-2">
-                  {scheduledActivities.map((activity) => (
-                    <AgendaWidgetItem
-                      key={activity.id}
-                      activity={activity}
-                      duration={activityDurations[activity.id]}
-                      onToggleComplete={onToggleComplete}
-                      onLogLearning={onLogLearning}
-                    />
-                  ))}
-                </ul>
-            ) : (
-              <div className="text-center text-muted-foreground py-8">
-                <p className="text-sm">No activities scheduled.</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {cardContent}
       </div>
     );
   }

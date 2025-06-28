@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
@@ -59,6 +60,14 @@ interface AuthContextType {
   setAllUpskillLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   allDeepWorkLogs: DatedWorkout[];
   setAllDeepWorkLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
+  allWorkoutLogs: DatedWorkout[];
+  setAllWorkoutLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
+
+  // Workout Log Handlers
+  logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
+  updateWorkoutSet: (date: Date, exerciseId: string, setId: string, reps: number, weight: number) => void;
+  deleteWorkoutSet: (date: Date, exerciseId: string, setId: string) => void;
+  removeExerciseFromWorkout: (date: Date, exerciseId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -95,6 +104,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAgendaDocked, setIsAgendaDocked] = useState(true); // Default to docked
   const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
   const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
+  const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
   const [activityDurations, setActivityDurations] = useState<Record<string, string>>({});
 
 
@@ -139,10 +149,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const scheduleKey = `lifeos_schedule_${username}`;
       const upskillLogsKey = `upskill_logs_${username}`;
       const deepworkLogsKey = `deepwork_logs_${username}`;
+      const workoutLogsKey = `allWorkoutLogs_${username}`;
 
       try { const d = localStorage.getItem(scheduleKey); setSchedule(d ? JSON.parse(d) : {}); } catch (e) { setSchedule({}); }
       try { const d = localStorage.getItem(upskillLogsKey); setAllUpskillLogs(d ? JSON.parse(d) : []); } catch (e) { setAllUpskillLogs([]); }
       try { const d = localStorage.getItem(deepworkLogsKey); setAllDeepWorkLogs(d ? JSON.parse(d) : []); } catch (e) { setAllDeepWorkLogs([]); }
+      try { const d = localStorage.getItem(workoutLogsKey); setAllWorkoutLogs(d ? JSON.parse(d) : []); } catch (e) { setAllWorkoutLogs([]); }
 
     } else {
       // Clear all data on logout
@@ -155,6 +167,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSchedule({});
       setAllUpskillLogs([]);
       setAllDeepWorkLogs([]);
+      setAllWorkoutLogs([]);
     }
   }, [currentUser]);
 
@@ -174,8 +187,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`lifeos_schedule_${username}`, JSON.stringify(schedule));
       localStorage.setItem(`upskill_logs_${username}`, JSON.stringify(allUpskillLogs));
       localStorage.setItem(`deepwork_logs_${username}`, JSON.stringify(allDeepWorkLogs));
+      localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(allWorkoutLogs));
     }
-  }, [weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, allUpskillLogs, allDeepWorkLogs, currentUser, loading]);
+  }, [weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, currentUser, loading]);
 
 
   useEffect(() => {
@@ -198,7 +212,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Workout
     localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(data.exerciseDefinitions || []));
     localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(data.workoutPlans || {}));
-    localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(data.allWorkoutLogs || []));
+    setAllWorkoutLogs(data.allWorkoutLogs || []);
     localStorage.setItem(`workoutMode_${username}`, data.workoutMode || 'two-muscle');
 
     // Upskill
@@ -280,7 +294,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const allUserData = {
         exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
         workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
-        allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
+        allWorkoutLogs: allWorkoutLogs,
         workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
         upskillDefinitions: JSON.parse(localStorage.getItem(`upskill_definitions_${username}`) || '[]'),
         upskillLogs: allUpskillLogs,
@@ -338,7 +352,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const allUserData = {
             exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
             workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
-            allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
+            allWorkoutLogs: allWorkoutLogs,
             workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
             upskillDefinitions: JSON.parse(localStorage.getItem(`upskill_definitions_${username}`) || '[]'),
             upskillLogs: allUpskillLogs,
@@ -445,7 +459,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // Workout
             exerciseDefinitions: JSON.parse(localStorage.getItem(`exerciseDefinitions_${username}`) || '[]'),
             workoutPlans: JSON.parse(localStorage.getItem(`workoutPlans_${username}`) || '{}'),
-            allWorkoutLogs: JSON.parse(localStorage.getItem(`allWorkoutLogs_${username}`) || '[]'),
+            allWorkoutLogs: allWorkoutLogs,
             workoutMode: localStorage.getItem(`workoutMode_${username}`) || 'two-muscle',
             
             // Upskill
@@ -646,6 +660,75 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
   
+  const updateWorkoutInLog = (dateKey: string, updatedWorkout: DatedWorkout) => {
+    setAllWorkoutLogs(prevLogs => {
+      const existingLogIndex = prevLogs.findIndex(log => log.id === dateKey);
+      if (existingLogIndex > -1) {
+        const newLogs = [...prevLogs];
+        newLogs[existingLogIndex] = updatedWorkout;
+        return newLogs;
+      }
+      return [...prevLogs, updatedWorkout];
+    });
+  };
+
+  const logWorkoutSet = (date: Date, exerciseId: string, reps: number, weight: number) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    if (existingWorkout) {
+      const newSet: LoggedSet = { id: Date.now().toString(), reps, weight, timestamp: Date.now() };
+      const updatedExercises = existingWorkout.exercises.map(ex => 
+        ex.id === exerciseId ? { ...ex, loggedSets: [...ex.loggedSets, newSet] } : ex
+      );
+      updateWorkoutInLog(dateKey, { ...existingWorkout, exercises: updatedExercises });
+      toast({ title: "Set Logged!", description: `Logged ${reps} reps at ${weight} kg/lb.`});
+    }
+  };
+
+  const updateWorkoutSet = (date: Date, exerciseId: string, setId: string, reps: number, weight: number) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    if (existingWorkout) {
+      const updatedExercises = existingWorkout.exercises.map(ex => {
+        if (ex.id === exerciseId) {
+          return { ...ex, loggedSets: ex.loggedSets.map(set => 
+              set.id === setId ? { ...set, reps, weight, timestamp: Date.now() } : set
+            )};
+        }
+        return ex;
+      });
+      updateWorkoutInLog(dateKey, { ...existingWorkout, exercises: updatedExercises });
+      toast({ title: "Set Updated", description: "The set has been updated."});
+    }
+  };
+
+  const deleteWorkoutSet = (date: Date, exerciseId: string, setId: string) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    if (existingWorkout) {
+      const updatedExercises = existingWorkout.exercises.map(ex =>
+        ex.id === exerciseId ? { ...ex, loggedSets: ex.loggedSets.filter(s => s.id !== setId) } : ex
+      );
+      updateWorkoutInLog(dateKey, { ...existingWorkout, exercises: updatedExercises });
+      toast({ title: "Set Deleted", description: "The set has been removed." });
+    }
+  };
+  
+  const removeExerciseFromWorkout = (date: Date, exerciseId: string) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    if (existingWorkout) {
+      const updatedExercises = existingWorkout.exercises.filter(ex => ex.id !== exerciseId);
+      const exerciseName = existingWorkout.exercises.find(ex => ex.id === exerciseId)?.name;
+      if (updatedExercises.length === 0) { 
+        setAllWorkoutLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
+      } else {
+        updateWorkoutInLog(dateKey, { ...existingWorkout, exercises: updatedExercises });
+      }
+      toast({ title: "Success", description: `"${exerciseName || ''}" removed from workout.` });
+    }
+  };
+  
   const value = {
     currentUser,
     loading,
@@ -688,6 +771,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAllUpskillLogs,
     allDeepWorkLogs,
     setAllDeepWorkLogs,
+    allWorkoutLogs,
+    setAllWorkoutLogs,
+    // Workout Handlers
+    logWorkoutSet,
+    updateWorkoutSet,
+    deleteWorkoutSet,
+    removeExerciseFromWorkout,
   };
 
   return (

@@ -176,7 +176,7 @@ const INITIAL_PLANS: AllWorkoutPlans = {
     "Back": ["Lat Pulldown", "1-Arm Dumbbell Row", "V handle lat pulldown", "Barbell Row", "Lat Prayer Pull", "Back extensions"],
     "Biceps": ["Strict bar curls", "Seated Incline Dumbbell Curl", "Seated Dumbbell Alternating Curl", "Preacher Curls Bar", "Reverse Cable", "Concentration Curl"],
     "Shoulders": ["Seated Dumbbell Shoulder Press", "Lean-Away Cable Lateral Raise", "Face Pulls", "Front Raise cable", "Cable Upright Rows", "Shrugs"],
-    "Legs": ["Walking Lunges (Barbell)", "Hack Squats", "Hamstring machine", "Quads Machine", "Leg Press", "Calfs (Bodyweight)"]
+    "Legs": ["Walking Lunges (Barbell)", "Hack Squats", "hamstring machine", "Quads Machine", "Leg Press", "Calfs (Bodyweight)"]
   }
 };
 
@@ -213,7 +213,10 @@ function WorkoutPageContent() {
     height, setHeight,
     dateOfBirth, setDateOfBirth,
     gender, setGender,
-    dietPlan
+    dietPlan,
+    allWorkoutLogs, setAllWorkoutLogs,
+    logWorkoutSet, updateWorkoutSet, deleteWorkoutSet,
+    removeExerciseFromWorkout
   } = useAuth();
 
   const [workoutMode, setWorkoutMode] = useState<WorkoutMode>('two-muscle');
@@ -226,7 +229,6 @@ function WorkoutPageContent() {
   const [editingDefinitionCategory, setEditingDefinitionCategory] = useState<ExerciseCategory | "">("");
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
 
   const [viewingProgressExercise, setViewingProgressExercise] = useState<ExerciseDefinition | null>(null);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
@@ -273,7 +275,6 @@ function WorkoutPageContent() {
         const username = currentUser.username;
         const defsKey = `exerciseDefinitions_${username}`;
         const plansKey = `workoutPlans_${username}`;
-        const logsKey = `allWorkoutLogs_${username}`;
         const modeKey = `workoutMode_${username}`;
 
         const storedMode = localStorage.getItem(modeKey);
@@ -317,14 +318,8 @@ function WorkoutPageContent() {
             localStorage.setItem(defsKey, JSON.stringify(DEFAULT_EXERCISE_DEFINITIONS));
         }
         
-        try {
-            const storedLogs = localStorage.getItem(logsKey);
-            setAllWorkoutLogs(storedLogs ? JSON.parse(storedLogs) : []);
-        } catch (e) { console.error("Error parsing workout logs", e); setAllWorkoutLogs([]); }
-
     } else {
       setExerciseDefinitions([]);
-      setAllWorkoutLogs([]);
       setWorkoutPlans(INITIAL_PLANS);
     }
     const timer = setTimeout(() => setIsLoadingPage(false), 300);
@@ -335,12 +330,10 @@ function WorkoutPageContent() {
     if (currentUser?.username && !isLoadingPage) {
       try {
         const defsKey = `exerciseDefinitions_${currentUser.username}`;
-        const logsKey = `allWorkoutLogs_${currentUser.username}`;
         const modeKey = `workoutMode_${currentUser.username}`;
         const plansKey = `workoutPlans_${currentUser.username}`;
         
         localStorage.setItem(defsKey, JSON.stringify(exerciseDefinitions));
-        localStorage.setItem(logsKey, JSON.stringify(allWorkoutLogs));
         localStorage.setItem(modeKey, workoutMode);
         localStorage.setItem(plansKey, JSON.stringify(workoutPlans));
       } catch (e) {
@@ -348,7 +341,7 @@ function WorkoutPageContent() {
         toast({ title: "Save Error", description: "Could not save workout data locally.", variant: "destructive"});
       }
     }
-  }, [exerciseDefinitions, allWorkoutLogs, workoutMode, workoutPlans, currentUser, isLoadingPage, toast]);
+  }, [exerciseDefinitions, workoutMode, workoutPlans, currentUser, isLoadingPage, toast]);
 
   useEffect(() => {
     if (!currentUser || exerciseDefinitions.length === 0 || Object.keys(workoutPlans).length === 0 || !workoutMode) {
@@ -370,7 +363,7 @@ function WorkoutPageContent() {
             });
         }
     }
-  }, [selectedDate, currentUser, exerciseDefinitions, workoutMode, workoutPlans, allWorkoutLogs, toast]);
+  }, [selectedDate, currentUser, exerciseDefinitions, workoutMode, workoutPlans, allWorkoutLogs, setAllWorkoutLogs, toast]);
 
   useEffect(() => {
       if (!currentUser) return;
@@ -437,18 +430,6 @@ function WorkoutPageContent() {
         ? prev.filter(c => c !== category) 
         : [...prev, category]
     );
-  };
-
-  const updateOrAddWorkoutLog = (updatedWorkout: DatedWorkout) => {
-    setAllWorkoutLogs(prevLogs => {
-      const existingLogIndex = prevLogs.findIndex(log => log.id === updatedWorkout.id);
-      if (existingLogIndex > -1) {
-        const newLogs = [...prevLogs];
-        newLogs[existingLogIndex] = updatedWorkout;
-        return newLogs;
-      }
-      return [...prevLogs, updatedWorkout];
-    });
   };
 
   const handleAddExerciseDefinition = (e: FormEvent) => {
@@ -535,74 +516,13 @@ function WorkoutPageContent() {
       if (existingWorkout.exercises.some(ex => ex.definitionId === definition.id)) {
         toast({ title: "Info", description: `"${definition.name}" is already in this workout.`, variant: "default" }); return;
       }
-      updateOrAddWorkoutLog({ ...existingWorkout, exercises: [...existingWorkout.exercises, newWorkoutExercise] });
+      setAllWorkoutLogs(prev => prev.map(log => log.id === dateKey ? {...log, exercises: [...log.exercises, newWorkoutExercise]} : log));
     } else {
-      updateOrAddWorkoutLog({ id: dateKey, date: dateKey, exercises: [newWorkoutExercise] });
+      setAllWorkoutLogs(prev => [...prev, { id: dateKey, date: dateKey, exercises: [newWorkoutExercise] }]);
     }
     toast({ title: "Added to Workout", description: `"${definition.name}" added for ${format(selectedDate, 'PPP')}.` });
   };
-
-  const handleRemoveExerciseFromWorkout = (exerciseId: string) => {
-    if (!currentUser) return;
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
-    if (existingWorkout) {
-      const updatedExercises = existingWorkout.exercises.filter(ex => ex.id !== exerciseId);
-      const exerciseName = existingWorkout.exercises.find(ex => ex.id === exerciseId)?.name;
-      if (updatedExercises.length === 0) { 
-        setAllWorkoutLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
-      } else {
-        updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
-      }
-      toast({ title: "Success", description: `"${exerciseName || ''}" removed from workout.` });
-    }
-  };
   
-  const handleLogSet = (exerciseId: string, reps: number, weight: number) => {
-    if (!currentUser) return;
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
-    if (existingWorkout) {
-      const newSet: LoggedSet = { id: Date.now().toString(), reps, weight, timestamp: Date.now() };
-      const updatedExercises = existingWorkout.exercises.map(ex => 
-        ex.id === exerciseId ? { ...ex, loggedSets: [...ex.loggedSets, newSet] } : ex
-      );
-      updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
-      toast({ title: "Set Logged!", description: `Logged ${reps} reps at ${weight} kg/lb.`});
-    }
-  };
-
-  const handleDeleteSet = (exerciseId: string, setId: string) => {
-    if (!currentUser) return;
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
-    if (existingWorkout) {
-      const updatedExercises = existingWorkout.exercises.map(ex =>
-        ex.id === exerciseId ? { ...ex, loggedSets: ex.loggedSets.filter(s => s.id !== setId) } : ex
-      );
-      updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
-      toast({ title: "Set Deleted", description: "The set has been removed." });
-    }
-  };
-
-  const handleUpdateSet = (exerciseId: string, setId: string, reps: number, weight: number) => {
-    if (!currentUser) return;
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
-    if (existingWorkout) {
-      const updatedExercises = existingWorkout.exercises.map(ex => {
-        if (ex.id === exerciseId) {
-          return { ...ex, loggedSets: ex.loggedSets.map(set => 
-              set.id === setId ? { ...set, reps, weight, timestamp: Date.now() } : set
-            )};
-        }
-        return ex;
-      });
-      updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
-      toast({ title: "Set Updated", description: "The set has been updated."});
-    }
-  };
-
   const handleViewProgress = (definition: ExerciseDefinition) => {
     setViewingProgressExercise(definition);
     setIsProgressModalOpen(true);
@@ -1040,10 +960,10 @@ function WorkoutPageContent() {
                                 <WorkoutExerciseCard 
                                   key={exercise.id} 
                                   exercise={exercise}
-                                  onLogSet={handleLogSet} 
-                                  onDeleteSet={handleDeleteSet} 
-                                  onUpdateSet={handleUpdateSet} 
-                                  onRemoveExercise={handleRemoveExerciseFromWorkout}
+                                  onLogSet={(...args) => logWorkoutSet(selectedDate, ...args)}
+                                  onDeleteSet={(...args) => deleteWorkoutSet(selectedDate, ...args)}
+                                  onUpdateSet={(...args) => updateWorkoutSet(selectedDate, ...args)}
+                                  onRemoveExercise={(exerciseId) => removeExerciseFromWorkout(selectedDate, exerciseId)}
                                   onViewProgress={definition ? () => handleViewProgress(definition) : undefined}
                                 />
                               );
@@ -1062,7 +982,7 @@ function WorkoutPageContent() {
                   allWorkoutLogs={allWorkoutLogs}
                   onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
                   consistencyData={consistencyData}
-                  oneYearAgo={oneYearAgo}
+                  oneYearAgo={today}
                   today={today}
                 />
               </div>

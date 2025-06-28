@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -92,9 +93,8 @@ function HomePageContent() {
     schedule,
     setSchedule,
     allUpskillLogs,
-    setAllUpskillLogs,
     allDeepWorkLogs,
-    setAllDeepWorkLogs,
+    allWorkoutLogs,
     setActivityDurations,
     isAgendaDocked,
     setIsAgendaDocked,
@@ -112,7 +112,6 @@ function HomePageContent() {
   const [workoutMode, setWorkoutMode] = useState<WorkoutMode>('two-muscle');
   const [workoutPlans, setWorkoutPlans] = useState<AllWorkoutPlans>(INITIAL_PLANS);
   const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>([]);
-  const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
   
   // State for upskill and deepwork data (now using context, but some local state might be needed for modals etc)
   const [deepWorkDefinitions, setDeepWorkDefinitions] = useState<ExerciseDefinition[]>([]);
@@ -128,7 +127,8 @@ function HomePageContent() {
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<{ slotName: string; activity: Activity } | null>(null);
-  
+  const [workoutActivityToLog, setWorkoutActivityToLog] = useState<Activity | null>(null);
+
   // State for Modal content
   const [todaysExercises, setTodaysExercises] = useState<WorkoutExercise[]>([]);
   const [todaysMuscleGroups, setTodaysMuscleGroups] = useState<string[]>([]);
@@ -149,7 +149,7 @@ function HomePageContent() {
     if (currentUser?.username) {
         const username = currentUser.username;
         const keys = {
-            workout: { defs: `exerciseDefinitions_${username}`, plans: `workoutPlans_${username}`, mode: `workoutMode_${username}`, logs: `allWorkoutLogs_${username}` },
+            workout: { defs: `exerciseDefinitions_${username}`, plans: `workoutPlans_${username}`, mode: `workoutMode_${username}` },
             upskill: { goals: `upskill_topic_goals_${username}` },
             deepwork: { defs: `deepwork_definitions_${username}` },
             branding: { tasks: `branding_tasks_${username}`, logs: `branding_logs_${username}` },
@@ -159,7 +159,6 @@ function HomePageContent() {
         setWorkoutMode((loadItem(keys.workout.mode, false) as WorkoutMode) || 'two-muscle');
         try { const d = loadItem(keys.workout.plans); setWorkoutPlans(d ? JSON.parse(d) : INITIAL_PLANS); } catch (e) { setWorkoutPlans(INITIAL_PLANS); }
         try { const d = loadItem(keys.workout.defs); setExerciseDefinitions(d ? JSON.parse(d) : []); } catch (e) { setExerciseDefinitions([]); }
-        try { const d = loadItem(keys.workout.logs); setAllWorkoutLogs(d ? JSON.parse(d) : []); } catch (e) { setAllWorkoutLogs([]); }
         try { const d = loadItem(keys.deepwork.defs); setDeepWorkDefinitions(d ? JSON.parse(d) : []); } catch (e) { setDeepWorkDefinitions([]); }
         try { const d = loadItem(keys.upskill.goals); setTopicGoals(d ? JSON.parse(d) : {}); } catch (e) { setTopicGoals({}); }
         try { const d = loadItem(keys.branding.tasks); setBrandingTasks(d ? JSON.parse(d) : []); } catch (e) { setBrandingTasks([]); }
@@ -177,13 +176,12 @@ function HomePageContent() {
     localStorage.setItem(`workoutMode_${username}`, workoutMode);
     localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(workoutPlans));
     localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(exerciseDefinitions));
-    localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(allWorkoutLogs));
     localStorage.setItem(`upskill_topic_goals_${username}`, JSON.stringify(topicGoals));
     localStorage.setItem(`deepwork_definitions_${username}`, JSON.stringify(deepWorkDefinitions));
     localStorage.setItem(`branding_tasks_${username}`, JSON.stringify(brandingTasks));
     localStorage.setItem(`branding_logs_${username}`, JSON.stringify(brandingLogs));
 
-  }, [workoutMode, workoutPlans, exerciseDefinitions, allWorkoutLogs, topicGoals, deepWorkDefinitions, brandingTasks, brandingLogs, currentUser, isScheduleLoaded]);
+  }, [workoutMode, workoutPlans, exerciseDefinitions, topicGoals, deepWorkDefinitions, brandingTasks, brandingLogs, currentUser, isScheduleLoaded]);
 
   useEffect(() => {
     const timerInterval = setInterval(() => {
@@ -284,13 +282,17 @@ function HomePageContent() {
     return { exercises, muscleGroups };
   };
 
+  const handleStartWorkoutLog = (activity: Activity) => {
+    const { exercises, muscleGroups } = getTodaysWorkout();
+    setTodaysExercises(exercises);
+    setTodaysMuscleGroups(muscleGroups);
+    setWorkoutActivityToLog(activity);
+  };
+  
   const handleActivityClick = (slotName: string, activity: Activity) => {
     if (!activity || activity.completed) return;
     if (activity.type === 'workout') {
-      const { exercises, muscleGroups } = getTodaysWorkout();
-      setTodaysExercises(exercises);
-      setTodaysMuscleGroups(muscleGroups);
-      setIsTodaysWorkoutModalOpen(true);
+      handleStartWorkoutLog(activity);
     } else if (['upskill', 'deepwork', 'branding'].includes(activity.type)) {
       setEditingActivity({ slotName, activity });
       setIsLearningModalOpen(true);
@@ -364,6 +366,7 @@ function HomePageContent() {
   const productivityStats = useMemo(() => {
       const todayStr = format(new Date(), 'yyyy-MM-dd');
       const getDailyDuration = (logs: DatedWorkout[], dateStr: string, durationField: 'reps' | 'weight') => {
+          if (!logs) return 0;
           const logForDay = logs.find(log => log.date === dateStr);
           if (!logForDay) return 0;
           return logForDay.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
@@ -713,8 +716,8 @@ function HomePageContent() {
                         activityDurations={activityDurations}
                         isAgendaDocked={isAgendaDocked}
                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                        onToggleComplete={handleToggleComplete}
                         onLogLearning={handleLogLearning}
+                        onStartWorkoutLog={handleStartWorkoutLog}
                     />
                 )}
                 <WeightGoalCard 
@@ -753,18 +756,22 @@ function HomePageContent() {
                 activityDurations={activityDurations}
                 isAgendaDocked={isAgendaDocked}
                 onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                onToggleComplete={handleToggleComplete}
                 onLogLearning={handleLogLearning}
+                onStartWorkoutLog={handleStartWorkoutLog}
             />
         )}
 
         {currentUser && (
           <TodaysWorkoutModal
-              isOpen={isTodaysWorkoutModalOpen}
-              onOpenChange={setIsTodaysWorkoutModalOpen}
+              isOpen={!!workoutActivityToLog}
+              onOpenChange={(isOpen) => { if(!isOpen) setWorkoutActivityToLog(null); }}
+              activityToLog={workoutActivityToLog}
               todaysExercises={todaysExercises}
               muscleGroupsForDay={todaysMuscleGroups}
-              allWorkoutLogs={allWorkoutLogs}
+              onActivityComplete={(slotName, activityId) => {
+                handleToggleComplete(slotName, activityId);
+                setWorkoutActivityToLog(null);
+              }}
           />
         )}
 
