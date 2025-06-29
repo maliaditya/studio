@@ -37,6 +37,7 @@ export function Header() {
     { href: '/monetization-engine', label: 'Monetization' },
     { href: '/productization', label: 'Productization' },
     { href: '/offerization', label: 'Offerization' },
+    { href: '/matrix', label: 'Matrix' },
   ];
 
   return (
