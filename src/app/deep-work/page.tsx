@@ -49,6 +49,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from '@/components/ui/textarea';
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 
 const DEFAULT_TARGET_SESSIONS = 1;
@@ -70,7 +72,6 @@ function DeepWorkPageContent() {
     gender, setGender,
     allDeepWorkLogs, setAllDeepWorkLogs,
     deepWorkDefinitions, setDeepWorkDefinitions,
-    deepworkManualDeletes, setDeepworkManualDeletes,
     upskillDefinitions, allUpskillLogs,
   } = useAuth();
 
@@ -163,48 +164,15 @@ function DeepWorkPageContent() {
     setIsLoadingPage(false); // Data is loaded from context
   }, []);
 
-  // Logic to promote Upskill tasks to Deep Work focus areas
-  useEffect(() => {
-    if (!currentUser?.username || isLoadingPage || upskillDefinitions.length === 0 || allUpskillLogs.length === 0) {
-        return;
-    }
-
-    const loggedUpskillDefIds = new Set<string>();
-    allUpskillLogs.forEach(log => {
-        log.exercises.forEach(ex => {
-            if (ex.loggedSets.length > 0) {
-                loggedUpskillDefIds.add(ex.definitionId);
-            }
-        });
-    });
-
-    const currentDeepWorkIds = new Set(deepWorkDefinitions.map(def => def.id));
-    const newlyPromoted: ExerciseDefinition[] = [];
-
-    upskillDefinitions.forEach(upskillDef => {
-        const newDeepWorkId = `dw-${upskillDef.id}`;
-        const wasManuallyDeleted = deepworkManualDeletes.includes(upskillDef.id);
-        const isAlreadyPromoted = currentDeepWorkIds.has(newDeepWorkId);
-        
-        if (loggedUpskillDefIds.has(upskillDef.id) && !isAlreadyPromoted && !wasManuallyDeleted) {
-            const newFocusArea: ExerciseDefinition = {
-                ...upskillDef,
-                id: newDeepWorkId,
-                sourceUpskillId: upskillDef.id,
-            };
-            newlyPromoted.push(newFocusArea);
-            currentDeepWorkIds.add(newDeepWorkId);
-        }
-    });
-
-    if (newlyPromoted.length > 0) {
-      toast({
-          title: "Focus Areas Promoted!",
-          description: `${newlyPromoted.length} learning task(s) have been added to your Focus Area Library.`,
-      });
-      setDeepWorkDefinitions(currentDefs => [...currentDefs, ...newlyPromoted]);
-    }
-  }, [upskillDefinitions, allUpskillLogs, currentUser, isLoadingPage, toast, deepWorkDefinitions, setDeepWorkDefinitions, deepworkManualDeletes]);
+  const handleToggleReadyForBranding = (id: string) => {
+    setDeepWorkDefinitions(prev => 
+      prev.map(def => 
+        def.id === id 
+          ? { ...def, isReadyForBranding: !def.isReadyForBranding } 
+          : def
+      )
+    );
+  };
 
 
   // Check for backup prompt on Mondays
@@ -288,10 +256,6 @@ function DeepWorkPageContent() {
 
   const handleDeleteExerciseDefinition = (id: string) => {
     const defToDelete = deepWorkDefinitions.find(def => def.id === id);
-
-    if (defToDelete?.sourceUpskillId) {
-        setDeepworkManualDeletes(prev => [...new Set([...prev, defToDelete!.sourceUpskillId])]);
-    }
 
     setDeepWorkDefinitions(prev => prev.filter(def => def.id !== id));
     setAllDeepWorkLogs(prevLogs => 
@@ -577,19 +541,31 @@ function DeepWorkPageContent() {
                                       </div>
                                     </div>
                                   ) : (
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="flex-grow min-w-0">
-                                          <span className="font-medium text-foreground block" title={def.name}>{def.name}</span>
-                                          <Badge variant="secondary" className="text-xs ml-0 my-0.5">{def.category}</Badge>
+                                    <>
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className="flex-grow min-w-0">
+                                            <span className="font-medium text-foreground block" title={def.name}>{def.name}</span>
+                                            <Badge variant="secondary" className="text-xs ml-0 my-0.5">{def.category}</Badge>
+                                        </div>
+                                        <div className="flex-shrink-0 flex items-center">
+                                          <Button variant="ghost" size="icon" onClick={() => handleOpenDecompositionModal(def)} className="h-8 w-8 text-muted-foreground hover:text-yellow-500" aria-label={`View decomposition techniques for ${def.name}`}> <Puzzle className="h-4 w-4" /> </Button>
+                                          <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
+                                          <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8 text-muted-foreground hover:text-primary" aria-label={`Edit ${def.name}`}> <Edit3 className="h-4 w-4" /> </Button>
+                                          <Button variant="ghost" size="icon" onClick={() => handleDeleteExerciseDefinition(def.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label={`Delete ${def.name}`}> <Trash2 className="h-4 w-4" /> </Button>
+                                          <Button variant="ghost" size="icon" onClick={() => handleAddTaskToSession(def)} className="h-8 w-8 text-muted-foreground hover:text-accent" aria-label={`Add ${def.name} to session`}> <ChevronRight className="h-5 w-5" /> </Button>
+                                        </div>
                                       </div>
-                                      <div className="flex-shrink-0 flex items-center">
-                                        <Button variant="ghost" size="icon" onClick={() => handleOpenDecompositionModal(def)} className="h-8 w-8 text-muted-foreground hover:text-yellow-500" aria-label={`View decomposition techniques for ${def.name}`}> <Puzzle className="h-4 w-4" /> </Button>
-                                        <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
-                                        <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8 text-muted-foreground hover:text-primary" aria-label={`Edit ${def.name}`}> <Edit3 className="h-4 w-4" /> </Button>
-                                        <Button variant="ghost" size="icon" onClick={() => handleDeleteExerciseDefinition(def.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label={`Delete ${def.name}`}> <Trash2 className="h-4 w-4" /> </Button>
-                                        <Button variant="ghost" size="icon" onClick={() => handleAddTaskToSession(def)} className="h-8 w-8 text-muted-foreground hover:text-accent" aria-label={`Add ${def.name} to session`}> <ChevronRight className="h-5 w-5" /> </Button>
+                                      <div className="flex items-center space-x-2 pt-3 mt-3 border-t">
+                                        <Checkbox
+                                          id={`branding-${def.id}`}
+                                          checked={!!def.isReadyForBranding}
+                                          onCheckedChange={() => handleToggleReadyForBranding(def.id)}
+                                        />
+                                        <Label htmlFor={`branding-${def.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                          Ready for Branding
+                                        </Label>
                                       </div>
-                                    </div>
+                                    </>
                                   )}
                                 </motion.li>
                               ))}

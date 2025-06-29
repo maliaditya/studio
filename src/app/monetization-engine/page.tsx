@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from '@/components/ui/separator';
 
 function MonetizationEnginePageContent() {
-  const { brandingTasks } = useAuth();
+  const { deepWorkDefinitions } = useAuth();
 
   const leadGenItems = [
     "Post CTAs (“DM me”, “Link in bio”)",
@@ -31,12 +31,13 @@ function MonetizationEnginePageContent() {
   ];
   
   const publishedBundles = useMemo(() => {
-    return (brandingTasks || []).filter(task => 
+    return (deepWorkDefinitions || []).filter(task => 
+        task.isReadyForBranding &&
         task.sharingStatus?.twitter &&
         task.sharingStatus?.linkedin &&
         task.sharingStatus?.devto
     );
-  }, [brandingTasks]);
+  }, [deepWorkDefinitions]);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
@@ -71,7 +72,7 @@ function MonetizationEnginePageContent() {
                     ))}
                 </ul>
             ) : (
-                <p className="text-sm text-muted-foreground mb-6">No published content bundles yet. Publish content from the Personal Branding page to see it here.</p>
+                <p className="text-sm text-muted-foreground mb-6">No published content yet. Mark items as 'Ready for Branding' and publish them to see them here.</p>
             )}
             <Separator className="my-4"/>
             <h4 className="font-semibold mb-3 text-md text-foreground/90">Lead Generation Actions</h4>

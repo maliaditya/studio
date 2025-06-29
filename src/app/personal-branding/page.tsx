@@ -48,9 +48,8 @@ function PersonalBrandingPageContent() {
   const { 
     currentUser, 
     exportData,
-    brandingTasks, setBrandingTasks,
     brandingLogs, setAllBrandingLogs,
-    deepWorkDefinitions, deepWorkLogs
+    deepWorkDefinitions, setDeepWorkDefinitions,
   } = useAuth();
   
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -58,113 +57,11 @@ function PersonalBrandingPageContent() {
   const [isLoadingPage, setIsLoadingPage] = useState(true);
   const [showBackupPrompt, setShowBackupPrompt] = useState(false);
   const [isPublishedExpanded, setIsPublishedExpanded] = useState(false);
-  const [addSelection, setAddSelection] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (currentUser?.username) {
-      const bundledFocusAreaNames = new Set<string>();
-      (brandingTasks || []).forEach(task => {
-          if (task.focusAreas) {
-              task.focusAreas.forEach(name => bundledFocusAreaNames.add(name));
-          }
-      });
-      
-      const uniqueDaysPerDef: Record<string, Set<string>> = {};
-      (deepWorkLogs || []).forEach(log => {
-        log.exercises.forEach(ex => {
-          if (ex.loggedSets.length > 0) {
-            if (!uniqueDaysPerDef[ex.definitionId]) {
-              uniqueDaysPerDef[ex.definitionId] = new Set();
-            }
-            uniqueDaysPerDef[ex.definitionId].add(log.date);
-          }
-        });
-      });
-
-      const focusAreaSessionCounts: Record<string, number> = {};
-      Object.keys(uniqueDaysPerDef).forEach(defId => {
-        focusAreaSessionCounts[defId] = uniqueDaysPerDef[defId].size;
-      });
-
-      const eligibleFocusAreas = (deepWorkDefinitions || []).filter(def => {
-        const hasEnoughSessions = (focusAreaSessionCounts[def.id] || 0) >= 1;
-        const isAlreadyBundled = bundledFocusAreaNames.has(def.name);
-        return hasEnoughSessions && !isAlreadyBundled;
-      });
-      
-      const newGeneratedTasks: ExerciseDefinition[] = [...(brandingTasks || [])];
-      let wasChanged = false;
-      const newlyBundledNames = new Set<string>();
-
-      // No longer grouping by topic. Process all eligible areas together.
-      if (eligibleFocusAreas.length >= 4) {
-          for (let i = 0; i < eligibleFocusAreas.length; i += 4) {
-              const bundle = eligibleFocusAreas.slice(i, i + 4);
-              if (bundle.length === 4) {
-                  wasChanged = true;
-                  // Use total number of bundles to determine the new bundle number
-                  const existingBundlesCount = newGeneratedTasks.filter(t => t.name.startsWith(`Content Bundle`)).length;
-                  const bundleNumber = existingBundlesCount + 1;
-                  const bundleId = `branding_bundle_${bundleNumber}_${Date.now()}`;
-                  const bundleName = `Content Bundle #${bundleNumber}`;
-                  const bundleFocusAreas = bundle.map(def => def.name);
-                  
-                  newGeneratedTasks.push({
-                      id: bundleId,
-                      name: bundleName,
-                      category: 'Personal Branding' as ExerciseCategory,
-                      sharingStatus: { twitter: false, linkedin: false, devto: false },
-                      focusAreas: bundleFocusAreas,
-                  });
-                  
-                  bundleFocusAreas.forEach(name => newlyBundledNames.add(name));
-              }
-          }
-      }
-      
-      if(wasChanged) {
-        toast({ title: 'New Content Bundles Created!', description: `${newlyBundledNames.size} focus areas have been bundled into new content ideas.` });
-        setBrandingTasks(newGeneratedTasks);
-      }
-    }
-    const timer = setTimeout(() => setIsLoadingPage(false), 300);
-    return () => clearTimeout(timer);
-  }, [currentUser, deepWorkDefinitions, deepWorkLogs, brandingTasks, setBrandingTasks, toast]);
+    setIsLoadingPage(false);
+  }, []);
   
-  const availableFocusAreas = useMemo(() => {
-    if (!deepWorkDefinitions || !deepWorkLogs || !brandingTasks) {
-      return [];
-    }
-
-    const uniqueDaysPerDef: Record<string, Set<string>> = {};
-    deepWorkLogs.forEach(log => {
-      log.exercises.forEach(ex => {
-        if (ex.loggedSets.length > 0) {
-          if (!uniqueDaysPerDef[ex.definitionId]) {
-            uniqueDaysPerDef[ex.definitionId] = new Set();
-          }
-          uniqueDaysPerDef[ex.definitionId].add(log.date);
-        }
-      });
-    });
-    
-    const focusAreaSessionCounts: Record<string, number> = {};
-    Object.keys(uniqueDaysPerDef).forEach(defId => {
-      focusAreaSessionCounts[defId] = uniqueDaysPerDef[defId].size;
-    });
-
-    const allEligibleFocusAreas = deepWorkDefinitions.filter(def => 
-        (focusAreaSessionCounts[def.id] || 0) >= 1
-    );
-    
-    const usedFocusAreaNames = new Set<string>();
-    brandingTasks.forEach(task => {
-      task.focusAreas?.forEach(name => usedFocusAreaNames.add(name));
-    });
-    
-    return allEligibleFocusAreas.filter(def => !usedFocusAreaNames.has(def.name));
-  }, [deepWorkDefinitions, deepWorkLogs, brandingTasks]);
-
   useEffect(() => {
     if (!currentUser) return;
     const today = new Date();
@@ -185,7 +82,7 @@ function PersonalBrandingPageContent() {
       const active: ExerciseDefinition[] = [];
       const published: ExerciseDefinition[] = [];
 
-      (brandingTasks || []).forEach(task => {
+      (deepWorkDefinitions || []).filter(def => def.isReadyForBranding).forEach(task => {
           if (isFullyShared(task)) {
               published.push(task);
           } else {
@@ -194,7 +91,7 @@ function PersonalBrandingPageContent() {
       });
 
       return { activeTasks: active, publishedTasks: published };
-  }, [brandingTasks]);
+  }, [deepWorkDefinitions]);
 
   const markBackupPromptAsHandled = () => {
     const today = new Date();
@@ -284,65 +181,18 @@ function PersonalBrandingPageContent() {
   };
 
   const handleUpdateSharingStatus = (definitionId: string, newStatus: SharingStatus) => {
-    setBrandingTasks(prevTasks => 
-      prevTasks.map(task => 
-        task.id === definitionId ? { ...task, sharingStatus: newStatus } : task
+    setDeepWorkDefinitions(prevDefs => 
+      prevDefs.map(def => 
+        def.id === definitionId ? { ...def, sharingStatus: { ...(def.sharingStatus || {}), ...newStatus } } : def
       )
     );
-  };
-  
-  const handleRemoveFocusAreaFromBundle = (bundleId: string, focusAreaName: string) => {
-    setBrandingTasks(prevTasks => {
-        const newTasks = prevTasks.map(task => {
-            if (task.id === bundleId) {
-                return {
-                    ...task,
-                    focusAreas: task.focusAreas?.filter(fa => fa !== focusAreaName)
-                };
-            }
-            return task;
-        }).filter(task => task.focusAreas && task.focusAreas.length > 0); 
-
-        if (newTasks.length < prevTasks.length) {
-            toast({ title: "Bundle Removed", description: "The bundle was removed as it became empty." });
-        } else {
-            toast({ title: "Focus Area Removed" });
-        }
-        return newTasks;
-    });
-  };
-
-  const handleAddFocusAreaToBundle = (bundleId: string) => {
-    const focusAreaName = addSelection[bundleId];
-    if (!focusAreaName) {
-        toast({ title: "No Selection", description: "Please select a focus area to add.", variant: "destructive" });
-        return;
-    }
-
-    setBrandingTasks(prevTasks => prevTasks.map(task => {
-        if (task.id === bundleId) {
-            const existingFocusAreas = Array.isArray(task.focusAreas) ? task.focusAreas : [];
-            if (existingFocusAreas.includes(focusAreaName)) {
-                toast({ title: "Already Exists", description: `"${focusAreaName}" is already in this bundle.` });
-                return task;
-            }
-            return {
-                ...task,
-                focusAreas: [...existingFocusAreas, focusAreaName]
-            };
-        }
-        return task;
-    }));
-
-    setAddSelection(prev => ({ ...prev, [bundleId]: '' }));
-    toast({ title: "Focus Area Added" });
   };
   
   if (isLoadingPage) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
         <Loader2 className="h-16 w-16 text-primary animate-spin mb-4" />
-        <p className="text-muted-foreground">Generating your branding pipeline...</p>
+        <p className="text-muted-foreground">Loading your branding pipeline...</p>
       </div>
     );
   }
@@ -358,7 +208,7 @@ function PersonalBrandingPageContent() {
                     <Share2 /> Branding Pipeline
                   </CardTitle>
                   <CardDescription>
-                    Content bundles are automatically generated. Add them to a session to start content creation.
+                    Items you've marked as "Ready for Branding" on the Deep Work page will appear here.
                   </CardDescription>
               </CardHeader>
               <CardContent className="p-4">
@@ -368,7 +218,7 @@ function PersonalBrandingPageContent() {
                         <Briefcase className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
                         <p className="text-muted-foreground">Your pipeline is empty.</p>
                         <p className="text-sm text-muted-foreground/80">
-                          A content bundle appears here for every 4 focus areas that have at least 1 day of logged sessions in Deep Work.
+                          Go to the Deep Work page and check "Ready for Branding" on a focus area to get started.
                         </p>
                       </div>
                     ) : (
@@ -378,43 +228,13 @@ function PersonalBrandingPageContent() {
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex-grow min-w-0">
                                   <span className="font-medium text-foreground block" title={task.name}>{task.name}</span>
+                                   <Badge variant="secondary" className="text-xs">{task.category}</Badge>
                               </div>
                               <div className="flex-shrink-0 flex items-center">
                                 <Button variant="ghost" size="icon" onClick={() => handleAddTaskToSession(task)} className="h-8 w-8 text-muted-foreground hover:text-accent" aria-label={`Add ${task.name} to session`}>
                                     <ChevronRight className="h-5 w-5" />
                                 </Button>
                               </div>
-                            </div>
-                            <div className="mt-2 flex flex-wrap gap-1">
-                                {task.focusAreas?.map(fa => (
-                                    <Badge key={fa} variant="secondary" className="py-1 pl-2 pr-1 inline-flex items-center gap-1">
-                                        <span className="truncate max-w-[150px]" title={fa}>{fa}</span>
-                                        <button 
-                                            onClick={() => handleRemoveFocusAreaFromBundle(task.id, fa)}
-                                            className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
-                                            aria-label={`Remove ${fa}`}
-                                        >
-                                            <X className="h-3 w-3" />
-                                        </button>
-                                    </Badge>
-                                ))}
-                            </div>
-                            <div className="mt-3 pt-3 border-t flex gap-2">
-                                <Select value={addSelection[task.id] || ''} onValueChange={(value) => setAddSelection(prev => ({ ...prev, [task.id]: value }))}>
-                                    <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Add eligible area..." /></SelectTrigger>
-                                    <SelectContent>
-                                        {availableFocusAreas.length > 0 ? (
-                                            availableFocusAreas.map(def => (
-                                                <SelectItem key={def.id} value={def.name}>{def.name} ({def.category})</SelectItem>
-                                            ))
-                                        ) : (
-                                            <div className="p-2 text-xs text-muted-foreground">No eligible areas found.</div>
-                                        )}
-                                    </SelectContent>
-                                </Select>
-                                <Button size="icon" className="h-9 w-9 shrink-0" onClick={() => handleAddFocusAreaToBundle(task.id)} disabled={!addSelection[task.id]}>
-                                    <PlusCircle className="h-4 w-4" />
-                                </Button>
                             </div>
                           </motion.li>
                         ))}
@@ -432,7 +252,7 @@ function PersonalBrandingPageContent() {
                                 <Check /> Published Content
                             </CardTitle>
                             <CardDescription className='mt-1'>
-                                A log of your successfully published bundles.
+                                A log of your successfully published items.
                             </CardDescription>
                         </div>
                         {isPublishedExpanded ? <ChevronUp className="h-5 w-5 text-primary" /> : <ChevronDown className="h-5 w-5 text-primary" />}
@@ -457,7 +277,7 @@ function PersonalBrandingPageContent() {
                                 <li key={task.id} className="p-3 bg-card border rounded-lg">
                                     <p className="font-semibold text-foreground">{task.name}</p>
                                     <div className="mt-2 flex flex-wrap gap-1">
-                                        {task.focusAreas?.map(fa => <Badge key={fa} variant="outline" className="text-xs">{fa}</Badge>)}
+                                        <Badge variant="outline" className="text-xs">{task.category}</Badge>
                                     </div>
                                     <div className="mt-3 pt-2 border-t flex items-center gap-4 text-muted-foreground">
                                         <span className="text-xs font-semibold">SHARED ON:</span>
@@ -512,7 +332,7 @@ function PersonalBrandingPageContent() {
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                           <AnimatePresence>
                           {currentSessionTasks.map(task => {
-                              const definition = brandingTasks.find(def => def.id === task.definitionId);
+                              const definition = deepWorkDefinitions.find(def => def.id === task.definitionId);
                               return (
                                 <WorkoutExerciseCard 
                                   key={task.id} 

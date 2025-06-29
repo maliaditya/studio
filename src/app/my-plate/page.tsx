@@ -19,7 +19,7 @@ function MyPlatePageContent() {
     schedule,
     allUpskillLogs,
     topicGoals, 
-    brandingTasks, 
+    deepWorkDefinitions, 
     workoutMode, 
     workoutPlans, 
     exerciseDefinitions,
@@ -67,9 +67,12 @@ function MyPlatePageContent() {
   }, [topicGoals, allUpskillLogs]);
   
   const brandingPipeline = useMemo(() => {
-    const activeTasks = (brandingTasks || []).filter(task => !(task.sharingStatus?.twitter && task.sharingStatus?.linkedin && task.sharingStatus?.devto));
-    return activeTasks.slice(0, 3); // Show top 3 active bundles
-  }, [brandingTasks]);
+    const activeTasks = (deepWorkDefinitions || []).filter(task => 
+      task.isReadyForBranding && 
+      !(task.sharingStatus?.twitter && task.sharingStatus?.linkedin && task.sharingStatus?.devto)
+    );
+    return activeTasks.slice(0, 3); // Show top 3 active items
+  }, [deepWorkDefinitions]);
   
   const latestWeightLog = useMemo(() => {
     if (!weightLogs || weightLogs.length === 0) return null;
@@ -199,7 +202,7 @@ function MyPlatePageContent() {
                                 ))}
                             </ul>
                         ) : (
-                            <p className="text-muted-foreground text-sm">Branding pipeline is clear. Keep learning!</p>
+                            <p className="text-muted-foreground text-sm">Branding pipeline is clear. Go to Deep Work to mark items as ready!</p>
                         )}
                     </div>
                 </CardContent>

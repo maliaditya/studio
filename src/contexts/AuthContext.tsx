@@ -81,12 +81,7 @@ interface AuthContextType {
 
   deepWorkDefinitions: ExerciseDefinition[];
   setDeepWorkDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
-  deepworkManualDeletes: string[];
-  setDeepworkManualDeletes: React.Dispatch<React.SetStateAction<string[]>>;
   
-  brandingTasks: ExerciseDefinition[];
-  setBrandingTasks: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
-
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
   updateWorkoutSet: (date: Date, exerciseId: string, setId: string, reps: number, weight: number) => void;
@@ -139,8 +134,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [upskillDefinitions, setUpskillDefinitions] = useState<ExerciseDefinition[]>([]);
   const [topicGoals, setTopicGoals] = useState<Record<string, TopicGoal>>({});
   const [deepWorkDefinitions, setDeepWorkDefinitions] = useState<ExerciseDefinition[]>([]);
-  const [deepworkManualDeletes, setDeepworkManualDeletes] = useState<string[]>([]);
-  const [brandingTasks, setBrandingTasks] = useState<ExerciseDefinition[]>([]);
 
 
   useEffect(() => {
@@ -188,8 +181,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`upskill_definitions_${username}`); setUpskillDefinitions(d ? JSON.parse(d) : []); } catch (e) { setUpskillDefinitions([]); }
       try { const d = loadItem(`upskill_topic_goals_${username}`); setTopicGoals(d ? JSON.parse(d) : {}); } catch (e) { setTopicGoals({}); }
       try { const d = loadItem(`deepwork_definitions_${username}`); setDeepWorkDefinitions(d ? JSON.parse(d) : []); } catch (e) { setDeepWorkDefinitions([]); }
-      try { const d = loadItem(`deepwork_manual_deletes_${username}`); setDeepworkManualDeletes(d ? JSON.parse(d) : []); } catch(e) { setDeepworkManualDeletes([]); }
-      try { const d = loadItem(`branding_tasks_${username}`); setBrandingTasks(d ? JSON.parse(d) : []); } catch (e) { setBrandingTasks([]); }
 
     } else {
       // Clear all data on logout
@@ -198,8 +189,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setAllUpskillLogs([]); setAllDeepWorkLogs([]); setAllWorkoutLogs([]); setAllBrandingLogs([]);
       setWorkoutMode('two-muscle'); setWorkoutPlans(INITIAL_PLANS); setExerciseDefinitions(DEFAULT_EXERCISE_DEFINITIONS);
       setUpskillDefinitions([]); setTopicGoals({});
-      setDeepWorkDefinitions([]); setDeepworkManualDeletes([]);
-      setBrandingTasks([]);
+      setDeepWorkDefinitions([]);
     }
   }, [currentUser]);
 
@@ -229,13 +219,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`upskill_definitions_${username}`, JSON.stringify(upskillDefinitions));
       localStorage.setItem(`upskill_topic_goals_${username}`, JSON.stringify(topicGoals));
       localStorage.setItem(`deepwork_definitions_${username}`, JSON.stringify(deepWorkDefinitions));
-      localStorage.setItem(`deepwork_manual_deletes_${username}`, JSON.stringify(deepworkManualDeletes));
-      localStorage.setItem(`branding_tasks_${username}`, JSON.stringify(brandingTasks));
     }
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
     schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs,
-    exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, deepworkManualDeletes, brandingTasks,
+    exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions,
     currentUser, loading
   ]);
 
@@ -267,9 +255,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     setDeepWorkDefinitions(data.deepWorkDefinitions || []);
     setAllDeepWorkLogs(data.deepWorkLogs || []);
-    setDeepworkManualDeletes(data.deepworkManualDeletes || []);
     
-    setBrandingTasks(data.brandingTasks || []);
     setAllBrandingLogs(data.brandingLogs || []);
     
     setSchedule(data.schedule || {});
@@ -327,8 +313,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return {
       exerciseDefinitions, workoutPlans, allWorkoutLogs, workoutMode,
       upskillDefinitions, upskillLogs: allUpskillLogs, upskillTopicGoals: topicGoals,
-      deepWorkDefinitions, deepWorkLogs: allDeepWorkLogs, deepworkManualDeletes,
-      brandingTasks, brandingLogs,
+      deepWorkDefinitions, deepWorkLogs: allDeepWorkLogs,
+      brandingLogs,
       schedule,
       dietPlan, weightLogs, goalWeight, height, dateOfBirth, gender,
     };
@@ -508,7 +494,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                           'exerciseDefinitions', 'workoutPlans', 'allWorkoutLogs', 'workoutMode',
                           'upskillDefinitions', 'upskillLogs', 'upskillTopicGoals',
                           'deepWorkDefinitions', 'deepWorkLogs',
-                          'brandingTasks', 'brandingLogs',
+                          'brandingLogs',
                           'schedule', 'dietPlan', 'weightLogs'
                       ];
 
@@ -721,8 +707,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs,
     workoutMode, setWorkoutMode, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
     upskillDefinitions, setUpskillDefinitions, topicGoals, setTopicGoals,
-    deepWorkDefinitions, setDeepWorkDefinitions, deepworkManualDeletes, setDeepworkManualDeletes,
-    brandingTasks, setBrandingTasks,
+    deepWorkDefinitions, setDeepWorkDefinitions,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
   };
 
