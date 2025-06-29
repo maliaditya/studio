@@ -14,6 +14,7 @@ import { ChartContainer } from '@/components/ui/chart';
 import { BarChart, Bar, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import { motion } from 'framer-motion';
+import { Carousel } from './ui/carousel';
 
 interface ProductivitySnapshotProps {
   stats: any;
@@ -67,162 +68,151 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
           <div className="md:col-span-2 space-y-4">
             <div className="relative">
               <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Learning Progress</h4>
-              <motion.div layout className="text-sm">
+               <motion.div layout>
                 {learningItems.length > 0 ? (
-                  <Accordion type="single" collapsible className="w-full">
-                    {learningItems.map(([topic, topicStats]: [string, any]) => {
+                  <Carousel
+                    items={learningItems}
+                    renderItem={([topic, topicStats]: [string, any]) => {
                        const showTodayStats = topicStats.todaysProgress > 0 || (topicStats.requiredDailyRate && topicStats.requiredDailyRate > 0.01);
                       return (
-                         <AccordionItem value={topic} key={topic} className="p-0 rounded-md bg-muted/30 border-b-0 mb-2">
-                           <AccordionTrigger className="py-2 px-3 text-left hover:no-underline">
-                              <div className="flex flex-col items-start flex-grow">
-                                <h5 className="font-bold text-foreground text-base">{topic}</h5>
-                                <div className="text-xs text-muted-foreground font-normal">
-                                  Progress: {topicStats.totalProgress.toLocaleString()} / {topicStats.goalValue.toLocaleString()} {topicStats.unit.split('/')[0]}
-                                </div>
-                              </div>
-                               {showTodayStats && (
-                                <div className="text-right text-xs ml-4 flex-shrink-0">
-                                  <div className="font-semibold text-foreground whitespace-nowrap">Today</div>
-                                  {topicStats.todaysProgress > 0 ? (
-                                    <div className="text-muted-foreground whitespace-nowrap text-green-500">
-                                      +{topicStats.todaysProgress.toLocaleString()} {topicStats.todaysProgress === 1 ? topicStats.progressUnit.slice(0, -1) : topicStats.progressUnit}
-                                      {topicStats.timeForTodaysProgress !== null && ` (est. ${(topicStats.timeForTodaysProgress / 60).toFixed(1)} hr)`}
+                         <Accordion type="single" collapsible className="w-full" key={topic}>
+                             <AccordionItem value={topic} className="p-0 rounded-md bg-muted/30 border-b-0">
+                               <AccordionTrigger className="py-2 px-3 text-left hover:no-underline">
+                                  <div className="flex flex-col items-start flex-grow">
+                                    <h5 className="font-bold text-foreground text-base">{topic}</h5>
+                                    <div className="text-xs text-muted-foreground font-normal">
+                                      Progress: {topicStats.totalProgress.toLocaleString()} / {topicStats.goalValue.toLocaleString()} {topicStats.unit.split('/')[0]}
                                     </div>
-                                  ) : null}
-                                  {topicStats.remainingForToday > 0 ? (
-                                    <div className="text-muted-foreground whitespace-nowrap">
-                                      {topicStats.remainingForToday.toLocaleString()} {topicStats.remainingForToday === 1 ? topicStats.progressUnit.slice(0, -1) : topicStats.progressUnit} left
-                                    </div>
-                                  ) : (topicStats.todaysProgress > 0 && topicStats.requiredDailyRate > 0) ? (
-                                    <div className="text-muted-foreground whitespace-nowrap text-green-500">
-                                      Daily goal met!
-                                    </div>
-                                  ) : (topicStats.todaysProgress === 0 && topicStats.requiredDailyRate === 0) ? (
-                                    <div className="text-muted-foreground whitespace-nowrap">
-                                      -
-                                    </div>
-                                  ) : null}
-                                </div>
-                              )}
-                           </AccordionTrigger>
-                           <AccordionContent className="px-3">
-                              <Progress value={(topicStats.totalProgress / topicStats.goalValue) * 100} className="h-2 my-2" />
-                              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                                {topicStats.nextMilestone && (
-                                  <div className="space-y-1">
-                                    <div className="font-semibold">Next Milestone ({topicStats.nextMilestone.percent}%)</div>
-                                    <div>Est. Date: <span className="font-medium text-foreground">{topicStats.nextMilestone.date}</span></div>
-                                    <div>Days Left: <span className="font-medium text-foreground">{topicStats.nextMilestone.daysRemaining}</span></div>
-                                    <div>Needed: <span className="font-medium text-foreground">{topicStats.nextMilestone.progressNeeded} {topicStats.nextMilestone.unit}</span></div>
-                                    {topicStats.nextMilestone.timeNeeded !== null && (
-                                      <div>Est. Time: <span className="font-medium text-foreground">{(topicStats.nextMilestone.timeNeeded / 60).toFixed(1)} hr</span></div>
-                                    )}
                                   </div>
-                                )}
-                                <div className="space-y-1">
-                                  <div className="font-semibold">Goal Completion</div>
-                                  {topicStats.completion ? (
-                                    <>
-                                      <div>Est. Date: <span className="font-medium text-foreground">{topicStats.completion.date}</span></div>
-                                      <div>Days Left: <span className="font-medium text-foreground">{topicStats.completion.daysRemaining}</span></div>
-                                      {topicStats.completion.timeNeeded !== null && (
-                                        <div>Est. Time: <span className="font-medium text-foreground">{(topicStats.completion.timeNeeded / 60).toFixed(1)} hr</span></div>
-                                      )}
-                                    </>
-                                  ) : (topicStats.totalProgress >= topicStats.goalValue) ? <div className="text-green-500 font-bold">Completed!</div> : <div className="text-muted-foreground">Not enough data to project.</div>}
-                                </div>
-                              </div>
-                              <div className="mt-2 pt-2 border-t text-xs">
-                                <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Learning Speed</span>
-                                  <span className="font-medium text-foreground">{topicStats.speed.toFixed(1)} {topicStats.unit}</span>
-                                </div>
-                              </div>
-                           </AccordionContent>
-                         </AccordionItem>
+                                   {showTodayStats && (
+                                    <div className="text-right text-xs ml-4 flex-shrink-0">
+                                      <div className="font-semibold text-foreground whitespace-nowrap">Today</div>
+                                      {topicStats.todaysProgress > 0 ? (
+                                        <div className="text-muted-foreground whitespace-nowrap text-green-500">
+                                          +{topicStats.todaysProgress.toLocaleString()} {topicStats.todaysProgress === 1 ? topicStats.progressUnit.slice(0, -1) : topicStats.progressUnit}
+                                          {topicStats.timeForTodaysProgress !== null && ` (est. ${(topicStats.timeForTodaysProgress / 60).toFixed(1)} hr)`}
+                                        </div>
+                                      ) : null}
+                                      {topicStats.remainingForToday > 0 ? (
+                                        <div className="text-muted-foreground whitespace-nowrap">
+                                          {topicStats.remainingForToday.toLocaleString()} {topicStats.remainingForToday === 1 ? topicStats.progressUnit.slice(0, -1) : topicStats.progressUnit} left
+                                        </div>
+                                      ) : (topicStats.todaysProgress > 0 && topicStats.requiredDailyRate > 0) ? (
+                                        <div className="text-muted-foreground whitespace-nowrap text-green-500">
+                                          Daily goal met!
+                                        </div>
+                                      ) : (topicStats.todaysProgress === 0 && topicStats.requiredDailyRate === 0) ? (
+                                        <div className="text-muted-foreground whitespace-nowrap">
+                                          -
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  )}
+                               </AccordionTrigger>
+                               <AccordionContent className="px-3">
+                                  <Progress value={(topicStats.totalProgress / topicStats.goalValue) * 100} className="h-2 my-2" />
+                                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                                    {topicStats.nextMilestone && (
+                                      <div className="space-y-1">
+                                        <div className="font-semibold">Next Milestone ({topicStats.nextMilestone.percent}%)</div>
+                                        <div>Est. Date: <span className="font-medium text-foreground">{topicStats.nextMilestone.date}</span></div>
+                                        <div>Days Left: <span className="font-medium text-foreground">{topicStats.nextMilestone.daysRemaining}</span></div>
+                                        <div>Needed: <span className="font-medium text-foreground">{topicStats.nextMilestone.progressNeeded} {topicStats.nextMilestone.unit}</span></div>
+                                        {topicStats.nextMilestone.timeNeeded !== null && (
+                                          <div>Est. Time: <span className="font-medium text-foreground">{(topicStats.nextMilestone.timeNeeded / 60).toFixed(1)} hr</span></div>
+                                        )}
+                                      </div>
+                                    )}
+                                    <div className="space-y-1">
+                                      <div className="font-semibold">Goal Completion</div>
+                                      {topicStats.completion ? (
+                                        <>
+                                          <div>Est. Date: <span className="font-medium text-foreground">{topicStats.completion.date}</span></div>
+                                          <div>Days Left: <span className="font-medium text-foreground">{topicStats.completion.daysRemaining}</span></div>
+                                          {topicStats.completion.timeNeeded !== null && (
+                                            <div>Est. Time: <span className="font-medium text-foreground">{(topicStats.completion.timeNeeded / 60).toFixed(1)} hr</span></div>
+                                          )}
+                                        </>
+                                      ) : (topicStats.totalProgress >= topicStats.goalValue) ? <div className="text-green-500 font-bold">Completed!</div> : <div className="text-muted-foreground">Not enough data to project.</div>}
+                                    </div>
+                                  </div>
+                                  <div className="mt-2 pt-2 border-t text-xs">
+                                    <div className="flex justify-between">
+                                      <span className="text-muted-foreground">Learning Speed</span>
+                                      <span className="font-medium text-foreground">{topicStats.speed.toFixed(1)} {topicStats.unit}</span>
+                                    </div>
+                                  </div>
+                               </AccordionContent>
+                             </AccordionItem>
+                         </Accordion>
                       )
-                    })}
-                  </Accordion>
+                    }}
+                  />
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-2">No learning stats yet. Log progress and duration in the Upskill page.</p>
                 )}
-              </motion.div>
+               </motion.div>
             </div>
             <Separator className="my-2" />
             <div className="relative">
               <h4 className="font-semibold mb-2 flex items-center gap-2"><Share2 /> Personal Branding</h4>
-              <motion.div layout>
+               <motion.div layout className="h-24">
                  {brandingItems.length > 0 ? (
-                    <Accordion type="single" collapsible className="w-full">
-                      {brandingItems.map((item: any) => (
-                        <AccordionItem value={item.taskName} key={item.taskName} className="p-0 rounded-md bg-muted/30 border-b-0 mb-2">
-                           <AccordionTrigger className="py-2 px-3 text-left hover:no-underline">
-                              <div className="flex flex-col items-start flex-grow">
-                                <h5 className="font-bold text-foreground text-base">{item.taskName}</h5>
-                              </div>
-                              <div className="text-right text-xs ml-4 flex-shrink-0">
-                                  <div className="font-semibold text-foreground whitespace-nowrap">{item.stage}</div>
-                                  <div className="text-muted-foreground whitespace-nowrap">({item.progress})</div>
-                              </div>
-                           </AccordionTrigger>
-                           <AccordionContent className="px-3 text-sm text-muted-foreground cursor-pointer" onClick={() => router.push('/personal-branding')}>
-                                Go to Personal Branding page to continue...
-                           </AccordionContent>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
+                    <Carousel
+                        items={brandingItems}
+                        renderItem={(item: any) => (
+                             <div className="h-24 flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 cursor-pointer" onClick={() => router.push('/personal-branding')}>
+                                <div className="flex justify-between items-center">
+                                  <h5 className="font-bold text-foreground text-base truncate">{item.taskName}</h5>
+                                   <div className="text-right text-xs ml-4 flex-shrink-0">
+                                      <div className="font-semibold text-foreground whitespace-nowrap">{item.stage}</div>
+                                      <div className="text-muted-foreground whitespace-nowrap">({item.progress})</div>
+                                  </div>
+                                </div>
+                                <p className="text-sm text-muted-foreground mt-1">Go to Personal Branding page to continue...</p>
+                            </div>
+                        )}
+                    />
                  ) : (
-                    <div className="text-sm text-muted-foreground p-2">
+                    <div className="text-sm text-muted-foreground p-2 h-24 flex flex-col justify-center">
                       <p>{stats.brandingStatus?.message || 'No branding tasks.'}</p>
                       <p className="text-xs mt-1">{stats.brandingStatus?.subMessage || ''}</p>
                     </div>
                  )}
-              </motion.div>
+               </motion.div>
             </div>
              <Separator className="my-2" />
              <div className="relative">
               <h4 className="font-semibold mb-2 flex items-center gap-2"><Rocket /> Upcoming Roadmap</h4>
-              <motion.div layout>
+               <motion.div layout className="h-24">
                 {roadmapItems.length > 0 ? (
-                    <Accordion type="single" collapsible className="w-full">
-                        {roadmapItems.map((item: any) => (
-                            <AccordionItem value={item.release.id} key={item.release.id} className="p-0 rounded-md bg-muted/30 border-b-0 mb-2">
-                                <AccordionTrigger className="py-2 px-3 text-left hover:no-underline" onClick={() => router.push(item.type === 'product' ? '/productization' : '/offerization')}>
-                                    <div className="flex-grow">
-                                        <p className="font-bold text-foreground">{item.release.name}</p>
-                                        <p className="text-xs text-muted-foreground">Topic: <span className="font-medium">{item.topic}</span></p>
-                                    </div>
-                                    <div className="flex flex-col items-end ml-2">
-                                        <Badge variant="outline" className="capitalize text-xs mb-1">{item.type}</Badge>
-                                        <p className="text-xs text-muted-foreground whitespace-nowrap">
-                                            {format(parseISO(item.release.launchDate), 'PPP')}
-                                        </p>
-                                    </div>
-                                </AccordionTrigger>
-                                <AccordionContent className="px-3 pb-3 text-sm">
-                                    {item.release.description && <p className="mb-2 text-muted-foreground">{item.release.description}</p>}
-                                    {item.release.features && item.release.features.length > 0 && (
-                                        <div>
-                                            <p className="font-medium text-foreground mb-1">Features:</p>
-                                            <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                                                {item.release.features.map((feature: string) => (
-                                                    <li key={feature}>{feature}</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                                </AccordionContent>
-                            </AccordionItem>
-                        ))}
-                    </Accordion>
+                    <Carousel
+                      items={roadmapItems}
+                      renderItem={(item: any) => (
+                        <div className="h-24 flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 cursor-pointer" onClick={() => router.push(item.type === 'product' ? '/productization' : '/offerization')}>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="font-bold text-foreground truncate">{item.release.name}</p>
+                                    <p className="text-xs text-muted-foreground">Topic: <span className="font-medium">{item.topic}</span></p>
+                                </div>
+                                <div className="flex flex-col items-end ml-2">
+                                    <Badge variant="outline" className="capitalize text-xs mb-1">{item.type}</Badge>
+                                    <p className="text-xs text-muted-foreground whitespace-nowrap">
+                                        {format(parseISO(item.release.launchDate), 'PPP')}
+                                    </p>
+                                </div>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1 truncate">{item.release.features?.length || 0} features planned.</p>
+                        </div>
+                      )}
+                    />
                 ) : (
-                    <div className="text-sm text-muted-foreground p-2">
+                    <div className="text-sm text-muted-foreground p-2 h-24 flex flex-col justify-center">
                     <p>No upcoming releases planned.</p>
                     <p className="text-xs mt-1">Go to Productization or Offerization to create a release plan.</p>
                     </div>
                 )}
-              </motion.div>
+               </motion.div>
             </div>
           </div>
         </div>
@@ -263,3 +253,4 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
     </Card>
   );
 }
+
