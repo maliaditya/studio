@@ -160,44 +160,46 @@ function ProductizationPageContent() {
 
   const publishReleases = async (releasesToPublish: Release[]) => {
     if (!currentUser?.username || currentUser.username !== 'Lonewolf') return;
-    
+
     if (!releasesToPublish) {
         releasesToPublish = [];
     }
-    
+
+    // Augment releases with feature names before publishing
+    const augmentedReleases = releasesToPublish.map(release => {
+      const featureNames = (release.focusAreaIds || [])
+        .map(id => deepWorkDefinitions.find(def => def.id === id)?.name)
+        .filter((name): name is string => !!name);
+      return { ...release, features: featureNames };
+    });
+
     toast({ title: "Publishing...", description: "Updating the public release plan for Life OS." });
 
     try {
         const response = await fetch('/api/publish-releases', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: currentUser.username, releases: releasesToPublish }),
+            body: JSON.stringify({ username: currentUser.username, releases: augmentedReleases }),
         });
 
         const bodyAsText = await response.text();
-
+        
         if (!response.ok) {
             let errorMessage = `Request failed with status ${response.status}.`;
-            if (bodyAsText) {
-                try {
-                    const json = JSON.parse(bodyAsText);
-                    errorMessage = json.error || bodyAsText;
-                } catch (e) {
-                    errorMessage = bodyAsText;
-                }
-            } else if (response.statusText) {
-                errorMessage = `Request failed: ${response.statusText}`;
+            try {
+                const json = JSON.parse(bodyAsText);
+                errorMessage = json.error || bodyAsText;
+            } catch (e) {
+                if (bodyAsText) errorMessage = bodyAsText;
             }
             throw new Error(errorMessage);
         }
 
         let successMessage = "Life OS release plan has been updated publicly.";
-        if (bodyAsText) {
-            try {
-                const json = JSON.parse(bodyAsText);
-                successMessage = json.message || successMessage;
-            } catch (e) { /* Not an error if success response is not JSON */ }
-        }
+        try {
+            const json = JSON.parse(bodyAsText);
+            successMessage = json.message || successMessage;
+        } catch (e) { /* Not an error if success response is not JSON */ }
         
         toast({ title: "Success!", description: successMessage });
 
@@ -387,10 +389,17 @@ function ProductizationPageContent() {
             return (
                 <Card key={topic} className="flex flex-col">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-3">
-                            <Briefcase className="h-5 w-5 text-primary"/>
-                            {topic}
-                        </CardTitle>
+                        <div className="flex justify-between items-start gap-4">
+                            <CardTitle className="flex items-center gap-3">
+                                <Briefcase className="h-5 w-5 text-primary"/>
+                                {topic}
+                            </CardTitle>
+                            {currentUser?.username === 'Lonewolf' && topic === 'Life OS' && (
+                                <Button size="sm" onClick={() => handlePublishReleases(topic)} className="flex-shrink-0">
+                                    Publish
+                                </Button>
+                            )}
+                        </div>
                         <CardDescription>{focusAreas.length} focus area(s)</CardDescription>
                     </CardHeader>
                     <CardContent className="flex-grow space-y-4">
@@ -526,54 +535,44 @@ function ProductizationPageContent() {
                         </AccordionItem>
                       </Accordion>
                       
+                      <Separator className="my-4"/>
                       <div>
-                          <Separator className="my-4"/>
-                          <div>
-                              <h4 className="font-semibold text-foreground mb-2">Add Focus Area</h4>
-                              <form onSubmit={(e) => handleAddActionTask(e, topic)} className="space-y-2">
-                                 <div className="flex items-center gap-2">
-                                    <Input 
-                                        placeholder="New focus area for this product..."
-                                        value={newActionTasks[topic] || ''}
-                                        onChange={(e) => handleActionTaskChange(topic, e.target.value)}
-                                    />
-                                    <Button type="submit" size="icon" className="flex-shrink-0">
-                                        <PlusCircle className="h-5 w-5"/>
-                                    </Button>
-                                 </div>
-                                 {releases.length > 0 && (
-                                  <div>
-                                      <Label htmlFor={`release-select-${topic}`} className="text-xs">Add to Release (Optional)</Label>
-                                      <Select 
-                                          value={selectedReleaseForTask[topic] || ''} 
-                                          onValueChange={(value) => setSelectedReleaseForTask(prev => ({...prev, [topic]: value}))}
-                                      >
-                                          <SelectTrigger id={`release-select-${topic}`}>
-                                              <SelectValue placeholder="Select a release..." />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                              {releases.map(r => (
-                                                  <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                                              ))}
-                                          </SelectContent>
-                                      </Select>
-                                  </div>
-                                 )}
-                              </form>
-                              <p className="text-xs text-muted-foreground mt-2">
-                                  Added focus areas will appear in your Deep Work library under the "{topic}" topic.
-                              </p>
-                          </div>
+                          <h4 className="font-semibold text-foreground mb-2">Add Focus Area</h4>
+                          <form onSubmit={(e) => handleAddActionTask(e, topic)} className="space-y-2">
+                             <div className="flex items-center gap-2">
+                                <Input 
+                                    placeholder="New focus area for this product..."
+                                    value={newActionTasks[topic] || ''}
+                                    onChange={(e) => handleActionTaskChange(topic, e.target.value)}
+                                />
+                                <Button type="submit" size="icon" className="flex-shrink-0">
+                                    <PlusCircle className="h-5 w-5"/>
+                                </Button>
+                             </div>
+                             {releases.length > 0 && (
+                              <div>
+                                  <Label htmlFor={`release-select-${topic}`} className="text-xs">Add to Release (Optional)</Label>
+                                  <Select 
+                                      value={selectedReleaseForTask[topic] || ''} 
+                                      onValueChange={(value) => setSelectedReleaseForTask(prev => ({...prev, [topic]: value}))}
+                                  >
+                                      <SelectTrigger id={`release-select-${topic}`}>
+                                          <SelectValue placeholder="Select a release..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                          {releases.map(r => (
+                                              <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                          ))}
+                                      </SelectContent>
+                                  </Select>
+                              </div>
+                             )}
+                          </form>
+                          <p className="text-xs text-muted-foreground mt-2">
+                              Added focus areas will appear in your Deep Work library under the "{topic}" topic.
+                          </p>
                       </div>
-
                     </CardContent>
-                     {topic === 'Life OS' && currentUser?.username === 'Lonewolf' && (
-                        <CardFooter className="border-t pt-4">
-                            <Button onClick={() => handlePublishReleases(topic)} className="w-full">
-                                Publish Life OS Releases
-                            </Button>
-                        </CardFooter>
-                    )}
                 </Card>
             )
           })}

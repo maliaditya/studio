@@ -111,14 +111,25 @@ export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
         <Separator className="my-4" />
         <div className="space-y-3">
           <h4 className="font-semibold text-center text-sm flex items-center justify-center gap-2"><Rocket className="h-4 w-4"/> Upcoming Life OS Releases</h4>
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {releases.map(release => (
-              <li key={release.id} className="text-sm p-2 rounded-md bg-muted/50 flex justify-between items-center">
-                <span className="font-medium">{release.name}</span>
-                <Badge variant="secondary" className="flex items-center gap-1.5">
-                  <Calendar className="h-3 w-3" />
-                  {format(parseISO(release.launchDate), 'MMM dd')}
-                </Badge>
+              <li key={release.id} className="text-sm p-3 rounded-md bg-muted/50">
+                <div className="flex justify-between items-center">
+                    <span className="font-medium">{release.name}</span>
+                    <Badge variant="secondary" className="flex items-center gap-1.5">
+                      <Calendar className="h-3 w-3" />
+                      {format(parseISO(release.launchDate), 'MMM dd')}
+                    </Badge>
+                </div>
+                {release.features && release.features.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-muted-foreground/20">
+                        <ul className="list-disc list-inside space-y-1 text-muted-foreground text-xs">
+                            {release.features.map((feature, index) => (
+                                <li key={index}>{feature}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
               </li>
             ))}
           </ul>
@@ -137,7 +148,7 @@ export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
           <DialogDescription>
             {showQr
               ? "Scan the QR code below to pay with any UPI app. Your contribution directly supports the development of these upcoming Life OS features. Thank you!"
-              : "Your support helps bring the features below to life. If you find this project helpful, please consider contributing."}
+              : "Your support helps bring the features below to life. If you see something you're excited about, please consider contributing to the project's development."}
           </DialogDescription>
         </DialogHeader>
 

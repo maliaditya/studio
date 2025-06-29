@@ -164,6 +164,7 @@ export interface Release {
   description: string;
   launchDate: string; // yyyy-MM-dd format
   focusAreaIds: string[];
+  features?: string[];
 }
 
 export interface GapAnalysis {
