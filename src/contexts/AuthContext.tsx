@@ -570,18 +570,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const isUpskill = activity.type === 'upskill';
     const logsUpdater = isUpskill ? setAllUpskillLogs : setAllDeepWorkLogs;
 
-    logsUpdater(prevLogs => {
-      let newLogs = [...prevLogs];
-      const logIndex = newLogs.findIndex(log => log.date === todayKey);
+    let updateSucceeded = false;
 
+    logsUpdater(prevLogs => {
+      const logIndex = prevLogs.findIndex(log => log.date === todayKey);
       if (logIndex === -1) {
-        toast({ title: "Error", description: "Could not find a session for today. Please add a task on the main page first.", variant: "destructive" });
         return prevLogs;
       }
 
       const exerciseId = activity.taskIds?.[0];
       if (!exerciseId) {
-        toast({ title: "Error", description: "No specific task linked to this agenda item.", variant: "destructive" });
         return prevLogs;
       }
       
@@ -592,9 +590,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         timestamp: Date.now(),
       };
 
+      const newLogs = [...prevLogs];
       const exerciseIndex = newLogs[logIndex].exercises.findIndex(ex => ex.id === exerciseId);
 
       if (exerciseIndex > -1) {
+        updateSucceeded = true;
         const updatedExercises = [...newLogs[logIndex].exercises];
         updatedExercises[exerciseIndex] = {
           ...updatedExercises[exerciseIndex],
@@ -604,56 +604,65 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           ...newLogs[logIndex],
           exercises: updatedExercises
         };
-        toast({ title: "Progress Logged", description: "Your session has been saved." });
-      } else {
-        toast({ title: "Error", description: "Could not find the specific task to log against.", variant: "destructive" });
-        return prevLogs;
+        return newLogs;
       }
       
-      return newLogs;
+      return prevLogs;
     });
 
-    // Also mark the activity as complete in the schedule
-    setSchedule(prev => {
-        const todaySchedule = { ...(prev[todayKey] || {}) };
-        const slotActivities = todaySchedule[activity.slot] || [];
-        todaySchedule[activity.slot] = slotActivities.map(act => 
-            act.id === activity.id ? { ...act, completed: true } : act
-        );
-        return { ...prev, [todayKey]: todaySchedule };
-    });
+    if (updateSucceeded) {
+      toast({ title: "Progress Logged", description: "Your session has been saved." });
+      // Also mark the activity as complete in the schedule
+      setSchedule(prev => {
+          const todaySchedule = { ...(prev[todayKey] || {}) };
+          const slotActivities = todaySchedule[activity.slot] || [];
+          todaySchedule[activity.slot] = slotActivities.map(act => 
+              act.id === activity.id ? { ...act, completed: true } : act
+          );
+          return { ...prev, [todayKey]: todaySchedule };
+      });
+    } else {
+      const sourceLogs = isUpskill ? allUpskillLogs : allDeepWorkLogs;
+      const logForToday = sourceLogs.find(log => log.date === todayKey);
+      if (!logForToday) {
+        toast({ title: "Error", description: "Could not find a session for today. Please add a task on the main page first.", variant: "destructive" });
+      } else if (!activity.taskIds?.[0]) {
+        toast({ title: "Error", description: "No specific task linked to this agenda item.", variant: "destructive" });
+      } else {
+        toast({ title: "Error", description: "Could not find the specific task to log against.", variant: "destructive" });
+      }
+    }
   };
 
   const carryForwardTask = (activity: Activity, targetSlot: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     
+    const activitiesInSlot = schedule[todayKey]?.[targetSlot] || [];
+    if (activitiesInSlot.length >= 2) {
+      toast({
+          title: "Slot Full",
+          description: "Cannot add more than two activities to a single time slot.",
+          variant: "destructive"
+      });
+      return;
+    }
+
+    const newActivity: Activity = {
+        ...activity,
+        id: `${activity.type}-${Date.now()}-${Math.random()}`,
+        completed: false,
+    };
+    
     setSchedule(prev => {
         const newTodaySchedule = { ...(prev[todayKey] || {}) };
-        const activitiesInSlot = newTodaySchedule[targetSlot] || [];
-        
-        if (activitiesInSlot.length >= 2) {
-            toast({
-                title: "Slot Full",
-                description: "Cannot add more than two activities to a single time slot.",
-                variant: "destructive"
-            });
-            return prev; // Return previous state without changes
-        }
-
-        const newActivity: Activity = {
-            ...activity,
-            id: `${activity.type}-${Date.now()}-${Math.random()}`,
-            completed: false,
-        };
-
-        newTodaySchedule[targetSlot] = [...activitiesInSlot, newActivity];
-        
-        toast({
-            title: "Task Carried Forward",
-            description: `"${newActivity.details}" has been added to today's ${targetSlot} slot.`
-        });
-        
+        const currentActivities = newTodaySchedule[targetSlot] || [];
+        newTodaySchedule[targetSlot] = [...currentActivities, newActivity];
         return { ...prev, [todayKey]: newTodaySchedule };
+    });
+    
+    toast({
+        title: "Task Carried Forward",
+        description: `"${newActivity.details}" has been added to today's ${targetSlot} slot.`
     });
   };
   

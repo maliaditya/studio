@@ -78,7 +78,7 @@ export function TodaysOfferSystemModal({
     } else {
       toast({
         title: "Actions Incomplete",
-        description: "You must log all target actions before marking this as complete.",
+        description: "You must log all target tasks before marking this as complete.",
         variant: "destructive"
       });
     }
@@ -93,11 +93,11 @@ export function TodaysOfferSystemModal({
             if (exerciseIndex > -1) {
                 const newSet = { id: Date.now().toString(), reps: 1, weight: 1, timestamp: Date.now() };
                 newLogs[logIndex].exercises[exerciseIndex].loggedSets.push(newSet);
-                toast({ title: "Action Logged!" });
             }
         }
         return newLogs;
     });
+    toast({ title: "Action Logged!" });
   };
 
   const handleDeleteSet = (exerciseId: string, setId: string) => {

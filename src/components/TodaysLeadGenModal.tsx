@@ -95,11 +95,11 @@ export function TodaysLeadGenModal({
             if (exerciseIndex > -1) {
                 const newSet = { id: Date.now().toString(), reps: 1, weight: 1, timestamp: Date.now() };
                 newLogs[logIndex].exercises[exerciseIndex].loggedSets.push(newSet);
-                toast({ title: "Action Logged!" });
             }
         }
         return newLogs;
     });
+    toast({ title: "Action Logged!" });
   };
 
   const handleDeleteSet = (exerciseId: string, setId: string) => {
