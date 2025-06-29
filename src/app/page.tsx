@@ -448,25 +448,27 @@ function HomePageContent() {
       
       const calculateBrandingStatus = () => {
           if (!deepWorkDefinitions || !brandingLogs) {
-              return { status: 'pending' as const, message: 'Loading branding status...' };
+              return { status: 'pending' as const, message: 'Loading branding status...', items: [] };
           }
           
           const allBundles = deepWorkDefinitions.filter(def => def.category === "Content Bundle");
           const isFullyShared = (task: ExerciseDefinition) => task.sharingStatus && task.sharingStatus.twitter && task.sharingStatus.linkedin && task.sharingStatus.devto;
           
           const activeBundles = allBundles.filter(task => !isFullyShared(task));
-          const nextTask = activeBundles[0];
 
-          if (nextTask) {
-              const logForTask = brandingLogs.flatMap(log => log.exercises).find(ex => ex.definitionId === nextTask.id);
-              const loggedStagesCount = logForTask?.loggedSets.length || 0;
-              const stages = ['Create', 'Optimize', 'Review', 'Final Review'];
-              
+          if (activeBundles.length > 0) {
               return {
                   status: 'in_progress' as const,
-                  taskName: nextTask.name,
-                  stage: loggedStagesCount < 4 ? stages[loggedStagesCount] : 'Ready to Share',
-                  progress: `${loggedStagesCount}/4`
+                  items: activeBundles.map(nextTask => {
+                    const logForTask = brandingLogs.flatMap(log => log.exercises).find(ex => ex.definitionId === nextTask.id);
+                    const loggedStagesCount = logForTask?.loggedSets.length || 0;
+                    const stages = ['Create', 'Optimize', 'Review', 'Final Review'];
+                    return {
+                      taskName: nextTask.name,
+                      stage: loggedStagesCount < 4 ? stages[loggedStagesCount] : 'Ready to Share',
+                      progress: `${loggedStagesCount}/4`
+                    }
+                  })
               };
           }
           
@@ -477,7 +479,7 @@ function HomePageContent() {
                   status: 'pending' as const,
                   message: `You have ${readyForBrandingCount} focus area(s) ready.`,
                   subMessage: "Go to Personal Branding to create a content bundle.",
-                  eligibleFocusAreas: [] 
+                  items: [] 
               };
           }
 
@@ -485,28 +487,12 @@ function HomePageContent() {
               status: 'pending' as const,
               message: "No content bundles in the pipeline.",
               subMessage: "Go to Deep Work to mark focus areas as 'Ready for Branding'.",
-              eligibleFocusAreas: []
+              items: []
           };
       };
 
-      const learningStats = calculateLearningStats(allUpskillLogs, topicGoals);
-
-      const milestones = Object.values(learningStats)
-        .map((s: any) => s.nextMilestone)
-        .filter(m => m)
-        .sort((a, b) => a.daysRemaining - b.daysRemaining);
-    
-      let overallNextMilestone = null;
-      if (milestones.length > 0) {
-          const closestMilestone = milestones[0];
-          const topic = Object.keys(learningStats).find(
-              (t: string) => learningStats[t].nextMilestone === closestMilestone
-          );
-          overallNextMilestone = { ...closestMilestone, topic };
-      }
-
-      const nextUpcomingRelease = (() => {
-        if (!productizationPlans && !offerizationPlans) return null;
+      const getUpcomingReleases = () => {
+        if (!productizationPlans && !offerizationPlans) return [];
     
         const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
     
@@ -538,9 +524,10 @@ function HomePageContent() {
                 try { return parseISO(release.launchDate) >= today; } 
                 catch (e) { return false; }
             })
-            .sort((a, b) => new Date(a.release.launchDate).getTime() - new Date(b.release.launchDate).getTime())[0] || null;
-      })();
+            .sort((a, b) => new Date(a.release.launchDate).getTime() - new Date(b.release.launchDate).getTime());
+      };
 
+      const learningStats = calculateLearningStats(allUpskillLogs, topicGoals);
       const totalProductiveMinutes = calculateAverageDuration(allUpskillLogs, 'reps') + calculateAverageDuration(allDeepWorkLogs, 'weight');
       const getHours = (logs: DatedWorkout[], field: 'reps' | 'weight') => logs.reduce((total, log) => total + log.exercises.reduce((exTotal, ex) => exTotal + ex.loggedSets.reduce((setTotal, set) => setTotal + (field === 'reps' ? set.reps : set.weight), 0), 0), 0) / 60;
       const totalHoursData = [
@@ -571,11 +558,10 @@ function HomePageContent() {
           avgProductiveHoursChange: calculateChange(avgProductiveHours, yesterdayTotalProductiveMinutes / 60),
           currentLevel: productivityLevels.find(l => totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max) || null,
           learningStats: learningStats,
-          overallNextMilestone: overallNextMilestone,
           latestConsistency: consistencyData[consistencyData.length - 1]?.score || 0,
           brandingStatus: calculateBrandingStatus(),
           totalHoursData, todayHoursData,
-          nextUpcomingRelease,
+          upcomingReleases: getUpcomingReleases(),
       };
   }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, consistencyData, brandingLogs, deepWorkDefinitions, productizationPlans, offerizationPlans]);
     

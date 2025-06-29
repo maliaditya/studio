@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { ChartContainer } from '@/components/ui/chart';
 import { BarChart, Bar, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { format, parseISO } from 'date-fns';
+import { Carousel } from './ui/carousel';
 
 interface ProductivitySnapshotProps {
   stats: any;
@@ -22,6 +23,10 @@ interface ProductivitySnapshotProps {
 
 export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsModal }: ProductivitySnapshotProps) {
   const router = useRouter();
+
+  const learningItems = Object.entries(stats.learningStats);
+  const brandingItems = stats.brandingStatus?.status === 'in_progress' ? stats.brandingStatus.items : [];
+  const roadmapItems = stats.upcomingReleases || [];
 
   return (
     <Card className="h-full bg-card/50">
@@ -60,131 +65,134 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
           </div>
 
           <div className="md:col-span-2 space-y-4">
-            <div>
+            <div className="relative">
               <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Learning Progress</h4>
               <div className="text-sm">
-                {Object.keys(stats.learningStats).length > 0 ? (
-                  <Accordion type="single" collapsible className="w-full space-y-2">
-                    {Object.entries(stats.learningStats).map(([topic, topicStats]: [string, any]) => {
+                {learningItems.length > 0 ? (
+                  <Carousel
+                    items={learningItems}
+                    renderItem={([topic, topicStats]: [string, any]) => {
                       const showTodayStats = topicStats.todaysProgress > 0 || (topicStats.requiredDailyRate && topicStats.requiredDailyRate > 0.01);
                       return (
-                        <AccordionItem key={topic} value={topic} className="p-3 rounded-md bg-muted/30 border-0">
-                          <AccordionTrigger className="py-0 text-left hover:no-underline">
-                            <div className="flex flex-col items-start">
-                              <h5 className="font-bold text-foreground text-base">{topic}</h5>
-                              <div className="text-xs text-muted-foreground font-normal">
-                                Progress: {topicStats.totalProgress.toLocaleString()} / {topicStats.goalValue.toLocaleString()} {topicStats.unit.split('/')[0]}
+                        <Accordion type="single" collapsible defaultValue={topic} className="w-full">
+                          <AccordionItem value={topic} className="p-3 rounded-md bg-muted/30 border-0">
+                            <AccordionTrigger className="py-0 text-left hover:no-underline">
+                              <div className="flex flex-col items-start">
+                                <h5 className="font-bold text-foreground text-base">{topic}</h5>
+                                <div className="text-xs text-muted-foreground font-normal">
+                                  Progress: {topicStats.totalProgress.toLocaleString()} / {topicStats.goalValue.toLocaleString()} {topicStats.unit.split('/')[0]}
+                                </div>
                               </div>
-                            </div>
-                            {showTodayStats && (
-                              <div className="text-right text-xs ml-4 flex-shrink-0">
-                                <div className="font-semibold text-foreground whitespace-nowrap">Today</div>
-                                {topicStats.todaysProgress > 0 ? (
-                                  <div className="text-muted-foreground whitespace-nowrap text-green-500">
-                                    +{topicStats.todaysProgress.toLocaleString()} {topicStats.todaysProgress === 1 ? topicStats.progressUnit.slice(0, -1) : topicStats.progressUnit}
-                                    {topicStats.timeForTodaysProgress !== null && ` (est. ${(topicStats.timeForTodaysProgress / 60).toFixed(1)} hr)`}
-                                  </div>
-                                ) : null}
-                                {topicStats.remainingForToday > 0 ? (
-                                  <div className="text-muted-foreground whitespace-nowrap">
-                                    {topicStats.remainingForToday.toLocaleString()} {topicStats.remainingForToday === 1 ? topicStats.progressUnit.slice(0, -1) : topicStats.progressUnit} left
-                                  </div>
-                                ) : (topicStats.todaysProgress > 0 && topicStats.requiredDailyRate > 0) ? (
-                                  <div className="text-muted-foreground whitespace-nowrap text-green-500">
-                                    Daily goal met!
-                                  </div>
-                                ) : (topicStats.todaysProgress === 0 && topicStats.requiredDailyRate === 0) ? (
-                                  <div className="text-muted-foreground whitespace-nowrap">
-                                    -
-                                  </div>
-                                ) : null}
-                              </div>
-                            )}
-                          </AccordionTrigger>
-                          <AccordionContent className="pt-2">
-                            <Progress value={(topicStats.totalProgress / topicStats.goalValue) * 100} className="h-2 my-2" />
-                            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                              {topicStats.nextMilestone && (
-                                <div className="space-y-1">
-                                  <div className="font-semibold">Next Milestone ({topicStats.nextMilestone.percent}%)</div>
-                                  <div>Est. Date: <span className="font-medium text-foreground">{topicStats.nextMilestone.date}</span></div>
-                                  <div>Days Left: <span className="font-medium text-foreground">{topicStats.nextMilestone.daysRemaining}</span></div>
-                                  <div>Needed: <span className="font-medium text-foreground">{topicStats.nextMilestone.progressNeeded} {topicStats.nextMilestone.unit}</span></div>
-                                  {topicStats.nextMilestone.timeNeeded !== null && (
-                                    <div>Est. Time: <span className="font-medium text-foreground">{(topicStats.nextMilestone.timeNeeded / 60).toFixed(1)} hr</span></div>
-                                  )}
+                              {showTodayStats && (
+                                <div className="text-right text-xs ml-4 flex-shrink-0">
+                                  <div className="font-semibold text-foreground whitespace-nowrap">Today</div>
+                                  {topicStats.todaysProgress > 0 ? (
+                                    <div className="text-muted-foreground whitespace-nowrap text-green-500">
+                                      +{topicStats.todaysProgress.toLocaleString()} {topicStats.todaysProgress === 1 ? topicStats.progressUnit.slice(0, -1) : topicStats.progressUnit}
+                                      {topicStats.timeForTodaysProgress !== null && ` (est. ${(topicStats.timeForTodaysProgress / 60).toFixed(1)} hr)`}
+                                    </div>
+                                  ) : null}
+                                  {topicStats.remainingForToday > 0 ? (
+                                    <div className="text-muted-foreground whitespace-nowrap">
+                                      {topicStats.remainingForToday.toLocaleString()} {topicStats.remainingForToday === 1 ? topicStats.progressUnit.slice(0, -1) : topicStats.progressUnit} left
+                                    </div>
+                                  ) : (topicStats.todaysProgress > 0 && topicStats.requiredDailyRate > 0) ? (
+                                    <div className="text-muted-foreground whitespace-nowrap text-green-500">
+                                      Daily goal met!
+                                    </div>
+                                  ) : (topicStats.todaysProgress === 0 && topicStats.requiredDailyRate === 0) ? (
+                                    <div className="text-muted-foreground whitespace-nowrap">
+                                      -
+                                    </div>
+                                  ) : null}
                                 </div>
                               )}
-                              <div className="space-y-1">
-                                <div className="font-semibold">Goal Completion</div>
-                                {topicStats.completion ? (
-                                  <>
-                                    <div>Est. Date: <span className="font-medium text-foreground">{topicStats.completion.date}</span></div>
-                                    <div>Days Left: <span className="font-medium text-foreground">{topicStats.completion.daysRemaining}</span></div>
-                                    {topicStats.completion.timeNeeded !== null && (
-                                      <div>Est. Time: <span className="font-medium text-foreground">{(topicStats.completion.timeNeeded / 60).toFixed(1)} hr</span></div>
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-2">
+                              <Progress value={(topicStats.totalProgress / topicStats.goalValue) * 100} className="h-2 my-2" />
+                              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                                {topicStats.nextMilestone && (
+                                  <div className="space-y-1">
+                                    <div className="font-semibold">Next Milestone ({topicStats.nextMilestone.percent}%)</div>
+                                    <div>Est. Date: <span className="font-medium text-foreground">{topicStats.nextMilestone.date}</span></div>
+                                    <div>Days Left: <span className="font-medium text-foreground">{topicStats.nextMilestone.daysRemaining}</span></div>
+                                    <div>Needed: <span className="font-medium text-foreground">{topicStats.nextMilestone.progressNeeded} {topicStats.nextMilestone.unit}</span></div>
+                                    {topicStats.nextMilestone.timeNeeded !== null && (
+                                      <div>Est. Time: <span className="font-medium text-foreground">{(topicStats.nextMilestone.timeNeeded / 60).toFixed(1)} hr</span></div>
                                     )}
-                                  </>
-                                ) : (topicStats.totalProgress >= topicStats.goalValue) ? <div className="text-green-500 font-bold">Completed!</div> : <div className="text-muted-foreground">Not enough data to project.</div>}
+                                  </div>
+                                )}
+                                <div className="space-y-1">
+                                  <div className="font-semibold">Goal Completion</div>
+                                  {topicStats.completion ? (
+                                    <>
+                                      <div>Est. Date: <span className="font-medium text-foreground">{topicStats.completion.date}</span></div>
+                                      <div>Days Left: <span className="font-medium text-foreground">{topicStats.completion.daysRemaining}</span></div>
+                                      {topicStats.completion.timeNeeded !== null && (
+                                        <div>Est. Time: <span className="font-medium text-foreground">{(topicStats.completion.timeNeeded / 60).toFixed(1)} hr</span></div>
+                                      )}
+                                    </>
+                                  ) : (topicStats.totalProgress >= topicStats.goalValue) ? <div className="text-green-500 font-bold">Completed!</div> : <div className="text-muted-foreground">Not enough data to project.</div>}
+                                </div>
                               </div>
-                            </div>
-                            <div className="mt-2 pt-2 border-t text-xs">
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Learning Speed</span>
-                                <span className="font-medium text-foreground">{topicStats.speed.toFixed(1)} {topicStats.unit}</span>
+                              <div className="mt-2 pt-2 border-t text-xs">
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Learning Speed</span>
+                                  <span className="font-medium text-foreground">{topicStats.speed.toFixed(1)} {topicStats.unit}</span>
+                                </div>
                               </div>
-                            </div>
-                          </AccordionContent>
-                        </AccordionItem>
-                      )
-                    })}
-                  </Accordion>
+                            </AccordionContent>
+                          </AccordionItem>
+                        </Accordion>
+                      );
+                    }}
+                  />
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-2">No learning stats yet. Log progress and duration in the Upskill page.</p>
                 )}
               </div>
             </div>
             <Separator className="my-2" />
-            <div>
+            <div className="relative">
               <h4 className="font-semibold mb-2 flex items-center gap-2"><Share2 /> Personal Branding</h4>
-              {stats.brandingStatus && (
-                stats.brandingStatus.status === 'in_progress' ? (
-                  <div className="text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md" onClick={() => router.push('/personal-branding')}>
-                    <p>Next up: <span className="font-bold text-foreground">{stats.brandingStatus.taskName}</span></p>
-                    <p>Current Stage: <span className="font-bold text-foreground">{stats.brandingStatus.stage} ({stats.brandingStatus.progress})</span></p>
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground p-2">
-                    <p>{stats.brandingStatus.message}</p>
-                    <p className="text-xs mt-1">{stats.brandingStatus.subMessage}</p>
-                    {stats.brandingStatus.eligibleFocusAreas.length > 0 && (
-                      <div className="mt-2">
-                        <p className="font-medium text-foreground text-xs">Eligible Areas:</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {stats.brandingStatus.eligibleFocusAreas.map((area: string) => <Badge key={area} variant="secondary" className="text-xs">{area}</Badge>)}
-                        </div>
+              {brandingItems.length > 0 ? (
+                 <Carousel
+                    items={brandingItems}
+                    renderItem={(item: any) => (
+                      <div className="text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md min-h-[56px]" onClick={() => router.push('/personal-branding')}>
+                        <p>Next up: <span className="font-bold text-foreground">{item.taskName}</span></p>
+                        <p>Current Stage: <span className="font-bold text-foreground">{item.stage} ({item.progress})</span></p>
                       </div>
                     )}
+                  />
+              ) : (
+                  <div className="text-sm text-muted-foreground p-2 min-h-[56px]">
+                    <p>{stats.brandingStatus?.message || 'No branding tasks.'}</p>
+                    <p className="text-xs mt-1">{stats.brandingStatus?.subMessage || ''}</p>
                   </div>
-                )
               )}
             </div>
              <Separator className="my-2" />
-             <div>
+             <div className="relative">
               <h4 className="font-semibold mb-2 flex items-center gap-2"><Rocket /> Upcoming Roadmap</h4>
-              {stats.nextUpcomingRelease ? (
-                  <div className="text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md" onClick={() => router.push(stats.nextUpcomingRelease.type === 'product' ? '/productization' : '/offerization')}>
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <p>Next Up: <span className="font-bold text-foreground">{stats.nextUpcomingRelease.release.name}</span></p>
-                            <p className="text-xs text-muted-foreground">Topic: <span className="font-medium">{stats.nextUpcomingRelease.topic}</span></p>
+              {roadmapItems.length > 0 ? (
+                  <Carousel
+                    items={roadmapItems}
+                    renderItem={(item: any) => (
+                      <div className="text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md min-h-[72px]" onClick={() => router.push(item.type === 'product' ? '/productization' : '/offerization')}>
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <p className="font-bold text-foreground">{item.release.name}</p>
+                                <p className="text-xs text-muted-foreground">Topic: <span className="font-medium">{item.topic}</span></p>
+                            </div>
+                            <Badge variant="outline" className="capitalize text-xs">{item.type}</Badge>
                         </div>
-                        <Badge variant="outline" className="capitalize text-xs">{stats.nextUpcomingRelease.type}</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">Launch: <span className="font-medium">{format(parseISO(stats.nextUpcomingRelease.release.launchDate), 'PPP')}</span></p>
-                  </div>
+                        <p className="text-xs text-muted-foreground mt-1">Launch: <span className="font-medium">{format(parseISO(item.release.launchDate), 'PPP')}</span></p>
+                      </div>
+                    )}
+                  />
                 ) : (
-                  <div className="text-sm text-muted-foreground p-2">
+                  <div className="text-sm text-muted-foreground p-2 min-h-[72px]">
                     <p>No upcoming releases planned.</p>
                     <p className="text-xs mt-1">Go to Productization or Offerization to create a release plan.</p>
                   </div>
