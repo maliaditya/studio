@@ -6,7 +6,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, getDay } from 'date-fns';
-import { DollarSign, Share2, Heart, Trophy, MessageSquareQuote, CheckCircle2, Circle, Target, TrendingUp } from 'lucide-react';
+import { DollarSign, Share2, Heart, Trophy, MessageSquareQuote, CheckCircle2, Circle, Target, TrendingUp, Magnet, Package } from 'lucide-react';
 import type { Activity } from '@/types/workout';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +25,8 @@ function MyPlatePageContent() {
     exerciseDefinitions,
     goalWeight,
     weightLogs,
+    leadGenDefinitions,
+    offerSystemDefinitions,
   } = useAuth();
   
   const [isLoading, setIsLoading] = useState(true);
@@ -74,6 +76,14 @@ function MyPlatePageContent() {
     return activeTasks.slice(0, 3); // Show top 3 active items
   }, [deepWorkDefinitions]);
   
+  const leadGenPipeline = useMemo(() => {
+    return (leadGenDefinitions || []).slice(0, 3);
+  }, [leadGenDefinitions]);
+
+  const offerSystemPipeline = useMemo(() => {
+    return (offerSystemDefinitions || []).slice(0, 3);
+  }, [offerSystemDefinitions]);
+
   const latestWeightLog = useMemo(() => {
     if (!weightLogs || weightLogs.length === 0) return null;
     return [...weightLogs].sort((a, b) => a.date.localeCompare(b.date)).pop();
@@ -168,8 +178,8 @@ function MyPlatePageContent() {
         <div className="lg:col-span-2 space-y-8">
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-xl"><DollarSign className="h-6 w-6 text-primary"/> Wealth</CardTitle>
-                    <CardDescription>Deep work & income opportunities.</CardDescription>
+                    <CardTitle className="flex items-center gap-2 text-xl"><DollarSign className="h-6 w-6 text-primary"/> Wealth Engine</CardTitle>
+                    <CardDescription>Your systems for growth and income generation.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div>
@@ -203,6 +213,34 @@ function MyPlatePageContent() {
                             </ul>
                         ) : (
                             <p className="text-muted-foreground text-sm">Branding pipeline is clear. Go to Deep Work to mark items as ready!</p>
+                        )}
+                    </div>
+                    <div className="pt-6 border-t">
+                        <h3 className="font-semibold mb-2 flex items-center gap-2"><Magnet /> Lead Generation Tasks</h3>
+                        {leadGenPipeline.length > 0 ? (
+                             <ul className="space-y-2">
+                                {leadGenPipeline.map(task => (
+                                    <li key={task.id} className="text-sm p-2 rounded-md bg-muted/50 flex justify-between items-center">
+                                        <span>{task.name}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-muted-foreground text-sm">No lead generation tasks defined.</p>
+                        )}
+                    </div>
+                    <div className="pt-6 border-t">
+                        <h3 className="font-semibold mb-2 flex items-center gap-2"><Package /> Defined Offers</h3>
+                        {offerSystemPipeline.length > 0 ? (
+                             <ul className="space-y-2">
+                                {offerSystemPipeline.map(task => (
+                                    <li key={task.id} className="text-sm p-2 rounded-md bg-muted/50 flex justify-between items-center">
+                                        <span>{task.name}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-muted-foreground text-sm">No offers have been defined yet.</p>
                         )}
                     </div>
                 </CardContent>
