@@ -156,12 +156,12 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             <Separator className="my-2" />
             <div className="relative">
               <h4 className="font-semibold mb-2 flex items-center gap-2"><Share2 /> Personal Branding</h4>
-              <motion.div layout className="min-h-[72px]">
+              <motion.div layout>
                 {brandingItems.length > 0 ? (
                   <Carousel
                       items={brandingItems}
                       renderItem={(item: any) => (
-                        <div className="text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md" onClick={() => router.push('/personal-branding')}>
+                        <div className="h-20 flex flex-col justify-center text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md" onClick={() => router.push('/personal-branding')}>
                           <p>Next up: <span className="font-bold text-foreground">{item.taskName}</span></p>
                           <p>Current Stage: <span className="font-bold text-foreground">{item.stage} ({item.progress})</span></p>
                         </div>
@@ -178,12 +178,12 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
              <Separator className="my-2" />
              <div className="relative">
               <h4 className="font-semibold mb-2 flex items-center gap-2"><Rocket /> Upcoming Roadmap</h4>
-              <motion.div layout className="min-h-[72px]">
+              <motion.div layout>
                 {roadmapItems.length > 0 ? (
                     <Carousel
                       items={roadmapItems}
                       renderItem={(item: any) => (
-                        <div className="text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md" onClick={() => router.push(item.type === 'product' ? '/productization' : '/offerization')}>
+                        <div className="h-20 flex flex-col justify-center text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md" onClick={() => router.push(item.type === 'product' ? '/productization' : '/offerization')}>
                           <div className="flex justify-between items-start">
                               <div>
                                   <p className="font-bold text-foreground">{item.release.name}</p>
