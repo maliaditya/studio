@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -98,6 +98,7 @@ interface AuthContextType {
   setProductizationPlans: React.Dispatch<React.SetStateAction<Record<string, ProductizationPlan>>>;
   offerizationPlans: Record<string, ProductizationPlan>;
   setOfferizationPlans: React.Dispatch<React.SetStateAction<Record<string, ProductizationPlan>>>;
+  addFeatureToRelease: (release: Release, topic: string, featureName: string, type: 'product' | 'service') => void;
 
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
@@ -684,6 +685,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
   
+  const addFeatureToRelease = (release: Release, topic: string, featureName: string, type: 'product' | 'service') => {
+    if (!featureName.trim()) {
+      toast({ title: "Error", description: "Feature name cannot be empty.", variant: "destructive" });
+      return;
+    }
+
+    const newFeatureDef: ExerciseDefinition = {
+      id: `def_${Date.now()}`,
+      name: featureName.trim(),
+      category: topic as ExerciseCategory,
+    };
+
+    setDeepWorkDefinitions(prev => [...prev, newFeatureDef]);
+
+    const plansUpdater = type === 'product' ? setProductizationPlans : setOfferizationPlans;
+
+    plansUpdater(prevPlans => {
+      const newPlans = { ...prevPlans };
+      const currentPlan = newPlans[topic];
+      
+      if (currentPlan && currentPlan.releases) {
+        const releaseIndex = currentPlan.releases.findIndex(r => r.id === release.id);
+        if (releaseIndex > -1) {
+          const updatedRelease = { ...currentPlan.releases[releaseIndex] };
+          updatedRelease.focusAreaIds = [...(updatedRelease.focusAreaIds || []), newFeatureDef.id];
+          currentPlan.releases[releaseIndex] = updatedRelease;
+        }
+      }
+      return newPlans;
+    });
+
+    toast({ title: "Feature Added", description: `"${newFeatureDef.name}" was added to the "${release.name}" release.` });
+  };
+  
   const updateWorkoutInLog = (dateKey: string, updatedWorkout: DatedWorkout) => {
     setAllWorkoutLogs(prevLogs => {
       const existingLogIndex = prevLogs.findIndex(log => log.id === dateKey);
@@ -769,6 +804,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     offerSystemDefinitions, setOfferSystemDefinitions,
     productizationPlans, setProductizationPlans,
     offerizationPlans, setOfferizationPlans,
+    addFeatureToRelease,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
   };
 
