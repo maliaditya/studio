@@ -51,6 +51,7 @@ import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 
 const DEFAULT_TARGET_SESSIONS = 1;
@@ -73,10 +74,12 @@ function DeepWorkPageContent() {
     allDeepWorkLogs, setAllDeepWorkLogs,
     deepWorkDefinitions, setDeepWorkDefinitions,
     upskillDefinitions, allUpskillLogs,
+    deepWorkTopicMetadata, setDeepWorkTopicMetadata,
   } = useAuth();
 
   const [newSubtopicName, setNewSubtopicName] = useState('');
   const [newTopicName, setNewTopicName] = useState('');
+  const [newTopicClassification, setNewTopicClassification] = useState<'product' | 'service'>('product');
   
   const [editingDefinition, setEditingDefinition] = useState<ExerciseDefinition | null>(null);
   const [editingDefinitionName, setEditingDefinitionName] = useState('');
@@ -156,6 +159,8 @@ function DeepWorkPageContent() {
     const topics = new Set(deepWorkDefinitions.map(def => def.category));
     return Array.from(topics).sort();
   }, [deepWorkDefinitions]);
+
+  const isNewTopic = newTopicName.trim() !== '' && !allTopics.includes(newTopicName.trim());
 
   useEffect(() => {
     const now = new Date();
@@ -239,18 +244,28 @@ function DeepWorkPageContent() {
       toast({ title: "Error", description: "Topic and Focus Area cannot be empty.", variant: "destructive" });
       return;
     }
-    if (deepWorkDefinitions.some(def => def.name.toLowerCase() === newSubtopicName.trim().toLowerCase() && def.category.toLowerCase() === newTopicName.trim().toLowerCase())) {
+    const topic = newTopicName.trim();
+    if (deepWorkDefinitions.some(def => def.name.toLowerCase() === newSubtopicName.trim().toLowerCase() && def.category.toLowerCase() === topic.toLowerCase())) {
       toast({ title: "Error", description: "This focus area already exists for this topic.", variant: "destructive" });
       return;
     }
+    
+    if (isNewTopic) {
+        setDeepWorkTopicMetadata(prev => ({
+            ...prev,
+            [topic]: { classification: newTopicClassification }
+        }));
+    }
+
     const newDef: ExerciseDefinition = { 
       id: `def_${Date.now().toString()}`, 
       name: newSubtopicName.trim(),
-      category: newTopicName.trim() as ExerciseCategory, // Casting, as we allow dynamic strings
+      category: topic as ExerciseCategory,
     };
     setDeepWorkDefinitions(prev => [...prev, newDef]);
     setNewSubtopicName('');
     setNewTopicName('');
+    setNewTopicClassification('product'); // Reset to default
     toast({ title: "Success", description: `Focus Area "${newDef.name}" added to library.` });
   };
 
@@ -518,6 +533,22 @@ function DeepWorkPageContent() {
                         </datalist>
 
                         <Input type="text" placeholder="New Focus Area" value={newSubtopicName} onChange={(e) => setNewSubtopicName(e.target.value)} aria-label="New focus area" className="h-10 text-sm" />
+
+                        {isNewTopic && (
+                          <div className="space-y-2 rounded-md border p-3 bg-muted/50">
+                            <Label className="text-xs font-medium">Classify this new topic</Label>
+                            <RadioGroup value={newTopicClassification} onValueChange={(v) => setNewTopicClassification(v as 'product' | 'service')} className="flex gap-4 pt-1">
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="product" id="class-product-new" />
+                                <Label htmlFor="class-product-new" className="font-normal">Product</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="service" id="class-service-new" />
+                                <Label htmlFor="class-service-new" className="font-normal">Service</Label>
+                              </div>
+                            </RadioGroup>
+                          </div>
+                        )}
                         
                         <Button type="submit" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs xl:text-sm xl:h-10 xl:px-4"> <PlusCircle className="mr-2 h-5 w-5" /> Add Focus Area </Button>
                       </form>
@@ -545,7 +576,12 @@ function DeepWorkPageContent() {
                                       <div className="flex items-center justify-between gap-2">
                                         <div className="flex-grow min-w-0">
                                             <span className="font-medium text-foreground block" title={def.name}>{def.name}</span>
-                                            <Badge variant="secondary" className="text-xs ml-0 my-0.5">{def.category}</Badge>
+                                            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                              <Badge variant="secondary" className="text-xs">{def.category}</Badge>
+                                              {deepWorkTopicMetadata[def.category] && (
+                                                  <Badge variant="outline" className="text-xs capitalize">{deepWorkTopicMetadata[def.category].classification}</Badge>
+                                              )}
+                                            </div>
                                         </div>
                                         <div className="flex-shrink-0 flex items-center">
                                           <Button variant="ghost" size="icon" onClick={() => handleOpenDecompositionModal(def)} className="h-8 w-8 text-muted-foreground hover:text-yellow-500" aria-label={`View decomposition techniques for ${def.name}`}> <Puzzle className="h-4 w-4" /> </Button>

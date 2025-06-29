@@ -71,6 +71,10 @@ export interface TopicGoal {
   goalValue: number;
 }
 
+export interface DeepWorkTopicMetadata {
+  classification: 'product' | 'service';
+}
+
 export interface TopicBrandingInfo {
   brandingStatus?: 'converted' | 'published';
   contentUrls?: {
@@ -147,6 +151,7 @@ export type Activity = {
   details: string;
   completed: boolean;
   taskIds?: string[];
+  slot: string;
 };
 
 export type DailySchedule = Record<string, Activity[]>; // Slot name -> Array of Activities

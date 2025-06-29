@@ -1,9 +1,10 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -84,6 +85,8 @@ interface AuthContextType {
 
   deepWorkDefinitions: ExerciseDefinition[];
   setDeepWorkDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
+  deepWorkTopicMetadata: Record<string, DeepWorkTopicMetadata>;
+  setDeepWorkTopicMetadata: React.Dispatch<React.SetStateAction<Record<string, DeepWorkTopicMetadata>>>;
   
   leadGenDefinitions: ExerciseDefinition[];
   setLeadGenDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
@@ -148,6 +151,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [upskillDefinitions, setUpskillDefinitions] = useState<ExerciseDefinition[]>([]);
   const [topicGoals, setTopicGoals] = useState<Record<string, TopicGoal>>({});
   const [deepWorkDefinitions, setDeepWorkDefinitions] = useState<ExerciseDefinition[]>([]);
+  const [deepWorkTopicMetadata, setDeepWorkTopicMetadata] = useState<Record<string, DeepWorkTopicMetadata>>({});
   const [leadGenDefinitions, setLeadGenDefinitions] = useState<ExerciseDefinition[]>(LEAD_GEN_DEFINITIONS);
   const [offerSystemDefinitions, setOfferSystemDefinitions] = useState<ExerciseDefinition[]>(OFFER_SYSTEM_DEFINITIONS);
   const [productizationPlans, setProductizationPlans] = useState<Record<string, { plan: string }>>({});
@@ -200,6 +204,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`upskill_definitions_${username}`); setUpskillDefinitions(d ? JSON.parse(d) : []); } catch (e) { setUpskillDefinitions([]); }
       try { const d = loadItem(`upskill_topic_goals_${username}`); setTopicGoals(d ? JSON.parse(d) : {}); } catch (e) { setTopicGoals({}); }
       try { const d = loadItem(`deepwork_definitions_${username}`); setDeepWorkDefinitions(d ? JSON.parse(d) : []); } catch (e) { setDeepWorkDefinitions([]); }
+      try { const d = loadItem(`deepwork_topic_metadata_${username}`); setDeepWorkTopicMetadata(d ? JSON.parse(d) : {}); } catch (e) { setDeepWorkTopicMetadata({}); }
       try { const d = loadItem(`leadgen_definitions_${username}`); setLeadGenDefinitions(d ? JSON.parse(d) : LEAD_GEN_DEFINITIONS); } catch (e) { setLeadGenDefinitions(LEAD_GEN_DEFINITIONS); }
       try { const d = loadItem(`offer_system_definitions_${username}`); setOfferSystemDefinitions(d ? JSON.parse(d) : OFFER_SYSTEM_DEFINITIONS); } catch (e) { setOfferSystemDefinitions(OFFER_SYSTEM_DEFINITIONS); }
       try { const d = loadItem(`productization_plans_${username}`); setProductizationPlans(d ? JSON.parse(d) : {}); } catch (e) { setProductizationPlans({}); }
@@ -211,7 +216,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setAllUpskillLogs([]); setAllDeepWorkLogs([]); setAllWorkoutLogs([]); setAllBrandingLogs([]); setAllLeadGenLogs([]); setAllOfferSystemLogs([]);
       setWorkoutMode('two-muscle'); setWorkoutPlans(INITIAL_PLANS); setExerciseDefinitions(DEFAULT_EXERCISE_DEFINITIONS);
       setUpskillDefinitions([]); setTopicGoals({});
-      setDeepWorkDefinitions([]); setLeadGenDefinitions(LEAD_GEN_DEFINITIONS); setOfferSystemDefinitions(OFFER_SYSTEM_DEFINITIONS);
+      setDeepWorkDefinitions([]); setDeepWorkTopicMetadata({});
+      setLeadGenDefinitions(LEAD_GEN_DEFINITIONS); setOfferSystemDefinitions(OFFER_SYSTEM_DEFINITIONS);
       setProductizationPlans({});
     }
   }, [currentUser]);
@@ -244,6 +250,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`upskill_definitions_${username}`, JSON.stringify(upskillDefinitions));
       localStorage.setItem(`upskill_topic_goals_${username}`, JSON.stringify(topicGoals));
       localStorage.setItem(`deepwork_definitions_${username}`, JSON.stringify(deepWorkDefinitions));
+      localStorage.setItem(`deepwork_topic_metadata_${username}`, JSON.stringify(deepWorkTopicMetadata));
       localStorage.setItem(`leadgen_definitions_${username}`, JSON.stringify(leadGenDefinitions));
       localStorage.setItem(`offer_system_definitions_${username}`, JSON.stringify(offerSystemDefinitions));
       localStorage.setItem(`productization_plans_${username}`, JSON.stringify(productizationPlans));
@@ -251,7 +258,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
     schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allOfferSystemLogs,
-    exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, offerSystemDefinitions,
+    exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, deepWorkTopicMetadata, leadGenDefinitions, offerSystemDefinitions,
     productizationPlans,
     currentUser, loading
   ]);
@@ -284,6 +291,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     setDeepWorkDefinitions(data.deepWorkDefinitions || []);
     setAllDeepWorkLogs(data.deepWorkLogs || []);
+    setDeepWorkTopicMetadata(data.deepWorkTopicMetadata || {});
     
     setBrandingLogs(data.brandingLogs || []);
 
@@ -350,7 +358,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return {
       exerciseDefinitions, workoutPlans, allWorkoutLogs, workoutMode,
       upskillDefinitions, upskillLogs: allUpskillLogs, upskillTopicGoals: topicGoals,
-      deepWorkDefinitions, deepWorkLogs: allDeepWorkLogs,
+      deepWorkDefinitions, deepWorkLogs: allDeepWorkLogs, deepWorkTopicMetadata,
       brandingLogs,
       leadGenDefinitions, allLeadGenLogs,
       offerSystemDefinitions, allOfferSystemLogs,
@@ -619,18 +627,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       return prevLogs;
     });
-
+    
     if (updateSucceeded) {
+      handleToggleComplete(activity.slot, activity.id);
       toast({ title: "Progress Logged", description: "Your session has been saved." });
-      // Also mark the activity as complete in the schedule
-      setSchedule(prev => {
-          const todaySchedule = { ...(prev[todayKey] || {}) };
-          const slotActivities = todaySchedule[activity.slot] || [];
-          todaySchedule[activity.slot] = slotActivities.map(act => 
-              act.id === activity.id ? { ...act, completed: true } : act
-          );
-          return { ...prev, [todayKey]: todaySchedule };
-      });
     } else {
       const sourceLogs = isUpskill ? allUpskillLogs : allDeepWorkLogs;
       const logForToday = sourceLogs.find(log => log.date === todayKey);
@@ -756,7 +756,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs, allLeadGenLogs, setAllLeadGenLogs, allOfferSystemLogs, setAllOfferSystemLogs,
     workoutMode, setWorkoutMode, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
     upskillDefinitions, setUpskillDefinitions, topicGoals, setTopicGoals,
-    deepWorkDefinitions, setDeepWorkDefinitions,
+    deepWorkDefinitions, setDeepWorkDefinitions, deepWorkTopicMetadata, setDeepWorkTopicMetadata,
     leadGenDefinitions, setLeadGenDefinitions,
     offerSystemDefinitions, setOfferSystemDefinitions,
     productizationPlans, setProductizationPlans,
