@@ -244,14 +244,19 @@ function ProductizationPageContent() {
         const body = await response.text();
 
         if (!response.ok) {
-            let errorMessage = `Request failed: ${response.statusText}`;
+            let errorMessage = `Request failed with status ${response.status}.`;
             if (body) {
                 try {
                     const json = JSON.parse(body);
-                    errorMessage = json.error || errorMessage;
+                    // Use the server's error message if available
+                    errorMessage = json.error || body;
                 } catch (e) {
+                    // If the body is not JSON, use the raw text
                     errorMessage = body;
                 }
+            } else if (response.statusText) {
+                // Fallback to statusText if body is empty
+                errorMessage = `Request failed with status ${response.status}: ${response.statusText}`;
             }
             throw new Error(errorMessage);
         }
