@@ -88,7 +88,7 @@ function PersonalBrandingPageContent() {
       });
 
       const eligibleFocusAreas = (deepWorkDefinitions || []).filter(def => {
-        const hasEnoughSessions = (focusAreaSessionCounts[def.id] || 0) >= 4;
+        const hasEnoughSessions = (focusAreaSessionCounts[def.id] || 0) >= 1;
         const isAlreadyBundled = bundledFocusAreaNames.has(def.name);
         return hasEnoughSessions && !isAlreadyBundled;
       });
@@ -162,7 +162,7 @@ function PersonalBrandingPageContent() {
     });
 
     const allEligibleFocusAreas = deepWorkDefinitions.filter(def => 
-        (focusAreaSessionCounts[def.id] || 0) >= 4
+        (focusAreaSessionCounts[def.id] || 0) >= 1
     );
     
     const usedFocusAreaNames = new Set<string>();
@@ -376,7 +376,7 @@ function PersonalBrandingPageContent() {
                         <Briefcase className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
                         <p className="text-muted-foreground">Your pipeline is empty.</p>
                         <p className="text-sm text-muted-foreground/80">
-                          A topic bundle appears here when it has 4 focus areas, each with at least 4 days of logged sessions in Deep Work.
+                          A topic bundle appears here when it has 4 focus areas, each with at least 1 day of logged sessions in Deep Work.
                         </p>
                       </div>
                     ) : (
