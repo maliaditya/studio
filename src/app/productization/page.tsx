@@ -163,12 +163,17 @@ function ProductizationPageContent() {
                                                 <SelectGroup key={group.group}>
                                                     <SelectLabel>{group.group}</SelectLabel>
                                                     {group.items.map(item => (
-                                                        <SelectItem key={item} value={item}>{item}</SelectItem>
+                                                        <SelectItem key={item.name} value={item.name}>{item.name}</SelectItem>
                                                     ))}
                                                 </SelectGroup>
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                     {gapAnalysis?.gapType && (
+                                        <p className="text-xs text-muted-foreground mt-2">
+                                            {GAP_TYPES.flatMap(g => g.items).find(i => i.name === gapAnalysis.gapType)?.description}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <Label htmlFor={`fill-${topic}`} className="text-sm">What You Can Fill</Label>

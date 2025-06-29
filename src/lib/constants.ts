@@ -171,11 +171,47 @@ export const productTypes = [
 ];
 
 export const GAP_TYPES = [
-    { group: "🔷 Primary Strategic Gaps (Core 5)", items: [ "Market Gap", "Skill Gap", "Execution Gap", "Content Gap", "System Gap" ]},
-    { group: "🔶 Expansion Gaps (Execution, Tech, or Product-based)", items: [ "Speed Gap", "Design Gap", "Integration Gap", "UX Gap", "Dev Experience Gap" ]},
-    { group: "🧠 Knowledge / Communication Gaps", items: [ "Education Gap", "Onboarding Gap", "Trust Gap", "Clarity Gap" ]},
-    { group: "💰 Monetization / Business Gaps", items: [ "Monetization Gap", "Pricing Gap", "Packaging Gap", "Value Ladder Gap" ]},
-    { group: "📣 Marketing / Distribution Gaps", items: [ "Distribution Gap", "Positioning Gap", "Narrative Gap", "Demo Gap" ]},
-    { group: "🔓 Access / Inclusivity Gaps", items: [ "Access Gap", "Affordability Gap", "Localization Gap" ]},
-    { group: "⏱ Time / Resource Gaps", items: [ "Time Gap", "Focus Gap", "Energy Gap", "Workflow Gap" ]}
+    { group: "🔷 Primary Strategic Gaps (Core 5)", items: [
+        { name: "Market Gap", description: "What the market lacks or does poorly." },
+        { name: "Skill Gap", description: "What few people have the skill to build or offer." },
+        { name: "Execution Gap", description: "What most people start but never finish or ship." },
+        { name: "Content Gap", description: "What isn’t well explained, documented, or visualized." },
+        { name: "System Gap", description: "Where tools or workflows are scattered and inefficient." },
+    ]},
+    { group: "🔶 Expansion Gaps (Execution, Tech, or Product-based)", items: [
+        { name: "Speed Gap", description: "Others are slow to act; you can build or launch fast." },
+        { name: "Design Gap", description: "Tools exist but are ugly, clunky, or unintuitive." },
+        { name: "Integration Gap", description: "Systems and tools don’t work well together." },
+        { name: "UX Gap", description: "User experience is confusing, frustrating, or overwhelming." },
+        { name: "Dev Experience Gap", description: "Poor setup, documentation, or usability for developers." },
+    ]},
+    { group: "🧠 Knowledge / Communication Gaps", items: [
+        { name: "Education Gap", description: "Valuable knowledge isn’t taught clearly or accessibly." },
+        { name: "Onboarding Gap", description: "Too hard for users or devs to get started." },
+        { name: "Trust Gap", description: "Users don’t trust the existing products or information." },
+        { name: "Clarity Gap", description: "Ideas/tools exist but are messy or buried in jargon." },
+    ]},
+    { group: "💰 Monetization / Business Gaps", items: [
+        { name: "Monetization Gap", description: "Useful things with no clear way to make money." },
+        { name: "Pricing Gap", description: "No smart pricing tiers; value isn’t matched to cost." },
+        { name: "Packaging Gap", description: "Products or info aren’t bundled or sold effectively." },
+        { name: "Value Ladder Gap", description: "No journey from free to paid to premium offers." },
+    ]},
+    { group: "📣 Marketing / Distribution Gaps", items: [
+        { name: "Distribution Gap", description: "Great products that nobody knows about." },
+        { name: "Positioning Gap", description: "Product is not framed to resonate with its audience." },
+        { name: "Narrative Gap", description: "No compelling story behind the product or creator." },
+        { name: "Demo Gap", description: "No working demos, previews, or proof-of-concept shown." },
+    ]},
+    { group: "🔓 Access / Inclusivity Gaps", items: [
+        { name: "Access Gap", description: "Knowledge or tools are locked behind skill, paywalls, or jargon." },
+        { name: "Affordability Gap", description: "Existing solutions are overpriced or bloated." },
+        { name: "Localization Gap", description: "Product not adapted to language, region, or culture." },
+    ]},
+    { group: "⏱ Time / Resource Gaps", items: [
+        { name: "Time Gap", description: "People want solutions but don’t have the time to build them." },
+        { name: "Focus Gap", description: "People can’t stay consistent or go deep; they’re scattered." },
+        { name: "Energy Gap", description: "Market is tired, burned out, or overloaded." },
+        { name: "Workflow Gap", description: "No repeatable, clean, productive process exists." },
+    ]}
 ];
