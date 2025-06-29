@@ -90,7 +90,7 @@ function MatrixPageContent() {
                   <TableHead>Format</TableHead>
                   <TableHead>Gap Type</TableHead>
                   <TableHead>What You Can Fill</TableHead>
-                  <TableHead>Core Solution / Offer Type</TableHead>
+                  <TableHead>Core Solution</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Outcome Goal</TableHead>
                 </TableRow>
@@ -101,7 +101,8 @@ function MatrixPageContent() {
                     <TableRow key={row.topic}>
                       <TableCell className="font-medium align-top">{row.topic}</TableCell>
                       <TableCell className="align-top">
-                        <Badge variant={row.classification === 'product' ? 'default' : 'secondary'} className="capitalize text-xs">{row.classification}</Badge>
+                        <p className="font-medium text-xs">{row.offerType}</p>
+                        <Badge variant={row.classification === 'product' ? 'default' : 'secondary'} className="capitalize text-xs mt-1">{row.classification}</Badge>
                       </TableCell>
                       <TableCell className="align-top">
                         <div className="flex flex-wrap gap-1">
@@ -113,7 +114,6 @@ function MatrixPageContent() {
                       </TableCell>
                       <TableCell className="align-top">
                         {renderTextAsList(row.coreSolution, "font-semibold")}
-                        {row.offerType && row.offerType !== '-' && <p className="text-xs text-muted-foreground mt-1">{row.offerType}</p>}
                       </TableCell>
                        <TableCell className="align-top">
                           <Badge variant={row.status === 'In Progress' ? 'destructive' : 'outline'}>{row.status}</Badge>
