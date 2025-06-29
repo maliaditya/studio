@@ -82,6 +82,7 @@ function HomePageContent() {
     allDeepWorkLogs, setAllDeepWorkLogs,
     allWorkoutLogs,
     allLeadGenLogs,
+    brandingLogs, setAllBrandingLogs,
     setActivityDurations,
     isAgendaDocked, setIsAgendaDocked,
     handleToggleComplete, handleLogLearning,
