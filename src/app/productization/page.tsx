@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -68,7 +69,7 @@ const productizationIdeas = [
 ];
 
 function ProductizationPageContent() {
-  const { deepWorkDefinitions, productizationPlans, setProductizationPlans } = useAuth();
+  const { deepWorkDefinitions, productizationPlans, setProductizationPlans, deepWorkTopicMetadata } = useAuth();
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [currentPlan, setCurrentPlan] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -82,8 +83,10 @@ function ProductizationPageContent() {
       }
       topicMap.get(topic)!.push(def);
     });
-    return Array.from(topicMap.entries());
-  }, [deepWorkDefinitions]);
+    return Array.from(topicMap.entries()).filter(([topic]) => {
+        return deepWorkTopicMetadata[topic]?.classification === 'product';
+    });
+  }, [deepWorkDefinitions, deepWorkTopicMetadata]);
 
   const handleOpenModal = (topic: string) => {
     setSelectedTopic(topic);
