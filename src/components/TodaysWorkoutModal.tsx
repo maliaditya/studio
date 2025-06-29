@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo } from 'react';
@@ -10,13 +11,14 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { WorkoutExercise, Activity } from '@/types/workout';
-import { Dumbbell, TrendingUp, CheckCircle2 } from 'lucide-react';
+import type { WorkoutExercise, Activity, ExerciseDefinition } from '@/types/workout';
+import { Dumbbell, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Button } from './ui/button';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { WorkoutExerciseCard } from './WorkoutExerciseCard';
 import { useToast } from '@/hooks/use-toast';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 interface TodaysWorkoutModalProps {
   isOpen: boolean;
@@ -40,7 +42,9 @@ export function TodaysWorkoutModal({
     logWorkoutSet, 
     updateWorkoutSet, 
     deleteWorkoutSet,
-    removeExerciseFromWorkout 
+    removeExerciseFromWorkout,
+    swapWorkoutExercise,
+    exerciseDefinitions
   } = useAuth();
   const { toast } = useToast();
 
@@ -90,7 +94,7 @@ export function TodaysWorkoutModal({
             Log Workout: {muscleGroupsForDay.join(' & ') || 'Rest Day'}
           </DialogTitle>
           <DialogDescription>
-            Log your sets for each exercise. The workout can be marked as complete once all target sets are logged.
+            Log your sets for each exercise. You can swap exercises if needed.
           </DialogDescription>
         </DialogHeader>
         <div className="flex-grow min-h-0">
@@ -98,16 +102,57 @@ export function TodaysWorkoutModal({
             {exercisesInLog.length > 0 ? (
               pendingExercises.length > 0 ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {pendingExercises.map(exercise => (
-                      <WorkoutExerciseCard 
-                          key={exercise.id} 
-                          exercise={exercise}
-                          onLogSet={(...args) => logWorkoutSet(today, ...args)} 
-                          onDeleteSet={(...args) => deleteWorkoutSet(today, ...args)} 
-                          onUpdateSet={(...args) => updateWorkoutSet(today, ...args)} 
-                          onRemoveExercise={(...args) => removeExerciseFromWorkout(today, ...args)}
-                      />
-                  ))}
+                  {pendingExercises.map(exercise => {
+                    const swappableExercises = exerciseDefinitions.filter(
+                      def => def.category === exercise.category && !exercisesInLog.some(e => e.definitionId === def.id)
+                    );
+                    
+                    return (
+                      <div key={exercise.id} className="flex flex-col gap-2">
+                        <WorkoutExerciseCard 
+                            exercise={exercise}
+                            onLogSet={(...args) => logWorkoutSet(today, ...args)} 
+                            onDeleteSet={(...args) => deleteWorkoutSet(today, ...args)} 
+                            onUpdateSet={(...args) => updateWorkoutSet(today, ...args)} 
+                            onRemoveExercise={(...args) => removeExerciseFromWorkout(today, ...args)}
+                        />
+                        <div className="flex justify-end">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" size="sm" className="h-8">
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                Swap Exercise
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 p-0">
+                              {swappableExercises.length > 0 ? (
+                                <ScrollArea className="h-[200px]">
+                                  <div className="p-2">
+                                    {swappableExercises.map(def => (
+                                      <Button
+                                        key={def.id}
+                                        variant="ghost"
+                                        className="w-full justify-start h-9"
+                                        onClick={() => {
+                                          swapWorkoutExercise(today, exercise.id, def)
+                                        }}
+                                      >
+                                        {def.name}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </ScrollArea>
+                              ) : (
+                                <p className="p-4 text-sm text-center text-muted-foreground">
+                                  No other exercises in this category.
+                                </p>
+                              )}
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8 min-h-[300px]">

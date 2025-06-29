@@ -105,6 +105,7 @@ interface AuthContextType {
   updateWorkoutSet: (date: Date, exerciseId: string, setId: string, reps: number, weight: number) => void;
   deleteWorkoutSet: (date: Date, exerciseId: string, setId: string) => void;
   removeExerciseFromWorkout: (date: Date, exerciseId: string) => void;
+  swapWorkoutExercise: (date: Date, oldExerciseId: string, newExerciseDefinition: ExerciseDefinition) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -788,6 +789,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
   
+  const swapWorkoutExercise = (date: Date, oldExerciseId: string, newExerciseDefinition: ExerciseDefinition) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    const workoutLog = allWorkoutLogs.find(log => log.id === dateKey);
+
+    if (!workoutLog) {
+      toast({ title: "Error", description: "Could not find workout log for the selected date.", variant: "destructive" });
+      return;
+    }
+
+    const exerciseIndex = workoutLog.exercises.findIndex(ex => ex.id === oldExerciseId);
+    if (exerciseIndex === -1) {
+      toast({ title: "Error", description: "Could not find the exercise to replace.", variant: "destructive" });
+      return;
+    }
+
+    const oldExerciseName = workoutLog.exercises[exerciseIndex].name;
+
+    const newWorkoutExercise: WorkoutExercise = {
+      id: `${newExerciseDefinition.id}-${Date.now()}`,
+      definitionId: newExerciseDefinition.id,
+      name: newExerciseDefinition.name,
+      category: newExerciseDefinition.category,
+      loggedSets: [],
+      targetSets: 3,
+      targetReps: "8-12",
+    };
+
+    const updatedExercises = [...workoutLog.exercises];
+    updatedExercises[exerciseIndex] = newWorkoutExercise;
+
+    const updatedWorkout = { ...workoutLog, exercises: updatedExercises };
+
+    setAllWorkoutLogs(prevLogs => prevLogs.map(log => log.id === dateKey ? updatedWorkout : log));
+
+    toast({ title: "Exercise Swapped!", description: `Replaced "${oldExerciseName}" with "${newWorkoutExercise.name}".` });
+  };
+
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -806,6 +844,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     offerizationPlans, setOfferizationPlans,
     addFeatureToRelease,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
+    swapWorkoutExercise,
   };
 
   return (
