@@ -56,6 +56,10 @@ function ProductizationPageContent() {
     toast({ title: "Product Type Set!", description: `Set to "${productType}" for ${topic}.` });
   };
   
+  const handleActionTaskChange = (topic: string, value: string) => {
+    setNewActionTasks(prev => ({ ...prev, [topic]: value }));
+  };
+
   const handleAddActionTask = (e: React.FormEvent, topic: string) => {
     e.preventDefault();
     const taskName = newActionTasks[topic]?.trim();
