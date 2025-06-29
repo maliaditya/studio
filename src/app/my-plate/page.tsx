@@ -5,9 +5,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, getDay } from 'date-fns';
-import { DollarSign, Share2, Heart, Trophy, MessageSquareQuote, CheckCircle2, Circle, Target, TrendingUp, Magnet, Package } from 'lucide-react';
-import type { Activity } from '@/types/workout';
+import { format, getDay, parseISO } from 'date-fns';
+import { DollarSign, Share2, Heart, Trophy, MessageSquareQuote, CheckCircle2, Circle, Target, TrendingUp, Magnet, Package, Rocket } from 'lucide-react';
+import type { Activity, Release } from '@/types/workout';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -27,6 +27,7 @@ function MyPlatePageContent() {
     weightLogs,
     leadGenDefinitions,
     offerSystemDefinitions,
+    productizationPlans,
   } = useAuth();
   
   const [isLoading, setIsLoading] = useState(true);
@@ -83,6 +84,35 @@ function MyPlatePageContent() {
   const offerSystemPipeline = useMemo(() => {
     return (offerSystemDefinitions || []).slice(0, 3);
   }, [offerSystemDefinitions]);
+
+  const upcomingReleases = useMemo(() => {
+    if (!productizationPlans) return [];
+
+    const allReleases: { topic: string, release: Release }[] = [];
+
+    Object.entries(productizationPlans).forEach(([topic, plan]) => {
+        if (plan.releases) {
+            plan.releases.forEach(release => {
+                allReleases.push({ topic, release });
+            });
+        }
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return allReleases
+        .filter(({ release }) => {
+            try {
+                const launchDate = parseISO(release.launchDate);
+                return launchDate >= today;
+            } catch (e) {
+                return false;
+            }
+        })
+        .sort((a, b) => new Date(a.release.launchDate).getTime() - new Date(b.release.launchDate).getTime())
+        .slice(0, 3);
+  }, [productizationPlans]);
 
   const latestWeightLog = useMemo(() => {
     if (!weightLogs || weightLogs.length === 0) return null;
@@ -179,7 +209,7 @@ function MyPlatePageContent() {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-xl"><DollarSign className="h-6 w-6 text-primary"/> Wealth Engine</CardTitle>
-                    <CardDescription>Your systems for growth and income generation.</CardDescription>
+                    <CardDescription>Your systems for growth, productization, and income generation.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div>
@@ -241,6 +271,24 @@ function MyPlatePageContent() {
                             </ul>
                         ) : (
                             <p className="text-muted-foreground text-sm">No offers have been defined yet.</p>
+                        )}
+                    </div>
+                    <div className="pt-6 border-t">
+                        <h3 className="font-semibold mb-2 flex items-center gap-2"><Rocket /> Upcoming Releases</h3>
+                        {upcomingReleases.length > 0 ? (
+                             <ul className="space-y-2">
+                                {upcomingReleases.map(({ topic, release }) => (
+                                    <li key={release.id} className="text-sm p-2 rounded-md bg-muted/50 flex justify-between items-center">
+                                        <div>
+                                            <span className="font-semibold">{release.name}</span>
+                                            <span className="text-muted-foreground ml-2">({topic})</span>
+                                        </div>
+                                        <Badge variant="secondary">{format(parseISO(release.launchDate), 'MMM dd, yyyy')}</Badge>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-muted-foreground text-sm">No upcoming product releases planned.</p>
                         )}
                     </div>
                 </CardContent>
