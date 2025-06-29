@@ -121,3 +121,9 @@ export const INITIAL_PLANS: AllWorkoutPlans = {
     "Legs": ["Walking Lunges (Barbell)", "Hack Squats", "hamstring machine", "Quads Machine", "Leg Press", "Calfs (Bodyweight)"]
   }
 };
+
+export const LEAD_GEN_DEFINITIONS: ExerciseDefinition[] = [
+    { id: 'lg_1', name: 'Cold DM 2 people', category: 'Lead Generation', description: 'Target: 1 founder/client, 1 recruiter/hiring manager.' },
+    { id: 'lg_2', name: 'Comment on 3 relevant posts', category: 'Lead Generation', description: 'Focus on founders, devs, and hiring managers.' },
+    { id: 'lg_3', name: 'Join 1 forum/group weekly', category: 'Lead Generation', description: 'e.g., IndieHackers, Reddit, Discord, LinkedIn groups.' },
+];

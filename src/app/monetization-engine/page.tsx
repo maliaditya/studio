@@ -3,19 +3,16 @@
 
 import React, { useMemo } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Check, Magnet, Package, MessageCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Check, Magnet, Package, MessageCircle, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
 
 function MonetizationEnginePageContent() {
-  const { deepWorkDefinitions } = useAuth();
-
-  const leadGenItems = [
-    "Post CTAs (“DM me”, “Link in bio”)",
-    "Join job boards, freelance platforms",
-    "Send 5 cold DMs daily with custom value",
-  ];
+  const { deepWorkDefinitions, leadGenDefinitions } = useAuth();
+  const router = useRouter();
 
   const offerSystemItems = [
     "Freelance Service",
@@ -52,39 +49,29 @@ function MonetizationEnginePageContent() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Lead Generation */}
-        <Card>
+        <Card className="flex flex-col">
           <CardHeader>
             <CardTitle className="flex items-center gap-3 text-xl">
               <Magnet className="h-6 w-6 text-primary" />
               Lead Generation
             </CardTitle>
-            <CardDescription>Attract and capture opportunities.</CardDescription>
+            <CardDescription>Attract and capture opportunities by consistently performing these actions.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <h4 className="font-semibold mb-2 text-md text-foreground/90">Published Content to Promote</h4>
-            {publishedBundles.length > 0 ? (
-                <ul className="space-y-2 mb-6 max-h-48 overflow-y-auto pr-2">
-                    {publishedBundles.map(bundle => (
-                        <li key={bundle.id} className="flex items-center gap-3 text-sm p-2 rounded-md bg-muted/50">
-                            <Package className="h-4 w-4 text-green-500 flex-shrink-0" />
-                            <span>{bundle.name}</span>
-                        </li>
-                    ))}
-                </ul>
-            ) : (
-                <p className="text-sm text-muted-foreground mb-6">No published content yet. Mark items as 'Ready for Branding' and publish them to see them here.</p>
-            )}
-            <Separator className="my-4"/>
-            <h4 className="font-semibold mb-3 text-md text-foreground/90">Lead Generation Actions</h4>
+          <CardContent className="flex-grow">
             <ul className="space-y-3">
-              {leadGenItems.map((item, index) => (
+              {leadGenDefinitions.map((item, index) => (
                 <li key={index} className="flex items-start gap-3">
                   <Check className="h-5 w-5 text-green-500 mt-1 flex-shrink-0" />
-                  <span className="text-muted-foreground">{item}</span>
+                  <span className="text-muted-foreground">{item.name}</span>
                 </li>
               ))}
             </ul>
           </CardContent>
+           <CardFooter>
+            <Button className="w-full" onClick={() => router.push('/lead-generation')}>
+              Go to Lead Gen Dashboard <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </CardFooter>
         </Card>
 
         {/* Offer System */}

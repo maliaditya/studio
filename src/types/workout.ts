@@ -11,6 +11,7 @@ export type ExerciseCategory =
   | "Core" 
   | "Full Body"
   | "Content Bundle"
+  | "Lead Generation"
   | "Other";
 
 export const exerciseCategories: ExerciseCategory[] = [
@@ -49,6 +50,7 @@ export interface ExerciseDefinition {
   id: string;
   name: string; // Subtopic for upskill
   category: ExerciseCategory; // Topic for upskill
+  description?: string;
   decompositionData?: DecompositionRow[];
   focusAreas?: string[];
   sourceUpskillId?: string;
@@ -83,6 +85,7 @@ export interface WorkoutExercise {
   definitionId: string; // Links to ExerciseDefinition
   name: string; // Copied from definition for display convenience
   category: ExerciseCategory; // Copied from definition
+  description?: string;
   loggedSets: LoggedSet[];
   targetSets: number;
   targetReps: string; // e.g., "10-15"

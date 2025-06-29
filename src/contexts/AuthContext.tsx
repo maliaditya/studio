@@ -12,7 +12,7 @@ import {
   getCurrentLocalUser,
 } from '@/lib/localAuth';
 import { format } from 'date-fns';
-import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS } from '@/lib/constants';
+import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS } from '@/lib/constants';
 
 
 interface AuthContextType {
@@ -65,6 +65,8 @@ interface AuthContextType {
   setAllWorkoutLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   brandingLogs: DatedWorkout[];
   setAllBrandingLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
+  allLeadGenLogs: DatedWorkout[];
+  setAllLeadGenLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   
   // Data Definitions & Plans
   workoutMode: WorkoutMode;
@@ -82,6 +84,9 @@ interface AuthContextType {
   deepWorkDefinitions: ExerciseDefinition[];
   setDeepWorkDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
   
+  leadGenDefinitions: ExerciseDefinition[];
+  setLeadGenDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
+
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
   updateWorkoutSet: (date: Date, exerciseId: string, setId: string, reps: number, weight: number) => void;
@@ -125,6 +130,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
   const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
   const [brandingLogs, setAllBrandingLogs] = useState<DatedWorkout[]>([]);
+  const [allLeadGenLogs, setAllLeadGenLogs] = useState<DatedWorkout[]>([]);
   const [activityDurations, setActivityDurations] = useState<Record<string, string>>({});
   
   // Data Definitions & Plans
@@ -134,6 +140,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [upskillDefinitions, setUpskillDefinitions] = useState<ExerciseDefinition[]>([]);
   const [topicGoals, setTopicGoals] = useState<Record<string, TopicGoal>>({});
   const [deepWorkDefinitions, setDeepWorkDefinitions] = useState<ExerciseDefinition[]>([]);
+  const [leadGenDefinitions, setLeadGenDefinitions] = useState<ExerciseDefinition[]>(LEAD_GEN_DEFINITIONS);
 
 
   useEffect(() => {
@@ -172,6 +179,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = localStorage.getItem(`deepwork_logs_${username}`); setAllDeepWorkLogs(d ? JSON.parse(d) : []); } catch (e) { setAllDeepWorkLogs([]); }
       try { const d = localStorage.getItem(`allWorkoutLogs_${username}`); setAllWorkoutLogs(d ? JSON.parse(d) : []); } catch (e) { setAllWorkoutLogs([]); }
       try { const d = localStorage.getItem(`branding_logs_${username}`); setAllBrandingLogs(d ? JSON.parse(d) : []); } catch (e) { setAllBrandingLogs([]); }
+      try { const d = localStorage.getItem(`leadgen_logs_${username}`); setAllLeadGenLogs(d ? JSON.parse(d) : []); } catch (e) { setAllLeadGenLogs([]); }
       
       // Definitions, Plans, and Goals
       const storedMode = loadItem(`workoutMode_${username}`, false);
@@ -181,15 +189,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`upskill_definitions_${username}`); setUpskillDefinitions(d ? JSON.parse(d) : []); } catch (e) { setUpskillDefinitions([]); }
       try { const d = loadItem(`upskill_topic_goals_${username}`); setTopicGoals(d ? JSON.parse(d) : {}); } catch (e) { setTopicGoals({}); }
       try { const d = loadItem(`deepwork_definitions_${username}`); setDeepWorkDefinitions(d ? JSON.parse(d) : []); } catch (e) { setDeepWorkDefinitions([]); }
+      try { const d = loadItem(`leadgen_definitions_${username}`); setLeadGenDefinitions(d ? JSON.parse(d) : LEAD_GEN_DEFINITIONS); } catch (e) { setLeadGenDefinitions(LEAD_GEN_DEFINITIONS); }
 
     } else {
       // Clear all data on logout
       setWeightLogs([]); setGoalWeight(null); setHeight(null); setDateOfBirth(null); setGender(null); setDietPlan([]);
       setSchedule({});
-      setAllUpskillLogs([]); setAllDeepWorkLogs([]); setAllWorkoutLogs([]); setAllBrandingLogs([]);
+      setAllUpskillLogs([]); setAllDeepWorkLogs([]); setAllWorkoutLogs([]); setAllBrandingLogs([]); setAllLeadGenLogs([]);
       setWorkoutMode('two-muscle'); setWorkoutPlans(INITIAL_PLANS); setExerciseDefinitions(DEFAULT_EXERCISE_DEFINITIONS);
       setUpskillDefinitions([]); setTopicGoals({});
-      setDeepWorkDefinitions([]);
+      setDeepWorkDefinitions([]); setLeadGenDefinitions(LEAD_GEN_DEFINITIONS);
     }
   }, [currentUser]);
 
@@ -211,6 +220,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`deepwork_logs_${username}`, JSON.stringify(allDeepWorkLogs));
       localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(allWorkoutLogs));
       localStorage.setItem(`branding_logs_${username}`, JSON.stringify(brandingLogs));
+      localStorage.setItem(`leadgen_logs_${username}`, JSON.stringify(allLeadGenLogs));
 
       // Definitions, Plans, and Goals
       localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(exerciseDefinitions));
@@ -219,11 +229,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`upskill_definitions_${username}`, JSON.stringify(upskillDefinitions));
       localStorage.setItem(`upskill_topic_goals_${username}`, JSON.stringify(topicGoals));
       localStorage.setItem(`deepwork_definitions_${username}`, JSON.stringify(deepWorkDefinitions));
+      localStorage.setItem(`leadgen_definitions_${username}`, JSON.stringify(leadGenDefinitions));
     }
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
-    schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs,
-    exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions,
+    schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
+    exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions,
     currentUser, loading
   ]);
 
@@ -256,7 +267,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setDeepWorkDefinitions(data.deepWorkDefinitions || []);
     setAllDeepWorkLogs(data.deepWorkLogs || []);
     
-    setAllBrandingLogs(data.brandingLogs || []);
+    setBrandingLogs(data.brandingLogs || []);
+
+    setLeadGenDefinitions(data.leadGenDefinitions || LEAD_GEN_DEFINITIONS);
+    setAllLeadGenLogs(data.allLeadGenLogs || []);
     
     setSchedule(data.schedule || {});
 
@@ -315,6 +329,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       upskillDefinitions, upskillLogs: allUpskillLogs, upskillTopicGoals: topicGoals,
       deepWorkDefinitions, deepWorkLogs: allDeepWorkLogs,
       brandingLogs,
+      leadGenDefinitions, allLeadGenLogs,
       schedule,
       dietPlan, weightLogs, goalWeight, height, dateOfBirth, gender,
     };
@@ -704,10 +719,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule, setSchedule, isAgendaDocked, setIsAgendaDocked, activityDurations, setActivityDurations,
     handleToggleComplete, handleLogLearning, carryForwardTask,
-    allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs,
+    allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs, allLeadGenLogs, setAllLeadGenLogs,
     workoutMode, setWorkoutMode, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
     upskillDefinitions, setUpskillDefinitions, topicGoals, setTopicGoals,
     deepWorkDefinitions, setDeepWorkDefinitions,
+    leadGenDefinitions, setLeadGenDefinitions,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
   };
 

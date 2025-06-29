@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Checkbox } from './ui/checkbox';
 import { Badge } from './ui/badge';
+import { format } from 'date-fns';
 
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -35,7 +36,7 @@ interface WorkoutExerciseCardProps {
   onRemoveExercise: (exerciseId: string) => void;
   onViewProgress?: () => void;
   onUpdateSharingStatus?: (definitionId: string, newStatus: SharingStatus) => void;
-  pageType?: 'workout' | 'upskill' | 'deepwork' | 'branding';
+  pageType?: 'workout' | 'upskill' | 'deepwork' | 'branding' | 'lead-generation';
 }
 
 export function WorkoutExerciseCard({
@@ -149,13 +150,8 @@ export function WorkoutExerciseCard({
   };
   
   const isCompleted = useMemo(() => {
-    if (pageType === 'workout') {
-        return exercise.loggedSets.length >= exercise.targetSets;
-    }
-    if (pageType === 'branding') {
-        return exercise.loggedSets.length >= 4;
-    }
-    return false;
+    if (pageType === 'branding') return exercise.loggedSets.length >= 4;
+    return exercise.loggedSets.length >= exercise.targetSets;
   }, [exercise, pageType]);
   
 
@@ -170,6 +166,9 @@ export function WorkoutExerciseCard({
     if (pageType === 'branding') {
         return `Progress: ${exercise.loggedSets.length} / 4 stages complete.`
     }
+    if (pageType === 'lead-generation') {
+        return `Progress: ${exercise.loggedSets.length} / ${exercise.targetSets} actions logged.`
+    }
     return `Target: ${exercise.targetSets} sessions of ${exercise.targetReps} min. Progress: ${exercise.loggedSets.length}/${exercise.targetSets} sessions.`;
   }
 
@@ -183,6 +182,9 @@ export function WorkoutExerciseCard({
     if (pageType === 'branding') {
         const stages = ['Create', 'Optimize', 'Review', 'Final Review'];
         return `Stage complete: <strong>${stages[set.reps - 1]}</strong>`;
+    }
+    if (pageType === 'lead-generation') {
+      return `Action logged at ${format(set.timestamp, 'p')}`;
     }
     return `Session ${exercise.loggedSets.length - index}: <strong>${set.weight}</strong> min`;
   }
@@ -247,6 +249,46 @@ export function WorkoutExerciseCard({
         </div>
       )
   }
+
+  const renderLeadGenerationContent = () => (
+    <div className='space-y-3'>
+        {exercise.description && (
+            <p className="text-sm text-muted-foreground">{exercise.description}</p>
+        )}
+        <Button onClick={() => onLogSet(exercise.id, 1, 1)} disabled={isCompleted} className="w-full">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Log 1 Action
+        </Button>
+        {exercise.loggedSets.length > 0 && (
+        <div>
+            <h4 className="text-sm font-medium mb-1 text-foreground">Logged Actions:</h4>
+            <ul className="space-y-1.5">
+            <AnimatePresence>
+                {exercise.loggedSets.slice().sort((a,b) => b.timestamp - a.timestamp).map((set, index) => (
+                <motion.li
+                    key={set.id}
+                    layout
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ duration: 0.2, delay: index * 0.05 }}
+                    className="flex items-center justify-between p-2 bg-muted/50 rounded-md text-xs"
+                >
+                    <span
+                        className="truncate"
+                        dangerouslySetInnerHTML={{ __html: getLoggedSetText(set, index) }}
+                    />
+                    <Button variant="ghost" size="icon" onClick={() => onDeleteSet(exercise.id, set.id)} className="h-6 w-6 text-muted-foreground hover:text-destructive" aria-label="Delete log">
+                        <Trash2 className="h-3 w-3" />
+                    </Button>
+                </motion.li>
+                ))}
+            </AnimatePresence>
+            </ul>
+        </div>
+        )}
+    </div>
+  );
 
   const renderDefaultContent = () => (
       <>
@@ -360,14 +402,16 @@ export function WorkoutExerciseCard({
             <CardTitle className="text-base xl:text-lg truncate" title={exercise.name}>{exercise.name}</CardTitle>
           </div>
           <div className="flex items-center flex-shrink-0">
-             {onViewProgress && (
+             {onViewProgress && pageType === 'workout' && (
                 <Button variant="ghost" size="icon" onClick={onViewProgress} className="h-7 w-7" aria-label={`View progress for ${exercise.name}`}>
                     <TrendingUp className="h-4 w-4 text-muted-foreground hover:text-blue-500" />
                 </Button>
             )}
-             <Button variant="ghost" size="icon" onClick={handleSearchOnYouTube} className="h-7 w-7" aria-label={`Search ${exercise.name} on YouTube`}>
-                <Youtube className="h-4 w-4 text-muted-foreground hover:text-red-500" />
-            </Button>
+             {pageType === 'workout' && (
+                <Button variant="ghost" size="icon" onClick={handleSearchOnYouTube} className="h-7 w-7" aria-label={`Search ${exercise.name} on YouTube`}>
+                    <Youtube className="h-4 w-4 text-muted-foreground hover:text-red-500" />
+                </Button>
+             )}
             <Button variant="ghost" size="icon" onClick={() => onRemoveExercise(exercise.id)} className="h-7 w-7" aria-label={`Remove ${exercise.name} from workout`}>
               <Trash2 className="h-4 w-4 text-destructive hover:text-destructive/80" />
             </Button>
@@ -377,7 +421,9 @@ export function WorkoutExerciseCard({
           <p className="text-xs text-muted-foreground mb-2">
             {getProgressText()}
           </p>
-          {pageType === 'branding' ? renderBrandingContent() : renderDefaultContent()}
+          {pageType === 'branding' ? renderBrandingContent() : 
+           pageType === 'lead-generation' ? renderLeadGenerationContent() :
+           renderDefaultContent()}
         </CardContent>
       </Card>
     </motion.div>

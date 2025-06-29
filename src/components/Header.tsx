@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -31,6 +32,7 @@ export function Header() {
     { href: '/upskill', label: 'Upskill' },
     { href: '/deep-work', label: 'Deep Work' },
     { href: '/personal-branding', label: 'Personal Branding' },
+    { href: '/lead-generation', label: 'Lead Gen' },
     { href: '/monetization-engine', label: 'Monetization' },
     { href: '/leverage-system', label: 'Leverage' },
   ];
