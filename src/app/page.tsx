@@ -22,7 +22,7 @@ import { TimeSlots } from '@/components/TimeSlots';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
 const slotEndHours: Record<string, number> = {
@@ -89,7 +89,8 @@ function HomePageContent() {
     handleToggleComplete, handleLogLearning,
     workoutMode, workoutPlans, exerciseDefinitions,
     upskillDefinitions, topicGoals, deepWorkDefinitions,
-    leadGenDefinitions
+    leadGenDefinitions,
+    productizationPlans,
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -503,6 +504,30 @@ function HomePageContent() {
           overallNextMilestone = { ...closestMilestone, topic };
       }
 
+      const nextUpcomingRelease = (() => {
+        if (!productizationPlans) return null;
+    
+        const allReleases: { topic: string, release: Release }[] = [];
+    
+        Object.entries(productizationPlans).forEach(([topic, plan]) => {
+            if (plan.releases) {
+                plan.releases.forEach(release => {
+                    allReleases.push({ topic, release });
+                });
+            }
+        });
+    
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+    
+        return allReleases
+            .filter(({ release }) => {
+                try { return parseISO(release.launchDate) >= today; } 
+                catch (e) { return false; }
+            })
+            .sort((a, b) => new Date(a.release.launchDate).getTime() - new Date(b.release.launchDate).getTime())[0] || null;
+      })();
+
       const totalProductiveMinutes = calculateAverageDuration(allUpskillLogs, 'reps') + calculateAverageDuration(allDeepWorkLogs, 'weight');
       const getHours = (logs: DatedWorkout[], field: 'reps' | 'weight') => logs.reduce((total, log) => total + log.exercises.reduce((exTotal, ex) => exTotal + ex.loggedSets.reduce((setTotal, set) => setTotal + (field === 'reps' ? set.reps : set.weight), 0), 0), 0) / 60;
       const totalHoursData = [
@@ -537,8 +562,9 @@ function HomePageContent() {
           latestConsistency: consistencyData[consistencyData.length - 1]?.score || 0,
           brandingStatus: calculateBrandingStatus(),
           totalHoursData, todayHoursData,
+          nextUpcomingRelease,
       };
-  }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, consistencyData, brandingLogs, deepWorkDefinitions]);
+  }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, consistencyData, brandingLogs, deepWorkDefinitions, productizationPlans]);
     
   const _activityDurations = useMemo(() => {
     const durations: Record<string, string> = {};
