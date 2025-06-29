@@ -208,30 +208,36 @@ function MyPlatePageContent() {
         <div className="lg:col-span-2 space-y-8">
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-xl"><DollarSign className="h-6 w-6 text-primary"/> Wealth Engine</CardTitle>
-                    <CardDescription>Your systems for growth, productization, and income generation.</CardDescription>
+                    <CardTitle className="flex items-center gap-3 text-xl"><TrendingUp className="h-6 w-6 text-primary"/> Upskill Progress</CardTitle>
+                    <CardDescription>Your progress towards mastering new topics.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {upskillProgress.length > 0 ? (
+                        <div className="space-y-4">
+                            {upskillProgress.map(item => (
+                                <div key={item.topic}>
+                                    <div className="flex justify-between items-baseline mb-1">
+                                        <span className="font-medium text-sm">{item.topic}</span>
+                                        <span className="text-xs text-muted-foreground">{item.progress.toLocaleString()} / {item.goal.toLocaleString()} {item.unit}</span>
+                                    </div>
+                                    <Progress value={(item.progress / item.goal) * 100} />
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-muted-foreground text-sm">No upskill goals set yet.</p>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-3 text-xl"><DollarSign className="h-6 w-6 text-primary"/> Monetization Pipeline</CardTitle>
+                    <CardDescription>Your content, lead generation, and offer creation flow.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div>
-                        <h3 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Upskill Progress</h3>
-                        {upskillProgress.length > 0 ? (
-                            <div className="space-y-4">
-                                {upskillProgress.map(item => (
-                                    <div key={item.topic}>
-                                        <div className="flex justify-between items-baseline mb-1">
-                                            <span className="font-medium text-sm">{item.topic}</span>
-                                            <span className="text-xs text-muted-foreground">{item.progress.toLocaleString()} / {item.goal.toLocaleString()} {item.unit}</span>
-                                        </div>
-                                        <Progress value={(item.progress / item.goal) * 100} />
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-muted-foreground text-sm">No upskill goals set yet.</p>
-                        )}
-                    </div>
-                     <div className="pt-6 border-t">
-                        <h3 className="font-semibold mb-2 flex items-center gap-2"><Share2 /> Branding Pipeline</h3>
+                        <h4 className="font-semibold mb-2 flex items-center gap-2 text-base"><Share2 className="h-5 w-5"/> Branding Pipeline</h4>
                         {brandingPipeline.length > 0 ? (
                              <ul className="space-y-2">
                                 {brandingPipeline.map(task => (
@@ -245,8 +251,8 @@ function MyPlatePageContent() {
                             <p className="text-muted-foreground text-sm">Branding pipeline is clear. Go to Deep Work to mark items as ready!</p>
                         )}
                     </div>
-                    <div className="pt-6 border-t">
-                        <h3 className="font-semibold mb-2 flex items-center gap-2"><Magnet /> Lead Generation Tasks</h3>
+                    <div className="pt-4 border-t">
+                        <h4 className="font-semibold mb-2 flex items-center gap-2 text-base"><Magnet className="h-5 w-5"/> Lead Generation Tasks</h4>
                         {leadGenPipeline.length > 0 ? (
                              <ul className="space-y-2">
                                 {leadGenPipeline.map(task => (
@@ -259,8 +265,8 @@ function MyPlatePageContent() {
                             <p className="text-muted-foreground text-sm">No lead generation tasks defined.</p>
                         )}
                     </div>
-                    <div className="pt-6 border-t">
-                        <h3 className="font-semibold mb-2 flex items-center gap-2"><Package /> Defined Offers</h3>
+                    <div className="pt-4 border-t">
+                        <h4 className="font-semibold mb-2 flex items-center gap-2 text-base"><Package className="h-5 w-5"/> Defined Offers</h4>
                         {offerSystemPipeline.length > 0 ? (
                              <ul className="space-y-2">
                                 {offerSystemPipeline.map(task => (
@@ -273,27 +279,33 @@ function MyPlatePageContent() {
                             <p className="text-muted-foreground text-sm">No offers have been defined yet.</p>
                         )}
                     </div>
-                    <div className="pt-6 border-t">
-                        <h3 className="font-semibold mb-2 flex items-center gap-2"><Rocket /> Upcoming Releases</h3>
-                        {upcomingReleases.length > 0 ? (
-                             <ul className="space-y-2">
-                                {upcomingReleases.map(({ topic, release }) => (
-                                    <li key={release.id} className="text-sm p-2 rounded-md bg-muted/50 flex justify-between items-center">
-                                        <div>
-                                            <span className="font-semibold">{release.name}</span>
-                                            <span className="text-muted-foreground ml-2">({topic})</span>
-                                        </div>
-                                        <Badge variant="secondary">{format(parseISO(release.launchDate), 'MMM dd, yyyy')}</Badge>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <p className="text-muted-foreground text-sm">No upcoming product releases planned.</p>
-                        )}
-                    </div>
                 </CardContent>
             </Card>
 
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-3 text-xl"><Rocket className="h-6 w-6 text-primary"/> Product Roadmap</CardTitle>
+                    <CardDescription>Your upcoming product releases and launches.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {upcomingReleases.length > 0 ? (
+                         <ul className="space-y-3">
+                            {upcomingReleases.map(({ topic, release }) => (
+                                <li key={release.id} className="text-sm p-3 rounded-md bg-muted/50 flex justify-between items-center">
+                                    <div>
+                                        <span className="font-semibold">{release.name}</span>
+                                        <span className="text-muted-foreground ml-2">({topic})</span>
+                                    </div>
+                                    <Badge variant="secondary">{format(parseISO(release.launchDate), 'MMM dd, yyyy')}</Badge>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="text-muted-foreground text-sm">No upcoming product releases planned.</p>
+                    )}
+                </CardContent>
+            </Card>
+            
              <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-3 text-xl">
