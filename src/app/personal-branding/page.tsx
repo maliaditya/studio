@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ListChecks, ChevronRight, CalendarIcon, GripVertical, Briefcase, Share2, Loader2, Check, ChevronDown, ChevronUp, Linkedin, Trash2, PlusCircle, X } from 'lucide-react';
+import { ListChecks, ChevronRight, CalendarIcon, GripVertical, Briefcase, Share2, Loader2, Check, ChevronDown, ChevronUp, Linkedin, PlusCircle, Package, Info } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format, isMonday, getYear, getISOWeek } from 'date-fns';
@@ -26,7 +26,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -58,6 +60,10 @@ function PersonalBrandingPageContent() {
   const [showBackupPrompt, setShowBackupPrompt] = useState(false);
   const [isPublishedExpanded, setIsPublishedExpanded] = useState(false);
 
+  // State for bundle creation
+  const [newBundleName, setNewBundleName] = useState('');
+  const [selectedFocusAreaIds, setSelectedFocusAreaIds] = useState<string[]>([]);
+
   useEffect(() => {
     setIsLoadingPage(false);
   }, []);
@@ -72,26 +78,35 @@ function PersonalBrandingPageContent() {
     if (isMonday(today) && !hasBeenPrompted) setShowBackupPrompt(true);
   }, [currentUser]);
 
-  const { activeTasks, publishedTasks } = useMemo(() => {
-      const isFullyShared = (task: ExerciseDefinition) => 
-          task.sharingStatus && 
-          task.sharingStatus.twitter && 
-          task.sharingStatus.linkedin && 
-          task.sharingStatus.devto;
-      
-      const active: ExerciseDefinition[] = [];
-      const published: ExerciseDefinition[] = [];
+  const { activeBundles, publishedBundles, eligibleFocusAreas } = useMemo(() => {
+    const allDefinitions = deepWorkDefinitions || [];
 
-      (deepWorkDefinitions || []).filter(def => def.isReadyForBranding).forEach(task => {
-          if (isFullyShared(task)) {
-              published.push(task);
-          } else {
-              active.push(task);
-          }
-      });
+    // Eligible areas are individual focus areas (not bundles) marked as ready.
+    const eligible = allDefinitions.filter(def => def.isReadyForBranding && !Array.isArray(def.focusAreas));
 
-      return { activeTasks: active, publishedTasks: published };
+    // Bundles are items that HAVE a focusAreas array.
+    const allBundles = allDefinitions.filter(def => Array.isArray(def.focusAreas));
+
+    const isFullyShared = (task: ExerciseDefinition) => 
+        task.sharingStatus && 
+        task.sharingStatus.twitter && 
+        task.sharingStatus.linkedin && 
+        task.sharingStatus.devto;
+
+    const active: ExerciseDefinition[] = [];
+    const published: ExerciseDefinition[] = [];
+
+    allBundles.forEach(bundle => {
+        if (isFullyShared(bundle)) {
+            published.push(bundle);
+        } else {
+            active.push(bundle);
+        }
+    });
+    
+    return { activeBundles: active, publishedBundles: published, eligibleFocusAreas: eligible };
   }, [deepWorkDefinitions]);
+
 
   const markBackupPromptAsHandled = () => {
     const today = new Date();
@@ -128,6 +143,44 @@ function PersonalBrandingPageContent() {
     });
   };
 
+  const handleCreateBundle = () => {
+    if (newBundleName.trim() === '') {
+      toast({ title: "Error", description: "Please provide a name for the bundle.", variant: "destructive" });
+      return;
+    }
+    if (selectedFocusAreaIds.length === 0) {
+      toast({ title: "Error", description: "Please select at least one focus area for the bundle.", variant: "destructive" });
+      return;
+    }
+
+    const selectedAreas = deepWorkDefinitions.filter(def => selectedFocusAreaIds.includes(def.id));
+
+    const newBundle: ExerciseDefinition = {
+      id: `bundle_${Date.now()}`,
+      name: newBundleName.trim(),
+      category: "Content Bundle",
+      focusAreas: selectedAreas.map(area => area.name),
+      isReadyForBranding: false, // Bundles aren't "ready" themselves, they just exist.
+      sharingStatus: { twitter: false, linkedin: false, devto: false }
+    };
+
+    setDeepWorkDefinitions(prevDefs => {
+      // Mark constituent focus areas as no longer "ready" so they don't show up in the list
+      const updatedDefs = prevDefs.map(def => {
+        if (selectedFocusAreaIds.includes(def.id)) {
+          return { ...def, isReadyForBranding: false };
+        }
+        return def;
+      });
+      // Add the new bundle
+      return [...updatedDefs, newBundle];
+    });
+
+    toast({ title: "Bundle Created!", description: `"${newBundle.name}" is now in your pipeline.` });
+    setNewBundleName('');
+    setSelectedFocusAreaIds([]);
+  };
+
   const handleAddTaskToSession = (definition: ExerciseDefinition) => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const newSessionTask: WorkoutExercise = {
@@ -143,7 +196,7 @@ function PersonalBrandingPageContent() {
     const existingLog = brandingLogs.find(log => log.id === dateKey);
     if (existingLog) {
       if (existingLog.exercises.some(ex => ex.definitionId === definition.id)) {
-        toast({ title: "Info", description: "This task is already in today's session." });
+        toast({ title: "Info", description: "This bundle is already in today's session." });
         return;
       }
       updateOrAddLog({ ...existingLog, exercises: [...existingLog.exercises, newSessionTask] });
@@ -203,27 +256,72 @@ function PersonalBrandingPageContent() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
           <section aria-labelledby="branding-pipeline-heading" className="md:col-span-1 space-y-6">
             <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg text-primary"><Package /> Create New Bundle</CardTitle>
+                    <CardDescription>Select ready focus areas to group them into a content bundle.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {eligibleFocusAreas.length === 0 ? (
+                        <div className="text-center py-4 text-sm text-muted-foreground">
+                            <Info className="mx-auto h-8 w-8 mb-2" />
+                            No focus areas are ready for bundling. Go to the Deep Work page and mark items as 'Ready for Branding' to see them here.
+                        </div>
+                    ) : (
+                        <>
+                            <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                                {eligibleFocusAreas.map(area => (
+                                    <div key={area.id} className="flex items-center space-x-2 p-2 rounded-md border">
+                                        <Checkbox
+                                            id={`check-${area.id}`}
+                                            checked={selectedFocusAreaIds.includes(area.id)}
+                                            onCheckedChange={(checked) => {
+                                                setSelectedFocusAreaIds(prev => 
+                                                    checked ? [...prev, area.id] : prev.filter(id => id !== area.id)
+                                                )
+                                            }}
+                                        />
+                                        <Label htmlFor={`check-${area.id}`} className="font-normal w-full cursor-pointer">
+                                            {area.name} <span className="text-muted-foreground">({area.category})</span>
+                                        </Label>
+                                    </div>
+                                ))}
+                            </div>
+                            <Input 
+                                placeholder="Name your new bundle"
+                                value={newBundleName}
+                                onChange={(e) => setNewBundleName(e.target.value)}
+                            />
+                            <Button className="w-full" onClick={handleCreateBundle}>
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Create Bundle
+                            </Button>
+                        </>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Card>
               <CardHeader>
                   <CardTitle id="branding-pipeline-heading" className="flex items-center gap-2 text-lg text-primary">
                     <Share2 /> Branding Pipeline
                   </CardTitle>
                   <CardDescription>
-                    Items you've marked as "Ready for Branding" on the Deep Work page will appear here.
+                    Content bundles you've created. Add them to a session to start working.
                   </CardDescription>
               </CardHeader>
               <CardContent className="p-4">
                   <div className="max-h-[calc(100vh-20rem)] overflow-y-auto pr-1">
-                    {activeTasks.length === 0 ? (
+                    {activeBundles.length === 0 ? (
                       <div className="text-center py-10">
                         <Briefcase className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
                         <p className="text-muted-foreground">Your pipeline is empty.</p>
                         <p className="text-sm text-muted-foreground/80">
-                          Go to the Deep Work page and check "Ready for Branding" on a focus area to get started.
+                         Create a content bundle to get started.
                         </p>
                       </div>
                     ) : (
                       <ul className="space-y-3">
-                        {activeTasks.map(task => (
+                        {activeBundles.map(task => (
                           <motion.li key={task.id} layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} className="p-3 bg-card border rounded-lg shadow-sm">
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex-grow min-w-0">
@@ -252,7 +350,7 @@ function PersonalBrandingPageContent() {
                                 <Check /> Published Content
                             </CardTitle>
                             <CardDescription className='mt-1'>
-                                A log of your successfully published items.
+                                A log of your successfully published bundles.
                             </CardDescription>
                         </div>
                         {isPublishedExpanded ? <ChevronUp className="h-5 w-5 text-primary" /> : <ChevronDown className="h-5 w-5 text-primary" />}
@@ -269,11 +367,11 @@ function PersonalBrandingPageContent() {
                     >
                         <CardContent className="p-4 pt-0">
                         <div className="max-h-[300px] overflow-y-auto pr-1">
-                            {publishedTasks.length === 0 ? (
+                            {publishedBundles.length === 0 ? (
                             <p className="text-muted-foreground text-sm text-center py-4">No published content yet.</p>
                             ) : (
                             <ul className="space-y-3">
-                                {publishedTasks.map(task => (
+                                {publishedBundles.map(task => (
                                 <li key={task.id} className="p-3 bg-card border rounded-lg">
                                     <p className="font-semibold text-foreground">{task.name}</p>
                                     <div className="mt-2 flex flex-wrap gap-1">
@@ -326,7 +424,7 @@ function PersonalBrandingPageContent() {
                         <div className="text-center py-10">
                             <GripVertical className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
                             <p className="text-muted-foreground">No content creation tasks for {format(selectedDate, 'PPP')}.</p>
-                            <p className="text-sm text-muted-foreground/80">Add tasks from the pipeline to get started!</p>
+                            <p className="text-sm text-muted-foreground/80">Add bundles from the pipeline to get started!</p>
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">

@@ -9,7 +9,8 @@ export type ExerciseCategory =
   | "Back" 
   | "Biceps" 
   | "Core" 
-  | "Full Body" 
+  | "Full Body"
+  | "Content Bundle"
   | "Other";
 
 export const exerciseCategories: ExerciseCategory[] = [
