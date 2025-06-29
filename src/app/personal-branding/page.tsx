@@ -69,9 +69,7 @@ function PersonalBrandingPageContent() {
           }
       });
       
-      const focusAreaSessionCounts: Record<string, number> = {};
       const uniqueDaysPerDef: Record<string, Set<string>> = {};
-
       (deepWorkLogs || []).forEach(log => {
         log.exercises.forEach(ex => {
           if (ex.loggedSets.length > 0) {
@@ -83,6 +81,7 @@ function PersonalBrandingPageContent() {
         });
       });
 
+      const focusAreaSessionCounts: Record<string, number> = {};
       Object.keys(uniqueDaysPerDef).forEach(defId => {
         focusAreaSessionCounts[defId] = uniqueDaysPerDef[defId].size;
       });
@@ -93,42 +92,35 @@ function PersonalBrandingPageContent() {
         return hasEnoughSessions && !isAlreadyBundled;
       });
       
-      const topics: Record<string, ExerciseDefinition[]> = {};
-      eligibleFocusAreas.forEach(def => {
-        if (!topics[def.category]) topics[def.category] = [];
-        topics[def.category].push(def);
-      });
-
       const newGeneratedTasks: ExerciseDefinition[] = [...(brandingTasks || [])];
       let wasChanged = false;
       const newlyBundledNames = new Set<string>();
 
-      Object.keys(topics).forEach(topicName => {
-        const focusAreasInTopic = topics[topicName];
-        if (focusAreasInTopic.length >= 4) {
-          for (let i = 0; i < focusAreasInTopic.length; i += 4) {
-            const bundle = focusAreasInTopic.slice(i, i + 4);
-            if (bundle.length === 4) {
-              wasChanged = true;
-              const existingBundlesForTopic = newGeneratedTasks.filter(t => t.name.startsWith(`${topicName} - Bundle`)).length;
-              const bundleNumber = existingBundlesForTopic + 1;
-              const bundleId = `branding_${topicName.replace(/\s+/g, '_')}_bundle_${bundleNumber}_${Date.now()}`;
-              const bundleName = `${topicName} - Bundle #${bundleNumber}`;
-              const bundleFocusAreas = bundle.map(def => def.name);
-              
-              newGeneratedTasks.push({
-                id: bundleId,
-                name: bundleName,
-                category: 'Personal Branding' as ExerciseCategory,
-                sharingStatus: { twitter: false, linkedin: false, devto: false },
-                focusAreas: bundleFocusAreas,
-              });
-              
-              bundleFocusAreas.forEach(name => newlyBundledNames.add(name));
-            }
+      // No longer grouping by topic. Process all eligible areas together.
+      if (eligibleFocusAreas.length >= 4) {
+          for (let i = 0; i < eligibleFocusAreas.length; i += 4) {
+              const bundle = eligibleFocusAreas.slice(i, i + 4);
+              if (bundle.length === 4) {
+                  wasChanged = true;
+                  // Use total number of bundles to determine the new bundle number
+                  const existingBundlesCount = newGeneratedTasks.filter(t => t.name.startsWith(`Content Bundle`)).length;
+                  const bundleNumber = existingBundlesCount + 1;
+                  const bundleId = `branding_bundle_${bundleNumber}_${Date.now()}`;
+                  const bundleName = `Content Bundle #${bundleNumber}`;
+                  const bundleFocusAreas = bundle.map(def => def.name);
+                  
+                  newGeneratedTasks.push({
+                      id: bundleId,
+                      name: bundleName,
+                      category: 'Personal Branding' as ExerciseCategory,
+                      sharingStatus: { twitter: false, linkedin: false, devto: false },
+                      focusAreas: bundleFocusAreas,
+                  });
+                  
+                  bundleFocusAreas.forEach(name => newlyBundledNames.add(name));
+              }
           }
-        }
-      });
+      }
       
       if(wasChanged) {
         toast({ title: 'New Content Bundles Created!', description: `${newlyBundledNames.size} focus areas have been bundled into new content ideas.` });
@@ -366,7 +358,7 @@ function PersonalBrandingPageContent() {
                     <Share2 /> Branding Pipeline
                   </CardTitle>
                   <CardDescription>
-                    Topic bundles are automatically generated. Add them to a session to start content creation.
+                    Content bundles are automatically generated. Add them to a session to start content creation.
                   </CardDescription>
               </CardHeader>
               <CardContent className="p-4">
@@ -376,7 +368,7 @@ function PersonalBrandingPageContent() {
                         <Briefcase className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
                         <p className="text-muted-foreground">Your pipeline is empty.</p>
                         <p className="text-sm text-muted-foreground/80">
-                          A topic bundle appears here when it has 4 focus areas, each with at least 1 day of logged sessions in Deep Work.
+                          A content bundle appears here for every 4 focus areas that have at least 1 day of logged sessions in Deep Work.
                         </p>
                       </div>
                     ) : (
