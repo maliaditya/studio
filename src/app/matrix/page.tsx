@@ -97,17 +97,17 @@ function MatrixPageContent() {
                     <Card key={row.topic} className="flex flex-col shadow-md hover:shadow-lg transition-shadow">
                         <CardHeader>
                             <div className="flex justify-between items-start gap-4">
-                                <CardTitle className="text-lg">{row.topic}</CardTitle>
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                  <span>{row.topic}</span>
+                                  <Badge variant="outline" className="capitalize text-xs font-medium">{row.classification}</Badge>
+                                </CardTitle>
                                 <Badge variant={getStatusVariant(row.status)}>{row.status}</Badge>
                             </div>
                         </CardHeader>
                         <CardContent className="flex-grow flex flex-col space-y-4">
                              <div>
                                 <h4 className="font-semibold text-sm">Format</h4>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <p className="text-sm font-medium">{row.offerType}</p>
-                                    <Badge variant={row.classification === 'product' ? 'default' : 'secondary'} className="capitalize text-xs">{row.classification}</Badge>
-                                </div>
+                                <p className="text-sm font-medium mt-1">{row.offerType}</p>
                             </div>
                             <Separator/>
                             <div className='flex-grow'>
