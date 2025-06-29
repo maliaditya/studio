@@ -187,7 +187,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                       <Carousel
                           items={brandingItems}
                           renderItem={(item: any) => (
-                              <div className="flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 cursor-pointer h-20" onClick={() => router.push('/personal-branding')}>
+                              <div className="flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 h-[88px] cursor-pointer" onClick={() => router.push('/personal-branding')}>
                                   <div className="flex justify-between items-center">
                                     <h5 className="font-bold text-foreground text-base truncate" title={item.taskName}>{item.taskName}</h5>
                                     <div className="text-right text-xs ml-4 flex-shrink-0">
@@ -216,7 +216,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                         items={roadmapItems}
                         renderItem={(item: any) => (
                           <div 
-                            className="flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 cursor-pointer h-20" 
+                            className="flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 h-[88px] cursor-pointer" 
                             onClick={() => {
                               setSelectedReleaseInfo({ release: item.release, topic: item.topic, type: item.type });
                               setIsAddFeatureModalOpen(true);
