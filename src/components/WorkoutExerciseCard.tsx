@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -420,12 +419,12 @@ export function WorkoutExerciseCard({
             <CardTitle className="text-base xl:text-lg truncate" title={exercise.name}>{exercise.name}</CardTitle>
           </div>
           <div className="flex items-center flex-shrink-0">
-             {onViewProgress && pageType === 'workout' && (
+            {onViewProgress && (
                 <Button variant="ghost" size="icon" onClick={onViewProgress} className="h-7 w-7" aria-label={`View progress for ${exercise.name}`}>
                     <TrendingUp className="h-4 w-4 text-muted-foreground hover:text-blue-500" />
                 </Button>
             )}
-             {pageType === 'workout' && (
+            {pageType === 'workout' && (
                 <Button variant="ghost" size="icon" onClick={handleSearchOnYouTube} className="h-7 w-7" aria-label={`Search ${exercise.name} on YouTube`}>
                     <Youtube className="h-4 w-4 text-muted-foreground hover:text-red-500" />
                 </Button>

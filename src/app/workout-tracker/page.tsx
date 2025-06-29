@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo } from 'react';
@@ -74,6 +73,7 @@ function WorkoutPageContent() {
     allWorkoutLogs, setAllWorkoutLogs,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet,
     removeExerciseFromWorkout,
+    swapWorkoutExercise,
     workoutMode, setWorkoutMode,
     workoutPlans, setWorkoutPlans,
     exerciseDefinitions, setExerciseDefinitions,
@@ -755,6 +755,9 @@ function WorkoutPageContent() {
                           <AnimatePresence>
                           {currentWorkoutExercises.map(exercise => {
                               const definition = exerciseDefinitions.find(def => def.id === exercise.definitionId);
+                              const swappableExercises = exerciseDefinitions.filter(
+                                def => def.category === exercise.category && !currentWorkoutExercises.some(e => e.definitionId === def.id)
+                              );
                               return (
                                 <WorkoutExerciseCard 
                                   key={exercise.id} 
@@ -763,6 +766,8 @@ function WorkoutPageContent() {
                                   onDeleteSet={(...args) => deleteWorkoutSet(selectedDate, ...args)}
                                   onUpdateSet={(...args) => updateWorkoutSet(selectedDate, ...args)}
                                   onRemoveExercise={(exerciseId) => removeExerciseFromWorkout(selectedDate, exerciseId)}
+                                  onSwapExercise={(newDef) => swapWorkoutExercise(selectedDate, exercise.id, newDef)}
+                                  swappableExercises={swappableExercises}
                                   onViewProgress={definition ? () => handleViewProgress(definition) : undefined}
                                 />
                               );
@@ -781,7 +786,7 @@ function WorkoutPageContent() {
                   allWorkoutLogs={allWorkoutLogs}
                   onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
                   consistencyData={consistencyData}
-                  oneYearAgo={today}
+                  oneYearAgo={oneYearAgo}
                   today={today}
                 />
               </div>

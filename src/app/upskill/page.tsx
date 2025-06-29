@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo } from 'react';
@@ -635,6 +634,7 @@ function UpskillPageContent() {
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                           <AnimatePresence>
                           {currentWorkoutExercises.map(exercise => {
+                              const definition = upskillDefinitions.find(def => def.id === exercise.definitionId);
                               return (
                                 <WorkoutExerciseCard 
                                   key={exercise.id} 
@@ -644,7 +644,7 @@ function UpskillPageContent() {
                                   onDeleteSet={handleDeleteSet} 
                                   onUpdateSet={handleUpdateSet} 
                                   onRemoveExercise={handleRemoveExerciseFromWorkout}
-                                  onViewProgress={() => handleViewProgress(upskillDefinitions.find(def => def.id === exercise.definitionId)!)}
+                                  onViewProgress={definition ? () => handleViewProgress(definition) : undefined}
                                   pageType="upskill"
                                 />
                               );
