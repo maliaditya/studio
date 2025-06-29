@@ -96,7 +96,14 @@ export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
     }
     
     if (releases.length === 0) {
-      return null; // Don't show anything if no releases
+      return (
+        <>
+          <Separator className="my-4" />
+          <p className="text-sm text-center text-muted-foreground py-4">
+            No upcoming releases are planned at the moment. Your support will help fund what's next!
+          </p>
+        </>
+      );
     }
 
     return (
