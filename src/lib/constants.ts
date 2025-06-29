@@ -171,47 +171,16 @@ export const productTypes = [
 ];
 
 export const GAP_TYPES = [
-    { group: "🔷 Primary Strategic Gaps (Core 5)", items: [
-        { name: "Market Gap", description: "What the market lacks or does poorly." },
-        { name: "Skill Gap", description: "What few people have the skill to build or offer." },
-        { name: "Execution Gap", description: "What most people start but never finish or ship." },
-        { name: "Content Gap", description: "What isn’t well explained, documented, or visualized." },
-        { name: "System Gap", description: "Where tools or workflows are scattered and inefficient." },
-    ]},
-    { group: "🔶 Expansion Gaps (Execution, Tech, or Product-based)", items: [
-        { name: "Speed Gap", description: "Others are slow to act; you can build or launch fast." },
-        { name: "Design Gap", description: "Tools exist but are ugly, clunky, or unintuitive." },
-        { name: "Integration Gap", description: "Systems and tools don’t work well together." },
-        { name: "UX Gap", description: "User experience is confusing, frustrating, or overwhelming." },
-        { name: "Dev Experience Gap", description: "Poor setup, documentation, or usability for developers." },
-    ]},
-    { group: "🧠 Knowledge / Communication Gaps", items: [
-        { name: "Education Gap", description: "Valuable knowledge isn’t taught clearly or accessibly." },
-        { name: "Onboarding Gap", description: "Too hard for users or devs to get started." },
-        { name: "Trust Gap", description: "Users don’t trust the existing products or information." },
-        { name: "Clarity Gap", description: "Ideas/tools exist but are messy or buried in jargon." },
-    ]},
-    { group: "💰 Monetization / Business Gaps", items: [
-        { name: "Monetization Gap", description: "Useful things with no clear way to make money." },
-        { name: "Pricing Gap", description: "No smart pricing tiers; value isn’t matched to cost." },
-        { name: "Packaging Gap", description: "Products or info aren’t bundled or sold effectively." },
-        { name: "Value Ladder Gap", description: "No journey from free to paid to premium offers." },
-    ]},
-    { group: "📣 Marketing / Distribution Gaps", items: [
-        { name: "Distribution Gap", description: "Great products that nobody knows about." },
-        { name: "Positioning Gap", description: "Product is not framed to resonate with its audience." },
-        { name: "Narrative Gap", description: "No compelling story behind the product or creator." },
-        { name: "Demo Gap", description: "No working demos, previews, or proof-of-concept shown." },
-    ]},
-    { group: "🔓 Access / Inclusivity Gaps", items: [
-        { name: "Access Gap", description: "Knowledge or tools are locked behind skill, paywalls, or jargon." },
-        { name: "Affordability Gap", description: "Existing solutions are overpriced or bloated." },
-        { name: "Localization Gap", description: "Product not adapted to language, region, or culture." },
-    ]},
-    { group: "⏱ Time / Resource Gaps", items: [
-        { name: "Time Gap", description: "People want solutions but don’t have the time to build them." },
-        { name: "Focus Gap", description: "People can’t stay consistent or go deep; they’re scattered." },
-        { name: "Energy Gap", description: "Market is tired, burned out, or overloaded." },
-        { name: "Workflow Gap", description: "No repeatable, clean, productive process exists." },
+    { group: "Service-Oriented Gaps", items: [
+        { name: "Market Gap", description: "There's demand but no easy/affordable supply. You step in to serve that underserved audience. Example: You offer GPU dev for indie teams who can’t hire full-time experts." },
+        { name: "Skill Gap", description: "You offer a rare skill or technical ability that few others provide. Example: CUDA + WebGL integration or performance engineering." },
+        { name: "Execution Gap", description: "Others start but don’t finish. You provide done-for-you solutions or working demos/MVPs. Example: “Prototype in 3 Days” freelance sprint or weekly tool drops." },
+        { name: "Learning Gap", description: "Beginners don’t have clear learning paths. You offer educational services, tutorials, or peer mentorship. Example: “Learn CUDA with me” content, micro-courses, or tutoring." },
+        { name: "Perspective Gap", description: "Experts confuse clients. You act as a translator, simplifying technical ideas into clear value. Example: Visual explainers, simplified breakdowns, onboarding guides." },
+        { name: "Support Gap", description: "People need accountability and structure. You provide support systems. Example: 30-day build challenges, coaching sprints, or co-building sessions." },
+        { name: "Tool Gap", description: "Specific problems lack tools. You offer a custom tool, script, or workflow shortcut as a service. Example: GPGPU visualizer, productivity dashboard, AI helper tool." },
+        { name: "Communication Gap", description: "Clients don't understand what tech people do. You create landing pages, demos, and messaging systems. Example: Dev portfolio revamp, offer page, pitch video, explainer animations." },
+        { name: "Integration Gap", description: "Clients struggle with tool overload. You offer systems thinking + integration as a service. Example: “All-in-One” productivity system or stack automation." },
+        { name: "Monetization Gap", description: "Many creators have skills but don’t make money. You build funnels, pages, pricing systems for them. Example: Productize your skill service, build client funnels, teach pricing." },
     ]}
 ];
