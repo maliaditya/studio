@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -67,14 +67,14 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
           <div className="md:col-span-2 space-y-4">
             <div className="relative">
               <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Learning Progress</h4>
-              <div className="text-sm">
+              <div className="text-sm min-h-[190px]">
                 {learningItems.length > 0 ? (
                   <Carousel
                     items={learningItems}
                     renderItem={([topic, topicStats]: [string, any]) => {
                       const showTodayStats = topicStats.todaysProgress > 0 || (topicStats.requiredDailyRate && topicStats.requiredDailyRate > 0.01);
                       return (
-                        <Accordion type="single" collapsible defaultValue={topic} className="w-full">
+                        <Accordion type="single" collapsible className="w-full">
                           <AccordionItem value={topic} className="p-3 rounded-md bg-muted/30 border-0">
                             <AccordionTrigger className="py-0 text-left hover:no-underline">
                               <div className="flex flex-col items-start">
@@ -155,48 +155,52 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             <Separator className="my-2" />
             <div className="relative">
               <h4 className="font-semibold mb-2 flex items-center gap-2"><Share2 /> Personal Branding</h4>
-              {brandingItems.length > 0 ? (
-                 <Carousel
-                    items={brandingItems}
-                    renderItem={(item: any) => (
-                      <div className="text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md min-h-[56px]" onClick={() => router.push('/personal-branding')}>
-                        <p>Next up: <span className="font-bold text-foreground">{item.taskName}</span></p>
-                        <p>Current Stage: <span className="font-bold text-foreground">{item.stage} ({item.progress})</span></p>
-                      </div>
-                    )}
-                  />
-              ) : (
-                  <div className="text-sm text-muted-foreground p-2 min-h-[56px]">
-                    <p>{stats.brandingStatus?.message || 'No branding tasks.'}</p>
-                    <p className="text-xs mt-1">{stats.brandingStatus?.subMessage || ''}</p>
-                  </div>
-              )}
+              <div className="min-h-[72px]">
+                {brandingItems.length > 0 ? (
+                  <Carousel
+                      items={brandingItems}
+                      renderItem={(item: any) => (
+                        <div className="text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md" onClick={() => router.push('/personal-branding')}>
+                          <p>Next up: <span className="font-bold text-foreground">{item.taskName}</span></p>
+                          <p>Current Stage: <span className="font-bold text-foreground">{item.stage} ({item.progress})</span></p>
+                        </div>
+                      )}
+                    />
+                ) : (
+                    <div className="text-sm text-muted-foreground p-2">
+                      <p>{stats.brandingStatus?.message || 'No branding tasks.'}</p>
+                      <p className="text-xs mt-1">{stats.brandingStatus?.subMessage || ''}</p>
+                    </div>
+                )}
+              </div>
             </div>
              <Separator className="my-2" />
              <div className="relative">
               <h4 className="font-semibold mb-2 flex items-center gap-2"><Rocket /> Upcoming Roadmap</h4>
-              {roadmapItems.length > 0 ? (
-                  <Carousel
-                    items={roadmapItems}
-                    renderItem={(item: any) => (
-                      <div className="text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md min-h-[72px]" onClick={() => router.push(item.type === 'product' ? '/productization' : '/offerization')}>
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <p className="font-bold text-foreground">{item.release.name}</p>
-                                <p className="text-xs text-muted-foreground">Topic: <span className="font-medium">{item.topic}</span></p>
-                            </div>
-                            <Badge variant="outline" className="capitalize text-xs">{item.type}</Badge>
+              <div className="min-h-[72px]">
+                {roadmapItems.length > 0 ? (
+                    <Carousel
+                      items={roadmapItems}
+                      renderItem={(item: any) => (
+                        <div className="text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md" onClick={() => router.push(item.type === 'product' ? '/productization' : '/offerization')}>
+                          <div className="flex justify-between items-start">
+                              <div>
+                                  <p className="font-bold text-foreground">{item.release.name}</p>
+                                  <p className="text-xs text-muted-foreground">Topic: <span className="font-medium">{item.topic}</span></p>
+                              </div>
+                              <Badge variant="outline" className="capitalize text-xs">{item.type}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">Launch: <span className="font-medium">{format(parseISO(item.release.launchDate), 'PPP')}</span></p>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">Launch: <span className="font-medium">{format(parseISO(item.release.launchDate), 'PPP')}</span></p>
-                      </div>
-                    )}
-                  />
-                ) : (
-                  <div className="text-sm text-muted-foreground p-2 min-h-[72px]">
-                    <p>No upcoming releases planned.</p>
-                    <p className="text-xs mt-1">Go to Productization or Offerization to create a release plan.</p>
-                  </div>
-                )}
+                      )}
+                    />
+                  ) : (
+                    <div className="text-sm text-muted-foreground p-2">
+                      <p>No upcoming releases planned.</p>
+                      <p className="text-xs mt-1">Go to Productization or Offerization to create a release plan.</p>
+                    </div>
+                  )}
+              </div>
             </div>
           </div>
         </div>
