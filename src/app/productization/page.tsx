@@ -56,10 +56,6 @@ function ProductizationPageContent() {
     toast({ title: "Product Type Set!", description: `Set to "${productType}" for ${topic}.` });
   };
   
-  const handleActionTaskChange = (topic: string, value: string) => {
-    setNewActionTasks(prev => ({ ...prev, [topic]: value }));
-  };
-
   const handleAddActionTask = (e: React.FormEvent, topic: string) => {
     e.preventDefault();
     const taskName = newActionTasks[topic]?.trim();
@@ -91,7 +87,7 @@ function ProductizationPageContent() {
                 if (releaseIndex > -1) {
                     const release = currentPlan.releases[releaseIndex];
                     const focusAreaIds = Array.isArray(release.focusAreaIds) ? release.focusAreaIds : [];
-                    release.focusAreaIds = [...focusAreaIds, newDef.id];
+                    release.focusAreaIds = Array.from(new Set([...focusAreaIds, newDef.id]));
                 }
             }
             return newPlans;
@@ -395,8 +391,8 @@ function ProductizationPageContent() {
                                 {release.description && <p className="mb-2 text-muted-foreground">{release.description}</p>}
                                 <p className="font-medium text-foreground">Focus Areas:</p>
                                 <ul className="list-disc list-inside text-muted-foreground">
-                                  {(release.focusAreaIds || []).map(id => (
-                                    <li key={id}>{focusAreaMap.get(id) || 'Unknown Focus Area'}</li>
+                                  {(release.focusAreaIds || []).map((id, index) => (
+                                    <li key={`${id}-${index}`}>{focusAreaMap.get(id) || 'Unknown Focus Area'}</li>
                                   ))}
                                 </ul>
                               </CardContent>
@@ -468,6 +464,3 @@ export default function ProductizationPage() {
         </AuthGuard>
     )
 }
-
-
-    
