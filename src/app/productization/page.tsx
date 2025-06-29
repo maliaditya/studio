@@ -241,13 +241,32 @@ function ProductizationPageContent() {
             body: JSON.stringify({ username: currentUser?.username, releases: plan.releases }),
         });
 
-        const result = await response.json();
+        const body = await response.text();
 
         if (!response.ok) {
-            throw new Error(result.error || 'Failed to publish releases.');
+            let errorMessage = `Request failed: ${response.statusText}`;
+            if (body) {
+                try {
+                    const json = JSON.parse(body);
+                    errorMessage = json.error || errorMessage;
+                } catch (e) {
+                    errorMessage = body;
+                }
+            }
+            throw new Error(errorMessage);
         }
 
-        toast({ title: "Success!", description: "Life OS release plan has been updated publicly." });
+        let successMessage = "Life OS release plan has been updated publicly.";
+        if (body) {
+            try {
+                const json = JSON.parse(body);
+                successMessage = json.message || successMessage;
+            } catch (e) {
+                // Not an error if success response is not JSON
+            }
+        }
+        
+        toast({ title: "Success!", description: successMessage });
 
     } catch (error) {
         console.error("Failed to publish releases:", error);
