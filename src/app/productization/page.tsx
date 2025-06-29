@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,7 +31,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 
 function ProductizationPageContent() {
-  const { deepWorkDefinitions, setDeepWorkDefinitions, productizationPlans, setProductizationPlans, deepWorkTopicMetadata } = useAuth();
+  const { currentUser, deepWorkDefinitions, setDeepWorkDefinitions, productizationPlans, setProductizationPlans, deepWorkTopicMetadata } = useAuth();
   const { toast } = useToast();
   const [newActionTasks, setNewActionTasks] = useState<Record<string, string>>({});
   
@@ -224,6 +224,40 @@ function ProductizationPageContent() {
     });
     toast({ title: "Release Deleted", description: "The release has been removed from your plan.", variant: "destructive" });
   };
+  
+  const handlePublishReleases = async (topic: string) => {
+    const plan = productizationPlans[topic];
+    if (!plan || !plan.releases || plan.releases.length === 0) {
+        toast({ title: "No Releases", description: "There are no releases planned for this product to publish.", variant: "destructive" });
+        return;
+    }
+
+    toast({ title: "Publishing...", description: "Updating the public release plan for Life OS." });
+
+    try {
+        const response = await fetch('/api/lifeos-releases', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: currentUser?.username, releases: plan.releases }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to publish releases.');
+        }
+
+        toast({ title: "Success!", description: "Life OS release plan has been updated publicly." });
+
+    } catch (error) {
+        console.error("Failed to publish releases:", error);
+        toast({
+            title: "Error",
+            description: error instanceof Error ? error.message : "An unknown error occurred.",
+            variant: "destructive",
+        });
+    }
+  };
 
 
   const renderReleaseForm = (topic: string, focusAreas: ExerciseDefinition[]) => {
@@ -305,50 +339,48 @@ function ProductizationPageContent() {
             
             return (
                 <Card key={topic} className="flex flex-col">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-3">
-                        <Briefcase className="h-5 w-5 text-primary"/>
-                        {topic}
-                    </CardTitle>
-                    <CardDescription>{focusAreas.length} focus area(s)</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow space-y-4">
-                  <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
-                    <AccordionItem value="item-1">
-                      <AccordionTrigger>Focus Areas</AccordionTrigger>
-                      <AccordionContent>
-                        <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                            {focusAreas.map(fa => <li key={fa.id}>{fa.name}</li>)}
-                        </ul>
-                      </AccordionContent>
-                    </AccordionItem>
-                    <AccordionItem value="item-2">
-                       <AccordionTrigger>Product Type</AccordionTrigger>
-                       <AccordionContent>
-                          <Select value={selectedProductType || ''} onValueChange={(value) => handleProductTypeChange(topic, value)}>
-                              <SelectTrigger>
-                                  <SelectValue placeholder="Select a product type..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                  {productTypes.map((group) => (
-                                  <SelectGroup key={group.group || group.title}>
-                                      <SelectLabel>{group.group || group.title}</SelectLabel>
-                                      {group.items.map(item => (
-                                          <SelectItem key={item.name} value={item.name}>{item.name}</SelectItem>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-3">
+                            <Briefcase className="h-5 w-5 text-primary"/>
+                            {topic}
+                        </CardTitle>
+                        <CardDescription>{focusAreas.length} focus area(s)</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-grow space-y-4">
+                      <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
+                        <AccordionItem value="item-1">
+                          <AccordionTrigger>Focus Areas</AccordionTrigger>
+                          <AccordionContent>
+                            <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                                {focusAreas.map(fa => <li key={fa.id}>{fa.name}</li>)}
+                            </ul>
+                          </AccordionContent>
+                        </AccordionItem>
+                        <AccordionItem value="item-2">
+                           <AccordionTrigger>Product Type</AccordionTrigger>
+                           <AccordionContent>
+                              <Select value={selectedProductType || ''} onValueChange={(value) => handleProductTypeChange(topic, value)}>
+                                  <SelectTrigger>
+                                      <SelectValue placeholder="Select a product type..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                      {productTypes.map((group) => (
+                                      <SelectGroup key={group.group || group.title}>
+                                          <SelectLabel>{group.group || group.title}</SelectLabel>
+                                          {group.items.map(item => (
+                                              <SelectItem key={item.name} value={item.name}>{item.name}</SelectItem>
+                                          ))}
+                                      </SelectGroup>
                                       ))}
-                                  </SelectGroup>
-                                  ))}
-                              </SelectContent>
-                          </Select>
-                          {selectedProductType && (
-                              <p className="text-xs text-muted-foreground mt-2">
-                                  {productTypes.flatMap(g => g.items).find(i => i.name === selectedProductType)?.description}
-                              </p>
-                          )}
-                       </AccordionContent>
-                    </AccordionItem>
-                     {selectedProductType && (
-                      <>
+                                  </SelectContent>
+                              </Select>
+                              {selectedProductType && (
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                      {productTypes.flatMap(g => g.items).find(i => i.name === selectedProductType)?.description}
+                                  </p>
+                              )}
+                           </AccordionContent>
+                        </AccordionItem>
                         <AccordionItem value="item-3">
                            <AccordionTrigger>Gap Analysis</AccordionTrigger>
                            <AccordionContent className="space-y-4">
@@ -445,53 +477,56 @@ function ProductizationPageContent() {
                               )}
                            </AccordionContent>
                         </AccordionItem>
-                      </>
-                     )}
-                  </Accordion>
-                  
-                  {selectedProductType && (
-                    <div>
-                        <Separator className="my-4"/>
-                        <div>
-                            <h4 className="font-semibold text-foreground mb-2">Add Focus Area</h4>
-                            <form onSubmit={(e) => handleAddActionTask(e, topic)} className="space-y-2">
-                               <div className="flex items-center gap-2">
-                                  <Input 
-                                      placeholder="New focus area for this product..."
-                                      value={newActionTasks[topic] || ''}
-                                      onChange={(e) => handleActionTaskChange(topic, e.target.value)}
-                                  />
-                                  <Button type="submit" size="icon" className="flex-shrink-0">
-                                      <PlusCircle className="h-5 w-5"/>
-                                  </Button>
-                               </div>
-                               {releases.length > 0 && (
-                                <div>
-                                    <Label htmlFor={`release-select-${topic}`} className="text-xs">Add to Release (Optional)</Label>
-                                    <Select 
-                                        value={selectedReleaseForTask[topic] || ''} 
-                                        onValueChange={(value) => setSelectedReleaseForTask(prev => ({...prev, [topic]: value}))}
-                                    >
-                                        <SelectTrigger id={`release-select-${topic}`}>
-                                            <SelectValue placeholder="Select a release..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {releases.map(r => (
-                                                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                               )}
-                            </form>
-                            <p className="text-xs text-muted-foreground mt-2">
-                                Added focus areas will appear in your Deep Work library under the "{topic}" topic.
-                            </p>
-                        </div>
-                    </div>
-                  )}
+                      </Accordion>
+                      
+                      <div>
+                          <Separator className="my-4"/>
+                          <div>
+                              <h4 className="font-semibold text-foreground mb-2">Add Focus Area</h4>
+                              <form onSubmit={(e) => handleAddActionTask(e, topic)} className="space-y-2">
+                                 <div className="flex items-center gap-2">
+                                    <Input 
+                                        placeholder="New focus area for this product..."
+                                        value={newActionTasks[topic] || ''}
+                                        onChange={(e) => handleActionTaskChange(topic, e.target.value)}
+                                    />
+                                    <Button type="submit" size="icon" className="flex-shrink-0">
+                                        <PlusCircle className="h-5 w-5"/>
+                                    </Button>
+                                 </div>
+                                 {releases.length > 0 && (
+                                  <div>
+                                      <Label htmlFor={`release-select-${topic}`} className="text-xs">Add to Release (Optional)</Label>
+                                      <Select 
+                                          value={selectedReleaseForTask[topic] || ''} 
+                                          onValueChange={(value) => setSelectedReleaseForTask(prev => ({...prev, [topic]: value}))}
+                                      >
+                                          <SelectTrigger id={`release-select-${topic}`}>
+                                              <SelectValue placeholder="Select a release..." />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                              {releases.map(r => (
+                                                  <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                              ))}
+                                          </SelectContent>
+                                      </Select>
+                                  </div>
+                                 )}
+                              </form>
+                              <p className="text-xs text-muted-foreground mt-2">
+                                  Added focus areas will appear in your Deep Work library under the "{topic}" topic.
+                              </p>
+                          </div>
+                      </div>
 
-                </CardContent>
+                    </CardContent>
+                     {topic === 'Life OS' && currentUser?.username === 'Lonewolf' && (
+                        <CardFooter className="border-t pt-4">
+                            <Button onClick={() => handlePublishReleases(topic)} className="w-full">
+                                Publish Life OS Releases
+                            </Button>
+                        </CardFooter>
+                    )}
                 </Card>
             )
           })}
