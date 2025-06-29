@@ -395,58 +395,63 @@ function ProductizationPageContent() {
                               </div>
                            </AccordionContent>
                         </AccordionItem>
+                        <AccordionItem value="item-4">
+                           <AccordionTrigger>Release Planner</AccordionTrigger>
+                           <AccordionContent>
+                              {releases.map(release => (
+                                <Card key={release.id} className="mb-3">
+                                  <CardHeader className="p-3">
+                                    <div className="flex justify-between items-start">
+                                      <div>
+                                        <CardTitle className="text-base">{release.name}</CardTitle>
+                                        <CardDescription>{format(parseISO(release.launchDate), 'PPP')}</CardDescription>
+                                      </div>
+                                      <div className="flex items-center">
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleStartEditingRelease(topic, release)}><Edit className="h-4 w-4"/></Button>
+                                        <AlertDialog>
+                                          <AlertDialogTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button>
+                                          </AlertDialogTrigger>
+                                          <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                              <AlertDialogDescription>This will permanently delete the release "{release.name}". This action cannot be undone.</AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                              <AlertDialogAction onClick={() => handleDeleteRelease(topic, release.id)}>Delete</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                          </AlertDialogContent>
+                                        </AlertDialog>
+                                      </div>
+                                    </div>
+                                  </CardHeader>
+                                  <CardContent className="p-3 text-sm">
+                                    {release.description && <p className="mb-2 text-muted-foreground">{release.description}</p>}
+                                    <p className="font-medium text-foreground">Focus Areas:</p>
+                                    <ul className="list-disc list-inside text-muted-foreground">
+                                      {(release.focusAreaIds || []).map((id, index) => (
+                                        <li key={`${id}-${index}`}>{focusAreaMap.get(id) || 'Unknown Focus Area'}</li>
+                                      ))}
+                                    </ul>
+                                  </CardContent>
+                                </Card>
+                              ))}
 
-                        <div className="pt-4">
-                          <h4 className="font-semibold text-foreground mb-2">Release Planner</h4>
-                          {releases.map(release => (
-                            <Card key={release.id} className="mb-3">
-                              <CardHeader className="p-3">
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <CardTitle className="text-base">{release.name}</CardTitle>
-                                    <CardDescription>{format(parseISO(release.launchDate), 'PPP')}</CardDescription>
-                                  </div>
-                                  <div className="flex items-center">
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleStartEditingRelease(topic, release)}><Edit className="h-4 w-4"/></Button>
-                                    <AlertDialog>
-                                      <AlertDialogTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button>
-                                      </AlertDialogTrigger>
-                                      <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                          <AlertDialogDescription>This will permanently delete the release "{release.name}". This action cannot be undone.</AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                          <AlertDialogAction onClick={() => handleDeleteRelease(topic, release.id)}>Delete</AlertDialogAction>
-                                        </AlertDialogFooter>
-                                      </AlertDialogContent>
-                                    </AlertDialog>
-                                  </div>
-                                </div>
-                              </CardHeader>
-                              <CardContent className="p-3 text-sm">
-                                {release.description && <p className="mb-2 text-muted-foreground">{release.description}</p>}
-                                <p className="font-medium text-foreground">Focus Areas:</p>
-                                <ul className="list-disc list-inside text-muted-foreground">
-                                  {(release.focusAreaIds || []).map((id, index) => (
-                                    <li key={`${id}-${index}`}>{focusAreaMap.get(id) || 'Unknown Focus Area'}</li>
-                                  ))}
-                                </ul>
-                              </CardContent>
-                            </Card>
-                          ))}
-
-                          {editingRelease?.topic === topic ? renderReleaseForm(topic, focusAreas) : (
-                             <Button className="w-full mt-2" variant="outline" onClick={() => handleStartEditingRelease(topic)}>
-                                <PlusCircle className="mr-2 h-4 w-4" /> Add Release
-                            </Button>
-                          )}
-                        </div>
-
+                              {editingRelease?.topic === topic ? renderReleaseForm(topic, focusAreas) : (
+                                 <Button className="w-full mt-2" variant="outline" onClick={() => handleStartEditingRelease(topic)}>
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Release
+                                </Button>
+                              )}
+                           </AccordionContent>
+                        </AccordionItem>
+                      </>
+                     )}
+                  </Accordion>
+                  
+                  {selectedProductType && (
+                    <div>
                         <Separator className="my-4"/>
-
                         <div>
                             <h4 className="font-semibold text-foreground mb-2">Add Focus Area</h4>
                             <form onSubmit={(e) => handleAddActionTask(e, topic)} className="space-y-2">
@@ -483,9 +488,9 @@ function ProductizationPageContent() {
                                 Added focus areas will appear in your Deep Work library under the "{topic}" topic.
                             </p>
                         </div>
-                      </>
-                     )}
-                  </Accordion>
+                    </div>
+                  )}
+
                 </CardContent>
                 </Card>
             )
