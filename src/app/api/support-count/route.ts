@@ -23,7 +23,12 @@ export async function GET() {
         if (!response.ok) {
             throw new Error(`Failed to download count data. Status: ${response.status}`);
         }
-        const data = await response.json();
+        
+        const textData = await response.text();
+        if (!textData) {
+            return NextResponse.json({ count: 0 });
+        }
+        const data = JSON.parse(textData);
         return NextResponse.json({ count: data.count || 0 });
 
     } catch (error) {
