@@ -46,7 +46,11 @@ export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
           const futureReleases = (data.releases || [])
             .filter((r: Release) => {
               try {
-                return parseISO(r.launchDate) >= new Date();
+                // Ensure date is valid and in the future or today
+                const launchDate = parseISO(r.launchDate);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0); // Set to beginning of today for comparison
+                return launchDate >= today;
               } catch {
                 return false;
               }
@@ -126,7 +130,7 @@ export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
           <DialogDescription>
             {showQr
               ? "Scan the QR code below to pay with any UPI app. Your contribution directly supports the development of these upcoming Life OS features. Thank you!"
-              : "Your support helps bring future Life OS releases to life. Clicking a link will open a new tab."}
+              : "Your support helps bring the features below to life. If you find this project helpful, please consider contributing."}
           </DialogDescription>
         </DialogHeader>
 
