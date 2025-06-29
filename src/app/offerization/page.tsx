@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { Briefcase, Package, PlusCircle, Calendar as CalendarIcon, Edit, Trash2 } from 'lucide-react';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -28,6 +27,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 function OfferizationPageContent() {
@@ -67,12 +67,21 @@ function OfferizationPageContent() {
     return classifiedAndSortedTopics;
   }, [deepWorkDefinitions, deepWorkTopicMetadata]);
 
-  const handleOfferTypeChange = (topic: string, offerType: string) => {
-    setOfferizationPlans(prev => ({
-        ...prev,
-        [topic]: { ...(prev[topic] || {}), productType: offerType }
-    }));
-    toast({ title: "Offer Type Set!", description: `Set to "${offerType}" for ${topic}.` });
+  const handleOfferTypeChange = (topic: string, offerTypeToAddOrRemove: string) => {
+    setOfferizationPlans(prev => {
+        const newPlans = { ...prev };
+        const currentPlan = newPlans[topic] || {};
+        const currentOfferTypes = currentPlan.offerTypes || [];
+        const newOfferTypes = currentOfferTypes.includes(offerTypeToAddOrRemove)
+            ? currentOfferTypes.filter(o => o !== offerTypeToAddOrRemove)
+            : [...currentOfferTypes, offerTypeToAddOrRemove];
+        
+        newPlans[topic] = {
+            ...currentPlan,
+            offerTypes: newOfferTypes
+        };
+        return newPlans;
+    });
   };
   
   const handleActionTaskChange = (topic: string, value: string) => {
@@ -309,7 +318,7 @@ function OfferizationPageContent() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {topics.map(([topic, focusAreas]) => {
             const plan = offerizationPlans[topic] || {};
-            const selectedOfferType = plan.productType;
+            const selectedOfferTypes = plan.offerTypes || [];
             const gapAnalysis = plan.gapAnalysis;
             const releases = plan.releases || [];
 
@@ -337,29 +346,46 @@ function OfferizationPageContent() {
                     <AccordionItem value="item-2">
                        <AccordionTrigger>Offer Type</AccordionTrigger>
                        <AccordionContent>
-                          <Select value={selectedOfferType || ''} onValueChange={(value) => handleOfferTypeChange(topic, value)}>
-                              <SelectTrigger>
-                                  <SelectValue placeholder="Select an offer type..." />
-                              </SelectTrigger>
-                              <SelectContent>
+                          <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                  <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                      {selectedOfferTypes.length > 0 ? `${selectedOfferTypes.length} selected` : "Select offer types..."}
+                                  </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent className="w-[--radix-select-trigger-width] max-h-60 overflow-y-auto">
                                   {offerTypes.map((group) => (
-                                  <SelectGroup key={group.group || group.title}>
-                                      <SelectLabel>{group.group || group.title}</SelectLabel>
-                                      {group.items.map(item => (
-                                          <SelectItem key={item.name} value={item.name}>{item.name}</SelectItem>
-                                      ))}
-                                  </SelectGroup>
+                                      <React.Fragment key={group.group}>
+                                          <DropdownMenuLabel>{group.group}</DropdownMenuLabel>
+                                          {group.items.map(item => (
+                                              <DropdownMenuCheckboxItem
+                                                  key={item.name}
+                                                  checked={selectedOfferTypes.includes(item.name)}
+                                                  onCheckedChange={() => handleOfferTypeChange(topic, item.name)}
+                                              >
+                                                  {item.name}
+                                              </DropdownMenuCheckboxItem>
+                                          ))}
+                                      </React.Fragment>
                                   ))}
-                              </SelectContent>
-                          </Select>
-                          {selectedOfferType && (
-                              <p className="text-xs text-muted-foreground mt-2">
-                                  {offerTypes.flatMap(g => g.items).find(i => i.name === selectedOfferType)?.description}
-                              </p>
+                              </DropdownMenuContent>
+                          </DropdownMenu>
+
+                          {selectedOfferTypes.length > 0 && (
+                              <div className="mt-2 space-y-2">
+                                  {selectedOfferTypes.map(offerName => {
+                                      const offer = offerTypes.flatMap(g => g.items).find(i => i.name === offerName);
+                                      return offer ? (
+                                          <div key={offer.name} className="text-xs p-2 bg-muted/50 rounded-md">
+                                              <p className="font-semibold">{offer.name}</p>
+                                              <p className="text-muted-foreground">{offer.description}</p>
+                                          </div>
+                                      ) : null;
+                                  })}
+                              </div>
                           )}
                        </AccordionContent>
                     </AccordionItem>
-                     {selectedOfferType && (
+                     {selectedOfferTypes.length > 0 && (
                       <>
                         <AccordionItem value="item-3">
                            <AccordionTrigger>Gap Analysis</AccordionTrigger>
@@ -462,7 +488,7 @@ function OfferizationPageContent() {
                      )}
                   </Accordion>
 
-                  {selectedOfferType && (
+                  {selectedOfferTypes.length > 0 && (
                     <div>
                         <Separator className="my-4"/>
                         <div>

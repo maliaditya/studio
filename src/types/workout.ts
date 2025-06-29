@@ -176,6 +176,7 @@ export interface GapAnalysis {
 
 export interface ProductizationPlan {
   productType?: string;
+  offerTypes?: string[];
   gapAnalysis?: GapAnalysis;
   releases?: Release[];
 }
