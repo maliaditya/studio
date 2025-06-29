@@ -158,6 +158,14 @@ export type DailySchedule = Record<string, Activity[]>; // Slot name -> Array of
 export type FullSchedule = Record<string, DailySchedule>; // Date key -> DailySchedule
 
 // Productization Plan types
+export interface Release {
+  id: string;
+  name: string;
+  description: string;
+  launchDate: string; // yyyy-MM-dd format
+  focusAreaIds: string[];
+}
+
 export interface GapAnalysis {
   gapType: string;
   whatYouCanFill: string;
@@ -168,4 +176,5 @@ export interface GapAnalysis {
 export interface ProductizationPlan {
   productType?: string;
   gapAnalysis?: GapAnalysis;
+  releases?: Release[];
 }
