@@ -93,7 +93,7 @@ export function TodaysLeadGenModal({
         if (logIndex > -1) {
             const exerciseIndex = newLogs[logIndex].exercises.findIndex(e => e.id === exerciseId);
             if (exerciseIndex > -1) {
-                const newSet = { id: Date.now().toString(), reps: 1, weight: 1, timestamp: Date.now() };
+                const newSet = { id: `${Date.now()}-${Math.random()}`, reps: 1, weight: 1, timestamp: Date.now() };
                 newLogs[logIndex].exercises[exerciseIndex].loggedSets.push(newSet);
             }
         }
