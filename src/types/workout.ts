@@ -167,7 +167,7 @@ export interface Release {
 }
 
 export interface GapAnalysis {
-  gapType: string;
+  gapTypes: string[];
   whatYouCanFill: string;
   coreSolution: string;
   outcomeGoal: string;

@@ -9,6 +9,13 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { Briefcase, Package, PlusCircle, Calendar as CalendarIcon, Edit, Trash2 } from 'lucide-react';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from '@/hooks/use-toast';
 import type { ExerciseCategory, ExerciseDefinition, GapAnalysis, ProductizationPlan as OfferizationPlan, Release } from '@/types/workout';
 import { productTypes as offerTypes, GAP_TYPES } from '@/lib/constants';
@@ -110,11 +117,33 @@ function OfferizationPageContent() {
       [topic]: {
         ...(prev[topic] || {}),
         gapAnalysis: {
-          ...(prev[topic]?.gapAnalysis || { gapType: '', whatYouCanFill: '', coreSolution: '', outcomeGoal: '' }),
+          ...(prev[topic]?.gapAnalysis || { gapTypes: [], whatYouCanFill: '', coreSolution: '', outcomeGoal: '' }),
           [field]: value
         }
       }
     }));
+  };
+
+  const handleGapTypeChange = (topic: string, gapToAddOrRemove: string) => {
+    setOfferizationPlans(prev => {
+        const newPlans = { ...prev };
+        const currentPlan = newPlans[topic] || {};
+        const currentGapAnalysis = currentPlan.gapAnalysis || { gapTypes: [], whatYouCanFill: '', coreSolution: '', outcomeGoal: '' };
+        
+        const currentGapTypes = currentGapAnalysis.gapTypes || [];
+        const newGapTypes = currentGapTypes.includes(gapToAddOrRemove)
+            ? currentGapTypes.filter(g => g !== gapToAddOrRemove)
+            : [...currentGapTypes, gapToAddOrRemove];
+            
+        newPlans[topic] = {
+            ...currentPlan,
+            gapAnalysis: {
+                ...currentGapAnalysis,
+                gapTypes: newGapTypes
+            }
+        };
+        return newPlans;
+    });
   };
 
   const handleStartEditingRelease = (topic: string, release?: Release) => {
@@ -326,26 +355,31 @@ function OfferizationPageContent() {
                               <p className="text-xs text-muted-foreground">Answer these questions to define your offer strategy.</p>
                               <div>
                                   <Label htmlFor={`gapType-${topic}`} className="text-sm">Gap Type</Label>
-                                  <Select value={gapAnalysis?.gapType || ''} onValueChange={(value) => handleGapAnalysisChange(topic, 'gapType', value)}>
-                                      <SelectTrigger id={`gapType-${topic}`}>
-                                          <SelectValue placeholder="Select a gap type..." />
-                                      </SelectTrigger>
-                                      <SelectContent>
+                                  <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                          <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                              {(gapAnalysis?.gapTypes && gapAnalysis.gapTypes.length > 0)
+                                                  ? `${gapAnalysis.gapTypes.length} selected`
+                                                  : "Select gap types..."}
+                                          </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent className="w-[--radix-select-trigger-width] max-h-60 overflow-y-auto">
                                           {GAP_TYPES.map(group => (
-                                              <SelectGroup key={group.group}>
-                                                  <SelectLabel>{group.group}</SelectLabel>
+                                              <React.Fragment key={group.group}>
+                                                  <DropdownMenuLabel>{group.group}</DropdownMenuLabel>
                                                   {group.items.map(item => (
-                                                      <SelectItem key={item.name} value={item.name}>{item.name}</SelectItem>
+                                                      <DropdownMenuCheckboxItem
+                                                          key={item.name}
+                                                          checked={(gapAnalysis?.gapTypes || []).includes(item.name)}
+                                                          onCheckedChange={() => handleGapTypeChange(topic, item.name)}
+                                                      >
+                                                          {item.name}
+                                                      </DropdownMenuCheckboxItem>
                                                   ))}
-                                              </SelectGroup>
+                                              </React.Fragment>
                                           ))}
-                                      </SelectContent>
-                                  </Select>
-                                   {gapAnalysis?.gapType && (
-                                      <p className="text-xs text-muted-foreground mt-2">
-                                          {GAP_TYPES.flatMap(g => g.items).find(i => i.name === gapAnalysis.gapType)?.description}
-                                      </p>
-                                  )}
+                                      </DropdownMenuContent>
+                                  </DropdownMenu>
                               </div>
                               <div>
                                   <Label htmlFor={`fill-${topic}`} className="text-sm">What You Can Fill</Label>

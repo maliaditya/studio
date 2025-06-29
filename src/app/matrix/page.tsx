@@ -12,7 +12,7 @@ import type { ProductizationPlan } from '@/types/workout';
 interface MatrixRow {
     topic: string;
     classification: 'product' | 'service';
-    gapType: string;
+    gapTypes: string[];
     whatYouCanFill: string;
     coreSolution: string;
     offerType: string;
@@ -42,7 +42,7 @@ function MatrixPageContent() {
         data.push({
           topic,
           classification: metadata.classification,
-          gapType: plan.gapAnalysis.gapType || '-',
+          gapTypes: plan.gapAnalysis.gapTypes || [],
           whatYouCanFill: plan.gapAnalysis.whatYouCanFill || '-',
           coreSolution: plan.gapAnalysis.coreSolution || '-',
           offerType: plan.productType || '-',
@@ -84,7 +84,11 @@ function MatrixPageContent() {
                       <TableCell>
                         <Badge variant={row.classification === 'product' ? 'default' : 'secondary'} className="capitalize text-xs">{row.classification}</Badge>
                       </TableCell>
-                      <TableCell>{row.gapType}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {row.gapTypes.map(gt => <Badge key={gt} variant="outline" className="text-xs whitespace-nowrap">{gt}</Badge>)}
+                        </div>
+                      </TableCell>
                       <TableCell>{row.whatYouCanFill}</TableCell>
                       <TableCell>
                         <p className="font-semibold">{row.coreSolution}</p>
