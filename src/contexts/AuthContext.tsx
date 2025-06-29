@@ -96,6 +96,8 @@ interface AuthContextType {
 
   productizationPlans: Record<string, ProductizationPlan>;
   setProductizationPlans: React.Dispatch<React.SetStateAction<Record<string, ProductizationPlan>>>;
+  offerizationPlans: Record<string, ProductizationPlan>;
+  setOfferizationPlans: React.Dispatch<React.SetStateAction<Record<string, ProductizationPlan>>>;
 
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
@@ -155,6 +157,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [leadGenDefinitions, setLeadGenDefinitions] = useState<ExerciseDefinition[]>(LEAD_GEN_DEFINITIONS);
   const [offerSystemDefinitions, setOfferSystemDefinitions] = useState<ExerciseDefinition[]>(OFFER_SYSTEM_DEFINITIONS);
   const [productizationPlans, setProductizationPlans] = useState<Record<string, ProductizationPlan>>({});
+  const [offerizationPlans, setOfferizationPlans] = useState<Record<string, ProductizationPlan>>({});
 
 
   useEffect(() => {
@@ -208,6 +211,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`leadgen_definitions_${username}`); setLeadGenDefinitions(d ? JSON.parse(d) : LEAD_GEN_DEFINITIONS); } catch (e) { setLeadGenDefinitions(LEAD_GEN_DEFINITIONS); }
       try { const d = loadItem(`offer_system_definitions_${username}`); setOfferSystemDefinitions(d ? JSON.parse(d) : OFFER_SYSTEM_DEFINITIONS); } catch (e) { setOfferSystemDefinitions(OFFER_SYSTEM_DEFINITIONS); }
       try { const d = loadItem(`productization_plans_${username}`); setProductizationPlans(d ? JSON.parse(d) : {}); } catch (e) { setProductizationPlans({}); }
+      try { const d = loadItem(`offerization_plans_${username}`); setOfferizationPlans(d ? JSON.parse(d) : {}); } catch (e) { setOfferizationPlans({}); }
 
     } else {
       // Clear all data on logout
@@ -219,6 +223,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setDeepWorkDefinitions([]); setDeepWorkTopicMetadata({});
       setLeadGenDefinitions(LEAD_GEN_DEFINITIONS); setOfferSystemDefinitions(OFFER_SYSTEM_DEFINITIONS);
       setProductizationPlans({});
+      setOfferizationPlans({});
     }
   }, [currentUser]);
 
@@ -254,12 +259,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`leadgen_definitions_${username}`, JSON.stringify(leadGenDefinitions));
       localStorage.setItem(`offer_system_definitions_${username}`, JSON.stringify(offerSystemDefinitions));
       localStorage.setItem(`productization_plans_${username}`, JSON.stringify(productizationPlans));
+      localStorage.setItem(`offerization_plans_${username}`, JSON.stringify(offerizationPlans));
     }
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
     schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allOfferSystemLogs,
     exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, deepWorkTopicMetadata, leadGenDefinitions, offerSystemDefinitions,
-    productizationPlans,
+    productizationPlans, offerizationPlans,
     currentUser, loading
   ]);
 
@@ -302,6 +308,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAllOfferSystemLogs(data.allOfferSystemLogs || []);
     
     setProductizationPlans(data.productizationPlans || {});
+    setOfferizationPlans(data.offerizationPlans || {});
 
     setSchedule(data.schedule || {});
 
@@ -363,6 +370,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       leadGenDefinitions, allLeadGenLogs,
       offerSystemDefinitions, allOfferSystemLogs,
       productizationPlans,
+      offerizationPlans,
       schedule,
       dietPlan, weightLogs, goalWeight, height, dateOfBirth, gender,
     };
@@ -760,6 +768,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     leadGenDefinitions, setLeadGenDefinitions,
     offerSystemDefinitions, setOfferSystemDefinitions,
     productizationPlans, setProductizationPlans,
+    offerizationPlans, setOfferizationPlans,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
   };
 

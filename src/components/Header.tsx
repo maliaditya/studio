@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -35,6 +36,7 @@ export function Header() {
     { href: '/offer-system', label: 'Offer System' },
     { href: '/monetization-engine', label: 'Monetization' },
     { href: '/productization', label: 'Productization' },
+    { href: '/offerization', label: 'Offerization' },
   ];
 
   return (
