@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysLearningModal } from '@/components/TodaysLearningModal';
+import { TodaysLeadGenModal } from '@/components/TodaysLeadGenModal';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
 import { DietPlanModal } from '@/components/DietPlanModal';
 import { StatsOverviewModal } from '@/components/StatsOverviewModal';
@@ -80,11 +81,13 @@ function HomePageContent() {
     allUpskillLogs, setAllUpskillLogs,
     allDeepWorkLogs, setAllDeepWorkLogs,
     allWorkoutLogs,
+    allLeadGenLogs,
     setActivityDurations,
     isAgendaDocked, setIsAgendaDocked,
     handleToggleComplete, handleLogLearning,
     workoutMode, workoutPlans, exerciseDefinitions,
-    upskillDefinitions, topicGoals, deepWorkDefinitions, brandingLogs
+    upskillDefinitions, topicGoals, deepWorkDefinitions, brandingLogs,
+    leadGenDefinitions
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -95,6 +98,7 @@ function HomePageContent() {
   // State for Modals
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
   const [isLearningModalOpen, setIsLearningModalOpen] = useState(false);
+  const [isLeadGenModalOpen, setIsLeadGenModalOpen] = useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<{ slotName: string; activity: Activity } | null>(null);
@@ -192,6 +196,7 @@ function HomePageContent() {
       case 'planning': details = 'Planning Session'; break;
       case 'tracking': details = 'Tracking Session'; break;
       case 'branding': details = 'Branding Session'; break;
+      case 'lead-generation': details = 'Lead Generation Session'; break;
     }
     const newActivity: Activity = { 
       id: `${type}-${Date.now()}`, 
@@ -229,6 +234,11 @@ function HomePageContent() {
     setIsTodaysWorkoutModalOpen(true);
   };
   
+  const handleStartLeadGenLog = (activity: Activity) => {
+    setWorkoutActivityToLog(activity); // Reusing state for simplicity
+    setIsLeadGenModalOpen(true);
+  };
+
   const handleActivityClick = (slotName: string, activity: Activity) => {
     if (!activity || activity.completed) return;
     if (activity.type === 'workout') {
@@ -236,6 +246,8 @@ function HomePageContent() {
     } else if (['upskill', 'deepwork', 'branding'].includes(activity.type)) {
       setEditingActivity({ slotName, activity });
       setIsLearningModalOpen(true);
+    } else if (activity.type === 'lead-generation') {
+      handleStartLeadGenLog(activity);
     }
   };
 
@@ -426,7 +438,7 @@ function HomePageContent() {
               return { status: 'pending' as const, message: 'Loading branding status...' };
           }
           
-          const allBundles = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreas));
+          const allBundles = deepWorkDefinitions.filter(def => def.category === "Content Bundle");
           const isFullyShared = (task: ExerciseDefinition) => task.sharingStatus && task.sharingStatus.twitter && task.sharingStatus.linkedin && task.sharingStatus.devto;
           
           const activeBundles = allBundles.filter(task => !isFullyShared(task));
@@ -445,14 +457,14 @@ function HomePageContent() {
               };
           }
           
-          const readyForBrandingCount = deepWorkDefinitions.filter(def => def.isReadyForBranding && !Array.isArray(def.focusAreas)).length;
+          const readyForBrandingCount = deepWorkDefinitions.filter(def => def.isReadyForBranding && def.category !== "Content Bundle").length;
 
           if (readyForBrandingCount > 0) {
               return {
                   status: 'pending' as const,
                   message: `You have ${readyForBrandingCount} focus area(s) ready.`,
                   subMessage: "Go to Personal Branding to create a content bundle.",
-                  eligibleFocusAreas: [] // Not needed for display here
+                  eligibleFocusAreas: [] 
               };
           }
 
@@ -539,6 +551,7 @@ function HomePageContent() {
           break;
         case 'deepwork':
         case 'branding':
+        case 'lead-generation':
           durations[activity.id] = slotTimeRanges[activity.slotName] || activity.slotName;
           break;
         case 'upskill':
@@ -816,6 +829,18 @@ function HomePageContent() {
           />
         )}
 
+        {currentUser && (
+            <TodaysLeadGenModal
+                isOpen={isLeadGenModalOpen}
+                onOpenChange={setIsLeadGenModalOpen}
+                activityToLog={workoutActivityToLog}
+                onActivityComplete={(slotName, activityId) => {
+                    handleToggleComplete(slotName, activityId);
+                    setWorkoutActivityToLog(null);
+                }}
+            />
+        )}
+        
         {currentUser && editingActivity && (
           <TodaysLearningModal
               isOpen={isLearningModalOpen}

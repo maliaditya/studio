@@ -138,7 +138,7 @@ export interface EditableMealPlan {
 export type UserDietPlan = EditableMealPlan[];
 
 // Types for homepage schedule
-export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding';
+export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation';
 
 export type Activity = {
   id: string;

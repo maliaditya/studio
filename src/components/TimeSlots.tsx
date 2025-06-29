@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
@@ -8,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import {
   Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, PlusCircle, Trash2,
-  Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2
+  Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet
 } from 'lucide-react';
 import type { ActivityType, Activity, DailySchedule } from '@/types/workout';
 
@@ -28,6 +29,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
   planning: <ClipboardList className="h-5 w-5 text-primary" />,
   tracking: <ClipboardCheck className="h-5 w-5 text-primary" />,
   branding: <Share2 className="h-5 w-5 text-primary" />,
+  'lead-generation': <Magnet className="h-5 w-5 text-primary" />,
 };
 
 interface TimeSlotsProps {
@@ -94,7 +96,7 @@ export function TimeSlots({
                               {activity.details}
                             </p>
                             <p className="text-xs text-muted-foreground capitalize">
-                              {activity.type === 'deepwork' ? 'Deep Work' : activity.type === 'branding' ? 'Personal Branding' : activity.type}
+                              {activity.type === 'deepwork' ? 'Deep Work' : activity.type === 'branding' ? 'Personal Branding' : activity.type === 'lead-generation' ? 'Lead Generation' : activity.type}
                             </p>
                           </div>
                         </div>
@@ -151,6 +153,10 @@ export function TimeSlots({
                       <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'branding')}>
                         <Share2 className="h-4 w-4 mr-2" />
                         Add Branding
+                      </Button>
+                       <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'lead-generation')}>
+                        <Magnet className="h-4 w-4 mr-2" />
+                        Add Lead Gen
                       </Button>
                       <Separator className="my-1" />
                       <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'planning')}>
