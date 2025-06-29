@@ -78,9 +78,9 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                          <Accordion type="single" collapsible className="w-full" key={topic}>
                              <AccordionItem value={topic} className="p-0 rounded-md bg-muted/30 border-b-0">
                                <AccordionTrigger className="py-2 px-3 text-left hover:no-underline">
-                                  <div className="flex flex-col items-start flex-grow">
-                                    <h5 className="font-bold text-foreground text-base">{topic}</h5>
-                                    <div className="text-xs text-muted-foreground font-normal">
+                                  <div className="flex flex-col items-start flex-grow min-w-0">
+                                    <h5 className="font-bold text-foreground text-base truncate" title={topic}>{topic}</h5>
+                                    <div className="text-xs text-muted-foreground font-normal truncate">
                                       Progress: {topicStats.totalProgress.toLocaleString()} / {topicStats.goalValue.toLocaleString()} {topicStats.unit.split('/')[0]}
                                     </div>
                                   </div>
@@ -163,13 +163,13 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                         renderItem={(item: any) => (
                              <div className="h-24 flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 cursor-pointer" onClick={() => router.push('/personal-branding')}>
                                 <div className="flex justify-between items-center">
-                                  <h5 className="font-bold text-foreground text-base truncate">{item.taskName}</h5>
+                                  <h5 className="font-bold text-foreground text-base truncate" title={item.taskName}>{item.taskName}</h5>
                                    <div className="text-right text-xs ml-4 flex-shrink-0">
                                       <div className="font-semibold text-foreground whitespace-nowrap">{item.stage}</div>
                                       <div className="text-muted-foreground whitespace-nowrap">({item.progress})</div>
                                   </div>
                                 </div>
-                                <p className="text-sm text-muted-foreground mt-1">Go to Personal Branding page to continue...</p>
+                                <p className="text-sm text-muted-foreground mt-1 truncate">Go to Personal Branding page to continue...</p>
                             </div>
                         )}
                     />
@@ -191,11 +191,11 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                       renderItem={(item: any) => (
                         <div className="h-24 flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 cursor-pointer" onClick={() => router.push(item.type === 'product' ? '/productization' : '/offerization')}>
                             <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="font-bold text-foreground truncate">{item.release.name}</p>
-                                    <p className="text-xs text-muted-foreground">Topic: <span className="font-medium">{item.topic}</span></p>
+                                <div className='min-w-0'>
+                                    <p className="font-bold text-foreground truncate" title={item.release.name}>{item.release.name}</p>
+                                    <p className="text-xs text-muted-foreground truncate" title={item.topic}>Topic: <span className="font-medium">{item.topic}</span></p>
                                 </div>
-                                <div className="flex flex-col items-end ml-2">
+                                <div className="flex flex-col items-end ml-2 flex-shrink-0">
                                     <Badge variant="outline" className="capitalize text-xs mb-1">{item.type}</Badge>
                                     <p className="text-xs text-muted-foreground whitespace-nowrap">
                                         {format(parseISO(item.release.launchDate), 'PPP')}
@@ -253,4 +253,3 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
     </Card>
   );
 }
-
