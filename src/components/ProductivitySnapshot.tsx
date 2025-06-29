@@ -7,11 +7,12 @@ import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown } from 'lucide-react';
+import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ChartContainer } from '@/components/ui/chart';
 import { BarChart, Bar, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { format, parseISO } from 'date-fns';
 
 interface ProductivitySnapshotProps {
   stats: any;
@@ -167,6 +168,22 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                   </div>
                 )
               )}
+            </div>
+             <Separator className="my-2" />
+             <div>
+              <h4 className="font-semibold mb-2 flex items-center gap-2"><Rocket /> Product Roadmap</h4>
+              {stats.nextUpcomingRelease ? (
+                  <div className="text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md" onClick={() => router.push('/productization')}>
+                    <p>Next Release: <span className="font-bold text-foreground">{stats.nextUpcomingRelease.release.name}</span></p>
+                    <p className="text-xs text-muted-foreground">Topic: <span className="font-medium">{stats.nextUpcomingRelease.topic}</span></p>
+                    <p className="text-xs text-muted-foreground">Launch: <span className="font-medium">{format(parseISO(stats.nextUpcomingRelease.release.launchDate), 'PPP')}</span></p>
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground p-2">
+                    <p>No upcoming product releases planned.</p>
+                    <p className="text-xs mt-1">Go to Productization to create a release plan.</p>
+                  </div>
+                )}
             </div>
           </div>
         </div>
