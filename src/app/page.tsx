@@ -84,7 +84,7 @@ function HomePageContent() {
     isAgendaDocked, setIsAgendaDocked,
     handleToggleComplete, handleLogLearning,
     workoutMode, workoutPlans, exerciseDefinitions,
-    upskillDefinitions, topicGoals, deepWorkDefinitions, brandingTasks, brandingLogs
+    upskillDefinitions, topicGoals, deepWorkDefinitions, brandingLogs
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -256,9 +256,9 @@ function HomePageContent() {
       logsUpdater = setAllDeepWorkLogs;
       definitionSource = deepWorkDefinitions;
       logSource = allDeepWorkLogs;
-    } else {
-      logsUpdater = () => {}; // Branding logs are handled on their page
-      definitionSource = brandingTasks;
+    } else { // branding
+      logsUpdater = setAllBrandingLogs;
+      definitionSource = deepWorkDefinitions.filter(def => def.category === "Content Bundle");
       logSource = brandingLogs;
     }
 
@@ -420,29 +420,48 @@ function HomePageContent() {
           });
           return topicStats;
       };
+      
       const calculateBrandingStatus = () => {
-          const isFullyShared = (task: ExerciseDefinition) => task.sharingStatus && task.sharingStatus.twitter && task.sharingStatus.linkedin && task.sharingStatus.devto;
-          const activeTasks = brandingTasks.filter(task => !isFullyShared(task));
-          const nextTask = activeTasks[0];
-          if (nextTask) {
-              let loggedStagesCount = brandingLogs.find(log => log.exercises.some(ex => ex.definitionId === nextTask.id))?.exercises.find(ex => ex.definitionId === nextTask.id)?.loggedSets.length || 0;
-              const stages = ['Create', 'Optimize', 'Review', 'Final Review'];
-              return { status: 'in_progress' as const, taskName: nextTask.name, stage: loggedStagesCount < 4 ? stages[loggedStagesCount] : 'Ready to Share', progress: `${loggedStagesCount}/4` };
+          if (!deepWorkDefinitions || !brandingLogs) {
+              return { status: 'pending' as const, message: 'Loading branding status...' };
           }
-          const bundledFocusAreaNames = new Set(brandingTasks.flatMap(task => task.focusAreas || []));
-          const focusAreaSessionCounts: Record<string, number> = {};
-          allDeepWorkLogs.forEach(log => log.exercises.forEach(ex => { focusAreaSessionCounts[ex.id] = (focusAreaSessionCounts[ex.id] || 0) + ex.loggedSets.length; }));
-          const eligibleFocusAreas = deepWorkDefinitions.filter(def => (focusAreaSessionCounts[def.id] || 0) >= 4 && !bundledFocusAreaNames.has(def.name));
-          const topics: Record<string, { eligibleCount: number, focusAreas: ExerciseDefinition[] }> = {};
-          deepWorkDefinitions.forEach(def => { if (!topics[def.category]) topics[def.category] = { eligibleCount: 0, focusAreas: [] }; topics[def.category].focusAreas.push(def); });
-          eligibleFocusAreas.forEach(def => { if (topics[def.category]) topics[def.category].eligibleCount++; });
-          let closestTopic = { name: '', needed: 4 };
-          Object.entries(topics).forEach(([topicName, data]) => { if (data.eligibleCount > 0 && data.eligibleCount < 4) { const needed = 4 - data.eligibleCount; if (needed < closestTopic.needed) closestTopic = { name: topicName, needed }; } });
-          if (closestTopic.name) return { status: 'pending' as const, message: `Need ${closestTopic.needed} more eligible focus areas in "${closestTopic.name}" to form a bundle.`, subMessage: `(An area is eligible after 4 deep work sessions).`, eligibleFocusAreas: eligibleFocusAreas.map(fa => `${fa.name} (${fa.category})`) };
-          let closestFocusArea = { name: '', needed: 5 };
-          deepWorkDefinitions.forEach(def => { const sessions = focusAreaSessionCounts[def.id] || 0; if (sessions < 4 && !bundledFocusAreaNames.has(def.name)) { const needed = 4 - sessions; if (needed < closestFocusArea.needed) closestFocusArea = { name: def.name, needed }; } });
-          if (closestFocusArea.name) return { status: 'pending' as const, message: `Log ${closestFocusArea.needed} more session(s) for "${closestFocusArea.name}" to make it eligible.`, subMessage: 'Then, group 4 eligible areas in one topic to form a bundle.', eligibleFocusAreas: eligibleFocusAreas.map(fa => `${fa.name} (${fa.category})`) };
-          return { status: 'pending' as const, message: 'Log 4 sessions on 4 focus areas within the same topic.', subMessage: 'This will create your first branding bundle.', eligibleFocusAreas: [] };
+          
+          const allBundles = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreas));
+          const isFullyShared = (task: ExerciseDefinition) => task.sharingStatus && task.sharingStatus.twitter && task.sharingStatus.linkedin && task.sharingStatus.devto;
+          
+          const activeBundles = allBundles.filter(task => !isFullyShared(task));
+          const nextTask = activeBundles[0];
+
+          if (nextTask) {
+              const logForTask = brandingLogs.flatMap(log => log.exercises).find(ex => ex.definitionId === nextTask.id);
+              const loggedStagesCount = logForTask?.loggedSets.length || 0;
+              const stages = ['Create', 'Optimize', 'Review', 'Final Review'];
+              
+              return {
+                  status: 'in_progress' as const,
+                  taskName: nextTask.name,
+                  stage: loggedStagesCount < 4 ? stages[loggedStagesCount] : 'Ready to Share',
+                  progress: `${loggedStagesCount}/4`
+              };
+          }
+          
+          const readyForBrandingCount = deepWorkDefinitions.filter(def => def.isReadyForBranding && !Array.isArray(def.focusAreas)).length;
+
+          if (readyForBrandingCount > 0) {
+              return {
+                  status: 'pending' as const,
+                  message: `You have ${readyForBrandingCount} focus area(s) ready.`,
+                  subMessage: "Go to Personal Branding to create a content bundle.",
+                  eligibleFocusAreas: [] // Not needed for display here
+              };
+          }
+
+          return {
+              status: 'pending' as const,
+              message: "No content bundles in the pipeline.",
+              subMessage: "Go to Deep Work to mark focus areas as 'Ready for Branding'.",
+              eligibleFocusAreas: []
+          };
       };
 
       const learningStats = calculateLearningStats(allUpskillLogs, topicGoals);
@@ -496,7 +515,7 @@ function HomePageContent() {
           brandingStatus: calculateBrandingStatus(),
           totalHoursData, todayHoursData,
       };
-  }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, consistencyData, brandingTasks, brandingLogs, deepWorkDefinitions]);
+  }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, consistencyData, brandingLogs, deepWorkDefinitions]);
     
   const _activityDurations = useMemo(() => {
     const durations: Record<string, string> = {};
@@ -646,7 +665,7 @@ function HomePageContent() {
       definitionSource = deepWorkDefinitions;
     } else { // branding
       logSource = brandingLogs;
-      definitionSource = brandingTasks;
+      definitionSource = deepWorkDefinitions.filter(def => def.category === "Content Bundle");
     }
     
     // These are the WorkoutExercise objects already created for today.
@@ -702,7 +721,7 @@ function HomePageContent() {
         allTodaysLoggedDefIds,
     };
 
-}, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, todayKey, schedule, upskillDefinitions, deepWorkDefinitions, brandingTasks]);
+}, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, todayKey, schedule, upskillDefinitions, deepWorkDefinitions]);
 
   const timeAllocationData = useMemo(() => {
     if (!productivityStats.todayHoursData) return [];
