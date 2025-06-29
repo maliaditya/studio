@@ -30,6 +30,7 @@ function ProductizationPageContent() {
   
   // State for release planning
   const [editingRelease, setEditingRelease] = useState<{ topic: string; release: Partial<Release> } | null>(null);
+  const [selectedReleaseForTask, setSelectedReleaseForTask] = useState<Record<string, string>>({});
 
   const topics = useMemo(() => {
     const topicMap = new Map<string, { name: string; category: string }[]>();
@@ -63,12 +64,12 @@ function ProductizationPageContent() {
     e.preventDefault();
     const taskName = newActionTasks[topic]?.trim();
     if (!taskName) {
-        toast({ title: 'Error', description: 'Task name cannot be empty.', variant: "destructive" });
+        toast({ title: 'Error', description: 'Focus area name cannot be empty.', variant: "destructive" });
         return;
     }
 
     if (deepWorkDefinitions.some(def => def.name.toLowerCase() === taskName.toLowerCase() && def.category === topic)) {
-        toast({ title: 'Error', description: 'This task already exists for this topic.', variant: "destructive" });
+        toast({ title: 'Error', description: 'This focus area already exists for this topic.', variant: "destructive" });
         return;
     }
 
@@ -79,8 +80,27 @@ function ProductizationPageContent() {
     };
 
     setDeepWorkDefinitions(prev => [...prev, newDef]);
+
+    const releaseId = selectedReleaseForTask[topic];
+    if (releaseId) {
+        setProductizationPlans(prev => {
+            const newPlans = { ...prev };
+            const currentPlan = newPlans[topic];
+            if (currentPlan && currentPlan.releases) {
+                const releaseIndex = currentPlan.releases.findIndex(r => r.id === releaseId);
+                if (releaseIndex > -1) {
+                    const release = currentPlan.releases[releaseIndex];
+                    const focusAreaIds = Array.isArray(release.focusAreaIds) ? release.focusAreaIds : [];
+                    release.focusAreaIds = [...focusAreaIds, newDef.id];
+                }
+            }
+            return newPlans;
+        });
+    }
+
     setNewActionTasks(prev => ({ ...prev, [topic]: '' }));
-    toast({ title: 'Task Added to Deep Work', description: `"${taskName}" is now in your Deep Work library under "${topic}".` });
+    setSelectedReleaseForTask(prev => ({...prev, [topic]: ''}));
+    toast({ title: 'Focus Area Added', description: `"${taskName}" is now in your Deep Work library and linked to the release if selected.` });
   };
 
   const handleGapAnalysisChange = (topic: string, field: keyof GapAnalysis, value: string) => {
@@ -393,19 +413,39 @@ function ProductizationPageContent() {
                         <Separator className="my-4"/>
 
                         <div>
-                            <h4 className="font-semibold text-foreground mb-2">Action Tasks</h4>
-                            <form onSubmit={(e) => handleAddActionTask(e, topic)} className="flex items-center gap-2">
-                                <Input 
-                                    placeholder="New task for this product..."
-                                    value={newActionTasks[topic] || ''}
-                                    onChange={(e) => handleActionTaskChange(topic, e.target.value)}
-                                />
-                                <Button type="submit" size="icon" className="flex-shrink-0">
-                                    <PlusCircle className="h-5 w-5"/>
-                                </Button>
+                            <h4 className="font-semibold text-foreground mb-2">Add Focus Area</h4>
+                            <form onSubmit={(e) => handleAddActionTask(e, topic)} className="space-y-2">
+                               <div className="flex items-center gap-2">
+                                  <Input 
+                                      placeholder="New focus area for this product..."
+                                      value={newActionTasks[topic] || ''}
+                                      onChange={(e) => handleActionTaskChange(topic, e.target.value)}
+                                  />
+                                  <Button type="submit" size="icon" className="flex-shrink-0">
+                                      <PlusCircle className="h-5 w-5"/>
+                                  </Button>
+                               </div>
+                               {releases.length > 0 && (
+                                <div>
+                                    <Label htmlFor={`release-select-${topic}`} className="text-xs">Add to Release (Optional)</Label>
+                                    <Select 
+                                        value={selectedReleaseForTask[topic] || ''} 
+                                        onValueChange={(value) => setSelectedReleaseForTask(prev => ({...prev, [topic]: value}))}
+                                    >
+                                        <SelectTrigger id={`release-select-${topic}`}>
+                                            <SelectValue placeholder="Select a release..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {releases.map(r => (
+                                                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                               )}
                             </form>
                             <p className="text-xs text-muted-foreground mt-2">
-                                Added tasks will appear in your Deep Work library under the "{topic}" topic.
+                                Added focus areas will appear in your Deep Work library under the "{topic}" topic.
                             </p>
                         </div>
                       </>
@@ -428,3 +468,6 @@ export default function ProductizationPage() {
         </AuthGuard>
     )
 }
+
+
+    
