@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from '@/hooks/use-toast';
 import type { ExerciseCategory, ExerciseDefinition, GapAnalysis, ProductizationPlan as OfferizationPlan, Release } from '@/types/workout';
-import { productTypes as offerTypes, GAP_TYPES } from '@/lib/constants';
+import { offerTypes, GAP_TYPES } from '@/lib/constants';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';

@@ -170,6 +170,37 @@ export const productTypes = [
   ]}
 ];
 
+export const offerTypes = [
+  {
+    group: "Direct Services",
+    items: [
+      { name: "Freelance Project", description: "Time-based or milestone-based work for a client. Best for skill-based services (e.g., CUDA/OpenGL sprint)." },
+      { name: "Retainer / Monthly Plan", description: "Ongoing help or support for a monthly fee. Best for clients who need consistent output or guidance." },
+      { name: "Consultation", description: "Strategy, diagnosis, or advice in a call format. Best for expert perspective and monetization gap support." },
+      { name: "Coaching / Mentoring", description: "Skill development and accountability support. Best for learning and support gaps." },
+    ]
+  },
+  {
+    group: "Productized & Scalable Services",
+    items: [
+      { name: "Productized Service", description: "Pre-scoped, fixed-price service with clear deliverables. Best for execution gap (e.g., “Prototype in 3 Days”)." },
+      { name: "Done-For-You (DFY)", description: "A full solution where you handle everything. Best for filling an execution gap." },
+      { name: "Done-With-You (DWY)", description: "You guide the client as they do the work. Best for combining support and learning gaps." },
+      { name: "Challenge / Sprint", description: "A time-boxed program with a specific goal. Best for execution and support gaps." },
+    ]
+  },
+  {
+    group: "Leveraged Offerings",
+    items: [
+      { name: "Mini-Course / Guide", description: "Educational product, often self-serve. Best for addressing learning and perspective gaps." },
+      { name: "Template / Toolkit", description: "A reusable system, starter kit, or resource pack. Best for tool and monetization gaps." },
+      { name: "Subscription Product", description: "Ongoing access to exclusive tools or content. Best for tool or learning gaps." },
+      { name: "Code Drop / GitHub Demo", description: "Lightweight offer of a mini-tool or component. Best for fast delivery and building trust." },
+    ]
+  }
+];
+
+
 export const GAP_TYPES = [
     { group: "Service-Oriented Gaps", items: [
         { name: "Market Gap", description: "There's demand but no easy/affordable supply. You step in to serve that underserved audience. Example: You offer GPU dev for indie teams who can’t hire full-time experts." },
