@@ -14,6 +14,7 @@ import { ChartContainer } from '@/components/ui/chart';
 import { BarChart, Bar, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import { Carousel } from './ui/carousel';
+import { motion } from 'framer-motion';
 
 interface ProductivitySnapshotProps {
   stats: any;
@@ -67,7 +68,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
           <div className="md:col-span-2 space-y-4">
             <div className="relative">
               <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Learning Progress</h4>
-              <div className="text-sm min-h-[190px]">
+              <motion.div layout className="text-sm">
                 {learningItems.length > 0 ? (
                   <Carousel
                     items={learningItems}
@@ -150,12 +151,12 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-2">No learning stats yet. Log progress and duration in the Upskill page.</p>
                 )}
-              </div>
+              </motion.div>
             </div>
             <Separator className="my-2" />
             <div className="relative">
               <h4 className="font-semibold mb-2 flex items-center gap-2"><Share2 /> Personal Branding</h4>
-              <div className="min-h-[72px]">
+              <motion.div layout className="min-h-[72px]">
                 {brandingItems.length > 0 ? (
                   <Carousel
                       items={brandingItems}
@@ -172,12 +173,12 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                       <p className="text-xs mt-1">{stats.brandingStatus?.subMessage || ''}</p>
                     </div>
                 )}
-              </div>
+              </motion.div>
             </div>
              <Separator className="my-2" />
              <div className="relative">
               <h4 className="font-semibold mb-2 flex items-center gap-2"><Rocket /> Upcoming Roadmap</h4>
-              <div className="min-h-[72px]">
+              <motion.div layout className="min-h-[72px]">
                 {roadmapItems.length > 0 ? (
                     <Carousel
                       items={roadmapItems}
@@ -200,7 +201,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                       <p className="text-xs mt-1">Go to Productization or Offerization to create a release plan.</p>
                     </div>
                   )}
-              </div>
+              </motion.div>
             </div>
           </div>
         </div>
