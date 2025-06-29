@@ -94,8 +94,8 @@ interface AuthContextType {
   offerSystemDefinitions: ExerciseDefinition[];
   setOfferSystemDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
 
-  productizationPlans: Record<string, { plan: string }>;
-  setProductizationPlans: React.Dispatch<React.SetStateAction<Record<string, { plan: string }>>>;
+  productizationPlans: Record<string, { productType: string }>;
+  setProductizationPlans: React.Dispatch<React.SetStateAction<Record<string, { productType: string }>>>;
 
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
@@ -154,7 +154,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [deepWorkTopicMetadata, setDeepWorkTopicMetadata] = useState<Record<string, DeepWorkTopicMetadata>>({});
   const [leadGenDefinitions, setLeadGenDefinitions] = useState<ExerciseDefinition[]>(LEAD_GEN_DEFINITIONS);
   const [offerSystemDefinitions, setOfferSystemDefinitions] = useState<ExerciseDefinition[]>(OFFER_SYSTEM_DEFINITIONS);
-  const [productizationPlans, setProductizationPlans] = useState<Record<string, { plan: string }>>({});
+  const [productizationPlans, setProductizationPlans] = useState<Record<string, { productType: string }>>({});
 
 
   useEffect(() => {
