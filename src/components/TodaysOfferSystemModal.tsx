@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,12 +12,13 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { WorkoutExercise, Activity, ExerciseDefinition } from '@/types/workout';
-import { Package, CheckCircle2 } from 'lucide-react';
+import { Package, PlusCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { WorkoutExerciseCard } from './WorkoutExerciseCard';
 import { useToast } from '@/hooks/use-toast';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 
 interface TodaysOfferSystemModalProps {
   isOpen: boolean;
@@ -41,29 +42,57 @@ export function TodaysOfferSystemModal({
 
   const today = useMemo(() => new Date(), [isOpen]);
   const dateKey = useMemo(() => format(today, 'yyyy-MM-dd'), [today]);
-
-  useEffect(() => {
-    if (isOpen && !allOfferSystemLogs.some(log => log.date === dateKey)) {
-        const exercises: WorkoutExercise[] = offerSystemDefinitions.map(def => {
-            return {
-                id: `${def.id}-${dateKey}`,
-                definitionId: def.id,
-                name: def.name,
-                category: def.category,
-                description: def.description,
-                loggedSets: [],
-                targetSets: 1,
-                targetReps: `1 action`,
-            };
-        });
-        setAllOfferSystemLogs(prev => [...prev, { id: dateKey, date: dateKey, exercises }]);
-    }
-  }, [isOpen, dateKey, allOfferSystemLogs, offerSystemDefinitions, setAllOfferSystemLogs]);
     
   const exercisesForToday = useMemo(() => {
       const log = allOfferSystemLogs.find(l => l.date === dateKey);
       return log ? log.exercises : [];
   }, [allOfferSystemLogs, dateKey]);
+
+  const availableDefinitions = useMemo(() => {
+    const todaysDefinitionIds = new Set(exercisesForToday.map(ex => ex.definitionId));
+    return offerSystemDefinitions.filter(def => !todaysDefinitionIds.has(def.id));
+  }, [offerSystemDefinitions, exercisesForToday]);
+
+  const handleAddTask = (definition: ExerciseDefinition) => {
+    const newExercise: WorkoutExercise = {
+      id: `${definition.id}-${Date.now()}`,
+      definitionId: definition.id,
+      name: definition.name,
+      category: definition.category,
+      description: definition.description,
+      loggedSets: [],
+      targetSets: 1,
+      targetReps: `1 action`,
+    };
+
+    setAllOfferSystemLogs(prev => {
+        const logIndex = prev.findIndex(l => l.date === dateKey);
+        if (logIndex > -1) {
+            const newLogs = [...prev];
+            const updatedExercises = [...newLogs[logIndex].exercises, newExercise];
+            newLogs[logIndex] = {...newLogs[logIndex], exercises: updatedExercises};
+            return newLogs;
+        } else {
+            return [...prev, { id: dateKey, date: dateKey, exercises: [newExercise] }];
+        }
+    });
+    toast({ title: "Task Added", description: `"${definition.name}" added to today's session.` });
+  };
+  
+  const handleRemoveTask = (exerciseId: string) => {
+    setAllOfferSystemLogs(prev => {
+      const logIndex = prev.findIndex(l => l.date === dateKey);
+      if (logIndex > -1) {
+        const newLogs = [...prev];
+        const updatedExercises = newLogs[logIndex].exercises.filter(ex => ex.id !== exerciseId);
+        newLogs[logIndex] = { ...newLogs[logIndex], exercises: updatedExercises };
+        return newLogs;
+      }
+      return prev;
+    });
+    toast({ title: "Task Removed", description: "Task removed from today's session." });
+  };
+
 
   const isComplete = useMemo(() => {
     if (exercisesForToday.length === 0) return false;
@@ -116,36 +145,66 @@ export function TodaysOfferSystemModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>Log Offer System Session</DialogTitle>
           <DialogDescription>
-            Log your progress on defining your offers. The session can be marked complete once all tasks are logged.
+            Add offer-related tasks from your library to the session, then log your progress.
           </DialogDescription>
         </DialogHeader>
         <div className="flex-grow min-h-0">
           <ScrollArea className="h-full pr-4">
-            {exercisesForToday.length > 0 ? (
-                <div className="grid grid-cols-1 gap-4">
-                  {exercisesForToday.map(exercise => (
-                      <WorkoutExerciseCard 
-                          key={exercise.id} 
-                          exercise={exercise}
-                          onLogSet={(exerciseId) => handleLogSet(exerciseId, 1, 1)} 
-                          onDeleteSet={handleDeleteSet} 
-                          onUpdateSet={() => {}} // Not needed
-                          onRemoveExercise={() => {}} // Not needed
-                          pageType="offer-system"
-                      />
-                  ))}
-                </div>
-            ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8 min-h-[300px]">
-                  <Package className="h-12 w-12 mb-4" />
-                  <p className="font-semibold">No Offer System tasks defined.</p>
-                  <p className="text-sm">Go to the Offer System page to set up your tasks.</p>
-                </div>
-            )}
+            <div className="grid md:grid-cols-2 gap-6 items-start">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Available Tasks</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {availableDefinitions.length > 0 ? (
+                    <ul className="space-y-2">
+                      {availableDefinitions.map(def => (
+                        <li key={def.id} className="flex items-center justify-between p-2 rounded-md border">
+                          <div className='flex-grow'>
+                            <p className="font-medium text-sm">{def.name}</p>
+                            {def.description && <p className="text-xs text-muted-foreground">{def.description}</p>}
+                          </div>
+                          <Button variant="ghost" size="icon" onClick={() => handleAddTask(def)}>
+                            <PlusCircle className="h-5 w-5 text-green-500"/>
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">All tasks are in today's session.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className='space-y-4'>
+                <h3 className="text-lg font-semibold">Today's Session</h3>
+                {exercisesForToday.length > 0 ? (
+                  <div className="space-y-4">
+                    {exercisesForToday.map(exercise => (
+                        <WorkoutExerciseCard 
+                            key={exercise.id} 
+                            exercise={exercise}
+                            onLogSet={() => handleLogSet(exercise.id)} 
+                            onDeleteSet={handleDeleteSet} 
+                            onUpdateSet={() => {}}
+                            onRemoveExercise={handleRemoveTask}
+                            pageType="offer-system"
+                        />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-center text-muted-foreground p-8 min-h-[200px] border-dashed border-2 rounded-md">
+                    <Package className="h-10 w-10 mb-2" />
+                    <p className="font-semibold">No tasks for today.</p>
+                    <p className="text-sm">Add tasks from the library to get started.</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </ScrollArea>
         </div>
         <DialogFooter className="flex-shrink-0 pt-4">
