@@ -134,3 +134,48 @@ export const OFFER_SYSTEM_DEFINITIONS: ExerciseDefinition[] = [
     { id: 'os_3', name: 'Develop pricing packages', category: 'Offer System', description: 'Structure your services into clear, tiered packages (if applicable).' },
     { id: 'os_4', name: 'Update resume & profiles', category: 'Offer System', description: 'Refresh your resume and online profiles (LinkedIn, etc.) for job searches.' },
 ];
+
+export const productTypes = [
+  { group: "Digital Products (High Scalability, Low Cost)", items: [
+      { name: "Ebooks / Guides", description: "Package your knowledge into a written format for detailed, step-by-step instructions." },
+      { name: "Online Courses", description: "Create video or text-based courses to teach a skill, suitable for platforms like Udemy or Gumroad." },
+      { name: "Code Templates & Starter Kits", description: "Sell pre-written code to help others start projects faster. Distribute on Gumroad, GitHub, etc." },
+      { name: "Notion / Life OS Systems", description: "Bundle and sell your productivity systems and templates for others to use." },
+  ]},
+  { group: "Service-Backed Products (Mid-Effort, Semi-Passive)", items: [
+      { name: "Technical Resume Website Templates", description: "Sell resume funnel templates with integrated developer portfolio sections." },
+      { name: "Custom Shader or Graphics Pack", description: "Sell presets, shader packs, or graphical assets for engines like Three.js, Unity, or Unreal." },
+      { name: "Landing Page + Sales System Kits", description: "Provide a complete one-page funnel template for freelancers or small businesses." },
+      { name: "AI Workflow Bundles", description: "Create and sell prompt libraries or automated workflows for specific industries (e.g., AI calorie estimator for coaches)." },
+  ]},
+  { group: "Creator Assets", items: [
+      { name: "Shortform Content Packs", description: "Repurpose your key learnings into content packs for social media platforms like LinkedIn or Instagram." },
+      { name: "Viral Dev Showcase Templates", description: "Provide a Canva and copy bundle to help developers promote their projects with a proven hook and demo format." },
+  ]},
+  { group: "Freemium → Paid Model", items: [
+      { name: "Free with Paid Upgrade", description: "Offer a free version (e.g., starter code, basic template) with an upgrade path to a Pro version with more features or support." },
+  ]},
+  { group: "Community-as-a-Product", items: [
+      { name: "Private Community", description: "Charge for access to a private group (e.g., Discord) with curated resources, expert feedback, and networking." },
+      { name: "Live Sessions / Office Hours", description: "Offer regularly scheduled live code reviews or Q&A sessions for a specific niche." },
+  ]},
+  { group: "Niche Tools / Apps", items: [
+      { name: "SaaS Application", description: "Develop and sell a software-as-a-service application, potentially based on one of your existing tracker tools." },
+      { name: "CLI Tool / IDE Extension", description: "Build a command-line tool or VSCode extension to solve a specific developer problem." },
+      { name: "Browser Extension", description: "Create a browser extension that assists with a specific task, such as an AI-based developer assistant." },
+  ]},
+  { group: "Subscription Models", items: [
+      { name: "Paid Newsletter", description: "Share your expertise through a subscription newsletter, including code snippets, tech breakdowns, and project deep dives." },
+      { name: "Sponsorship Platform", description: "Use Patreon or GitHub Sponsors to offer exclusive content, source code access, or early demos to paying supporters." },
+  ]}
+];
+
+export const GAP_TYPES = [
+    { group: "🔷 Primary Strategic Gaps (Core 5)", items: [ "Market Gap", "Skill Gap", "Execution Gap", "Content Gap", "System Gap" ]},
+    { group: "🔶 Expansion Gaps (Execution, Tech, or Product-based)", items: [ "Speed Gap", "Design Gap", "Integration Gap", "UX Gap", "Dev Experience Gap" ]},
+    { group: "🧠 Knowledge / Communication Gaps", items: [ "Education Gap", "Onboarding Gap", "Trust Gap", "Clarity Gap" ]},
+    { group: "💰 Monetization / Business Gaps", items: [ "Monetization Gap", "Pricing Gap", "Packaging Gap", "Value Ladder Gap" ]},
+    { group: "📣 Marketing / Distribution Gaps", items: [ "Distribution Gap", "Positioning Gap", "Narrative Gap", "Demo Gap" ]},
+    { group: "🔓 Access / Inclusivity Gaps", items: [ "Access Gap", "Affordability Gap", "Localization Gap" ]},
+    { group: "⏱ Time / Resource Gaps", items: [ "Time Gap", "Focus Gap", "Energy Gap", "Workflow Gap" ]}
+];

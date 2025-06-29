@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -94,8 +94,8 @@ interface AuthContextType {
   offerSystemDefinitions: ExerciseDefinition[];
   setOfferSystemDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
 
-  productizationPlans: Record<string, { productType: string }>;
-  setProductizationPlans: React.Dispatch<React.SetStateAction<Record<string, { productType: string }>>>;
+  productizationPlans: Record<string, ProductizationPlan>;
+  setProductizationPlans: React.Dispatch<React.SetStateAction<Record<string, ProductizationPlan>>>;
 
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
@@ -154,7 +154,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [deepWorkTopicMetadata, setDeepWorkTopicMetadata] = useState<Record<string, DeepWorkTopicMetadata>>({});
   const [leadGenDefinitions, setLeadGenDefinitions] = useState<ExerciseDefinition[]>(LEAD_GEN_DEFINITIONS);
   const [offerSystemDefinitions, setOfferSystemDefinitions] = useState<ExerciseDefinition[]>(OFFER_SYSTEM_DEFINITIONS);
-  const [productizationPlans, setProductizationPlans] = useState<Record<string, { productType: string }>>({});
+  const [productizationPlans, setProductizationPlans] = useState<Record<string, ProductizationPlan>>({});
 
 
   useEffect(() => {

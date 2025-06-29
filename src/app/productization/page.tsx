@@ -10,63 +10,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Briefcase, Package, PlusCircle } from 'lucide-react';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import type { ExerciseCategory, ExerciseDefinition } from '@/types/workout';
-
-const productTypes = [
-  {
-    group: "Digital Products (High Scalability, Low Cost)",
-    items: [
-      { name: "Ebooks / Guides", description: "Package your knowledge into a written format for detailed, step-by-step instructions." },
-      { name: "Online Courses", description: "Create video or text-based courses to teach a skill, suitable for platforms like Udemy or Gumroad." },
-      { name: "Code Templates & Starter Kits", description: "Sell pre-written code to help others start projects faster. Distribute on Gumroad, GitHub, etc." },
-      { name: "Notion / Life OS Systems", description: "Bundle and sell your productivity systems and templates for others to use." },
-    ]
-  },
-  {
-    group: "Service-Backed Products (Mid-Effort, Semi-Passive)",
-    items: [
-      { name: "Technical Resume Website Templates", description: "Sell resume funnel templates with integrated developer portfolio sections." },
-      { name: "Custom Shader or Graphics Pack", description: "Sell presets, shader packs, or graphical assets for engines like Three.js, Unity, or Unreal." },
-      { name: "Landing Page + Sales System Kits", description: "Provide a complete one-page funnel template for freelancers or small businesses." },
-      { name: "AI Workflow Bundles", description: "Create and sell prompt libraries or automated workflows for specific industries (e.g., AI calorie estimator for coaches)." },
-    ]
-  },
-  {
-    group: "Creator Assets",
-    items: [
-      { name: "Shortform Content Packs", description: "Repurpose your key learnings into content packs for social media platforms like LinkedIn or Instagram." },
-      { name: "Viral Dev Showcase Templates", description: "Provide a Canva and copy bundle to help developers promote their projects with a proven hook and demo format." },
-    ]
-  },
-  {
-    group: "Freemium → Paid Model",
-    items: [
-      { name: "Free with Paid Upgrade", description: "Offer a free version (e.g., starter code, basic template) with an upgrade path to a Pro version with more features or support." },
-    ]
-  },
-  {
-    group: "Community-as-a-Product",
-    items: [
-      { name: "Private Community", description: "Charge for access to a private group (e.g., Discord) with curated resources, expert feedback, and networking." },
-      { name: "Live Sessions / Office Hours", description: "Offer regularly scheduled live code reviews or Q&A sessions for a specific niche." },
-    ]
-  },
-  {
-    group: "Niche Tools / Apps",
-    items: [
-      { name: "SaaS Application", description: "Develop and sell a software-as-a-service application, potentially based on one of your existing tracker tools." },
-      { name: "CLI Tool / IDE Extension", description: "Build a command-line tool or VSCode extension to solve a specific developer problem." },
-      { name: "Browser Extension", description: "Create a browser extension that assists with a specific task, such as an AI-based developer assistant." },
-    ]
-  },
-  {
-    title: "Subscription Models",
-    items: [
-      { name: "Paid Newsletter", description: "Share your expertise through a subscription newsletter, including code snippets, tech breakdowns, and project deep dives." },
-      { name: "Sponsorship Platform", description: "Use Patreon or GitHub Sponsors to offer exclusive content, source code access, or early demos to paying supporters." },
-    ]
-  }
-];
+import type { ExerciseCategory, ExerciseDefinition, GapAnalysis } from '@/types/workout';
+import { productTypes, GAP_TYPES } from '@/lib/constants';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 
 function ProductizationPageContent() {
@@ -127,6 +74,19 @@ function ProductizationPageContent() {
     toast({ title: 'Task Added to Deep Work', description: `"${taskName}" is now in your Deep Work library under "${topic}".` });
   };
 
+  const handleGapAnalysisChange = (topic: string, field: keyof GapAnalysis, value: string) => {
+    setProductizationPlans(prev => ({
+      ...prev,
+      [topic]: {
+        ...(prev[topic] || {}),
+        gapAnalysis: {
+          ...(prev[topic]?.gapAnalysis || { gapType: '', whatYouCanFill: '', coreSolution: '', outcomeGoal: '' }),
+          [field]: value
+        }
+      }
+    }));
+  };
+
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
@@ -141,7 +101,10 @@ function ProductizationPageContent() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {topics.map(([topic, focusAreas]) => {
-            const selectedProductType = productizationPlans[topic]?.productType;
+            const plan = productizationPlans[topic] || {};
+            const selectedProductType = plan.productType;
+            const gapAnalysis = plan.gapAnalysis;
+            
             return (
                 <Card key={topic} className="flex flex-col">
                 <CardHeader>
@@ -184,6 +147,44 @@ function ProductizationPageContent() {
                     </div>
                     
                     {selectedProductType && (
+                        <>
+                        <div className="pt-4 border-t">
+                            <h4 className="font-semibold text-foreground mb-2">Gap Analysis</h4>
+                             <p className="text-xs text-muted-foreground mb-4">Answer these questions to define your product strategy.</p>
+                            <div className="space-y-4">
+                                <div>
+                                    <Label htmlFor={`gapType-${topic}`} className="text-sm">Gap Type</Label>
+                                    <Select value={gapAnalysis?.gapType || ''} onValueChange={(value) => handleGapAnalysisChange(topic, 'gapType', value)}>
+                                        <SelectTrigger id={`gapType-${topic}`}>
+                                            <SelectValue placeholder="Select a gap type..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {GAP_TYPES.map(group => (
+                                                <SelectGroup key={group.group}>
+                                                    <SelectLabel>{group.group}</SelectLabel>
+                                                    {group.items.map(item => (
+                                                        <SelectItem key={item} value={item}>{item}</SelectItem>
+                                                    ))}
+                                                </SelectGroup>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label htmlFor={`fill-${topic}`} className="text-sm">What You Can Fill</Label>
+                                    <Textarea id={`fill-${topic}`} value={gapAnalysis?.whatYouCanFill || ''} onChange={(e) => handleGapAnalysisChange(topic, 'whatYouCanFill', e.target.value)} placeholder="How can you specifically address this gap?" />
+                                </div>
+                                <div>
+                                    <Label htmlFor={`solution-${topic}`} className="text-sm">Core Solution / Offer</Label>
+                                    <Textarea id={`solution-${topic}`} value={gapAnalysis?.coreSolution || ''} onChange={(e) => handleGapAnalysisChange(topic, 'coreSolution', e.target.value)} placeholder="What is the core product or service?" />
+                                </div>
+                                <div>
+                                    <Label htmlFor={`goal-${topic}`} className="text-sm">Outcome Goal</Label>
+                                    <Textarea id={`goal-${topic}`} value={gapAnalysis?.outcomeGoal || ''} onChange={(e) => handleGapAnalysisChange(topic, 'outcomeGoal', e.target.value)} placeholder="What is the desired result?" />
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="pt-4 border-t">
                             <h4 className="font-semibold text-foreground mb-2">Action Tasks</h4>
                             <form onSubmit={(e) => handleAddActionTask(e, topic)} className="flex items-center gap-2">
@@ -200,6 +201,7 @@ function ProductizationPageContent() {
                                 Added tasks will appear in your Deep Work library under the "{topic}" topic.
                             </p>
                         </div>
+                        </>
                     )}
                 </CardContent>
                 </Card>
