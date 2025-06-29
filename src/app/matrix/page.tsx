@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import type { ProductizationPlan } from '@/types/workout';
+import { cn } from '@/lib/utils';
 
 interface MatrixRow {
     topic: string;
@@ -54,6 +55,24 @@ function MatrixPageContent() {
 
     return data;
   }, [deepWorkTopicMetadata, productizationPlans, offerizationPlans]);
+  
+  const renderTextAsList = (text: string, className?: string) => {
+    if (!text || text.trim() === '-' || text.trim() === '') {
+      return <p className={cn("text-xs text-muted-foreground", className)}>-</p>;
+    }
+  
+    if (text.includes('\n')) {
+      return (
+        <ul className={cn("list-disc list-inside space-y-1 text-xs", className)}>
+          {text.split('\n').filter(line => line.trim()).map((item, index) => (
+            <li key={index}>{item.trim()}</li>
+          ))}
+        </ul>
+      );
+    }
+    return <p className={cn("text-xs", className)}>{text}</p>;
+  };
+
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -80,24 +99,28 @@ function MatrixPageContent() {
                 {matrixData.length > 0 ? (
                   matrixData.map((row) => (
                     <TableRow key={row.topic}>
-                      <TableCell className="font-medium">{row.topic}</TableCell>
-                      <TableCell>
+                      <TableCell className="font-medium align-top">{row.topic}</TableCell>
+                      <TableCell className="align-top">
                         <Badge variant={row.classification === 'product' ? 'default' : 'secondary'} className="capitalize text-xs">{row.classification}</Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-top">
                         <div className="flex flex-wrap gap-1">
-                          {row.gapTypes.map(gt => <Badge key={gt} variant="outline" className="text-xs whitespace-nowrap">{gt}</Badge>)}
+                          {row.gapTypes.map((gt, i) => <Badge key={`${gt}-${i}`} variant="outline" className="text-xs whitespace-nowrap">{gt}</Badge>)}
                         </div>
                       </TableCell>
-                      <TableCell>{row.whatYouCanFill}</TableCell>
-                      <TableCell>
-                        <p className="font-semibold">{row.coreSolution}</p>
-                        <p className="text-xs text-muted-foreground">{row.offerType}</p>
+                      <TableCell className="align-top">
+                        {renderTextAsList(row.whatYouCanFill)}
                       </TableCell>
-                       <TableCell>
+                      <TableCell className="align-top">
+                        {renderTextAsList(row.coreSolution, "font-semibold")}
+                        {row.offerType && row.offerType !== '-' && <p className="text-xs text-muted-foreground mt-1">{row.offerType}</p>}
+                      </TableCell>
+                       <TableCell className="align-top">
                           <Badge variant={row.status === 'In Progress' ? 'destructive' : 'outline'}>{row.status}</Badge>
                        </TableCell>
-                      <TableCell>{row.outcomeGoal}</TableCell>
+                      <TableCell className="align-top">
+                        {renderTextAsList(row.outcomeGoal)}
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
