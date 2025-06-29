@@ -68,6 +68,7 @@ function MatrixPageContent() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[150px]">Topic</TableHead>
+                  <TableHead>Format</TableHead>
                   <TableHead>Gap Type</TableHead>
                   <TableHead>What You Can Fill</TableHead>
                   <TableHead>Core Solution / Offer Type</TableHead>
@@ -79,9 +80,9 @@ function MatrixPageContent() {
                 {matrixData.length > 0 ? (
                   matrixData.map((row) => (
                     <TableRow key={row.topic}>
-                      <TableCell className="font-medium">
-                        {row.topic}
-                        <Badge variant={row.classification === 'product' ? 'default' : 'secondary'} className="ml-2 capitalize text-xs">{row.classification}</Badge>
+                      <TableCell className="font-medium">{row.topic}</TableCell>
+                      <TableCell>
+                        <Badge variant={row.classification === 'product' ? 'default' : 'secondary'} className="capitalize text-xs">{row.classification}</Badge>
                       </TableCell>
                       <TableCell>{row.gapType}</TableCell>
                       <TableCell>{row.whatYouCanFill}</TableCell>
@@ -97,7 +98,7 @@ function MatrixPageContent() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
+                    <TableCell colSpan={7} className="h-24 text-center">
                       No product or service plans with gap analysis defined. Go to Productization or Offerization to get started.
                     </TableCell>
                   </TableRow>
