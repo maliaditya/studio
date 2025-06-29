@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -12,14 +11,12 @@ interface CarouselProps<T> {
   items: T[]
   renderItem: (item: T) => React.ReactNode
   className?: string
-  autoSlideInterval?: number
 }
 
 export function Carousel<T>({
   items,
   renderItem,
   className,
-  autoSlideInterval = 7000,
 }: CarouselProps<T>) {
   const [currentIndex, setCurrentIndex] = React.useState(0)
   const [containerHeight, setContainerHeight] = React.useState<number | "auto">("auto")
@@ -45,14 +42,6 @@ export function Carousel<T>({
   const handlePrev = () => {
     setCurrentIndex((prevIndex) => (prevIndex - 1 + items.length) % items.length)
   }
-
-  // Auto-slide functionality
-  React.useEffect(() => {
-    if (items.length <= 1 || !autoSlideInterval) return
-
-    const slideInterval = setInterval(handleNext, autoSlideInterval)
-    return () => clearInterval(slideInterval)
-  }, [items.length, handleNext, autoSlideInterval])
 
   if (items.length === 0) {
     return null;
