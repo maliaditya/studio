@@ -13,7 +13,6 @@ import { useRouter } from 'next/navigation';
 import { ChartContainer } from '@/components/ui/chart';
 import { BarChart, Bar, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { format, parseISO } from 'date-fns';
-import { Carousel } from './ui/carousel';
 import { motion } from 'framer-motion';
 
 interface ProductivitySnapshotProps {
@@ -70,21 +69,19 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
               <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Learning Progress</h4>
               <motion.div layout className="text-sm">
                 {learningItems.length > 0 ? (
-                  <Carousel
-                    items={learningItems}
-                    renderItem={([topic, topicStats]: [string, any]) => {
-                      const showTodayStats = topicStats.todaysProgress > 0 || (topicStats.requiredDailyRate && topicStats.requiredDailyRate > 0.01);
+                  <Accordion type="single" collapsible className="w-full">
+                    {learningItems.map(([topic, topicStats]: [string, any]) => {
+                       const showTodayStats = topicStats.todaysProgress > 0 || (topicStats.requiredDailyRate && topicStats.requiredDailyRate > 0.01);
                       return (
-                        <Accordion type="single" collapsible className="w-full">
-                          <AccordionItem value={topic} className="p-3 rounded-md bg-muted/30 border-0">
-                            <AccordionTrigger className="py-0 text-left hover:no-underline">
-                              <div className="flex flex-col items-start">
+                         <AccordionItem value={topic} key={topic} className="p-0 rounded-md bg-muted/30 border-b-0 mb-2">
+                           <AccordionTrigger className="py-2 px-3 text-left hover:no-underline">
+                              <div className="flex flex-col items-start flex-grow">
                                 <h5 className="font-bold text-foreground text-base">{topic}</h5>
                                 <div className="text-xs text-muted-foreground font-normal">
                                   Progress: {topicStats.totalProgress.toLocaleString()} / {topicStats.goalValue.toLocaleString()} {topicStats.unit.split('/')[0]}
                                 </div>
                               </div>
-                              {showTodayStats && (
+                               {showTodayStats && (
                                 <div className="text-right text-xs ml-4 flex-shrink-0">
                                   <div className="font-semibold text-foreground whitespace-nowrap">Today</div>
                                   {topicStats.todaysProgress > 0 ? (
@@ -108,8 +105,8 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                                   ) : null}
                                 </div>
                               )}
-                            </AccordionTrigger>
-                            <AccordionContent className="pt-2">
+                           </AccordionTrigger>
+                           <AccordionContent className="px-3">
                               <Progress value={(topicStats.totalProgress / topicStats.goalValue) * 100} className="h-2 my-2" />
                               <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
                                 {topicStats.nextMilestone && (
@@ -142,12 +139,11 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                                   <span className="font-medium text-foreground">{topicStats.speed.toFixed(1)} {topicStats.unit}</span>
                                 </div>
                               </div>
-                            </AccordionContent>
-                          </AccordionItem>
-                        </Accordion>
-                      );
-                    }}
-                  />
+                           </AccordionContent>
+                         </AccordionItem>
+                      )
+                    })}
+                  </Accordion>
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-2">No learning stats yet. Log progress and duration in the Upskill page.</p>
                 )}
@@ -157,22 +153,31 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             <div className="relative">
               <h4 className="font-semibold mb-2 flex items-center gap-2"><Share2 /> Personal Branding</h4>
               <motion.div layout>
-                {brandingItems.length > 0 ? (
-                  <Carousel
-                      items={brandingItems}
-                      renderItem={(item: any) => (
-                        <div className="h-20 flex flex-col justify-center text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md" onClick={() => router.push('/personal-branding')}>
-                          <p>Next up: <span className="font-bold text-foreground">{item.taskName}</span></p>
-                          <p>Current Stage: <span className="font-bold text-foreground">{item.stage} ({item.progress})</span></p>
-                        </div>
-                      )}
-                    />
-                ) : (
+                 {brandingItems.length > 0 ? (
+                    <Accordion type="single" collapsible className="w-full">
+                      {brandingItems.map((item: any) => (
+                        <AccordionItem value={item.taskName} key={item.taskName} className="p-0 rounded-md bg-muted/30 border-b-0 mb-2">
+                           <AccordionTrigger className="py-2 px-3 text-left hover:no-underline">
+                              <div className="flex flex-col items-start flex-grow">
+                                <h5 className="font-bold text-foreground text-base">{item.taskName}</h5>
+                              </div>
+                              <div className="text-right text-xs ml-4 flex-shrink-0">
+                                  <div className="font-semibold text-foreground whitespace-nowrap">{item.stage}</div>
+                                  <div className="text-muted-foreground whitespace-nowrap">({item.progress})</div>
+                              </div>
+                           </AccordionTrigger>
+                           <AccordionContent className="px-3 text-sm text-muted-foreground cursor-pointer" onClick={() => router.push('/personal-branding')}>
+                                Go to Personal Branding page to continue...
+                           </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                 ) : (
                     <div className="text-sm text-muted-foreground p-2">
                       <p>{stats.brandingStatus?.message || 'No branding tasks.'}</p>
                       <p className="text-xs mt-1">{stats.brandingStatus?.subMessage || ''}</p>
                     </div>
-                )}
+                 )}
               </motion.div>
             </div>
              <Separator className="my-2" />
@@ -180,27 +185,43 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
               <h4 className="font-semibold mb-2 flex items-center gap-2"><Rocket /> Upcoming Roadmap</h4>
               <motion.div layout>
                 {roadmapItems.length > 0 ? (
-                    <Carousel
-                      items={roadmapItems}
-                      renderItem={(item: any) => (
-                        <div className="h-20 flex flex-col justify-center text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md" onClick={() => router.push(item.type === 'product' ? '/productization' : '/offerization')}>
-                          <div className="flex justify-between items-start">
-                              <div>
-                                  <p className="font-bold text-foreground">{item.release.name}</p>
-                                  <p className="text-xs text-muted-foreground">Topic: <span className="font-medium">{item.topic}</span></p>
-                              </div>
-                              <Badge variant="outline" className="capitalize text-xs">{item.type}</Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">Launch: <span className="font-medium">{format(parseISO(item.release.launchDate), 'PPP')}</span></p>
-                        </div>
-                      )}
-                    />
-                  ) : (
+                    <Accordion type="single" collapsible className="w-full">
+                        {roadmapItems.map((item: any) => (
+                            <AccordionItem value={item.release.id} key={item.release.id} className="p-0 rounded-md bg-muted/30 border-b-0 mb-2">
+                                <AccordionTrigger className="py-2 px-3 text-left hover:no-underline" onClick={() => router.push(item.type === 'product' ? '/productization' : '/offerization')}>
+                                    <div className="flex-grow">
+                                        <p className="font-bold text-foreground">{item.release.name}</p>
+                                        <p className="text-xs text-muted-foreground">Topic: <span className="font-medium">{item.topic}</span></p>
+                                    </div>
+                                    <div className="flex flex-col items-end ml-2">
+                                        <Badge variant="outline" className="capitalize text-xs mb-1">{item.type}</Badge>
+                                        <p className="text-xs text-muted-foreground whitespace-nowrap">
+                                            {format(parseISO(item.release.launchDate), 'PPP')}
+                                        </p>
+                                    </div>
+                                </AccordionTrigger>
+                                <AccordionContent className="px-3 pb-3 text-sm">
+                                    {item.release.description && <p className="mb-2 text-muted-foreground">{item.release.description}</p>}
+                                    {item.release.features && item.release.features.length > 0 && (
+                                        <div>
+                                            <p className="font-medium text-foreground mb-1">Features:</p>
+                                            <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                                                {item.release.features.map((feature: string) => (
+                                                    <li key={feature}>{feature}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </AccordionContent>
+                            </AccordionItem>
+                        ))}
+                    </Accordion>
+                ) : (
                     <div className="text-sm text-muted-foreground p-2">
-                      <p>No upcoming releases planned.</p>
-                      <p className="text-xs mt-1">Go to Productization or Offerization to create a release plan.</p>
+                    <p>No upcoming releases planned.</p>
+                    <p className="text-xs mt-1">Go to Productization or Offerization to create a release plan.</p>
                     </div>
-                  )}
+                )}
               </motion.div>
             </div>
           </div>
