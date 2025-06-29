@@ -91,6 +91,7 @@ function HomePageContent() {
     upskillDefinitions, topicGoals, deepWorkDefinitions,
     leadGenDefinitions,
     productizationPlans,
+    offerizationPlans,
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -226,7 +227,7 @@ function HomePageContent() {
 
   const getTodaysWorkout = () => {
     const today = new Date();
-    const { exercises } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions);
+    const { exercises, description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions);
     const muscleGroups = Array.from(new Set(exercises.map(ex => ex.category)));
     return { exercises, muscleGroups };
   };
@@ -505,17 +506,29 @@ function HomePageContent() {
       }
 
       const nextUpcomingRelease = (() => {
-        if (!productizationPlans) return null;
+        if (!productizationPlans && !offerizationPlans) return null;
     
-        const allReleases: { topic: string, release: Release }[] = [];
+        const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
     
-        Object.entries(productizationPlans).forEach(([topic, plan]) => {
-            if (plan.releases) {
-                plan.releases.forEach(release => {
-                    allReleases.push({ topic, release });
-                });
-            }
-        });
+        if (productizationPlans) {
+          Object.entries(productizationPlans).forEach(([topic, plan]) => {
+              if (plan.releases) {
+                  plan.releases.forEach(release => {
+                      allReleases.push({ topic, release, type: 'product' });
+                  });
+              }
+          });
+        }
+        
+        if (offerizationPlans) {
+            Object.entries(offerizationPlans).forEach(([topic, plan]) => {
+                if (plan.releases) {
+                    plan.releases.forEach(release => {
+                        allReleases.push({ topic, release, type: 'service' });
+                    });
+                }
+            });
+        }
     
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -564,7 +577,7 @@ function HomePageContent() {
           totalHoursData, todayHoursData,
           nextUpcomingRelease,
       };
-  }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, consistencyData, brandingLogs, deepWorkDefinitions, productizationPlans]);
+  }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, consistencyData, brandingLogs, deepWorkDefinitions, productizationPlans, offerizationPlans]);
     
   const _activityDurations = useMemo(() => {
     const durations: Record<string, string> = {};

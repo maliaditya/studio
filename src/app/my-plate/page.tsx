@@ -28,6 +28,7 @@ function MyPlatePageContent() {
     leadGenDefinitions,
     offerSystemDefinitions,
     productizationPlans,
+    offerizationPlans,
   } = useAuth();
   
   const [isLoading, setIsLoading] = useState(true);
@@ -86,17 +87,29 @@ function MyPlatePageContent() {
   }, [offerSystemDefinitions]);
 
   const upcomingReleases = useMemo(() => {
-    if (!productizationPlans) return [];
+    if (!productizationPlans && !offerizationPlans) return [];
 
-    const allReleases: { topic: string, release: Release }[] = [];
+    const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
 
-    Object.entries(productizationPlans).forEach(([topic, plan]) => {
-        if (plan.releases) {
-            plan.releases.forEach(release => {
-                allReleases.push({ topic, release });
-            });
-        }
-    });
+    if (productizationPlans) {
+      Object.entries(productizationPlans).forEach(([topic, plan]) => {
+          if (plan.releases) {
+              plan.releases.forEach(release => {
+                  allReleases.push({ topic, release, type: 'product' });
+              });
+          }
+      });
+    }
+
+    if (offerizationPlans) {
+      Object.entries(offerizationPlans).forEach(([topic, plan]) => {
+          if (plan.releases) {
+              plan.releases.forEach(release => {
+                  allReleases.push({ topic, release, type: 'service' });
+              });
+          }
+      });
+    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -112,7 +125,7 @@ function MyPlatePageContent() {
         })
         .sort((a, b) => new Date(a.release.launchDate).getTime() - new Date(b.release.launchDate).getTime())
         .slice(0, 3);
-  }, [productizationPlans]);
+  }, [productizationPlans, offerizationPlans]);
 
   const latestWeightLog = useMemo(() => {
     if (!weightLogs || weightLogs.length === 0) return null;
@@ -284,24 +297,27 @@ function MyPlatePageContent() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-3 text-xl"><Rocket className="h-6 w-6 text-primary"/> Product Roadmap</CardTitle>
-                    <CardDescription>Your upcoming product releases and launches.</CardDescription>
+                    <CardTitle className="flex items-center gap-3 text-xl"><Rocket className="h-6 w-6 text-primary"/> Upcoming Roadmap</CardTitle>
+                    <CardDescription>Your upcoming product and service releases.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     {upcomingReleases.length > 0 ? (
                          <ul className="space-y-3">
-                            {upcomingReleases.map(({ topic, release }) => (
+                            {upcomingReleases.map(({ topic, release, type }) => (
                                 <li key={release.id} className="text-sm p-3 rounded-md bg-muted/50 flex justify-between items-center">
                                     <div>
                                         <span className="font-semibold">{release.name}</span>
                                         <span className="text-muted-foreground ml-2">({topic})</span>
                                     </div>
-                                    <Badge variant="secondary">{format(parseISO(release.launchDate), 'MMM dd, yyyy')}</Badge>
+                                     <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className="capitalize">{type}</Badge>
+                                        <Badge variant="secondary">{format(parseISO(release.launchDate), 'MMM dd, yyyy')}</Badge>
+                                    </div>
                                 </li>
                             ))}
                         </ul>
                     ) : (
-                        <p className="text-muted-foreground text-sm">No upcoming product releases planned.</p>
+                        <p className="text-muted-foreground text-sm">No upcoming releases planned.</p>
                     )}
                 </CardContent>
             </Card>

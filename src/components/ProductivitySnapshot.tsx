@@ -171,17 +171,22 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             </div>
              <Separator className="my-2" />
              <div>
-              <h4 className="font-semibold mb-2 flex items-center gap-2"><Rocket /> Product Roadmap</h4>
+              <h4 className="font-semibold mb-2 flex items-center gap-2"><Rocket /> Upcoming Roadmap</h4>
               {stats.nextUpcomingRelease ? (
-                  <div className="text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md" onClick={() => router.push('/productization')}>
-                    <p>Next Release: <span className="font-bold text-foreground">{stats.nextUpcomingRelease.release.name}</span></p>
-                    <p className="text-xs text-muted-foreground">Topic: <span className="font-medium">{stats.nextUpcomingRelease.topic}</span></p>
-                    <p className="text-xs text-muted-foreground">Launch: <span className="font-medium">{format(parseISO(stats.nextUpcomingRelease.release.launchDate), 'PPP')}</span></p>
+                  <div className="text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md" onClick={() => router.push(stats.nextUpcomingRelease.type === 'product' ? '/productization' : '/offerization')}>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p>Next Up: <span className="font-bold text-foreground">{stats.nextUpcomingRelease.release.name}</span></p>
+                            <p className="text-xs text-muted-foreground">Topic: <span className="font-medium">{stats.nextUpcomingRelease.topic}</span></p>
+                        </div>
+                        <Badge variant="outline" className="capitalize text-xs">{stats.nextUpcomingRelease.type}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Launch: <span className="font-medium">{format(parseISO(stats.nextUpcomingRelease.release.launchDate), 'PPP')}</span></p>
                   </div>
                 ) : (
                   <div className="text-sm text-muted-foreground p-2">
-                    <p>No upcoming product releases planned.</p>
-                    <p className="text-xs mt-1">Go to Productization to create a release plan.</p>
+                    <p>No upcoming releases planned.</p>
+                    <p className="text-xs mt-1">Go to Productization or Offerization to create a release plan.</p>
                   </div>
                 )}
             </div>
