@@ -40,7 +40,7 @@ function OfferizationPageContent() {
   const [selectedReleaseForTask, setSelectedReleaseForTask] = useState<Record<string, string>>({});
 
   const topics = useMemo(() => {
-    const topicMap = new Map<string, { name: string; category: string }[]>();
+    const topicMap = new Map<string, ExerciseDefinition[]>();
     (deepWorkDefinitions || []).forEach(def => {
       if (Array.isArray(def.focusAreas)) return;
       
@@ -50,9 +50,21 @@ function OfferizationPageContent() {
       }
       topicMap.get(topic)!.push(def);
     });
-    return Array.from(topicMap.entries()).filter(([topic]) => {
-        return deepWorkTopicMetadata[topic]?.classification === 'service';
-    });
+
+    const topicEntries = Array.from(topicMap.entries());
+
+    const classifiedAndSortedTopics = topicEntries
+      .filter(([topic]) => deepWorkTopicMetadata[topic]?.classification === 'service')
+      .map(([topic, defs]) => {
+        const latestTimestamp = Math.max(
+            ...defs.map(d => parseInt(d.id.split('_')[1], 10) || 0)
+        );
+        return { topic, defs, latestTimestamp };
+      })
+      .sort((a, b) => b.latestTimestamp - a.latestTimestamp)
+      .map(({ topic, defs }) => [topic, defs] as [string, ExerciseDefinition[]]);
+
+    return classifiedAndSortedTopics;
   }, [deepWorkDefinitions, deepWorkTopicMetadata]);
 
   const handleOfferTypeChange = (topic: string, offerType: string) => {

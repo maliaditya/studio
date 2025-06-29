@@ -40,7 +40,7 @@ function ProductizationPageContent() {
   const [selectedReleaseForTask, setSelectedReleaseForTask] = useState<Record<string, string>>({});
 
   const topics = useMemo(() => {
-    const topicMap = new Map<string, { name: string; category: string }[]>();
+    const topicMap = new Map<string, ExerciseDefinition[]>();
     (deepWorkDefinitions || []).forEach(def => {
       if (Array.isArray(def.focusAreas)) return;
       
@@ -50,9 +50,21 @@ function ProductizationPageContent() {
       }
       topicMap.get(topic)!.push(def);
     });
-    return Array.from(topicMap.entries()).filter(([topic]) => {
-        return deepWorkTopicMetadata[topic]?.classification === 'product';
-    });
+
+    const topicEntries = Array.from(topicMap.entries());
+
+    const classifiedAndSortedTopics = topicEntries
+      .filter(([topic]) => deepWorkTopicMetadata[topic]?.classification === 'product')
+      .map(([topic, defs]) => {
+        const latestTimestamp = Math.max(
+            ...defs.map(d => parseInt(d.id.split('_')[1], 10) || 0)
+        );
+        return { topic, defs, latestTimestamp };
+      })
+      .sort((a, b) => b.latestTimestamp - a.latestTimestamp)
+      .map(({ topic, defs }) => [topic, defs] as [string, ExerciseDefinition[]]);
+
+    return classifiedAndSortedTopics;
   }, [deepWorkDefinitions, deepWorkTopicMetadata]);
 
   const handleProductTypeChange = (topic: string, productType: string) => {
@@ -146,6 +158,68 @@ function ProductizationPageContent() {
     });
   };
 
+  const publishReleases = async (releasesToPublish: Release[]) => {
+    if (!currentUser?.username || currentUser.username !== 'Lonewolf') return;
+    
+    if (!releasesToPublish) {
+        releasesToPublish = [];
+    }
+    
+    toast({ title: "Publishing...", description: "Updating the public release plan for Life OS." });
+
+    try {
+        const response = await fetch('/api/publish-releases', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: currentUser.username, releases: releasesToPublish }),
+        });
+
+        const bodyAsText = await response.text();
+
+        if (!response.ok) {
+            let errorMessage = `Request failed with status ${response.status}.`;
+            if (bodyAsText) {
+                try {
+                    const json = JSON.parse(bodyAsText);
+                    errorMessage = json.error || bodyAsText;
+                } catch (e) {
+                    errorMessage = bodyAsText;
+                }
+            } else if (response.statusText) {
+                errorMessage = `Request failed: ${response.statusText}`;
+            }
+            throw new Error(errorMessage);
+        }
+
+        let successMessage = "Life OS release plan has been updated publicly.";
+        if (bodyAsText) {
+            try {
+                const json = JSON.parse(bodyAsText);
+                successMessage = json.message || successMessage;
+            } catch (e) { /* Not an error if success response is not JSON */ }
+        }
+        
+        toast({ title: "Success!", description: successMessage });
+
+    } catch (error) {
+        console.error("Failed to publish releases:", error);
+        toast({
+            title: "Error Publishing",
+            description: error instanceof Error ? error.message : "An unknown error occurred.",
+            variant: "destructive",
+        });
+    }
+  };
+
+  const handlePublishReleases = async (topic: string) => {
+    const plan = productizationPlans[topic];
+    if (plan && plan.releases) {
+        await publishReleases(plan.releases);
+    } else {
+        toast({ title: "No Releases", description: "There are no releases planned for this product to publish.", variant: "destructive" });
+    }
+  };
+
   const handleStartEditingRelease = (topic: string, release?: Release) => {
     setEditingRelease({
         topic,
@@ -188,99 +262,51 @@ function ProductizationPageContent() {
       return;
     }
 
-    setProductizationPlans(prev => {
-        const newPlans = { ...prev };
-        const currentPlan = newPlans[topic] || {};
-        const existingReleases = currentPlan.releases || [];
-        
-        const releaseIndex = existingReleases.findIndex(r => r.id === release.id);
+    const currentPlan = productizationPlans[topic] || {};
+    const existingReleases = currentPlan.releases || [];
+    const releaseIndex = existingReleases.findIndex(r => r.id === release.id);
+    let newReleasesList: Release[];
 
-        if (releaseIndex > -1) {
-            // Update existing release
-            existingReleases[releaseIndex] = release as Release;
-        } else {
-            // Add new release
-            existingReleases.push(release as Release);
-        }
+    if (releaseIndex > -1) {
+        newReleasesList = existingReleases.map(r => r.id === release.id ? release as Release : r);
+    } else {
+        newReleasesList = [...existingReleases, release as Release];
+    }
+    
+    const sortedNewReleases = newReleasesList.sort((a,b) => new Date(a.launchDate).getTime() - new Date(b.launchDate).getTime());
+    const newPlan = { ...currentPlan, releases: sortedNewReleases };
 
-        newPlans[topic] = { ...currentPlan, releases: existingReleases.sort((a,b) => new Date(a.launchDate).getTime() - new Date(b.launchDate).getTime()) };
-        return newPlans;
-    });
-
+    setProductizationPlans(prev => ({ ...prev, [topic]: newPlan }));
+    
     toast({ title: "Release Saved", description: `"${release.name}" has been saved.`});
     setEditingRelease(null);
+
+    if (topic === 'Life OS' && currentUser?.username === 'Lonewolf') {
+        publishReleases(sortedNewReleases);
+    }
   };
 
   const handleDeleteRelease = (topic: string, releaseId: string) => {
-     setProductizationPlans(prev => {
-        const newPlans = { ...prev };
-        const currentPlan = newPlans[topic];
-        if (!currentPlan || !currentPlan.releases) return prev;
+    const currentPlan = productizationPlans[topic];
+    if (!currentPlan || !currentPlan.releases) return;
 
-        currentPlan.releases = currentPlan.releases.filter(r => r.id !== releaseId);
-        newPlans[topic] = currentPlan;
-        
-        return newPlans;
-    });
+    const updatedReleases = currentPlan.releases.filter(r => r.id !== releaseId);
+    
+    setProductizationPlans(prev => ({
+        ...prev,
+        [topic]: {
+            ...currentPlan,
+            releases: updatedReleases,
+        }
+    }));
+    
     toast({ title: "Release Deleted", description: "The release has been removed from your plan.", variant: "destructive" });
+    
+    if (topic === 'Life OS' && currentUser?.username === 'Lonewolf') {
+        publishReleases(updatedReleases);
+    }
   };
   
-  const handlePublishReleases = async (topic: string) => {
-    const plan = productizationPlans[topic];
-    if (!plan || !plan.releases || plan.releases.length === 0) {
-        toast({ title: "No Releases", description: "There are no releases planned for this product to publish.", variant: "destructive" });
-        return;
-    }
-
-    toast({ title: "Publishing...", description: "Updating the public release plan for Life OS." });
-
-    try {
-        const response = await fetch('/api/publish-releases', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: currentUser?.username, releases: plan.releases }),
-        });
-
-        const bodyAsText = await response.text();
-
-        if (!response.ok) {
-            let errorMessage = `Request failed with status ${response.status}.`;
-            if (bodyAsText) {
-                try {
-                    const json = JSON.parse(bodyAsText);
-                    errorMessage = json.error || bodyAsText;
-                } catch (e) {
-                    errorMessage = bodyAsText;
-                }
-            } else if (response.statusText) {
-                errorMessage = `Request failed with status ${response.status}: ${response.statusText}`;
-            }
-            throw new Error(errorMessage);
-        }
-
-        let successMessage = "Life OS release plan has been updated publicly.";
-        if (bodyAsText) {
-            try {
-                const json = JSON.parse(bodyAsText);
-                successMessage = json.message || successMessage;
-            } catch (e) {
-                // Not an error if success response is not JSON
-            }
-        }
-        
-        toast({ title: "Success!", description: successMessage });
-
-    } catch (error) {
-        console.error("Failed to publish releases:", error);
-        toast({
-            title: "Error",
-            description: error instanceof Error ? error.message : "An unknown error occurred.",
-            variant: "destructive",
-        });
-    }
-  };
-
-
   const renderReleaseForm = (topic: string, focusAreas: ExerciseDefinition[]) => {
     if (!editingRelease || editingRelease.topic !== topic) return null;
     const { release } = editingRelease;
