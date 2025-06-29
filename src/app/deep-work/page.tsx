@@ -168,7 +168,7 @@ function DeepWorkPageContent() {
     setDeepWorkDefinitions(prev => 
       prev.map(def => 
         def.id === id 
-          ? { ...def, isReadyForBranding: !def.isReadyForBranding } 
+          ? { ...def, isReadyForBranding: !def.isReadyForBranding, sharingStatus: def.isReadyForBranding ? def.sharingStatus : { twitter: false, linkedin: false, devto: false } }
           : def
       )
     );
@@ -322,7 +322,7 @@ function DeepWorkPageContent() {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const existingWorkout = allDeepWorkLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
-      const newSet: LoggedSet = { id: Date.now().toString(), reps, weight, timestamp: Date.now() };
+      const newSet: LoggedSet = { id: `${Date.now()}-${Math.random()}`, reps, weight, timestamp: Date.now() };
       const updatedExercises = existingWorkout.exercises.map(ex => 
         ex.id === exerciseId ? { ...ex, loggedSets: [...ex.loggedSets, newSet] } : ex
       );

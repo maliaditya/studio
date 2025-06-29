@@ -290,7 +290,7 @@ function UpskillPageContent() {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const existingWorkout = allUpskillLogs.find(log => log.id === dateKey);
     if (existingWorkout && currentUser?.username) {
-      const newSet: LoggedSet = { id: Date.now().toString(), reps, weight, timestamp: Date.now() };
+      const newSet: LoggedSet = { id: `${Date.now()}-${Math.random()}`, reps, weight, timestamp: Date.now() };
       const updatedExercises = existingWorkout.exercises.map(ex => 
         ex.id === exerciseId ? { ...ex, loggedSets: [...ex.loggedSets, newSet] } : ex
       );

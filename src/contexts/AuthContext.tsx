@@ -584,7 +584,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       
       const newSet: LoggedSet = {
-        id: Date.now().toString(),
+        id: `${Date.now()}-${Math.random()}`,
         reps: isUpskill ? duration : 1, // Store duration in reps for upskill, 1 for deepwork
         weight: isUpskill ? progress : duration, // Store progress in weight for upskill, duration for deepwork
         timestamp: Date.now(),
@@ -682,7 +682,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const dateKey = format(date, 'yyyy-MM-dd');
     const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
-      const newSet: LoggedSet = { id: Date.now().toString(), reps, weight, timestamp: Date.now() };
+      const newSet: LoggedSet = { id: `${Date.now()}-${Math.random()}`, reps, weight, timestamp: Date.now() };
       const updatedExercises = existingWorkout.exercises.map(ex => 
         ex.id === exerciseId ? { ...ex, loggedSets: [...ex.loggedSets, newSet] } : ex
       );
