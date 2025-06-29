@@ -156,12 +156,12 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             <Separator className="my-2" />
             <div className="relative">
               <h4 className="font-semibold mb-2 flex items-center gap-2"><Share2 /> Personal Branding</h4>
-               <motion.div layout className="h-24">
+               <motion.div layout>
                  {brandingItems.length > 0 ? (
                     <Carousel
                         items={brandingItems}
                         renderItem={(item: any) => (
-                             <div className="h-24 flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 cursor-pointer" onClick={() => router.push('/personal-branding')}>
+                             <div className="flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 cursor-pointer" onClick={() => router.push('/personal-branding')}>
                                 <div className="flex justify-between items-center">
                                   <h5 className="font-bold text-foreground text-base truncate" title={item.taskName}>{item.taskName}</h5>
                                    <div className="text-right text-xs ml-4 flex-shrink-0">
@@ -174,7 +174,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                         )}
                     />
                  ) : (
-                    <div className="text-sm text-muted-foreground p-2 h-24 flex flex-col justify-center">
+                    <div className="text-sm text-muted-foreground p-2 min-h-[6rem] flex flex-col justify-center">
                       <p>{stats.brandingStatus?.message || 'No branding tasks.'}</p>
                       <p className="text-xs mt-1">{stats.brandingStatus?.subMessage || ''}</p>
                     </div>
@@ -184,12 +184,12 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
              <Separator className="my-2" />
              <div className="relative">
               <h4 className="font-semibold mb-2 flex items-center gap-2"><Rocket /> Upcoming Roadmap</h4>
-               <motion.div layout className="h-24">
+               <motion.div layout>
                 {roadmapItems.length > 0 ? (
                     <Carousel
                       items={roadmapItems}
                       renderItem={(item: any) => (
-                        <div className="h-24 flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 cursor-pointer" onClick={() => router.push(item.type === 'product' ? '/productization' : '/offerization')}>
+                        <div className="flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 cursor-pointer" onClick={() => router.push(item.type === 'product' ? '/productization' : '/offerization')}>
                             <div className="flex justify-between items-start">
                                 <div className='min-w-0'>
                                     <p className="font-bold text-foreground truncate" title={item.release.name}>{item.release.name}</p>
@@ -207,7 +207,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                       )}
                     />
                 ) : (
-                    <div className="text-sm text-muted-foreground p-2 h-24 flex flex-col justify-center">
+                    <div className="text-sm text-muted-foreground p-2 min-h-[6rem] flex flex-col justify-center">
                     <p>No upcoming releases planned.</p>
                     <p className="text-xs mt-1">Go to Productization or Offerization to create a release plan.</p>
                     </div>
