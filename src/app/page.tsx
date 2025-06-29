@@ -552,8 +552,10 @@ function HomePageContent() {
           break;
         case 'deepwork':
         case 'branding':
-        case 'lead-generation':
           durations[activity.id] = slotTimeRanges[activity.slotName] || activity.slotName;
+          break;
+        case 'lead-generation':
+          durations[activity.id] = '45m';
           break;
         case 'upskill':
           if (activity.taskIds && activity.taskIds.length > 0) {
