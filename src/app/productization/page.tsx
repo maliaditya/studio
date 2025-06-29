@@ -235,36 +235,33 @@ function ProductizationPageContent() {
     toast({ title: "Publishing...", description: "Updating the public release plan for Life OS." });
 
     try {
-        const response = await fetch('/api/lifeos-releases', {
+        const response = await fetch('/api/publish-releases', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: currentUser?.username, releases: plan.releases }),
         });
 
-        const body = await response.text();
+        const bodyAsText = await response.text();
 
         if (!response.ok) {
             let errorMessage = `Request failed with status ${response.status}.`;
-            if (body) {
+            if (bodyAsText) {
                 try {
-                    const json = JSON.parse(body);
-                    // Use the server's error message if available
-                    errorMessage = json.error || body;
+                    const json = JSON.parse(bodyAsText);
+                    errorMessage = json.error || bodyAsText;
                 } catch (e) {
-                    // If the body is not JSON, use the raw text
-                    errorMessage = body;
+                    errorMessage = bodyAsText;
                 }
             } else if (response.statusText) {
-                // Fallback to statusText if body is empty
                 errorMessage = `Request failed with status ${response.status}: ${response.statusText}`;
             }
             throw new Error(errorMessage);
         }
 
         let successMessage = "Life OS release plan has been updated publicly.";
-        if (body) {
+        if (bodyAsText) {
             try {
-                const json = JSON.parse(body);
+                const json = JSON.parse(bodyAsText);
                 successMessage = json.message || successMessage;
             } catch (e) {
                 // Not an error if success response is not JSON

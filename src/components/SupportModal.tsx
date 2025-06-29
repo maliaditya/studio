@@ -40,7 +40,7 @@ export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
       const fetchReleases = async () => {
         setIsLoading(true);
         try {
-          const response = await fetch('/api/lifeos-releases');
+          const response = await fetch('/api/publish-releases');
           if (!response.ok) throw new Error('Failed to fetch releases');
           const data = await response.json();
           const futureReleases = (data.releases || [])
