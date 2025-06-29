@@ -202,7 +202,11 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                                     </p>
                                 </div>
                             </div>
-                            <p className="text-sm text-muted-foreground mt-1 truncate">{item.release.features?.length || 0} features planned.</p>
+                            <p className="text-sm text-muted-foreground mt-1 truncate">
+                              {item.release.features && item.release.features.length > 0
+                                ? `${item.release.features.length} features planned.`
+                                : "No features planned yet."}
+                            </p>
                         </div>
                       )}
                     />

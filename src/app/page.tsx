@@ -500,7 +500,10 @@ function HomePageContent() {
           Object.entries(productizationPlans).forEach(([topic, plan]) => {
               if (plan.releases) {
                   plan.releases.forEach(release => {
-                      allReleases.push({ topic, release, type: 'product' });
+                      const featureNames = (release.focusAreaIds || [])
+                          .map(id => deepWorkDefinitions.find(def => def.id === id)?.name)
+                          .filter((name): name is string => !!name);
+                      allReleases.push({ topic, release: { ...release, features: featureNames }, type: 'product' });
                   });
               }
           });
@@ -510,7 +513,10 @@ function HomePageContent() {
             Object.entries(offerizationPlans).forEach(([topic, plan]) => {
                 if (plan.releases) {
                     plan.releases.forEach(release => {
-                        allReleases.push({ topic, release, type: 'service' });
+                        const featureNames = (release.focusAreaIds || [])
+                            .map(id => deepWorkDefinitions.find(def => def.id === id)?.name)
+                            .filter((name): name is string => !!name);
+                        allReleases.push({ topic, release: { ...release, features: featureNames }, type: 'service' });
                     });
                 }
             });
