@@ -4,11 +4,11 @@
 import React, { useMemo } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import type { ProductizationPlan } from '@/types/workout';
 import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 interface MatrixRow {
     topic: string;
@@ -58,19 +58,28 @@ function MatrixPageContent() {
   
   const renderTextAsList = (text: string, className?: string) => {
     if (!text || text.trim() === '-' || text.trim() === '') {
-      return <p className={cn("text-xs text-muted-foreground", className)}>-</p>;
+      return <p className={cn("text-sm text-muted-foreground", className)}>-</p>;
     }
   
     if (text.includes('\n')) {
       return (
-        <ul className={cn("list-disc list-inside space-y-1 text-xs", className)}>
+        <ul className={cn("list-disc list-inside space-y-1 text-sm text-muted-foreground", className)}>
           {text.split('\n').filter(line => line.trim()).map((item, index) => (
             <li key={index}>{item.trim()}</li>
           ))}
         </ul>
       );
     }
-    return <p className={cn("text-xs", className)}>{text}</p>;
+    return <p className={cn("text-sm text-muted-foreground", className)}>{text}</p>;
+  };
+
+  const getStatusVariant = (status: MatrixRow['status']): "destructive" | "secondary" | "outline" => {
+    switch (status) {
+      case 'In Progress': return 'destructive';
+      case 'Defined': return 'secondary';
+      case 'Planning':
+      default: return 'outline';
+    }
   };
 
 
@@ -82,57 +91,54 @@ function MatrixPageContent() {
           <CardDescription>A consolidated view of all your defined product and service initiatives based on your gap analysis.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[150px]">Topic</TableHead>
-                  <TableHead>Format</TableHead>
-                  <TableHead>Gap Type</TableHead>
-                  <TableHead>What You Can Fill</TableHead>
-                  <TableHead>Core Solution</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Outcome Goal</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {matrixData.length > 0 ? (
-                  matrixData.map((row) => (
-                    <TableRow key={row.topic}>
-                      <TableCell className="font-medium align-top">{row.topic}</TableCell>
-                      <TableCell className="align-top">
-                        <p className="font-medium text-xs">{row.offerType}</p>
-                        <Badge variant={row.classification === 'product' ? 'default' : 'secondary'} className="capitalize text-xs mt-1">{row.classification}</Badge>
-                      </TableCell>
-                      <TableCell className="align-top">
-                        <div className="flex flex-wrap gap-1">
-                          {row.gapTypes.map((gt, i) => <Badge key={`${gt}-${i}`} variant="outline" className="text-xs whitespace-nowrap">{gt}</Badge>)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="align-top">
-                        {renderTextAsList(row.whatYouCanFill)}
-                      </TableCell>
-                      <TableCell className="align-top">
-                        {renderTextAsList(row.coreSolution, "font-semibold")}
-                      </TableCell>
-                       <TableCell className="align-top">
-                          <Badge variant={row.status === 'In Progress' ? 'destructive' : 'outline'}>{row.status}</Badge>
-                       </TableCell>
-                      <TableCell className="align-top">
-                        {renderTextAsList(row.outcomeGoal)}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">
-                      No product or service plans with gap analysis defined. Go to Productization or Offerization to get started.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          {matrixData.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {matrixData.map((row) => (
+                    <Card key={row.topic} className="flex flex-col shadow-md hover:shadow-lg transition-shadow">
+                        <CardHeader>
+                            <div className="flex justify-between items-start gap-4">
+                                <CardTitle className="text-lg">{row.topic}</CardTitle>
+                                <Badge variant={getStatusVariant(row.status)}>{row.status}</Badge>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="flex-grow flex flex-col space-y-4">
+                             <div>
+                                <h4 className="font-semibold text-sm">Format</h4>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <p className="text-sm font-medium">{row.offerType}</p>
+                                    <Badge variant={row.classification === 'product' ? 'default' : 'secondary'} className="capitalize text-xs">{row.classification}</Badge>
+                                </div>
+                            </div>
+                            <Separator/>
+                            <div className='flex-grow'>
+                                <h4 className="font-semibold text-sm mb-2">Gap Analysis</h4>
+                                {row.gapTypes.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mb-3">
+                                        {row.gapTypes.map((gt, i) => <Badge key={`${gt}-${i}`} variant="outline" className="text-xs whitespace-nowrap">{gt}</Badge>)}
+                                    </div>
+                                )}
+                                <h5 className="font-medium text-xs text-muted-foreground">What You Can Fill</h5>
+                                {renderTextAsList(row.whatYouCanFill)}
+                            </div>
+                            <Separator/>
+                            <div>
+                                <h4 className="font-semibold text-sm mb-1">Core Solution</h4>
+                                {renderTextAsList(row.coreSolution, "text-foreground font-medium")}
+                            </div>
+                             <Separator/>
+                            <div>
+                                <h4 className="font-semibold text-sm mb-1">Outcome Goal</h4>
+                                {renderTextAsList(row.outcomeGoal)}
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+           ) : (
+            <div className="h-48 flex items-center justify-center text-center text-muted-foreground border-2 border-dashed rounded-lg">
+                <p>No product or service plans with gap analysis defined. <br/> Go to Productization or Offerization to get started.</p>
+            </div>
+           )}
         </CardContent>
       </Card>
     </div>
