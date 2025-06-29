@@ -12,13 +12,12 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { WorkoutExercise, Activity, ExerciseDefinition } from '@/types/workout';
-import { Dumbbell, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Dumbbell, CheckCircle2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { WorkoutExerciseCard } from './WorkoutExerciseCard';
 import { useToast } from '@/hooks/use-toast';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 interface TodaysWorkoutModalProps {
   isOpen: boolean;
@@ -108,49 +107,16 @@ export function TodaysWorkoutModal({
                     );
                     
                     return (
-                      <div key={exercise.id} className="flex flex-col gap-2">
-                        <WorkoutExerciseCard 
-                            exercise={exercise}
-                            onLogSet={(...args) => logWorkoutSet(today, ...args)} 
-                            onDeleteSet={(...args) => deleteWorkoutSet(today, ...args)} 
-                            onUpdateSet={(...args) => updateWorkoutSet(today, ...args)} 
-                            onRemoveExercise={(...args) => removeExerciseFromWorkout(today, ...args)}
-                        />
-                        <div className="flex justify-end">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" size="sm" className="h-8">
-                                <RefreshCw className="mr-2 h-4 w-4" />
-                                Swap Exercise
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-64 p-0">
-                              {swappableExercises.length > 0 ? (
-                                <ScrollArea className="h-[200px]">
-                                  <div className="p-2">
-                                    {swappableExercises.map(def => (
-                                      <Button
-                                        key={def.id}
-                                        variant="ghost"
-                                        className="w-full justify-start h-9"
-                                        onClick={() => {
-                                          swapWorkoutExercise(today, exercise.id, def)
-                                        }}
-                                      >
-                                        {def.name}
-                                      </Button>
-                                    ))}
-                                  </div>
-                                </ScrollArea>
-                              ) : (
-                                <p className="p-4 text-sm text-center text-muted-foreground">
-                                  No other exercises in this category.
-                                </p>
-                              )}
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
+                      <WorkoutExerciseCard 
+                          key={exercise.id}
+                          exercise={exercise}
+                          onLogSet={(...args) => logWorkoutSet(today, ...args)} 
+                          onDeleteSet={(...args) => deleteWorkoutSet(today, ...args)} 
+                          onUpdateSet={(...args) => updateWorkoutSet(today, ...args)} 
+                          onRemoveExercise={(...args) => removeExerciseFromWorkout(today, ...args)}
+                          onSwapExercise={(newDef) => swapWorkoutExercise(today, exercise.id, newDef)}
+                          swappableExercises={swappableExercises}
+                      />
                     )
                   })}
                 </div>

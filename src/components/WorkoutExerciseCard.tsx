@@ -5,13 +5,15 @@ import React, { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Trash2, CheckSquare, Edit2, Save, X, Youtube, TrendingUp, Check, Linkedin } from 'lucide-react';
-import { WorkoutExercise, LoggedSet, TopicGoal, SharingStatus } from '@/types/workout';
+import { PlusCircle, Trash2, CheckSquare, Edit2, Save, X, Youtube, TrendingUp, Check, Linkedin, RefreshCw } from 'lucide-react';
+import { WorkoutExercise, LoggedSet, TopicGoal, SharingStatus, ExerciseDefinition } from '@/types/workout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Checkbox } from './ui/checkbox';
 import { Badge } from './ui/badge';
 import { format } from 'date-fns';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from './ui/scroll-area';
 
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -36,6 +38,8 @@ interface WorkoutExerciseCardProps {
   onRemoveExercise: (exerciseId: string) => void;
   onViewProgress?: () => void;
   onUpdateSharingStatus?: (definitionId: string, newStatus: SharingStatus) => void;
+  onSwapExercise?: (newExerciseDefinition: ExerciseDefinition) => void;
+  swappableExercises?: ExerciseDefinition[];
   pageType?: 'workout' | 'upskill' | 'deepwork' | 'branding' | 'lead-generation' | 'offer-system';
 }
 
@@ -48,6 +52,8 @@ export function WorkoutExerciseCard({
   onRemoveExercise,
   onViewProgress,
   onUpdateSharingStatus,
+  onSwapExercise,
+  swappableExercises,
   pageType = 'workout'
 }: WorkoutExerciseCardProps) {
   const [reps, setReps] = useState('');
@@ -424,6 +430,37 @@ export function WorkoutExerciseCard({
                     <Youtube className="h-4 w-4 text-muted-foreground hover:text-red-500" />
                 </Button>
              )}
+            {pageType === 'workout' && onSwapExercise && swappableExercises && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Swap ${exercise.name}`}>
+                      <RefreshCw className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-0">
+                    {swappableExercises.length > 0 ? (
+                      <ScrollArea className="h-[200px]">
+                        <div className="p-2">
+                          {swappableExercises.map(def => (
+                            <Button
+                              key={def.id}
+                              variant="ghost"
+                              className="w-full justify-start h-9"
+                              onClick={() => onSwapExercise(def)}
+                            >
+                              {def.name}
+                            </Button>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    ) : (
+                      <p className="p-4 text-sm text-center text-muted-foreground">
+                        No other exercises in this category.
+                      </p>
+                    )}
+                  </PopoverContent>
+                </Popover>
+            )}
             <Button variant="ghost" size="icon" onClick={() => onRemoveExercise(exercise.id)} className="h-7 w-7" aria-label={`Remove ${exercise.name} from workout`}>
               <Trash2 className="h-4 w-4 text-destructive hover:text-destructive/80" />
             </Button>
