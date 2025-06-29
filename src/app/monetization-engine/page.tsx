@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo } from 'react';
@@ -15,10 +14,10 @@ function MonetizationEnginePageContent() {
   const router = useRouter();
 
   const offerSystemItems = [
-    "Freelance Service",
-    "Productized Offer",
-    "Job Search (Portfolio + Resume Funnel)",
-    "Coach/Guide (Session Booking)",
+    "Define your freelance services",
+    "Add a “Hire Me” or “Work With Me” section on your site",
+    "Create pricing packages (if freelance)",
+    "Upload a resume and list job roles you’re open for (if job search)",
   ];
 
   const salesSystemItems = [
@@ -75,15 +74,18 @@ function MonetizationEnginePageContent() {
         </Card>
 
         {/* Offer System */}
-        <Card>
+        <Card className="flex flex-col">
           <CardHeader>
             <CardTitle className="flex items-center gap-3 text-xl">
               <Package className="h-6 w-6 text-primary" />
               Offer System
             </CardTitle>
-            <CardDescription>Define what you sell or provide.</CardDescription>
+            <CardDescription>
+              <span className="font-semibold block mt-2">"What do you offer?"</span>
+              This is your product/service definition — what people are hiring you for.
+            </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-grow">
             <ul className="space-y-3">
               {offerSystemItems.map((item, index) => (
                 <li key={index} className="flex items-start gap-3">
@@ -93,10 +95,15 @@ function MonetizationEnginePageContent() {
               ))}
             </ul>
           </CardContent>
+          <CardFooter>
+            <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+              📌 Goal: Show exactly what you do and how someone can work with you
+            </p>
+          </CardFooter>
         </Card>
 
         {/* Sales System */}
-        <Card>
+        <Card className="flex flex-col">
           <CardHeader>
             <CardTitle className="flex items-center gap-3 text-xl">
               <MessageCircle className="h-6 w-6 text-primary" />
@@ -104,7 +111,7 @@ function MonetizationEnginePageContent() {
             </CardTitle>
             <CardDescription>Convert leads into commitments.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-grow">
             <ul className="space-y-3">
               {salesSystemItems.map((item, index) => (
                 <li key={index} className="flex items-start gap-3">
