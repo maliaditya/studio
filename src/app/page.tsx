@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysLearningModal } from '@/components/TodaysLearningModal';
 import { TodaysLeadGenModal } from '@/components/TodaysLeadGenModal';
+import { TodaysOfferSystemModal } from '@/components/TodaysOfferSystemModal';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
 import { DietPlanModal } from '@/components/DietPlanModal';
 import { StatsOverviewModal } from '@/components/StatsOverviewModal';
@@ -100,6 +101,7 @@ function HomePageContent() {
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
   const [isLearningModalOpen, setIsLearningModalOpen] = useState(false);
   const [isLeadGenModalOpen, setIsLeadGenModalOpen] = useState(false);
+  const [isOfferSystemModalOpen, setIsOfferSystemModalOpen] = useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<{ slotName: string; activity: Activity } | null>(null);
@@ -198,6 +200,7 @@ function HomePageContent() {
       case 'tracking': details = 'Tracking Session'; break;
       case 'branding': details = 'Branding Session'; break;
       case 'lead-generation': details = 'Lead Generation Session'; break;
+      case 'offer-system': details = 'Offer System Session'; break;
     }
     const newActivity: Activity = { 
       id: `${type}-${Date.now()}`, 
@@ -240,6 +243,11 @@ function HomePageContent() {
     setIsLeadGenModalOpen(true);
   };
 
+  const handleStartOfferSystemLog = (activity: Activity) => {
+    setWorkoutActivityToLog(activity);
+    setIsOfferSystemModalOpen(true);
+  };
+
   const handleActivityClick = (slotName: string, activity: Activity) => {
     if (!activity || activity.completed) return;
     if (activity.type === 'workout') {
@@ -249,6 +257,8 @@ function HomePageContent() {
       setIsLearningModalOpen(true);
     } else if (activity.type === 'lead-generation') {
       handleStartLeadGenLog(activity);
+    } else if (activity.type === 'offer-system') {
+      handleStartOfferSystemLog(activity);
     }
   };
 
@@ -555,6 +565,7 @@ function HomePageContent() {
           durations[activity.id] = slotTimeRanges[activity.slotName] || activity.slotName;
           break;
         case 'lead-generation':
+        case 'offer-system':
           durations[activity.id] = '45m';
           break;
         case 'upskill':
@@ -776,6 +787,7 @@ function HomePageContent() {
                         onLogLearning={handleLogLearning}
                         onStartWorkoutLog={handleStartWorkoutLog}
                         onStartLeadGenLog={handleStartLeadGenLog}
+                        onStartOfferSystemLog={handleStartOfferSystemLog}
                     />
                 )}
                 <WeightGoalCard 
@@ -817,6 +829,7 @@ function HomePageContent() {
                 onLogLearning={handleLogLearning}
                 onStartWorkoutLog={handleStartWorkoutLog}
                 onStartLeadGenLog={handleStartLeadGenLog}
+                onStartOfferSystemLog={handleStartOfferSystemLog}
             />
         )}
 
@@ -838,6 +851,18 @@ function HomePageContent() {
             <TodaysLeadGenModal
                 isOpen={isLeadGenModalOpen}
                 onOpenChange={setIsLeadGenModalOpen}
+                activityToLog={workoutActivityToLog}
+                onActivityComplete={(slotName, activityId) => {
+                    handleToggleComplete(slotName, activityId);
+                    setWorkoutActivityToLog(null);
+                }}
+            />
+        )}
+
+        {currentUser && (
+            <TodaysOfferSystemModal
+                isOpen={isOfferSystemModalOpen}
+                onOpenChange={setIsOfferSystemModalOpen}
                 activityToLog={workoutActivityToLog}
                 onActivityComplete={(slotName, activityId) => {
                     handleToggleComplete(slotName, activityId);

@@ -36,7 +36,7 @@ interface WorkoutExerciseCardProps {
   onRemoveExercise: (exerciseId: string) => void;
   onViewProgress?: () => void;
   onUpdateSharingStatus?: (definitionId: string, newStatus: SharingStatus) => void;
-  pageType?: 'workout' | 'upskill' | 'deepwork' | 'branding' | 'lead-generation';
+  pageType?: 'workout' | 'upskill' | 'deepwork' | 'branding' | 'lead-generation' | 'offer-system';
 }
 
 export function WorkoutExerciseCard({
@@ -166,7 +166,7 @@ export function WorkoutExerciseCard({
     if (pageType === 'branding') {
         return `Progress: ${exercise.loggedSets.length} / 4 stages complete.`
     }
-    if (pageType === 'lead-generation') {
+    if (pageType === 'lead-generation' || pageType === 'offer-system') {
         return `Progress: ${exercise.loggedSets.length} / ${exercise.targetSets} actions logged.`
     }
     return `Target: ${exercise.targetSets} sessions of ${exercise.targetReps} min. Progress: ${exercise.loggedSets.length}/${exercise.targetSets} sessions.`;
@@ -183,7 +183,7 @@ export function WorkoutExerciseCard({
         const stages = ['Create', 'Optimize', 'Review', 'Final Review'];
         return `Stage complete: <strong>${stages[set.reps - 1]}</strong>`;
     }
-    if (pageType === 'lead-generation') {
+    if (pageType === 'lead-generation' || pageType === 'offer-system') {
       return `Action logged at ${format(set.timestamp, 'p')}`;
     }
     return `Session ${exercise.loggedSets.length - index}: <strong>${set.weight}</strong> min`;
@@ -250,7 +250,7 @@ export function WorkoutExerciseCard({
       )
   }
 
-  const renderLeadGenerationContent = () => (
+  const renderSimpleLogContent = () => (
     <div className='space-y-3'>
         {exercise.description && (
             <p className="text-sm text-muted-foreground">{exercise.description}</p>
@@ -386,6 +386,18 @@ export function WorkoutExerciseCard({
     </>
   )
 
+  const renderContent = () => {
+    switch (pageType) {
+      case 'branding':
+        return renderBrandingContent();
+      case 'lead-generation':
+      case 'offer-system':
+        return renderSimpleLogContent();
+      default:
+        return renderDefaultContent();
+    }
+  }
+
   return (
     <motion.div
       layout
@@ -421,9 +433,7 @@ export function WorkoutExerciseCard({
           <p className="text-xs text-muted-foreground mb-2">
             {getProgressText()}
           </p>
-          {pageType === 'branding' ? renderBrandingContent() : 
-           pageType === 'lead-generation' ? renderLeadGenerationContent() :
-           renderDefaultContent()}
+          {renderContent()}
         </CardContent>
       </Card>
     </motion.div>

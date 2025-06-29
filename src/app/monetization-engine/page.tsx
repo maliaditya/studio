@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo } from 'react';
@@ -10,15 +11,8 @@ import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 
 function MonetizationEnginePageContent() {
-  const { deepWorkDefinitions, leadGenDefinitions } = useAuth();
+  const { deepWorkDefinitions, leadGenDefinitions, offerSystemDefinitions } = useAuth();
   const router = useRouter();
-
-  const offerSystemItems = [
-    "Define your freelance services",
-    "Add a “Hire Me” or “Work With Me” section on your site",
-    "Create pricing packages (if freelance)",
-    "Upload a resume and list job roles you’re open for (if job search)",
-  ];
 
   const salesSystemItems = [
     "Auto-reply template for inbound DMs",
@@ -87,18 +81,18 @@ function MonetizationEnginePageContent() {
           </CardHeader>
           <CardContent className="flex-grow">
             <ul className="space-y-3">
-              {offerSystemItems.map((item, index) => (
+              {offerSystemDefinitions.map((item, index) => (
                 <li key={index} className="flex items-start gap-3">
                   <Check className="h-5 w-5 text-green-500 mt-1 flex-shrink-0" />
-                  <span className="text-muted-foreground">{item}</span>
+                  <span className="text-muted-foreground">{item.name}</span>
                 </li>
               ))}
             </ul>
           </CardContent>
           <CardFooter>
-            <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-              📌 Goal: Show exactly what you do and how someone can work with you
-            </p>
+             <Button className="w-full" onClick={() => router.push('/offer-system')}>
+              Go to Offer System Dashboard <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
           </CardFooter>
         </Card>
 

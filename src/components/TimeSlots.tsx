@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import {
   Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, PlusCircle, Trash2,
-  Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet
+  Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, Package
 } from 'lucide-react';
 import type { ActivityType, Activity, DailySchedule } from '@/types/workout';
 
@@ -30,6 +30,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
   tracking: <ClipboardCheck className="h-5 w-5 text-primary" />,
   branding: <Share2 className="h-5 w-5 text-primary" />,
   'lead-generation': <Magnet className="h-5 w-5 text-primary" />,
+  'offer-system': <Package className="h-5 w-5 text-primary" />,
 };
 
 interface TimeSlotsProps {
@@ -96,7 +97,7 @@ export function TimeSlots({
                               {activity.details}
                             </p>
                             <p className="text-xs text-muted-foreground capitalize">
-                              {activity.type === 'deepwork' ? 'Deep Work' : activity.type === 'branding' ? 'Personal Branding' : activity.type === 'lead-generation' ? 'Lead Generation' : activity.type}
+                              {activity.type === 'deepwork' ? 'Deep Work' : activity.type === 'branding' ? 'Personal Branding' : activity.type === 'lead-generation' ? 'Lead Generation' : activity.type.replace('-', ' ')}
                             </p>
                           </div>
                         </div>
@@ -157,6 +158,10 @@ export function TimeSlots({
                        <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'lead-generation')}>
                         <Magnet className="h-4 w-4 mr-2" />
                         Add Lead Gen
+                      </Button>
+                       <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'offer-system')}>
+                        <Package className="h-4 w-4 mr-2" />
+                        Add Offer System
                       </Button>
                       <Separator className="my-1" />
                       <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'planning')}>

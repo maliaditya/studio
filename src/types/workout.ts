@@ -12,6 +12,7 @@ export type ExerciseCategory =
   | "Full Body"
   | "Content Bundle"
   | "Lead Generation"
+  | "Offer System"
   | "Other";
 
 export const exerciseCategories: ExerciseCategory[] = [
@@ -138,7 +139,7 @@ export interface EditableMealPlan {
 export type UserDietPlan = EditableMealPlan[];
 
 // Types for homepage schedule
-export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation';
+export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation' | 'offer-system';
 
 export type Activity = {
   id: string;

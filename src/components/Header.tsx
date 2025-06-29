@@ -33,6 +33,7 @@ export function Header() {
     { href: '/deep-work', label: 'Deep Work' },
     { href: '/personal-branding', label: 'Personal Branding' },
     { href: '/lead-generation', label: 'Lead Gen' },
+    { href: '/offer-system', label: 'Offer System' },
     { href: '/monetization-engine', label: 'Monetization' },
     { href: '/leverage-system', label: 'Leverage' },
   ];

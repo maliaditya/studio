@@ -12,7 +12,7 @@ import {
   getCurrentLocalUser,
 } from '@/lib/localAuth';
 import { format } from 'date-fns';
-import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS } from '@/lib/constants';
+import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, OFFER_SYSTEM_DEFINITIONS } from '@/lib/constants';
 
 
 interface AuthContextType {
@@ -67,6 +67,8 @@ interface AuthContextType {
   setAllBrandingLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   allLeadGenLogs: DatedWorkout[];
   setAllLeadGenLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
+  allOfferSystemLogs: DatedWorkout[];
+  setAllOfferSystemLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   
   // Data Definitions & Plans
   workoutMode: WorkoutMode;
@@ -86,6 +88,9 @@ interface AuthContextType {
   
   leadGenDefinitions: ExerciseDefinition[];
   setLeadGenDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
+  
+  offerSystemDefinitions: ExerciseDefinition[];
+  setOfferSystemDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
 
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
@@ -131,6 +136,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
   const [brandingLogs, setAllBrandingLogs] = useState<DatedWorkout[]>([]);
   const [allLeadGenLogs, setAllLeadGenLogs] = useState<DatedWorkout[]>([]);
+  const [allOfferSystemLogs, setAllOfferSystemLogs] = useState<DatedWorkout[]>([]);
   const [activityDurations, setActivityDurations] = useState<Record<string, string>>({});
   
   // Data Definitions & Plans
@@ -141,6 +147,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [topicGoals, setTopicGoals] = useState<Record<string, TopicGoal>>({});
   const [deepWorkDefinitions, setDeepWorkDefinitions] = useState<ExerciseDefinition[]>([]);
   const [leadGenDefinitions, setLeadGenDefinitions] = useState<ExerciseDefinition[]>(LEAD_GEN_DEFINITIONS);
+  const [offerSystemDefinitions, setOfferSystemDefinitions] = useState<ExerciseDefinition[]>(OFFER_SYSTEM_DEFINITIONS);
 
 
   useEffect(() => {
@@ -180,6 +187,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = localStorage.getItem(`allWorkoutLogs_${username}`); setAllWorkoutLogs(d ? JSON.parse(d) : []); } catch (e) { setAllWorkoutLogs([]); }
       try { const d = localStorage.getItem(`branding_logs_${username}`); setAllBrandingLogs(d ? JSON.parse(d) : []); } catch (e) { setAllBrandingLogs([]); }
       try { const d = localStorage.getItem(`leadgen_logs_${username}`); setAllLeadGenLogs(d ? JSON.parse(d) : []); } catch (e) { setAllLeadGenLogs([]); }
+      try { const d = localStorage.getItem(`offer_system_logs_${username}`); setAllOfferSystemLogs(d ? JSON.parse(d) : []); } catch (e) { setAllOfferSystemLogs([]); }
       
       // Definitions, Plans, and Goals
       const storedMode = loadItem(`workoutMode_${username}`, false);
@@ -190,15 +198,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`upskill_topic_goals_${username}`); setTopicGoals(d ? JSON.parse(d) : {}); } catch (e) { setTopicGoals({}); }
       try { const d = loadItem(`deepwork_definitions_${username}`); setDeepWorkDefinitions(d ? JSON.parse(d) : []); } catch (e) { setDeepWorkDefinitions([]); }
       try { const d = loadItem(`leadgen_definitions_${username}`); setLeadGenDefinitions(d ? JSON.parse(d) : LEAD_GEN_DEFINITIONS); } catch (e) { setLeadGenDefinitions(LEAD_GEN_DEFINITIONS); }
+      try { const d = loadItem(`offer_system_definitions_${username}`); setOfferSystemDefinitions(d ? JSON.parse(d) : OFFER_SYSTEM_DEFINITIONS); } catch (e) { setOfferSystemDefinitions(OFFER_SYSTEM_DEFINITIONS); }
 
     } else {
       // Clear all data on logout
       setWeightLogs([]); setGoalWeight(null); setHeight(null); setDateOfBirth(null); setGender(null); setDietPlan([]);
       setSchedule({});
-      setAllUpskillLogs([]); setAllDeepWorkLogs([]); setAllWorkoutLogs([]); setAllBrandingLogs([]); setAllLeadGenLogs([]);
+      setAllUpskillLogs([]); setAllDeepWorkLogs([]); setAllWorkoutLogs([]); setAllBrandingLogs([]); setAllLeadGenLogs([]); setAllOfferSystemLogs([]);
       setWorkoutMode('two-muscle'); setWorkoutPlans(INITIAL_PLANS); setExerciseDefinitions(DEFAULT_EXERCISE_DEFINITIONS);
       setUpskillDefinitions([]); setTopicGoals({});
-      setDeepWorkDefinitions([]); setLeadGenDefinitions(LEAD_GEN_DEFINITIONS);
+      setDeepWorkDefinitions([]); setLeadGenDefinitions(LEAD_GEN_DEFINITIONS); setOfferSystemDefinitions(OFFER_SYSTEM_DEFINITIONS);
     }
   }, [currentUser]);
 
@@ -221,6 +230,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(allWorkoutLogs));
       localStorage.setItem(`branding_logs_${username}`, JSON.stringify(brandingLogs));
       localStorage.setItem(`leadgen_logs_${username}`, JSON.stringify(allLeadGenLogs));
+      localStorage.setItem(`offer_system_logs_${username}`, JSON.stringify(allOfferSystemLogs));
 
       // Definitions, Plans, and Goals
       localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(exerciseDefinitions));
@@ -230,11 +240,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`upskill_topic_goals_${username}`, JSON.stringify(topicGoals));
       localStorage.setItem(`deepwork_definitions_${username}`, JSON.stringify(deepWorkDefinitions));
       localStorage.setItem(`leadgen_definitions_${username}`, JSON.stringify(leadGenDefinitions));
+      localStorage.setItem(`offer_system_definitions_${username}`, JSON.stringify(offerSystemDefinitions));
     }
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
-    schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
-    exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions,
+    schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allOfferSystemLogs,
+    exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, offerSystemDefinitions,
     currentUser, loading
   ]);
 
@@ -271,6 +282,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setLeadGenDefinitions(data.leadGenDefinitions || LEAD_GEN_DEFINITIONS);
     setAllLeadGenLogs(data.allLeadGenLogs || []);
+
+    setOfferSystemDefinitions(data.offerSystemDefinitions || OFFER_SYSTEM_DEFINITIONS);
+    setAllOfferSystemLogs(data.allOfferSystemLogs || []);
     
     setSchedule(data.schedule || {});
 
@@ -330,6 +344,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       deepWorkDefinitions, deepWorkLogs: allDeepWorkLogs,
       brandingLogs,
       leadGenDefinitions, allLeadGenLogs,
+      offerSystemDefinitions, allOfferSystemLogs,
       schedule,
       dietPlan, weightLogs, goalWeight, height, dateOfBirth, gender,
     };
@@ -719,11 +734,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule, setSchedule, isAgendaDocked, setIsAgendaDocked, activityDurations, setActivityDurations,
     handleToggleComplete, handleLogLearning, carryForwardTask,
-    allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs, allLeadGenLogs, setAllLeadGenLogs,
+    allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs, allLeadGenLogs, setAllLeadGenLogs, allOfferSystemLogs, setAllOfferSystemLogs,
     workoutMode, setWorkoutMode, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
     upskillDefinitions, setUpskillDefinitions, topicGoals, setTopicGoals,
     deepWorkDefinitions, setDeepWorkDefinitions,
     leadGenDefinitions, setLeadGenDefinitions,
+    offerSystemDefinitions, setOfferSystemDefinitions,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
   };
 
