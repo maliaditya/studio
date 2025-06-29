@@ -86,7 +86,7 @@ function HomePageContent() {
     isAgendaDocked, setIsAgendaDocked,
     handleToggleComplete, handleLogLearning,
     workoutMode, workoutPlans, exerciseDefinitions,
-    upskillDefinitions, topicGoals, deepWorkDefinitions, brandingLogs,
+    upskillDefinitions, topicGoals, deepWorkDefinitions,
     leadGenDefinitions
   } = useAuth();
   const { toast } = useToast();
@@ -270,7 +270,7 @@ function HomePageContent() {
       logSource = allDeepWorkLogs;
     } else { // branding
       logsUpdater = setAllBrandingLogs;
-      definitionSource = deepWorkDefinitions.filter(def => def.category === "Content Bundle");
+      definitionSource = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreas));
       logSource = brandingLogs;
     }
 
@@ -457,7 +457,7 @@ function HomePageContent() {
               };
           }
           
-          const readyForBrandingCount = deepWorkDefinitions.filter(def => def.isReadyForBranding && def.category !== "Content Bundle").length;
+          const readyForBrandingCount = deepWorkDefinitions.filter(def => def.isReadyForBranding && !Array.isArray(def.focusAreas)).length;
 
           if (readyForBrandingCount > 0) {
               return {
@@ -678,7 +678,7 @@ function HomePageContent() {
       definitionSource = deepWorkDefinitions;
     } else { // branding
       logSource = brandingLogs;
-      definitionSource = deepWorkDefinitions.filter(def => def.category === "Content Bundle");
+      definitionSource = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreas));
     }
     
     // These are the WorkoutExercise objects already created for today.
@@ -772,6 +772,7 @@ function HomePageContent() {
                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
                         onLogLearning={handleLogLearning}
                         onStartWorkoutLog={handleStartWorkoutLog}
+                        onStartLeadGenLog={handleStartLeadGenLog}
                     />
                 )}
                 <WeightGoalCard 
@@ -812,6 +813,7 @@ function HomePageContent() {
                 onToggleDock={() => setIsAgendaDocked(prev => !prev)}
                 onLogLearning={handleLogLearning}
                 onStartWorkoutLog={handleStartWorkoutLog}
+                onStartLeadGenLog={handleStartLeadGenLog}
             />
         )}
 
