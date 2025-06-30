@@ -405,8 +405,7 @@ function MindMapPageContent() {
         "flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border",
         isLoggedToday && "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700",
         isScheduledToday && !isLoggedToday && "bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700",
-        isPending && "bg-orange-100 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700",
-        isPastAndDone && "bg-gray-100 border-gray-300 dark:bg-gray-800/20 dark:border-gray-700"
+        isPending && "bg-orange-100 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700"
       )}>
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted flex-shrink-0">
@@ -439,7 +438,7 @@ function MindMapPageContent() {
                 )}
             </div>
         ) : isPastAndDone ? (
-            <div className="mt-1 pt-1 border-t border-gray-300/50 flex items-center gap-1.5 text-xs text-green-800 dark:text-green-400">
+            <div className="mt-1 pt-1 border-t flex items-center gap-1.5 text-xs text-green-800 dark:text-green-400">
                 <Check className="h-4 w-4 flex-shrink-0" />
                 <span className="font-medium">Completed in Past</span>
             </div>
@@ -542,5 +541,8 @@ export default function MindMapPage() {
     
 
     
+
+    
+
 
     
