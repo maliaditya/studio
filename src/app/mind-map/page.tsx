@@ -204,6 +204,28 @@ function MindMapPageContent() {
     return pendingInfo;
   }, [schedule, allUpskillLogs, allDeepWorkLogs]);
 
+  const pastCompletedTaskInfo = useMemo(() => {
+    const info = new Set<string>();
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+    const processLogs = (logs: DatedWorkout[]) => {
+        (logs || []).forEach(log => {
+            if (log.date < todayStr) {
+                (log.exercises || []).forEach(ex => {
+                    if ((ex.loggedSets || []).length > 0) {
+                        info.add(ex.definitionId);
+                    }
+                });
+            }
+        });
+    };
+
+    processLogs(allUpskillLogs);
+    processLogs(allDeepWorkLogs);
+
+    return info;
+  }, [allUpskillLogs, allDeepWorkLogs]);
+
 
   const toggleFullScreen = () => {
     if (!containerRef.current) return;
@@ -364,10 +386,13 @@ function MindMapPageContent() {
 
     const loggedInfo = loggedTaskInfo[node.definitionId];
     const scheduledInfo = scheduledTaskInfo.get(node.definitionId);
-    const pendingInfoForNode = pendingTaskInfo.get(node.definitionId);
+    const pendingInfoForNode = pendingInfo.get(node.definitionId);
+    const isCompletedInPast = pastCompletedTaskInfo.has(node.definitionId);
+
     const isLoggedToday = !!loggedInfo;
     const isScheduledToday = !!scheduledInfo;
     const isPending = !!pendingInfoForNode && !isLoggedToday && !isScheduledToday;
+    const isPastAndDone = isCompletedInPast && !isLoggedToday && !isScheduledToday && !isPending;
 
     let daysPending = 0;
     if (isPending && pendingInfoForNode) {
@@ -380,7 +405,8 @@ function MindMapPageContent() {
         "flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border",
         isLoggedToday && "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700",
         isScheduledToday && !isLoggedToday && "bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700",
-        isPending && "bg-orange-100 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700"
+        isPending && "bg-orange-100 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700",
+        isPastAndDone && "bg-gray-100 border-gray-300 dark:bg-gray-800/20 dark:border-gray-700"
       )}>
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted flex-shrink-0">
@@ -411,6 +437,11 @@ function MindMapPageContent() {
                 {daysPending > 0 && (
                     <Badge variant="destructive" className="ml-auto text-xs font-mono">{daysPending}d</Badge>
                 )}
+            </div>
+        ) : isPastAndDone ? (
+            <div className="mt-1 pt-1 border-t border-gray-300/50 flex items-center gap-1.5 text-xs text-gray-800 dark:text-gray-400">
+                <Check className="h-4 w-4 flex-shrink-0" />
+                <span className="font-medium">Completed in Past</span>
             </div>
         ) : null}
       </div>
@@ -503,6 +534,8 @@ export default function MindMapPage() {
         </AuthGuard>
     )
 }
+
+    
 
     
 
