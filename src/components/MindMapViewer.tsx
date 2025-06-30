@@ -338,8 +338,17 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
               totalLoggedHours: totalMinutes > 0 ? totalMinutes / 60 : 0
             };
         });
+
+        const totalTopicHours = releaseNodes.reduce((sum, release) => sum + (release.totalLoggedHours || 0), 0);
         const classification = deepWorkTopicMetadata[topic]?.classification || 'Topic';
-        return { id: topic, definitionId: topic, name: topic, category: classification, children: releaseNodes };
+        return { 
+            id: topic, 
+            definitionId: topic, 
+            name: topic, 
+            category: classification, 
+            children: releaseNodes,
+            totalLoggedHours: totalTopicHours > 0 ? totalTopicHours : undefined
+        };
     };
 
     if (selectedTopic === 'Strategic Overview') {
@@ -466,7 +475,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
           </div>
         </div>
 
-        {node.category === 'Release' && node.totalLoggedHours && node.totalLoggedHours > 0 && (
+        {(node.category === 'Release' || node.category === 'product' || node.category === 'service') && node.totalLoggedHours && node.totalLoggedHours > 0 && (
           <div className="mt-1 pt-1 border-t border-muted-foreground/20">
               <Badge variant="secondary" className="w-full justify-center text-xs">
                   Total Logged: {node.totalLoggedHours.toFixed(1)}h
