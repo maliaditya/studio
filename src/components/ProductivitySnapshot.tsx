@@ -28,6 +28,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { Release } from '@/types/workout';
+import { ScrollArea } from './ui/scroll-area';
 
 interface ProductivitySnapshotProps {
   stats: any;
@@ -50,7 +51,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
     if (selectedReleaseInfo) {
       addFeatureToRelease(selectedReleaseInfo.release, selectedReleaseInfo.topic, newFeatureName, selectedReleaseInfo.type);
       setNewFeatureName('');
-      setIsAddFeatureModalOpen(false);
+      // Keep the modal open after adding
     }
   };
 
@@ -292,25 +293,43 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
         <Dialog open={isAddFeatureModalOpen} onOpenChange={setIsAddFeatureModalOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add Feature to "{selectedReleaseInfo.release.name}"</DialogTitle>
+              <DialogTitle>Manage Features for "{selectedReleaseInfo.release.name}"</DialogTitle>
               <DialogDescription>
-                Enter the name for the new feature (focus area) to add to this release. This will also add it to your Deep Work library under the "{selectedReleaseInfo.topic}" topic.
+                 View existing features or add a new one. This will also create a new focus area in your Deep Work library under the "{selectedReleaseInfo.topic}" topic.
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
-              <Label htmlFor="feature-name" className="sr-only">New Feature Name</Label>
-              <Input
-                id="feature-name"
-                value={newFeatureName}
-                onChange={(e) => setNewFeatureName(e.target.value)}
-                placeholder="e.g., Implement user authentication"
-                autoFocus
-                onKeyDown={(e) => e.key === 'Enter' && handleAddFeature()}
-              />
+            
+            {selectedReleaseInfo.release.features && selectedReleaseInfo.release.features.length > 0 && (
+                <div className="space-y-2">
+                    <Label className="font-semibold">Current Features</Label>
+                    <ScrollArea className="h-24 w-full rounded-md border p-2">
+                        <ul className="space-y-1">
+                            {selectedReleaseInfo.release.features.map((feature, index) => (
+                                <li key={index} className="text-sm text-muted-foreground">{feature}</li>
+                            ))}
+                        </ul>
+                    </ScrollArea>
+                </div>
+            )}
+
+            <div className="pt-2">
+                <Label htmlFor="feature-name" className="text-sm font-medium">New Feature Name</Label>
+                <div className="flex gap-2 mt-1">
+                    <Input
+                        id="feature-name"
+                        value={newFeatureName}
+                        onChange={(e) => setNewFeatureName(e.target.value)}
+                        placeholder="e.g., Implement user authentication"
+                        autoFocus
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddFeature()}
+                        className="flex-grow"
+                    />
+                    <Button onClick={handleAddFeature}>Add</Button>
+                </div>
             </div>
+            
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddFeatureModalOpen(false)}>Cancel</Button>
-              <Button onClick={handleAddFeature}>Add Feature</Button>
+              <Button variant="outline" onClick={() => setIsAddFeatureModalOpen(false)}>Close</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
