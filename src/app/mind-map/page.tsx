@@ -54,19 +54,19 @@ function MindMapPageContent() {
   const renderNode = (node: MindMapNode, level: number) => (
     <div className="flex items-center flex-row-reverse">
       {/* Node Box: The visual representation of a single node */}
-      <div className="flex-shrink-0 w-56 p-2 rounded-lg shadow-md bg-card border">
+      <div className="flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border">
         <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center h-6 w-6 rounded-full bg-muted flex-shrink-0">
+          <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted flex-shrink-0">
             {level === 0 ? (
-              <GitBranch className="h-4 w-4 text-primary" />
+              <GitBranch className="h-3.5 w-3.5 text-primary" />
             ) : level === 1 ? (
-              <GitMerge className="h-4 w-4 text-secondary-foreground" />
+              <GitMerge className="h-3.5 w-3.5 text-secondary-foreground" />
             ) : (
               <BookCopy className="h-3 w-3 text-muted-foreground" />
             )}
           </div>
           <div className="min-w-0">
-            <p className="font-semibold text-sm text-foreground truncate" title={node.name}>
+            <p className="font-semibold text-xs text-foreground truncate" title={node.name}>
               {node.name}
             </p>
             <p className="text-xs text-muted-foreground capitalize">{node.category}</p>
@@ -78,14 +78,14 @@ function MindMapPageContent() {
       {node.children && node.children.length > 0 && (
         <div className="flex">
           {/* Horizontal line extending from the parent node */}
-          <div className="w-6 h-px bg-border self-center" />
+          <div className="w-4 h-px bg-border self-center" />
   
           {/* List of children with a vertical connector line */}
-          <ul className="flex flex-col justify-center border-r border-border pr-6 space-y-4 py-2">
+          <ul className="flex flex-col justify-center border-r border-border pr-4 space-y-2 py-1">
             {node.children.map(child => (
               <li key={child.id} className="relative">
                 {/* Horizontal line from the vertical connector to the child node */}
-                <div className="absolute -right-6 top-1/2 w-6 h-px bg-border" />
+                <div className="absolute -right-4 top-1/2 w-4 h-px bg-border" />
                 {/* Recursively render the child node and its own children */}
                 {renderNode(child, level + 1)}
               </li>
@@ -120,7 +120,7 @@ function MindMapPageContent() {
           </div>
 
           {selectedTopic && mindMapData && (
-            <div className="mt-8 p-4 rounded-lg bg-muted/30 overflow-x-auto flex justify-end">
+            <div className="mt-8 p-4 rounded-lg bg-muted/30 overflow-x-auto flex justify-center">
               <div className="inline-block py-4">
                 {renderNode(mindMapData, 0)}
               </div>
