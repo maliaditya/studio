@@ -179,7 +179,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     if (!todaysActivities) return infoMap;
 
     const instanceIdToDefIdMap = new Map<string, string>();
-    const logs = [...allUpskillLogs, ...allDeepWorkLogs, ...brandingLogs];
+    const logs = [...(allUpskillLogs || []), ...(allDeepWorkLogs || []), ...(brandingLogs || [])];
     const todayLogs = logs.filter(log => log.date === todayKey);
 
     todayLogs.forEach(log => {
@@ -270,7 +270,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     const todayStr = format(new Date(), 'yyyy-MM-dd');
 
     const instanceIdToDefIdMap = new Map<string, string>();
-    [...allUpskillLogs, ...allDeepWorkLogs, ...brandingLogs].forEach(log => {
+    [...(allUpskillLogs || []), ...(allDeepWorkLogs || []), ...(brandingLogs || [])].forEach(log => {
         (log.exercises || []).forEach(ex => {
             if (ex.id && ex.definitionId) {
               instanceIdToDefIdMap.set(ex.id, ex.definitionId);
@@ -290,7 +290,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
 
                             const addInfo = (definitionId: string, activityType: ActivityTypeType) => {
                                 const existingEntry = pendingInfo.get(definitionId);
-                                if ((!existingEntry || dateKey < existingEntry.oldestDate) && existingEntry?.type !== activityType) {
+                                if (!existingEntry || dateKey < existingEntry.oldestDate) {
                                     pendingInfo.set(definitionId, { oldestDate: dateKey, type: activityType });
                                 }
                             };
@@ -325,7 +325,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                     const loggedTime = ex.loggedSets.reduce((sum, set) => sum + set[timeField], 0);
                     if (loggedTime > 0) {
                         const existingEntry = infoMap.get(ex.definitionId);
-                        if ((!existingEntry || log.date > existingEntry.lastLogDate) && existingEntry?.type !== activityType) {
+                        if (!existingEntry || log.date > existingEntry.lastLogDate) {
                             infoMap.set(ex.definitionId, { type: activityType, lastLogDate: log.date, totalTime: loggedTime });
                         }
                     }
@@ -343,7 +343,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                         if (bundleDef?.focusAreaIds) {
                             bundleDef.focusAreaIds.forEach(focusAreaDefId => {
                                 const existingEntry = infoMap.get(focusAreaDefId);
-                                if ((!existingEntry || log.date > existingEntry.lastLogDate) && existingEntry?.type !== 'branding') {
+                                if (!existingEntry || log.date > existingEntry.lastLogDate) {
                                     infoMap.set(focusAreaDefId, { type: 'branding', lastLogDate: log.date, totalTime: 1 });
                                 }
                             });
@@ -636,10 +636,10 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     const pendingInfoForNode = pendingTaskInfo.get(node.definitionId);
     const pastLogForNode = pastLoggedTaskInfo.get(node.definitionId);
 
-    const isLoggedToday = loggedInfoForNode?.type === activityTypeForNode;
-    const isScheduledToday = scheduledInfoForNode?.type === activityTypeForNode;
-    const isPending = pendingInfoForNode?.type === activityTypeForNode && !isLoggedToday && !isScheduledToday;
-    const isPastAndDone = pastLogForNode?.type === activityTypeForNode && !isLoggedToday && !isScheduledToday && !isPending;
+    const isLoggedToday = !!loggedInfoForNode && loggedInfoForNode.type === activityTypeForNode;
+    const isScheduledToday = !!scheduledInfoForNode && scheduledInfoForNode.type === activityTypeForNode;
+    const isPending = !!pendingInfoForNode && pendingInfoForNode.type === activityTypeForNode && !isLoggedToday && !isScheduledToday;
+    const isPastAndDone = !!pastLogForNode && pastLogForNode.type === activityTypeForNode && !isLoggedToday && !isScheduledToday && !isPending;
 
     let daysPending = 0;
     if (isPending && pendingInfoForNode) {
@@ -698,8 +698,8 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
             </Popover>
         )}
 
-        {node.category === 'Release' && node.topic && node.type && (
-            <Button variant="ghost" size="icon" className="absolute -right-2 -top-2 h-6 w-6 rounded-full bg-background border"
+        {node.category === 'Release' && (
+            <Button variant="ghost" size="icon" className="absolute top-0 -right-2 h-6 w-6 rounded-full bg-background border"
                 onClick={() => setInlineAddInfo({ parentReleaseId: node.id, newFeatureName: '' })}
             >
                 <PlusCircle className="h-4 w-4 text-primary" />
@@ -726,7 +726,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
           </div>
         )}
 
-        {isLoggedToday ? (
+        {isLoggedToday && loggedInfoForNode ? (
             <div className="mt-1 pt-1 border-t border-green-300/50 flex items-center gap-1.5 text-xs text-green-800 dark:text-green-200">
                 <Check className="h-4 w-4 flex-shrink-0" />
                 <span className="font-medium">Logged: {loggedInfoForNode.totalTime > 60 ? `${(loggedInfoForNode.totalTime / 60).toFixed(1)}h` : `${loggedInfoForNode.totalTime}m`}</span>
@@ -746,7 +746,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                     <Badge variant="destructive" className="ml-auto text-xs font-mono">{daysPending}d</Badge>
                 )}
             </div>
-        ) : isPastAndDone ? (
+        ) : isPastAndDone && pastLogForNode ? (
             <div className="mt-1 pt-1 border-t border-green-500/50 flex items-center gap-1.5 text-xs text-green-800 dark:text-green-400">
                 <Check className="h-4 w-4 flex-shrink-0" />
                 <div className="flex-grow flex items-center justify-between">
