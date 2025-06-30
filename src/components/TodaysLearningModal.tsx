@@ -24,11 +24,9 @@ interface TodaysLearningModalProps {
   onOpenChange: (isOpen: boolean) => void;
   availableTasks: WorkoutExercise[];
   initialSelectedIds: string[];
-  onSave: (allTodaysDefIds: string[], selectedDefIdsForSlot: string[]) => void;
+  onSave: (selectedDefIds: string[]) => void;
   pageType: 'upskill' | 'deepwork' | 'branding';
-  isAddingNewTasks: boolean;
   disabledTaskIds?: string[];
-  allTodaysLoggedDefIds?: string[];
 }
 
 const ScheduledTaskItem = ({ task, isDisabled, selected, onToggle }: { task: WorkoutExercise; isDisabled: boolean; selected: boolean; onToggle: () => void; }) => (
@@ -54,13 +52,13 @@ const ScheduledTaskItem = ({ task, isDisabled, selected, onToggle }: { task: Wor
   </div>
 );
 
-const LibraryTaskItem = ({ task, onAdd }: { task: WorkoutExercise; onAdd: () => void; }) => (
+const LibraryTaskItem = ({ task, onAddAndSelect }: { task: WorkoutExercise; onAddAndSelect: () => void; }) => (
     <div className="flex items-center justify-between space-x-3 p-3 rounded-md border transition-colors">
         <Label htmlFor={`task-${task.id}`} className="font-normal w-full cursor-default">
             <p className="font-medium">{task.name}</p>
             <p className="text-xs text-muted-foreground">{task.category}</p>
         </Label>
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-accent-foreground" onClick={onAdd} aria-label={`Add ${task.name} to today's session`}>
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-accent-foreground" onClick={onAddAndSelect} aria-label={`Add and select ${task.name}`}>
             <PlusCircle className="h-5 w-5" />
         </Button>
     </div>
@@ -74,39 +72,48 @@ export function TodaysLearningModal({
   initialSelectedIds,
   onSave,
   pageType,
-  allTodaysLoggedDefIds = [],
   disabledTaskIds = [],
 }: TodaysLearningModalProps) {
-  const [todaysDefIds, setTodaysDefIds] = useState<string[]>([]);
-  const [selectedDefIds, setSelectedDefIds] = useState<string[]>([]);
+  const [selectedDefinitionIds, setSelectedDefinitionIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (isOpen) {
-      setTodaysDefIds(allTodaysLoggedDefIds);
-      setSelectedDefIds(initialSelectedIds);
+      setSelectedDefinitionIds(initialSelectedIds);
     }
-  }, [isOpen, allTodaysLoggedDefIds, initialSelectedIds]);
+  }, [isOpen, initialSelectedIds]);
 
-  const handleAddTaskToDay = (taskToAdd: WorkoutExercise) => {
-    setTodaysDefIds(prev => [...new Set([...prev, taskToAdd.definitionId])]);
-  };
-
-  const handleToggleScheduledTask = (defId: string) => {
-    setSelectedDefIds(prev =>
-      prev.includes(defId)
-        ? prev.filter(id => id !== defId)
-        : [...prev, defId]
-    );
+  const handleToggleSelection = (defId: string) => {
+    setSelectedDefinitionIds(currentIds => {
+      const newIds = new Set(currentIds);
+      if (newIds.has(defId)) {
+        newIds.delete(defId);
+      } else {
+        newIds.add(defId);
+      }
+      return Array.from(newIds);
+    });
   };
   
-  const handleSaveChanges = () => {
-    onSave([...new Set(todaysDefIds)], selectedDefIds);
-    onOpenChange(false);
+  const handleAddAndSelect = (defId: string) => {
+    setSelectedDefinitionIds(currentIds => {
+        const newIds = new Set(currentIds);
+        newIds.add(defId);
+        return Array.from(newIds);
+    });
   };
 
-  const scheduledTasks = availableTasks.filter(t => todaysDefIds.includes(t.definitionId));
-  const libraryTasks = availableTasks.filter(t => !todaysDefIds.includes(t.definitionId));
+  const handleSaveChanges = () => {
+    onSave(selectedDefinitionIds);
+    onOpenChange(false);
+  };
+  
+  const todaysDefIdsInLog = new Set(availableTasks.filter(t => !t.id.startsWith('lib-')).map(t => t.definitionId));
+  
+  const allConsideredDefIds = new Set([...todaysDefIdsInLog, ...selectedDefinitionIds]);
 
+  const scheduledTasks = availableTasks.filter(t => allConsideredDefIds.has(t.definitionId));
+  const libraryTasks = availableTasks.filter(t => !allConsideredDefIds.has(t.definitionId));
+  
   const pageInfo = {
     upskill: {
       icon: <BookOpenCheck className="h-12 w-12 mb-4" />,
@@ -153,8 +160,8 @@ export function TodaysLearningModal({
                             key={task.id} 
                             task={task} 
                             isDisabled={disabledTaskIds.includes(task.definitionId)}
-                            selected={selectedDefIds.includes(task.definitionId)}
-                            onToggle={() => handleToggleScheduledTask(task.definitionId)}
+                            selected={selectedDefinitionIds.includes(task.definitionId)}
+                            onToggle={() => handleToggleSelection(task.definitionId)}
                           />
                         ))}
                       </div>
@@ -169,7 +176,7 @@ export function TodaysLearningModal({
                              <LibraryTaskItem 
                               key={task.id} 
                               task={task} 
-                              onAdd={() => handleAddTaskToDay(task)}
+                              onAddAndSelect={() => handleAddAndSelect(task.definitionId)}
                             />
                           ))}
                         </div>
