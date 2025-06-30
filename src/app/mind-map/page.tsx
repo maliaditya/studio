@@ -6,7 +6,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { GitBranch, BookCopy } from 'lucide-react';
+import { GitBranch, BookCopy, GitMerge } from 'lucide-react';
 import type { ExerciseDefinition } from '@/types/workout';
 
 interface MindMapNode extends ExerciseDefinition {
@@ -28,11 +28,11 @@ function MindMapPageContent() {
       def => def.category === selectedTopic && !Array.isArray(def.focusAreas)
     );
 
-    const data: MindMapNode[] = focusAreasForTopic.map(focusArea => {
+    const childrenNodes: MindMapNode[] = focusAreasForTopic.map(focusArea => {
       const linkedLearningTasks = (focusArea.linkedUpskillIds || [])
         .map(id => upskillDefinitions.find(ud => ud.id === id))
         .filter((task): task is ExerciseDefinition => !!task)
-        .map(task => ({ ...task, children: [] }));
+        .map(task => ({ ...task, children: [] })); // Learning tasks are leaf nodes
       
       return {
         ...focusArea,
@@ -40,23 +40,49 @@ function MindMapPageContent() {
       };
     });
 
-    return data;
-  }, [selectedTopic, deepWorkDefinitions, upskillDefinitions]);
+    // Create a root node for the selected topic
+    const rootNode: MindMapNode = {
+      id: selectedTopic,
+      name: selectedTopic,
+      category: deepWorkTopicMetadata[selectedTopic]?.classification || 'Topic',
+      children: childrenNodes,
+    };
+
+    return rootNode;
+  }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata]);
 
   const renderNode = (node: MindMapNode, level: number) => (
-    <div key={node.id} className="ml-8 mt-4">
-      <div className="flex items-center gap-3">
-        <div className="flex items-center justify-center h-8 w-8 rounded-full bg-muted flex-shrink-0">
-          {level === 0 ? <GitBranch className="h-5 w-5 text-primary" /> : <BookCopy className="h-4 w-4 text-muted-foreground" />}
-        </div>
-        <div className="p-3 rounded-lg bg-card border flex-grow">
-          <p className="font-semibold text-foreground">{node.name}</p>
-          <p className="text-xs text-muted-foreground">{node.category}</p>
+    <div key={node.id} className="flex items-center">
+      {/* Node Box */}
+      <div className="flex-shrink-0 w-64 p-3 rounded-lg shadow-md bg-card border">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center h-8 w-8 rounded-full bg-muted flex-shrink-0">
+            {level === 0 ? (
+              <GitBranch className="h-5 w-5 text-primary" />
+            ) : level === 1 ? (
+              <GitMerge className="h-5 w-5 text-secondary-foreground" />
+            ) : (
+              <BookCopy className="h-4 w-4 text-muted-foreground" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="font-semibold text-foreground truncate" title={node.name}>
+              {node.name}
+            </p>
+            <p className="text-xs text-muted-foreground capitalize">{node.category}</p>
+          </div>
         </div>
       </div>
+  
+      {/* Children */}
       {node.children && node.children.length > 0 && (
-        <div className="pl-4 border-l-2 border-muted-foreground/20 ml-4">
-          {node.children.map(child => renderNode(child, level + 1))}
+        <div className="flex items-center">
+          {/* Connector Line */}
+          <div className="w-8 h-px bg-border" />
+          {/* Vertical stack for children */}
+          <div className="flex flex-col gap-4">
+            {node.children.map(child => renderNode(child, level + 1))}
+          </div>
         </div>
       )}
     </div>
@@ -72,7 +98,7 @@ function MindMapPageContent() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="max-w-sm mb-8">
+          <div className="max-w-sm mb-6">
             <Select onValueChange={setSelectedTopic} value={selectedTopic}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a Product or Service..." />
@@ -85,27 +111,20 @@ function MindMapPageContent() {
             </Select>
           </div>
 
-          {selectedTopic && (
-            <div className="p-4 rounded-lg bg-muted/30">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center justify-center h-12 w-12 rounded-full bg-primary text-primary-foreground flex-shrink-0">
-                  <GitBranch className="h-7 w-7" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-primary">{selectedTopic}</h2>
-                  <p className="text-muted-foreground capitalize">{deepWorkTopicMetadata[selectedTopic]?.classification}</p>
-                </div>
-              </div>
-
-              <div className="mt-4 pl-4 border-l-2 border-primary ml-6">
-                {mindMapData && mindMapData.length > 0 ? (
-                  mindMapData.map(node => renderNode(node, 0))
-                ) : (
-                  <p className="text-muted-foreground text-sm ml-8 mt-4">No focus areas defined for this topic.</p>
-                )}
+          {selectedTopic && mindMapData && (
+            <div className="mt-8 p-4 rounded-lg bg-muted/30 overflow-x-auto">
+              <div className="inline-block py-4 min-w-full">
+                {renderNode(mindMapData, 0)}
               </div>
             </div>
           )}
+
+          {selectedTopic && (!mindMapData || mindMapData.children.length === 0) && (
+             <p className="text-muted-foreground text-sm text-center mt-8 py-4">
+              No focus areas defined for this topic.
+            </p>
+          )}
+
         </CardContent>
       </Card>
     </div>
