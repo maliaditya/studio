@@ -120,12 +120,44 @@ function MindMapPageContent() {
   }, []);
 
   const allTopics = useMemo(() => {
-    return Object.keys(deepWorkTopicMetadata).sort();
-  }, [deepWorkTopicMetadata]);
+    const productAndServiceTopics = Object.keys(deepWorkTopicMetadata).sort();
+    const hasBundles = deepWorkDefinitions.some(def => Array.isArray(def.focusAreas));
+    
+    if (hasBundles) {
+      return ["Content Bundles", ...productAndServiceTopics].sort();
+    }
+    
+    return productAndServiceTopics;
+  }, [deepWorkTopicMetadata, deepWorkDefinitions]);
 
   const mindMapData = useMemo(() => {
     if (!selectedTopic) return null;
 
+    if (selectedTopic === 'Content Bundles') {
+        const bundles = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreas));
+        const allFocusAreaDefs = deepWorkDefinitions.filter(def => !Array.isArray(def.focusAreas));
+        const focusAreaDefMap = new Map(allFocusAreaDefs.map(def => [def.name.toLowerCase(), def]));
+
+        const bundleNodes: MindMapNode[] = bundles.map(bundle => {
+            const constituentFocusAreas = (bundle.focusAreas || [])
+                .map(name => focusAreaDefMap.get(name.toLowerCase()))
+                .filter((def): def is ExerciseDefinition => !!def)
+                .map(def => ({ ...def, children: [] }));
+            
+            return {
+                ...bundle,
+                children: constituentFocusAreas
+            };
+        });
+
+        return {
+            id: 'content-bundles-root',
+            name: 'Content Bundles',
+            category: 'Branding',
+            children: bundleNodes,
+        };
+    }
+    
     const focusAreasForTopic = deepWorkDefinitions.filter(
       def => def.category === selectedTopic && !Array.isArray(def.focusAreas)
     );
@@ -134,7 +166,7 @@ function MindMapPageContent() {
       const linkedLearningTasks = (focusArea.linkedUpskillIds || [])
         .map(id => upskillDefinitions.find(ud => ud.id === id))
         .filter((task): task is ExerciseDefinition => !!task)
-        .map(task => ({ ...task, children: [] })); // Learning tasks are leaf nodes
+        .map(task => ({ ...task, children: [] }));
       
       return {
         ...focusArea,
@@ -157,7 +189,11 @@ function MindMapPageContent() {
       <div className="flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border">
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted flex-shrink-0">
-            {level === 0 ? <GitBranch className="h-3.5 w-3.5 text-primary" /> : level === 1 ? <GitMerge className="h-3.5 w-3.5 text-secondary-foreground" /> : <BookCopy className="h-3 w-3 text-muted-foreground" />}
+            {level === 0 ? <GitBranch className="h-3.5 w-3.5 text-primary" /> 
+              : node.category === 'Content Bundle' ? <Package className="h-3.5 w-3.5 text-secondary-foreground" />
+              : Array.isArray(node.focusAreas) ? <Package className="h-3.5 w-3.5 text-secondary-foreground" />
+              : (node.category === 'product' || node.category === 'service' || level === 1) ? <GitMerge className="h-3.5 w-3.5 text-secondary-foreground" />
+              : <BookCopy className="h-3 w-3 text-muted-foreground" />}
           </div>
           <div className="min-w-0">
             <p className="font-semibold text-xs text-foreground truncate" title={node.name}>{node.name}</p>
@@ -188,7 +224,7 @@ function MindMapPageContent() {
         <CardHeader>
           <CardTitle>Flow Mind Map</CardTitle>
           <CardDescription>
-            A conceptual map of the LifeOS workflow. Select a specific product or service from the dropdown to visualize its unique structure.
+            A conceptual map of the LifeOS workflow. Select an item from the dropdown to visualize its unique structure.
           </CardDescription>
         </CardHeader>
         <CardContent>
