@@ -5,7 +5,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle, Link as LinkIcon } from 'lucide-react';
+import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle, Link as LinkIcon, Save } from 'lucide-react';
 import type { ExerciseDefinition, Release, DatedWorkout, ActivityType as ActivityTypeType } from '@/types/workout'; // Renaming imported ActivityType to avoid conflict with lucide-react
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
@@ -154,14 +154,14 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   
   const timeSlots = [ 'Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night' ];
 
-  // Modal State
-  const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service' } | null>(null);
-  const [isAddFeatureModalOpen, setIsAddFeatureModalOpen] = useState(false);
-  const [newFeatureName, setNewFeatureName] = useState('');
-
+  // Modal State for linking learning tasks
   const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
   const [isLinkLearningModalOpen, setIsLinkLearningModalOpen] = useState(false);
   const [editableLinkedUpskillIds, setEditableLinkedUpskillIds] = useState<string[]>([]);
+
+  // State for inline adding
+  const [inlineAddInfo, setInlineAddInfo] = useState<{ parentReleaseId: string; newFeatureName: string } | null>(null);
+
 
   useEffect(() => {
     if (defaultView) {
@@ -564,16 +564,45 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, totalTimePerFocusArea]);
 
   // Modal Handlers
-  const handleAddFeature = () => {
-    if (selectedReleaseInfo && newFeatureName.trim()) {
-      addFeatureToRelease(
-        selectedReleaseInfo.release,
-        selectedReleaseInfo.topic,
-        newFeatureName,
-        selectedReleaseInfo.type
-      );
-      setNewFeatureName('');
-      // Don't close the modal, allowing for multiple additions.
+  const handleSaveNewFeature = () => {
+    if (inlineAddInfo && inlineAddInfo.newFeatureName.trim() && mindMapData) {
+        const { parentReleaseId, newFeatureName } = inlineAddInfo;
+        
+        let releaseNode: Release | undefined;
+        let topic: string | undefined;
+        let type: 'product' | 'service' | undefined;
+
+        const findNode = (node: MindMapNode): MindMapNode | null => {
+            if (node.id === parentReleaseId) return node;
+            if (node.children) {
+                for (const child of node.children) {
+                    const found = findNode(child);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+        
+        const foundNode = findNode(mindMapData);
+
+        if (foundNode && foundNode.topic && foundNode.type) {
+            releaseNode = foundNode as Release;
+            topic = foundNode.topic;
+            type = foundNode.type;
+        } else {
+             toast({ title: "Error", description: "Could not find release information to add feature.", variant: "destructive" });
+             setInlineAddInfo(null);
+             return;
+        }
+
+        addFeatureToRelease(
+            releaseNode,
+            topic,
+            newFeatureName,
+            type
+        );
+
+        setInlineAddInfo(null); // Reset after save
     }
   };
 
@@ -702,10 +731,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
 
         {node.category === 'Release' && node.topic && node.type && (
             <Button variant="ghost" size="icon" className="absolute right-1 -bottom-2 h-6 w-6"
-                onClick={() => {
-                    setSelectedReleaseInfo({ release: node as Release, topic: node.topic!, type: node.type! });
-                    setIsAddFeatureModalOpen(true);
-                }}
+                onClick={() => setInlineAddInfo({ parentReleaseId: node.id, newFeatureName: '' })}
             >
                 <PlusCircle className="h-4 w-4 text-primary" />
             </Button>
@@ -781,6 +807,36 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                 {renderNode(child, level + 1, node)}
               </li>
             ))}
+            {inlineAddInfo?.parentReleaseId === node.id && (
+                <li className="relative">
+                    <div className="absolute -right-4 top-1/2 w-4 h-px bg-border" />
+                    <div className="flex items-center flex-row-reverse">
+                        <div className="relative flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border-2 border-primary border-dashed">
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted flex-shrink-0">
+                                    <Workflow className="h-3 w-3 text-muted-foreground" />
+                                </div>
+                                <Input
+                                    value={inlineAddInfo.newFeatureName}
+                                    onChange={(e) => setInlineAddInfo({ ...inlineAddInfo, newFeatureName: e.target.value })}
+                                    placeholder="New feature name..."
+                                    className="h-7 text-xs"
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleSaveNewFeature();
+                                        if (e.key === 'Escape') setInlineAddInfo(null);
+                                    }}
+                                />
+                            </div>
+                             <div className="flex justify-end gap-1 mt-2">
+                                <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => setInlineAddInfo(null)}>Cancel</Button>
+                                <Button size="sm" className="h-6 px-2" onClick={handleSaveNewFeature}><Save className="h-3 w-3"/></Button>
+                            </div>
+                        </div>
+                        <div className="w-4 h-px bg-border self-center" />
+                    </div>
+                </li>
+            )}
           </ul>
         </div>
       )}
@@ -870,34 +926,6 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
           </CardContent>
         </Card>
       </div>
-
-      <Dialog open={isAddFeatureModalOpen} onOpenChange={setIsAddFeatureModalOpen}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Add Feature to "{selectedReleaseInfo?.release.name}"</DialogTitle>
-                <DialogDescription>
-                    This will create a new focus area in your Deep Work library under the "{selectedReleaseInfo?.topic}" topic and link it to this release.
-                </DialogDescription>
-            </DialogHeader>
-            <div className="pt-2">
-                <Label htmlFor="feature-name">New Feature Name</Label>
-                <div className="flex gap-2 mt-1">
-                    <Input
-                        id="feature-name"
-                        value={newFeatureName}
-                        onChange={(e) => setNewFeatureName(e.target.value)}
-                        placeholder="e.g., Implement user authentication"
-                        autoFocus
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddFeature()}
-                    />
-                    <Button onClick={handleAddFeature}>Add</Button>
-                </div>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddFeatureModalOpen(false)}>Done</Button>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
       
       <Dialog open={isLinkLearningModalOpen} onOpenChange={setIsLinkLearningModalOpen}>
           <DialogContent className="sm:max-w-md">
