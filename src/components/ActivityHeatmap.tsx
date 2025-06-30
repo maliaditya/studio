@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 
 interface ActivityHeatmapProps {
   schedule: FullSchedule;
+  onDateSelect?: (date: string) => void;
 }
 
 interface HeatmapValue {
@@ -18,7 +19,7 @@ interface HeatmapValue {
     activities: string;
 }
 
-export function ActivityHeatmap({ schedule }: ActivityHeatmapProps) {
+export function ActivityHeatmap({ schedule, onDateSelect }: ActivityHeatmapProps) {
   const today = new Date();
   const oneYearAgo = subYears(today, 1);
 
@@ -67,6 +68,11 @@ export function ActivityHeatmap({ schedule }: ActivityHeatmapProps) {
                         if (value.count >= 3) return 'color-scale-3';
                         if (value.count >= 2) return 'color-scale-2';
                         return 'color-scale-1';
+                    }}
+                    onClick={(value) => {
+                        if (onDateSelect && value && value.date) {
+                            onDateSelect(value.date);
+                        }
                     }}
                     transformDayElement={(element, value, index) => {
                          if (!value || value.count === 0) {

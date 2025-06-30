@@ -21,6 +21,15 @@ import { ProductivitySnapshot } from '@/components/ProductivitySnapshot';
 import { TimeSlots } from '@/components/TimeSlots';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Badge } from '@/components/ui/badge';
+import { CheckCircle2 } from 'lucide-react';
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -116,6 +125,11 @@ function HomePageContent() {
   // State for productivity stats
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   const [today, setToday] = useState<Date | null>(null);
+
+  // State for Day Detail Modal
+  const [isDayDetailModalOpen, setIsDayDetailModalOpen] = useState(false);
+  const [selectedDaySchedule, setSelectedDaySchedule] = useState<DailySchedule | null>(null);
+  const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null);
 
   useEffect(() => {
     setTodayKey(format(new Date(), 'yyyy-MM-dd'));
@@ -791,6 +805,17 @@ function HomePageContent() {
     ];
   }, [productivityStats.todayHoursData]);
 
+  const handleHeatmapClick = (date: string) => {
+    const daySchedule = schedule[date];
+    if (daySchedule && Object.values(daySchedule).flat().some(a => a?.completed)) {
+        setSelectedDaySchedule(daySchedule);
+        setSelectedDayDate(date);
+        setIsDayDetailModalOpen(true);
+    } else {
+        toast({ title: "No Activities", description: `No activities were completed on ${format(parseISO(date), 'PPP')}.` });
+    }
+  };
+
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -849,7 +874,7 @@ function HomePageContent() {
           </CardContent>
         </Card>
         
-        <ActivityHeatmap schedule={schedule} />
+        <ActivityHeatmap schedule={schedule} onDateSelect={handleHeatmapClick} />
 
         {currentUser && !isAgendaDocked && (
             <TodaysScheduleCard
@@ -937,6 +962,37 @@ function HomePageContent() {
           todayHoursData={productivityStats.todayHoursData}
         />
       </div>
+
+      <Dialog open={isDayDetailModalOpen} onOpenChange={setIsDayDetailModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Activities for {selectedDayDate ? format(parseISO(selectedDayDate), 'PPP') : ''}</DialogTitle>
+            <DialogDescription>A log of your completed activities for this day.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto pr-4">
+              {selectedDaySchedule && Object.values(selectedDaySchedule).flat().some(a => a.completed) ? (
+                  <ul className="space-y-3">
+                      {Object.entries(selectedDaySchedule).flatMap(([slotName, activities]) =>
+                          activities.filter(a => a.completed).map(activity => (
+                              <li key={activity.id} className="flex items-center justify-between gap-3 p-2 bg-muted/50 rounded-md">
+                                  <div className="flex items-center gap-3">
+                                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                      <div className="flex-grow">
+                                          <p className="font-medium text-sm">{activity.details}</p>
+                                          <p className="text-xs text-muted-foreground">{slotName}</p>
+                                      </div>
+                                  </div>
+                                  <Badge variant="outline" className="capitalize">{activity.type}</Badge>
+                              </li>
+                          ))
+                      )}
+                  </ul>
+              ) : (
+                  <p className="text-center text-muted-foreground py-4">No completed activities for this day.</p>
+              )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
