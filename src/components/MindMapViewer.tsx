@@ -161,16 +161,6 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         setSelectedTopic(showControls ? '' : 'Strategic Overview');
     }
   }, [defaultView, showControls]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-        if (transformWrapperRef.current) {
-            transformWrapperRef.current.centerView();
-        }
-    }, 100); // Small delay for content to render before centering
-
-    return () => clearTimeout(timer);
-  }, [mindMapData]); // Re-center whenever the mind map data changes
   
   const scheduledTaskInfo = useMemo(() => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -535,6 +525,16 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
 
   }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, totalTimePerFocusArea]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+        if (transformWrapperRef.current) {
+            transformWrapperRef.current.centerView();
+        }
+    }, 100); // Small delay for content to render before centering
+
+    return () => clearTimeout(timer);
+  }, [mindMapData, selectedTopic]); // Re-center whenever the mind map data changes
+
   // Modal Handlers
   const handleSaveNewFeature = () => {
     if (inlineAddInfo && inlineAddInfo.newFeatureName.trim() && mindMapData) {
@@ -688,14 +688,6 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
           </div>
         </div>
         
-        {node.category === 'Release' && (
-            <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-6 w-6"
-                onClick={() => setInlineAddInfo({ parentReleaseId: node.id, newFeatureName: '' })}
-            >
-                <PlusCircle className="h-4 w-4 text-primary" />
-            </Button>
-        )}
-        
         <div className="absolute top-0 right-0 flex">
             {isSchedulable && !isLoggedToday && !isScheduledToday && !isPending && (
                 <Popover>
@@ -767,6 +759,14 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                 </Popover>
             )}
         </div>
+        
+        {node.category === 'Release' && (
+            <Button variant="ghost" size="icon" className="absolute bottom-0 right-0 h-6 w-6"
+                onClick={() => setInlineAddInfo({ parentReleaseId: node.id, newFeatureName: '' })}
+            >
+                <PlusCircle className="h-4 w-4 text-primary" />
+            </Button>
+        )}
 
 
         {(node.category === 'Release' || node.category === 'product' || node.category === 'service') && node.totalLoggedHours && node.totalLoggedHours > 0 && (
@@ -780,7 +780,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         {isLoggedToday && loggedInfoForNode ? (
             <div className="mt-1 pt-1 border-t border-green-300/50 flex items-center gap-1.5 text-xs text-green-800 dark:text-green-200">
                 <Check className="h-4 w-4 flex-shrink-0" />
-                <span className="font-medium">Logged: {loggedInfoForNode?.totalTime > 60 ? `${(loggedInfoForNode.totalTime / 60).toFixed(1)}h` : `${loggedInfoForNode?.totalTime}m`}</span>
+                <span className="font-medium">Logged: {loggedInfoForNode.totalTime > 60 ? `${(loggedInfoForNode.totalTime / 60).toFixed(1)}h` : `${loggedInfoForNode.totalTime}m`}</span>
                 <span className="ml-auto font-mono">{format(new Date(), 'MMM dd')}</span>
             </div>
         ) : isScheduledToday ? (
