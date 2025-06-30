@@ -79,7 +79,7 @@ export function TodaysLearningModal({
 
   useEffect(() => {
     if (isOpen) {
-      if (pageType === 'deepwork') {
+      if (pageType === 'deepwork' || pageType === 'upskill') {
         setSelectedRadioDefId(initialSelectedIds.length > 0 ? initialSelectedIds[0] : null);
         setSelectedDefinitionIds([]); // Clear checkbox state
       } else {
@@ -102,7 +102,7 @@ export function TodaysLearningModal({
   };
 
   const handleAddAndSelect = (defId: string) => {
-    if (pageType === 'deepwork') {
+    if (pageType === 'deepwork' || pageType === 'upskill') {
       setSelectedRadioDefId(defId);
     } else {
       setSelectedDefinitionIds(currentIds => Array.from(new Set([...currentIds, defId])));
@@ -110,7 +110,7 @@ export function TodaysLearningModal({
   };
 
   const handleSaveChanges = () => {
-    if (pageType === 'deepwork') {
+    if (pageType === 'deepwork' || pageType === 'upskill') {
       onSave(selectedRadioDefId ? [selectedRadioDefId] : []);
     } else {
       onSave(selectedDefinitionIds);
@@ -122,7 +122,7 @@ export function TodaysLearningModal({
     const todaysLogDefIds = new Set(availableTasks.filter(t => !t.id.startsWith('lib-')).map(t => t.definitionId));
     
     let currentlySelectedIds: Set<string>;
-    if (pageType === 'deepwork') {
+    if (pageType === 'deepwork' || pageType === 'upskill') {
         currentlySelectedIds = new Set(selectedRadioDefId ? [selectedRadioDefId] : []);
     } else {
         currentlySelectedIds = new Set(selectedDefinitionIds);
@@ -150,14 +150,14 @@ export function TodaysLearningModal({
   const pageInfo = {
     upskill: {
       icon: <BookOpenCheck className="h-12 w-12 mb-4" />,
-      title: 'Upskill Session Tasks',
-      description: 'Select the tasks you plan to focus on for this session slot.',
+      title: 'Upskill Session Task',
+      description: 'Select the task you plan to focus on for this session slot.',
       pageLink: '/upskill',
       pageName: 'Upskill'
     },
     deepwork: {
       icon: <Briefcase className="h-12 w-12 mb-4" />,
-      title: 'Deep Work Session Tasks',
+      title: 'Deep Work Session Task',
       description: 'Select a focus area for this session slot.',
       pageLink: '/deep-work',
       pageName: 'Deep Work'
@@ -187,7 +187,7 @@ export function TodaysLearningModal({
                 {allTasksForToday.length > 0 && (
                   <div>
                       <h4 className="mb-2 text-sm font-medium text-muted-foreground">Scheduled for Today</h4>
-                      {pageType === 'deepwork' ? (
+                      {pageType === 'deepwork' || pageType === 'upskill' ? (
                         <RadioGroup
                           value={selectedRadioDefId ?? ''}
                           onValueChange={setSelectedRadioDefId}
@@ -262,7 +262,7 @@ export function TodaysLearningModal({
         <DialogFooter>
             <Button onClick={handleSaveChanges} disabled={availableTasks.length === 0}>
                 <Save className="mr-2 h-4 w-4" />
-                Save Selections
+                Save Selection
             </Button>
         </DialogFooter>
       </DialogContent>
