@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -7,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/contexts/AuthContext';
 import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle, Link as LinkIcon, Save } from 'lucide-react';
 import type { ExerciseDefinition, Release, DatedWorkout, ActivityType as ActivityTypeType } from '@/types/workout'; // Renaming imported ActivityType to avoid conflict with lucide-react
-import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import { TransformWrapper, TransformComponent, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format, parseISO, differenceInDays } from 'date-fns';
@@ -124,14 +123,6 @@ interface MindMapViewerProps {
     showControls?: boolean;
 }
 
-const Controls = () => {
-  useEffect(() => {
-    // Re-center logic is removed as per user request.
-  }, []);
-  return null;
-};
-  
-
 export function MindMapViewer({ defaultView, showControls = true }: MindMapViewerProps) {
   const { toast } = useToast();
   const { 
@@ -150,6 +141,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   } = useAuth();
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const transformWrapperRef = useRef<ReactZoomPanPinchRef>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
   
   const timeSlots = [ 'Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night' ];
@@ -162,7 +154,6 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   // State for inline adding
   const [inlineAddInfo, setInlineAddInfo] = useState<{ parentReleaseId: string; newFeatureName: string } | null>(null);
 
-
   useEffect(() => {
     if (defaultView) {
         setSelectedTopic(defaultView);
@@ -170,6 +161,16 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         setSelectedTopic(showControls ? '' : 'Strategic Overview');
     }
   }, [defaultView, showControls]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+        if (transformWrapperRef.current) {
+            transformWrapperRef.current.centerView();
+        }
+    }, 100); // Small delay for content to render before centering
+
+    return () => clearTimeout(timer);
+  }, [mindMapData]); // Re-center whenever the mind map data changes
   
   const scheduledTaskInfo = useMemo(() => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -234,7 +235,6 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
           const loggedTime = ex.loggedSets.reduce((sum, set) => sum + set[timeField], 0);
           if (loggedTime > 0) {
             const existing = infoMap.get(ex.definitionId);
-            // Only set if not already logged under another type (to avoid double counting)
             if (!existing) {
               infoMap.set(ex.definitionId, { type: activityType, totalTime: loggedTime });
             }
@@ -687,89 +687,87 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
             <p className="text-xs text-muted-foreground capitalize">{node.category}</p>
           </div>
         </div>
-
-        {isSchedulable && !isLoggedToday && !isScheduledToday && !isPending && (
-            <Popover>
-                <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="absolute -right-2 -top-2 h-6 w-6 rounded-full bg-background border">
-                        <PlusCircle className="h-4 w-4 text-primary" />
-                    </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-48 p-1">
-                    <div className="flex flex-col">
-                        <p className="p-2 text-xs font-semibold text-muted-foreground">Schedule for Today</p>
-                        {timeSlots.map(slot => (
-                            <Button
-                                key={slot}
-                                variant="ghost"
-                                className="justify-start h-8 text-sm"
-                                onClick={() => {
-                                    if (activityTypeForNode) {
-                                        scheduleTaskFromMindMap(node.definitionId, activityTypeForNode, slot);
-                                    }
-                                }}
-                            >
-                                {slot}
-                            </Button>
-                        ))}
-                    </div>
-                </PopoverContent>
-            </Popover>
-        )}
-
+        
         {node.category === 'Release' && (
-            <Button variant="ghost" size="icon" className="absolute top-0 -right-2 h-6 w-6 rounded-full bg-background border"
+            <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-6 w-6"
                 onClick={() => setInlineAddInfo({ parentReleaseId: node.id, newFeatureName: '' })}
             >
                 <PlusCircle className="h-4 w-4 text-primary" />
             </Button>
         )}
         
-        {node.category === 'FocusArea' && (
-            <Popover open={isLinkLearningPopoverOpen && linkingLearningToFocusArea?.id === node.id} onOpenChange={(isOpen) => { if (!isOpen) { setIsLinkLearningPopoverOpen(false); } }}>
-                <PopoverTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute -right-2 -bottom-2 h-6 w-6 rounded-full bg-background border"
-                        onClick={() => handleOpenLinkLearningPopover(node)}
-                    >
-                        <BookCopy className="h-4 w-4 text-primary" />
-                    </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80">
-                    <div className="grid gap-4">
-                        <div className="space-y-2">
-                            <h4 className="font-medium leading-none">Link Learning to "{node.name}"</h4>
-                            <p className="text-sm text-muted-foreground">Select learning tasks that support this focus area.</p>
+        <div className="absolute top-0 right-0 flex">
+            {isSchedulable && !isLoggedToday && !isScheduledToday && !isPending && (
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                            <PlusCircle className="h-4 w-4 text-primary" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-48 p-1">
+                        <div className="flex flex-col">
+                            <p className="p-2 text-xs font-semibold text-muted-foreground">Schedule for Today</p>
+                            {timeSlots.map(slot => (
+                                <Button
+                                    key={slot}
+                                    variant="ghost"
+                                    className="justify-start h-8 text-sm"
+                                    onClick={() => {
+                                        if (activityTypeForNode) {
+                                            scheduleTaskFromMindMap(node.definitionId, activityTypeForNode, slot);
+                                        }
+                                    }}
+                                >
+                                    {slot}
+                                </Button>
+                            ))}
                         </div>
-                        <div className="py-2">
-                            <ScrollArea className="h-40 w-full rounded-md border p-2">
-                                {(loggedUpskillDefinitions || []).length > 0 ? (
-                                <div className="space-y-2">
-                                    {loggedUpskillDefinitions.map(upskillDef => (
-                                        <div key={upskillDef.id} className="flex items-center space-x-3">
-                                            <Checkbox
-                                                id={`link-popover-${upskillDef.id}`}
-                                                checked={editableLinkedUpskillIds.includes(upskillDef.id)}
-                                                onCheckedChange={() => handleToggleUpskillLink(upskillDef.id)}
-                                            />
-                                            <Label htmlFor={`link-popover-${upskillDef.id}`} className="font-normal w-full cursor-pointer">
-                                                {upskillDef.name} <span className="text-muted-foreground/80">({upskillDef.category})</span>
-                                            </Label>
-                                        </div>
-                                    ))}
-                                </div>
-                                ) : (
-                                    <p className="text-center text-sm text-muted-foreground p-4">No logged learning tasks found. Go to the Upskill page to log some progress.</p>
-                                )}
-                            </ScrollArea>
+                    </PopoverContent>
+                </Popover>
+            )}
+
+            {node.category === 'FocusArea' && (
+                <Popover open={isLinkLearningPopoverOpen && linkingLearningToFocusArea?.id === node.id} onOpenChange={(isOpen) => { if (!isOpen) { setIsLinkLearningPopoverOpen(false); } }}>
+                    <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenLinkLearningPopover(node)}>
+                            <BookCopy className="h-4 w-4 text-primary" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80">
+                        <div className="grid gap-4">
+                            <div className="space-y-2">
+                                <h4 className="font-medium leading-none">Link Learning to "{node.name}"</h4>
+                                <p className="text-sm text-muted-foreground">Select learning tasks that support this focus area.</p>
+                            </div>
+                            <div className="py-2">
+                                <ScrollArea className="h-40 w-full rounded-md border p-2">
+                                    {(loggedUpskillDefinitions || []).length > 0 ? (
+                                    <div className="space-y-2">
+                                        {loggedUpskillDefinitions.map(upskillDef => (
+                                            <div key={upskillDef.id} className="flex items-center space-x-3">
+                                                <Checkbox
+                                                    id={`link-popover-${upskillDef.id}`}
+                                                    checked={editableLinkedUpskillIds.includes(upskillDef.id)}
+                                                    onCheckedChange={() => handleToggleUpskillLink(upskillDef.id)}
+                                                />
+                                                <Label htmlFor={`link-popover-${upskillDef.id}`} className="font-normal w-full cursor-pointer">
+                                                    {upskillDef.name} <span className="text-muted-foreground/80">({upskillDef.category})</span>
+                                                </Label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    ) : (
+                                        <p className="text-center text-sm text-muted-foreground p-4">No logged learning tasks found. Go to the Upskill page to log some progress.</p>
+                                    )}
+                                </ScrollArea>
+                            </div>
+                            <Button onClick={handleSaveLinkedLearning}>Save Links</Button>
                         </div>
-                        <Button onClick={handleSaveLinkedLearning}>Save Links</Button>
-                    </div>
-                </PopoverContent>
-            </Popover>
-        )}
+                    </PopoverContent>
+                </Popover>
+            )}
+        </div>
+
 
         {(node.category === 'Release' || node.category === 'product' || node.category === 'service') && node.totalLoggedHours && node.totalLoggedHours > 0 && (
           <div className="mt-1 pt-1 border-t border-muted-foreground/20">
@@ -877,7 +875,8 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     >
         {selectedTopic && mindMapData ? (
           <TransformWrapper 
-            initialScale={0.15} 
+            ref={transformWrapperRef}
+            initialScale={0.6} 
             minScale={0.01} 
             limitToBounds={false}
           >
@@ -885,7 +884,6 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
               
               return (
               <>
-                <Controls />
                 <div className="absolute top-2 right-2 z-10 flex gap-2">
                   <Button size="icon" variant="outline" onClick={() => props.zoomIn()} aria-label="Zoom in">
                     <ZoomIn />
