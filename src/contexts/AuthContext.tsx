@@ -99,6 +99,7 @@ interface AuthContextType {
   offerizationPlans: Record<string, ProductizationPlan>;
   setOfferizationPlans: React.Dispatch<React.SetStateAction<Record<string, ProductizationPlan>>>;
   addFeatureToRelease: (release: Release, topic: string, featureName: string, type: 'product' | 'service') => void;
+  updateTopic: (oldTopicName: string, newTopicName: string, newClassification: 'product' | 'service') => void;
 
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
@@ -827,6 +828,62 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     toast({ title: "Exercise Swapped!", description: `Replaced "${oldExerciseName}" with "${newWorkoutExercise.name}".` });
   };
+  
+  const updateTopic = (oldTopicName: string, newTopicName: string, newClassification: 'product' | 'service') => {
+    const oldClassification = deepWorkTopicMetadata[oldTopicName]?.classification;
+    const classificationDidChange = oldClassification && oldClassification !== newClassification;
+
+    // Update definitions and logs
+    setDeepWorkDefinitions(prev => prev.map(def => def.category === oldTopicName ? { ...def, category: newTopicName as ExerciseCategory } : def));
+    setAllDeepWorkLogs(prev => prev.map(log => ({ ...log, exercises: log.exercises.map(ex => ex.category === oldTopicName ? { ...ex, category: newTopicName as ExerciseCategory } : ex) })));
+
+    // Update metadata
+    setDeepWorkTopicMetadata(prev => {
+        const newMeta = { ...prev };
+        const topicData = newMeta[oldTopicName] || { classification: oldClassification };
+        delete newMeta[oldTopicName];
+        newMeta[newTopicName] = { ...topicData, classification: newClassification };
+        return newMeta;
+    });
+
+    // Handle plans
+    if (classificationDidChange) {
+        if (oldClassification === 'product') {
+            const planToMove = productizationPlans[oldTopicName];
+            setProductizationPlans(prev => {
+                const newPlans = { ...prev };
+                delete newPlans[oldTopicName];
+                return newPlans;
+            });
+            if(planToMove) setOfferizationPlans(prev => ({ ...prev, [newTopicName]: planToMove }));
+        } else { // service -> product
+            const planToMove = offerizationPlans[oldTopicName];
+            setOfferizationPlans(prev => {
+                const newPlans = { ...prev };
+                delete newPlans[oldTopicName];
+                return newPlans;
+            });
+            if(planToMove) setProductizationPlans(prev => ({ ...prev, [newTopicName]: planToMove }));
+        }
+    } else {
+        const renameKey = (obj: any, oldKey: string, newKey: string) => {
+            const newObj = {...obj};
+            if (oldKey in newObj) {
+                newObj[newKey] = newObj[oldKey];
+                delete newObj[oldKey];
+            }
+            return newObj;
+        }
+
+        if (newClassification === 'product') {
+            setProductizationPlans(prev => renameKey(prev, oldTopicName, newTopicName));
+        } else {
+            setOfferizationPlans(prev => renameKey(prev, oldTopicName, newTopicName));
+        }
+    }
+
+    toast({ title: "Topic Updated", description: `"${oldTopicName}" has been updated to "${newTopicName}".`});
+  };
 
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
@@ -845,6 +902,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     productizationPlans, setProductizationPlans,
     offerizationPlans, setOfferizationPlans,
     addFeatureToRelease,
+    updateTopic,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
   };

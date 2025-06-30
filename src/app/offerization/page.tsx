@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,16 +28,39 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogFooter } from '@/components/ui/dialog';
+import { DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 
 function OfferizationPageContent() {
-  const { deepWorkDefinitions, setDeepWorkDefinitions, offerizationPlans, setOfferizationPlans, deepWorkTopicMetadata } = useAuth();
+  const { deepWorkDefinitions, setDeepWorkDefinitions, offerizationPlans, setOfferizationPlans, deepWorkTopicMetadata, updateTopic } = useAuth();
   const { toast } = useToast();
   const [newActionTasks, setNewActionTasks] = useState<Record<string, string>>({});
   
   // State for release planning
   const [editingRelease, setEditingRelease] = useState<{ topic: string; release: Partial<Release> } | null>(null);
   const [selectedReleaseForTask, setSelectedReleaseForTask] = useState<Record<string, string>>({});
+
+  const [editingTopic, setEditingTopic] = useState<string | null>(null);
+  const [newTopicName, setNewTopicName] = useState('');
+  const [newTopicClassification, setNewTopicClassification] = useState<'product' | 'service'>('product');
+
+  useEffect(() => {
+    if (editingTopic) {
+        setNewTopicName(editingTopic);
+        setNewTopicClassification(deepWorkTopicMetadata[editingTopic]?.classification || 'product');
+    }
+  }, [editingTopic, deepWorkTopicMetadata]);
+
+  const handleSaveTopic = () => {
+    if (!editingTopic || !newTopicName.trim()) {
+        toast({ title: "Error", description: "Topic name cannot be empty.", variant: "destructive" });
+        return;
+    }
+    updateTopic(editingTopic, newTopicName.trim(), newTopicClassification);
+    setEditingTopic(null);
+  };
 
   const topics = useMemo(() => {
     const topicMap = new Map<string, ExerciseDefinition[]>();
@@ -327,10 +350,15 @@ function OfferizationPageContent() {
             return (
                 <Card key={topic} className="flex flex-col">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-3">
-                        <Briefcase className="h-5 w-5 text-primary"/>
-                        {topic}
-                    </CardTitle>
+                    <div className="flex justify-between items-start">
+                        <CardTitle className="flex items-center gap-3">
+                            <Briefcase className="h-5 w-5 text-primary"/>
+                            {topic}
+                        </CardTitle>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingTopic(topic)}>
+                            <Edit className="h-4 w-4" />
+                        </Button>
+                    </div>
                     <CardDescription>{focusAreas.length} focus area(s)</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow space-y-4">
@@ -535,6 +563,37 @@ function OfferizationPageContent() {
           })}
         </div>
       </div>
+      <Dialog open={!!editingTopic} onOpenChange={(isOpen) => !isOpen && setEditingTopic(null)}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Edit Topic</DialogTitle>
+                <DialogDescription>Rename the topic or change its classification. This will affect all associated focus areas and plans.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                    <Label htmlFor="topic-name">Topic Name</Label>
+                    <Input id="topic-name" value={newTopicName} onChange={(e) => setNewTopicName(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                    <Label>Classification</Label>
+                    <RadioGroup value={newTopicClassification} onValueChange={(v) => setNewTopicClassification(v as 'product' | 'service')} className="flex gap-4 pt-1">
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="product" id="class-product" />
+                            <Label htmlFor="class-product" className="font-normal">Product</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="service" id="class-service" />
+                            <Label htmlFor="class-service" className="font-normal">Service</Label>
+                        </div>
+                    </RadioGroup>
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingTopic(null)}>Cancel</Button>
+                <Button onClick={handleSaveTopic}>Save Changes</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo } from 'react';
@@ -10,7 +11,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, parse, getISOWeek, isMonday, getYear, subYears, addDays, parseISO } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, WeightLog, Gender, DecompositionRow } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, WeightLog, Gender, DecompositionRow, ProductizationPlan } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -72,6 +73,8 @@ function DeepWorkPageContent() {
     gender, setGender,
     allDeepWorkLogs, setAllDeepWorkLogs,
     deepWorkDefinitions, setDeepWorkDefinitions,
+    setProductizationPlans,
+    setOfferizationPlans,
     upskillDefinitions, allUpskillLogs,
     deepWorkTopicMetadata, setDeepWorkTopicMetadata,
   } = useAuth();
@@ -270,11 +273,30 @@ function DeepWorkPageContent() {
 
   const handleDeleteExerciseDefinition = (id: string) => {
     const defToDelete = deepWorkDefinitions.find(def => def.id === id);
+    if (!defToDelete) return;
 
     setDeepWorkDefinitions(prev => prev.filter(def => def.id !== id));
+    
     setAllDeepWorkLogs(prevLogs => 
       prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) }))
     );
+
+    const cleanPlans = (plans: Record<string, ProductizationPlan>) => {
+        const newPlans = { ...plans };
+        for (const topic in newPlans) {
+            if (newPlans[topic].releases) {
+                newPlans[topic].releases = newPlans[topic].releases?.map(release => ({
+                    ...release,
+                    focusAreaIds: (release.focusAreaIds || []).filter(faId => faId !== id)
+                }));
+            }
+        }
+        return newPlans;
+    }
+
+    if (setProductizationPlans) setProductizationPlans(cleanPlans);
+    if (setOfferizationPlans) setOfferizationPlans(cleanPlans);
+    
     toast({ title: "Success", description: `Focus Area "${defToDelete?.name}" removed.` });
   };
 
