@@ -204,8 +204,8 @@ function MindMapPageContent() {
     return pendingInfo;
   }, [schedule, allUpskillLogs, allDeepWorkLogs]);
 
-  const pastCompletedTaskInfo = useMemo(() => {
-    const info = new Set<string>();
+  const pastLoggedTaskInfo = useMemo(() => {
+    const info: Record<string, { lastLogDate: string }> = {};
     const todayStr = format(new Date(), 'yyyy-MM-dd');
 
     const processLogs = (logs: DatedWorkout[]) => {
@@ -213,7 +213,12 @@ function MindMapPageContent() {
             if (log.date < todayStr) {
                 (log.exercises || []).forEach(ex => {
                     if ((ex.loggedSets || []).length > 0) {
-                        info.add(ex.definitionId);
+                        if (!info[ex.definitionId]) {
+                            info[ex.definitionId] = { lastLogDate: '1970-01-01' };
+                        }
+                        if (log.date > info[ex.definitionId].lastLogDate) {
+                            info[ex.definitionId].lastLogDate = log.date;
+                        }
                     }
                 });
             }
@@ -387,12 +392,12 @@ function MindMapPageContent() {
     const loggedInfo = loggedTaskInfo[node.definitionId];
     const scheduledInfo = scheduledTaskInfo.get(node.definitionId);
     const pendingInfoForNode = pendingTaskInfo.get(node.definitionId);
-    const isCompletedInPast = pastCompletedTaskInfo.has(node.definitionId);
+    const pastLogInfo = pastLoggedTaskInfo[node.definitionId];
 
     const isLoggedToday = !!loggedInfo;
     const isScheduledToday = !!scheduledInfo;
     const isPending = !!pendingInfoForNode && !isLoggedToday && !isScheduledToday;
-    const isPastAndDone = isCompletedInPast && !isLoggedToday && !isScheduledToday && !isPending;
+    const isPastAndDone = pastLogInfo && !isLoggedToday && !isScheduledToday && !isPending;
 
     let daysPending = 0;
     if (isPending && pendingInfoForNode) {
@@ -440,7 +445,8 @@ function MindMapPageContent() {
         ) : isPastAndDone ? (
             <div className="mt-1 pt-1 border-t flex items-center gap-1.5 text-xs text-green-800 dark:text-green-400">
                 <Check className="h-4 w-4 flex-shrink-0" />
-                <span className="font-medium">Completed in Past</span>
+                <span className="font-medium">Logged</span>
+                <span className="ml-auto font-mono">{format(parseISO(pastLogInfo.lastLogDate), 'MMM dd')}</span>
             </div>
         ) : null}
       </div>
