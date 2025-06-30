@@ -27,14 +27,12 @@ export function Header() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   const navLinks = [
-    { href: '/my-plate', label: 'My Plate' },
     { href: '/workout-tracker', label: 'Workout Tracker' },
     { href: '/upskill', label: 'Upskill' },
     { href: '/deep-work', label: 'Deep Work' },
     { href: '/personal-branding', label: 'Personal Branding' },
     { href: '/lead-generation', label: 'Lead Gen' },
     { href: '/offer-system', label: 'Offer System' },
-    { href: '/monetization-engine', label: 'Monetization' },
     { href: '/productization', label: 'Productization' },
     { href: '/offerization', label: 'Offerization' },
     { href: '/matrix', label: 'Matrix' },
