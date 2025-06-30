@@ -1,5 +1,4 @@
-
-"use client";
+"use client"
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
@@ -18,6 +17,7 @@ import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 
 interface TodaysLearningModalProps {
   isOpen: boolean;
@@ -74,13 +74,20 @@ export function TodaysLearningModal({
   pageType,
   disabledTaskIds = [],
 }: TodaysLearningModalProps) {
-  const [selectedDefinitionIds, setSelectedDefinitionIds] = useState<string[]>([]);
+  const [selectedDefinitionIds, setSelectedDefinitionIds] = useState<string[]>(initialSelectedIds);
+  const [selectedRadioDefId, setSelectedRadioDefId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
-      setSelectedDefinitionIds(initialSelectedIds);
+      if (pageType === 'deepwork') {
+        setSelectedRadioDefId(initialSelectedIds.length > 0 ? initialSelectedIds[0] : null);
+        setSelectedDefinitionIds([]); // Clear checkbox state
+      } else {
+        setSelectedDefinitionIds(initialSelectedIds);
+        setSelectedRadioDefId(null); // Clear radio state
+      }
     }
-  }, [isOpen, initialSelectedIds]);
+  }, [isOpen, initialSelectedIds, pageType]);
 
   const handleToggleSelection = (defId: string) => {
     setSelectedDefinitionIds(currentIds => {
@@ -93,46 +100,52 @@ export function TodaysLearningModal({
       return Array.from(newIds);
     });
   };
-  
+
   const handleAddAndSelect = (defId: string) => {
-    setSelectedDefinitionIds(currentIds => {
-        const newIds = new Set(currentIds);
-        newIds.add(defId);
-        return Array.from(newIds);
-    });
+    if (pageType === 'deepwork') {
+      setSelectedRadioDefId(defId);
+    } else {
+      setSelectedDefinitionIds(currentIds => Array.from(new Set([...currentIds, defId])));
+    }
   };
 
   const handleSaveChanges = () => {
-    onSave(selectedDefinitionIds);
+    if (pageType === 'deepwork') {
+      onSave(selectedRadioDefId ? [selectedRadioDefId] : []);
+    } else {
+      onSave(selectedDefinitionIds);
+    }
     onOpenChange(false);
   };
   
-  const { scheduledTasks, libraryTasks } = useMemo(() => {
-    // This Set holds the definition IDs of tasks already logged for today.
-    const todaysDefIdsInLog = new Set(availableTasks.filter(t => !t.id.startsWith('lib-')).map(t => t.definitionId));
+  const { allTasksForToday, libraryTasks } = useMemo(() => {
+    const todaysLogDefIds = new Set(availableTasks.filter(t => !t.id.startsWith('lib-')).map(t => t.definitionId));
     
-    // This Set holds the definition IDs of all tasks that should appear in the top list (scheduled/selected).
-    const allConsideredDefIds = new Set([...todaysDefIdsInLog, ...selectedDefinitionIds]);
+    let currentlySelectedIds: Set<string>;
+    if (pageType === 'deepwork') {
+        currentlySelectedIds = new Set(selectedRadioDefId ? [selectedRadioDefId] : []);
+    } else {
+        currentlySelectedIds = new Set(selectedDefinitionIds);
+    }
+    
+    const allConsideredDefIds = new Set([...todaysLogDefIds, ...currentlySelectedIds]);
 
     const scheduled: WorkoutExercise[] = [];
     const library: WorkoutExercise[] = [];
-    
-    // To prevent any visual duplication, we track which definition IDs have been processed.
     const processedDefIds = new Set<string>();
 
     availableTasks.forEach(task => {
-      if (processedDefIds.has(task.definitionId)) return;
+        if (processedDefIds.has(task.definitionId)) return;
 
-      if (allConsideredDefIds.has(task.definitionId)) {
-        scheduled.push(task);
-      } else {
-        library.push(task);
-      }
-      processedDefIds.add(task.definitionId);
+        if (allConsideredDefIds.has(task.definitionId)) {
+            scheduled.push(task);
+        } else {
+            library.push(task);
+        }
+        processedDefIds.add(task.definitionId);
     });
-
-    return { scheduledTasks: scheduled, libraryTasks: library };
-  }, [availableTasks, selectedDefinitionIds]);
+    return { allTasksForToday: scheduled, libraryTasks: library };
+  }, [availableTasks, selectedDefinitionIds, selectedRadioDefId, pageType]);
   
   const pageInfo = {
     upskill: {
@@ -145,7 +158,7 @@ export function TodaysLearningModal({
     deepwork: {
       icon: <Briefcase className="h-12 w-12 mb-4" />,
       title: 'Deep Work Session Tasks',
-      description: 'Select the focus areas for this session slot.',
+      description: 'Select a focus area for this session slot.',
       pageLink: '/deep-work',
       pageName: 'Deep Work'
     },
@@ -171,20 +184,48 @@ export function TodaysLearningModal({
           <ScrollArea className="h-full pr-4">
             {availableTasks.length > 0 ? (
               <div className="space-y-4">
-                {scheduledTasks.length > 0 && (
+                {allTasksForToday.length > 0 && (
                   <div>
                       <h4 className="mb-2 text-sm font-medium text-muted-foreground">Scheduled for Today</h4>
-                      <div className="space-y-2">
-                        {scheduledTasks.map(task => (
-                           <ScheduledTaskItem 
-                            key={task.id} 
-                            task={task} 
-                            isDisabled={disabledTaskIds.includes(task.definitionId)}
-                            selected={selectedDefinitionIds.includes(task.definitionId)}
-                            onToggle={() => handleToggleSelection(task.definitionId)}
-                          />
-                        ))}
-                      </div>
+                      {pageType === 'deepwork' ? (
+                        <RadioGroup
+                          value={selectedRadioDefId ?? ''}
+                          onValueChange={setSelectedRadioDefId}
+                          className="space-y-2"
+                        >
+                          {allTasksForToday.map(task => (
+                            <div key={task.id} className="flex items-center space-x-3 p-3 rounded-md border has-[[data-state=checked]]:bg-muted/50 transition-colors">
+                              <RadioGroupItem
+                                value={task.definitionId}
+                                id={`task-radio-${task.id}`}
+                                disabled={disabledTaskIds.includes(task.definitionId)}
+                              />
+                              <Label
+                                htmlFor={`task-radio-${task.id}`}
+                                className={cn(
+                                  "font-normal w-full",
+                                  disabledTaskIds.includes(task.definitionId) ? "cursor-not-allowed text-muted-foreground/50" : "cursor-pointer"
+                                )}
+                              >
+                                <p className="font-medium">{task.name}</p>
+                                <p className="text-xs text-muted-foreground">{task.category}</p>
+                              </Label>
+                            </div>
+                          ))}
+                        </RadioGroup>
+                      ) : (
+                        <div className="space-y-2">
+                          {allTasksForToday.map(task => (
+                             <ScheduledTaskItem 
+                              key={task.id} 
+                              task={task} 
+                              isDisabled={disabledTaskIds.includes(task.definitionId)}
+                              selected={selectedDefinitionIds.includes(task.definitionId)}
+                              onToggle={() => handleToggleSelection(task.definitionId)}
+                            />
+                          ))}
+                        </div>
+                      )}
                   </div>
                 )}
                 
