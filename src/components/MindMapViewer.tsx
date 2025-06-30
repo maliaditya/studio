@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, ActivityType } from 'lucide-react';
-import type { ExerciseDefinition, Release, DatedWorkout } from '@/types/workout';
+import type { ExerciseDefinition, Release, DatedWorkout, ActivityType as ActivityTypeType } from '@/types/workout'; // Renaming imported ActivityType to avoid conflict with lucide-react
 import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -117,12 +117,11 @@ interface MindMapViewerProps {
 
 // This helper component is rendered inside TransformWrapper to get access to its context
 const Controls = () => {
-    const { centerView } = useControls();
-    useEffect(() => {
-        // Use a timeout to ensure the element is rendered and positioned
-        setTimeout(() => centerView(), 100);
-    }, [centerView]);
-    return null;
+  const { centerView } = useControls();
+  useEffect(() => {
+    // Re-center logic is removed as per user request.
+  }, [centerView]);
+  return null;
 };
   
 
@@ -136,7 +135,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
       schedule,
       allUpskillLogs,
       allDeepWorkLogs,
-      allBrandingLogs,
+      brandingLogs,
   } = useAuth();
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -153,12 +152,12 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   const scheduledTaskInfo = useMemo(() => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const todaysActivities = schedule[todayKey];
-    const infoMap = new Map<string, { slot: string; type: ActivityType }[]>();
+    const infoMap = new Map<string, { slot: string; type: ActivityTypeType }[]>();
 
     if (!todaysActivities) return infoMap;
 
     const instanceIdToDefIdMap = new Map<string, string>();
-    const logs = [...allUpskillLogs, ...allDeepWorkLogs, ...allBrandingLogs];
+    const logs = [...allUpskillLogs, ...allDeepWorkLogs, ...brandingLogs];
     const todayLogs = logs.filter(log => log.date === todayKey);
 
     todayLogs.forEach(log => {
@@ -175,7 +174,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
           const defId = instanceIdToDefIdMap.get(instanceId);
           if (!defId) return;
 
-          const addInfo = (definitionId: string, activityType: ActivityType) => {
+          const addInfo = (definitionId: string, activityType: ActivityTypeType) => {
               if (!infoMap.has(definitionId)) {
                   infoMap.set(definitionId, []);
               }
@@ -200,7 +199,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     });
 
     return infoMap;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, allBrandingLogs, deepWorkDefinitions]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs, deepWorkDefinitions]);
   
   const loggedTaskInfo = useMemo(() => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -228,11 +227,11 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   }, [allUpskillLogs, allDeepWorkLogs]);
 
   const pendingTaskInfo = useMemo(() => {
-    const pendingInfo = new Map<string, { oldestDate: string, type: ActivityType }[]>();
+    const pendingInfo = new Map<string, { oldestDate: string; type: ActivityTypeType }[]>();
     const todayStr = format(new Date(), 'yyyy-MM-dd');
 
     const instanceIdToDefIdMap = new Map<string, string>();
-    [...allUpskillLogs, ...allDeepWorkLogs, ...allBrandingLogs].forEach(log => {
+    [...allUpskillLogs, ...allDeepWorkLogs, ...brandingLogs].forEach(log => {
         (log.exercises || []).forEach(ex => {
             if (ex.id && ex.definitionId) {
               instanceIdToDefIdMap.set(ex.id, ex.definitionId);
@@ -250,7 +249,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                             const defId = instanceIdToDefIdMap.get(taskId);
                             if (!defId) return;
 
-                            const addInfo = (definitionId: string, activityType: ActivityType) => {
+                            const addInfo = (definitionId: string, activityType: ActivityTypeType) => {
                                 if (!pendingInfo.has(definitionId)) {
                                     pendingInfo.set(definitionId, []);
                                 }
@@ -280,7 +279,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         }
     });
     return pendingInfo;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, allBrandingLogs, deepWorkDefinitions]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs, deepWorkDefinitions]);
 
   const pastLoggedTaskInfo = useMemo(() => {
     const taskLogs: Record<string, { date: string; time: number }[]> = {};
@@ -512,7 +511,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     if (!nodeIcons[iconKey] && level >= 4) iconKey = 'FocusArea';
 
     const scheduledActivities = scheduledTaskInfo.get(node.definitionId);
-    let activityTypeToShow: ActivityType | undefined;
+    let activityTypeToShow: ActivityTypeType | undefined;
 
     if (parentNode?.category === 'Release' || parentNode?.category === 'product' || parentNode?.category === 'service' || parentNode?.name === 'Products' || parentNode?.name === 'Services') {
       activityTypeToShow = 'deepwork';
@@ -708,4 +707,3 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     </div>
   );
 }
-
