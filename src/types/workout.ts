@@ -56,6 +56,7 @@ export interface ExerciseDefinition {
   focusAreaIds?: string[];
   sourceUpskillId?: string;
   linkedUpskillIds?: string[];
+  linkedDeepWorkIds?: string[];
   isReadyForBranding?: boolean;
   // Personal Branding
   brandingStatus?: 'converted' | 'published';

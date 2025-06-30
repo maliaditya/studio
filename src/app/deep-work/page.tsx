@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Puzzle, ChevronDown, ChevronUp, Briefcase, LineChart as LineChartIcon, BookCopy, ClipboardList } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Puzzle, ChevronDown, ChevronUp, Briefcase, LineChart as LineChartIcon, BookCopy, ClipboardList, Link as LinkIcon } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +26,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { WorkoutHeatmap } from '@/components/WorkoutHeatmap';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +42,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter
 } from "@/components/ui/dialog";
 import { WeightChartModal } from '@/components/WeightChartModal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -53,6 +53,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 const DEFAULT_TARGET_SESSIONS = 1;
@@ -109,6 +110,11 @@ function DeepWorkPageContent() {
   const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
   const [isDetailsEditing, setIsDetailsEditing] = useState(false);
   const [editableLinkedUpskillIds, setEditableLinkedUpskillIds] = useState<string[]>([]);
+  
+  // State for linking deep work modal
+  const [isLinkDeepWorkModalOpen, setIsLinkDeepWorkModalOpen] = useState(false);
+  const [linkingFocusArea, setLinkingFocusArea] = useState<ExerciseDefinition | null>(null);
+  const [editableLinkedDeepWorkIds, setEditableLinkedDeepWorkIds] = useState<string[]>([]);
 
   const allTopics = useMemo(() => {
     const topics = new Set(deepWorkDefinitions.map(def => def.category));
@@ -409,6 +415,35 @@ function DeepWorkPageContent() {
     setIsDetailsEditing(false);
     toast({ title: "Saved", description: "Focus area details have been updated." });
   };
+  
+  const handleOpenLinkDeepWorkModal = (def: ExerciseDefinition) => {
+    setLinkingFocusArea(def);
+    setEditableLinkedDeepWorkIds(def.linkedDeepWorkIds || []);
+    setIsLinkDeepWorkModalOpen(true);
+  };
+
+  const handleToggleDeepWorkLink = (deepWorkId: string) => {
+      setEditableLinkedDeepWorkIds(currentIds => {
+          const newIds = new Set(currentIds);
+          if (newIds.has(deepWorkId)) {
+              newIds.delete(deepWorkId);
+          } else {
+              newIds.add(deepWorkId);
+          }
+          return Array.from(newIds);
+      });
+  };
+
+  const handleSaveDeepWorkLinks = () => {
+      if (!linkingFocusArea) return;
+      setDeepWorkDefinitions(prevDefs => prevDefs.map(def =>
+          def.id === linkingFocusArea.id
+              ? { ...def, linkedDeepWorkIds: editableLinkedDeepWorkIds }
+              : def
+      ));
+      setIsLinkDeepWorkModalOpen(false);
+      toast({ title: "Saved", description: "Deep work links have been updated." });
+  };
 
   const handleLogWeight = (weight: number, date: Date) => {
     if (!currentUser) return;
@@ -593,11 +628,18 @@ function DeepWorkPageContent() {
                                                   {def.linkedUpskillIds.length}
                                                 </Badge>
                                               )}
+                                              {def.linkedDeepWorkIds && def.linkedDeepWorkIds.length > 0 && (
+                                                <Badge variant="outline" className="text-xs">
+                                                    <Briefcase className="h-3 w-3 mr-1" />
+                                                    {def.linkedDeepWorkIds.length}
+                                                </Badge>
+                                              )}
                                             </div>
                                         </div>
                                         <div className="flex-shrink-0 flex items-center">
                                           <Button variant="ghost" size="icon" onClick={() => handleOpenDetailsModal(def)} className="h-8 w-8 text-muted-foreground hover:text-yellow-500" aria-label={`View details for ${def.name}`}> <ClipboardList className="h-4 w-4" /> </Button>
                                           <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
+                                          <Button variant="ghost" size="icon" onClick={() => handleOpenLinkDeepWorkModal(def)} className="h-8 w-8 text-muted-foreground hover:text-purple-500" aria-label={`Link other work to ${def.name}`}> <LinkIcon className="h-4 w-4" /> </Button>
                                           <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8 text-muted-foreground hover:text-primary" aria-label={`Edit ${def.name}`}> <Edit3 className="h-4 w-4" /> </Button>
                                           <Button variant="ghost" size="icon" onClick={() => handleDeleteExerciseDefinition(def.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label={`Delete ${def.name}`}> <Trash2 className="h-4 w-4" /> </Button>
                                           <Button variant="ghost" size="icon" onClick={() => handleAddTaskToSession(def)} className="h-8 w-8 text-muted-foreground hover:text-accent" aria-label={`Add ${def.name} to session`}> <ChevronRight className="h-5 w-5" /> </Button>
@@ -880,6 +922,43 @@ function DeepWorkPageContent() {
               )}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isLinkDeepWorkModalOpen} onOpenChange={setIsLinkDeepWorkModalOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Link work to: {linkingFocusArea?.name}</DialogTitle>
+            <DialogDescription>
+              Select other focus areas to link as related or foundational work.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <ScrollArea className="h-72 w-full">
+              <div className="pr-6 space-y-2">
+                {deepWorkDefinitions
+                  .filter(def => def.id !== linkingFocusArea?.id)
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map(def => (
+                    <div key={def.id} className="flex items-center space-x-3 p-2 rounded-md border has-[[data-state=checked]]:bg-muted/50 transition-colors">
+                        <Checkbox
+                            id={`deepwork-link-${def.id}`}
+                            checked={editableLinkedDeepWorkIds.includes(def.id)}
+                            onCheckedChange={() => handleToggleDeepWorkLink(def.id)}
+                        />
+                        <Label htmlFor={`deepwork-link-${def.id}`} className="font-normal w-full cursor-pointer">
+                            {def.name}
+                            <span className="text-muted-foreground ml-2 text-xs">({def.category})</span>
+                        </Label>
+                    </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+           <DialogFooter>
+              <Button variant="outline" onClick={() => setIsLinkDeepWorkModalOpen(false)}>Cancel</Button>
+              <Button onClick={handleSaveDeepWorkLinks}>Save Links</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
