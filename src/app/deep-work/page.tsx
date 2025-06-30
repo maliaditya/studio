@@ -723,11 +723,11 @@ function DeepWorkPageContent() {
                       ) : (
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                           <AnimatePresence>
-                          {currentWorkoutExercises.map(exercise => {
+                          {currentWorkoutExercises.map((exercise, index) => {
                               const definition = deepWorkDefinitions.find(def => def.id === exercise.definitionId);
                               return (
                                 <WorkoutExerciseCard 
-                                  key={exercise.id} 
+                                  key={`${exercise.id}-${index}`} 
                                   exercise={exercise}
                                   onLogSet={handleLogSet} 
                                   onDeleteSet={handleDeleteSet} 
