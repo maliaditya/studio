@@ -11,7 +11,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, parse, getISOWeek, isMonday, getYear, subYears, addDays, parseISO } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, WeightLog, Gender, DecompositionRow, ProductizationPlan } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, WeightLog, Gender, ProductizationPlan } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -108,56 +108,7 @@ function DeepWorkPageContent() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
   const [isDetailsEditing, setIsDetailsEditing] = useState(false);
-  const [editableDecompositionData, setEditableDecompositionData] = useState<DecompositionRow[]>([]);
   const [editableLinkedUpskillIds, setEditableLinkedUpskillIds] = useState<string[]>([]);
-  
-  const decompositionTechniques: DecompositionRow[] = [
-    {
-      technique: "📏 Unit Consistency",
-      description: "Define `1 unit = 1 meter` for realism and coherence",
-      useCases: "Accurately sizing doors, walls, furniture; physics-based movement",
-    },
-    {
-      technique: "🧵 Texture Optimization",
-      description: "Use `.jpg` for color, `.png` for normals; tile and wrap correctly",
-      useCases: "Optimizing texture memory; preventing seams; enhancing visual fidelity",
-    },
-    {
-      technique: "📐 Geometry Reuse",
-      description: "Reuse geometries like `SphereGeometry` or `BoxGeometry`",
-      useCases: "Multiple bushes or graves; instancing; reducing GPU load",
-    },
-    {
-      technique: "🎲 Randomization Techniques",
-      description: "Use `Math.random()` for variation in placement, rotation, scale",
-      useCases: "Scattering graves, rocks, vegetation; procedural generation",
-    },
-    {
-      technique: "👻 Ghosts",
-      description: "Orbiting point lights with sine/cosine and oscillating Y position",
-      useCases: "Spooky floating effects; animated magical particles",
-    },
-    {
-      technique: "🧱 Z-Fighting Avoidance",
-      description: "Slightly offset objects to prevent flickering surface artifacts",
-      useCases: "Overlapping meshes like door-on-wall or decals-on-geometry",
-    },
-    {
-      technique: "🔦 Shadow Optimization",
-      description: "Use low-res shadow maps and tight shadow camera bounds",
-      useCases: "Improve FPS while maintaining soft shadows",
-    },
-    {
-      technique: "🌫️ Fog Integration",
-      description: "Match fog color to sky for seamless blending",
-      useCases: "Distant hills, mystery atmosphere, depth cueing in large outdoor scenes",
-    },
-    {
-      technique: "🔁 Circular Motion (Orbits)",
-      description: "Animate objects using `Math.sin()` and `Math.cos()`",
-      useCases: "Ghosts orbiting a house, rotating planets, flying creatures around targets",
-    },
-  ];
 
   const allTopics = useMemo(() => {
     const topics = new Set(deepWorkDefinitions.map(def => def.category));
@@ -431,18 +382,9 @@ function DeepWorkPageContent() {
   
   const handleOpenDetailsModal = (def: ExerciseDefinition) => {
     setSelectedFocusArea(def);
-    setEditableDecompositionData(Array.isArray(def.decompositionData) ? def.decompositionData : decompositionTechniques);
     setEditableLinkedUpskillIds(def.linkedUpskillIds || []);
     setIsDetailsModalOpen(true);
     setIsDetailsEditing(false);
-  };
-
-  const handleDecompositionChange = (index: number, field: keyof DecompositionRow, value: string) => {
-    setEditableDecompositionData(currentData => {
-        const newData = [...currentData];
-        newData[index] = { ...newData[index], [field]: value };
-        return newData;
-    });
   };
 
   const handleToggleUpskillLink = (upskillId: string) => {
@@ -461,7 +403,7 @@ function DeepWorkPageContent() {
     if (!selectedFocusArea) return;
     setDeepWorkDefinitions(prevDefs => prevDefs.map(def =>
         def.id === selectedFocusArea.id
-            ? { ...def, decompositionData: editableDecompositionData, linkedUpskillIds: editableLinkedUpskillIds }
+            ? { ...def, linkedUpskillIds: editableLinkedUpskillIds }
             : def
     ));
     setIsDetailsEditing(false);
@@ -861,7 +803,7 @@ function DeepWorkPageContent() {
       />
 
       <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
-        <DialogContent className="sm:max-w-4xl">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader className="flex flex-row justify-between items-center">
             <DialogTitle>Details for: {selectedFocusArea?.name}</DialogTitle>
             <div className="flex-shrink-0">
@@ -936,47 +878,6 @@ function DeepWorkPageContent() {
                     <p className="text-sm text-muted-foreground">No learning tasks linked. Click edit to add some.</p>
                  )
               )}
-            </div>
-
-            <Separator/>
-
-            {/* Decomposition Section */}
-            <div>
-              <h4 className="font-semibold mb-2 text-foreground">Decomposition Techniques</h4>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[200px]">Technique</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Use Cases</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {Array.isArray(editableDecompositionData) && editableDecompositionData.map((item, index) => (
-                    <TableRow key={index}>
-                      {isDetailsEditing ? (
-                        <>
-                          <TableCell className="align-top">
-                            <Textarea value={item.technique} onChange={(e) => handleDecompositionChange(index, 'technique', e.target.value)} className="min-h-[60px]" />
-                          </TableCell>
-                          <TableCell className="align-top">
-                            <Textarea value={item.description} onChange={(e) => handleDecompositionChange(index, 'description', e.target.value)} className="min-h-[60px]" />
-                          </TableCell>
-                          <TableCell className="align-top">
-                            <Textarea value={item.useCases} onChange={(e) => handleDecompositionChange(index, 'useCases', e.target.value)} className="min-h-[60px]" />
-                          </TableCell>
-                        </>
-                      ) : (
-                        <>
-                          <TableCell className="font-medium align-top">{item.technique}</TableCell>
-                          <TableCell className="align-top">{item.description}</TableCell>
-                          <TableCell className="align-top">{item.useCases}</TableCell>
-                        </>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
             </div>
           </div>
         </DialogContent>
