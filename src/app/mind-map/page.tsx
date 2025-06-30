@@ -52,8 +52,8 @@ function MindMapPageContent() {
   }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata]);
 
   const renderNode = (node: MindMapNode, level: number) => (
-    <div key={node.id} className="flex items-center">
-      {/* Node Box */}
+    <div className="flex items-center">
+      {/* Node Box: The visual representation of a single node */}
       <div className="flex-shrink-0 w-64 p-3 rounded-lg shadow-md bg-card border">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center h-8 w-8 rounded-full bg-muted flex-shrink-0">
@@ -74,15 +74,23 @@ function MindMapPageContent() {
         </div>
       </div>
   
-      {/* Children */}
+      {/* Children and Connectors */}
       {node.children && node.children.length > 0 && (
-        <div className="flex items-center">
-          {/* Connector Line */}
-          <div className="w-8 h-px bg-border" />
-          {/* Vertical stack for children */}
-          <div className="flex flex-col gap-4">
-            {node.children.map(child => renderNode(child, level + 1))}
-          </div>
+        <div className="flex">
+          {/* Horizontal line extending from the parent node */}
+          <div className="w-8 h-px bg-border self-center" />
+  
+          {/* List of children with a vertical connector line */}
+          <ul className="flex flex-col justify-center border-l border-border pl-8 space-y-8 py-4">
+            {node.children.map(child => (
+              <li key={child.id} className="relative">
+                {/* Horizontal line from the vertical connector to the child node */}
+                <div className="absolute -left-8 top-1/2 w-8 h-px bg-border" />
+                {/* Recursively render the child node and its own children */}
+                {renderNode(child, level + 1)}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
