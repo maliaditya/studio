@@ -100,6 +100,7 @@ interface AuthContextType {
   setOfferizationPlans: React.Dispatch<React.SetStateAction<Record<string, ProductizationPlan>>>;
   addFeatureToRelease: (release: Release, topic: string, featureName: string, type: 'product' | 'service') => void;
   updateTopic: (oldTopicName: string, newTopicName: string, newClassification: 'product' | 'service') => void;
+  deleteTopic: (topic: string) => void;
 
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
@@ -885,6 +886,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Topic Updated", description: `"${oldTopicName}" has been updated to "${newTopicName}".`});
   };
 
+  const deleteTopic = (topicToDelete: string) => {
+    const focusAreaIdsToDelete = deepWorkDefinitions
+        .filter(def => def.category === topicToDelete)
+        .map(def => def.id);
+
+    setDeepWorkDefinitions(prev => prev.filter(def => def.category !== topicToDelete));
+    
+    setDeepWorkTopicMetadata(prev => {
+        const newMeta = { ...prev };
+        delete newMeta[topicToDelete];
+        return newMeta;
+    });
+
+    setProductizationPlans(prev => {
+        const newPlans = { ...prev };
+        delete newPlans[topicToDelete];
+        return newPlans;
+    });
+    setOfferizationPlans(prev => {
+        const newPlans = { ...prev };
+        delete newPlans[topicToDelete];
+        return newPlans;
+    });
+
+    setAllDeepWorkLogs(prevLogs =>
+        prevLogs.map(log => ({
+            ...log,
+            exercises: log.exercises.filter(ex => !focusAreaIdsToDelete.includes(ex.definitionId))
+        })).filter(log => log.exercises.length > 0)
+    );
+    
+    toast({
+        title: "Topic Deleted",
+        description: `The topic "${topicToDelete}" and all its associated data have been deleted.`,
+        variant: "destructive"
+    });
+  };
+
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -903,6 +942,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     offerizationPlans, setOfferizationPlans,
     addFeatureToRelease,
     updateTopic,
+    deleteTopic,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
   };
