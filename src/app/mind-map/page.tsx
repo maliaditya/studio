@@ -12,6 +12,8 @@ import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+
 
 interface MindMapNode extends Partial<ExerciseDefinition> {
   id: string;
@@ -111,40 +113,35 @@ function MindMapPageContent() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
-  const scheduledDefinitionIds = useMemo(() => {
+  const scheduledTaskInfo = useMemo(() => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const todaysActivities = schedule[todayKey];
-    if (!todaysActivities) return new Set<string>();
+    const infoMap = new Map<string, { slot: string }>();
 
-    const scheduledInstanceIds = new Set<string>();
-    Object.values(todaysActivities).flat().forEach(activity => {
-        (activity?.taskIds || []).forEach(id => scheduledInstanceIds.add(id));
-    });
+    if (!todaysActivities) return infoMap;
 
-    if (scheduledInstanceIds.size === 0) return new Set<string>();
-    
-    // Create a map from task instance ID -> definition ID from today's logs
     const idToDefIdMap = new Map<string, string>();
-    
     const todayUpskillLog = allUpskillLogs.find(log => log.date === todayKey);
     if (todayUpskillLog) {
         todayUpskillLog.exercises.forEach(ex => idToDefIdMap.set(ex.id, ex.definitionId));
     }
-
     const todayDeepWorkLog = allDeepWorkLogs.find(log => log.date === todayKey);
     if (todayDeepWorkLog) {
         todayDeepWorkLog.exercises.forEach(ex => idToDefIdMap.set(ex.id, ex.definitionId));
     }
-    
-    const defIds = new Set<string>();
-    scheduledInstanceIds.forEach(instanceId => {
-        const defId = idToDefIdMap.get(instanceId);
-        if (defId) {
-            defIds.add(defId);
-        }
+
+    Object.entries(todaysActivities).forEach(([slotName, activities]) => {
+      (activities || []).forEach(activity => {
+        (activity?.taskIds || []).forEach(instanceId => {
+          const defId = idToDefIdMap.get(instanceId);
+          if (defId && !infoMap.has(defId)) {
+            infoMap.set(defId, { slot: slotName });
+          }
+        });
+      });
     });
-    
-    return defIds;
+
+    return infoMap;
   }, [schedule, allUpskillLogs, allDeepWorkLogs]);
   
   const loggedTaskInfo = useMemo(() => {
@@ -331,10 +328,11 @@ function MindMapPageContent() {
     if (!nodeIcons[iconKey] && level >= 4) iconKey = 'FocusArea';
 
     const loggedInfo = loggedTaskInfo[node.definitionId];
-    const isScheduledToday = !loggedInfo && scheduledDefinitionIds.has(node.definitionId);
+    const scheduledInfo = !loggedInfo ? scheduledTaskInfo.get(node.definitionId) : null;
+    const isScheduledToday = !!scheduledInfo;
 
     return (
-    <div className="flex items-center flex-row-reverse">
+    <div className="flex items-center">
       <div className={cn(
         "flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border",
         loggedInfo && "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700",
@@ -360,6 +358,7 @@ function MindMapPageContent() {
             <div className="mt-1 pt-1 border-t border-yellow-300/50 flex items-center gap-1.5 text-xs text-yellow-800 dark:text-yellow-200">
                 <Calendar className="h-4 w-4 flex-shrink-0 text-yellow-600 dark:text-yellow-400" />
                 <span className="font-medium">Scheduled Today</span>
+                {scheduledInfo?.slot && <Badge variant="outline" className="ml-auto text-yellow-900 border-yellow-500/50 bg-yellow-500/10 text-xs">{scheduledInfo.slot}</Badge>}
             </div>
         ) : null}
       </div>
@@ -367,10 +366,10 @@ function MindMapPageContent() {
       {node.children && node.children.length > 0 && (
         <div className="flex">
           <div className="w-4 h-px bg-border self-center" />
-          <ul className="flex flex-col justify-center border-r border-border pr-4 space-y-2 py-1">
+          <ul className="flex flex-col justify-center border-l border-border pl-4 space-y-2 py-1">
             {node.children.map(child => (
               <li key={child.id} className="relative">
-                <div className="absolute -right-4 top-1/2 w-4 h-px bg-border" />
+                <div className="absolute -left-4 top-1/2 w-4 h-px bg-border" />
                 {renderNode(child, level + 1)}
               </li>
             ))}
@@ -452,5 +451,7 @@ export default function MindMapPage() {
         </AuthGuard>
     )
 }
+
+    
 
     
