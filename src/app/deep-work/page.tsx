@@ -274,13 +274,15 @@ function DeepWorkPageContent() {
   const handleDeleteExerciseDefinition = (id: string) => {
     const defToDelete = deepWorkDefinitions.find(def => def.id === id);
     if (!defToDelete) return;
-
+  
+    const wasLastForTopic = deepWorkDefinitions.filter(d => d.category === defToDelete.category).length === 1;
+  
     setDeepWorkDefinitions(prev => prev.filter(def => def.id !== id));
     
     setAllDeepWorkLogs(prevLogs => 
       prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) }))
     );
-
+  
     const cleanPlans = (plans: Record<string, ProductizationPlan>) => {
         const newPlans = { ...plans };
         for (const topic in newPlans) {
@@ -293,11 +295,37 @@ function DeepWorkPageContent() {
         }
         return newPlans;
     }
-
+  
     if (setProductizationPlans) setProductizationPlans(cleanPlans);
     if (setOfferizationPlans) setOfferizationPlans(cleanPlans);
-    
-    toast({ title: "Success", description: `Focus Area "${defToDelete?.name}" removed.` });
+  
+    if (wasLastForTopic) {
+        const topicToRemove = defToDelete.category;
+        if (setDeepWorkTopicMetadata) {
+            setDeepWorkTopicMetadata(prev => {
+                const newMeta = { ...prev };
+                delete newMeta[topicToRemove];
+                return newMeta;
+            });
+        }
+        if (setProductizationPlans) {
+            setProductizationPlans(prev => {
+                const newPlans = { ...prev };
+                delete newPlans[topicToRemove];
+                return newPlans;
+            });
+        }
+        if (setOfferizationPlans) {
+            setOfferizationPlans(prev => {
+                const newPlans = { ...prev };
+                delete newPlans[topicToRemove];
+                return newPlans;
+            });
+        }
+        toast({ title: "Focus Area & Topic Removed", description: `"${defToDelete.name}" was removed, and because it was the last in its topic, "${defToDelete.category}" was removed as well.`});
+    } else {
+        toast({ title: "Success", description: `Focus Area "${defToDelete.name}" removed.` });
+    }
   };
 
   const handleStartEditDefinition = (def: ExerciseDefinition) => {
