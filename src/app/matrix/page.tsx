@@ -16,7 +16,7 @@ interface MatrixRow {
     gapTypes: string[];
     whatYouCanFill: string;
     coreSolution: string;
-    offerType: string;
+    format: string | string[];
     status: 'In Progress' | 'Defined' | 'Planning';
     outcomeGoal: string;
 }
@@ -29,16 +29,28 @@ function MatrixPageContent() {
 
     Object.entries(deepWorkTopicMetadata).forEach(([topic, metadata]) => {
       let plan: ProductizationPlan | undefined;
+      let format: string | string[] = '-';
+      
       if (metadata.classification === 'product') {
         plan = productizationPlans[topic];
+        if (plan) {
+            format = plan.productType || '-';
+        }
       } else if (metadata.classification === 'service') {
         plan = offerizationPlans[topic];
+        if (plan) {
+            format = plan.offerTypes || [];
+        }
       }
 
       if (plan && plan.gapAnalysis) {
+        const isDefined = metadata.classification === 'product'
+            ? !!plan.productType
+            : !!(plan.offerTypes && plan.offerTypes.length > 0);
+
         const status: MatrixRow['status'] = (plan.releases && plan.releases.length > 0)
           ? 'In Progress'
-          : plan.productType ? 'Defined' : 'Planning';
+          : isDefined ? 'Defined' : 'Planning';
         
         data.push({
           topic,
@@ -46,7 +58,7 @@ function MatrixPageContent() {
           gapTypes: plan.gapAnalysis.gapTypes || [],
           whatYouCanFill: plan.gapAnalysis.whatYouCanFill || '-',
           coreSolution: plan.gapAnalysis.coreSolution || '-',
-          offerType: plan.productType || '-',
+          format,
           status,
           outcomeGoal: plan.gapAnalysis.outcomeGoal || '-',
         });
@@ -107,7 +119,17 @@ function MatrixPageContent() {
                         <CardContent className="flex-grow flex flex-col space-y-4">
                              <div>
                                 <h4 className="font-semibold text-sm">Format</h4>
-                                <p className="text-sm font-medium mt-1">{row.offerType}</p>
+                                {Array.isArray(row.format) ? (
+                                    row.format.length > 0 ? (
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                            {row.format.map((f, i) => <Badge key={`${f}-${i}`} variant="secondary" className="text-xs">{f}</Badge>)}
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm font-medium mt-1">-</p>
+                                    )
+                                ) : (
+                                    <p className="text-sm font-medium mt-1">{row.format}</p>
+                                )}
                             </div>
                             <Separator/>
                             <div className='flex-grow'>
