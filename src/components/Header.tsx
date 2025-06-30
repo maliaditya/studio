@@ -38,6 +38,7 @@ export function Header() {
     { href: '/productization', label: 'Productization' },
     { href: '/offerization', label: 'Offerization' },
     { href: '/matrix', label: 'Matrix' },
+    { href: '/mind-map', label: 'Mind Map' },
   ];
 
   return (
