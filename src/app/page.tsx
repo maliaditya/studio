@@ -1,4 +1,3 @@
-
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -566,10 +565,7 @@ function HomePageContent() {
   const _activityDurations = useMemo(() => {
     const durations: Record<string, string> = {};
     const daySchedule = schedule[selectedDateKey];
-    if (!daySchedule || !productivityStats.learningStats) return durations;
-
-    const todaysUpskillTasks = allUpskillLogs.find(log => log.date === selectedDateKey)?.exercises || [];
-    const upskillTaskMap = new Map(todaysUpskillTasks.map(task => [task.id, task]));
+    if (!daySchedule) return durations;
 
     for (const slotName in daySchedule) {
         const activities = daySchedule[slotName] || [];
@@ -578,52 +574,22 @@ function HomePageContent() {
         for (const activity of activities) {
             switch (activity.type) {
                 case 'workout':
-                    durations[activity.id] = '1h 30m';
-                    break;
-                case 'planning':
-                case 'tracking':
-                    durations[activity.id] = '30m';
-                    break;
+                    durations[activity.id] = '1h 30m'; break;
+                case 'planning': case 'tracking':
+                    durations[activity.id] = '30m'; break;
                 case 'deepwork':
-                    if (deepWorkCount === 1) {
-                        durations[activity.id] = '4h';
-                    } else if (deepWorkCount === 2) {
-                        durations[activity.id] = '2h';
-                    }
-                    break;
+                    durations[activity.id] = deepWorkCount === 1 ? '4h' : '2h'; break;
                 case 'branding':
-                    durations[activity.id] = '4h';
-                    break;
-                case 'lead-generation':
-                case 'offer-system':
-                    durations[activity.id] = '45m';
-                    break;
+                    durations[activity.id] = '4h'; break;
+                case 'lead-generation': case 'offer-system':
+                    durations[activity.id] = '45m'; break;
                 case 'upskill':
-                    if (activity.taskIds && activity.taskIds.length > 0) {
-                        const firstTask = upskillTaskMap.get(activity.taskIds[0]);
-                        if (firstTask) {
-                            const topic = firstTask.category;
-                            const topicStats = productivityStats.learningStats[topic];
-                            if (topicStats && topicStats.remainingForToday > 0 && topicStats.speed > 0) {
-                                const timeInMinutes = (topicStats.remainingForToday / (topicStats.speed / 60));
-                                if (timeInMinutes >= 60) {
-                                    const hours = Math.floor(timeInMinutes / 60);
-                                    const minutes = Math.round(timeInMinutes % 60);
-                                    durations[activity.id] = `${hours}h ${minutes > 0 ? `${minutes}m` : ''}`.trim();
-                                } else {
-                                    durations[activity.id] = `${Math.round(timeInMinutes)}m`;
-                                }
-                            }
-                        }
-                    }
-                    break;
-                default:
-                    break;
+                    durations[activity.id] = '30m'; break;
             }
         }
     }
     return durations;
-}, [schedule, selectedDateKey, productivityStats.learningStats, allUpskillLogs]);
+}, [schedule, selectedDateKey]);
 
   // Push calculated durations to the global context
   useEffect(() => {
@@ -952,7 +918,7 @@ function HomePageContent() {
             <DialogHeader className="sr-only">
               <DialogTitle>Mind Map Overview</DialogTitle>
             </DialogHeader>
-            <MindMapViewer defaultView="Strategic Overview" />
+            <MindMapViewer defaultView="Strategic Overview" showControls={false} />
         </DialogContent>
       </Dialog>
     </>

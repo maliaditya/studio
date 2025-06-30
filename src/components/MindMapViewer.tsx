@@ -91,9 +91,10 @@ interface MindMapNode extends Partial<ExerciseDefinition> {
 
 interface MindMapViewerProps {
     defaultView?: string | null;
+    showControls?: boolean;
 }
 
-export function MindMapViewer({ defaultView }: MindMapViewerProps) {
+export function MindMapViewer({ defaultView, showControls = true }: MindMapViewerProps) {
   const { 
       deepWorkDefinitions, 
       upskillDefinitions, 
@@ -112,9 +113,9 @@ export function MindMapViewer({ defaultView }: MindMapViewerProps) {
     if (defaultView) {
         setSelectedTopic(defaultView);
     } else {
-        setSelectedTopic('');
+        setSelectedTopic(showControls ? '' : 'Strategic Overview');
     }
-  }, [defaultView]);
+  }, [defaultView, showControls]);
 
   const scheduledTaskInfo = useMemo(() => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -399,7 +400,7 @@ export function MindMapViewer({ defaultView }: MindMapViewerProps) {
     const isLoggedToday = !!loggedInfo;
     const isScheduledToday = !!scheduledInfo;
     const isPending = !!pendingInfoForNode && !isLoggedToday && !isScheduledToday;
-    const isPastAndDone = pastLogInfo && !isLoggedToday && !isScheduledToday && !isPending;
+    const isPastAndDone = !!pastLogInfo && !isLoggedToday && !isScheduledToday && !isPending;
 
     let daysPending = 0;
     if (isPending && pendingInfoForNode) {
@@ -412,7 +413,8 @@ export function MindMapViewer({ defaultView }: MindMapViewerProps) {
         "flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border",
         isLoggedToday && "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700",
         isScheduledToday && !isLoggedToday && "bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700",
-        isPending && "bg-orange-100 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700"
+        isPending && "bg-orange-100 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700",
+        isPastAndDone && "bg-card border-green-500/50"
       )}>
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted flex-shrink-0">
@@ -445,7 +447,7 @@ export function MindMapViewer({ defaultView }: MindMapViewerProps) {
                 )}
             </div>
         ) : isPastAndDone ? (
-            <div className="mt-1 pt-1 border-t flex items-center gap-1.5 text-xs text-green-800 dark:text-green-400">
+            <div className="mt-1 pt-1 border-t border-green-500/50 flex items-center gap-1.5 text-xs text-green-800 dark:text-green-400">
                 <Check className="h-4 w-4 flex-shrink-0" />
                 <span className="font-medium">Logged</span>
                 <span className="ml-auto font-mono">{format(parseISO(pastLogInfo.lastLogDate), 'MMM dd')}</span>
@@ -470,6 +472,54 @@ export function MindMapViewer({ defaultView }: MindMapViewerProps) {
   );
   }
 
+  const MapContent = (
+    <div 
+        ref={containerRef} 
+        className={cn(
+            "relative overflow-auto flex-grow", 
+            isFullScreen && "bg-background", 
+            !showControls ? "h-full w-full" : "mt-2 rounded-lg bg-muted/30"
+        )}
+    >
+        {selectedTopic && mindMapData ? (
+          <TransformWrapper initialScale={1} centerOnInit={true}>
+            {({ zoomIn, zoomOut, resetTransform }) => (
+              <>
+                <div className="absolute top-2 right-2 z-10 flex gap-2">
+                  <Button size="icon" variant="outline" onClick={() => zoomIn()} aria-label="Zoom in">
+                    <ZoomIn />
+                  </Button>
+                  <Button size="icon" variant="outline" onClick={() => zoomOut()} aria-label="Zoom out">
+                    <ZoomOut />
+                  </Button>
+                  <Button size="icon" variant="outline" onClick={() => resetTransform()} aria-label="Reset view">
+                    <RefreshCw />
+                  </Button>
+                  <Button size="icon" variant="outline" onClick={toggleFullScreen} aria-label="Toggle full screen">
+                    {isFullScreen ? <Shrink /> : <Expand />}
+                  </Button>
+                </div>
+                <TransformComponent
+                  wrapperClass="!w-full !h-full"
+                  contentClass={cn("flex items-center justify-center", isFullScreen ? "h-screen" : "h-full")}
+                >
+                  <div className="inline-block py-4">
+                    {renderNode(mindMapData, 0)}
+                  </div>
+                </TransformComponent>
+              </>
+            )}
+          </TransformWrapper>
+        ) : (
+          <ConceptualFlowDiagram />
+        )}
+    </div>
+  );
+
+  if (!showControls) {
+    return MapContent;
+  }
+
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-full flex flex-col">
       <Card className="flex-grow flex flex-col">
@@ -492,41 +542,7 @@ export function MindMapViewer({ defaultView }: MindMapViewerProps) {
               </SelectContent>
             </Select>
           </div>
-
-          <div ref={containerRef} className={cn("relative mt-2 rounded-lg bg-muted/30 overflow-auto flex-grow", isFullScreen && "bg-background")}>
-            {selectedTopic && mindMapData ? (
-              <TransformWrapper initialScale={1} centerOnInit={true}>
-                {({ zoomIn, zoomOut, resetTransform }) => (
-                  <>
-                    <div className="absolute top-2 right-2 z-10 flex gap-2">
-                      <Button size="icon" variant="outline" onClick={() => zoomIn()} aria-label="Zoom in">
-                        <ZoomIn />
-                      </Button>
-                      <Button size="icon" variant="outline" onClick={() => zoomOut()} aria-label="Zoom out">
-                        <ZoomOut />
-                      </Button>
-                      <Button size="icon" variant="outline" onClick={() => resetTransform()} aria-label="Reset view">
-                        <RefreshCw />
-                      </Button>
-                      <Button size="icon" variant="outline" onClick={toggleFullScreen} aria-label="Toggle full screen">
-                        {isFullScreen ? <Shrink /> : <Expand />}
-                      </Button>
-                    </div>
-                    <TransformComponent
-                      wrapperClass="!w-full !h-full"
-                      contentClass={cn("flex items-center justify-center", isFullScreen ? "h-screen" : "h-full")}
-                    >
-                      <div className="inline-block py-4">
-                        {renderNode(mindMapData, 0)}
-                      </div>
-                    </TransformComponent>
-                  </>
-                )}
-              </TransformWrapper>
-            ) : (
-                <ConceptualFlowDiagram />
-            )}
-          </div>
+          {MapContent}
         </CardContent>
       </Card>
     </div>
