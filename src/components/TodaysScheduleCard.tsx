@@ -136,6 +136,7 @@ function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog
 
 interface TodaysScheduleCardProps {
   schedule: FullSchedule;
+  date: Date;
   activityDurations: Record<string, string>;
   isAgendaDocked: boolean;
   onToggleDock: () => void;
@@ -143,10 +144,12 @@ interface TodaysScheduleCardProps {
   onStartWorkoutLog: (activity: Activity) => void;
   onStartLeadGenLog: (activity: Activity) => void;
   onStartOfferSystemLog: (activity: Activity) => void;
+  onToggleComplete: (slotName: string, activityId: string) => void;
 }
 
 export function TodaysScheduleCard({ 
   schedule, 
+  date,
   activityDurations, 
   isAgendaDocked, 
   onToggleDock,
@@ -154,13 +157,14 @@ export function TodaysScheduleCard({
   onStartWorkoutLog,
   onStartLeadGenLog,
   onStartOfferSystemLog,
+  onToggleComplete,
 }: TodaysScheduleCardProps) {
-  const { carryForwardTask, handleToggleComplete } = useAuth();
+  const { carryForwardTask } = useAuth();
+  const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
 
   const todaysSchedule = React.useMemo(() => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    return schedule[todayKey] || {};
-  }, [schedule]);
+    return schedule[dayKey] || {};
+  }, [schedule, dayKey]);
 
   const scheduledActivities = React.useMemo(() => {
     return slotOrder.flatMap(slot => {
@@ -173,13 +177,13 @@ export function TodaysScheduleCard({
   }, [todaysSchedule]);
 
   const pendingTasks = React.useMemo(() => {
-    const yesterday = addDays(new Date(), -1);
+    const yesterday = addDays(date, -1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
     const yesterdaysSchedule = schedule[yesterdayKey] || {};
     return Object.values(yesterdaysSchedule)
       .flat()
       .filter((activity): activity is Activity => !!activity && !activity.completed);
-  }, [schedule]);
+  }, [schedule, date]);
 
   const slotNames: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -240,7 +244,7 @@ export function TodaysScheduleCard({
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2 text-base text-primary">
-               Today's Agenda
+               Agenda
             </CardTitle>
             {isAgendaDocked && <CardDescription className="text-xs mt-1">A sequential view of your scheduled activities.</CardDescription>}
           </div>
@@ -307,7 +311,7 @@ export function TodaysScheduleCard({
                 duration={activityDurations[activity.id]}
                 onLogLearning={onLogLearning}
                 onStartWorkoutLog={onStartWorkoutLog}
-                onToggleComplete={handleToggleComplete}
+                onToggleComplete={onToggleComplete}
                 onStartLeadGenLog={onStartLeadGenLog}
                 onStartOfferSystemLog={onStartOfferSystemLog}
               />

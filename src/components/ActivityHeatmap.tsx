@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 
 interface ActivityHeatmapProps {
   schedule: FullSchedule;
-  onDateSelect?: (date: string) => void;
+  onDateSelect: (date: string) => void;
 }
 
 interface HeatmapValue {
@@ -54,7 +54,7 @@ export function ActivityHeatmap({ schedule, onDateSelect }: ActivityHeatmapProps
     <Card className="mt-8 max-w-5xl mx-auto shadow-lg border-0 bg-transparent">
         <CardHeader>
             <CardTitle>Activity Heatmap</CardTitle>
-            <CardDescription>Your consistency over the last year. More completed activities result in a darker square.</CardDescription>
+            <CardDescription>Your consistency over the last year. Click a square to view or schedule tasks for that day.</CardDescription>
         </CardHeader>
         <CardContent className="p-4 overflow-x-auto">
              <TooltipProvider>
@@ -70,14 +70,26 @@ export function ActivityHeatmap({ schedule, onDateSelect }: ActivityHeatmapProps
                         return 'color-scale-1';
                     }}
                     onClick={(value) => {
-                        if (onDateSelect && value && value.date) {
+                        if (value && value.date) {
                             onDateSelect(value.date);
                         }
                     }}
                     transformDayElement={(element, value, index) => {
-                         if (!value || value.count === 0) {
-                            return React.cloneElement(element, { key: index });
+                        const date = value?.date || format(new Date(oneYearAgo.getTime() + index * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
+
+                        if (!value || value.count === 0) {
+                           return (
+                                <Tooltip key={index}>
+                                    <TooltipTrigger asChild onClick={() => onDateSelect(date)}>
+                                      {React.cloneElement(element, { 'aria-label': `Schedule tasks for ${format(parseISO(date), 'PPP')}`})}
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>{format(parseISO(date), 'PPP')}: No completed tasks</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            );
                         }
+                        
                         const tooltipText = `${format(parseISO(value.date), 'PPP')}: ${value.activities || `${value.count} task(s)`}`;
                         return (
                             <Tooltip key={index}>

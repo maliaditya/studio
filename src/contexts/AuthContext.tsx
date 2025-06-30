@@ -52,8 +52,8 @@ interface AuthContextType {
   setIsAgendaDocked: React.Dispatch<React.SetStateAction<boolean>>;
   activityDurations: Record<string, string>;
   setActivityDurations: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  handleToggleComplete: (slotName: string, activityId: string) => void;
-  handleLogLearning: (activity: Activity, progress: number, duration: number) => void;
+  handleToggleComplete: (dateKey: string, slotName: string, activityId: string) => void;
+  handleLogLearning: (dateKey: string, activity: Activity, progress: number, duration: number) => void;
   carryForwardTask: (activity: Activity, targetSlot: string) => void;
 
   // Global Logs State
@@ -583,29 +583,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       input.click();
   };
 
-  const handleToggleComplete = (slotName: string, activityId: string) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
+  const handleToggleComplete = (dateKey: string, slotName: string, activityId: string) => {
     setSchedule(prev => {
-      const todaySchedule = { ...(prev[todayKey] || {}) };
-      const activities = todaySchedule[slotName] || [];
+      const daySchedule = { ...(prev[dateKey] || {}) };
+      const activities = daySchedule[slotName] || [];
       if (activities.length > 0) {
-        todaySchedule[slotName] = activities.map(act => 
+        daySchedule[slotName] = activities.map(act => 
           act.id === activityId ? { ...act, completed: !act.completed } : act
         );
       }
-      return { ...prev, [todayKey]: todaySchedule };
+      return { ...prev, [dateKey]: daySchedule };
     });
   };
   
-  const handleLogLearning = (activity: Activity, progress: number, duration: number) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
+  const handleLogLearning = (dateKey: string, activity: Activity, progress: number, duration: number) => {
     const isUpskill = activity.type === 'upskill';
     const logsUpdater = isUpskill ? setAllUpskillLogs : setAllDeepWorkLogs;
 
     let updateSucceeded = false;
 
     logsUpdater(prevLogs => {
-      const logIndex = prevLogs.findIndex(log => log.date === todayKey);
+      const logIndex = prevLogs.findIndex(log => log.date === dateKey);
       if (logIndex === -1) {
         return prevLogs;
       }
@@ -643,13 +641,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     
     if (updateSucceeded) {
-      handleToggleComplete(activity.slot, activity.id);
+      handleToggleComplete(dateKey, activity.slot, activity.id);
       toast({ title: "Progress Logged", description: "Your session has been saved." });
     } else {
       const sourceLogs = isUpskill ? allUpskillLogs : allDeepWorkLogs;
-      const logForToday = sourceLogs.find(log => log.date === todayKey);
+      const logForToday = sourceLogs.find(log => log.date === dateKey);
       if (!logForToday) {
-        toast({ title: "Error", description: "Could not find a session for today. Please add a task on the main page first.", variant: "destructive" });
+        toast({ title: "Error", description: `Could not find a session for ${dateKey}. Please add a task on the main page first.`, variant: "destructive" });
       } else if (!activity.taskIds?.[0]) {
         toast({ title: "Error", description: "No specific task linked to this agenda item.", variant: "destructive" });
       } else {

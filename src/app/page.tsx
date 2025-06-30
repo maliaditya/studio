@@ -21,15 +21,12 @@ import { ProductivitySnapshot } from '@/components/ProductivitySnapshot';
 import { TimeSlots } from '@/components/TimeSlots';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Badge } from '@/components/ui/badge';
-import { CheckCircle2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from '@/lib/utils';
+import { CalendarIcon } from 'lucide-react';
+
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -106,7 +103,9 @@ function HomePageContent() {
   const [currentSlot, setCurrentSlot] = useState('');
   const [remainingTime, setRemainingTime] = useState('');
   const [isScheduleLoaded, setIsScheduleLoaded] = useState(false);
-  const [todayKey, setTodayKey] = useState('');
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
+  const todayKey = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
 
   // State for Modals
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
@@ -126,13 +125,7 @@ function HomePageContent() {
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   const [today, setToday] = useState<Date | null>(null);
 
-  // State for Day Detail Modal
-  const [isDayDetailModalOpen, setIsDayDetailModalOpen] = useState(false);
-  const [selectedDaySchedule, setSelectedDaySchedule] = useState<DailySchedule | null>(null);
-  const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null);
-
   useEffect(() => {
-    setTodayKey(format(new Date(), 'yyyy-MM-dd'));
     const now = new Date();
     setToday(now);
     setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
@@ -177,17 +170,17 @@ function HomePageContent() {
     const settings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false };
     if (!settings.carryForward) return;
     const today = new Date();
-    const todayKey = format(today, 'yyyy-MM-dd');
+    const todayDateKey = format(today, 'yyyy-MM-dd');
     const yesterday = addDays(today, -1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
     const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
     const lastCarryForwardDate = localStorage.getItem(lastCarryForwardKey);
-    if (lastCarryForwardDate === todayKey) return;
-    const todaysActivities = schedule[todayKey];
+    if (lastCarryForwardDate === todayDateKey) return;
+    const todaysActivities = schedule[todayDateKey];
     const hasTodaysActivities = todaysActivities && Object.keys(todaysActivities).length > 0 && Object.values(todaysActivities).some(slot => slot.length > 0);
-    if (hasTodaysActivities) { localStorage.setItem(lastCarryForwardKey, todayKey); return; }
+    if (hasTodaysActivities) { localStorage.setItem(lastCarryForwardKey, todayDateKey); return; }
     const yesterdaysSchedule = schedule[yesterdayKey];
-    if (!yesterdaysSchedule || Object.keys(yesterdaysSchedule).length === 0) { localStorage.setItem(lastCarryForwardKey, todayKey); return; }
+    if (!yesterdaysSchedule || Object.keys(yesterdaysSchedule).length === 0) { localStorage.setItem(lastCarryForwardKey, todayDateKey); return; }
     const newTodaySchedule: DailySchedule = {};
     let carriedOver = false;
     Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
@@ -197,19 +190,19 @@ function HomePageContent() {
         }
     });
     if (carriedOver) {
-        setSchedule(prev => ({ ...prev, [todayKey]: newTodaySchedule }));
+        setSchedule(prev => ({ ...prev, [todayDateKey]: newTodaySchedule }));
         toast({ title: "Activities Carried Over", description: "Yesterday's activities have been added to today's schedule." });
     }
-    localStorage.setItem(lastCarryForwardKey, todayKey);
+    localStorage.setItem(lastCarryForwardKey, todayDateKey);
   }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast]);
 
   const handleAddActivity = (slotName: string, type: ActivityType) => {
-    if (!currentUser?.username || !todayKey) return;
-    const currentActivities = schedule[todayKey]?.[slotName] || [];
+    if (!currentUser?.username || !selectedDateKey) return;
+    const currentActivities = schedule[selectedDateKey]?.[slotName] || [];
     if (currentActivities.length >= 2) { toast({ title: "Slot Full", description: "You can add a maximum of two activities per slot.", variant: "destructive" }); return; }
     let details = '';
     switch (type) {
-      case 'workout': { const dayOfWeek = getDay(new Date()); let muscleGroups: string[] = []; if (workoutMode === 'one-muscle') { const muscle = singleMuscleDailySchedule[dayOfWeek]; if (muscle) muscleGroups = [muscle]; } else { muscleGroups = dailyMuscleGroups[dayOfWeek] || []; } details = muscleGroups.join(' & ') || "Rest Day"; break; }
+      case 'workout': { const dayOfWeek = getDay(selectedDate); let muscleGroups: string[] = []; if (workoutMode === 'one-muscle') { const muscle = singleMuscleDailySchedule[dayOfWeek]; if (muscle) muscleGroups = [muscle]; } else { muscleGroups = dailyMuscleGroups[dayOfWeek] || []; } details = muscleGroups.join(' & ') || "Rest Day"; break; }
       case 'upskill': details = 'Learning Session'; break;
       case 'deepwork': details = 'Deep Work Session'; break;
       case 'planning': details = 'Planning Session'; break;
@@ -225,23 +218,22 @@ function HomePageContent() {
       completed: false,
       taskIds: [],
     };
-    setSchedule(prev => ({ ...prev, [todayKey]: { ...(prev[todayKey] || {}), [slotName]: [...(prev[todayKey]?.[slotName] || []), newActivity] } }));
+    setSchedule(prev => ({ ...prev, [selectedDateKey]: { ...(prev[selectedDateKey] || {}), [slotName]: [...(prev[selectedDateKey]?.[slotName] || []), newActivity] } }));
   };
 
   const handleRemoveActivity = (slotName: string, activityId: string) => {
-    if (!todayKey) return;
+    if (!selectedDateKey) return;
     setSchedule(prev => {
-      const newTodaySchedule = { ...(prev[todayKey] || {}) };
+      const newTodaySchedule = { ...(prev[selectedDateKey] || {}) };
       const activities = newTodaySchedule[slotName] || [];
       const updatedActivities = activities.filter(act => act.id !== activityId);
       if (updatedActivities.length > 0) { newTodaySchedule[slotName] = updatedActivities; } else { delete newTodaySchedule[slotName]; }
-      return { ...prev, [todayKey]: newTodaySchedule };
+      return { ...prev, [selectedDateKey]: newTodaySchedule };
     });
   };
 
   const getTodaysWorkout = () => {
-    const today = new Date();
-    const { exercises, description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions);
+    const { exercises, description } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
     const muscleGroups = Array.from(new Set(exercises.map(ex => ex.category)));
     return { exercises, muscleGroups };
   };
@@ -302,7 +294,7 @@ function HomePageContent() {
     }
 
     // 1. Determine which exercises need to be created.
-    const logForDay = logSource.find(log => log.date === todayKey);
+    const logForDay = logSource.find(log => log.date === selectedDateKey);
     const existingDefIdsForDay = new Set(logForDay?.exercises.map(ex => ex.definitionId) || []);
     const defIdsToCreate = allTodaysDefIds.filter(id => !existingDefIdsForDay.has(id));
 
@@ -322,11 +314,11 @@ function HomePageContent() {
     if (newExercises.length > 0) {
       logsUpdater(prevLogs => {
           const newLogs = [...prevLogs];
-          const logIndex = newLogs.findIndex(log => log.date === todayKey);
+          const logIndex = newLogs.findIndex(log => log.date === selectedDateKey);
           if (logIndex > -1) {
               newLogs[logIndex].exercises.push(...newExercises);
           } else {
-              newLogs.push({ id: todayKey, date: todayKey, exercises: [...(logForDay?.exercises || []), ...newExercises] });
+              newLogs.push({ id: selectedDateKey, date: selectedDateKey, exercises: [...(logForDay?.exercises || []), ...newExercises] });
           }
           return newLogs;
       });
@@ -343,19 +335,19 @@ function HomePageContent() {
       .map(t => t.name).join(', ') || (pageType === 'upskill' ? 'Learning Session' : pageType === 'deepwork' ? 'Deep Work Session' : 'Branding Session');
     
     setSchedule(prev => {
-      const newTodaySchedule = { ...(prev[todayKey] || {}) };
+      const newTodaySchedule = { ...(prev[selectedDateKey] || {}) };
       const activitiesInSlot = (newTodaySchedule[slotName] || []).map(act =>
         act.id === activity.id ? { ...act, taskIds: finalTaskIdsForSlot, details: newDetails } : act
       );
       newTodaySchedule[slotName] = activitiesInSlot;
-      return { ...prev, [todayKey]: newTodaySchedule };
+      return { ...prev, [selectedDateKey]: newTodaySchedule };
     });
 
     setEditingActivity(null);
   };
 
 
-  const todaysSchedule = schedule[todayKey] || {};
+  const selectedDaySchedule = schedule[selectedDateKey] || {};
 
   const dailyStats = useMemo(() => {
     const todaysActivities = schedule[todayKey] || {};
@@ -587,13 +579,13 @@ function HomePageContent() {
     
   const _activityDurations = useMemo(() => {
     const durations: Record<string, string> = {};
-    if (!schedule[todayKey] || !productivityStats.learningStats) return durations;
+    if (!schedule[selectedDateKey] || !productivityStats.learningStats) return durations;
 
-    const allTodaysActivities = Object.entries(schedule[todayKey] || {}).flatMap(([slotName, activities]) =>
+    const allTodaysActivities = Object.entries(schedule[selectedDateKey] || {}).flatMap(([slotName, activities]) =>
       activities.map(activity => ({ ...activity, slotName }))
     );
 
-    const todaysUpskillTasks = allUpskillLogs.find(log => log.date === todayKey)?.exercises || [];
+    const todaysUpskillTasks = allUpskillLogs.find(log => log.date === selectedDateKey)?.exercises || [];
     const upskillTaskMap = new Map(todaysUpskillTasks.map(task => [task.id, task]));
 
     for (const activity of allTodaysActivities) {
@@ -637,7 +629,7 @@ function HomePageContent() {
       }
     }
     return durations;
-  }, [schedule, todayKey, productivityStats.learningStats, allUpskillLogs]);
+  }, [schedule, selectedDateKey, productivityStats.learningStats, allUpskillLogs]);
 
   // Push calculated durations to the global context
   useEffect(() => {
@@ -740,11 +732,11 @@ function HomePageContent() {
       definitionSource = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreas));
     }
     
-    // These are the WorkoutExercise objects already created for today.
-    const allTasksForDay = logSource.find(log => log.date === todayKey)?.exercises || [];
+    // These are the WorkoutExercise objects already created for the selected day.
+    const allTasksForDay = logSource.find(log => log.date === selectedDateKey)?.exercises || [];
     const loggedDefinitionIds = new Set(allTasksForDay.map(task => task.definitionId));
 
-    // These are definitions from the library that have NOT been added to today's log at all.
+    // These are definitions from the library that have NOT been added to the selected day's log at all.
     const libraryDefinitions = definitionSource.filter(def => !loggedDefinitionIds.has(def.id));
 
     // Convert library definitions to temporary WorkoutExercise objects for the modal.
@@ -768,7 +760,7 @@ function HomePageContent() {
     });
     const initialSelectedIds = Array.from(initialSelectedDefIds);
     
-    const todaysActivitiesForType = Object.values(schedule[todayKey] || {}).flat();
+    const todaysActivitiesForType = Object.values(schedule[selectedDateKey] || {}).flat();
     const disabledDefIds = new Set<string>();
     todaysActivitiesForType.forEach(act => {
         if (act && act.type === pageType && act.id !== activity.id && act.taskIds) {
@@ -793,7 +785,7 @@ function HomePageContent() {
         allTodaysLoggedDefIds,
     };
 
-}, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, todayKey, schedule, upskillDefinitions, deepWorkDefinitions]);
+}, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, schedule, upskillDefinitions, deepWorkDefinitions]);
 
   const timeAllocationData = useMemo(() => {
     if (!productivityStats.todayHoursData) return [];
@@ -805,23 +797,25 @@ function HomePageContent() {
     ];
   }, [productivityStats.todayHoursData]);
 
-  const handleHeatmapClick = (date: string) => {
-    const daySchedule = schedule[date];
-    if (daySchedule && Object.values(daySchedule).flat().some(a => a?.completed)) {
-        setSelectedDaySchedule(daySchedule);
-        setSelectedDayDate(date);
-        setIsDayDetailModalOpen(true);
-    } else {
-        toast({ title: "No Activities", description: `No activities were completed on ${format(parseISO(date), 'PPP')}.` });
-    }
-  };
-
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
         <Card className="max-w-5xl mx-auto shadow-lg bg-card/60 border-border/20 backdrop-blur-sm">
-          <CardHeader className="text-center py-4">
-              <p className="text-sm text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+          <CardHeader className="flex flex-row items-center justify-between text-center py-4">
+              <div className="flex-grow">
+                <p className="text-sm text-muted-foreground">{format(selectedDate, 'EEEE, MMMM d, yyyy')}</p>
+              </div>
+              <Popover>
+                  <PopoverTrigger asChild>
+                  <Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {selectedDate ? format(selectedDate, "MMM d") : <span>Pick a date</span>}
+                  </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus />
+                  </PopoverContent>
+              </Popover>
           </CardHeader>
           <CardContent>
             <DashboardStats stats={productivityStats} />
@@ -837,13 +831,15 @@ function HomePageContent() {
                  {currentUser && isAgendaDocked && (
                     <TodaysScheduleCard
                         schedule={schedule}
+                        date={selectedDate}
                         activityDurations={_activityDurations}
                         isAgendaDocked={isAgendaDocked}
                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                        onLogLearning={handleLogLearning}
+                        onLogLearning={(...args) => handleLogLearning(selectedDateKey, ...args)}
                         onStartWorkoutLog={handleStartWorkoutLog}
                         onStartLeadGenLog={handleStartLeadGenLog}
                         onStartOfferSystemLog={handleStartOfferSystemLog}
+                        onToggleComplete={(...args) => handleToggleComplete(selectedDateKey, ...args)}
                     />
                 )}
                 <WeightGoalCard 
@@ -863,29 +859,31 @@ function HomePageContent() {
               </div>
             </div>
             <TimeSlots 
-              schedule={todaysSchedule}
+              schedule={selectedDaySchedule}
               currentSlot={currentSlot}
               remainingTime={remainingTime}
               onAddActivity={handleAddActivity}
               onRemoveActivity={handleRemoveActivity}
-              onToggleComplete={handleToggleComplete}
+              onToggleComplete={(...args) => handleToggleComplete(selectedDateKey, ...args)}
               onActivityClick={handleActivityClick}
             />
           </CardContent>
         </Card>
         
-        <ActivityHeatmap schedule={schedule} onDateSelect={handleHeatmapClick} />
+        <ActivityHeatmap schedule={schedule} onDateSelect={(date) => setSelectedDate(parseISO(date))} />
 
         {currentUser && !isAgendaDocked && (
             <TodaysScheduleCard
                 schedule={schedule}
+                date={selectedDate}
                 activityDurations={_activityDurations}
                 isAgendaDocked={isAgendaDocked}
                 onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                onLogLearning={handleLogLearning}
+                onLogLearning={(...args) => handleLogLearning(selectedDateKey, ...args)}
                 onStartWorkoutLog={handleStartWorkoutLog}
                 onStartLeadGenLog={handleStartLeadGenLog}
                 onStartOfferSystemLog={handleStartOfferSystemLog}
+                onToggleComplete={(...args) => handleToggleComplete(selectedDateKey, ...args)}
             />
         )}
 
@@ -896,10 +894,7 @@ function HomePageContent() {
               activityToLog={workoutActivityToLog}
               todaysExercises={todaysExercises}
               muscleGroupsForDay={todaysMuscleGroups}
-              onActivityComplete={(slotName, activityId) => {
-                handleToggleComplete(slotName, activityId);
-                setWorkoutActivityToLog(null);
-              }}
+              onActivityComplete={(...args) => handleToggleComplete(selectedDateKey, ...args)}
           />
         )}
 
@@ -908,10 +903,7 @@ function HomePageContent() {
                 isOpen={isLeadGenModalOpen}
                 onOpenChange={setIsLeadGenModalOpen}
                 activityToLog={workoutActivityToLog}
-                onActivityComplete={(slotName, activityId) => {
-                    handleToggleComplete(slotName, activityId);
-                    setWorkoutActivityToLog(null);
-                }}
+                onActivityComplete={(...args) => handleToggleComplete(selectedDateKey, ...args)}
             />
         )}
 
@@ -920,10 +912,7 @@ function HomePageContent() {
                 isOpen={isOfferSystemModalOpen}
                 onOpenChange={setIsOfferSystemModalOpen}
                 activityToLog={workoutActivityToLog}
-                onActivityComplete={(slotName, activityId) => {
-                    handleToggleComplete(slotName, activityId);
-                    setWorkoutActivityToLog(null);
-                }}
+                onActivityComplete={(...args) => handleToggleComplete(selectedDateKey, ...args)}
             />
         )}
         
@@ -962,37 +951,6 @@ function HomePageContent() {
           todayHoursData={productivityStats.todayHoursData}
         />
       </div>
-
-      <Dialog open={isDayDetailModalOpen} onOpenChange={setIsDayDetailModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Activities for {selectedDayDate ? format(parseISO(selectedDayDate), 'PPP') : ''}</DialogTitle>
-            <DialogDescription>A log of your completed activities for this day.</DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[60vh] overflow-y-auto pr-4">
-              {selectedDaySchedule && Object.values(selectedDaySchedule).flat().some(a => a.completed) ? (
-                  <ul className="space-y-3">
-                      {Object.entries(selectedDaySchedule).flatMap(([slotName, activities]) =>
-                          activities.filter(a => a.completed).map(activity => (
-                              <li key={activity.id} className="flex items-center justify-between gap-3 p-2 bg-muted/50 rounded-md">
-                                  <div className="flex items-center gap-3">
-                                      <CheckCircle2 className="h-5 w-5 text-green-500" />
-                                      <div className="flex-grow">
-                                          <p className="font-medium text-sm">{activity.details}</p>
-                                          <p className="text-xs text-muted-foreground">{slotName}</p>
-                                      </div>
-                                  </div>
-                                  <Badge variant="outline" className="capitalize">{activity.type}</Badge>
-                              </li>
-                          ))
-                      )}
-                  </ul>
-              ) : (
-                  <p className="text-center text-muted-foreground py-4">No completed activities for this day.</p>
-              )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
