@@ -129,7 +129,6 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const { zoomToElement, centerView } = useControls()
 
   useEffect(() => {
     if (defaultView) {
@@ -560,6 +559,25 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   );
   }
 
+  // Helper component to get the zoom/pan controls context
+  const MindMapInner = ({ mindMapData, renderNode }: { mindMapData: MindMapNode, renderNode: (node: MindMapNode, level: number) => React.ReactNode }) => {
+    const { centerView } = useControls();
+    const isInitialMount = React.useRef(true);
+
+    useEffect(() => {
+        if (isInitialMount.current) {
+          setTimeout(() => centerView(0.1), 100);
+          isInitialMount.current = false;
+        }
+    }, [centerView]);
+    
+    return (
+        <div className="inline-block py-4">
+            {renderNode(mindMapData, 0)}
+        </div>
+    );
+  };
+
   const MapContent = (
     <div 
         ref={containerRef} 
@@ -570,7 +588,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         )}
     >
         {selectedTopic && mindMapData ? (
-          <TransformWrapper initialScale={0.1} minScale={0.05} centerOnInit={true}>
+          <TransformWrapper initialScale={0.1} minScale={0.05}>
             {({ zoomIn, zoomOut, resetTransform }) => (
               <>
                 <div className="absolute top-2 right-2 z-10 flex gap-2">
@@ -591,9 +609,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                   wrapperClass="!w-full !h-full"
                   contentClass={cn("flex items-center justify-center", isFullScreen ? "h-screen" : "h-full")}
                 >
-                  <div className="inline-block py-4">
-                    {renderNode(mindMapData, 0)}
-                  </div>
+                  <MindMapInner mindMapData={mindMapData} renderNode={renderNode} />
                 </TransformComponent>
               </>
             )}
@@ -637,5 +653,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   );
 }
 
+
+    
 
     
