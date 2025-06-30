@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/contexts/AuthContext';
 import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet } from 'lucide-react';
 import type { ExerciseDefinition, Release, DatedWorkout } from '@/types/workout';
-import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format, parseISO, differenceInDays } from 'date-fns';
@@ -117,17 +117,6 @@ interface MindMapViewerProps {
 
 // Helper component to get the zoom/pan controls context
 const MindMapInner = ({ mindMapData, renderNode }: { mindMapData: MindMapNode, renderNode: (node: MindMapNode, level: number) => React.ReactNode }) => {
-    const { centerView, zoomToElement } = useControls();
-    const isInitialMount = React.useRef(true);
-  
-    useEffect(() => {
-      const mindMapContainer = document.getElementById('strategic-overview');
-      if (isInitialMount.current && mindMapContainer) {
-        setTimeout(() => centerView(0.1), 100);
-        isInitialMount.current = false;
-      }
-    }, [centerView]);
-  
     return (
       <div className="inline-block py-4">
         {renderNode(mindMapData, 0)}
@@ -590,7 +579,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         )}
     >
         {selectedTopic && mindMapData ? (
-          <TransformWrapper initialScale={0.1} minScale={0.05}>
+          <TransformWrapper initialScale={0.05} minScale={0.05}>
             {(props) => {
               
               return (
@@ -661,3 +650,4 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     
 
     
+
