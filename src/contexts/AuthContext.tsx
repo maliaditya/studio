@@ -305,7 +305,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAllDeepWorkLogs(data.deepWorkLogs || []);
     setDeepWorkTopicMetadata(data.deepWorkTopicMetadata || {});
     
-    setBrandingLogs(data.brandingLogs || []);
+    setAllBrandingLogs(data.brandingLogs || []);
 
     setLeadGenDefinitions(data.leadGenDefinitions || LEAD_GEN_DEFINITIONS);
     setAllLeadGenLogs(data.allLeadGenLogs || []);
