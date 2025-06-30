@@ -65,7 +65,7 @@ function OfferizationPageContent() {
   const topics = useMemo(() => {
     const topicMap = new Map<string, ExerciseDefinition[]>();
     (deepWorkDefinitions || []).forEach(def => {
-      if (Array.isArray(def.focusAreas)) return;
+      if (Array.isArray(def.focusAreaIds)) return;
       
       const topic = def.category;
       if (!topicMap.has(topic)) {
