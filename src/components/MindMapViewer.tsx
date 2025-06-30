@@ -5,7 +5,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet } from 'lucide-react';
+import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, ActivityType } from 'lucide-react';
 import type { ExerciseDefinition, Release, DatedWorkout } from '@/types/workout';
 import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
@@ -116,14 +116,12 @@ interface MindMapViewerProps {
 }
 
 // This helper component is rendered inside TransformWrapper to get access to its context
-const Controls = ({ centerOnLoad }: { centerOnLoad: boolean }) => {
+const Controls = () => {
     const { centerView } = useControls();
     useEffect(() => {
-        if (centerOnLoad) {
-            // Use a timeout to ensure the element is rendered and positioned
-            setTimeout(() => centerView(), 100);
-        }
-    }, [centerOnLoad, centerView]);
+        // Use a timeout to ensure the element is rendered and positioned
+        setTimeout(() => centerView(), 100);
+    }, [centerView]);
     return null;
 };
   
@@ -138,11 +136,11 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
       schedule,
       allUpskillLogs,
       allDeepWorkLogs,
+      allBrandingLogs,
   } = useAuth();
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [hasCentered, setHasCentered] = useState(false);
 
   useEffect(() => {
     if (defaultView) {
@@ -152,41 +150,57 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     }
   }, [defaultView, showControls]);
   
-  // Effect to reset centering flag when the selected topic changes
-  useEffect(() => {
-    setHasCentered(false);
-  }, [selectedTopic]);
-
   const scheduledTaskInfo = useMemo(() => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const todaysActivities = schedule[todayKey];
-    const infoMap = new Map<string, { slot: string }>();
+    const infoMap = new Map<string, { slot: string; type: ActivityType }[]>();
 
     if (!todaysActivities) return infoMap;
 
-    const idToDefIdMap = new Map<string, string>();
-    const todayUpskillLog = allUpskillLogs.find(log => log.date === todayKey);
-    if (todayUpskillLog) {
-        todayUpskillLog.exercises.forEach(ex => idToDefIdMap.set(ex.id, ex.definitionId));
-    }
-    const todayDeepWorkLog = allDeepWorkLogs.find(log => log.date === todayKey);
-    if (todayDeepWorkLog) {
-        todayDeepWorkLog.exercises.forEach(ex => idToDefIdMap.set(ex.id, ex.definitionId));
-    }
+    const instanceIdToDefIdMap = new Map<string, string>();
+    const logs = [...allUpskillLogs, ...allDeepWorkLogs, ...allBrandingLogs];
+    const todayLogs = logs.filter(log => log.date === todayKey);
+
+    todayLogs.forEach(log => {
+        (log.exercises || []).forEach(ex => {
+            if (ex.definitionId) {
+                instanceIdToDefIdMap.set(ex.id, ex.definitionId);
+            }
+        });
+    });
 
     Object.entries(todaysActivities).forEach(([slotName, activities]) => {
       (activities || []).forEach(activity => {
-        (activity?.taskIds || []).forEach(instanceId => {
-          const defId = idToDefIdMap.get(instanceId);
-          if (defId && !infoMap.has(defId)) {
-            infoMap.set(defId, { slot: slotName });
+        (activity.taskIds || []).forEach(instanceId => {
+          const defId = instanceIdToDefIdMap.get(instanceId);
+          if (!defId) return;
+
+          const addInfo = (definitionId: string, activityType: ActivityType) => {
+              if (!infoMap.has(definitionId)) {
+                  infoMap.set(definitionId, []);
+              }
+              const existingEntries = infoMap.get(definitionId)!;
+              if (!existingEntries.some(e => e.type === activityType)) {
+                  existingEntries.push({ slot: slotName, type: activityType });
+              }
+          };
+          
+          if (activity.type === 'branding') {
+              const bundleDef = deepWorkDefinitions.find(d => d.id === defId);
+              if (bundleDef?.focusAreaIds) {
+                  bundleDef.focusAreaIds.forEach(focusAreaDefId => {
+                      addInfo(focusAreaDefId, 'branding');
+                  });
+              }
+          } else {
+              addInfo(defId, activity.type);
           }
         });
       });
     });
 
     return infoMap;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, allBrandingLogs, deepWorkDefinitions]);
   
   const loggedTaskInfo = useMemo(() => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -214,13 +228,15 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   }, [allUpskillLogs, allDeepWorkLogs]);
 
   const pendingTaskInfo = useMemo(() => {
-    const pendingInfo = new Map<string, { oldestDate: string }>();
+    const pendingInfo = new Map<string, { oldestDate: string, type: ActivityType }[]>();
     const todayStr = format(new Date(), 'yyyy-MM-dd');
 
     const instanceIdToDefIdMap = new Map<string, string>();
-    [...allUpskillLogs, ...allDeepWorkLogs].forEach(log => {
+    [...allUpskillLogs, ...allDeepWorkLogs, ...allBrandingLogs].forEach(log => {
         (log.exercises || []).forEach(ex => {
-            instanceIdToDefIdMap.set(ex.id, ex.definitionId);
+            if (ex.id && ex.definitionId) {
+              instanceIdToDefIdMap.set(ex.id, ex.definitionId);
+            }
         });
     });
 
@@ -232,11 +248,30 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                     if (!activity.completed && activity.taskIds && activity.taskIds.length > 0) {
                         activity.taskIds.forEach(taskId => {
                             const defId = instanceIdToDefIdMap.get(taskId);
-                            if (defId) {
-                                const existing = pendingInfo.get(defId);
-                                if (!existing || dateKey < existing.oldestDate) {
-                                    pendingInfo.set(defId, { oldestDate: dateKey });
+                            if (!defId) return;
+
+                            const addInfo = (definitionId: string, activityType: ActivityType) => {
+                                if (!pendingInfo.has(definitionId)) {
+                                    pendingInfo.set(definitionId, []);
                                 }
+                                const entries = pendingInfo.get(definitionId)!;
+                                const existingEntry = entries.find(e => e.type === activityType);
+                                if (!existingEntry || dateKey < existingEntry.oldestDate) {
+                                    const newEntries = entries.filter(e => e.type !== activityType);
+                                    newEntries.push({ oldestDate: dateKey, type: activityType });
+                                    pendingInfo.set(definitionId, newEntries);
+                                }
+                            };
+
+                            if (activity.type === 'branding') {
+                                const bundleDef = deepWorkDefinitions.find(d => d.id === defId);
+                                if (bundleDef?.focusAreaIds) {
+                                    bundleDef.focusAreaIds.forEach(focusAreaDefId => {
+                                        addInfo(focusAreaDefId, 'branding');
+                                    });
+                                }
+                            } else {
+                                addInfo(defId, activity.type);
                             }
                         });
                     }
@@ -244,9 +279,8 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
             });
         }
     });
-
     return pendingInfo;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, allBrandingLogs, deepWorkDefinitions]);
 
   const pastLoggedTaskInfo = useMemo(() => {
     const taskLogs: Record<string, { date: string; time: number }[]> = {};
@@ -454,7 +488,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
 
   }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, totalTimePerFocusArea]);
 
-  const renderNode = (node: MindMapNode, level: number) => {
+  const renderNode = (node: MindMapNode, level: number, parentNode?: MindMapNode) => {
     const nodeIcons: Record<string, React.ReactNode> = {
         'System': <GitMerge className="h-3.5 w-3.5 text-primary" />,
         'System Branch:Products': <Package className="h-3.5 w-3.5 text-blue-500" />,
@@ -477,9 +511,22 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     if (node.category === deepWorkTopicMetadata[node.name]?.classification) iconKey = node.category;
     if (!nodeIcons[iconKey] && level >= 4) iconKey = 'FocusArea';
 
+    const scheduledActivities = scheduledTaskInfo.get(node.definitionId);
+    let activityTypeToShow: ActivityType | undefined;
+
+    if (parentNode?.category === 'Release' || parentNode?.category === 'product' || parentNode?.category === 'service' || parentNode?.name === 'Products' || parentNode?.name === 'Services') {
+      activityTypeToShow = 'deepwork';
+    } else if (parentNode?.category === 'Content Bundle' || parentNode?.name === 'Content Bundles') {
+      activityTypeToShow = 'branding';
+    } else if (node.category === 'Learning Task') {
+      activityTypeToShow = 'upskill';
+    }
+
+    const scheduledInfo = scheduledActivities?.find(act => act.type === activityTypeToShow);
+    
     const loggedInfo = loggedTaskInfo[node.definitionId];
-    const scheduledInfo = scheduledTaskInfo.get(node.definitionId);
-    const pendingInfoForNode = pendingTaskInfo.get(node.definitionId);
+    const allPendingInfos = pendingTaskInfo.get(node.definitionId);
+    const pendingInfoForNode = allPendingInfos?.find(info => info.type === activityTypeToShow);
     const pastLogInfo = pastLoggedTaskInfo[node.definitionId];
 
     const isLoggedToday = !!loggedInfo;
@@ -568,7 +615,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
             {node.children.map(child => (
               <li key={child.id} className="relative">
                 <div className="absolute -right-4 top-1/2 w-4 h-px bg-border" />
-                {renderNode(child, level + 1)}
+                {renderNode(child, level + 1, node)}
               </li>
             ))}
           </ul>
@@ -592,13 +639,12 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
             initialScale={0.15} 
             minScale={0.01} 
             limitToBounds={false}
-            onInit={() => setHasCentered(true)}
           >
             {(props) => {
               
               return (
               <>
-                <Controls centerOnLoad={!hasCentered} />
+                <Controls />
                 <div className="absolute top-2 right-2 z-10 flex gap-2">
                   <Button size="icon" variant="outline" onClick={() => props.zoomIn()} aria-label="Zoom in">
                     <ZoomIn />
@@ -662,3 +708,4 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     </div>
   );
 }
+
