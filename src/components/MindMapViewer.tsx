@@ -37,25 +37,25 @@ const FlowCard = ({ icon, title, description, children }: { icon: React.ReactNod
 const ConceptualFlowDiagram = () => {
     return (
         <div className="flex items-center justify-center p-8 overflow-x-auto">
-            <div className="flex flex-wrap items-stretch justify-center gap-4 flex-row-reverse">
+            <div className="flex flex-wrap items-stretch justify-center gap-4 flex-row">
                 <div className="flex items-center gap-4">
                   <FlowCard icon={<BookCopy size={32} />} title="1. Upskill" description="Learn new skills and gain knowledge on specific topics." />
                 </div>
-                <div className="flex items-center"><ArrowLeft className="w-10 h-10 text-muted-foreground/30 shrink-0" /></div>
+                <div className="flex items-center"><ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" /></div>
                 <div className="flex items-center gap-4">
                   <FlowCard icon={<Briefcase size={32} />} title="2. Deep Work" description="Apply skills to focus areas. This is where value is created." />
                 </div>
-                <div className="flex items-center"><ArrowLeft className="w-10 h-10 text-muted-foreground/30 shrink-0" /></div>
+                <div className="flex items-center"><ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" /></div>
                 
                 <div className="flex flex-col gap-4 justify-center">
-                    <div className="flex flex-wrap items-stretch justify-center gap-4 flex-row-reverse">
+                    <div className="flex flex-wrap items-stretch justify-center gap-4 flex-row">
                         <FlowCard icon={<Share2 size={32} />} title="3a. Branding" description="Bundle focus areas into shareable content.">
                             <div className="mt-2 pt-2 border-t w-full">
                                 <p className="text-xs font-bold text-foreground">Output:</p>
                                 <p className="text-xs text-muted-foreground">Content Bundles</p>
                             </div>
                         </FlowCard>
-                        <div className="flex items-center"><ArrowLeft className="w-10 h-10 text-muted-foreground/30 shrink-0" /></div>
+                        <div className="flex items-center"><ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" /></div>
                         <FlowCard icon={<Globe size={32} />} title="4a. Publishing" description="Share content on social platforms to build authority.">
                             <div className="mt-2 pt-2 border-t w-full">
                                 <div className="flex justify-center gap-3 mt-1 text-muted-foreground">
@@ -441,7 +441,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
 
     const loggedInfo = loggedTaskInfo[node.definitionId];
     const scheduledInfo = scheduledTaskInfo.get(node.definitionId);
-    const pendingInfoForNode = pendingTaskInfo.get(node.definitionId);
+    const pendingInfoForNode = pendingInfo.get(node.definitionId);
     const pastLogInfo = pastLoggedTaskInfo[node.definitionId];
 
     const isLoggedToday = !!loggedInfo;
@@ -524,7 +524,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
       </div>
   
       {node.children && node.children.length > 0 && (
-        <div className="flex flex-row-reverse">
+        <div className="flex items-center flex-row-reverse">
           <div className="w-4 h-px bg-border self-center" />
           <ul className="flex flex-col justify-center border-r border-border pr-4 space-y-2 py-1">
             {node.children.map(child => (
