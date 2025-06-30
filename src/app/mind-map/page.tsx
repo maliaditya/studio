@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 
 interface MindMapNode extends Partial<ExerciseDefinition> {
   id: string;
+  definitionId: string;
   name: string;
   category: string;
   children: MindMapNode[];
@@ -96,24 +97,55 @@ const ConceptualFlowDiagram = () => {
 
 
 function MindMapPageContent() {
-  const { deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, schedule } = useAuth();
+  const { 
+      deepWorkDefinitions, 
+      upskillDefinitions, 
+      deepWorkTopicMetadata, 
+      productizationPlans, 
+      offerizationPlans, 
+      schedule,
+      allUpskillLogs,
+      allDeepWorkLogs,
+  } = useAuth();
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
-  const todaysScheduledTaskNames = useMemo(() => {
+  const scheduledDefinitionIds = useMemo(() => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const todaysActivities = schedule[todayKey];
     if (!todaysActivities) return new Set<string>();
 
-    const names = new Set<string>();
+    const scheduledInstanceIds = new Set<string>();
     Object.values(todaysActivities).flat().forEach(activity => {
-      if (activity?.details) {
-        activity.details.split(', ').forEach(name => names.add(name));
-      }
+        (activity?.taskIds || []).forEach(id => scheduledInstanceIds.add(id));
     });
-    return names;
-  }, [schedule]);
+
+    if (scheduledInstanceIds.size === 0) return new Set<string>();
+    
+    // Create a map from task instance ID -> definition ID from today's logs
+    const idToDefIdMap = new Map<string, string>();
+    
+    const todayUpskillLog = allUpskillLogs.find(log => log.date === todayKey);
+    if (todayUpskillLog) {
+        todayUpskillLog.exercises.forEach(ex => idToDefIdMap.set(ex.id, ex.definitionId));
+    }
+
+    const todayDeepWorkLog = allDeepWorkLogs.find(log => log.date === todayKey);
+    if (todayDeepWorkLog) {
+        todayDeepWorkLog.exercises.forEach(ex => idToDefIdMap.set(ex.id, ex.definitionId));
+    }
+    
+    const defIds = new Set<string>();
+    scheduledInstanceIds.forEach(instanceId => {
+        const defId = idToDefIdMap.get(instanceId);
+        if (defId) {
+            defIds.add(defId);
+        }
+    });
+    
+    return defIds;
+  }, [schedule, allUpskillLogs, allDeepWorkLogs]);
 
   const toggleFullScreen = () => {
     if (!containerRef.current) return;
@@ -157,8 +189,19 @@ function MindMapPageContent() {
         const linkedLearningTasks = (focusAreaDef.linkedUpskillIds || [])
             .map(id => upskillDefinitions.find(ud => ud.id === id))
             .filter((task): task is ExerciseDefinition => !!task)
-            .map(task => ({ ...task, id: `${task.id}-from-${focusAreaDef.id}-in-${parentId}`, category: 'Learning Task', children: [] }));
-        return { ...focusAreaDef, id: `${focusAreaDef.id}-in-${parentId}`, children: linkedLearningTasks };
+            .map(task => ({ 
+                ...task, 
+                definitionId: task.id,
+                id: `${task.id}-from-${focusAreaDef.id}-in-${parentId}`, 
+                category: 'Learning Task', 
+                children: [] 
+            }));
+        return { 
+            ...focusAreaDef, 
+            definitionId: focusAreaDef.id,
+            id: `${focusAreaDef.id}-in-${parentId}`, 
+            children: linkedLearningTasks 
+        };
     };
 
     const buildFullTopicTree = (topic: string, plan: any): MindMapNode => {
@@ -167,10 +210,10 @@ function MindMapPageContent() {
                 .map(id => deepWorkDefinitions.find(def => def.id === id))
                 .filter((def): def is ExerciseDefinition => !!def)
                 .map(fa => createFocusAreaNode(fa, release.id));
-            return { id: release.id, name: release.name, category: 'Release', children: focusAreaNodes };
+            return { id: release.id, definitionId: release.id, name: release.name, category: 'Release', children: focusAreaNodes };
         });
         const classification = deepWorkTopicMetadata[topic]?.classification || 'Topic';
-        return { id: topic, name: topic, category: classification, children: releaseNodes };
+        return { id: topic, definitionId: topic, name: topic, category: classification, children: releaseNodes };
     };
 
     if (selectedTopic === 'Strategic Overview') {
@@ -183,26 +226,27 @@ function MindMapPageContent() {
         const bundles = deepWorkDefinitions.filter(def => def.focusAreaIds && def.focusAreaIds.length > 0);
         const bundleNodes: MindMapNode[] = bundles.map(bundle => {
             const socialChildren: MindMapNode[] = [];
-            if (bundle.sharingStatus?.twitter) socialChildren.push({ id: `${bundle.id}-twitter`, name: 'X/Twitter', category: 'Social', children: [] });
-            if (bundle.sharingStatus?.linkedin) socialChildren.push({ id: `${bundle.id}-linkedin`, name: 'LinkedIn', category: 'Social', children: [] });
-            if (bundle.sharingStatus?.devto) socialChildren.push({ id: `${bundle.id}-devto`, name: 'Dev.to', category: 'Social', children: [] });
+            if (bundle.sharingStatus?.twitter) socialChildren.push({ id: `${bundle.id}-twitter`, definitionId: `${bundle.id}-twitter`, name: 'X/Twitter', category: 'Social', children: [] });
+            if (bundle.sharingStatus?.linkedin) socialChildren.push({ id: `${bundle.id}-linkedin`, definitionId: `${bundle.id}-linkedin`, name: 'LinkedIn', category: 'Social', children: [] });
+            if (bundle.sharingStatus?.devto) socialChildren.push({ id: `${bundle.id}-devto`, definitionId: `${bundle.id}-devto`, name: 'Dev.to', category: 'Social', children: [] });
 
             const focusAreaChildren = (bundle.focusAreaIds || [])
                 .map(id => deepWorkDefinitions.find(d => d.id === id))
                 .filter((def): def is ExerciseDefinition => !!def)
                 .map(faDef => createFocusAreaNode(faDef, bundle.id));
 
-            return { ...bundle, children: [...focusAreaChildren, ...socialChildren] };
+            return { ...bundle, definitionId: bundle.id, children: [...focusAreaChildren, ...socialChildren] };
         });
 
         const rootNode: MindMapNode = {
             id: 'strategic-overview',
+            definitionId: 'strategic-overview',
             name: 'Strategic Overview',
             category: 'System',
             children: [
-                { id: 'products-branch', name: 'Products', category: 'System Branch', children: productNodes },
-                { id: 'services-branch', name: 'Services', category: 'System Branch', children: serviceNodes },
-                { id: 'bundles-branch', name: 'Content Bundles', category: 'System Branch', children: bundleNodes },
+                { id: 'products-branch', definitionId: 'products-branch', name: 'Products', category: 'System Branch', children: productNodes },
+                { id: 'services-branch', definitionId: 'services-branch', name: 'Services', category: 'System Branch', children: serviceNodes },
+                { id: 'bundles-branch', definitionId: 'bundles-branch', name: 'Content Bundles', category: 'System Branch', children: bundleNodes },
             ].filter(branch => branch.children.length > 0)
         };
         return rootNode;
@@ -212,19 +256,20 @@ function MindMapPageContent() {
         const bundles = deepWorkDefinitions.filter(def => def.focusAreaIds && def.focusAreaIds.length > 0);
         const bundleNodes: MindMapNode[] = bundles.map(bundle => {
             const socialChildren: MindMapNode[] = [];
-            if (bundle.sharingStatus?.twitter) socialChildren.push({ id: `${bundle.id}-twitter`, name: 'X/Twitter', category: 'Social', children: [] });
-            if (bundle.sharingStatus?.linkedin) socialChildren.push({ id: `${bundle.id}-linkedin`, name: 'LinkedIn', category: 'Social', children: [] });
-            if (bundle.sharingStatus?.devto) socialChildren.push({ id: `${bundle.id}-devto`, name: 'Dev.to', category: 'Social', children: [] });
+            if (bundle.sharingStatus?.twitter) socialChildren.push({ id: `${bundle.id}-twitter`, definitionId: `${bundle.id}-twitter`, name: 'X/Twitter', category: 'Social', children: [] });
+            if (bundle.sharingStatus?.linkedin) socialChildren.push({ id: `${bundle.id}-linkedin`, definitionId: `${bundle.id}-linkedin`, name: 'LinkedIn', category: 'Social', children: [] });
+            if (bundle.sharingStatus?.devto) socialChildren.push({ id: `${bundle.id}-devto`, definitionId: `${bundle.id}-devto`, name: 'Dev.to', category: 'Social', children: [] });
             
             const focusAreaChildren = (bundle.focusAreaIds || [])
                 .map(id => deepWorkDefinitions.find(d => d.id === id))
                 .filter((def): def is ExerciseDefinition => !!def)
                 .map(faDef => createFocusAreaNode(faDef, bundle.id));
 
-            return { ...bundle, children: [...focusAreaChildren, ...socialChildren] };
+            return { ...bundle, definitionId: bundle.id, children: [...focusAreaChildren, ...socialChildren] };
         });
         return {
             id: 'content-bundles-root',
+            definitionId: 'content-bundles-root',
             name: 'Content Bundles',
             category: 'Branding',
             children: bundleNodes,
@@ -259,7 +304,7 @@ function MindMapPageContent() {
     if (node.category === deepWorkTopicMetadata[node.name]?.classification) iconKey = node.category;
     if (!nodeIcons[iconKey] && level === 4) iconKey = 'FocusArea';
 
-    const isScheduledToday = todaysScheduledTaskNames.has(node.name);
+    const isScheduledToday = node.definitionId ? scheduledDefinitionIds.has(node.definitionId) : false;
 
     return (
     <div className="flex items-center flex-row-reverse">
