@@ -439,7 +439,7 @@ function MindMapPageContent() {
                 )}
             </div>
         ) : isPastAndDone ? (
-            <div className="mt-1 pt-1 border-t border-gray-300/50 flex items-center gap-1.5 text-xs text-gray-800 dark:text-gray-400">
+            <div className="mt-1 pt-1 border-t border-gray-300/50 flex items-center gap-1.5 text-xs text-green-800 dark:text-green-400">
                 <Check className="h-4 w-4 flex-shrink-0" />
                 <span className="font-medium">Completed in Past</span>
             </div>
