@@ -111,8 +111,8 @@ function DeepWorkPageContent() {
   const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
   const [isDetailsEditing, setIsDetailsEditing] = useState(false);
   
-  // State for linking learning modal
-  const [isLinkLearningModalOpen, setIsLinkLearningModalOpen] = useState(false);
+  // State for linking learning popover
+  const [isLinkLearningPopoverOpen, setIsLinkLearningPopoverOpen] = useState(false);
   const [linkingLearningToFocusArea, setLinkingLearningToFocusArea] = useState<ExerciseDefinition | null>(null);
   const [editableLinkedUpskillIds, setEditableLinkedUpskillIds] = useState<string[]>([]);
   
@@ -447,10 +447,10 @@ function DeepWorkPageContent() {
       toast({ title: "Saved", description: "Deep work links have been updated." });
   };
 
-  const handleOpenLinkLearningModal = (def: ExerciseDefinition) => {
+  const handleOpenLinkLearningPopover = (def: ExerciseDefinition) => {
     setLinkingLearningToFocusArea(def);
     setEditableLinkedUpskillIds(def.linkedUpskillIds || []);
-    setIsLinkLearningModalOpen(true);
+    setIsLinkLearningPopoverOpen(true);
   };
   
   const handleToggleUpskillLink = (upskillId: string) => {
@@ -472,7 +472,7 @@ function DeepWorkPageContent() {
             ? { ...def, linkedUpskillIds: editableLinkedUpskillIds }
             : def
     ));
-    setIsLinkLearningModalOpen(false);
+    setIsLinkLearningPopoverOpen(false);
     toast({ title: "Saved", description: "Learning tasks have been linked." });
   };
 
@@ -583,7 +583,7 @@ function DeepWorkPageContent() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                     <Button variant="ghost" size="icon" onClick={() => setIsLibraryExpanded(!isLibraryExpanded)} className="h-8 w-8" aria-label={isLibraryExpanded ? "Collapse library" : "Expand library"}>
-                      {isLibraryExpanded ? <ChevronUp className="h-5 w-5 text-primary" /> : <ChevronDown className="h-5 w-5 text-primary" />}
+                      {isLibraryExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                     </Button>
                   </div>
                 </div>
@@ -669,13 +669,52 @@ function DeepWorkPageContent() {
                                             </div>
                                         </div>
                                         <div className="flex-shrink-0 flex items-center">
-                                          <Button variant="ghost" size="icon" onClick={() => handleOpenDetailsModal(def)} className="h-8 w-8 text-muted-foreground hover:text-yellow-500" aria-label={`View details for ${def.name}`}> <ClipboardList className="h-4 w-4" /> </Button>
-                                          <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
-                                          <Button variant="ghost" size="icon" onClick={() => handleOpenLinkLearningModal(def)} className="h-8 w-8 text-muted-foreground hover:text-green-500" aria-label={`Link learning tasks to ${def.name}`}> <PlusCircle className="h-4 w-4" /> </Button>
-                                          <Button variant="ghost" size="icon" onClick={() => handleOpenLinkDeepWorkModal(def)} className="h-8 w-8 text-muted-foreground hover:text-purple-500" aria-label={`Link other work to ${def.name}`}> <LinkIcon className="h-4 w-4" /> </Button>
-                                          <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8 text-muted-foreground hover:text-primary" aria-label={`Edit ${def.name}`}> <Edit3 className="h-4 w-4" /> </Button>
-                                          <Button variant="ghost" size="icon" onClick={() => handleDeleteExerciseDefinition(def.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label={`Delete ${def.name}`}> <Trash2 className="h-4 w-4" /> </Button>
-                                          <Button variant="ghost" size="icon" onClick={() => handleAddTaskToSession(def)} className="h-8 w-8 text-muted-foreground hover:text-accent" aria-label={`Add ${def.name} to session`}> <ChevronRight className="h-5 w-5" /> </Button>
+                                          <Button variant="ghost" size="icon" onClick={() => handleOpenDetailsModal(def)} className="h-8 w-8" aria-label={`View details for ${def.name}`}> <ClipboardList className="h-4 w-4" /> </Button>
+                                          <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
+                                          
+                                          <Popover open={isLinkLearningPopoverOpen && linkingLearningToFocusArea?.id === def.id} onOpenChange={(isOpen) => { if (!isOpen) { setIsLinkLearningPopoverOpen(false); } }}>
+                                            <PopoverTrigger asChild>
+                                                <Button variant="ghost" size="icon" onClick={() => handleOpenLinkLearningPopover(def)} className="h-8 w-8" aria-label={`Link learning tasks to ${def.name}`}>
+                                                    <BookCopy className="h-4 w-4" />
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-80">
+                                                <div className="grid gap-4">
+                                                    <div className="space-y-2">
+                                                        <h4 className="font-medium leading-none">Link Learning to "{def.name}"</h4>
+                                                        <p className="text-sm text-muted-foreground">Select learning tasks that support this focus area.</p>
+                                                    </div>
+                                                    <div className="py-2">
+                                                        <ScrollArea className="h-40 w-full rounded-md border p-2">
+                                                            {loggedUpskillDefinitions.length > 0 ? (
+                                                              <div className="space-y-2">
+                                                                  {loggedUpskillDefinitions.map(upskillDef => (
+                                                                      <div key={upskillDef.id} className="flex items-center space-x-3">
+                                                                          <Checkbox
+                                                                              id={`link-popover-${upskillDef.id}`}
+                                                                              checked={editableLinkedUpskillIds.includes(upskillDef.id)}
+                                                                              onCheckedChange={() => handleToggleUpskillLink(upskillDef.id)}
+                                                                          />
+                                                                          <Label htmlFor={`link-popover-${upskillDef.id}`} className="font-normal w-full cursor-pointer">
+                                                                              {upskillDef.name} <span className="text-muted-foreground/80">({upskillDef.category})</span>
+                                                                          </Label>
+                                                                      </div>
+                                                                  ))}
+                                                              </div>
+                                                            ) : (
+                                                                <p className="text-center text-sm text-muted-foreground p-4">No logged learning tasks found. Go to the Upskill page to log some progress.</p>
+                                                            )}
+                                                        </ScrollArea>
+                                                    </div>
+                                                    <Button onClick={handleSaveLearningLinks}>Save Links</Button>
+                                                </div>
+                                            </PopoverContent>
+                                          </Popover>
+
+                                          <Button variant="ghost" size="icon" onClick={() => handleOpenLinkDeepWorkModal(def)} className="h-8 w-8" aria-label={`Link other work to ${def.name}`}> <LinkIcon className="h-4 w-4" /> </Button>
+                                          <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8" aria-label={`Edit ${def.name}`}> <Edit3 className="h-4 w-4" /> </Button>
+                                          <Button variant="ghost" size="icon" onClick={() => handleDeleteExerciseDefinition(def.id)} className="h-8 w-8" aria-label={`Delete ${def.name}`}> <Trash2 className="h-4 w-4" /> </Button>
+                                          <Button variant="ghost" size="icon" onClick={() => handleAddTaskToSession(def)} className="h-8 w-8" aria-label={`Add ${def.name} to session`}> <ChevronRight className="h-5 w-5" /> </Button>
                                         </div>
                                       </div>
                                       <div className="flex items-center space-x-2 pt-3 mt-3 border-t">
@@ -704,8 +743,8 @@ function DeepWorkPageContent() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg text-primary">
-                        <LineChartIcon /> Daily Deep Work Duration
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                        Daily Deep Work Duration
                     </CardTitle>
                     <CardDescription>
                        Total minutes of deep work logged each day.
@@ -759,7 +798,7 @@ function DeepWorkPageContent() {
                         </ResponsiveContainer>
                       </ChartContainer>
                     ) : (
-                      <div className="flex h-[200px] items-center justify-center text-center text-sm text-muted-foreground">
+                      <div className="flex h-[200px] items-center justify-center text-center text-sm">
                         <p>Log deep work sessions on multiple days to see a chart of your daily duration.</p>
                       </div>
                     )}
@@ -771,8 +810,8 @@ function DeepWorkPageContent() {
               <Card>
                   <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
-                          <CardTitle id="current-learning-heading" className="flex items-center gap-2 text-lg text-primary">
-                              <ListChecks /> Deep Work Session for: {format(selectedDate, 'PPP')}
+                          <CardTitle id="current-learning-heading" className="flex items-center gap-2 text-lg">
+                              Deep Work Session for: {format(selectedDate, 'PPP')}
                           </CardTitle>
                       </div>
                       <Popover>
@@ -886,7 +925,7 @@ function DeepWorkPageContent() {
             
             {/* Linked Learning Section */}
             <div>
-              <h4 className="font-semibold mb-2 text-foreground">Linked Learning</h4>
+              <h4 className="font-semibold mb-2">Linked Learning</h4>
               {selectedFocusArea?.linkedUpskillIds && selectedFocusArea.linkedUpskillIds.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                         {selectedFocusArea.linkedUpskillIds.map(id => {
@@ -897,46 +936,11 @@ function DeepWorkPageContent() {
                         })}
                     </div>
                  ) : (
-                    <p className="text-sm text-muted-foreground">No learning tasks linked.</p>
+                    <p className="text-sm">No learning tasks linked.</p>
                  )
               }
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isLinkLearningModalOpen} onOpenChange={setIsLinkLearningModalOpen}>
-        <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-                <DialogTitle>Link Learning to "{linkingLearningToFocusArea?.name}"</DialogTitle>
-                <DialogDescription>Select the logged learning tasks that support this focus area.</DialogDescription>
-            </DialogHeader>
-            <div className="py-4">
-                <ScrollArea className="h-60 w-full rounded-md border p-2">
-                    {loggedUpskillDefinitions.length > 0 ? (
-                      <div className="space-y-2">
-                          {loggedUpskillDefinitions.map(def => (
-                              <div key={def.id} className="flex items-center space-x-3">
-                                  <Checkbox
-                                      id={`link-${def.id}`}
-                                      checked={editableLinkedUpskillIds.includes(def.id)}
-                                      onCheckedChange={() => handleToggleUpskillLink(def.id)}
-                                  />
-                                  <Label htmlFor={`link-${def.id}`} className="font-normal w-full cursor-pointer">
-                                      {def.name} <span className="text-muted-foreground/80">({def.category})</span>
-                                  </Label>
-                              </div>
-                          ))}
-                      </div>
-                    ) : (
-                        <p className="text-center text-sm text-muted-foreground p-4">No logged learning tasks found. Go to the Upskill page to log some progress.</p>
-                    )}
-                </ScrollArea>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setIsLinkLearningModalOpen(false)}>Cancel</Button>
-                <Button onClick={handleSaveLearningLinks}>Save Links</Button>
-            </DialogFooter>
         </DialogContent>
       </Dialog>
       
@@ -983,5 +987,7 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
+
+    
 
     
