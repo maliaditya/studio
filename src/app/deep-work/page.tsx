@@ -110,6 +110,10 @@ function DeepWorkPageContent() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
   const [isDetailsEditing, setIsDetailsEditing] = useState(false);
+  
+  // State for linking learning modal
+  const [isLinkLearningModalOpen, setIsLinkLearningModalOpen] = useState(false);
+  const [linkingLearningToFocusArea, setLinkingLearningToFocusArea] = useState<ExerciseDefinition | null>(null);
   const [editableLinkedUpskillIds, setEditableLinkedUpskillIds] = useState<string[]>([]);
   
   // State for linking deep work modal
@@ -123,6 +127,16 @@ function DeepWorkPageContent() {
   }, [deepWorkDefinitions]);
 
   const isNewTopic = newTopicName.trim() !== '' && !allTopics.includes(newTopicName.trim());
+  
+  const loggedUpskillDefinitions = useMemo(() => {
+    const loggedIds = new Set(
+        allUpskillLogs.flatMap(log => 
+            log.exercises.filter(ex => ex.loggedSets.length > 0)
+                         .map(ex => ex.definitionId)
+        )
+    );
+    return upskillDefinitions.filter(def => loggedIds.has(def.id));
+  }, [allUpskillLogs, upskillDefinitions]);
 
   useEffect(() => {
     const now = new Date();
@@ -389,23 +403,10 @@ function DeepWorkPageContent() {
   
   const handleOpenDetailsModal = (def: ExerciseDefinition) => {
     setSelectedFocusArea(def);
-    setEditableLinkedUpskillIds(def.linkedUpskillIds || []);
     setIsDetailsModalOpen(true);
     setIsDetailsEditing(false);
   };
 
-  const handleToggleUpskillLink = (upskillId: string) => {
-    setEditableLinkedUpskillIds(currentIds => {
-      const newIds = new Set(currentIds);
-      if (newIds.has(upskillId)) {
-        newIds.delete(upskillId);
-      } else {
-        newIds.add(upskillId);
-      }
-      return Array.from(newIds);
-    });
-  };
-  
   const handleSaveDetails = () => {
     if (!selectedFocusArea) return;
     setDeepWorkDefinitions(prevDefs => prevDefs.map(def =>
@@ -445,6 +446,36 @@ function DeepWorkPageContent() {
       setIsLinkDeepWorkModalOpen(false);
       toast({ title: "Saved", description: "Deep work links have been updated." });
   };
+
+  const handleOpenLinkLearningModal = (def: ExerciseDefinition) => {
+    setLinkingLearningToFocusArea(def);
+    setEditableLinkedUpskillIds(def.linkedUpskillIds || []);
+    setIsLinkLearningModalOpen(true);
+  };
+  
+  const handleToggleUpskillLink = (upskillId: string) => {
+    setEditableLinkedUpskillIds(currentIds => {
+      const newIds = new Set(currentIds);
+      if (newIds.has(upskillId)) {
+        newIds.delete(upskillId);
+      } else {
+        newIds.add(upskillId);
+      }
+      return Array.from(newIds);
+    });
+  };
+
+  const handleSaveLearningLinks = () => {
+    if (!linkingLearningToFocusArea) return;
+    setDeepWorkDefinitions(prevDefs => prevDefs.map(def =>
+        def.id === linkingLearningToFocusArea.id
+            ? { ...def, linkedUpskillIds: editableLinkedUpskillIds }
+            : def
+    ));
+    setIsLinkLearningModalOpen(false);
+    toast({ title: "Saved", description: "Learning tasks have been linked." });
+  };
+
 
   const handleLogWeight = (weight: number, date: Date) => {
     if (!currentUser) return;
@@ -640,6 +671,7 @@ function DeepWorkPageContent() {
                                         <div className="flex-shrink-0 flex items-center">
                                           <Button variant="ghost" size="icon" onClick={() => handleOpenDetailsModal(def)} className="h-8 w-8 text-muted-foreground hover:text-yellow-500" aria-label={`View details for ${def.name}`}> <ClipboardList className="h-4 w-4" /> </Button>
                                           <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
+                                          <Button variant="ghost" size="icon" onClick={() => handleOpenLinkLearningModal(def)} className="h-8 w-8 text-muted-foreground hover:text-green-500" aria-label={`Link learning tasks to ${def.name}`}> <PlusCircle className="h-4 w-4" /> </Button>
                                           <Button variant="ghost" size="icon" onClick={() => handleOpenLinkDeepWorkModal(def)} className="h-8 w-8 text-muted-foreground hover:text-purple-500" aria-label={`Link other work to ${def.name}`}> <LinkIcon className="h-4 w-4" /> </Button>
                                           <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8 text-muted-foreground hover:text-primary" aria-label={`Edit ${def.name}`}> <Edit3 className="h-4 w-4" /> </Button>
                                           <Button variant="ghost" size="icon" onClick={() => handleDeleteExerciseDefinition(def.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label={`Delete ${def.name}`}> <Trash2 className="h-4 w-4" /> </Button>
@@ -849,68 +881,15 @@ function DeepWorkPageContent() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader className="flex flex-row justify-between items-center">
             <DialogTitle>Details for: {selectedFocusArea?.name}</DialogTitle>
-            <div className="flex-shrink-0">
-              {isDetailsEditing ? (
-                  <Button variant="ghost" size="icon" onClick={handleSaveDetails} aria-label="Save Changes">
-                      <Save className="h-5 w-5 text-green-500" />
-                  </Button>
-              ) : (
-                  <Button variant="ghost" size="icon" onClick={() => setIsDetailsEditing(true)} aria-label="Edit Details">
-                      <Edit3 className="h-5 w-5" />
-                  </Button>
-              )}
-            </div>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto pr-4 space-y-6">
             
             {/* Linked Learning Section */}
             <div>
               <h4 className="font-semibold mb-2 text-foreground">Linked Learning</h4>
-              {isDetailsEditing ? (
-                <div>
-                    <div className="flex flex-wrap gap-2 mb-2">
-                        {editableLinkedUpskillIds.map(id => {
-                            const upskillDef = upskillDefinitions.find(ud => ud.id === id);
-                            return upskillDef ? (
-                                <Badge key={id} variant="secondary" className="text-sm">
-                                    {upskillDef.name}
-                                    <button onClick={() => handleToggleUpskillLink(id)} className="ml-1.5 rounded-full hover:bg-destructive/20 p-0.5">
-                                        <X className="h-3 w-3"/>
-                                    </button>
-                                </Badge>
-                            ) : null;
-                        })}
-                    </div>
-                     <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm">
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Link a Learning Task
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-80 max-h-72 overflow-y-auto">
-                            <DropdownMenuLabel>Available Learning Tasks</DropdownMenuLabel>
-                            <DropdownMenuSeparator/>
-                            {upskillDefinitions.filter(ud => !editableLinkedUpskillIds.includes(ud.id)).length > 0 ?
-                              upskillDefinitions.filter(ud => !editableLinkedUpskillIds.includes(ud.id)).map(ud => (
-                                <DropdownMenuCheckboxItem
-                                    key={ud.id}
-                                    checked={false}
-                                    onCheckedChange={() => handleToggleUpskillLink(ud.id)}
-                                >
-                                    {ud.name} ({ud.category})
-                                </DropdownMenuCheckboxItem>
-                              )) : (
-                                <p className="px-2 py-1.5 text-sm text-muted-foreground">No other tasks to link.</p>
-                              )
-                            }
-                        </DropdownMenuContent>
-                     </DropdownMenu>
-                </div>
-              ) : (
-                 editableLinkedUpskillIds.length > 0 ? (
+              {selectedFocusArea?.linkedUpskillIds && selectedFocusArea.linkedUpskillIds.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
-                        {editableLinkedUpskillIds.map(id => {
+                        {selectedFocusArea.linkedUpskillIds.map(id => {
                             const upskillDef = upskillDefinitions.find(ud => ud.id === id);
                             return upskillDef ? (
                                 <Badge key={id} variant="secondary" className="text-sm">{upskillDef.name} ({upskillDef.category})</Badge>
@@ -918,11 +897,46 @@ function DeepWorkPageContent() {
                         })}
                     </div>
                  ) : (
-                    <p className="text-sm text-muted-foreground">No learning tasks linked. Click edit to add some.</p>
+                    <p className="text-sm text-muted-foreground">No learning tasks linked.</p>
                  )
-              )}
+              }
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isLinkLearningModalOpen} onOpenChange={setIsLinkLearningModalOpen}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Link Learning to "{linkingLearningToFocusArea?.name}"</DialogTitle>
+                <DialogDescription>Select the logged learning tasks that support this focus area.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+                <ScrollArea className="h-60 w-full rounded-md border p-2">
+                    {loggedUpskillDefinitions.length > 0 ? (
+                      <div className="space-y-2">
+                          {loggedUpskillDefinitions.map(def => (
+                              <div key={def.id} className="flex items-center space-x-3">
+                                  <Checkbox
+                                      id={`link-${def.id}`}
+                                      checked={editableLinkedUpskillIds.includes(def.id)}
+                                      onCheckedChange={() => handleToggleUpskillLink(def.id)}
+                                  />
+                                  <Label htmlFor={`link-${def.id}`} className="font-normal w-full cursor-pointer">
+                                      {def.name} <span className="text-muted-foreground/80">({def.category})</span>
+                                  </Label>
+                              </div>
+                          ))}
+                      </div>
+                    ) : (
+                        <p className="text-center text-sm text-muted-foreground p-4">No logged learning tasks found. Go to the Upskill page to log some progress.</p>
+                    )}
+                </ScrollArea>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsLinkLearningModalOpen(false)}>Cancel</Button>
+                <Button onClick={handleSaveLearningLinks}>Save Links</Button>
+            </DialogFooter>
         </DialogContent>
       </Dialog>
       
@@ -969,3 +983,5 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
+
+    
