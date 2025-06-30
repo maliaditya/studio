@@ -79,7 +79,7 @@ function HomePageContent() {
     isAgendaDocked, setIsAgendaDocked,
     handleToggleComplete, handleLogLearning,
     workoutMode, workoutPlans, exerciseDefinitions,
-    upskillDefinitions, topicGoals, deepWorkDefinitions,
+    upskillDefinitions, topicGoals, deepWorkDefinitions, setDeepWorkDefinitions,
     leadGenDefinitions,
     productizationPlans,
     offerizationPlans,
@@ -275,7 +275,7 @@ function HomePageContent() {
       logSource = allDeepWorkLogs;
     } else { // branding
       logsUpdater = setAllBrandingLogs;
-      definitionSource = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreas));
+      definitionSource = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreaIds));
       logSource = brandingLogs;
     }
     
@@ -295,7 +295,7 @@ function HomePageContent() {
         category: def.category,
         loggedSets: [],
         targetSets: 1,
-        targetReps: '25',
+        targetReps: pageType === 'branding' ? '4 stages' : '25',
       };
     });
 
@@ -468,7 +468,7 @@ function HomePageContent() {
               };
           }
           
-          const readyForBrandingCount = deepWorkDefinitions.filter(def => def.isReadyForBranding && !Array.isArray(def.focusAreas)).length;
+          const readyForBrandingCount = deepWorkDefinitions.filter(def => def.isReadyForBranding && !Array.isArray(def.focusAreaIds)).length;
 
           if (readyForBrandingCount > 0) {
               return {
@@ -694,7 +694,7 @@ function HomePageContent() {
       definitionSource = deepWorkDefinitions;
     } else { // branding
       logSource = brandingLogs;
-      definitionSource = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreas));
+      definitionSource = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreaIds));
     }
     
     // These are the WorkoutExercise objects already created for the selected day.
@@ -889,6 +889,8 @@ function HomePageContent() {
               onSave={handleSaveTaskSelection}
               pageType={learningModalProps.pageType}
               disabledTaskIds={learningModalProps.disabledTaskIds}
+              deepWorkDefinitions={deepWorkDefinitions}
+              setDeepWorkDefinitions={setDeepWorkDefinitions}
           />
         )}
 
