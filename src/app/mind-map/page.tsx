@@ -11,6 +11,7 @@ import type { ExerciseDefinition, Release } from '@/types/workout';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 interface MindMapNode extends Partial<ExerciseDefinition> {
   id: string;
@@ -95,10 +96,24 @@ const ConceptualFlowDiagram = () => {
 
 
 function MindMapPageContent() {
-  const { deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans } = useAuth();
+  const { deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, schedule } = useAuth();
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
+
+  const todaysScheduledTaskNames = useMemo(() => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const todaysActivities = schedule[todayKey];
+    if (!todaysActivities) return new Set<string>();
+
+    const names = new Set<string>();
+    Object.values(todaysActivities).flat().forEach(activity => {
+      if (activity?.details) {
+        activity.details.split(', ').forEach(name => names.add(name));
+      }
+    });
+    return names;
+  }, [schedule]);
 
   const toggleFullScreen = () => {
     if (!containerRef.current) return;
@@ -238,16 +253,20 @@ function MindMapPageContent() {
         'Social:Dev.to': <DevToIcon className="h-3 w-3 text-muted-foreground" />,
     };
     
-    // Determine the key for the icon
     let iconKey = node.category;
     if (node.category === 'System Branch') iconKey = `System Branch:${node.name}`;
     if (node.category === 'Social') iconKey = `Social:${node.name}`;
-    if (node.category === deepWorkTopicMetadata[node.name]?.classification) iconKey = node.category; // To handle product/service topics
+    if (node.category === deepWorkTopicMetadata[node.name]?.classification) iconKey = node.category;
     if (!nodeIcons[iconKey] && level === 4) iconKey = 'FocusArea';
+
+    const isScheduledToday = todaysScheduledTaskNames.has(node.name);
 
     return (
     <div className="flex items-center flex-row-reverse">
-      <div className="flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border">
+      <div className={cn(
+        "flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border",
+        isScheduledToday && "bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700"
+      )}>
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted flex-shrink-0">
              {nodeIcons[iconKey] || <GitBranch className="h-3.5 w-3.5 text-primary" />}
@@ -347,5 +366,3 @@ export default function MindMapPage() {
         </AuthGuard>
     )
 }
-
-    
