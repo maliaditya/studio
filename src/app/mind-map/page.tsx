@@ -6,12 +6,12 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, Linkedin, Youtube, Rocket } from 'lucide-react';
-import type { ExerciseDefinition, Release } from '@/types/workout';
+import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, Linkedin, Youtube, Rocket, Workflow, Calendar, Check } from 'lucide-react';
+import type { ExerciseDefinition, Release, DatedWorkout } from '@/types/workout';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 interface MindMapNode extends Partial<ExerciseDefinition> {
   id: string;
@@ -146,6 +146,32 @@ function MindMapPageContent() {
     
     return defIds;
   }, [schedule, allUpskillLogs, allDeepWorkLogs]);
+  
+  const loggedTaskInfo = useMemo(() => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const info: Record<string, { totalTime: number }> = {};
+
+    const processLogs = (logs: DatedWorkout[], timeField: 'reps' | 'weight') => {
+      const todayLog = logs.find(log => log.date === todayKey);
+      if (todayLog) {
+        todayLog.exercises.forEach(ex => {
+          const loggedTime = ex.loggedSets.reduce((sum, set) => sum + set[timeField], 0);
+          if (loggedTime > 0) {
+            if (!info[ex.definitionId]) {
+              info[ex.definitionId] = { totalTime: 0 };
+            }
+            info[ex.definitionId].totalTime += loggedTime;
+          }
+        });
+      }
+    };
+
+    processLogs(allUpskillLogs, 'reps'); // 'reps' is duration for upskill
+    processLogs(allDeepWorkLogs, 'weight'); // 'weight' is duration for deepwork
+
+    return info;
+  }, [allUpskillLogs, allDeepWorkLogs]);
+
 
   const toggleFullScreen = () => {
     if (!containerRef.current) return;
@@ -290,7 +316,7 @@ function MindMapPageContent() {
         'product': <GitBranch className="h-3.5 w-3.5 text-secondary-foreground" />,
         'service': <GitBranch className="h-3.5 w-3.5 text-secondary-foreground" />,
         'Release': <Rocket className="h-3 w-3 text-muted-foreground" />,
-        'FocusArea': <GitMerge className="h-3.5 w-3.5 text-secondary-foreground" />,
+        'FocusArea': <Workflow className="h-3 w-3 text-muted-foreground" />,
         'Learning Task': <BookCopy className="h-3 w-3 text-muted-foreground" />,
         'Content Bundle': <Package className="h-3.5 w-3.5 text-secondary-foreground" />,
         'Social:X/Twitter': <TwitterIcon className="h-3 w-3 text-muted-foreground" />,
@@ -302,25 +328,40 @@ function MindMapPageContent() {
     if (node.category === 'System Branch') iconKey = `System Branch:${node.name}`;
     if (node.category === 'Social') iconKey = `Social:${node.name}`;
     if (node.category === deepWorkTopicMetadata[node.name]?.classification) iconKey = node.category;
-    if (!nodeIcons[iconKey] && level === 4) iconKey = 'FocusArea';
+    if (!nodeIcons[iconKey] && level >= 4) iconKey = 'FocusArea';
 
-    const isScheduledToday = node.definitionId ? scheduledDefinitionIds.has(node.definitionId) : false;
+    const loggedInfo = loggedTaskInfo[node.definitionId];
+    const isScheduledToday = !loggedInfo && scheduledDefinitionIds.has(node.definitionId);
 
     return (
     <div className="flex items-center flex-row-reverse">
       <div className={cn(
         "flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border",
-        isScheduledToday && "bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700"
+        loggedInfo && "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700",
+        isScheduledToday && "bg-card" // No highlight for scheduled, just the badge
       )}>
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted flex-shrink-0">
-             {nodeIcons[iconKey] || <GitBranch className="h-3.5 w-3.5 text-primary" />}
+            {nodeIcons[iconKey] || <GitBranch className="h-3.5 w-3.5 text-primary" />}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-grow">
             <p className="font-semibold text-xs text-foreground truncate" title={node.name}>{node.name}</p>
             <p className="text-xs text-muted-foreground capitalize">{node.category}</p>
           </div>
         </div>
+
+        {loggedInfo ? (
+            <div className="mt-1 pt-1 border-t border-green-300/50 flex items-center gap-1.5 text-xs text-green-800 dark:text-green-200">
+                <Check className="h-4 w-4 flex-shrink-0" />
+                <span className="font-medium">Logged: {loggedInfo.totalTime > 60 ? `${(loggedInfo.totalTime / 60).toFixed(1)}h` : `${loggedInfo.totalTime}m`}</span>
+                <span className="ml-auto font-mono">{format(new Date(), 'MMM dd')}</span>
+            </div>
+        ) : isScheduledToday ? (
+            <div className="mt-1 pt-1 border-t border-border flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Calendar className="h-4 w-4 flex-shrink-0 text-primary" />
+                <span className="font-medium">Scheduled Today</span>
+            </div>
+        ) : null}
       </div>
   
       {node.children && node.children.length > 0 && (
@@ -411,3 +452,5 @@ export default function MindMapPage() {
         </AuthGuard>
     )
 }
+
+    
