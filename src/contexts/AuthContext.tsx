@@ -176,8 +176,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // This effect shows a toast ONLY when a user logs out.
   useEffect(() => {
+    // Defer the toast until after the current render cycle to avoid state update conflicts.
     if (prevUser && !currentUser) {
+      setTimeout(() => {
         toast({ title: "Logged Out", description: "You have been successfully logged out." });
+      }, 0);
     }
   }, [currentUser, prevUser, toast]);
 
@@ -787,7 +790,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const newFeatureDef: ExerciseDefinition = {
-      id: `def_${Date.now()}`,
+      id: `def_${Date.now()}_${Math.random()}`,
       name: featureName.trim(),
       category: topic as ExerciseCategory,
     };
@@ -901,7 +904,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const oldExerciseName = workoutLog.exercises[exerciseIndex].name;
 
     const newWorkoutExercise: WorkoutExercise = {
-      id: `${newExerciseDefinition.id}-${Date.now()}`,
+      id: `${newExerciseDefinition.id}-${Date.now()}_${Math.random()}`,
       definitionId: newExerciseDefinition.id,
       name: newExerciseDefinition.name,
       category: newExerciseDefinition.category,
