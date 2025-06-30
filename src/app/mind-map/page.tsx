@@ -52,7 +52,7 @@ function MindMapPageContent() {
   }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata]);
 
   const renderNode = (node: MindMapNode, level: number) => (
-    <div className="flex items-center">
+    <div className="flex items-center flex-row-reverse">
       {/* Node Box: The visual representation of a single node */}
       <div className="flex-shrink-0 w-64 p-3 rounded-lg shadow-md bg-card border">
         <div className="flex items-center gap-3">
@@ -81,11 +81,11 @@ function MindMapPageContent() {
           <div className="w-8 h-px bg-border self-center" />
   
           {/* List of children with a vertical connector line */}
-          <ul className="flex flex-col justify-center border-l border-border pl-8 space-y-8 py-4">
+          <ul className="flex flex-col justify-center border-r border-border pr-8 space-y-8 py-4">
             {node.children.map(child => (
               <li key={child.id} className="relative">
                 {/* Horizontal line from the vertical connector to the child node */}
-                <div className="absolute -left-8 top-1/2 w-8 h-px bg-border" />
+                <div className="absolute -right-8 top-1/2 w-8 h-px bg-border" />
                 {/* Recursively render the child node and its own children */}
                 {renderNode(child, level + 1)}
               </li>
@@ -120,8 +120,8 @@ function MindMapPageContent() {
           </div>
 
           {selectedTopic && mindMapData && (
-            <div className="mt-8 p-4 rounded-lg bg-muted/30 overflow-x-auto">
-              <div className="inline-block py-4 min-w-full">
+            <div className="mt-8 p-4 rounded-lg bg-muted/30 overflow-x-auto flex justify-end">
+              <div className="inline-block py-4">
                 {renderNode(mindMapData, 0)}
               </div>
             </div>
