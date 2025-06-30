@@ -224,9 +224,9 @@ function MindMapPageContent() {
   const renderNode = (node: MindMapNode, level: number) => {
     const nodeIcons: Record<string, React.ReactNode> = {
         'System': <GitMerge className="h-3.5 w-3.5 text-primary" />,
-        'System Branch:Products': <Package className="h-3.5 w-3.5 text-primary" />,
-        'System Branch:Services': <Briefcase className="h-3.5 w-3.5 text-primary" />,
-        'System Branch:Content Bundles': <Share2 className="h-3.5 w-3.5 text-primary" />,
+        'System Branch:Products': <Package className="h-3.5 w-3.5 text-blue-500" />,
+        'System Branch:Services': <Briefcase className="h-3.5 w-3.5 text-green-500" />,
+        'System Branch:Content Bundles': <Share2 className="h-3.5 w-3.5 text-purple-500" />,
         'product': <GitBranch className="h-3.5 w-3.5 text-secondary-foreground" />,
         'service': <GitBranch className="h-3.5 w-3.5 text-secondary-foreground" />,
         'Release': <Rocket className="h-3 w-3 text-muted-foreground" />,
