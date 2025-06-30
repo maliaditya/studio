@@ -274,10 +274,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const root = window.document.documentElement;
-    root.classList.remove('theme-default', 'theme-matrix');
+    root.classList.remove('theme-default', 'theme-matrix', 'theme-ad-dark');
     
     if (theme === 'matrix') {
       root.classList.add('theme-matrix');
+    } else if (theme === 'ad-dark') {
+        root.classList.add('theme-ad-dark');
     } else {
       root.classList.add('theme-default');
     }

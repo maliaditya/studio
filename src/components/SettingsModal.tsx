@@ -97,7 +97,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
             <RadioGroup
               value={theme}
               onValueChange={handleThemeChange}
-              className="grid grid-cols-2 gap-4"
+              className="grid grid-cols-3 gap-4"
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="default" id="theme-default" />
@@ -106,6 +106,10 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="matrix" id="theme-matrix" />
                 <Label htmlFor="theme-matrix" className="font-normal">Matrix</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="ad-dark" id="theme-ad-dark" />
+                <Label htmlFor="theme-ad-dark" className="font-normal">Ad Dark</Label>
               </div>
             </RadioGroup>
           </div>
