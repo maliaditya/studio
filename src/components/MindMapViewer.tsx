@@ -5,7 +5,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, ActivityType } from 'lucide-react';
+import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon } from 'lucide-react';
 import type { ExerciseDefinition, Release, DatedWorkout, ActivityType as ActivityTypeType } from '@/types/workout'; // Renaming imported ActivityType to avoid conflict with lucide-react
 import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
@@ -115,12 +115,10 @@ interface MindMapViewerProps {
     showControls?: boolean;
 }
 
-// This helper component is rendered inside TransformWrapper to get access to its context
 const Controls = () => {
-  const { centerView } = useControls();
   useEffect(() => {
     // Re-center logic is removed as per user request.
-  }, [centerView]);
+  }, []);
   return null;
 };
   
@@ -203,28 +201,58 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   
   const loggedTaskInfo = useMemo(() => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const info: Record<string, { totalTime: number }> = {};
+    const infoMap = new Map<string, { type: ActivityTypeType; totalTime: number }[]>();
 
-    const processLogs = (logs: DatedWorkout[], timeField: 'reps' | 'weight') => {
-      const todayLog = logs.find(log => log.date === todayKey);
+    const processLogs = (logs: DatedWorkout[], activityType: ActivityTypeType, timeField: 'reps' | 'weight') => {
+      const todayLog = (logs || []).find(log => log.date === todayKey);
       if (todayLog) {
         todayLog.exercises.forEach(ex => {
           const loggedTime = ex.loggedSets.reduce((sum, set) => sum + set[timeField], 0);
           if (loggedTime > 0) {
-            if (!info[ex.definitionId]) {
-              info[ex.definitionId] = { totalTime: 0 };
+            if (!infoMap.has(ex.definitionId)) {
+              infoMap.set(ex.definitionId, []);
             }
-            info[ex.definitionId].totalTime += loggedTime;
+            const entries = infoMap.get(ex.definitionId)!;
+            const existingEntry = entries.find(e => e.type === activityType);
+            if (existingEntry) {
+              existingEntry.totalTime += loggedTime;
+            } else {
+              entries.push({ type: activityType, totalTime: loggedTime });
+            }
           }
         });
       }
     };
+    
+    const processBrandingLogs = () => {
+        const todayLog = (brandingLogs || []).find(log => log.date === todayKey);
+        if (todayLog) {
+            todayLog.exercises.forEach(bundleExercise => {
+                if (bundleExercise.loggedSets.length > 0) {
+                    const bundleDef = deepWorkDefinitions.find(d => d.id === bundleExercise.definitionId);
+                    if (bundleDef?.focusAreaIds) {
+                        bundleDef.focusAreaIds.forEach(focusAreaDefId => {
+                            if (!infoMap.has(focusAreaDefId)) {
+                                infoMap.set(focusAreaDefId, []);
+                            }
+                            const entries = infoMap.get(focusAreaDefId)!;
+                            const existingEntry = entries.find(e => e.type === 'branding');
+                            if (!existingEntry) {
+                                entries.push({ type: 'branding', totalTime: 1 });
+                            }
+                        });
+                    }
+                }
+            });
+        }
+    };
 
-    processLogs(allUpskillLogs, 'reps'); // 'reps' is duration for upskill
-    processLogs(allDeepWorkLogs, 'weight'); // 'weight' is duration for deepwork
+    processLogs(allUpskillLogs, 'upskill', 'reps');
+    processLogs(allDeepWorkLogs, 'deepwork', 'weight');
+    processBrandingLogs();
 
-    return info;
-  }, [allUpskillLogs, allDeepWorkLogs]);
+    return infoMap;
+  }, [allUpskillLogs, allDeepWorkLogs, brandingLogs, deepWorkDefinitions]);
 
   const pendingTaskInfo = useMemo(() => {
     const pendingInfo = new Map<string, { oldestDate: string; type: ActivityTypeType }[]>();
@@ -282,42 +310,63 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   }, [schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs, deepWorkDefinitions]);
 
   const pastLoggedTaskInfo = useMemo(() => {
-    const taskLogs: Record<string, { date: string; time: number }[]> = {};
     const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const infoMap = new Map<string, { type: ActivityTypeType; lastLogDate: string; totalTime: number }[]>();
 
-    const processLogs = (logs: DatedWorkout[], timeField: 'reps' | 'weight') => {
-      (logs || []).forEach(log => {
-        if (log.date < todayStr) {
-          (log.exercises || []).forEach(ex => {
-            const loggedTime = ex.loggedSets.reduce((sum, set) => sum + set[timeField], 0);
-            if (loggedTime > 0) {
-              if (!taskLogs[ex.definitionId]) {
-                taskLogs[ex.definitionId] = [];
-              }
-              taskLogs[ex.definitionId].push({ date: log.date, time: loggedTime });
+    const processLogs = (logs: DatedWorkout[], activityType: ActivityTypeType, timeField: 'reps' | 'weight') => {
+        (logs || []).forEach(log => {
+            if (log.date < todayStr) {
+                (log.exercises || []).forEach(ex => {
+                    const loggedTime = ex.loggedSets.reduce((sum, set) => sum + set[timeField], 0);
+                    if (loggedTime > 0) {
+                        if (!infoMap.has(ex.definitionId)) {
+                            infoMap.set(ex.definitionId, []);
+                        }
+                        const entries = infoMap.get(ex.definitionId)!;
+                        const existingEntry = entries.find(e => e.type === activityType);
+                        if (!existingEntry || log.date > existingEntry.lastLogDate) {
+                            const newEntries = entries.filter(e => e.type !== activityType);
+                            newEntries.push({ type: activityType, lastLogDate: log.date, totalTime: loggedTime });
+                            infoMap.set(ex.definitionId, newEntries);
+                        }
+                    }
+                });
             }
-          });
-        }
-      });
+        });
     };
 
-    processLogs(allUpskillLogs, 'reps');
-    processLogs(allDeepWorkLogs, 'weight');
+    const processBrandingLogs = () => {
+        (brandingLogs || []).forEach(log => {
+            if (log.date < todayStr) {
+                log.exercises.forEach(bundleExercise => {
+                    if (bundleExercise.loggedSets.length > 0) {
+                        const bundleDef = deepWorkDefinitions.find(d => d.id === bundleExercise.definitionId);
+                        if (bundleDef?.focusAreaIds) {
+                            bundleDef.focusAreaIds.forEach(focusAreaDefId => {
+                                if (!infoMap.has(focusAreaDefId)) {
+                                    infoMap.set(focusAreaDefId, []);
+                                }
+                                const entries = infoMap.get(focusAreaDefId)!;
+                                const existingEntry = entries.find(e => e.type === 'branding');
+                                if (!existingEntry || log.date > existingEntry.lastLogDate) {
+                                    const newEntries = entries.filter(e => e.type !== 'branding');
+                                    newEntries.push({ type: 'branding', lastLogDate: log.date, totalTime: 1 });
+                                    infoMap.set(focusAreaDefId, newEntries);
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+        });
+    };
+    
+    processLogs(allUpskillLogs, 'upskill', 'reps');
+    processLogs(allDeepWorkLogs, 'deepwork', 'weight');
+    processBrandingLogs();
 
-    const finalInfo: Record<string, { lastLogDate: string; totalTime: number }> = {};
-
-    for (const defId in taskLogs) {
-      if (taskLogs[defId].length > 0) {
-        taskLogs[defId].sort((a, b) => b.date.localeCompare(a.date));
-        finalInfo[defId] = {
-          lastLogDate: taskLogs[defId][0].date,
-          totalTime: taskLogs[defId][0].time,
-        };
-      }
-    }
-
-    return finalInfo;
-  }, [allUpskillLogs, allDeepWorkLogs]);
+    return infoMap;
+  }, [allUpskillLogs, allDeepWorkLogs, brandingLogs, deepWorkDefinitions]);
   
   const totalTimePerFocusArea = useMemo(() => {
     const timeMap = new Map<string, number>();
@@ -439,7 +488,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
             const focusAreaChildren = (bundle.focusAreaIds || [])
                 .map(id => deepWorkDefinitions.find(d => d.id === id))
                 .filter((def): def is ExerciseDefinition => !!def)
-                .map(faDef => createFocusAreaNode(faDef, bundle.id));
+                .map(fa => createFocusAreaNode(fa, bundle.id));
 
             return { ...bundle, definitionId: bundle.id, children: [...focusAreaChildren, ...socialChildren] };
         });
@@ -523,15 +572,19 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
 
     const scheduledInfo = scheduledActivities?.find(act => act.type === activityTypeToShow);
     
-    const loggedInfo = loggedTaskInfo[node.definitionId];
+    const allLoggedInfos = loggedTaskInfo.get(node.definitionId);
+    const loggedInfoForNode = allLoggedInfos?.find(info => info.type === activityTypeToShow);
+
     const allPendingInfos = pendingTaskInfo.get(node.definitionId);
     const pendingInfoForNode = allPendingInfos?.find(info => info.type === activityTypeToShow);
-    const pastLogInfo = pastLoggedTaskInfo[node.definitionId];
+    
+    const allPastLogs = pastLoggedTaskInfo.get(node.definitionId);
+    const pastLogForNode = allPastLogs?.find(info => info.type === activityTypeToShow);
 
-    const isLoggedToday = !!loggedInfo;
+    const isLoggedToday = !!loggedInfoForNode;
     const isScheduledToday = !!scheduledInfo;
     const isPending = !!pendingInfoForNode && !isLoggedToday && !isScheduledToday;
-    const isPastAndDone = !!pastLogInfo && !isLoggedToday && !isScheduledToday && !isPending;
+    const isPastAndDone = !!pastLogForNode && !isLoggedToday && !isScheduledToday && !isPending;
 
     let daysPending = 0;
     if (isPending && pendingInfoForNode) {
@@ -570,7 +623,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         {isLoggedToday ? (
             <div className="mt-1 pt-1 border-t border-green-300/50 flex items-center gap-1.5 text-xs text-green-800 dark:text-green-200">
                 <Check className="h-4 w-4 flex-shrink-0" />
-                <span className="font-medium">Logged: {loggedInfo.totalTime > 60 ? `${(loggedInfo.totalTime / 60).toFixed(1)}h` : `${loggedInfo.totalTime}m`}</span>
+                <span className="font-medium">Logged: {loggedInfoForNode.totalTime > 60 ? `${(loggedInfoForNode.totalTime / 60).toFixed(1)}h` : `${loggedInfoForNode.totalTime}m`}</span>
                 <span className="ml-auto font-mono">{format(new Date(), 'MMM dd')}</span>
             </div>
         ) : isScheduledToday ? (
@@ -593,13 +646,13 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                 <div className="flex-grow flex items-center justify-between">
                   <div>
                     <span className="font-medium">Logged</span>
-                    <span className="font-mono ml-2">{format(parseISO(pastLogInfo.lastLogDate), 'MMM dd')}</span>
+                    <span className="font-mono ml-2">{format(parseISO(pastLogForNode.lastLogDate), 'MMM dd')}</span>
                   </div>
-                  {pastLogInfo.totalTime > 0 && (
+                  {pastLogForNode.totalTime > 0 && (
                       <span className="font-mono font-semibold">
-                          {pastLogInfo.totalTime > 60
-                              ? `${(pastLogInfo.totalTime / 60).toFixed(1)}h`
-                              : `${pastLogInfo.totalTime}m`}
+                          {pastLogForNode.totalTime > 60
+                              ? `${(pastLogForNode.totalTime / 60).toFixed(1)}h`
+                              : `${pastLogForNode.totalTime}m`}
                       </span>
                   )}
                 </div>
@@ -707,3 +760,5 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     </div>
   );
 }
+
+    
