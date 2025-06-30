@@ -11,8 +11,9 @@ import {
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
 } from '@/lib/localAuth';
-import { format, parseISO } from 'date-fns';
+import { format, addDays, parseISO } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, OFFER_SYSTEM_DEFINITIONS } from '@/lib/constants';
+import { getExercisesForDay } from '@/lib/workoutUtils';
 
 
 interface AuthContextType {
@@ -292,6 +293,105 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     localStorage.setItem('lifeos_theme', theme);
   }, [theme]);
+
+  const [isScheduleLoaded, setIsScheduleLoaded] = useState(false);
+  useEffect(() => {
+    if (currentUser?.username) {
+        setIsScheduleLoaded(true);
+    }
+  }, [currentUser]);
+
+  // Carry forward tasks logic
+  useEffect(() => {
+    if (!currentUser || !isScheduleLoaded) return;
+    
+    const settingsKey = `lifeos_settings_${currentUser.username}`;
+    const storedSettings = localStorage.getItem(settingsKey);
+    const settings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false };
+    if (!settings.carryForward) return;
+
+    const today = new Date();
+    const todayDateKey = format(today, 'yyyy-MM-dd');
+    const yesterday = addDays(today, -1);
+    const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
+
+    const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
+    const lastCarryForwardDate = localStorage.getItem(lastCarryForwardKey);
+    if (lastCarryForwardDate === todayDateKey) return;
+
+    const todaysActivities = schedule[todayDateKey];
+    const hasTodaysActivities = todaysActivities && Object.keys(todaysActivities).length > 0 && Object.values(todaysActivities).some(slot => slot.length > 0);
+    if (hasTodaysActivities) {
+        localStorage.setItem(lastCarryForwardKey, todayDateKey);
+        return;
+    }
+
+    const yesterdaysSchedule = schedule[yesterdayKey];
+    if (!yesterdaysSchedule || Object.keys(yesterdaysSchedule).length === 0) {
+        localStorage.setItem(lastCarryForwardKey, todayDateKey);
+        return;
+    }
+
+    const newTodaySchedule: DailySchedule = {};
+    let carriedOver = false;
+
+    Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
+      const incompleteActivities = (activities || []).filter(activity => activity && !activity.completed);
+      
+      if (incompleteActivities.length > 0) {
+        newTodaySchedule[slotName] = incompleteActivities.map(activity => {
+          let newDetails = '';
+
+          switch (activity.type) {
+            case 'workout': {
+              const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions);
+              newDetails = description.split(' for ')[1] || "Workout";
+              break;
+            }
+            case 'upskill':
+              newDetails = 'Learning Session';
+              break;
+            case 'deepwork':
+              newDetails = 'Deep Work Session';
+              break;
+            case 'planning':
+              newDetails = 'Planning Session';
+              break;
+            case 'tracking':
+              newDetails = 'Tracking Session';
+              break;
+            case 'branding':
+              newDetails = 'Branding Session';
+              break;
+            case 'lead-generation':
+              newDetails = 'Lead Generation Session';
+              break;
+            case 'offer-system':
+              newDetails = 'Offer System Session';
+              break;
+            default:
+              newDetails = activity.details; // Fallback
+          }
+
+          return {
+            ...activity,
+            id: `${activity.type}-${Date.now()}-${Math.random()}`,
+            completed: false,
+            details: newDetails,
+            taskIds: [], // Reset linked tasks
+          };
+        });
+        carriedOver = true;
+      }
+    });
+
+    if (carriedOver) {
+      setSchedule(prev => ({ ...prev, [todayDateKey]: newTodaySchedule }));
+      toast({ title: "Tasks Carried Over", description: "Yesterday's incomplete tasks have been moved to today." });
+    }
+
+    localStorage.setItem(lastCarryForwardKey, todayDateKey);
+  }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, workoutMode, workoutPlans, exerciseDefinitions]);
 
   const loadDataIntoLocalStorage = (data: any, username: string) => {
     if (!data) return;
