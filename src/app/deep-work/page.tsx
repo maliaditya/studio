@@ -309,7 +309,7 @@ function DeepWorkPageContent() {
   const handleAddTaskToSession = (definition: ExerciseDefinition) => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const newWorkoutExercise: WorkoutExercise = {
-      id: `${definition.id}-${Date.now()}-${Math.random()}`,
+      id: `dwex_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
       definitionId: definition.id, name: definition.name, category: definition.category,
       loggedSets: [], targetSets: parseInt(DEFAULT_TARGET_SESSIONS.toString(), 10), targetReps: DEFAULT_TARGET_DURATION,
     };
