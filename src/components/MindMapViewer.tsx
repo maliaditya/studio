@@ -154,9 +154,9 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   
   const timeSlots = [ 'Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night' ];
 
-  // Modal State for linking learning tasks
-  const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
-  const [isLinkLearningModalOpen, setIsLinkLearningModalOpen] = useState(false);
+  // State for linking learning popover
+  const [isLinkLearningPopoverOpen, setIsLinkLearningPopoverOpen] = useState(false);
+  const [linkingLearningToFocusArea, setLinkingLearningToFocusArea] = useState<MindMapNode | null>(null);
   const [editableLinkedUpskillIds, setEditableLinkedUpskillIds] = useState<string[]>([]);
 
   // State for inline adding
@@ -234,7 +234,8 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
           const loggedTime = ex.loggedSets.reduce((sum, set) => sum + set[timeField], 0);
           if (loggedTime > 0) {
             const existing = infoMap.get(ex.definitionId);
-            if (!existing || existing.type !== activityType) {
+            // Only set if not already logged under another type (to avoid double counting)
+            if (!existing) {
               infoMap.set(ex.definitionId, { type: activityType, totalTime: loggedTime });
             }
           }
@@ -250,7 +251,9 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                     const bundleDef = deepWorkDefinitions.find(d => d.id === bundleExercise.definitionId);
                     if (bundleDef?.focusAreaIds) {
                         bundleDef.focusAreaIds.forEach(focusAreaDefId => {
-                            infoMap.set(focusAreaDefId, { type: 'branding', totalTime: 1 });
+                           if (!infoMap.has(focusAreaDefId)) {
+                               infoMap.set(focusAreaDefId, { type: 'branding', totalTime: 1 });
+                           }
                         });
                     }
                 }
@@ -575,6 +578,12 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     }
   };
 
+  const handleOpenLinkLearningPopover = (node: MindMapNode) => {
+    setLinkingLearningToFocusArea(node);
+    setEditableLinkedUpskillIds(node.linkedUpskillIds || []);
+    setIsLinkLearningPopoverOpen(true);
+  };
+  
   const handleToggleUpskillLink = (upskillId: string) => {
     setEditableLinkedUpskillIds(currentIds => {
       const newIds = new Set(currentIds);
@@ -588,15 +597,25 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   };
 
   const handleSaveLinkedLearning = () => {
-    if (!selectedFocusArea) return;
+    if (!linkingLearningToFocusArea) return;
     setDeepWorkDefinitions(prevDefs => prevDefs.map(def =>
-        def.id === selectedFocusArea!.id
+        def.id === linkingLearningToFocusArea!.id
             ? { ...def, linkedUpskillIds: editableLinkedUpskillIds }
             : def
     ));
-    setIsLinkLearningModalOpen(false);
+    setIsLinkLearningPopoverOpen(false);
     toast({ title: "Saved", description: "Learning tasks have been linked." });
   };
+  
+  const loggedUpskillDefinitions = useMemo(() => {
+    const loggedIds = new Set(
+        (allUpskillLogs || []).flatMap(log => 
+            log.exercises.filter(ex => ex.loggedSets.length > 0)
+                        .map(ex => ex.definitionId)
+        )
+    );
+    return (upskillDefinitions || []).filter(def => loggedIds.has(def.id));
+  }, [allUpskillLogs, upskillDefinitions]);
 
 
   const renderNode = (node: MindMapNode, level: number, parentNode?: MindMapNode) => {
@@ -707,15 +726,49 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         )}
         
         {node.category === 'FocusArea' && (
-             <Button variant="ghost" size="icon" className="absolute right-8 -bottom-2 h-6 w-6"
-                onClick={() => {
-                    setSelectedFocusArea(node as ExerciseDefinition);
-                    setEditableLinkedUpskillIds(node.linkedUpskillIds || []);
-                    setIsLinkLearningModalOpen(true);
-                }}
-            >
-                <LinkIcon className="h-4 w-4 text-primary" />
-            </Button>
+            <Popover open={isLinkLearningPopoverOpen && linkingLearningToFocusArea?.id === node.id} onOpenChange={(isOpen) => { if (!isOpen) { setIsLinkLearningPopoverOpen(false); } }}>
+                <PopoverTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-8 -top-2 h-6 w-6 rounded-full bg-background border"
+                        onClick={() => handleOpenLinkLearningPopover(node)}
+                    >
+                        <BookCopy className="h-4 w-4 text-primary" />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80">
+                    <div className="grid gap-4">
+                        <div className="space-y-2">
+                            <h4 className="font-medium leading-none">Link Learning to "{node.name}"</h4>
+                            <p className="text-sm text-muted-foreground">Select learning tasks that support this focus area.</p>
+                        </div>
+                        <div className="py-2">
+                            <ScrollArea className="h-40 w-full rounded-md border p-2">
+                                {(loggedUpskillDefinitions || []).length > 0 ? (
+                                <div className="space-y-2">
+                                    {loggedUpskillDefinitions.map(upskillDef => (
+                                        <div key={upskillDef.id} className="flex items-center space-x-3">
+                                            <Checkbox
+                                                id={`link-popover-${upskillDef.id}`}
+                                                checked={editableLinkedUpskillIds.includes(upskillDef.id)}
+                                                onCheckedChange={() => handleToggleUpskillLink(upskillDef.id)}
+                                            />
+                                            <Label htmlFor={`link-popover-${upskillDef.id}`} className="font-normal w-full cursor-pointer">
+                                                {upskillDef.name} <span className="text-muted-foreground/80">({upskillDef.category})</span>
+                                            </Label>
+                                        </div>
+                                    ))}
+                                </div>
+                                ) : (
+                                    <p className="text-center text-sm text-muted-foreground p-4">No logged learning tasks found. Go to the Upskill page to log some progress.</p>
+                                )}
+                            </ScrollArea>
+                        </div>
+                        <Button onClick={handleSaveLinkedLearning}>Save Links</Button>
+                    </div>
+                </PopoverContent>
+            </Popover>
         )}
 
         {(node.category === 'Release' || node.category === 'product' || node.category === 'service') && node.totalLoggedHours && node.totalLoggedHours > 0 && (
@@ -896,40 +949,6 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         </Card>
       </div>
       
-      <Dialog open={isLinkLearningModalOpen} onOpenChange={setIsLinkLearningModalOpen}>
-          <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                  <DialogTitle>Link Learning to "{selectedFocusArea?.name}"</DialogTitle>
-                  <DialogDescription>Select the learning tasks that support this focus area.</DialogDescription>
-              </DialogHeader>
-              <div className="py-4">
-                  <ScrollArea className="h-60 w-full rounded-md border p-2">
-                      {upskillDefinitions.length > 0 ? (
-                        <div className="space-y-2">
-                            {upskillDefinitions.map(def => (
-                                <div key={def.id} className="flex items-center space-x-3">
-                                    <Checkbox
-                                        id={`link-${def.id}`}
-                                        checked={editableLinkedUpskillIds.includes(def.id)}
-                                        onCheckedChange={() => handleToggleUpskillLink(def.id)}
-                                    />
-                                    <Label htmlFor={`link-${def.id}`} className="font-normal w-full cursor-pointer">
-                                        {def.name} <span className="text-muted-foreground/80">({def.category})</span>
-                                    </Label>
-                                </div>
-                            ))}
-                        </div>
-                      ) : (
-                          <p className="text-center text-sm text-muted-foreground p-4">No learning tasks in library. Add some on the Upskill page.</p>
-                      )}
-                  </ScrollArea>
-              </div>
-              <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsLinkLearningModalOpen(false)}>Cancel</Button>
-                  <Button onClick={handleSaveLinkedLearning}>Save Links</Button>
-              </DialogFooter>
-          </DialogContent>
-      </Dialog>
     </>
   );
 }
