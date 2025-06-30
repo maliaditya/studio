@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Puzzle, ChevronDown, ChevronUp, Briefcase, LineChart as LineChartIcon } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Puzzle, ChevronDown, ChevronUp, Briefcase, LineChart as LineChartIcon, BookCopy, ClipboardList } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +52,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tool
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Separator } from '@/components/ui/separator';
 
 
 const DEFAULT_TARGET_SESSIONS = 1;
@@ -103,11 +104,12 @@ function DeepWorkPageContent() {
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   const [today, setToday] = useState<Date | null>(null);
 
-  // State for decomposition modal
-  const [isDecompositionModalOpen, setIsDecompositionModalOpen] = useState(false);
+  // State for details modal
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
-  const [isDecompositionEditing, setIsDecompositionEditing] = useState(false);
+  const [isDetailsEditing, setIsDetailsEditing] = useState(false);
   const [editableDecompositionData, setEditableDecompositionData] = useState<DecompositionRow[]>([]);
+  const [editableLinkedUpskillIds, setEditableLinkedUpskillIds] = useState<string[]>([]);
   
   const decompositionTechniques: DecompositionRow[] = [
     {
@@ -427,11 +429,12 @@ function DeepWorkPageContent() {
     setIsProgressModalOpen(true);
   };
   
-  const handleOpenDecompositionModal = (def: ExerciseDefinition) => {
+  const handleOpenDetailsModal = (def: ExerciseDefinition) => {
     setSelectedFocusArea(def);
     setEditableDecompositionData(Array.isArray(def.decompositionData) ? def.decompositionData : decompositionTechniques);
-    setIsDecompositionModalOpen(true);
-    setIsDecompositionEditing(false);
+    setEditableLinkedUpskillIds(def.linkedUpskillIds || []);
+    setIsDetailsModalOpen(true);
+    setIsDetailsEditing(false);
   };
 
   const handleDecompositionChange = (index: number, field: keyof DecompositionRow, value: string) => {
@@ -441,16 +444,28 @@ function DeepWorkPageContent() {
         return newData;
     });
   };
+
+  const handleToggleUpskillLink = (upskillId: string) => {
+    setEditableLinkedUpskillIds(currentIds => {
+      const newIds = new Set(currentIds);
+      if (newIds.has(upskillId)) {
+        newIds.delete(upskillId);
+      } else {
+        newIds.add(upskillId);
+      }
+      return Array.from(newIds);
+    });
+  };
   
-  const handleSaveDecomposition = () => {
+  const handleSaveDetails = () => {
     if (!selectedFocusArea) return;
     setDeepWorkDefinitions(prevDefs => prevDefs.map(def =>
         def.id === selectedFocusArea.id
-            ? { ...def, decompositionData: editableDecompositionData }
+            ? { ...def, decompositionData: editableDecompositionData, linkedUpskillIds: editableLinkedUpskillIds }
             : def
     ));
-    setIsDecompositionEditing(false);
-    toast({ title: "Saved", description: "Decomposition techniques have been updated." });
+    setIsDetailsEditing(false);
+    toast({ title: "Saved", description: "Focus area details have been updated." });
   };
 
   const handleLogWeight = (weight: number, date: Date) => {
@@ -630,10 +645,16 @@ function DeepWorkPageContent() {
                                               {deepWorkTopicMetadata[def.category] && (
                                                   <Badge variant="outline" className="text-xs capitalize">{deepWorkTopicMetadata[def.category].classification}</Badge>
                                               )}
+                                              {def.linkedUpskillIds && def.linkedUpskillIds.length > 0 && (
+                                                <Badge variant="outline" className="text-xs">
+                                                  <BookCopy className="h-3 w-3 mr-1" />
+                                                  {def.linkedUpskillIds.length}
+                                                </Badge>
+                                              )}
                                             </div>
                                         </div>
                                         <div className="flex-shrink-0 flex items-center">
-                                          <Button variant="ghost" size="icon" onClick={() => handleOpenDecompositionModal(def)} className="h-8 w-8 text-muted-foreground hover:text-yellow-500" aria-label={`View decomposition techniques for ${def.name}`}> <Puzzle className="h-4 w-4" /> </Button>
+                                          <Button variant="ghost" size="icon" onClick={() => handleOpenDetailsModal(def)} className="h-8 w-8 text-muted-foreground hover:text-yellow-500" aria-label={`View details for ${def.name}`}> <ClipboardList className="h-4 w-4" /> </Button>
                                           <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
                                           <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8 text-muted-foreground hover:text-primary" aria-label={`Edit ${def.name}`}> <Edit3 className="h-4 w-4" /> </Button>
                                           <Button variant="ghost" size="icon" onClick={() => handleDeleteExerciseDefinition(def.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label={`Delete ${def.name}`}> <Trash2 className="h-4 w-4" /> </Button>
@@ -839,57 +860,124 @@ function DeepWorkPageContent() {
         onSetGender={(g) => setGender(g)}
       />
 
-      <Dialog open={isDecompositionModalOpen} onOpenChange={setIsDecompositionModalOpen}>
+      <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader className="flex flex-row justify-between items-center">
-            <DialogTitle>Decomposition Techniques for: {selectedFocusArea?.name}</DialogTitle>
+            <DialogTitle>Details for: {selectedFocusArea?.name}</DialogTitle>
             <div className="flex-shrink-0">
-              {isDecompositionEditing ? (
-                  <Button variant="ghost" size="icon" onClick={handleSaveDecomposition} aria-label="Save Changes">
+              {isDetailsEditing ? (
+                  <Button variant="ghost" size="icon" onClick={handleSaveDetails} aria-label="Save Changes">
                       <Save className="h-5 w-5 text-green-500" />
                   </Button>
               ) : (
-                  <Button variant="ghost" size="icon" onClick={() => setIsDecompositionEditing(true)} aria-label="Edit Techniques">
+                  <Button variant="ghost" size="icon" onClick={() => setIsDetailsEditing(true)} aria-label="Edit Details">
                       <Edit3 className="h-5 w-5" />
                   </Button>
               )}
             </div>
           </DialogHeader>
-          <div className="max-h-[60vh] overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[200px]">Technique</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Use Cases</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Array.isArray(editableDecompositionData) && editableDecompositionData.map((item, index) => (
-                  <TableRow key={index}>
-                    {isDecompositionEditing ? (
-                      <>
-                        <TableCell className="align-top">
-                          <Textarea value={item.technique} onChange={(e) => handleDecompositionChange(index, 'technique', e.target.value)} className="min-h-[60px]" />
-                        </TableCell>
-                        <TableCell className="align-top">
-                          <Textarea value={item.description} onChange={(e) => handleDecompositionChange(index, 'description', e.target.value)} className="min-h-[60px]" />
-                        </TableCell>
-                        <TableCell className="align-top">
-                           <Textarea value={item.useCases} onChange={(e) => handleDecompositionChange(index, 'useCases', e.target.value)} className="min-h-[60px]" />
-                        </TableCell>
-                      </>
-                    ) : (
-                      <>
-                        <TableCell className="font-medium align-top">{item.technique}</TableCell>
-                        <TableCell className="align-top">{item.description}</TableCell>
-                        <TableCell className="align-top">{item.useCases}</TableCell>
-                      </>
-                    )}
+          <div className="max-h-[60vh] overflow-y-auto pr-4 space-y-6">
+            
+            {/* Linked Learning Section */}
+            <div>
+              <h4 className="font-semibold mb-2 text-foreground">Linked Learning</h4>
+              {isDetailsEditing ? (
+                <div>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                        {editableLinkedUpskillIds.map(id => {
+                            const upskillDef = upskillDefinitions.find(ud => ud.id === id);
+                            return upskillDef ? (
+                                <Badge key={id} variant="secondary" className="text-sm">
+                                    {upskillDef.name}
+                                    <button onClick={() => handleToggleUpskillLink(id)} className="ml-1.5 rounded-full hover:bg-destructive/20 p-0.5">
+                                        <X className="h-3 w-3"/>
+                                    </button>
+                                </Badge>
+                            ) : null;
+                        })}
+                    </div>
+                     <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Link a Learning Task
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-80 max-h-72 overflow-y-auto">
+                            <DropdownMenuLabel>Available Learning Tasks</DropdownMenuLabel>
+                            <DropdownMenuSeparator/>
+                            {upskillDefinitions.filter(ud => !editableLinkedUpskillIds.includes(ud.id)).length > 0 ?
+                              upskillDefinitions.filter(ud => !editableLinkedUpskillIds.includes(ud.id)).map(ud => (
+                                <DropdownMenuCheckboxItem
+                                    key={ud.id}
+                                    checked={false}
+                                    onCheckedChange={() => handleToggleUpskillLink(ud.id)}
+                                >
+                                    {ud.name} ({ud.category})
+                                </DropdownMenuCheckboxItem>
+                              )) : (
+                                <p className="px-2 py-1.5 text-sm text-muted-foreground">No other tasks to link.</p>
+                              )
+                            }
+                        </DropdownMenuContent>
+                     </DropdownMenu>
+                </div>
+              ) : (
+                 editableLinkedUpskillIds.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                        {editableLinkedUpskillIds.map(id => {
+                            const upskillDef = upskillDefinitions.find(ud => ud.id === id);
+                            return upskillDef ? (
+                                <Badge key={id} variant="secondary" className="text-sm">{upskillDef.name} ({upskillDef.category})</Badge>
+                            ) : null;
+                        })}
+                    </div>
+                 ) : (
+                    <p className="text-sm text-muted-foreground">No learning tasks linked. Click edit to add some.</p>
+                 )
+              )}
+            </div>
+
+            <Separator/>
+
+            {/* Decomposition Section */}
+            <div>
+              <h4 className="font-semibold mb-2 text-foreground">Decomposition Techniques</h4>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[200px]">Technique</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Use Cases</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {Array.isArray(editableDecompositionData) && editableDecompositionData.map((item, index) => (
+                    <TableRow key={index}>
+                      {isDetailsEditing ? (
+                        <>
+                          <TableCell className="align-top">
+                            <Textarea value={item.technique} onChange={(e) => handleDecompositionChange(index, 'technique', e.target.value)} className="min-h-[60px]" />
+                          </TableCell>
+                          <TableCell className="align-top">
+                            <Textarea value={item.description} onChange={(e) => handleDecompositionChange(index, 'description', e.target.value)} className="min-h-[60px]" />
+                          </TableCell>
+                          <TableCell className="align-top">
+                            <Textarea value={item.useCases} onChange={(e) => handleDecompositionChange(index, 'useCases', e.target.value)} className="min-h-[60px]" />
+                          </TableCell>
+                        </>
+                      ) : (
+                        <>
+                          <TableCell className="font-medium align-top">{item.technique}</TableCell>
+                          <TableCell className="align-top">{item.description}</TableCell>
+                          <TableCell className="align-top">{item.useCases}</TableCell>
+                        </>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

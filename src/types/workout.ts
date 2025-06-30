@@ -55,6 +55,7 @@ export interface ExerciseDefinition {
   decompositionData?: DecompositionRow[];
   focusAreas?: string[];
   sourceUpskillId?: string;
+  linkedUpskillIds?: string[];
   isReadyForBranding?: boolean;
   // Personal Branding
   brandingStatus?: 'converted' | 'published';
