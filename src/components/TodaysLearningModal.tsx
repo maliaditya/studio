@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -107,12 +107,32 @@ export function TodaysLearningModal({
     onOpenChange(false);
   };
   
-  const todaysDefIdsInLog = new Set(availableTasks.filter(t => !t.id.startsWith('lib-')).map(t => t.definitionId));
-  
-  const allConsideredDefIds = new Set([...todaysDefIdsInLog, ...selectedDefinitionIds]);
+  const { scheduledTasks, libraryTasks } = useMemo(() => {
+    // This Set holds the definition IDs of tasks already logged for today.
+    const todaysDefIdsInLog = new Set(availableTasks.filter(t => !t.id.startsWith('lib-')).map(t => t.definitionId));
+    
+    // This Set holds the definition IDs of all tasks that should appear in the top list (scheduled/selected).
+    const allConsideredDefIds = new Set([...todaysDefIdsInLog, ...selectedDefinitionIds]);
 
-  const scheduledTasks = availableTasks.filter(t => allConsideredDefIds.has(t.definitionId));
-  const libraryTasks = availableTasks.filter(t => !allConsideredDefIds.has(t.definitionId));
+    const scheduled: WorkoutExercise[] = [];
+    const library: WorkoutExercise[] = [];
+    
+    // To prevent any visual duplication, we track which definition IDs have been processed.
+    const processedDefIds = new Set<string>();
+
+    availableTasks.forEach(task => {
+      if (processedDefIds.has(task.definitionId)) return;
+
+      if (allConsideredDefIds.has(task.definitionId)) {
+        scheduled.push(task);
+      } else {
+        library.push(task);
+      }
+      processedDefIds.add(task.definitionId);
+    });
+
+    return { scheduledTasks: scheduled, libraryTasks: library };
+  }, [availableTasks, selectedDefinitionIds]);
   
   const pageInfo = {
     upskill: {

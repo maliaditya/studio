@@ -279,8 +279,11 @@ function HomePageContent() {
       logSource = brandingLogs;
     }
     
+    // Get the state of the log for the selected day BEFORE any updates.
     const logForDay = logSource.find(log => log.date === selectedDateKey);
     const existingDefIdsForDay = new Set(logForDay?.exercises.map(ex => ex.definitionId) || []);
+
+    // Determine which of the selected definitions need a new exercise instance created.
     const defIdsToCreate = finalSelectedDefIds.filter(id => !existingDefIdsForDay.has(id));
 
     const newExercises: WorkoutExercise[] = defIdsToCreate.map((defId) => {
@@ -296,41 +299,43 @@ function HomePageContent() {
       };
     });
 
-    if (newExercises.length > 0) {
-      logsUpdater(prevLogs => {
-        const newLogs = [...prevLogs];
-        const logIndex = newLogs.findIndex(log => log.date === selectedDateKey);
-        if (logIndex > -1) {
-          newLogs[logIndex].exercises.push(...newExercises);
-        } else {
-          newLogs.push({ id: selectedDateKey, date: selectedDateKey, exercises: newExercises });
-        }
-        return newLogs;
-      });
-    }
-
-    const allRelevantExercises = [...(logForDay?.exercises || []), ...newExercises];
+    // Construct the final state of the exercises for the day's log.
+    const finalExercisesForDay = [...(logForDay?.exercises || []), ...newExercises];
+    const updatedLogForDay: DatedWorkout = { id: selectedDateKey, date: selectedDateKey, exercises: finalExercisesForDay };
     
-    const finalInstanceIds = allRelevantExercises
+    // Update the main logs state.
+    logsUpdater(prevLogs => {
+      const logIndex = prevLogs.findIndex(log => log.date === selectedDateKey);
+      if (logIndex > -1) {
+        const newLogs = [...prevLogs];
+        newLogs[logIndex] = updatedLogForDay;
+        return newLogs;
+      }
+      return [...prevLogs, updatedLogForDay];
+    });
+
+    // Now, using the final computed state, update the schedule.
+    const finalInstanceIds = updatedLogForDay.exercises
       .filter(ex => finalSelectedDefIds.includes(ex.definitionId))
       .map(t => t.id);
 
-    const newDetails = allRelevantExercises
+    const newDetails = updatedLogForDay.exercises
       .filter(ex => finalInstanceIds.includes(ex.id))
       .map(t => t.name).join(', ') || (pageType === 'upskill' ? 'Learning Session' : pageType === 'deepwork' ? 'Deep Work Session' : 'Branding Session');
     
     setSchedule(prev => {
-      const newTodaySchedule = { ...(prev[selectedDateKey] || {}) };
-      const activitiesInSlot = (newTodaySchedule[slotName] || []).map(act =>
+      const newSchedule = { ...prev };
+      const daySchedule = { ...(newSchedule[selectedDateKey] || {}) };
+      const activitiesInSlot = (daySchedule[slotName] || []).map(act =>
         act.id === activity.id ? { ...act, taskIds: finalInstanceIds, details: newDetails } : act
       );
-      newTodaySchedule[slotName] = activitiesInSlot;
-      return { ...prev, [selectedDateKey]: newTodaySchedule };
+      daySchedule[slotName] = activitiesInSlot;
+      newSchedule[selectedDateKey] = daySchedule;
+      return newSchedule;
     });
 
     setEditingActivity(null);
   };
-
 
   const selectedDaySchedule = schedule[selectedDateKey] || {};
 
@@ -701,7 +706,7 @@ function HomePageContent() {
 
     // Convert library definitions to temporary WorkoutExercise objects for the modal.
     const libraryTasks = libraryDefinitions.map(def => ({
-        id: `lib-${def.id}`, // Stable, unique ID for library items
+        id: `lib-${def.id}-${Math.random()}`,
         definitionId: def.id,
         name: def.name,
         category: def.category,
