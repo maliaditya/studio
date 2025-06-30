@@ -88,6 +88,7 @@ interface MindMapNode extends Partial<ExerciseDefinition> {
   name: string;
   category: string;
   children: MindMapNode[];
+  totalLoggedHours?: number;
 }
 
 interface MindMapViewerProps {
@@ -246,6 +247,20 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
 
     return finalInfo;
   }, [allUpskillLogs, allDeepWorkLogs]);
+  
+  const totalTimePerFocusArea = useMemo(() => {
+    const timeMap = new Map<string, number>();
+    allDeepWorkLogs.forEach(log => {
+        log.exercises.forEach(ex => {
+            const duration = ex.loggedSets.reduce((sum, set) => sum + set.weight, 0);
+            if (duration > 0) {
+                timeMap.set(ex.definitionId, (timeMap.get(ex.definitionId) || 0) + duration);
+            }
+        });
+    });
+    return timeMap;
+  }, [allDeepWorkLogs]);
+
 
   const toggleFullScreen = () => {
     if (!containerRef.current) return;
@@ -310,7 +325,18 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                 .map(id => deepWorkDefinitions.find(def => def.id === id))
                 .filter((def): def is ExerciseDefinition => !!def)
                 .map(fa => createFocusAreaNode(fa, release.id));
-            return { id: release.id, definitionId: release.id, name: release.name, category: 'Release', children: focusAreaNodes };
+            
+            const totalMinutes = (release.focusAreaIds || [])
+                .reduce((sum, id) => sum + (totalTimePerFocusArea.get(id) || 0), 0);
+
+            return { 
+              id: release.id, 
+              definitionId: release.id, 
+              name: release.name, 
+              category: 'Release', 
+              children: focusAreaNodes,
+              totalLoggedHours: totalMinutes > 0 ? totalMinutes / 60 : 0
+            };
         });
         const classification = deepWorkTopicMetadata[topic]?.classification || 'Topic';
         return { id: topic, definitionId: topic, name: topic, category: classification, children: releaseNodes };
@@ -379,9 +405,9 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     const plan = productizationPlans[selectedTopic] || offerizationPlans[selectedTopic];
     return buildFullTopicTree(selectedTopic, plan);
 
-  }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans]);
+  }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, totalTimePerFocusArea]);
 
-  const renderNode = (node: MindMapNode, level: number) => {
+  const renderNode = (node: MindMapNode, level: number, zoomToElement: (id: string, scale: number, animationTime: number) => void) => {
     const nodeIcons: Record<string, React.ReactNode> = {
         'System': <GitMerge className="h-3.5 w-3.5 text-primary" />,
         'System Branch:Products': <Package className="h-3.5 w-3.5 text-blue-500" />,
@@ -420,7 +446,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     }
 
     return (
-    <div className="flex items-center flex-row-reverse">
+    <div className="flex items-center flex-row-reverse" onClick={() => zoomToElement(node.id, 1.2, 300)} style={{ cursor: 'pointer' }}>
       <div 
         id={node.id}
         className={cn(
@@ -439,6 +465,14 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
             <p className="text-xs text-muted-foreground capitalize">{node.category}</p>
           </div>
         </div>
+
+        {node.category === 'Release' && node.totalLoggedHours && node.totalLoggedHours > 0 && (
+          <div className="mt-1 pt-1 border-t border-muted-foreground/20">
+              <Badge variant="secondary" className="w-full justify-center text-xs">
+                  Total Logged: {node.totalLoggedHours.toFixed(1)}h
+              </Badge>
+          </div>
+        )}
 
         {isLoggedToday ? (
             <div className="mt-1 pt-1 border-t border-green-300/50 flex items-center gap-1.5 text-xs text-green-800 dark:text-green-200">
@@ -487,7 +521,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
             {node.children.map(child => (
               <li key={child.id} className="relative">
                 <div className="absolute -right-4 top-1/2 w-4 h-px bg-border" />
-                {renderNode(child, level + 1)}
+                {renderNode(child, level + 1, zoomToElement)}
               </li>
             ))}
           </ul>
@@ -507,8 +541,8 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         )}
     >
         {selectedTopic && mindMapData ? (
-          <TransformWrapper initialScale={1} centerOnInit={true} minScale={0.1}>
-            {({ zoomIn, zoomOut, resetTransform }) => (
+          <TransformWrapper initialScale={1} centerOnInit={true} minScale={0.01}>
+            {({ zoomIn, zoomOut, resetTransform, zoomToElement }) => (
               <>
                 <div className="absolute top-2 right-2 z-10 flex gap-2">
                   <Button size="icon" variant="outline" onClick={() => zoomIn()} aria-label="Zoom in">
@@ -529,7 +563,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                   contentClass={cn("flex items-center justify-center", isFullScreen ? "h-screen" : "h-full")}
                 >
                   <div className="inline-block py-4">
-                    {renderNode(mindMapData, 0)}
+                    {renderNode(mindMapData, 0, zoomToElement)}
                   </div>
                 </TransformComponent>
               </>
@@ -573,5 +607,3 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     </div>
   );
 }
-
-    
