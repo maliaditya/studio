@@ -115,6 +115,27 @@ interface MindMapViewerProps {
     showControls?: boolean;
 }
 
+// Helper component to get the zoom/pan controls context
+const MindMapInner = ({ mindMapData, renderNode }: { mindMapData: MindMapNode, renderNode: (node: MindMapNode, level: number) => React.ReactNode }) => {
+    const { centerView, zoomToElement } = useControls();
+    const isInitialMount = React.useRef(true);
+  
+    useEffect(() => {
+      const mindMapContainer = document.getElementById('strategic-overview');
+      if (isInitialMount.current && mindMapContainer) {
+        setTimeout(() => centerView(0.1), 100);
+        isInitialMount.current = false;
+      }
+    }, [centerView]);
+  
+    return (
+      <div className="inline-block py-4">
+        {renderNode(mindMapData, 0)}
+      </div>
+    );
+  };
+  
+
 export function MindMapViewer({ defaultView, showControls = true }: MindMapViewerProps) {
   const { 
       deepWorkDefinitions, 
@@ -460,7 +481,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
 
     const loggedInfo = loggedTaskInfo[node.definitionId];
     const scheduledInfo = scheduledTaskInfo.get(node.definitionId);
-    const pendingInfoForNode = pendingInfo.get(node.definitionId);
+    const pendingInfoForNode = pendingTaskInfo.get(node.definitionId);
     const pastLogInfo = pastLoggedTaskInfo[node.definitionId];
 
     const isLoggedToday = !!loggedInfo;
@@ -559,25 +580,6 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   );
   }
 
-  // Helper component to get the zoom/pan controls context
-  const MindMapInner = ({ mindMapData, renderNode }: { mindMapData: MindMapNode, renderNode: (node: MindMapNode, level: number) => React.ReactNode }) => {
-    const { centerView } = useControls();
-    const isInitialMount = React.useRef(true);
-
-    useEffect(() => {
-        if (isInitialMount.current) {
-          setTimeout(() => centerView(0.1), 100);
-          isInitialMount.current = false;
-        }
-    }, [centerView]);
-    
-    return (
-        <div className="inline-block py-4">
-            {renderNode(mindMapData, 0)}
-        </div>
-    );
-  };
-
   const MapContent = (
     <div 
         ref={containerRef} 
@@ -589,16 +591,18 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     >
         {selectedTopic && mindMapData ? (
           <TransformWrapper initialScale={0.1} minScale={0.05}>
-            {({ zoomIn, zoomOut, resetTransform }) => (
+            {(props) => {
+              
+              return (
               <>
                 <div className="absolute top-2 right-2 z-10 flex gap-2">
-                  <Button size="icon" variant="outline" onClick={() => zoomIn()} aria-label="Zoom in">
+                  <Button size="icon" variant="outline" onClick={() => props.zoomIn()} aria-label="Zoom in">
                     <ZoomIn />
                   </Button>
-                  <Button size="icon" variant="outline" onClick={() => zoomOut()} aria-label="Zoom out">
+                  <Button size="icon" variant="outline" onClick={() => props.zoomOut()} aria-label="Zoom out">
                     <ZoomOut />
                   </Button>
-                  <Button size="icon" variant="outline" onClick={() => resetTransform()} aria-label="Reset view">
+                  <Button size="icon" variant="outline" onClick={() => props.resetTransform()} aria-label="Reset view">
                     <RefreshCw />
                   </Button>
                   <Button size="icon" variant="outline" onClick={toggleFullScreen} aria-label="Toggle full screen">
@@ -612,7 +616,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                   <MindMapInner mindMapData={mindMapData} renderNode={renderNode} />
                 </TransformComponent>
               </>
-            )}
+            )}}
           </TransformWrapper>
         ) : (
           <ConceptualFlowDiagram />
