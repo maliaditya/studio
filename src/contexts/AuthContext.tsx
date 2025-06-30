@@ -367,7 +367,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await localLogoutUser();
     setCurrentUser(null);
     router.push('/login');
-    // REMOVED: toast({ title: "Logged Out", description: "You have been successfully logged out." });
     setLoading(false);
   };
 
@@ -795,28 +794,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         category: topic as ExerciseCategory,
     };
 
+    // Add the new definition to the main list of deep work tasks.
     setDeepWorkDefinitions(prev => [...prev, newFeatureDef]);
 
+    // Choose the correct state updater based on whether it's a product or service.
     const plansUpdater = type === 'product' ? setProductizationPlans : setOfferizationPlans;
 
+    // Update the plans immutably.
     plansUpdater(prevPlans => {
+        // 1. Create a shallow copy of the plans object.
         const newPlans = { ...prevPlans };
-        const currentPlan = newPlans[topic];
+        
+        // 2. Get the specific plan for the topic, or create a new one if it doesn't exist.
+        const oldPlan = newPlans[topic] || { releases: [] };
+        
+        // 3. Create a new array of releases, updating the one that matches.
+        const updatedReleases = (oldPlan.releases || []).map(r => {
+            if (r.id === release.id) {
+                // 4. If this is the correct release, return a new object for it with the new focus area ID.
+                return {
+                    ...r,
+                    focusAreaIds: [...(r.focusAreaIds || []), newFeatureDef.id]
+                };
+            }
+            // Return other releases unchanged.
+            return r;
+        });
+        
+        // 5. Create a new plan object for the topic with the updated releases.
+        newPlans[topic] = {
+            ...oldPlan,
+            releases: updatedReleases
+        };
 
-        if (currentPlan && currentPlan.releases) {
-            newPlans[topic] = {
-                ...currentPlan,
-                releases: currentPlan.releases.map(r => {
-                    if (r.id === release.id) {
-                        return {
-                            ...r,
-                            focusAreaIds: [...(r.focusAreaIds || []), newFeatureDef.id]
-                        };
-                    }
-                    return r;
-                })
-            };
-        }
+        // 6. Return the new top-level plans object.
         return newPlans;
     });
 
