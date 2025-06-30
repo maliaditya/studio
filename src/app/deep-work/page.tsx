@@ -213,7 +213,7 @@ function DeepWorkPageContent() {
     }
 
     const newDef: ExerciseDefinition = { 
-      id: `def_${Date.now().toString()}`, 
+      id: `def_${Date.now()}_${Math.random()}`, 
       name: newSubtopicName.trim(),
       category: topic as ExerciseCategory,
     };

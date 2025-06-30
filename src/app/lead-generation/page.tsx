@@ -122,7 +122,7 @@ function LeadGenerationPageContent() {
       return;
     }
     const newDef: ExerciseDefinition = { 
-      id: `lg_${Date.now().toString()}`, 
+      id: `lg_${Date.now()}_${Math.random()}`, 
       name: newActionName.trim(),
       category: "Lead Generation",
       description: newActionDescription.trim(),
@@ -216,7 +216,7 @@ function LeadGenerationPageContent() {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const existingLog = allLeadGenLogs.find(log => log.id === dateKey);
     if (existingLog) {
-      const newSet = { id: Date.now().toString(), reps, weight, timestamp: Date.now() };
+      const newSet = { id: `${Date.now()}-${Math.random()}`, reps, weight, timestamp: Date.now() };
       const updatedExercises = existingLog.exercises.map(ex => 
         ex.id === exerciseId ? { ...ex, loggedSets: [...ex.loggedSets, newSet] } : ex
       );

@@ -209,7 +209,7 @@ function UpskillPageContent() {
     }
 
     const newDef: ExerciseDefinition = { 
-      id: `def_${Date.now().toString()}`, 
+      id: `def_${Date.now()}_${Math.random()}`, 
       name: subtopic,
       category: topic as ExerciseCategory,
     };
@@ -261,7 +261,7 @@ function UpskillPageContent() {
   const handleAddTaskToSession = (definition: ExerciseDefinition) => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const newWorkoutExercise: WorkoutExercise = {
-      id: `${definition.id}-${Date.now()}`, definitionId: definition.id, name: definition.name, category: definition.category,
+      id: `${definition.id}-${Date.now()}-${Math.random()}`, definitionId: definition.id, name: definition.name, category: definition.category,
       loggedSets: [], targetSets: parseInt(DEFAULT_TARGET_SESSIONS.toString(), 10), targetReps: DEFAULT_TARGET_DURATION,
     };
     const existingWorkout = allUpskillLogs.find(log => log.id === dateKey);

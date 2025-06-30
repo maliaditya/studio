@@ -193,7 +193,7 @@ function OfferizationPageContent() {
   const handleStartEditingRelease = (topic: string, release?: Release) => {
     setEditingRelease({
         topic,
-        release: release ? { ...release } : { id: `release_${Date.now()}`, name: '', description: '', launchDate: format(new Date(), 'yyyy-MM-dd'), focusAreaIds: [] }
+        release: release ? { ...release } : { id: `release_${Date.now()}_${Math.random()}`, name: '', description: '', launchDate: format(new Date(), 'yyyy-MM-dd'), focusAreaIds: [] }
     });
   };
 

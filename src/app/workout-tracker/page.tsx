@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo } from 'react';
@@ -246,7 +247,7 @@ function WorkoutPageContent() {
       toast({ title: "Error", description: "Exercise with this name already exists.", variant: "destructive" }); return;
     }
     const newDef: ExerciseDefinition = { 
-      id: `def_${Date.now().toString()}_${newExerciseName.trim().replace(/\s+/g, '_')}`, 
+      id: `def_${Date.now()}_${Math.random()}`, 
       name: newExerciseName.trim(),
       category: newExerciseCategory || DEFAULT_EXERCISE_CATEGORY
     };
@@ -306,7 +307,7 @@ function WorkoutPageContent() {
     if (!currentUser) { toast({ title: "Error", description: "You must be logged in.", variant: "destructive" }); return; }
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const newWorkoutExercise: WorkoutExercise = {
-      id: `${definition.id}-${Date.now()}`, definitionId: definition.id, name: definition.name, category: definition.category,
+      id: `${definition.id}-${Date.now()}-${Math.random()}`, definitionId: definition.id, name: definition.name, category: definition.category,
       loggedSets: [], targetSets: DEFAULT_TARGET_SETS, targetReps: DEFAULT_TARGET_REPS,
     };
 

@@ -58,7 +58,7 @@ export function TodaysLeadGenModal({
     const targetSets = match ? parseInt(match[0], 10) : 1;
 
     const newExercise: WorkoutExercise = {
-      id: `${definition.id}-${Date.now()}`,
+      id: `${definition.id}-${Date.now()}-${Math.random()}`,
       definitionId: definition.id,
       name: definition.name,
       category: definition.category,

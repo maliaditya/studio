@@ -154,7 +154,7 @@ function PersonalBrandingPageContent() {
     }
 
     const newBundle: ExerciseDefinition = {
-      id: `bundle_${Date.now()}`,
+      id: `bundle_${Date.now()}_${Math.random()}`,
       name: newBundleName.trim(),
       category: "Content Bundle",
       focusAreaIds: selectedFocusAreaIds,
@@ -182,7 +182,7 @@ function PersonalBrandingPageContent() {
   const handleAddTaskToSession = (definition: ExerciseDefinition) => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const newSessionTask: WorkoutExercise = {
-      id: `${definition.id}-${Date.now()}`,
+      id: `${definition.id}-${Date.now()}-${Math.random()}`,
       definitionId: definition.id,
       name: definition.name,
       category: definition.category,
@@ -218,7 +218,7 @@ function PersonalBrandingPageContent() {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const existingLog = brandingLogs.find(log => log.id === dateKey);
     if (existingLog) {
-      const newSet: LoggedSet = { id: Date.now().toString(), reps: stageIndex, weight: 1, timestamp: Date.now() };
+      const newSet: LoggedSet = { id: `${Date.now()}-${Math.random()}`, reps: stageIndex, weight: 1, timestamp: Date.now() };
       const updatedExercises = existingLog.exercises.map(ex => {
         if (ex.id === exerciseId) {
           if (ex.loggedSets.some(s => s.reps === stageIndex)) return ex;

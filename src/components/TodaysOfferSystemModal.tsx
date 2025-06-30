@@ -55,7 +55,7 @@ export function TodaysOfferSystemModal({
 
   const handleAddTask = (definition: ExerciseDefinition) => {
     const newExercise: WorkoutExercise = {
-      id: `${definition.id}-${Date.now()}`,
+      id: `${definition.id}-${Date.now()}-${Math.random()}`,
       definitionId: definition.id,
       name: definition.name,
       category: definition.category,

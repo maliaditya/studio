@@ -112,7 +112,7 @@ function OfferSystemPageContent() {
       return;
     }
     const newDef: ExerciseDefinition = { 
-      id: `os_${Date.now().toString()}`, 
+      id: `os_${Date.now()}_${Math.random()}`, 
       name: newActionName.trim(),
       category: "Offer System",
       description: newActionDescription.trim(),
@@ -202,7 +202,7 @@ function OfferSystemPageContent() {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const existingLog = allOfferSystemLogs.find(log => log.id === dateKey);
     if (existingLog) {
-      const newSet = { id: Date.now().toString(), reps, weight, timestamp: Date.now() };
+      const newSet = { id: `${Date.now()}-${Math.random()}`, reps, weight, timestamp: Date.now() };
       const updatedExercises = existingLog.exercises.map(ex => 
         ex.id === exerciseId ? { ...ex, loggedSets: [...ex.loggedSets, newSet] } : ex
       );

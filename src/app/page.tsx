@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -197,7 +198,7 @@ function HomePageContent() {
       case 'offer-system': details = 'Offer System Session'; break;
     }
     const newActivity: Activity = { 
-      id: `${type}-${Date.now()}`, 
+      id: `${type}-${Date.now()}-${Math.random()}`, 
       type, 
       details, 
       completed: false,
