@@ -6,13 +6,16 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, Linkedin, Youtube } from 'lucide-react';
-import type { ExerciseDefinition } from '@/types/workout';
+import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, Linkedin, Youtube, Rocket } from 'lucide-react';
+import type { ExerciseDefinition, Release } from '@/types/workout';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-interface MindMapNode extends ExerciseDefinition {
+interface MindMapNode extends Partial<ExerciseDefinition> {
+  id: string;
+  name: string;
+  category: string;
   children: MindMapNode[];
 }
 
@@ -92,7 +95,7 @@ const ConceptualFlowDiagram = () => {
 
 
 function MindMapPageContent() {
-  const { deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata } = useAuth();
+  const { deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans } = useAuth();
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -135,37 +138,39 @@ function MindMapPageContent() {
   const mindMapData = useMemo((): MindMapNode | null => {
     if (!selectedTopic) return null;
 
-    const buildTopicTree = (topic: string): MindMapNode => {
-        const focusAreasForTopic = deepWorkDefinitions.filter(
-            def => def.category === topic && !Array.isArray(def.focusAreas)
-        );
-        const childrenNodes = focusAreasForTopic.map(focusArea => {
-            const linkedLearningTasks = (focusArea.linkedUpskillIds || [])
-                .map(id => upskillDefinitions.find(ud => ud.id === id))
-                .filter((task): task is ExerciseDefinition => !!task)
-                .map(task => ({ ...task, children: [] }));
-            return { ...focusArea, children: linkedLearningTasks };
+    const buildFullTopicTree = (topic: string, plan: any): MindMapNode => {
+        const releaseNodes: MindMapNode[] = (plan?.releases || []).map((release: Release) => {
+            const focusAreaNodes = (release.focusAreaIds || [])
+                .map(id => deepWorkDefinitions.find(def => def.id === id))
+                .filter((def): def is ExerciseDefinition => !!def)
+                .map(fa => {
+                    const linkedLearningTasks = (fa.linkedUpskillIds || [])
+                        .map(id => upskillDefinitions.find(ud => ud.id === id))
+                        .filter((task): task is ExerciseDefinition => !!task)
+                        .map(task => ({ ...task, category: 'Learning Task', children: [] }));
+                    return { ...fa, children: linkedLearningTasks };
+                });
+            return { id: release.id, name: release.name, category: 'Release', children: focusAreaNodes };
         });
         const classification = deepWorkTopicMetadata[topic]?.classification || 'Topic';
-        return { id: topic, name: topic, category: classification, children: childrenNodes };
+        return { id: topic, name: topic, category: classification, children: releaseNodes };
     };
 
     if (selectedTopic === 'Strategic Overview') {
-        const productTopics = Object.keys(deepWorkTopicMetadata).filter(topic => deepWorkTopicMetadata[topic]?.classification === 'product');
-        const serviceTopics = Object.keys(deepWorkTopicMetadata).filter(topic => deepWorkTopicMetadata[topic]?.classification === 'service');
-        const bundles = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreas));
-
-        const productNodes = productTopics.map(buildTopicTree);
-        const serviceNodes = serviceTopics.map(buildTopicTree);
+        const productNodes = Object.keys(productizationPlans)
+            .map(topic => buildFullTopicTree(topic, productizationPlans[topic]));
         
-        const allFocusAreaDefs = deepWorkDefinitions.filter(def => !Array.isArray(def.focusAreas));
-        const focusAreaDefMap = new Map(allFocusAreaDefs.map(def => [def.name.toLowerCase(), def]));
+        const serviceNodes = Object.keys(offerizationPlans)
+            .map(topic => buildFullTopicTree(topic, offerizationPlans[topic]));
+        
+        const bundles = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreas));
         const bundleNodes: MindMapNode[] = bundles.map(bundle => {
-            const constituentFocusAreas = (bundle.focusAreas || [])
-                .map(name => focusAreaDefMap.get(name.toLowerCase()))
-                .filter((def): def is ExerciseDefinition => !!def)
-                .map(def => ({ ...def, children: [] }));
-            return { ...bundle, children: constituentFocusAreas };
+            const socialChildren: MindMapNode[] = [];
+            if (bundle.sharingStatus?.twitter) socialChildren.push({ id: `${bundle.id}-twitter`, name: 'X/Twitter', category: 'Social', children: [] });
+            if (bundle.sharingStatus?.linkedin) socialChildren.push({ id: `${bundle.id}-linkedin`, name: 'LinkedIn', category: 'Social', children: [] });
+            if (bundle.sharingStatus?.devto) socialChildren.push({ id: `${bundle.id}-devto`, name: 'Dev.to', category: 'Social', children: [] });
+
+            return { ...bundle, children: socialChildren };
         });
 
         const rootNode: MindMapNode = {
@@ -183,14 +188,13 @@ function MindMapPageContent() {
 
     if (selectedTopic === 'Content Bundles') {
         const bundles = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreas));
-        const allFocusAreaDefs = deepWorkDefinitions.filter(def => !Array.isArray(def.focusAreas));
-        const focusAreaDefMap = new Map(allFocusAreaDefs.map(def => [def.name.toLowerCase(), def]));
         const bundleNodes: MindMapNode[] = bundles.map(bundle => {
-            const constituentFocusAreas = (bundle.focusAreas || [])
-                .map(name => focusAreaDefMap.get(name.toLowerCase()))
-                .filter((def): def is ExerciseDefinition => !!def)
-                .map(def => ({ ...def, children: [] }));
-            return { ...bundle, children: constituentFocusAreas };
+            const socialChildren: MindMapNode[] = [];
+            if (bundle.sharingStatus?.twitter) socialChildren.push({ id: `${bundle.id}-twitter`, name: 'X/Twitter', category: 'Social', children: [] });
+            if (bundle.sharingStatus?.linkedin) socialChildren.push({ id: `${bundle.id}-linkedin`, name: 'LinkedIn', category: 'Social', children: [] });
+            if (bundle.sharingStatus?.devto) socialChildren.push({ id: `${bundle.id}-devto`, name: 'Dev.to', category: 'Social', children: [] });
+            
+            return { ...bundle, children: socialChildren };
         });
         return {
             id: 'content-bundles-root',
@@ -200,25 +204,41 @@ function MindMapPageContent() {
         };
     }
     
-    return buildTopicTree(selectedTopic);
+    const plan = productizationPlans[selectedTopic] || offerizationPlans[selectedTopic];
+    return buildFullTopicTree(selectedTopic, plan);
 
-  }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata]);
+  }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans]);
 
-  const renderNode = (node: MindMapNode, level: number) => (
+  const renderNode = (node: MindMapNode, level: number) => {
+    const nodeIcons: Record<string, React.ReactNode> = {
+        'System': <GitMerge className="h-3.5 w-3.5 text-primary" />,
+        'System Branch:Products': <Package className="h-3.5 w-3.5 text-primary" />,
+        'System Branch:Services': <Briefcase className="h-3.5 w-3.5 text-primary" />,
+        'System Branch:Content Bundles': <Share2 className="h-3.5 w-3.5 text-primary" />,
+        'product': <GitBranch className="h-3.5 w-3.5 text-secondary-foreground" />,
+        'service': <GitBranch className="h-3.5 w-3.5 text-secondary-foreground" />,
+        'Release': <Rocket className="h-3 w-3 text-muted-foreground" />,
+        'FocusArea': <GitMerge className="h-3.5 w-3.5 text-secondary-foreground" />,
+        'Learning Task': <BookCopy className="h-3 w-3 text-muted-foreground" />,
+        'Content Bundle': <Package className="h-3.5 w-3.5 text-secondary-foreground" />,
+        'Social:X/Twitter': <TwitterIcon className="h-3 w-3 text-muted-foreground" />,
+        'Social:LinkedIn': <Linkedin className="h-3 w-3 text-muted-foreground" />,
+        'Social:Dev.to': <DevToIcon className="h-3 w-3 text-muted-foreground" />,
+    };
+    
+    // Determine the key for the icon
+    let iconKey = node.category;
+    if (node.category === 'System Branch') iconKey = `System Branch:${node.name}`;
+    if (node.category === 'Social') iconKey = `Social:${node.name}`;
+    if (node.category === deepWorkTopicMetadata[node.name]?.classification) iconKey = node.category; // To handle product/service topics
+    if (!nodeIcons[iconKey] && level === 4) iconKey = 'FocusArea';
+
+    return (
     <div className="flex items-center flex-row-reverse">
       <div className="flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border">
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted flex-shrink-0">
-             { node.id === 'strategic-overview' ? <GitMerge className="h-3.5 w-3.5 text-primary" /> 
-              : node.id === 'products-branch' ? <Package className="h-3.5 w-3.5 text-primary" />
-              : node.id === 'services-branch' ? <Briefcase className="h-3.5 w-3.5 text-primary" />
-              : node.id === 'bundles-branch' ? <Share2 className="h-3.5 w-3.5 text-primary" />
-              : Array.isArray(node.focusAreas) ? <Package className="h-3.5 w-3.5 text-secondary-foreground" /> // Bundle Item
-              : level === 2 ? <GitBranch className="h-3.5 w-3.5 text-secondary-foreground" /> // Product/Service/Bundle Topic
-              : level === 3 ? <GitMerge className="h-3.5 w-3.5 text-secondary-foreground" /> // Focus Area
-              : level === 4 ? <BookCopy className="h-3 w-3 text-muted-foreground" /> // Learning Task
-              : <GitBranch className="h-3.5 w-3.5 text-primary" /> // Fallback for level 0/1 topics
-            }
+             {nodeIcons[iconKey] || <GitBranch className="h-3.5 w-3.5 text-primary" />}
           </div>
           <div className="min-w-0">
             <p className="font-semibold text-xs text-foreground truncate" title={node.name}>{node.name}</p>
@@ -242,6 +262,7 @@ function MindMapPageContent() {
       )}
     </div>
   );
+  }
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
