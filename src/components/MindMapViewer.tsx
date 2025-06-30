@@ -413,8 +413,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         "flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border",
         isLoggedToday && "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700",
         isScheduledToday && !isLoggedToday && "bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700",
-        isPending && "bg-orange-100 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700",
-        isPastAndDone && "bg-card border-green-500/50"
+        isPending && "bg-orange-100 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700"
       )}>
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted flex-shrink-0">
@@ -482,7 +481,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         )}
     >
         {selectedTopic && mindMapData ? (
-          <TransformWrapper initialScale={1} centerOnInit={true}>
+          <TransformWrapper initialScale={1} centerOnInit={true} minScale={0.1}>
             {({ zoomIn, zoomOut, resetTransform }) => (
               <>
                 <div className="absolute top-2 right-2 z-10 flex gap-2">
