@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -18,7 +18,6 @@ import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { Separator } from './ui/separator';
 
 interface TodaysLearningModalProps {
   isOpen: boolean;
@@ -75,35 +74,25 @@ export function TodaysLearningModal({
   initialSelectedIds,
   onSave,
   pageType,
-  isAddingNewTasks,
-  disabledTaskIds = [],
   allTodaysLoggedDefIds = [],
+  disabledTaskIds = [],
 }: TodaysLearningModalProps) {
-  const [scheduledTasks, setScheduledTasks] = useState<WorkoutExercise[]>([]);
-  const [libraryTasks, setLibraryTasks] = useState<WorkoutExercise[]>([]);
+  const [todaysDefIds, setTodaysDefIds] = useState<string[]>([]);
   const [selectedDefIds, setSelectedDefIds] = useState<string[]>([]);
 
-
   useEffect(() => {
-    if(isOpen) {
-      const loggedDefIdsSet = new Set(allTodaysLoggedDefIds);
-      
-      const initialScheduled = availableTasks.filter(task => loggedDefIdsSet.has(task.definitionId));
-      const initialLibrary = availableTasks.filter(task => !loggedDefIdsSet.has(task.definitionId));
-
-      setScheduledTasks(initialScheduled);
-      setLibraryTasks(initialLibrary);
+    if (isOpen) {
+      setTodaysDefIds(allTodaysLoggedDefIds);
       setSelectedDefIds(initialSelectedIds);
     }
-  }, [isOpen, availableTasks, initialSelectedIds, allTodaysLoggedDefIds]);
+  }, [isOpen, allTodaysLoggedDefIds, initialSelectedIds]);
 
   const handleAddTaskToDay = (taskToAdd: WorkoutExercise) => {
-    setLibraryTasks(prev => prev.filter(t => t.id !== taskToAdd.id));
-    setScheduledTasks(prev => [...prev, taskToAdd]);
+    setTodaysDefIds(prev => [...new Set([...prev, taskToAdd.definitionId])]);
   };
 
   const handleToggleScheduledTask = (defId: string) => {
-    setSelectedDefIds(prev => 
+    setSelectedDefIds(prev =>
       prev.includes(defId)
         ? prev.filter(id => id !== defId)
         : [...prev, defId]
@@ -111,17 +100,18 @@ export function TodaysLearningModal({
   };
   
   const handleSaveChanges = () => {
-    const allTodaysDefIds = scheduledTasks.map(t => t.definitionId);
-    onSave(allTodaysDefIds, selectedDefIds);
+    onSave([...new Set(todaysDefIds)], selectedDefIds);
     onOpenChange(false);
   };
+
+  const scheduledTasks = availableTasks.filter(t => todaysDefIds.includes(t.definitionId));
+  const libraryTasks = availableTasks.filter(t => !todaysDefIds.includes(t.definitionId));
 
   const pageInfo = {
     upskill: {
       icon: <BookOpenCheck className="h-12 w-12 mb-4" />,
       title: 'Upskill Session Tasks',
       description: 'Select the tasks you plan to focus on for this session slot.',
-      emptyText: 'No learning tasks scheduled for today.',
       pageLink: '/upskill',
       pageName: 'Upskill'
     },
@@ -129,7 +119,6 @@ export function TodaysLearningModal({
       icon: <Briefcase className="h-12 w-12 mb-4" />,
       title: 'Deep Work Session Tasks',
       description: 'Select the focus areas for this session slot.',
-      emptyText: 'No focus areas added to the session for today.',
       pageLink: '/deep-work',
       pageName: 'Deep Work'
     },
@@ -137,7 +126,6 @@ export function TodaysLearningModal({
       icon: <Share2 className="h-12 w-12 mb-4" />,
       title: 'Branding Session Tasks',
       description: 'Select the content bundles to work on for this session slot.',
-      emptyText: 'No branding tasks scheduled for today.',
       pageLink: '/personal-branding',
       pageName: 'Personal Branding'
     }
