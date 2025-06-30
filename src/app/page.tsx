@@ -8,7 +8,7 @@ import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subYea
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MindMapViewer } from '@/components/MindMapViewer';
 
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
@@ -949,6 +949,9 @@ function HomePageContent() {
 
       <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
         <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Mind Map Overview</DialogTitle>
+            </DialogHeader>
             <MindMapViewer defaultView="Strategic Overview" />
         </DialogContent>
       </Dialog>
