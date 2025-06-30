@@ -46,10 +46,11 @@ const FeatureList = ({ features }: { features: string[] }) => (
 const ConceptualFlowDiagram = () => {
     return (
         <div className="flex items-start justify-center p-8 overflow-x-auto">
-            <div className="flex flex-col items-center gap-8">
+            {/* Main container changed to flex-row */}
+            <div className="flex flex-row items-center gap-8">
 
-                {/* Stage 1: Foundation */}
-                <div className="flex flex-wrap items-stretch justify-center gap-8">
+                {/* Stage 1: Foundation (Vertical stack) */}
+                <div className="flex flex-col items-center gap-4 text-center">
                     <FlowCard icon={<HeartPulse size={32} />} title="1. Health" description="Track workouts, diet, and physical progress.">
                         <FeatureList features={["Workout Plans", "Exercise Library", "Diet Planning", "Weight Tracking"]} />
                     </FlowCard>
@@ -58,43 +59,34 @@ const ConceptualFlowDiagram = () => {
                     </FlowCard>
                 </div>
 
-                <div className="flex items-center"><ArrowDown className="w-10 h-10 text-muted-foreground/30" /></div>
+                <ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" />
 
                 {/* Stage 2: Application */}
-                <FlowCard icon={<Briefcase size={32} />} title="3. Deep Work" description="Apply skills to focus areas, creating tangible value.">
-                    <FeatureList features={["Focus Area Management", "Skill Integration", "Time Tracking", "Ready for Branding Pipeline"]} />
-                </FlowCard>
-
-                <div className="flex items-center"><ArrowDown className="w-10 h-10 text-muted-foreground/30" /></div>
-
-                {/* Stage 3: Systemization & Monetization */}
-                <div className="flex flex-wrap items-stretch justify-center gap-12">
-                    {/* Path A */}
-                    <div className="flex flex-col items-center gap-4 text-center">
-                        <FlowCard icon={<Share2 size={32} />} title="4a. Personal Branding" description="Bundle completed Deep Work into shareable content.">
-                            <FeatureList features={["Content Bundling", "Creation Workflow (4-stage)", "Publishing Checklist"]} />
-                        </FlowCard>
-                    </div>
-
-                    {/* Path B */}
-                    <div className="flex flex-col items-center gap-4 text-center">
-                        <FlowCard icon={<Package size={32} />} title="4b. Productization & Offerization" description="Systematically plan products and services.">
-                            <FeatureList features={["Gap Analysis", "Product/Service Definition", "Release Planning"]} />
-                        </FlowCard>
-                    </div>
-
-                    {/* Path C */}
-                    <div className="flex flex-col items-center gap-4 text-center">
-                        <FlowCard icon={<Magnet size={32} />} title="4c. Lead Gen & Offer System" description="Define and track outreach and service offerings.">
-                            <FeatureList features={["Daily Action Tracking", "Service Offer Definition"]} />
-                        </FlowCard>
-                    </div>
+                <div className="flex flex-col items-center gap-4 text-center">
+                    <FlowCard icon={<Briefcase size={32} />} title="3. Deep Work" description="Apply skills to focus areas, creating tangible value.">
+                        <FeatureList features={["Focus Area Management", "Skill Integration", "Time Tracking", "Ready for Branding Pipeline"]} />
+                    </FlowCard>
                 </div>
 
-                 <div className="flex items-center"><ArrowDown className="w-10 h-10 text-muted-foreground/30" /></div>
+                <ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" />
 
-                {/* Stage 4: Overview & Control */}
-                <div className="flex flex-wrap items-stretch justify-center gap-8">
+                {/* Stage 3: Systemization & Monetization (Vertical stack) */}
+                <div className="flex flex-col items-center gap-4 text-center">
+                    <FlowCard icon={<Share2 size={32} />} title="4a. Personal Branding" description="Bundle completed Deep Work into shareable content.">
+                        <FeatureList features={["Content Bundling", "Creation Workflow (4-stage)", "Publishing Checklist"]} />
+                    </FlowCard>
+                    <FlowCard icon={<Package size={32} />} title="4b. Productization & Offerization" description="Systematically plan products and services.">
+                        <FeatureList features={["Gap Analysis", "Product/Service Definition", "Release Planning"]} />
+                    </FlowCard>
+                     <FlowCard icon={<Magnet size={32} />} title="4c. Lead Gen & Offer System" description="Define and track outreach and service offerings.">
+                        <FeatureList features={["Daily Action Tracking", "Service Offer Definition"]} />
+                    </FlowCard>
+                </div>
+
+                 <ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" />
+
+                {/* Stage 4: Overview & Control (Vertical stack) */}
+                <div className="flex flex-col items-center gap-4 text-center">
                     <FlowCard icon={<LayoutDashboard size={32} />} title="5. Dashboard" description="Your daily command center for all activities.">
                         <FeatureList features={["Time-Slotted Agenda", "Productivity Snapshot", "Activity Heatmap"]} />
                     </FlowCard>
@@ -137,6 +129,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const { zoomToElement, centerView } = useControls()
 
   useEffect(() => {
     if (defaultView) {
@@ -577,7 +570,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         )}
     >
         {selectedTopic && mindMapData ? (
-          <TransformWrapper initialScale={0.5} minScale={0.1} centerOnInit={true}>
+          <TransformWrapper initialScale={0.1} minScale={0.05} centerOnInit={true}>
             {({ zoomIn, zoomOut, resetTransform }) => (
               <>
                 <div className="absolute top-2 right-2 z-10 flex gap-2">
@@ -644,3 +637,5 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   );
 }
 
+
+    
