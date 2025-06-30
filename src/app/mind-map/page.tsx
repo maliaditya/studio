@@ -338,7 +338,7 @@ function MindMapPageContent() {
       <div className={cn(
         "flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border",
         loggedInfo && "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700",
-        isScheduledToday && "bg-card" // No highlight for scheduled, just the badge
+        isScheduledToday && "bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700"
       )}>
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted flex-shrink-0">
@@ -357,8 +357,8 @@ function MindMapPageContent() {
                 <span className="ml-auto font-mono">{format(new Date(), 'MMM dd')}</span>
             </div>
         ) : isScheduledToday ? (
-            <div className="mt-1 pt-1 border-t border-border flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Calendar className="h-4 w-4 flex-shrink-0 text-primary" />
+            <div className="mt-1 pt-1 border-t border-yellow-300/50 flex items-center gap-1.5 text-xs text-yellow-800 dark:text-yellow-200">
+                <Calendar className="h-4 w-4 flex-shrink-0 text-yellow-600 dark:text-yellow-400" />
                 <span className="font-medium">Scheduled Today</span>
             </div>
         ) : null}
