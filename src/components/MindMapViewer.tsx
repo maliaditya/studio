@@ -5,7 +5,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle } from 'lucide-react';
+import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle, Link as LinkIcon } from 'lucide-react';
 import type { ExerciseDefinition, Release, DatedWorkout, ActivityType as ActivityTypeType } from '@/types/workout'; // Renaming imported ActivityType to avoid conflict with lucide-react
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,12 @@ import { cn } from '@/lib/utils';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { ScrollArea } from './ui/scroll-area';
+import { Checkbox } from './ui/checkbox';
+import { useToast } from '@/hooks/use-toast';
 
 // Component-specific icons
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -102,13 +108,15 @@ const ConceptualFlowDiagram = () => {
 };
 
 
-interface MindMapNode extends Partial<ExerciseDefinition> {
+interface MindMapNode extends Partial<ExerciseDefinition>, Partial<Release> {
   id: string;
   definitionId: string;
   name: string;
   category: string;
   children: MindMapNode[];
   totalLoggedHours?: number;
+  topic?: string;
+  type?: 'product' | 'service';
 }
 
 interface MindMapViewerProps {
@@ -125,6 +133,7 @@ const Controls = () => {
   
 
 export function MindMapViewer({ defaultView, showControls = true }: MindMapViewerProps) {
+  const { toast } = useToast();
   const { 
       deepWorkDefinitions, 
       upskillDefinitions, 
@@ -136,12 +145,23 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
       allDeepWorkLogs,
       brandingLogs,
       scheduleTaskFromMindMap,
+      addFeatureToRelease,
+      setDeepWorkDefinitions,
   } = useAuth();
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
   
   const timeSlots = [ 'Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night' ];
+
+  // Modal State
+  const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service' } | null>(null);
+  const [isAddFeatureModalOpen, setIsAddFeatureModalOpen] = useState(false);
+  const [newFeatureName, setNewFeatureName] = useState('');
+
+  const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
+  const [isLinkLearningModalOpen, setIsLinkLearningModalOpen] = useState(false);
+  const [editableLinkedUpskillIds, setEditableLinkedUpskillIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (defaultView) {
@@ -164,7 +184,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
 
     todayLogs.forEach(log => {
         (log.exercises || []).forEach(ex => {
-            if (ex.definitionId) {
+            if (ex.id && ex.definitionId) {
                 instanceIdToDefIdMap.set(ex.id, ex.definitionId);
             }
         });
@@ -443,7 +463,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         };
     };
 
-    const buildFullTopicTree = (topic: string, plan: any): MindMapNode => {
+    const buildFullTopicTree = (topic: string, plan: any, type: 'product' | 'service'): MindMapNode => {
         const releaseNodes: MindMapNode[] = (plan?.releases || []).map((release: Release) => {
             const focusAreaNodes = (release.focusAreaIds || [])
                 .map(id => deepWorkDefinitions.find(def => def.id === id))
@@ -454,22 +474,24 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                 .reduce((sum, id) => sum + (totalTimePerFocusArea.get(id) || 0), 0);
 
             return { 
+              ...release,
               id: release.id, 
               definitionId: release.id, 
               name: release.name, 
               category: 'Release', 
               children: focusAreaNodes,
-              totalLoggedHours: totalMinutes > 0 ? totalMinutes / 60 : 0
+              totalLoggedHours: totalMinutes > 0 ? totalMinutes / 60 : 0,
+              topic: topic,
+              type: type
             };
         });
 
         const totalTopicHours = releaseNodes.reduce((sum, release) => sum + (release.totalLoggedHours || 0), 0);
-        const classification = deepWorkTopicMetadata[topic]?.classification || 'Topic';
         return { 
             id: topic, 
             definitionId: topic, 
             name: topic, 
-            category: classification, 
+            category: type, 
             children: releaseNodes,
             totalLoggedHours: totalTopicHours > 0 ? totalTopicHours : undefined
         };
@@ -477,10 +499,10 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
 
     if (selectedTopic === 'Strategic Overview') {
         const productNodes = Object.keys(productizationPlans)
-            .map(topic => buildFullTopicTree(topic, productizationPlans[topic]));
+            .map(topic => buildFullTopicTree(topic, productizationPlans[topic], 'product'));
         
         const serviceNodes = Object.keys(offerizationPlans)
-            .map(topic => buildFullTopicTree(topic, offerizationPlans[topic]));
+            .map(topic => buildFullTopicTree(topic, offerizationPlans[topic], 'service'));
         
         const bundles = deepWorkDefinitions.filter(def => def.focusAreaIds && def.focusAreaIds.length > 0);
         const bundleNodes: MindMapNode[] = bundles.map(bundle => {
@@ -536,9 +558,48 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     }
     
     const plan = productizationPlans[selectedTopic] || offerizationPlans[selectedTopic];
-    return buildFullTopicTree(selectedTopic, plan);
+    const type = productizationPlans[selectedTopic] ? 'product' : 'service';
+    return buildFullTopicTree(selectedTopic, plan, type);
 
   }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, totalTimePerFocusArea]);
+
+  // Modal Handlers
+  const handleAddFeature = () => {
+    if (selectedReleaseInfo && newFeatureName.trim()) {
+      addFeatureToRelease(
+        selectedReleaseInfo.release,
+        selectedReleaseInfo.topic,
+        newFeatureName,
+        selectedReleaseInfo.type
+      );
+      setNewFeatureName('');
+      // Don't close the modal, allowing for multiple additions.
+    }
+  };
+
+  const handleToggleUpskillLink = (upskillId: string) => {
+    setEditableLinkedUpskillIds(currentIds => {
+      const newIds = new Set(currentIds);
+      if (newIds.has(upskillId)) {
+        newIds.delete(upskillId);
+      } else {
+        newIds.add(upskillId);
+      }
+      return Array.from(newIds);
+    });
+  };
+
+  const handleSaveLinkedLearning = () => {
+    if (!selectedFocusArea) return;
+    setDeepWorkDefinitions(prevDefs => prevDefs.map(def =>
+        def.id === selectedFocusArea!.id
+            ? { ...def, linkedUpskillIds: editableLinkedUpskillIds }
+            : def
+    ));
+    setIsLinkLearningModalOpen(false);
+    toast({ title: "Saved", description: "Learning tasks have been linked." });
+  };
+
 
   const renderNode = (node: MindMapNode, level: number, parentNode?: MindMapNode) => {
     const nodeIcons: Record<string, React.ReactNode> = {
@@ -639,6 +700,29 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
             </Popover>
         )}
 
+        {node.category === 'Release' && node.topic && node.type && (
+            <Button variant="ghost" size="icon" className="absolute right-1 -bottom-2 h-6 w-6"
+                onClick={() => {
+                    setSelectedReleaseInfo({ release: node as Release, topic: node.topic!, type: node.type! });
+                    setIsAddFeatureModalOpen(true);
+                }}
+            >
+                <PlusCircle className="h-4 w-4 text-primary" />
+            </Button>
+        )}
+        
+        {node.category === 'FocusArea' && (
+             <Button variant="ghost" size="icon" className="absolute right-8 -bottom-2 h-6 w-6"
+                onClick={() => {
+                    setSelectedFocusArea(node as ExerciseDefinition);
+                    setEditableLinkedUpskillIds(node.linkedUpskillIds || []);
+                    setIsLinkLearningModalOpen(true);
+                }}
+            >
+                <LinkIcon className="h-4 w-4 text-primary" />
+            </Button>
+        )}
+
         {(node.category === 'Release' || node.category === 'product' || node.category === 'service') && node.totalLoggedHours && node.totalLoggedHours > 0 && (
           <div className="mt-1 pt-1 border-t border-muted-foreground/20">
               <Badge variant="secondary" className="w-full justify-center text-xs">
@@ -657,7 +741,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
             <div className="mt-1 pt-1 border-t border-yellow-300/50 flex items-center gap-1.5 text-xs text-yellow-800 dark:text-yellow-400">
                 <Calendar className="h-4 w-4 flex-shrink-0 text-yellow-600 dark:text-yellow-400" />
                 <span className="font-medium">Scheduled Today</span>
-                {scheduledInfoForNode?.slot && !['Afternoon', 'Late Night', 'Evening'].includes(scheduledInfoForNode.slot) && <Badge variant="outline" className="ml-auto text-yellow-900 border-yellow-500/50 bg-yellow-500/10 text-xs">{scheduledInfoForNode.slot}</Badge>}
+                {!['Afternoon', 'Late Night', 'Evening'].includes(scheduledInfoForNode.slot) && <Badge variant="outline" className="ml-auto text-yellow-900 border-yellow-500/50 bg-yellow-500/10 text-xs">{scheduledInfoForNode.slot}</Badge>}
             </div>
         ) : isPending ? (
             <div className="mt-1 pt-1 border-t border-orange-300/50 flex items-center gap-1.5 text-xs text-orange-800 dark:text-orange-400">
@@ -760,30 +844,95 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   }
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-full flex flex-col">
-      <Card className="flex-grow flex flex-col">
-        <CardHeader>
-          <CardTitle>Flow Mind Map</CardTitle>
-          <CardDescription>
-            A conceptual map of the LifeOS workflow. Select an item from the dropdown to visualize its unique structure.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex-grow flex flex-col">
-          <div className="max-w-sm mb-6">
-            <Select onValueChange={setSelectedTopic} value={selectedTopic}>
-              <SelectTrigger>
-                <SelectValue placeholder="View Conceptual Flow..." />
-              </SelectTrigger>
-              <SelectContent>
-                {allTopics.map(topic => (
-                  <SelectItem key={topic} value={topic}>{topic}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {MapContent}
-        </CardContent>
-      </Card>
-    </div>
+    <>
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-full flex flex-col">
+        <Card className="flex-grow flex flex-col">
+          <CardHeader>
+            <CardTitle>Flow Mind Map</CardTitle>
+            <CardDescription>
+              A conceptual map of the LifeOS workflow. Select an item from the dropdown to visualize its unique structure.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex-grow flex flex-col">
+            <div className="max-w-sm mb-6">
+              <Select onValueChange={setSelectedTopic} value={selectedTopic}>
+                <SelectTrigger>
+                  <SelectValue placeholder="View Conceptual Flow..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {allTopics.map(topic => (
+                    <SelectItem key={topic} value={topic}>{topic}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {MapContent}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Dialog open={isAddFeatureModalOpen} onOpenChange={setIsAddFeatureModalOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Add Feature to "{selectedReleaseInfo?.release.name}"</DialogTitle>
+                <DialogDescription>
+                    This will create a new focus area in your Deep Work library under the "{selectedReleaseInfo?.topic}" topic and link it to this release.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="pt-2">
+                <Label htmlFor="feature-name">New Feature Name</Label>
+                <div className="flex gap-2 mt-1">
+                    <Input
+                        id="feature-name"
+                        value={newFeatureName}
+                        onChange={(e) => setNewFeatureName(e.target.value)}
+                        placeholder="e.g., Implement user authentication"
+                        autoFocus
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddFeature()}
+                    />
+                    <Button onClick={handleAddFeature}>Add</Button>
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsAddFeatureModalOpen(false)}>Done</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isLinkLearningModalOpen} onOpenChange={setIsLinkLearningModalOpen}>
+          <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                  <DialogTitle>Link Learning to "{selectedFocusArea?.name}"</DialogTitle>
+                  <DialogDescription>Select the learning tasks that support this focus area.</DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                  <ScrollArea className="h-60 w-full rounded-md border p-2">
+                      {upskillDefinitions.length > 0 ? (
+                        <div className="space-y-2">
+                            {upskillDefinitions.map(def => (
+                                <div key={def.id} className="flex items-center space-x-3">
+                                    <Checkbox
+                                        id={`link-${def.id}`}
+                                        checked={editableLinkedUpskillIds.includes(def.id)}
+                                        onCheckedChange={() => handleToggleUpskillLink(def.id)}
+                                    />
+                                    <Label htmlFor={`link-${def.id}`} className="font-normal w-full cursor-pointer">
+                                        {def.name} <span className="text-muted-foreground/80">({def.category})</span>
+                                    </Label>
+                                </div>
+                            ))}
+                        </div>
+                      ) : (
+                          <p className="text-center text-sm text-muted-foreground p-4">No learning tasks in library. Add some on the Upskill page.</p>
+                      )}
+                  </ScrollArea>
+              </div>
+              <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsLinkLearningModalOpen(false)}>Cancel</Button>
+                  <Button onClick={handleSaveLinkedLearning}>Save Links</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+    </>
   );
 }
