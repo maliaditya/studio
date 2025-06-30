@@ -82,10 +82,10 @@ function PersonalBrandingPageContent() {
     const allDefinitions = deepWorkDefinitions || [];
 
     // Eligible areas are individual focus areas (not bundles) marked as ready.
-    const eligible = allDefinitions.filter(def => def.isReadyForBranding && !Array.isArray(def.focusAreas));
+    const eligible = allDefinitions.filter(def => def.isReadyForBranding && !def.focusAreaIds);
 
-    // Bundles are items that HAVE a focusAreas array.
-    const allBundles = allDefinitions.filter(def => Array.isArray(def.focusAreas));
+    // Bundles are items that HAVE a focusAreaIds array.
+    const allBundles = allDefinitions.filter(def => Array.isArray(def.focusAreaIds));
 
     const isFullyShared = (task: ExerciseDefinition) => 
         task.sharingStatus && 
@@ -153,13 +153,11 @@ function PersonalBrandingPageContent() {
       return;
     }
 
-    const selectedAreas = deepWorkDefinitions.filter(def => selectedFocusAreaIds.includes(def.id));
-
     const newBundle: ExerciseDefinition = {
       id: `bundle_${Date.now()}`,
       name: newBundleName.trim(),
       category: "Content Bundle",
-      focusAreas: selectedAreas.map(area => area.name),
+      focusAreaIds: selectedFocusAreaIds,
       isReadyForBranding: false, // Bundles aren't "ready" themselves, they just exist.
       sharingStatus: { twitter: false, linkedin: false, devto: false }
     };
@@ -191,7 +189,7 @@ function PersonalBrandingPageContent() {
       loggedSets: [],
       targetSets: 4,
       targetReps: "4 stages",
-      focusAreas: definition.focusAreas,
+      focusAreaIds: definition.focusAreaIds,
     };
     const existingLog = brandingLogs.find(log => log.id === dateKey);
     if (existingLog) {
@@ -441,6 +439,7 @@ function PersonalBrandingPageContent() {
                                   onUpdateSharingStatus={handleUpdateSharingStatus}
                                   onRemoveExercise={handleRemoveTaskFromSession}
                                   pageType="branding"
+                                  deepWorkDefinitions={deepWorkDefinitions}
                                 />
                               );
                           })}

@@ -124,7 +124,7 @@ function MindMapPageContent() {
 
   const allTopics = useMemo(() => {
     const productAndServiceTopics = Object.keys(deepWorkTopicMetadata).sort();
-    const hasBundles = deepWorkDefinitions.some(def => Array.isArray(def.focusAreas));
+    const hasBundles = deepWorkDefinitions.some(def => Array.isArray(def.focusAreaIds));
     
     const availableTopics = [];
     if (hasBundles) {
@@ -138,18 +138,20 @@ function MindMapPageContent() {
   const mindMapData = useMemo((): MindMapNode | null => {
     if (!selectedTopic) return null;
 
+    const createFocusAreaNode = (focusAreaDef: ExerciseDefinition, parentId: string): MindMapNode => {
+        const linkedLearningTasks = (focusAreaDef.linkedUpskillIds || [])
+            .map(id => upskillDefinitions.find(ud => ud.id === id))
+            .filter((task): task is ExerciseDefinition => !!task)
+            .map(task => ({ ...task, id: `${task.id}-from-${focusAreaDef.id}-in-${parentId}`, category: 'Learning Task', children: [] }));
+        return { ...focusAreaDef, id: `${focusAreaDef.id}-in-${parentId}`, children: linkedLearningTasks };
+    };
+
     const buildFullTopicTree = (topic: string, plan: any): MindMapNode => {
         const releaseNodes: MindMapNode[] = (plan?.releases || []).map((release: Release) => {
             const focusAreaNodes = (release.focusAreaIds || [])
                 .map(id => deepWorkDefinitions.find(def => def.id === id))
                 .filter((def): def is ExerciseDefinition => !!def)
-                .map(fa => {
-                    const linkedLearningTasks = (fa.linkedUpskillIds || [])
-                        .map(id => upskillDefinitions.find(ud => ud.id === id))
-                        .filter((task): task is ExerciseDefinition => !!task)
-                        .map(task => ({ ...task, category: 'Learning Task', children: [] }));
-                    return { ...fa, children: linkedLearningTasks };
-                });
+                .map(fa => createFocusAreaNode(fa, release.id));
             return { id: release.id, name: release.name, category: 'Release', children: focusAreaNodes };
         });
         const classification = deepWorkTopicMetadata[topic]?.classification || 'Topic';
@@ -163,14 +165,19 @@ function MindMapPageContent() {
         const serviceNodes = Object.keys(offerizationPlans)
             .map(topic => buildFullTopicTree(topic, offerizationPlans[topic]));
         
-        const bundles = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreas));
+        const bundles = deepWorkDefinitions.filter(def => def.focusAreaIds && def.focusAreaIds.length > 0);
         const bundleNodes: MindMapNode[] = bundles.map(bundle => {
             const socialChildren: MindMapNode[] = [];
             if (bundle.sharingStatus?.twitter) socialChildren.push({ id: `${bundle.id}-twitter`, name: 'X/Twitter', category: 'Social', children: [] });
             if (bundle.sharingStatus?.linkedin) socialChildren.push({ id: `${bundle.id}-linkedin`, name: 'LinkedIn', category: 'Social', children: [] });
             if (bundle.sharingStatus?.devto) socialChildren.push({ id: `${bundle.id}-devto`, name: 'Dev.to', category: 'Social', children: [] });
 
-            return { ...bundle, children: socialChildren };
+            const focusAreaChildren = (bundle.focusAreaIds || [])
+                .map(id => deepWorkDefinitions.find(d => d.id === id))
+                .filter((def): def is ExerciseDefinition => !!def)
+                .map(faDef => createFocusAreaNode(faDef, bundle.id));
+
+            return { ...bundle, children: [...focusAreaChildren, ...socialChildren] };
         });
 
         const rootNode: MindMapNode = {
@@ -187,14 +194,19 @@ function MindMapPageContent() {
     }
 
     if (selectedTopic === 'Content Bundles') {
-        const bundles = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreas));
+        const bundles = deepWorkDefinitions.filter(def => def.focusAreaIds && def.focusAreaIds.length > 0);
         const bundleNodes: MindMapNode[] = bundles.map(bundle => {
             const socialChildren: MindMapNode[] = [];
             if (bundle.sharingStatus?.twitter) socialChildren.push({ id: `${bundle.id}-twitter`, name: 'X/Twitter', category: 'Social', children: [] });
             if (bundle.sharingStatus?.linkedin) socialChildren.push({ id: `${bundle.id}-linkedin`, name: 'LinkedIn', category: 'Social', children: [] });
             if (bundle.sharingStatus?.devto) socialChildren.push({ id: `${bundle.id}-devto`, name: 'Dev.to', category: 'Social', children: [] });
             
-            return { ...bundle, children: socialChildren };
+            const focusAreaChildren = (bundle.focusAreaIds || [])
+                .map(id => deepWorkDefinitions.find(d => d.id === id))
+                .filter((def): def is ExerciseDefinition => !!def)
+                .map(faDef => createFocusAreaNode(faDef, bundle.id));
+
+            return { ...bundle, children: [...focusAreaChildren, ...socialChildren] };
         });
         return {
             id: 'content-bundles-root',

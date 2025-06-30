@@ -53,7 +53,7 @@ export interface ExerciseDefinition {
   category: ExerciseCategory; // Topic for upskill
   description?: string;
   decompositionData?: DecompositionRow[];
-  focusAreas?: string[];
+  focusAreaIds?: string[];
   sourceUpskillId?: string;
   linkedUpskillIds?: string[];
   isReadyForBranding?: boolean;
@@ -95,7 +95,7 @@ export interface WorkoutExercise {
   loggedSets: LoggedSet[];
   targetSets: number;
   targetReps: string; // e.g., "10-15"
-  focusAreas?: string[];
+  focusAreaIds?: string[];
   lastPerformance?: {
     reps: number;
     weight: number;

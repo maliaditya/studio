@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -40,6 +41,7 @@ interface WorkoutExerciseCardProps {
   onSwapExercise?: (newExerciseDefinition: ExerciseDefinition) => void;
   swappableExercises?: ExerciseDefinition[];
   pageType?: 'workout' | 'upskill' | 'deepwork' | 'branding' | 'lead-generation' | 'offer-system';
+  deepWorkDefinitions?: ExerciseDefinition[];
 }
 
 export function WorkoutExerciseCard({
@@ -53,7 +55,8 @@ export function WorkoutExerciseCard({
   onUpdateSharingStatus,
   onSwapExercise,
   swappableExercises,
-  pageType = 'workout'
+  pageType = 'workout',
+  deepWorkDefinitions
 }: WorkoutExerciseCardProps) {
   const [reps, setReps] = useState('');
   const [weight, setWeight] = useState('');
@@ -71,6 +74,12 @@ export function WorkoutExerciseCard({
     const newStatus = { ...exercise.sharingStatus, [platform]: !exercise.sharingStatus[platform] };
     onUpdateSharingStatus(exercise.definitionId, newStatus);
   }
+
+  const focusAreaNames = useMemo(() => {
+    if (!exercise.focusAreaIds || !deepWorkDefinitions) return [];
+    const nameMap = new Map(deepWorkDefinitions.map(d => [d.id, d.name]));
+    return exercise.focusAreaIds.map(id => nameMap.get(id) || 'Unknown Focus Area');
+  }, [exercise.focusAreaIds, deepWorkDefinitions]);
 
   const placeholder = useMemo(() => {
     if (pageType === 'upskill') {
@@ -201,11 +210,11 @@ export function WorkoutExerciseCard({
 
       return (
         <div className='space-y-4'>
-            {exercise.focusAreas && exercise.focusAreas.length > 0 && (
+            {focusAreaNames && focusAreaNames.length > 0 && (
               <div className='mb-3'>
                 <h4 className="text-sm font-medium mb-2 text-foreground">Included Focus Areas:</h4>
                 <div className="flex flex-wrap gap-1.5">
-                  {exercise.focusAreas.map(fa => (
+                  {focusAreaNames.map(fa => (
                     <Badge key={fa} variant="outline">{fa}</Badge>
                   ))}
                 </div>
