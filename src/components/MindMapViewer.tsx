@@ -1,13 +1,13 @@
 
 "use client";
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet } from 'lucide-react';
 import type { ExerciseDefinition, Release, DatedWorkout } from '@/types/workout';
-import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format, parseISO, differenceInDays } from 'date-fns';
@@ -115,14 +115,17 @@ interface MindMapViewerProps {
     showControls?: boolean;
 }
 
-// Helper component to get the zoom/pan controls context
-const MindMapInner = ({ mindMapData, renderNode }: { mindMapData: MindMapNode, renderNode: (node: MindMapNode, level: number) => React.ReactNode }) => {
-    return (
-      <div className="inline-block py-4">
-        {renderNode(mindMapData, 0)}
-      </div>
-    );
-  };
+// This helper component is rendered inside TransformWrapper to get access to its context
+const Controls = ({ centerOnLoad }: { centerOnLoad: boolean }) => {
+    const { centerView } = useControls();
+    useEffect(() => {
+        if (centerOnLoad) {
+            // Use a timeout to ensure the element is rendered and positioned
+            setTimeout(() => centerView(), 100);
+        }
+    }, [centerOnLoad, centerView]);
+    return null;
+};
   
 
 export function MindMapViewer({ defaultView, showControls = true }: MindMapViewerProps) {
@@ -139,6 +142,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [hasCentered, setHasCentered] = useState(false);
 
   useEffect(() => {
     if (defaultView) {
@@ -147,6 +151,11 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         setSelectedTopic(showControls ? '' : 'Strategic Overview');
     }
   }, [defaultView, showControls]);
+  
+  // Effect to reset centering flag when the selected topic changes
+  useEffect(() => {
+    setHasCentered(false);
+  }, [selectedTopic]);
 
   const scheduledTaskInfo = useMemo(() => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -522,7 +531,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
             <div className="mt-1 pt-1 border-t border-yellow-300/50 flex items-center gap-1.5 text-xs text-yellow-800 dark:text-yellow-400">
                 <Calendar className="h-4 w-4 flex-shrink-0 text-yellow-600 dark:text-yellow-400" />
                 <span className="font-medium">Scheduled Today</span>
-                {scheduledInfo?.slot && <Badge variant="outline" className="ml-auto text-yellow-900 border-yellow-500/50 bg-yellow-500/10 text-xs">{scheduledInfo.slot}</Badge>}
+                {scheduledInfo?.slot && !['Afternoon', 'Late Night', 'Evening'].includes(scheduledInfo.slot) && <Badge variant="outline" className="ml-auto text-yellow-900 border-yellow-500/50 bg-yellow-500/10 text-xs">{scheduledInfo.slot}</Badge>}
             </div>
         ) : isPending ? (
             <div className="mt-1 pt-1 border-t border-orange-300/50 flex items-center gap-1.5 text-xs text-orange-800 dark:text-orange-400">
@@ -579,11 +588,17 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         )}
     >
         {selectedTopic && mindMapData ? (
-          <TransformWrapper initialScale={0.05} minScale={0.05}>
+          <TransformWrapper 
+            initialScale={0.15} 
+            minScale={0.01} 
+            limitToBounds={false}
+            onInit={() => setHasCentered(true)}
+          >
             {(props) => {
               
               return (
               <>
+                <Controls centerOnLoad={!hasCentered} />
                 <div className="absolute top-2 right-2 z-10 flex gap-2">
                   <Button size="icon" variant="outline" onClick={() => props.zoomIn()} aria-label="Zoom in">
                     <ZoomIn />
@@ -602,7 +617,9 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                   wrapperClass="!w-full !h-full"
                   contentClass={cn("flex items-center justify-center", isFullScreen ? "h-screen" : "h-full")}
                 >
-                  <MindMapInner mindMapData={mindMapData} renderNode={renderNode} />
+                    <div className="inline-block py-4">
+                        {renderNode(mindMapData, 0)}
+                    </div>
                 </TransformComponent>
               </>
             )}}
@@ -645,9 +662,3 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     </div>
   );
 }
-
-
-    
-
-    
-
