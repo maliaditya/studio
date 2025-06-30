@@ -785,14 +785,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const addFeatureToRelease = (release: Release, topic: string, featureName: string, type: 'product' | 'service') => {
     if (!featureName.trim()) {
-      toast({ title: "Error", description: "Feature name cannot be empty.", variant: "destructive" });
-      return;
+        toast({ title: "Error", description: "Feature name cannot be empty.", variant: "destructive" });
+        return;
     }
 
     const newFeatureDef: ExerciseDefinition = {
-      id: `def_${Date.now()}_${Math.random()}`,
-      name: featureName.trim(),
-      category: topic as ExerciseCategory,
+        id: `def_${Date.now()}_${Math.random()}`,
+        name: featureName.trim(),
+        category: topic as ExerciseCategory,
     };
 
     setDeepWorkDefinitions(prev => [...prev, newFeatureDef]);
@@ -800,18 +800,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const plansUpdater = type === 'product' ? setProductizationPlans : setOfferizationPlans;
 
     plansUpdater(prevPlans => {
-      const newPlans = { ...prevPlans };
-      const currentPlan = newPlans[topic];
-      
-      if (currentPlan && currentPlan.releases) {
-        const releaseIndex = currentPlan.releases.findIndex(r => r.id === release.id);
-        if (releaseIndex > -1) {
-          const updatedRelease = { ...currentPlan.releases[releaseIndex] };
-          updatedRelease.focusAreaIds = [...(updatedRelease.focusAreaIds || []), newFeatureDef.id];
-          currentPlan.releases[releaseIndex] = updatedRelease;
+        const newPlans = { ...prevPlans };
+        const currentPlan = newPlans[topic];
+
+        if (currentPlan && currentPlan.releases) {
+            newPlans[topic] = {
+                ...currentPlan,
+                releases: currentPlan.releases.map(r => {
+                    if (r.id === release.id) {
+                        return {
+                            ...r,
+                            focusAreaIds: [...(r.focusAreaIds || []), newFeatureDef.id]
+                        };
+                    }
+                    return r;
+                })
+            };
         }
-      }
-      return newPlans;
+        return newPlans;
     });
 
     toast({ title: "Feature Added", description: `"${newFeatureDef.name}" was added to the "${release.name}" release.` });
@@ -1054,3 +1060,5 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
+    
