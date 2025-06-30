@@ -8,6 +8,8 @@ import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subYea
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { MindMapViewer } from '@/components/MindMapViewer';
 
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysLearningModal } from '@/components/TodaysLearningModal';
@@ -97,6 +99,7 @@ function HomePageContent() {
   const [isOfferSystemModalOpen, setIsOfferSystemModalOpen] = useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
+  const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<{ slotName: string; activity: Activity } | null>(null);
   const [workoutActivityToLog, setWorkoutActivityToLog] = useState<Activity | null>(null);
 
@@ -808,6 +811,7 @@ function HomePageContent() {
                   stats={productivityStats} 
                   timeAllocationData={timeAllocationData} 
                   onOpenStatsModal={() => setIsStatsModalOpen(true)} 
+                  onOpenMindMapModal={() => setIsMindMapModalOpen(true)}
                 />
               </div>
               <div className="lg:col-span-2 space-y-6">
@@ -934,6 +938,12 @@ function HomePageContent() {
           todayHoursData={productivityStats.todayHoursData}
         />
       </div>
+
+      <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
+        <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+            <MindMapViewer defaultView="Strategic Overview" />
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

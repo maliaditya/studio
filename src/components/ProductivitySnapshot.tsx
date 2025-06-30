@@ -34,9 +34,10 @@ interface ProductivitySnapshotProps {
   stats: any;
   timeAllocationData: { name: string; time: number; fill: string; }[];
   onOpenStatsModal: () => void;
+  onOpenMindMapModal: () => void;
 }
 
-export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsModal }: ProductivitySnapshotProps) {
+export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsModal, onOpenMindMapModal }: ProductivitySnapshotProps) {
   const router = useRouter();
   const [isAddFeatureModalOpen, setIsAddFeatureModalOpen] = useState(false);
   const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service' } | null>(null);
@@ -63,7 +64,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             <CardTitle className="flex items-center gap-2 text-primary">Your Productivity Snapshot</CardTitle>
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" onClick={() => router.push('/mind-map?view=strategic')}>
+            <Button variant="outline" size="icon" onClick={onOpenMindMapModal}>
               <GitMerge className="h-4 w-4" />
               <span className="sr-only">Open Strategic Mind Map</span>
             </Button>
