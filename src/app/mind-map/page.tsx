@@ -11,7 +11,7 @@ import type { ExerciseDefinition, Release, DatedWorkout } from '@/types/workout'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, differenceInDays } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 
 
@@ -169,40 +169,39 @@ function MindMapPageContent() {
     return info;
   }, [allUpskillLogs, allDeepWorkLogs]);
 
-  const pendingTaskDefinitionIds = useMemo(() => {
-    const pendingIds = new Set<string>();
+  const pendingTaskInfo = useMemo(() => {
+    const pendingInfo = new Map<string, { oldestDate: string }>();
     const todayStr = format(new Date(), 'yyyy-MM-dd');
 
-    // Create a map of instance IDs to definition IDs from all logs
     const instanceIdToDefIdMap = new Map<string, string>();
     [...allUpskillLogs, ...allDeepWorkLogs].forEach(log => {
-      (log.exercises || []).forEach(ex => {
-        instanceIdToDefIdMap.set(ex.id, ex.definitionId);
-      });
-    });
-
-    // Iterate through past schedule dates
-    Object.keys(schedule).forEach(dateKey => {
-      if (dateKey < todayStr) {
-        const dailySchedule = schedule[dateKey];
-        // Iterate through slots in the day
-        Object.values(dailySchedule).forEach(activities => {
-          (activities || []).forEach(activity => {
-            // If an activity was not completed and had tasks
-            if (!activity.completed && activity.taskIds && activity.taskIds.length > 0) {
-              activity.taskIds.forEach(taskId => {
-                const defId = instanceIdToDefIdMap.get(taskId);
-                if (defId) {
-                  pendingIds.add(defId);
-                }
-              });
-            }
-          });
+        (log.exercises || []).forEach(ex => {
+            instanceIdToDefIdMap.set(ex.id, ex.definitionId);
         });
-      }
     });
 
-    return pendingIds;
+    Object.keys(schedule).forEach(dateKey => {
+        if (dateKey < todayStr) {
+            const dailySchedule = schedule[dateKey];
+            Object.values(dailySchedule).forEach(activities => {
+                (activities || []).forEach(activity => {
+                    if (!activity.completed && activity.taskIds && activity.taskIds.length > 0) {
+                        activity.taskIds.forEach(taskId => {
+                            const defId = instanceIdToDefIdMap.get(taskId);
+                            if (defId) {
+                                const existing = pendingInfo.get(defId);
+                                if (!existing || dateKey < existing.oldestDate) {
+                                    pendingInfo.set(defId, { oldestDate: dateKey });
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+        }
+    });
+
+    return pendingInfo;
   }, [schedule, allUpskillLogs, allDeepWorkLogs]);
 
 
@@ -365,9 +364,15 @@ function MindMapPageContent() {
 
     const loggedInfo = loggedTaskInfo[node.definitionId];
     const scheduledInfo = scheduledTaskInfo.get(node.definitionId);
+    const pendingInfoForNode = pendingTaskInfo.get(node.definitionId);
     const isLoggedToday = !!loggedInfo;
     const isScheduledToday = !!scheduledInfo;
-    const isPending = pendingTaskDefinitionIds.has(node.definitionId) && !isLoggedToday && !isScheduledToday;
+    const isPending = !!pendingInfoForNode && !isLoggedToday && !isScheduledToday;
+
+    let daysPending = 0;
+    if (isPending && pendingInfoForNode) {
+        daysPending = differenceInDays(new Date(), parseISO(pendingInfoForNode.oldestDate));
+    }
 
     return (
     <div className="flex items-center flex-row-reverse">
@@ -403,6 +408,9 @@ function MindMapPageContent() {
             <div className="mt-1 pt-1 border-t border-orange-300/50 flex items-center gap-1.5 text-xs text-orange-800 dark:text-orange-400">
                 <AlertTriangle className="h-4 w-4 flex-shrink-0 text-orange-600 dark:text-orange-400" />
                 <span className="font-medium">Pending from Past</span>
+                {daysPending > 0 && (
+                    <Badge variant="destructive" className="ml-auto text-xs font-mono">{daysPending}d</Badge>
+                )}
             </div>
         ) : null}
       </div>
