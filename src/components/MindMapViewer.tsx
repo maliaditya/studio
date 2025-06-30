@@ -210,30 +210,41 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   }, [schedule, allUpskillLogs, allDeepWorkLogs]);
 
   const pastLoggedTaskInfo = useMemo(() => {
-    const info: Record<string, { lastLogDate: string }> = {};
+    const taskLogs: Record<string, { date: string; time: number }[]> = {};
     const todayStr = format(new Date(), 'yyyy-MM-dd');
 
-    const processLogs = (logs: DatedWorkout[]) => {
-        (logs || []).forEach(log => {
-            if (log.date < todayStr) {
-                (log.exercises || []).forEach(ex => {
-                    if ((ex.loggedSets || []).length > 0) {
-                        if (!info[ex.definitionId]) {
-                            info[ex.definitionId] = { lastLogDate: '1970-01-01' };
-                        }
-                        if (log.date > info[ex.definitionId].lastLogDate) {
-                            info[ex.definitionId].lastLogDate = log.date;
-                        }
-                    }
-                });
+    const processLogs = (logs: DatedWorkout[], timeField: 'reps' | 'weight') => {
+      (logs || []).forEach(log => {
+        if (log.date < todayStr) {
+          (log.exercises || []).forEach(ex => {
+            const loggedTime = ex.loggedSets.reduce((sum, set) => sum + set[timeField], 0);
+            if (loggedTime > 0) {
+              if (!taskLogs[ex.definitionId]) {
+                taskLogs[ex.definitionId] = [];
+              }
+              taskLogs[ex.definitionId].push({ date: log.date, time: loggedTime });
             }
-        });
+          });
+        }
+      });
     };
 
-    processLogs(allUpskillLogs);
-    processLogs(allDeepWorkLogs);
+    processLogs(allUpskillLogs, 'reps');
+    processLogs(allDeepWorkLogs, 'weight');
 
-    return info;
+    const finalInfo: Record<string, { lastLogDate: string; totalTime: number }> = {};
+
+    for (const defId in taskLogs) {
+      if (taskLogs[defId].length > 0) {
+        taskLogs[defId].sort((a, b) => b.date.localeCompare(a.date));
+        finalInfo[defId] = {
+          lastLogDate: taskLogs[defId][0].date,
+          totalTime: taskLogs[defId][0].time,
+        };
+      }
+    }
+
+    return finalInfo;
   }, [allUpskillLogs, allDeepWorkLogs]);
 
   const toggleFullScreen = () => {
@@ -452,8 +463,19 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         ) : isPastAndDone ? (
             <div className="mt-1 pt-1 border-t border-green-500/50 flex items-center gap-1.5 text-xs text-green-800 dark:text-green-400">
                 <Check className="h-4 w-4 flex-shrink-0" />
-                <span className="font-medium">Logged</span>
-                <span className="ml-auto font-mono">{format(parseISO(pastLogInfo.lastLogDate), 'MMM dd')}</span>
+                <div className="flex-grow flex items-center justify-between">
+                  <div>
+                    <span className="font-medium">Logged</span>
+                    <span className="font-mono ml-2">{format(parseISO(pastLogInfo.lastLogDate), 'MMM dd')}</span>
+                  </div>
+                  {pastLogInfo.totalTime > 0 && (
+                      <span className="font-mono font-semibold">
+                          {pastLogInfo.totalTime > 60
+                              ? `${(pastLogInfo.totalTime / 60).toFixed(1)}h`
+                              : `${pastLogInfo.totalTime}m`}
+                      </span>
+                  )}
+                </div>
             </div>
         ) : null}
       </div>
@@ -551,3 +573,5 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     </div>
   );
 }
+
+    
