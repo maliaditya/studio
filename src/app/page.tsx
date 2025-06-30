@@ -35,23 +35,6 @@ const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
 };
 
-const slotTimeRanges: Record<string, string> = {
-  'Late Night': '12 AM - 4 AM',
-  'Dawn': '4 AM - 8 AM',
-  'Morning': '8 AM - 12 PM',
-  'Afternoon': '12 PM - 4 PM',
-  'Evening': '4 PM - 8 PM',
-  'Night': '8 PM - 12 AM',
-};
-
-const dailyMuscleGroups: Record<number, string[]> = {
-  1: ["Chest", "Triceps"], 2: ["Back", "Biceps"], 3: ["Shoulders", "Legs"],
-  4: ["Chest", "Triceps"], 5: ["Back", "Biceps"], 6: ["Shoulders", "Legs"], 0: [],
-};
-const singleMuscleDailySchedule: Record<number, ExerciseCategory | null> = {
-    1: "Chest", 2: "Triceps", 3: "Back", 4: "Biceps", 5: "Shoulders", 6: "Legs", 0: null,
-};
-
 const productivityLevels = [
     { level: 'L1', min: 15, max: 30, description: 'Just showing up', zone: '⚪️ Entry Zone' },
     { level: 'L2', min: 30, max: 45, description: 'Light touch / spark', zone: '⚪️ Entry Zone' },
@@ -202,7 +185,7 @@ function HomePageContent() {
     if (currentActivities.length >= 2) { toast({ title: "Slot Full", description: "You can add a maximum of two activities per slot.", variant: "destructive" }); return; }
     let details = '';
     switch (type) {
-      case 'workout': { const dayOfWeek = getDay(selectedDate); let muscleGroups: string[] = []; if (workoutMode === 'one-muscle') { const muscle = singleMuscleDailySchedule[dayOfWeek]; if (muscle) muscleGroups = [muscle]; } else { muscleGroups = dailyMuscleGroups[dayOfWeek] || []; } details = muscleGroups.join(' & ') || "Rest Day"; break; }
+      case 'workout': { const { description } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions); details = description.split(' for ')[1] || "Workout"; break; }
       case 'upskill': details = 'Learning Session'; break;
       case 'deepwork': details = 'Deep Work Session'; break;
       case 'planning': details = 'Planning Session'; break;
@@ -599,7 +582,7 @@ function HomePageContent() {
           break;
         case 'deepwork':
         case 'branding':
-          durations[activity.id] = slotTimeRanges[activity.slotName] || activity.slotName;
+          durations[activity.id] = '4h';
           break;
         case 'lead-generation':
         case 'offer-system':

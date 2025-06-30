@@ -28,6 +28,28 @@ interface AgendaWidgetItemProps {
   onStartOfferSystemLog: (activity: Activity) => void;
 }
 
+const parseDurationToHours = (durationStr: string | undefined): number => {
+  if (!durationStr) return 0;
+  let totalHours = 0;
+  
+  const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
+  if (hourMatch) {
+    totalHours += parseFloat(hourMatch[1]);
+  }
+
+  const minMatch = durationStr.match(/(\d+)\s*m/);
+  if (minMatch) {
+    totalHours += parseFloat(minMatch[1]) / 60;
+  }
+  
+  // Handle case where it's just a number in minutes e.g., "30" from upskill
+  if (!hourMatch && !minMatch && /^\d+$/.test(durationStr)) {
+      totalHours += parseFloat(durationStr) / 60;
+  }
+
+  return totalHours;
+};
+
 function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog, onToggleComplete, onStartLeadGenLog, onStartOfferSystemLog }: AgendaWidgetItemProps) {
   const [openPopover, setOpenPopover] = useState(false);
   const [progressInput, setProgressInput] = useState('');
@@ -176,6 +198,27 @@ export function TodaysScheduleCard({
     });
   }, [todaysSchedule]);
 
+  const timeSummary = React.useMemo(() => {
+    const dailyActivities = Object.values(todaysSchedule).flat();
+    if (dailyActivities.length === 0) {
+      return { completed: 0, total: 0 };
+    }
+
+    const scheduledSlots = new Set<string>();
+    dailyActivities.forEach(activity => scheduledSlots.add(activity.slot));
+    const totalScheduledHours = scheduledSlots.size * 4;
+
+    const completedHours = dailyActivities
+      .filter(activity => activity.completed)
+      .reduce((sum, activity) => {
+        const duration = activityDurations[activity.id];
+        return sum + parseDurationToHours(duration);
+      }, 0);
+
+    return { completed: completedHours, total: totalScheduledHours };
+  }, [todaysSchedule, activityDurations]);
+
+
   const pendingTasks = React.useMemo(() => {
     const yesterday = addDays(date, -1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
@@ -242,10 +285,17 @@ export function TodaysScheduleCard({
         onMouseDown={handleMouseDown}
       >
         <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base text-primary">
-               Agenda
-            </CardTitle>
+          <div className="flex-grow">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base text-primary">
+                  Agenda
+              </CardTitle>
+              {timeSummary.total > 0 && (
+                <span className="font-mono text-sm font-medium text-muted-foreground mr-4">
+                  {timeSummary.completed.toFixed(1)} / {timeSummary.total.toFixed(0)}h
+                </span>
+              )}
+            </div>
             {isAgendaDocked && <CardDescription className="text-xs mt-1">A sequential view of your scheduled activities.</CardDescription>}
           </div>
           <div className="flex items-center">
