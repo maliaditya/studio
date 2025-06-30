@@ -731,7 +731,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="absolute right-8 -top-2 h-6 w-6 rounded-full bg-background border"
+                        className="absolute -right-2 -bottom-2 h-6 w-6 rounded-full bg-background border"
                         onClick={() => handleOpenLinkLearningPopover(node)}
                     >
                         <BookCopy className="h-4 w-4 text-primary" />
@@ -782,7 +782,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         {isLoggedToday && loggedInfoForNode ? (
             <div className="mt-1 pt-1 border-t border-green-300/50 flex items-center gap-1.5 text-xs text-green-800 dark:text-green-200">
                 <Check className="h-4 w-4 flex-shrink-0" />
-                <span className="font-medium">Logged: {loggedInfoForNode.totalTime > 60 ? `${(loggedInfoForNode.totalTime / 60).toFixed(1)}h` : `${loggedInfoForNode.totalTime}m`}</span>
+                <span className="font-medium">Logged: {loggedInfoForNode?.totalTime > 60 ? `${(loggedInfoForNode.totalTime / 60).toFixed(1)}h` : `${loggedInfoForNode?.totalTime}m`}</span>
                 <span className="ml-auto font-mono">{format(new Date(), 'MMM dd')}</span>
             </div>
         ) : isScheduledToday ? (
