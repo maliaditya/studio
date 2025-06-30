@@ -6,7 +6,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check } from 'lucide-react';
+import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle } from 'lucide-react';
 import type { ExerciseDefinition, Release, DatedWorkout } from '@/types/workout';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
@@ -169,6 +169,42 @@ function MindMapPageContent() {
     return info;
   }, [allUpskillLogs, allDeepWorkLogs]);
 
+  const pendingTaskDefinitionIds = useMemo(() => {
+    const pendingIds = new Set<string>();
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+    // Create a map of instance IDs to definition IDs from all logs
+    const instanceIdToDefIdMap = new Map<string, string>();
+    [...allUpskillLogs, ...allDeepWorkLogs].forEach(log => {
+      (log.exercises || []).forEach(ex => {
+        instanceIdToDefIdMap.set(ex.id, ex.definitionId);
+      });
+    });
+
+    // Iterate through past schedule dates
+    Object.keys(schedule).forEach(dateKey => {
+      if (dateKey < todayStr) {
+        const dailySchedule = schedule[dateKey];
+        // Iterate through slots in the day
+        Object.values(dailySchedule).forEach(activities => {
+          (activities || []).forEach(activity => {
+            // If an activity was not completed and had tasks
+            if (!activity.completed && activity.taskIds && activity.taskIds.length > 0) {
+              activity.taskIds.forEach(taskId => {
+                const defId = instanceIdToDefIdMap.get(taskId);
+                if (defId) {
+                  pendingIds.add(defId);
+                }
+              });
+            }
+          });
+        });
+      }
+    });
+
+    return pendingIds;
+  }, [schedule, allUpskillLogs, allDeepWorkLogs]);
+
 
   const toggleFullScreen = () => {
     if (!containerRef.current) return;
@@ -329,14 +365,17 @@ function MindMapPageContent() {
 
     const loggedInfo = loggedTaskInfo[node.definitionId];
     const scheduledInfo = scheduledTaskInfo.get(node.definitionId);
+    const isLoggedToday = !!loggedInfo;
     const isScheduledToday = !!scheduledInfo;
+    const isPending = pendingTaskDefinitionIds.has(node.definitionId) && !isLoggedToday && !isScheduledToday;
 
     return (
     <div className="flex items-center flex-row-reverse">
       <div className={cn(
         "flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border",
-        loggedInfo && "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700",
-        isScheduledToday && !loggedInfo && "bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700"
+        isLoggedToday && "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700",
+        isScheduledToday && !isLoggedToday && "bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700",
+        isPending && "bg-orange-100 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700"
       )}>
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted flex-shrink-0">
@@ -348,7 +387,7 @@ function MindMapPageContent() {
           </div>
         </div>
 
-        {loggedInfo ? (
+        {isLoggedToday ? (
             <div className="mt-1 pt-1 border-t border-green-300/50 flex items-center gap-1.5 text-xs text-green-800 dark:text-green-200">
                 <Check className="h-4 w-4 flex-shrink-0" />
                 <span className="font-medium">Logged: {loggedInfo.totalTime > 60 ? `${(loggedInfo.totalTime / 60).toFixed(1)}h` : `${loggedInfo.totalTime}m`}</span>
@@ -359,6 +398,11 @@ function MindMapPageContent() {
                 <Calendar className="h-4 w-4 flex-shrink-0 text-yellow-600 dark:text-yellow-400" />
                 <span className="font-medium">Scheduled Today</span>
                 {scheduledInfo?.slot && <Badge variant="outline" className="ml-auto text-yellow-900 border-yellow-500/50 bg-yellow-500/10 text-xs">{scheduledInfo.slot}</Badge>}
+            </div>
+        ) : isPending ? (
+            <div className="mt-1 pt-1 border-t border-orange-300/50 flex items-center gap-1.5 text-xs text-orange-800 dark:text-orange-400">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 text-orange-600 dark:text-orange-400" />
+                <span className="font-medium">Pending from Past</span>
             </div>
         ) : null}
       </div>
@@ -451,6 +495,8 @@ export default function MindMapPage() {
         </AuthGuard>
     )
 }
+
+    
 
     
 
