@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -6,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/contexts/AuthContext';
 import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle } from 'lucide-react';
 import type { ExerciseDefinition, Release, DatedWorkout } from '@/types/workout';
-import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format, parseISO, differenceInDays } from 'date-fns';
@@ -369,7 +370,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
 
   }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans]);
 
-  const renderNode = (node: MindMapNode, level: number) => {
+  const renderNode = (node: MindMapNode, level: number, zoomToElement: (id: string, scale?: number, duration?: number, easing?: string) => void) => {
     const nodeIcons: Record<string, React.ReactNode> = {
         'System': <GitMerge className="h-3.5 w-3.5 text-primary" />,
         'System Branch:Products': <Package className="h-3.5 w-3.5 text-blue-500" />,
@@ -409,11 +410,18 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
 
     return (
     <div className="flex items-center flex-row-reverse">
-      <div className={cn(
-        "flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border",
+      <div 
+        id={node.id}
+        onClick={(e) => {
+            e.stopPropagation();
+            zoomToElement(node.id, 1.2, 200, 'easeOutCubic');
+        }}
+        className={cn(
+        "flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border cursor-pointer",
         isLoggedToday && "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700",
         isScheduledToday && !isLoggedToday && "bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700",
-        isPending && "bg-orange-100 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700"
+        isPending && "bg-orange-100 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700",
+        isPastAndDone && "bg-background border-green-500/50"
       )}>
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted flex-shrink-0">
@@ -461,7 +469,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
             {node.children.map(child => (
               <li key={child.id} className="relative">
                 <div className="absolute -right-4 top-1/2 w-4 h-px bg-border" />
-                {renderNode(child, level + 1)}
+                {renderNode(child, level + 1, zoomToElement)}
               </li>
             ))}
           </ul>
@@ -482,7 +490,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     >
         {selectedTopic && mindMapData ? (
           <TransformWrapper initialScale={1} centerOnInit={true} minScale={0.1}>
-            {({ zoomIn, zoomOut, resetTransform }) => (
+            {({ zoomIn, zoomOut, resetTransform, zoomToElement }) => (
               <>
                 <div className="absolute top-2 right-2 z-10 flex gap-2">
                   <Button size="icon" variant="outline" onClick={() => zoomIn()} aria-label="Zoom in">
@@ -503,7 +511,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                   contentClass={cn("flex items-center justify-center", isFullScreen ? "h-screen" : "h-full")}
                 >
                   <div className="inline-block py-4">
-                    {renderNode(mindMapData, 0)}
+                    {renderNode(mindMapData, 0, zoomToElement)}
                   </div>
                 </TransformComponent>
               </>
