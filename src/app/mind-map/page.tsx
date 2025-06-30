@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { useSearchParams } from 'next/navigation';
 
 
 interface MindMapNode extends Partial<ExerciseDefinition> {
@@ -99,6 +100,7 @@ const ConceptualFlowDiagram = () => {
 
 
 function MindMapPageContent() {
+  const searchParams = useSearchParams();
   const { 
       deepWorkDefinitions, 
       upskillDefinitions, 
@@ -109,7 +111,8 @@ function MindMapPageContent() {
       allUpskillLogs,
       allDeepWorkLogs,
   } = useAuth();
-  const [selectedTopic, setSelectedTopic] = useState<string>('');
+  const viewFromQuery = searchParams.get('view');
+  const [selectedTopic, setSelectedTopic] = useState<string>(viewFromQuery === 'strategic' ? 'Strategic Overview' : '');
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
@@ -552,3 +555,4 @@ export default function MindMapPage() {
 
 
     
+

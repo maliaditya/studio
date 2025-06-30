@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket } from 'lucide-react';
+import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, GitMerge } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ChartContainer } from '@/components/ui/chart';
@@ -62,10 +62,16 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
           <div>
             <CardTitle className="flex items-center gap-2 text-primary">Your Productivity Snapshot</CardTitle>
           </div>
-          <Button variant="outline" size="icon" onClick={onOpenStatsModal}>
-            <BarChart3 className="h-4 w-4" />
-            <span className="sr-only">Open Stats Overview</span>
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" onClick={() => router.push('/mind-map?view=strategic')}>
+              <GitMerge className="h-4 w-4" />
+              <span className="sr-only">Open Strategic Mind Map</span>
+            </Button>
+            <Button variant="outline" size="icon" onClick={onOpenStatsModal}>
+              <BarChart3 className="h-4 w-4" />
+              <span className="sr-only">Open Stats Overview</span>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
