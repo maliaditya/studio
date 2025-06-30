@@ -386,7 +386,7 @@ function MindMapPageContent() {
 
     const loggedInfo = loggedTaskInfo[node.definitionId];
     const scheduledInfo = scheduledTaskInfo.get(node.definitionId);
-    const pendingInfoForNode = pendingInfo.get(node.definitionId);
+    const pendingInfoForNode = pendingTaskInfo.get(node.definitionId);
     const isCompletedInPast = pastCompletedTaskInfo.has(node.definitionId);
 
     const isLoggedToday = !!loggedInfo;
