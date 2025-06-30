@@ -6,7 +6,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, Linkedin, Youtube, Rocket, Workflow, Calendar, Check } from 'lucide-react';
+import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check } from 'lucide-react';
 import type { ExerciseDefinition, Release, DatedWorkout } from '@/types/workout';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
@@ -50,26 +50,26 @@ const FlowCard = ({ icon, title, description, children }: { icon: React.ReactNod
 const ConceptualFlowDiagram = () => {
     return (
         <div className="flex items-center justify-center p-8 overflow-x-auto">
-            <div className="flex flex-wrap items-stretch justify-center gap-4">
+            <div className="flex flex-wrap items-stretch justify-center gap-4 flex-row-reverse">
                 <div className="flex items-center gap-4">
                   <FlowCard icon={<BookCopy size={32} />} title="1. Upskill" description="Learn new skills and gain knowledge on specific topics." />
                 </div>
-                <div className="flex items-center"><ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" /></div>
+                <div className="flex items-center"><ArrowLeft className="w-10 h-10 text-muted-foreground/30 shrink-0" /></div>
                 <div className="flex items-center gap-4">
                   <FlowCard icon={<Briefcase size={32} />} title="2. Deep Work" description="Apply skills to focus areas. This is where value is created." />
                 </div>
-                <div className="flex items-center"><ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" /></div>
+                <div className="flex items-center"><ArrowLeft className="w-10 h-10 text-muted-foreground/30 shrink-0" /></div>
                 
                 <div className="flex flex-col gap-4 justify-center">
                     {/* Branch 1 */}
-                    <div className="flex flex-wrap items-stretch justify-center gap-4">
+                    <div className="flex flex-wrap items-stretch justify-center gap-4 flex-row-reverse">
                         <FlowCard icon={<Share2 size={32} />} title="3a. Branding" description="Bundle focus areas into shareable content.">
                             <div className="mt-2 pt-2 border-t w-full">
                                 <p className="text-xs font-bold text-foreground">Output:</p>
                                 <p className="text-xs text-muted-foreground">Content Bundles</p>
                             </div>
                         </FlowCard>
-                        <div className="flex items-center"><ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" /></div>
+                        <div className="flex items-center"><ArrowLeft className="w-10 h-10 text-muted-foreground/30 shrink-0" /></div>
                         <FlowCard icon={<Globe size={32} />} title="4a. Publishing" description="Share content on social platforms to build authority.">
                             <div className="mt-2 pt-2 border-t w-full">
                                 <div className="flex justify-center gap-3 mt-1 text-muted-foreground">
@@ -328,15 +328,15 @@ function MindMapPageContent() {
     if (!nodeIcons[iconKey] && level >= 4) iconKey = 'FocusArea';
 
     const loggedInfo = loggedTaskInfo[node.definitionId];
-    const scheduledInfo = !loggedInfo ? scheduledTaskInfo.get(node.definitionId) : null;
+    const scheduledInfo = scheduledTaskInfo.get(node.definitionId);
     const isScheduledToday = !!scheduledInfo;
 
     return (
-    <div className="flex items-center">
+    <div className="flex items-center flex-row-reverse">
       <div className={cn(
         "flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border",
         loggedInfo && "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700",
-        isScheduledToday && "bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700"
+        isScheduledToday && !loggedInfo && "bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700"
       )}>
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted flex-shrink-0">
@@ -355,7 +355,7 @@ function MindMapPageContent() {
                 <span className="ml-auto font-mono">{format(new Date(), 'MMM dd')}</span>
             </div>
         ) : isScheduledToday ? (
-            <div className="mt-1 pt-1 border-t border-yellow-300/50 flex items-center gap-1.5 text-xs text-yellow-800 dark:text-yellow-200">
+            <div className="mt-1 pt-1 border-t border-yellow-300/50 flex items-center gap-1.5 text-xs text-yellow-800 dark:text-yellow-400">
                 <Calendar className="h-4 w-4 flex-shrink-0 text-yellow-600 dark:text-yellow-400" />
                 <span className="font-medium">Scheduled Today</span>
                 {scheduledInfo?.slot && <Badge variant="outline" className="ml-auto text-yellow-900 border-yellow-500/50 bg-yellow-500/10 text-xs">{scheduledInfo.slot}</Badge>}
@@ -364,12 +364,12 @@ function MindMapPageContent() {
       </div>
   
       {node.children && node.children.length > 0 && (
-        <div className="flex">
+        <div className="flex flex-row-reverse">
           <div className="w-4 h-px bg-border self-center" />
-          <ul className="flex flex-col justify-center border-l border-border pl-4 space-y-2 py-1">
+          <ul className="flex flex-col justify-center border-r border-border pr-4 space-y-2 py-1">
             {node.children.map(child => (
               <li key={child.id} className="relative">
-                <div className="absolute -left-4 top-1/2 w-4 h-px bg-border" />
+                <div className="absolute -right-4 top-1/2 w-4 h-px bg-border" />
                 {renderNode(child, level + 1)}
               </li>
             ))}
@@ -451,6 +451,8 @@ export default function MindMapPage() {
         </AuthGuard>
     )
 }
+
+    
 
     
 
