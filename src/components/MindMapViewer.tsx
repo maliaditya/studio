@@ -5,13 +5,14 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon } from 'lucide-react';
+import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle } from 'lucide-react';
 import type { ExerciseDefinition, Release, DatedWorkout, ActivityType as ActivityTypeType } from '@/types/workout'; // Renaming imported ActivityType to avoid conflict with lucide-react
-import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 // Component-specific icons
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -134,10 +135,13 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
       allUpskillLogs,
       allDeepWorkLogs,
       brandingLogs,
+      scheduleTaskFromMindMap,
   } = useAuth();
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  
+  const timeSlots = [ 'Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night' ];
 
   useEffect(() => {
     if (defaultView) {
@@ -559,30 +563,22 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     if (node.category === deepWorkTopicMetadata[node.name]?.classification) iconKey = node.category;
     if (!nodeIcons[iconKey] && level >= 4) iconKey = 'FocusArea';
 
-    const scheduledActivities = scheduledTaskInfo.get(node.definitionId);
-    let activityTypeToShow: ActivityTypeType | undefined;
-
+    let activityTypeForNode: ActivityTypeType | undefined;
     if (parentNode?.category === 'Release' || parentNode?.category === 'product' || parentNode?.category === 'service' || parentNode?.name === 'Products' || parentNode?.name === 'Services') {
-      activityTypeToShow = 'deepwork';
+      activityTypeForNode = 'deepwork';
     } else if (parentNode?.category === 'Content Bundle' || parentNode?.name === 'Content Bundles') {
-      activityTypeToShow = 'branding';
+      activityTypeForNode = 'branding';
     } else if (node.category === 'Learning Task') {
-      activityTypeToShow = 'upskill';
+      activityTypeForNode = 'upskill';
     }
 
-    const scheduledInfo = scheduledActivities?.find(act => act.type === activityTypeToShow);
-    
-    const allLoggedInfos = loggedTaskInfo.get(node.definitionId);
-    const loggedInfoForNode = allLoggedInfos?.find(info => info.type === activityTypeToShow);
-
-    const allPendingInfos = pendingTaskInfo.get(node.definitionId);
-    const pendingInfoForNode = allPendingInfos?.find(info => info.type === activityTypeToShow);
-    
-    const allPastLogs = pastLoggedTaskInfo.get(node.definitionId);
-    const pastLogForNode = allPastLogs?.find(info => info.type === activityTypeToShow);
+    const scheduledInfoForNode = scheduledTaskInfo.get(node.definitionId)?.find(act => act.type === activityTypeForNode);
+    const loggedInfoForNode = loggedTaskInfo.get(node.definitionId)?.find(info => info.type === activityTypeForNode);
+    const pendingInfoForNode = pendingTaskInfo.get(node.definitionId)?.find(info => info.type === activityTypeForNode);
+    const pastLogForNode = pastLoggedTaskInfo.get(node.definitionId)?.find(info => info.type === activityTypeForNode);
 
     const isLoggedToday = !!loggedInfoForNode;
-    const isScheduledToday = !!scheduledInfo;
+    const isScheduledToday = !!scheduledInfoForNode;
     const isPending = !!pendingInfoForNode && !isLoggedToday && !isScheduledToday;
     const isPastAndDone = !!pastLogForNode && !isLoggedToday && !isScheduledToday && !isPending;
 
@@ -590,13 +586,15 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     if (isPending && pendingInfoForNode) {
         daysPending = differenceInDays(new Date(), parseISO(pendingInfoForNode.oldestDate));
     }
+    
+    const isSchedulable = activityTypeForNode && ['FocusArea', 'Learning Task', 'Content Bundle'].includes(node.category);
 
     return (
     <div className="flex items-center flex-row-reverse">
       <div 
         id={node.id}
         className={cn(
-        "flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border",
+        "relative flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border",
         isLoggedToday && "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700",
         isScheduledToday && !isLoggedToday && "bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700",
         isPending && "bg-orange-100 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700",
@@ -611,6 +609,35 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
             <p className="text-xs text-muted-foreground capitalize">{node.category}</p>
           </div>
         </div>
+
+        {isSchedulable && !isLoggedToday && !isScheduledToday && !isPending && (
+            <Popover>
+                <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="absolute -right-2 -top-2 h-6 w-6 rounded-full bg-background border">
+                        <PlusCircle className="h-4 w-4 text-primary" />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-48 p-1">
+                    <div className="flex flex-col">
+                        <p className="p-2 text-xs font-semibold text-muted-foreground">Schedule for Today</p>
+                        {timeSlots.map(slot => (
+                            <Button
+                                key={slot}
+                                variant="ghost"
+                                className="justify-start h-8 text-sm"
+                                onClick={() => {
+                                    if (activityTypeForNode) {
+                                        scheduleTaskFromMindMap(node.definitionId, activityTypeForNode, slot);
+                                    }
+                                }}
+                            >
+                                {slot}
+                            </Button>
+                        ))}
+                    </div>
+                </PopoverContent>
+            </Popover>
+        )}
 
         {(node.category === 'Release' || node.category === 'product' || node.category === 'service') && node.totalLoggedHours && node.totalLoggedHours > 0 && (
           <div className="mt-1 pt-1 border-t border-muted-foreground/20">
@@ -630,7 +657,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
             <div className="mt-1 pt-1 border-t border-yellow-300/50 flex items-center gap-1.5 text-xs text-yellow-800 dark:text-yellow-400">
                 <Calendar className="h-4 w-4 flex-shrink-0 text-yellow-600 dark:text-yellow-400" />
                 <span className="font-medium">Scheduled Today</span>
-                {scheduledInfo?.slot && !['Afternoon', 'Late Night', 'Evening'].includes(scheduledInfo.slot) && <Badge variant="outline" className="ml-auto text-yellow-900 border-yellow-500/50 bg-yellow-500/10 text-xs">{scheduledInfo.slot}</Badge>}
+                {scheduledInfoForNode?.slot && !['Afternoon', 'Late Night', 'Evening'].includes(scheduledInfoForNode.slot) && <Badge variant="outline" className="ml-auto text-yellow-900 border-yellow-500/50 bg-yellow-500/10 text-xs">{scheduledInfoForNode.slot}</Badge>}
             </div>
         ) : isPending ? (
             <div className="mt-1 pt-1 border-t border-orange-300/50 flex items-center gap-1.5 text-xs text-orange-800 dark:text-orange-400">
@@ -760,5 +787,3 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     </div>
   );
 }
-
-    

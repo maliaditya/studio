@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -55,6 +55,7 @@ interface AuthContextType {
   handleToggleComplete: (dateKey: string, slotName: string, activityId: string) => void;
   handleLogLearning: (dateKey: string, activity: Activity, progress: number, duration: number) => void;
   carryForwardTask: (activity: Activity, targetSlot: string) => void;
+  scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string) => void;
 
   // Global Logs State
   allUpskillLogs: DatedWorkout[];
@@ -669,7 +670,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const newActivity: Activity = {
+    const newActivity: Omit<Activity, 'slot'> = {
         ...activity,
         id: `${activity.type}-${Date.now()}-${Math.random()}`,
         completed: false,
@@ -678,7 +679,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSchedule(prev => {
         const newTodaySchedule = { ...(prev[todayKey] || {}) };
         const currentActivities = newTodaySchedule[targetSlot] || [];
-        newTodaySchedule[targetSlot] = [...currentActivities, newActivity];
+        newTodaySchedule[targetSlot] = [...currentActivities, newActivity as Activity];
         return { ...prev, [todayKey]: newTodaySchedule };
     });
     
@@ -686,6 +687,97 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         title: "Task Carried Forward",
         description: `"${newActivity.details}" has been added to today's ${targetSlot} slot.`
     });
+  };
+
+  const scheduleTaskFromMindMap = (definitionId: string, activityType: ActivityType, slotName: string) => {
+    let definition: ExerciseDefinition | undefined;
+    let logsUpdater: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
+    let logSource: DatedWorkout[];
+
+    switch (activityType) {
+        case 'upskill':
+            definition = upskillDefinitions.find(d => d.id === definitionId);
+            logsUpdater = setAllUpskillLogs;
+            logSource = allUpskillLogs;
+            break;
+        case 'deepwork':
+            definition = deepWorkDefinitions.find(d => d.id === definitionId);
+            logsUpdater = setAllDeepWorkLogs;
+            logSource = allDeepWorkLogs;
+            break;
+        case 'branding':
+            definition = deepWorkDefinitions.find(d => d.id === definitionId);
+            logsUpdater = setAllBrandingLogs;
+            logSource = brandingLogs;
+            break;
+        default:
+            toast({ title: "Error", description: "Invalid activity type for scheduling.", variant: "destructive" });
+            return;
+    }
+
+    if (!definition) {
+        toast({ title: "Error", description: "Task definition not found.", variant: "destructive" });
+        return;
+    }
+
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    let todaysLog = logSource.find(log => log.date === todayKey);
+    let exerciseInstance: WorkoutExercise | undefined;
+
+    if (!todaysLog) {
+        todaysLog = { id: todayKey, date: todayKey, exercises: [] };
+    }
+
+    exerciseInstance = todaysLog.exercises.find(ex => ex.definitionId === definitionId);
+
+    if (!exerciseInstance) {
+        exerciseInstance = {
+            id: `${definition.id}-${Date.now()}-${Math.random()}`,
+            definitionId: definition.id,
+            name: definition.name,
+            category: definition.category,
+            loggedSets: [],
+            targetSets: activityType === 'branding' ? 4 : 1,
+            targetReps: activityType === 'branding' ? '4 stages' : '25',
+            focusAreaIds: definition.focusAreaIds,
+        };
+        todaysLog.exercises.push(exerciseInstance);
+    }
+    
+    logsUpdater(prevLogs => {
+        const existingLogIndex = prevLogs.findIndex(log => log.date === todayKey);
+        if (existingLogIndex > -1) {
+            const newLogs = [...prevLogs];
+            newLogs[existingLogIndex] = todaysLog!;
+            return newLogs;
+        }
+        return [...prevLogs, todaysLog!];
+    });
+
+    const newActivity: Omit<Activity, 'slot'> = {
+        id: `${activityType}-${Date.now()}-${Math.random()}`,
+        type: activityType,
+        details: definition.name,
+        completed: false,
+        taskIds: [exerciseInstance.id],
+    };
+    
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        const daySchedule = { ...(newSchedule[todayKey] || {}) };
+        const activitiesInSlot = daySchedule[slotName] || [];
+
+        if (activitiesInSlot.length >= 2) {
+            toast({ title: "Slot Full", description: "Cannot add more than two activities per slot.", variant: "destructive" });
+            return prev;
+        }
+
+        daySchedule[slotName] = [...activitiesInSlot, newActivity as Activity];
+        newSchedule[todayKey] = daySchedule;
+        return newSchedule;
+    });
+
+    toast({ title: "Task Scheduled", description: `"${definition.name}" has been added to your ${slotName} slot.` });
   };
   
   const addFeatureToRelease = (release: Release, topic: string, featureName: string, type: 'product' | 'service') => {
@@ -929,7 +1021,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     theme, setTheme,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule, setSchedule, isAgendaDocked, setIsAgendaDocked, activityDurations, setActivityDurations,
-    handleToggleComplete, handleLogLearning, carryForwardTask,
+    handleToggleComplete, handleLogLearning, carryForwardTask, scheduleTaskFromMindMap,
     allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs, allLeadGenLogs, setAllLeadGenLogs, allOfferSystemLogs, setAllOfferSystemLogs,
     workoutMode, setWorkoutMode, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
     upskillDefinitions, setUpskillDefinitions, topicGoals, setTopicGoals,
