@@ -201,19 +201,20 @@ export function TodaysScheduleCard({
   const timeSummary = React.useMemo(() => {
     const dailyActivities = Object.values(todaysSchedule).flat();
     if (dailyActivities.length === 0) {
-      return { completed: 0, total: 0 };
+        return { completed: 0, total: 0 };
     }
 
-    const scheduledSlots = new Set<string>();
-    dailyActivities.forEach(activity => scheduledSlots.add(activity.slot));
-    const totalScheduledHours = scheduledSlots.size * 4;
-
-    const completedHours = dailyActivities
-      .filter(activity => activity.completed)
-      .reduce((sum, activity) => {
+    const totalScheduledHours = dailyActivities.reduce((sum, activity) => {
         const duration = activityDurations[activity.id];
         return sum + parseDurationToHours(duration);
-      }, 0);
+    }, 0);
+
+    const completedHours = dailyActivities
+        .filter(activity => activity.completed)
+        .reduce((sum, activity) => {
+            const duration = activityDurations[activity.id];
+            return sum + parseDurationToHours(duration);
+        }, 0);
 
     return { completed: completedHours, total: totalScheduledHours };
   }, [todaysSchedule, activityDurations]);
@@ -292,7 +293,7 @@ export function TodaysScheduleCard({
               </CardTitle>
               {timeSummary.total > 0 && (
                 <span className="font-mono text-sm font-medium text-muted-foreground mr-4">
-                  {timeSummary.completed.toFixed(1)} / {timeSummary.total.toFixed(0)}h
+                  {timeSummary.completed.toFixed(1)} / {timeSummary.total.toFixed(1)}h
                 </span>
               )}
             </div>
