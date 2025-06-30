@@ -225,7 +225,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   
   const loggedTaskInfo = useMemo(() => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const infoMap = new Map<string, { type: ActivityTypeType; totalTime: number }[]>();
+    const infoMap = new Map<string, { type: ActivityTypeType; totalTime: number }>();
 
     const processLogs = (logs: DatedWorkout[], activityType: ActivityTypeType, timeField: 'reps' | 'weight') => {
       const todayLog = (logs || []).find(log => log.date === todayKey);
@@ -233,21 +233,15 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         todayLog.exercises.forEach(ex => {
           const loggedTime = ex.loggedSets.reduce((sum, set) => sum + set[timeField], 0);
           if (loggedTime > 0) {
-            if (!infoMap.has(ex.definitionId)) {
-              infoMap.set(ex.definitionId, []);
-            }
-            const entries = infoMap.get(ex.definitionId)!;
-            const existingEntry = entries.find(e => e.type === activityType);
-            if (existingEntry) {
-              existingEntry.totalTime += loggedTime;
-            } else {
-              entries.push({ type: activityType, totalTime: loggedTime });
+            const existing = infoMap.get(ex.definitionId);
+            if (!existing || existing.type !== activityType) {
+              infoMap.set(ex.definitionId, { type: activityType, totalTime: loggedTime });
             }
           }
         });
       }
     };
-    
+
     const processBrandingLogs = () => {
         const todayLog = (brandingLogs || []).find(log => log.date === todayKey);
         if (todayLog) {
@@ -256,30 +250,23 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                     const bundleDef = deepWorkDefinitions.find(d => d.id === bundleExercise.definitionId);
                     if (bundleDef?.focusAreaIds) {
                         bundleDef.focusAreaIds.forEach(focusAreaDefId => {
-                            if (!infoMap.has(focusAreaDefId)) {
-                                infoMap.set(focusAreaDefId, []);
-                            }
-                            const entries = infoMap.get(focusAreaDefId)!;
-                            const existingEntry = entries.find(e => e.type === 'branding');
-                            if (!existingEntry) {
-                                entries.push({ type: 'branding', totalTime: 1 });
-                            }
+                            infoMap.set(focusAreaDefId, { type: 'branding', totalTime: 1 });
                         });
                     }
                 }
             });
         }
     };
-
+    
     processLogs(allUpskillLogs, 'upskill', 'reps');
     processLogs(allDeepWorkLogs, 'deepwork', 'weight');
     processBrandingLogs();
 
     return infoMap;
-  }, [allUpskillLogs, allDeepWorkLogs, brandingLogs, deepWorkDefinitions]);
+}, [allUpskillLogs, allDeepWorkLogs, brandingLogs, deepWorkDefinitions]);
 
   const pendingTaskInfo = useMemo(() => {
-    const pendingInfo = new Map<string, { oldestDate: string; type: ActivityTypeType }[]>();
+    const pendingInfo = new Map<string, { oldestDate: string; type: ActivityTypeType }>();
     const todayStr = format(new Date(), 'yyyy-MM-dd');
 
     const instanceIdToDefIdMap = new Map<string, string>();
@@ -302,15 +289,9 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                             if (!defId) return;
 
                             const addInfo = (definitionId: string, activityType: ActivityTypeType) => {
-                                if (!pendingInfo.has(definitionId)) {
-                                    pendingInfo.set(definitionId, []);
-                                }
-                                const entries = pendingInfo.get(definitionId)!;
-                                const existingEntry = entries.find(e => e.type === activityType);
-                                if (!existingEntry || dateKey < existingEntry.oldestDate) {
-                                    const newEntries = entries.filter(e => e.type !== activityType);
-                                    newEntries.push({ oldestDate: dateKey, type: activityType });
-                                    pendingInfo.set(definitionId, newEntries);
+                                const existingEntry = pendingInfo.get(definitionId);
+                                if ((!existingEntry || dateKey < existingEntry.oldestDate) && existingEntry?.type !== activityType) {
+                                    pendingInfo.set(definitionId, { oldestDate: dateKey, type: activityType });
                                 }
                             };
 
@@ -335,7 +316,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
 
   const pastLoggedTaskInfo = useMemo(() => {
     const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const infoMap = new Map<string, { type: ActivityTypeType; lastLogDate: string; totalTime: number }[]>();
+    const infoMap = new Map<string, { type: ActivityTypeType; lastLogDate: string; totalTime: number }>();
 
     const processLogs = (logs: DatedWorkout[], activityType: ActivityTypeType, timeField: 'reps' | 'weight') => {
         (logs || []).forEach(log => {
@@ -343,15 +324,9 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                 (log.exercises || []).forEach(ex => {
                     const loggedTime = ex.loggedSets.reduce((sum, set) => sum + set[timeField], 0);
                     if (loggedTime > 0) {
-                        if (!infoMap.has(ex.definitionId)) {
-                            infoMap.set(ex.definitionId, []);
-                        }
-                        const entries = infoMap.get(ex.definitionId)!;
-                        const existingEntry = entries.find(e => e.type === activityType);
-                        if (!existingEntry || log.date > existingEntry.lastLogDate) {
-                            const newEntries = entries.filter(e => e.type !== activityType);
-                            newEntries.push({ type: activityType, lastLogDate: log.date, totalTime: loggedTime });
-                            infoMap.set(ex.definitionId, newEntries);
+                        const existingEntry = infoMap.get(ex.definitionId);
+                        if ((!existingEntry || log.date > existingEntry.lastLogDate) && existingEntry?.type !== activityType) {
+                            infoMap.set(ex.definitionId, { type: activityType, lastLogDate: log.date, totalTime: loggedTime });
                         }
                     }
                 });
@@ -367,15 +342,9 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                         const bundleDef = deepWorkDefinitions.find(d => d.id === bundleExercise.definitionId);
                         if (bundleDef?.focusAreaIds) {
                             bundleDef.focusAreaIds.forEach(focusAreaDefId => {
-                                if (!infoMap.has(focusAreaDefId)) {
-                                    infoMap.set(focusAreaDefId, []);
-                                }
-                                const entries = infoMap.get(focusAreaDefId)!;
-                                const existingEntry = entries.find(e => e.type === 'branding');
-                                if (!existingEntry || log.date > existingEntry.lastLogDate) {
-                                    const newEntries = entries.filter(e => e.type !== 'branding');
-                                    newEntries.push({ type: 'branding', lastLogDate: log.date, totalTime: 1 });
-                                    infoMap.set(focusAreaDefId, newEntries);
+                                const existingEntry = infoMap.get(focusAreaDefId);
+                                if ((!existingEntry || log.date > existingEntry.lastLogDate) && existingEntry?.type !== 'branding') {
+                                    infoMap.set(focusAreaDefId, { type: 'branding', lastLogDate: log.date, totalTime: 1 });
                                 }
                             });
                         }
@@ -663,14 +632,14 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     }
 
     const scheduledInfoForNode = scheduledTaskInfo.get(node.definitionId)?.find(act => act.type === activityTypeForNode);
-    const loggedInfoForNode = loggedTaskInfo.get(node.definitionId)?.find(info => info.type === activityTypeForNode);
-    const pendingInfoForNode = pendingTaskInfo.get(node.definitionId)?.find(info => info.type === activityTypeForNode);
-    const pastLogForNode = pastLoggedTaskInfo.get(node.definitionId)?.find(info => info.type === activityTypeForNode);
+    const loggedInfoForNode = loggedTaskInfo.get(node.definitionId);
+    const pendingInfoForNode = pendingTaskInfo.get(node.definitionId);
+    const pastLogForNode = pastLoggedTaskInfo.get(node.definitionId);
 
-    const isLoggedToday = !!loggedInfoForNode;
-    const isScheduledToday = !!scheduledInfoForNode;
-    const isPending = !!pendingInfoForNode && !isLoggedToday && !isScheduledToday;
-    const isPastAndDone = !!pastLogForNode && !isLoggedToday && !isScheduledToday && !isPending;
+    const isLoggedToday = loggedInfoForNode?.type === activityTypeForNode;
+    const isScheduledToday = scheduledInfoForNode?.type === activityTypeForNode;
+    const isPending = pendingInfoForNode?.type === activityTypeForNode && !isLoggedToday && !isScheduledToday;
+    const isPastAndDone = pastLogForNode?.type === activityTypeForNode && !isLoggedToday && !isScheduledToday && !isPending;
 
     let daysPending = 0;
     if (isPending && pendingInfoForNode) {
@@ -730,7 +699,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         )}
 
         {node.category === 'Release' && node.topic && node.type && (
-            <Button variant="ghost" size="icon" className="absolute right-1 -bottom-2 h-6 w-6"
+            <Button variant="ghost" size="icon" className="absolute -right-2 -top-2 h-6 w-6 rounded-full bg-background border"
                 onClick={() => setInlineAddInfo({ parentReleaseId: node.id, newFeatureName: '' })}
             >
                 <PlusCircle className="h-4 w-4 text-primary" />
