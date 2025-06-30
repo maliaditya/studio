@@ -54,6 +54,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { WorkoutHeatmap } from '@/components/WorkoutHeatmap';
 
 
 const DEFAULT_TARGET_SESSIONS = 1;
