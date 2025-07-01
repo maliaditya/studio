@@ -12,7 +12,6 @@ export type ExerciseCategory =
   | "Full Body"
   | "Content Bundle"
   | "Lead Generation"
-  | "Offer System"
   | "Other";
 
 export const exerciseCategories: ExerciseCategory[] = [
@@ -145,7 +144,7 @@ export interface EditableMealPlan {
 export type UserDietPlan = EditableMealPlan[];
 
 // Types for homepage schedule
-export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation' | 'offer-system';
+export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation';
 
 export type Activity = {
   id: string;
@@ -169,11 +168,16 @@ export interface Release {
   features?: string[];
 }
 
-export interface GapAnalysis {
-  gapTypes: string[];
-  whatYouCanFill: string;
-  coreSolution: string;
-  outcomeGoal: string;
+export interface Offer {
+  id: string;
+  name: string;
+  outcome: string;
+  audience: string;
+  deliverables: string;
+  valueStack: string;
+  timeline: string;
+  price: string;
+  format: string;
 }
 
 export interface ProductizationPlan {
@@ -181,4 +185,12 @@ export interface ProductizationPlan {
   offerTypes?: string[];
   gapAnalysis?: GapAnalysis;
   releases?: Release[];
+  offers?: Offer[];
+}
+
+export interface GapAnalysis {
+  gapTypes: string[];
+  whatYouCanFill: string;
+  coreSolution: string;
+  outcomeGoal: string;
 }

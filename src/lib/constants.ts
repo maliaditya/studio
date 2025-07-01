@@ -54,7 +54,7 @@ export const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
     { id: 'def_50', name: 'Shrugs', category: 'Shoulders' },
     { id: 'def_51', name: 'Squats (Barbell)', category: 'Legs' },
     { id: 'def_52', name: 'Standing Dumbbell Alternating Curl', category: 'Biceps' },
-    { id: 'def_53', name: 'Standing dumbbell curls', category: 'Biceps' },
+    { id: 'def_53', name: 'standing dumbbell curls', category: 'Biceps' },
     { id: 'def_54', name: 'Standing Dumbbell Lateral Raise', category: 'Shoulders' },
     { id: 'def_55', name: 'Straight bar pushdown', category: 'Triceps' },
     { id: 'def_56', name: 'Strict bar curls', category: 'Biceps' },
@@ -126,13 +126,6 @@ export const LEAD_GEN_DEFINITIONS: ExerciseDefinition[] = [
     { id: 'lg_1', name: 'Cold DM 2 people', category: 'Lead Generation', description: 'Target: 1 founder/client, 1 recruiter/hiring manager.' },
     { id: 'lg_2', name: 'Comment on 3 relevant posts', category: 'Lead Generation', description: 'Focus on founders, devs, and hiring managers.' },
     { id: 'lg_3', name: 'Join 1 forum/group weekly', category: 'Lead Generation', description: 'e.g., IndieHackers, Reddit, Discord, LinkedIn groups.' },
-];
-
-export const OFFER_SYSTEM_DEFINITIONS: ExerciseDefinition[] = [
-    { id: 'os_1', name: 'Define freelance services', category: 'Offer System', description: 'Clearly outline what you offer, your process, and deliverables.' },
-    { id: 'os_2', name: 'Create "Hire Me" page', category: 'Offer System', description: 'Build a dedicated section on your website for potential clients.' },
-    { id: 'os_3', name: 'Develop pricing packages', category: 'Offer System', description: 'Structure your services into clear, tiered packages (if applicable).' },
-    { id: 'os_4', name: 'Update resume & profiles', category: 'Offer System', description: 'Refresh your resume and online profiles (LinkedIn, etc.) for job searches.' },
 ];
 
 export const productTypes = [

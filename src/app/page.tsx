@@ -14,7 +14,6 @@ import { MindMapViewer } from '@/components/MindMapViewer';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysLearningModal } from '@/components/TodaysLearningModal';
 import { TodaysLeadGenModal } from '@/components/TodaysLeadGenModal';
-import { TodaysOfferSystemModal } from '@/components/TodaysOfferSystemModal';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
 import { DietPlanModal } from '@/components/DietPlanModal';
 import { StatsOverviewModal } from '@/components/StatsOverviewModal';
@@ -96,7 +95,6 @@ function HomePageContent() {
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
   const [isLearningModalOpen, setIsLearningModalOpen] = useState(false);
   const [isLeadGenModalOpen, setIsLeadGenModalOpen] = useState(false);
-  const [isOfferSystemModalOpen, setIsOfferSystemModalOpen] = useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
@@ -195,7 +193,6 @@ function HomePageContent() {
       case 'tracking': details = 'Tracking Session'; break;
       case 'branding': details = 'Branding Session'; break;
       case 'lead-generation': details = 'Lead Generation Session'; break;
-      case 'offer-system': details = 'Offer System Session'; break;
     }
     const newActivity: Activity = { 
       id: `${type}-${Date.now()}-${Math.random()}`, 
@@ -237,11 +234,6 @@ function HomePageContent() {
     setIsLeadGenModalOpen(true);
   };
 
-  const handleStartOfferSystemLog = (activity: Activity) => {
-    setWorkoutActivityToLog(activity);
-    setIsOfferSystemModalOpen(true);
-  };
-
   const handleActivityClick = (slotName: string, activity: Activity) => {
     if (!activity || activity.completed) return;
     if (activity.type === 'workout') {
@@ -251,8 +243,6 @@ function HomePageContent() {
       setIsLearningModalOpen(true);
     } else if (activity.type === 'lead-generation') {
       handleStartLeadGenLog(activity);
-    } else if (activity.type === 'offer-system') {
-      handleStartOfferSystemLog(activity);
     }
   };
 
@@ -586,7 +576,7 @@ function HomePageContent() {
                     durations[activity.id] = deepWorkCount === 1 ? '4h' : '2h'; break;
                 case 'branding':
                     durations[activity.id] = '4h'; break;
-                case 'lead-generation': case 'offer-system':
+                case 'lead-generation':
                     durations[activity.id] = '45m'; break;
                 case 'upskill':
                     durations[activity.id] = '30m'; break;
@@ -799,7 +789,6 @@ function HomePageContent() {
                         onLogLearning={(...args) => handleLogLearning(selectedDateKey, ...args)}
                         onStartWorkoutLog={handleStartWorkoutLog}
                         onStartLeadGenLog={handleStartLeadGenLog}
-                        onStartOfferSystemLog={handleStartOfferSystemLog}
                         onToggleComplete={(...args) => handleToggleComplete(selectedDateKey, ...args)}
                     />
                 )}
@@ -843,7 +832,6 @@ function HomePageContent() {
                 onLogLearning={(...args) => handleLogLearning(selectedDateKey, ...args)}
                 onStartWorkoutLog={handleStartWorkoutLog}
                 onStartLeadGenLog={handleStartLeadGenLog}
-                onStartOfferSystemLog={handleStartOfferSystemLog}
                 onToggleComplete={(...args) => handleToggleComplete(selectedDateKey, ...args)}
             />
         )}
@@ -863,15 +851,6 @@ function HomePageContent() {
             <TodaysLeadGenModal
                 isOpen={isLeadGenModalOpen}
                 onOpenChange={setIsLeadGenModalOpen}
-                activityToLog={workoutActivityToLog}
-                onActivityComplete={(...args) => handleToggleComplete(selectedDateKey, ...args)}
-            />
-        )}
-
-        {currentUser && (
-            <TodaysOfferSystemModal
-                isOpen={isOfferSystemModalOpen}
-                onOpenChange={setIsOfferSystemModalOpen}
                 activityToLog={workoutActivityToLog}
                 onActivityComplete={(...args) => handleToggleComplete(selectedDateKey, ...args)}
             />

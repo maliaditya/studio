@@ -16,7 +16,7 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from '@/hooks/use-toast';
-import type { ExerciseCategory, ExerciseDefinition, GapAnalysis, ProductizationPlan as OfferizationPlan, Release } from '@/types/workout';
+import type { ExerciseCategory, ExerciseDefinition, GapAnalysis, Offer, ProductizationPlan as OfferizationPlan, Release } from '@/types/workout';
 import { offerTypes, GAP_TYPES } from '@/lib/constants';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogFooter } from '@/components/ui/dialog';
 import { DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 function OfferizationPageContent() {
@@ -45,6 +46,8 @@ function OfferizationPageContent() {
   const [editingTopic, setEditingTopic] = useState<string | null>(null);
   const [newTopicName, setNewTopicName] = useState('');
   const [newTopicClassification, setNewTopicClassification] = useState<'product' | 'service'>('product');
+
+  const [editingOffer, setEditingOffer] = useState<{ topic: string; offer: Partial<Offer> } | null>(null);
 
   useEffect(() => {
     if (editingTopic) {
@@ -268,6 +271,81 @@ function OfferizationPageContent() {
     });
     toast({ title: "Expertise Deleted", description: "The expertise has been removed from your plan.", variant: "destructive" });
   };
+  
+  const handleStartEditingOffer = (topic: string, offer?: Offer) => {
+    setEditingOffer({
+        topic,
+        offer: offer ? { ...offer } : { 
+            id: `offer_${Date.now()}_${Math.random()}`, 
+            name: '', 
+            outcome: '',
+            audience: '',
+            deliverables: '',
+            valueStack: '',
+            timeline: '',
+            price: '',
+            format: '',
+        }
+    });
+  };
+
+  const handleUpdateEditingOffer = (field: keyof Offer, value: string) => {
+    setEditingOffer(current => {
+      if (!current) return null;
+      return {
+        ...current,
+        offer: {
+          ...current.offer,
+          [field]: value,
+        }
+      }
+    });
+  };
+
+  const handleSaveOffer = () => {
+    if (!editingOffer) return;
+    const { topic, offer } = editingOffer;
+    if (!offer.name?.trim()) {
+      toast({ title: "Error", description: "Offer name cannot be empty.", variant: "destructive" });
+      return;
+    }
+
+    setOfferizationPlans(prev => {
+        const newPlans = { ...prev };
+        const currentPlan = newPlans[topic] || {};
+        const existingOffers = currentPlan.offers || [];
+        
+        const offerIndex = existingOffers.findIndex(o => o.id === offer.id);
+
+        if (offerIndex > -1) {
+            // Update existing offer
+            existingOffers[offerIndex] = offer as Offer;
+        } else {
+            // Add new offer
+            existingOffers.push(offer as Offer);
+        }
+
+        newPlans[topic] = { ...currentPlan, offers: existingOffers };
+        return newPlans;
+    });
+
+    toast({ title: "Offer Saved", description: `"${offer.name}" has been saved.`});
+    setEditingOffer(null);
+  };
+
+  const handleDeleteOffer = (topic: string, offerId: string) => {
+     setOfferizationPlans(prev => {
+        const newPlans = { ...prev };
+        const currentPlan = newPlans[topic];
+        if (!currentPlan || !currentPlan.offers) return prev;
+
+        currentPlan.offers = currentPlan.offers.filter(o => o.id !== offerId);
+        newPlans[topic] = currentPlan;
+        
+        return newPlans;
+    });
+    toast({ title: "Offer Deleted", description: "The offer has been removed from your plan.", variant: "destructive" });
+  };
 
 
   const renderExpertiseForm = (topic: string, focusAreas: ExerciseDefinition[]) => {
@@ -344,6 +422,7 @@ function OfferizationPageContent() {
             const selectedOfferTypes = plan.offerTypes || [];
             const gapAnalysis = plan.gapAnalysis;
             const releases = plan.releases || [];
+            const offers = plan.offers || [];
 
             const focusAreaMap = new Map(focusAreas.map(fa => [fa.id, fa.name]));
             
@@ -484,7 +563,6 @@ function OfferizationPageContent() {
                               </div>
                            </AccordionContent>
                         </AccordionItem>
-
                         <AccordionItem value="item-4">
                            <AccordionTrigger>Expertise Planner</AccordionTrigger>
                            <AccordionContent>
@@ -534,6 +612,42 @@ function OfferizationPageContent() {
                                 </Button>
                             )}
                            </AccordionContent>
+                        </AccordionItem>
+                        <AccordionItem value="item-5">
+                            <AccordionTrigger>Offers</AccordionTrigger>
+                            <AccordionContent className="space-y-3">
+                                {offers.map(offer => (
+                                    <Card key={offer.id}>
+                                        <CardHeader className="p-3">
+                                            <div className="flex justify-between items-start">
+                                                <CardTitle className="text-base">{offer.name}</CardTitle>
+                                                <div className="flex items-center">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleStartEditingOffer(topic, offer)}><Edit className="h-4 w-4" /></Button>
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                                <AlertDialogDescription>This will permanently delete the offer "{offer.name}".</AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                <AlertDialogAction onClick={() => handleDeleteOffer(topic, offer.id)}>Delete</AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                </div>
+                                            </div>
+                                            <CardDescription className="text-xs">{offer.outcome}</CardDescription>
+                                        </CardHeader>
+                                    </Card>
+                                ))}
+                                <Button className="w-full mt-2" variant="outline" onClick={() => handleStartEditingOffer(topic)}>
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Offer
+                                </Button>
+                            </AccordionContent>
                         </AccordionItem>
                       </>
                      )}
@@ -617,6 +731,61 @@ function OfferizationPageContent() {
             </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {editingOffer && (
+        <Dialog open={!!editingOffer} onOpenChange={(isOpen) => !isOpen && setEditingOffer(null)}>
+            <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+                <DialogHeader>
+                    <DialogTitle>{editingOffer.offer.name ? 'Edit Offer' : 'Create New Offer'}</DialogTitle>
+                    <DialogDescription>
+                        Use this template to turn your service topic into a concrete offer.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="flex-grow min-h-0">
+                    <ScrollArea className="h-full pr-6">
+                        <div className="space-y-4 py-4">
+                            <div>
+                                <Label htmlFor="offer-name">1. Offer Name</Label>
+                                <Input id="offer-name" value={editingOffer.offer.name || ''} onChange={(e) => handleUpdateEditingOffer('name', e.target.value)} placeholder="e.g., Launch Starter, GPU Boost Sprint" />
+                            </div>
+                            <div>
+                                <Label htmlFor="offer-outcome">2. Outcome / Promise</Label>
+                                <Textarea id="offer-outcome" value={editingOffer.offer.outcome || ''} onChange={(e) => handleUpdateEditingOffer('outcome', e.target.value)} placeholder="Get [X result] in [Y time] using [Z method]" />
+                            </div>
+                            <div>
+                                <Label htmlFor="offer-audience">3. Who It's For (Audience)</Label>
+                                <Textarea id="offer-audience" value={editingOffer.offer.audience || ''} onChange={(e) => handleUpdateEditingOffer('audience', e.target.value)} placeholder="Describe the ideal client segment" />
+                            </div>
+                            <div>
+                                <Label htmlFor="offer-deliverables">4. Core Deliverables</Label>
+                                <Textarea id="offer-deliverables" value={editingOffer.offer.deliverables || ''} onChange={(e) => handleUpdateEditingOffer('deliverables', e.target.value)} placeholder="List tangible items the client will receive, one per line." />
+                            </div>
+                            <div>
+                                <Label htmlFor="offer-valueStack">5. Value Stack</Label>
+                                <Textarea id="offer-valueStack" value={editingOffer.offer.valueStack || ''} onChange={(e) => handleUpdateEditingOffer('valueStack', e.target.value)} placeholder="List all included items, one per line. Include core work, support, and bonuses." />
+                            </div>
+                            <div>
+                                <Label htmlFor="offer-timeline">6. Timeline</Label>
+                                <Input id="offer-timeline" value={editingOffer.offer.timeline || ''} onChange={(e) => handleUpdateEditingOffer('timeline', e.target.value)} placeholder="e.g., Delivered in 3 working days" />
+                            </div>
+                            <div>
+                                <Label htmlFor="offer-price">7. Price</Label>
+                                <Input id="offer-price" value={editingOffer.offer.price || ''} onChange={(e) => handleUpdateEditingOffer('price', e.target.value)} placeholder="e.g., $500 flat (50% upfront)" />
+                            </div>
+                             <div>
+                                <Label htmlFor="offer-format">8. Format / Delivery</Label>
+                                <Textarea id="offer-format" value={editingOffer.offer.format || ''} onChange={(e) => handleUpdateEditingOffer('format', e.target.value)} placeholder="How is the service delivered? (e.g., GitHub, Loom, Notion)" />
+                            </div>
+                        </div>
+                    </ScrollArea>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setEditingOffer(null)}>Cancel</Button>
+                    <Button onClick={handleSaveOffer}>Save Offer</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }

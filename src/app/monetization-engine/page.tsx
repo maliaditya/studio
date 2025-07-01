@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 
 function MonetizationEnginePageContent() {
-  const { deepWorkDefinitions, leadGenDefinitions, offerSystemDefinitions } = useAuth();
+  const { leadGenDefinitions, offerizationPlans } = useAuth();
   const router = useRouter();
 
   const salesSystemItems = [
@@ -19,15 +19,10 @@ function MonetizationEnginePageContent() {
     "Pricing sheet or calendar link",
     "Portfolio/demo breakdown to convert leads",
   ];
-  
-  const publishedBundles = useMemo(() => {
-    return (deepWorkDefinitions || []).filter(task => 
-        task.isReadyForBranding &&
-        task.sharingStatus?.twitter &&
-        task.sharingStatus?.linkedin &&
-        task.sharingStatus?.devto
-    );
-  }, [deepWorkDefinitions]);
+
+  const definedOffers = useMemo(() => {
+    return Object.values(offerizationPlans || {}).flatMap(plan => plan.offers || []).slice(0, 3);
+  }, [offerizationPlans]);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
@@ -80,18 +75,22 @@ function MonetizationEnginePageContent() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-grow">
-            <ul className="space-y-3">
-              {offerSystemDefinitions.map((item, index) => (
-                <li key={index} className="flex items-start gap-3">
-                  <Check className="h-5 w-5 text-green-500 mt-1 flex-shrink-0" />
-                  <span className="text-muted-foreground">{item.name}</span>
-                </li>
-              ))}
+             <ul className="space-y-3">
+              {definedOffers.length > 0 ? (
+                  definedOffers.map((offer, index) => (
+                      <li key={index} className="flex items-start gap-3">
+                          <Check className="h-5 w-5 text-green-500 mt-1 flex-shrink-0" />
+                          <span className="text-muted-foreground">{offer.name}</span>
+                      </li>
+                  ))
+              ) : (
+                  <li className="text-muted-foreground text-sm">No concrete offers defined yet. Go to the Offerization page to create them.</li>
+              )}
             </ul>
           </CardContent>
           <CardFooter>
-             <Button className="w-full" onClick={() => router.push('/offer-system')}>
-              Go to Offer System Dashboard <ArrowRight className="ml-2 h-4 w-4" />
+             <Button className="w-full" onClick={() => router.push('/offerization')}>
+              Define Your Offers <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </CardFooter>
         </Card>
