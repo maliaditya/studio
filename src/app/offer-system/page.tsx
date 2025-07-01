@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo } from 'react';
@@ -45,24 +46,24 @@ function OfferSystemPageContent() {
     };
 
     const textToCopy = `
-**Offer:** ${offer.name}
-**Topic:** ${offer.topic}
----
-**Outcome / Promise:**
+Offer: ${offer.name}
+Topic: ${offer.topic}
+
+Outcome / Promise:
 ${offer.outcome || '-'}
 
-**Audience:**
+Audience:
 ${offer.audience || '-'}
 
-**Core Deliverables:**
+Core Deliverables:
 ${formatForClipboard(offer.deliverables)}
 
-**Value Stack:**
+Value Stack:
 ${formatForClipboard(offer.valueStack)}
 
-**Timeline:** ${offer.timeline || '-'}
-**Price:** ${offer.price || '-'}
-**Format / Delivery:** ${offer.format || '-'}
+Timeline: ${offer.timeline || '-'}
+Price: ${offer.price || '-'}
+Format / Delivery: ${offer.format || '-'}
     `.trim().replace(/^\s+/gm, '');
 
     navigator.clipboard.writeText(textToCopy).then(() => {
@@ -157,3 +158,4 @@ ${formatForClipboard(offer.valueStack)}
 export default function OfferSystemPage() {
   return ( <AuthGuard> <OfferSystemPageContent /> </AuthGuard> );
 }
+    
