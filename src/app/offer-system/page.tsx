@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo } from 'react';
@@ -8,10 +7,12 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Package, ArrowRight, DraftingCompass, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
 
 function OfferSystemPageContent() {
-  const { offerizationPlans, copyOffer } = useAuth();
+  const { offerizationPlans } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
 
   const allOffers = useMemo(() => {
     return Object.entries(offerizationPlans || {})
@@ -37,6 +38,48 @@ function OfferSystemPageContent() {
     return <p className="text-sm text-muted-foreground">{text}</p>;
   };
   
+  const handleCopyToClipboard = (offer: any) => {
+    const formatForClipboard = (text: string) => {
+      if (!text || text.trim() === '') return '  - Not specified';
+      return text.split('\n').filter(line => line.trim()).map(item => `  - ${item.trim()}`).join('\n');
+    };
+
+    const textToCopy = `
+**Offer:** ${offer.name}
+**Topic:** ${offer.topic}
+---
+**Outcome / Promise:**
+${offer.outcome || '-'}
+
+**Audience:**
+${offer.audience || '-'}
+
+**Core Deliverables:**
+${formatForClipboard(offer.deliverables)}
+
+**Value Stack:**
+${formatForClipboard(offer.valueStack)}
+
+**Timeline:** ${offer.timeline || '-'}
+**Price:** ${offer.price || '-'}
+**Format / Delivery:** ${offer.format || '-'}
+    `.trim().replace(/^\s+/gm, '');
+
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      toast({
+        title: "Copied to Clipboard!",
+        description: `The details for "${offer.name}" have been copied.`,
+      });
+    }, (err) => {
+      toast({
+        title: "Copy Failed",
+        description: "Could not copy text to clipboard.",
+        variant: "destructive",
+      });
+      console.error('Could not copy text: ', err);
+    });
+  };
+
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
       <div className="text-center mb-8">
@@ -84,9 +127,9 @@ function OfferSystemPageContent() {
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col gap-2 p-4">
-                <Button variant="outline" className="w-full" onClick={() => copyOffer(offer.topic, offer.id)}>
+                <Button variant="outline" className="w-full" onClick={() => handleCopyToClipboard(offer)}>
                     <Copy className="mr-2 h-4 w-4" />
-                    Duplicate Offer
+                    Copy to Clipboard
                 </Button>
                 <Button variant="outline" className="w-full" onClick={() => router.push('/offerization')}>
                     Edit in Offerization <ArrowRight className="ml-2 h-4 w-4" />
