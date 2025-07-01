@@ -6,11 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
-import { Package, ArrowRight, DraftingCompass } from 'lucide-react';
+import { Package, ArrowRight, DraftingCompass, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 function OfferSystemPageContent() {
-  const { offerizationPlans } = useAuth();
+  const { offerizationPlans, copyOffer } = useAuth();
   const router = useRouter();
 
   const allOffers = useMemo(() => {
@@ -83,8 +83,12 @@ function OfferSystemPageContent() {
                     </div>
                 </div>
               </CardContent>
-              <CardFooter>
-                 <Button variant="outline" className="w-full" onClick={() => router.push('/offerization')}>
+              <CardFooter className="flex flex-col gap-2 p-4">
+                <Button variant="outline" className="w-full" onClick={() => copyOffer(offer.topic, offer.id)}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Duplicate Offer
+                </Button>
+                <Button variant="outline" className="w-full" onClick={() => router.push('/offerization')}>
                     Edit in Offerization <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </CardFooter>

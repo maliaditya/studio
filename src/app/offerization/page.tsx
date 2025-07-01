@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
-import { Briefcase, Package, PlusCircle, Calendar as CalendarIcon, Edit, Trash2 } from 'lucide-react';
+import { Briefcase, Package, PlusCircle, Calendar as CalendarIcon, Edit, Trash2, Copy } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -35,7 +35,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 function OfferizationPageContent() {
-  const { deepWorkDefinitions, setDeepWorkDefinitions, offerizationPlans, setOfferizationPlans, deepWorkTopicMetadata, updateTopic, deleteTopic } = useAuth();
+  const { deepWorkDefinitions, setDeepWorkDefinitions, offerizationPlans, setOfferizationPlans, deepWorkTopicMetadata, updateTopic, deleteTopic, copyOffer } = useAuth();
   const { toast } = useToast();
   const [newActionTasks, setNewActionTasks] = useState<Record<string, string>>({});
   
@@ -622,6 +622,9 @@ function OfferizationPageContent() {
                                             <div className="flex justify-between items-start">
                                                 <CardTitle className="text-base">{offer.name}</CardTitle>
                                                 <div className="flex items-center">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copyOffer(topic, offer.id)}>
+                                                        <Copy className="h-4 w-4" />
+                                                    </Button>
                                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleStartEditingOffer(topic, offer)}><Edit className="h-4 w-4" /></Button>
                                                     <AlertDialog>
                                                         <AlertDialogTrigger asChild>

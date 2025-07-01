@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -98,6 +98,7 @@ interface AuthContextType {
   addFeatureToRelease: (release: Release, topic: string, featureName: string, type: 'product' | 'service') => void;
   updateTopic: (oldTopicName: string, newTopicName: string, newClassification: 'product' | 'service') => void;
   deleteTopic: (topic: string) => void;
+  copyOffer: (topic: string, offerId: string) => void;
 
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
@@ -1116,6 +1117,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const copyOffer = (topic: string, offerId: string) => {
+    setOfferizationPlans(prev => {
+        const newPlans = { ...prev };
+        const currentPlan = newPlans[topic];
+        if (!currentPlan || !currentPlan.offers) return prev;
+
+        const offerToCopy = currentPlan.offers.find(o => o.id === offerId);
+        if (!offerToCopy) return prev;
+
+        const newOffer: Offer = {
+            ...offerToCopy,
+            id: `offer_${Date.now()}_${Math.random()}`,
+            name: `${offerToCopy.name} (Copy)`
+        };
+
+        const offerIndex = currentPlan.offers.findIndex(o => o.id === offerId);
+        const updatedOffers = [...currentPlan.offers];
+        updatedOffers.splice(offerIndex + 1, 0, newOffer);
+
+        newPlans[topic] = { ...currentPlan, offers: updatedOffers };
+        return newPlans;
+    });
+    toast({ title: "Offer Copied", description: `A copy of "${offerToCopy.name}" has been created.` });
+  };
+
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -1134,6 +1160,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     addFeatureToRelease,
     updateTopic,
     deleteTopic,
+    copyOffer,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
   };
