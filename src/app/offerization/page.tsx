@@ -16,7 +16,7 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from '@/hooks/use-toast';
-import type { ExerciseCategory, ExerciseDefinition, GapAnalysis, Offer, ProductizationPlan as OfferizationPlan, Release } from '@/types/workout';
+import type { ExerciseCategory, ExerciseDefinition, GapAnalysis, Offer, ProductizationPlan as OfferizationPlan, Version } from '@/types/workout';
 import { offerTypes, GAP_TYPES } from '@/lib/constants';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -40,8 +40,8 @@ function OfferizationPageContent() {
   const [newActionTasks, setNewActionTasks] = useState<Record<string, string>>({});
   
   // State for expertise planning
-  const [editingRelease, setEditingRelease] = useState<{ topic: string; release: Partial<Release> } | null>(null);
-  const [selectedReleaseForTask, setSelectedReleaseForTask] = useState<Record<string, string>>({});
+  const [editingVersion, setEditingVersion] = useState<{ topic: string; version: Partial<Version> } | null>(null);
+  const [selectedVersionForTask, setSelectedVersionForTask] = useState<Record<string, string>>({});
 
   const [editingTopic, setEditingTopic] = useState<string | null>(null);
   const [newTopicName, setNewTopicName] = useState('');
@@ -135,18 +135,18 @@ function OfferizationPageContent() {
 
     setDeepWorkDefinitions(prev => [...prev, newDef]);
 
-    const releaseId = selectedReleaseForTask[topic];
-    if (releaseId) {
+    const versionId = selectedVersionForTask[topic];
+    if (versionId) {
         setOfferizationPlans(prev => {
             const newPlans = { ...prev };
             const currentPlan = newPlans[topic];
-            if (currentPlan && currentPlan.releases) {
-                const releaseIndex = currentPlan.releases.findIndex(r => r.id === releaseId);
-                if (releaseIndex > -1) {
-                    const release = currentPlan.releases[releaseIndex];
-                    const focusAreaIds = Array.from(new Set(release.focusAreaIds || []));
+            if (currentPlan && currentPlan.versions) {
+                const versionIndex = currentPlan.versions.findIndex(r => r.id === versionId);
+                if (versionIndex > -1) {
+                    const version = currentPlan.versions[versionIndex];
+                    const focusAreaIds = Array.from(new Set(version.focusAreaIds || []));
                     focusAreaIds.push(newDef.id);
-                    release.focusAreaIds = focusAreaIds;
+                    version.focusAreaIds = focusAreaIds;
                 }
             }
             return newPlans;
@@ -154,7 +154,7 @@ function OfferizationPageContent() {
     }
 
     setNewActionTasks(prev => ({ ...prev, [topic]: '' }));
-    setSelectedReleaseForTask(prev => ({...prev, [topic]: ''}));
+    setSelectedVersionForTask(prev => ({...prev, [topic]: ''}));
     toast({ title: 'Focus Area Added', description: `"${taskName}" is now in your Deep Work library and linked to the expertise if selected.` });
   };
 
@@ -193,44 +193,44 @@ function OfferizationPageContent() {
     });
   };
 
-  const handleStartEditingRelease = (topic: string, release?: Release) => {
-    setEditingRelease({
+  const handleStartEditingVersion = (topic: string, version?: Version) => {
+    setEditingVersion({
         topic,
-        release: release ? { ...release } : { id: `release_${Date.now()}_${Math.random()}`, name: '', description: '', launchDate: format(new Date(), 'yyyy-MM-dd'), focusAreaIds: [] }
+        version: version ? { ...version } : { id: `version_${Date.now()}_${Math.random()}`, name: '', description: '', launchDate: format(new Date(), 'yyyy-MM-dd'), focusAreaIds: [] }
     });
   };
 
-  const handleUpdateEditingRelease = (field: keyof Release, value: any) => {
-    setEditingRelease(current => {
+  const handleUpdateEditingVersion = (field: keyof Version, value: any) => {
+    setEditingVersion(current => {
       if (!current) return null;
       return {
         ...current,
-        release: {
-          ...current.release,
+        version: {
+          ...current.version,
           [field]: value,
         }
       }
     });
   };
 
-  const handleToggleFocusAreaInRelease = (focusAreaId: string) => {
-     setEditingRelease(current => {
+  const handleToggleFocusAreaInVersion = (focusAreaId: string) => {
+     setEditingVersion(current => {
         if (!current) return null;
-        const currentIds = current.release.focusAreaIds || [];
+        const currentIds = current.version.focusAreaIds || [];
         const newIds = currentIds.includes(focusAreaId)
             ? currentIds.filter(id => id !== focusAreaId)
             : [...currentIds, focusAreaId];
         return {
             ...current,
-            release: { ...current.release, focusAreaIds: newIds }
+            version: { ...current.version, focusAreaIds: newIds }
         }
      });
   };
 
-  const handleSaveRelease = () => {
-    if (!editingRelease) return;
-    const { topic, release } = editingRelease;
-    if (!release.name?.trim()) {
+  const handleSaveVersion = () => {
+    if (!editingVersion) return;
+    const { topic, version } = editingVersion;
+    if (!version.name?.trim()) {
       toast({ title: "Error", description: "Expertise name cannot be empty.", variant: "destructive" });
       return;
     }
@@ -238,33 +238,33 @@ function OfferizationPageContent() {
     setOfferizationPlans(prev => {
         const newPlans = { ...prev };
         const currentPlan = newPlans[topic] || {};
-        const existingReleases = currentPlan.releases || [];
+        const existingVersions = currentPlan.versions || [];
         
-        const releaseIndex = existingReleases.findIndex(r => r.id === release.id);
+        const versionIndex = existingVersions.findIndex(r => r.id === version.id);
 
-        if (releaseIndex > -1) {
-            // Update existing release
-            existingReleases[releaseIndex] = release as Release;
+        if (versionIndex > -1) {
+            // Update existing version
+            existingVersions[versionIndex] = version as Version;
         } else {
-            // Add new release
-            existingReleases.push(release as Release);
+            // Add new version
+            existingVersions.push(version as Version);
         }
 
-        newPlans[topic] = { ...currentPlan, releases: existingReleases.sort((a,b) => new Date(a.launchDate).getTime() - new Date(b.launchDate).getTime()) };
+        newPlans[topic] = { ...currentPlan, versions: existingVersions.sort((a,b) => new Date(a.launchDate).getTime() - new Date(b.launchDate).getTime()) };
         return newPlans;
     });
 
-    toast({ title: "Expertise Saved", description: `"${release.name}" has been saved.`});
-    setEditingRelease(null);
+    toast({ title: "Expertise Saved", description: `"${version.name}" has been saved.`});
+    setEditingVersion(null);
   };
 
-  const handleDeleteRelease = (topic: string, releaseId: string) => {
+  const handleDeleteVersion = (topic: string, versionId: string) => {
      setOfferizationPlans(prev => {
         const newPlans = { ...prev };
         const currentPlan = newPlans[topic];
-        if (!currentPlan || !currentPlan.releases) return prev;
+        if (!currentPlan || !currentPlan.versions) return prev;
 
-        currentPlan.releases = currentPlan.releases.filter(r => r.id !== releaseId);
+        currentPlan.versions = currentPlan.versions.filter(r => r.id !== versionId);
         newPlans[topic] = currentPlan;
         
         return newPlans;
@@ -349,36 +349,36 @@ function OfferizationPageContent() {
 
 
   const renderExpertiseForm = (topic: string, focusAreas: ExerciseDefinition[]) => {
-    if (!editingRelease || editingRelease.topic !== topic) return null;
-    const { release } = editingRelease;
+    if (!editingVersion || editingVersion.topic !== topic) return null;
+    const { version } = editingVersion;
     
     return (
       <Card className="mt-4 bg-muted/50">
         <CardHeader>
-          <CardTitle className="text-lg">{release.id?.startsWith('release_') ? 'Add New Expertise' : 'Edit Expertise'}</CardTitle>
+          <CardTitle className="text-lg">{version.id?.startsWith('version_') ? 'Add New Expertise' : 'Edit Expertise'}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="release-name">Expertise Name</Label>
-            <Input id="release-name" value={release.name || ''} onChange={(e) => handleUpdateEditingRelease('name', e.target.value)} placeholder="e.g., CUDA Optimization, WebGL Development"/>
+            <Label htmlFor="version-name">Expertise Name</Label>
+            <Input id="version-name" value={version.name || ''} onChange={(e) => handleUpdateEditingVersion('name', e.target.value)} placeholder="e.g., CUDA Optimization, WebGL Development"/>
           </div>
           <div>
-            <Label htmlFor="release-date">Start Date</Label>
+            <Label htmlFor="version-date">Start Date</Label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button id="release-date" variant="outline" className="w-full justify-start text-left font-normal">
+                <Button id="version-date" variant="outline" className="w-full justify-start text-left font-normal">
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {release.launchDate ? format(parseISO(release.launchDate), 'PPP') : 'Select a date'}
+                  {version.launchDate ? format(parseISO(version.launchDate), 'PPP') : 'Select a date'}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
-                <Calendar mode="single" selected={release.launchDate ? parseISO(release.launchDate) : new Date()} onSelect={(date) => handleUpdateEditingRelease('launchDate', format(date as Date, 'yyyy-MM-dd'))} />
+                <Calendar mode="single" selected={version.launchDate ? parseISO(version.launchDate) : new Date()} onSelect={(date) => handleUpdateEditingVersion('launchDate', format(date as Date, 'yyyy-MM-dd'))} />
               </PopoverContent>
             </Popover>
           </div>
            <div>
-            <Label htmlFor="release-desc">Description</Label>
-            <Textarea id="release-desc" value={release.description || ''} onChange={(e) => handleUpdateEditingRelease('description', e.target.value)} placeholder="What is the goal of this expertise area?"/>
+            <Label htmlFor="version-desc">Description</Label>
+            <Textarea id="version-desc" value={version.description || ''} onChange={(e) => handleUpdateEditingVersion('description', e.target.value)} placeholder="What is the goal of this expertise area?"/>
           </div>
           <div>
             <Label>Included Focus Areas</Label>
@@ -387,8 +387,8 @@ function OfferizationPageContent() {
                 <div key={fa.id} className="flex items-center space-x-2">
                   <Checkbox 
                     id={`fa-${fa.id}`} 
-                    checked={(release.focusAreaIds || []).includes(fa.id)}
-                    onCheckedChange={() => handleToggleFocusAreaInRelease(fa.id)}
+                    checked={(version.focusAreaIds || []).includes(fa.id)}
+                    onCheckedChange={() => handleToggleFocusAreaInVersion(fa.id)}
                   />
                   <Label htmlFor={`fa-${fa.id}`} className="font-normal">{fa.name}</Label>
                 </div>
@@ -396,8 +396,8 @@ function OfferizationPageContent() {
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setEditingRelease(null)}>Cancel</Button>
-            <Button onClick={handleSaveRelease}>Save Expertise</Button>
+            <Button variant="ghost" onClick={() => setEditingVersion(null)}>Cancel</Button>
+            <Button onClick={handleSaveVersion}>Save Expertise</Button>
           </div>
         </CardContent>
       </Card>
@@ -421,7 +421,7 @@ function OfferizationPageContent() {
             const plan = offerizationPlans[topic] || {};
             const selectedOfferTypes = plan.offerTypes || [];
             const gapAnalysis = plan.gapAnalysis;
-            const releases = plan.releases || [];
+            const versions = plan.versions || [];
             const offers = plan.offers || [];
 
             const focusAreaMap = new Map(focusAreas.map(fa => [fa.id, fa.name]));
@@ -566,16 +566,16 @@ function OfferizationPageContent() {
                         <AccordionItem value="item-4">
                            <AccordionTrigger>Expertise Planner</AccordionTrigger>
                            <AccordionContent>
-                                {releases.map(release => (
-                                <Card key={release.id} className="mb-3">
+                                {versions.map(version => (
+                                <Card key={version.id} className="mb-3">
                                 <CardHeader className="p-3">
                                     <div className="flex justify-between items-start">
                                     <div>
-                                        <CardTitle className="text-base">{release.name}</CardTitle>
-                                        <CardDescription>{format(parseISO(release.launchDate), 'PPP')}</CardDescription>
+                                        <CardTitle className="text-base">{version.name}</CardTitle>
+                                        <CardDescription>{format(parseISO(version.launchDate), 'PPP')}</CardDescription>
                                     </div>
                                     <div className="flex items-center">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleStartEditingRelease(topic, release)}><Edit className="h-4 w-4"/></Button>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleStartEditingVersion(topic, version)}><Edit className="h-4 w-4"/></Button>
                                         <AlertDialog>
                                         <AlertDialogTrigger asChild>
                                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button>
@@ -583,11 +583,11 @@ function OfferizationPageContent() {
                                         <AlertDialogContent>
                                             <AlertDialogHeader>
                                             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                            <AlertDialogDescription>This will permanently delete the expertise "{release.name}". This action cannot be undone.</AlertDialogDescription>
+                                            <AlertDialogDescription>This will permanently delete the expertise "{version.name}". This action cannot be undone.</AlertDialogDescription>
                                             </AlertDialogHeader>
                                             <AlertDialogFooter>
                                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => handleDeleteRelease(topic, release.id)}>Delete</AlertDialogAction>
+                                            <AlertDialogAction onClick={() => handleDeleteVersion(topic, version.id)}>Delete</AlertDialogAction>
                                             </AlertDialogFooter>
                                         </AlertDialogContent>
                                         </AlertDialog>
@@ -595,10 +595,10 @@ function OfferizationPageContent() {
                                     </div>
                                 </CardHeader>
                                 <CardContent className="p-3 text-sm">
-                                    {release.description && <p className="mb-2 text-muted-foreground">{release.description}</p>}
+                                    {version.description && <p className="mb-2 text-muted-foreground">{version.description}</p>}
                                     <p className="font-medium text-foreground">Focus Areas:</p>
                                     <ul className="list-disc list-inside text-muted-foreground">
-                                    {(release.focusAreaIds || []).map((id, index) => (
+                                    {(version.focusAreaIds || []).map((id, index) => (
                                         <li key={`${id}-${index}`}>{focusAreaMap.get(id) || 'Unknown Focus Area'}</li>
                                     ))}
                                     </ul>
@@ -606,8 +606,8 @@ function OfferizationPageContent() {
                                 </Card>
                             ))}
 
-                            {editingRelease?.topic === topic ? renderExpertiseForm(topic, focusAreas) : (
-                                <Button className="w-full mt-2" variant="outline" onClick={() => handleStartEditingRelease(topic)}>
+                            {editingVersion?.topic === topic ? renderExpertiseForm(topic, focusAreas) : (
+                                <Button className="w-full mt-2" variant="outline" onClick={() => handleStartEditingVersion(topic)}>
                                     <PlusCircle className="mr-2 h-4 w-4" /> Add Expertise
                                 </Button>
                             )}
@@ -672,18 +672,18 @@ function OfferizationPageContent() {
                                       <PlusCircle className="h-5 w-5"/>
                                   </Button>
                                </div>
-                               {releases.length > 0 && (
+                               {versions.length > 0 && (
                                 <div>
-                                    <Label htmlFor={`release-select-${topic}`} className="text-xs">Add to Expertise (Optional)</Label>
+                                    <Label htmlFor={`version-select-${topic}`} className="text-xs">Add to Expertise (Optional)</Label>
                                     <Select 
-                                        value={selectedReleaseForTask[topic] || ''} 
-                                        onValueChange={(value) => setSelectedReleaseForTask(prev => ({...prev, [topic]: value}))}
+                                        value={selectedVersionForTask[topic] || ''} 
+                                        onValueChange={(value) => setSelectedVersionForTask(prev => ({...prev, [topic]: value}))}
                                     >
-                                        <SelectTrigger id={`release-select-${topic}`}>
+                                        <SelectTrigger id={`version-select-${topic}`}>
                                             <SelectValue placeholder="Select an expertise..." />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {releases.map(r => (
+                                            {versions.map(r => (
                                                 <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                                             ))}
                                         </SelectContent>

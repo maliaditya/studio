@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useAuth } from '@/contexts/AuthContext';
 import { format, getDay, parseISO } from 'date-fns';
 import { DollarSign, Share2, Heart, Trophy, MessageSquareQuote, CheckCircle2, Circle, Target, TrendingUp, Magnet, Package, Rocket } from 'lucide-react';
-import type { Activity, Release } from '@/types/workout';
+import type { Activity, Version } from '@/types/workout';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -86,16 +86,16 @@ function MyPlatePageContent() {
     return (offerSystemDefinitions || []).slice(0, 3);
   }, [offerSystemDefinitions]);
 
-  const upcomingReleases = useMemo(() => {
+  const upcomingVersions = useMemo(() => {
     if (!productizationPlans && !offerizationPlans) return [];
 
-    const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
+    const allVersions: { topic: string, version: Version, type: 'product' | 'service' }[] = [];
 
     if (productizationPlans) {
       Object.entries(productizationPlans).forEach(([topic, plan]) => {
-          if (plan.releases) {
-              plan.releases.forEach(release => {
-                  allReleases.push({ topic, release, type: 'product' });
+          if (plan.versions) {
+              plan.versions.forEach(version => {
+                  allVersions.push({ topic, version, type: 'product' });
               });
           }
       });
@@ -103,9 +103,9 @@ function MyPlatePageContent() {
 
     if (offerizationPlans) {
       Object.entries(offerizationPlans).forEach(([topic, plan]) => {
-          if (plan.releases) {
-              plan.releases.forEach(release => {
-                  allReleases.push({ topic, release, type: 'service' });
+          if (plan.versions) {
+              plan.versions.forEach(version => {
+                  allVersions.push({ topic, version, type: 'service' });
               });
           }
       });
@@ -114,16 +114,16 @@ function MyPlatePageContent() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    return allReleases
-        .filter(({ release }) => {
+    return allVersions
+        .filter(({ version }) => {
             try {
-                const launchDate = parseISO(release.launchDate);
+                const launchDate = parseISO(version.launchDate);
                 return launchDate >= today;
             } catch (e) {
                 return false;
             }
         })
-        .sort((a, b) => new Date(a.release.launchDate).getTime() - new Date(b.release.launchDate).getTime())
+        .sort((a, b) => new Date(a.version.launchDate).getTime() - new Date(b.version.launchDate).getTime())
         .slice(0, 3);
   }, [productizationPlans, offerizationPlans]);
 
@@ -298,26 +298,26 @@ function MyPlatePageContent() {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-3 text-xl"><Rocket className="h-6 w-6 text-primary"/> Upcoming Roadmap</CardTitle>
-                    <CardDescription>Your upcoming product and service releases.</CardDescription>
+                    <CardDescription>Your upcoming product and service versions.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {upcomingReleases.length > 0 ? (
+                    {upcomingVersions.length > 0 ? (
                          <ul className="space-y-3">
-                            {upcomingReleases.map(({ topic, release, type }) => (
-                                <li key={release.id} className="text-sm p-3 rounded-md bg-muted/50 flex justify-between items-center">
+                            {upcomingVersions.map(({ topic, version, type }) => (
+                                <li key={version.id} className="text-sm p-3 rounded-md bg-muted/50 flex justify-between items-center">
                                     <div>
-                                        <span className="font-semibold">{release.name}</span>
+                                        <span className="font-semibold">{version.name}</span>
                                         <span className="text-muted-foreground ml-2">({topic})</span>
                                     </div>
                                      <div className="flex items-center gap-2">
                                         <Badge variant="outline" className="capitalize">{type}</Badge>
-                                        <Badge variant="secondary">{format(parseISO(release.launchDate), 'MMM dd, yyyy')}</Badge>
+                                        <Badge variant="secondary">{format(parseISO(version.launchDate), 'MMM dd, yyyy')}</Badge>
                                     </div>
                                 </li>
                             ))}
                         </ul>
                     ) : (
-                        <p className="text-muted-foreground text-sm">No upcoming releases planned.</p>
+                        <p className="text-muted-foreground text-sm">No upcoming versions planned.</p>
                     )}
                 </CardContent>
             </Card>

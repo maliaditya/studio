@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -5,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle, Link as LinkIcon, Save } from 'lucide-react';
-import type { ExerciseDefinition, Release, DatedWorkout, ActivityType as ActivityTypeType } from '@/types/workout'; // Renaming imported ActivityType to avoid conflict with lucide-react
+import type { ExerciseDefinition, Version, DatedWorkout, ActivityType as ActivityTypeType } from '@/types/workout'; // Renaming imported ActivityType to avoid conflict with lucide-react
 import { TransformWrapper, TransformComponent, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -82,7 +83,7 @@ const ConceptualFlowDiagram = () => {
                         <FeatureList features={["Content Bundling", "Creation Workflow (4-stage)", "Publishing Checklist"]} />
                     </FlowCard>
                     <FlowCard icon={<Package size={32} />} title="4b. Productization & Offerization" description="Systematically plan products and services.">
-                        <FeatureList features={["Gap Analysis", "Product/Service Definition", "Release Planning"]} />
+                        <FeatureList features={["Gap Analysis", "Product/Service Definition", "Version Planning"]} />
                     </FlowCard>
                      <FlowCard icon={<Magnet size={32} />} title="4c. Lead Gen & Offer System" description="Define and track outreach and service offerings.">
                         <FeatureList features={["Daily Action Tracking", "Service Offer Definition"]} />
@@ -107,7 +108,7 @@ const ConceptualFlowDiagram = () => {
 };
 
 
-interface MindMapNode extends Partial<ExerciseDefinition>, Partial<Release> {
+interface MindMapNode extends Partial<ExerciseDefinition>, Partial<Version> {
   id: string;
   definitionId: string;
   name: string;
@@ -136,7 +137,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
       allDeepWorkLogs,
       brandingLogs,
       scheduleTaskFromMindMap,
-      addFeatureToRelease,
+      addFeatureToVersion,
       setDeepWorkDefinitions,
   } = useAuth();
   const [selectedTopic, setSelectedTopic] = useState<string>('');
@@ -152,7 +153,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   const [editableLinkedUpskillIds, setEditableLinkedUpskillIds] = useState<string[]>([]);
 
   // State for inline adding
-  const [inlineAddInfo, setInlineAddInfo] = useState<{ parentReleaseId: string; newFeatureName: string } | null>(null);
+  const [inlineAddInfo, setInlineAddInfo] = useState<{ parentVersionId: string; newFeatureName: string } | null>(null);
 
   useEffect(() => {
     if (defaultView) {
@@ -198,21 +199,21 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     };
 
     const buildFullTopicTree = (topic: string, plan: any, type: 'product' | 'service'): MindMapNode => {
-        const releaseNodes: MindMapNode[] = (plan?.releases || []).map((release: Release) => {
-            const focusAreaNodes = (release.focusAreaIds || [])
+        const versionNodes: MindMapNode[] = (plan?.versions || []).map((version: Version) => {
+            const focusAreaNodes = (version.focusAreaIds || [])
                 .map(id => deepWorkDefinitions.find(def => def.id === id))
                 .filter((def): def is ExerciseDefinition => !!def)
-                .map(fa => createFocusAreaNode(fa, release.id));
+                .map(fa => createFocusAreaNode(fa, version.id));
             
-            const totalMinutes = (release.focusAreaIds || [])
+            const totalMinutes = (version.focusAreaIds || [])
                 .reduce((sum, id) => sum + (totalTimePerFocusArea.get(id) || 0), 0);
 
             return { 
-              ...release,
-              id: release.id, 
-              definitionId: release.id, 
-              name: release.name, 
-              category: 'Release', 
+              ...version,
+              id: version.id, 
+              definitionId: version.id, 
+              name: version.name, 
+              category: 'Version', 
               children: focusAreaNodes,
               totalLoggedHours: totalMinutes > 0 ? totalMinutes / 60 : 0,
               topic: topic,
@@ -220,13 +221,13 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
             };
         });
 
-        const totalTopicHours = releaseNodes.reduce((sum, release) => sum + (release.totalLoggedHours || 0), 0);
+        const totalTopicHours = versionNodes.reduce((sum, version) => sum + (version.totalLoggedHours || 0), 0);
         return { 
             id: topic, 
             definitionId: topic, 
             name: topic, 
             category: type, 
-            children: releaseNodes,
+            children: versionNodes,
             totalLoggedHours: totalTopicHours > 0 ? totalTopicHours : undefined
         };
     };
@@ -539,14 +540,14 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   // Modal Handlers
   const handleSaveNewFeature = () => {
     if (inlineAddInfo && inlineAddInfo.newFeatureName.trim() && mindMapData) {
-        const { parentReleaseId, newFeatureName } = inlineAddInfo;
+        const { parentVersionId, newFeatureName } = inlineAddInfo;
         
-        let releaseNode: Release | undefined;
+        let versionNode: Version | undefined;
         let topic: string | undefined;
         let type: 'product' | 'service' | undefined;
 
         const findNode = (node: MindMapNode): MindMapNode | null => {
-            if (node.id === parentReleaseId) return node;
+            if (node.id === parentVersionId) return node;
             if (node.children) {
                 for (const child of node.children) {
                     const found = findNode(child);
@@ -559,17 +560,17 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         const foundNode = findNode(mindMapData);
 
         if (foundNode && foundNode.topic && foundNode.type) {
-            releaseNode = foundNode as Release;
+            versionNode = foundNode as Version;
             topic = foundNode.topic;
             type = foundNode.type;
         } else {
-             toast({ title: "Error", description: "Could not find release information to add feature.", variant: "destructive" });
+             toast({ title: "Error", description: "Could not find version information to add feature.", variant: "destructive" });
              setInlineAddInfo(null);
              return;
         }
 
-        addFeatureToRelease(
-            releaseNode,
+        addFeatureToVersion(
+            versionNode,
             topic,
             newFeatureName,
             type
@@ -627,7 +628,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         'System Branch:Content Bundles': <Share2 className="h-3.5 w-3.5 text-purple-500" />,
         'product': <GitBranch className="h-3.5 w-3.5 text-secondary-foreground" />,
         'service': <GitBranch className="h-3.5 w-3.5 text-secondary-foreground" />,
-        'Release': <Rocket className="h-3 w-3 text-muted-foreground" />,
+        'Version': <Rocket className="h-3 w-3 text-muted-foreground" />,
         'FocusArea': <Workflow className="h-3 w-3 text-muted-foreground" />,
         'Learning Task': <BookCopy className="h-3 w-3 text-muted-foreground" />,
         'Content Bundle': <Package className="h-3.5 w-3.5 text-secondary-foreground" />,
@@ -643,7 +644,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     if (!nodeIcons[iconKey] && level >= 4) iconKey = 'FocusArea';
 
     let activityTypeForNode: ActivityTypeType | undefined;
-    if (parentNode?.category === 'Release' || parentNode?.category === 'product' || parentNode?.category === 'service' || parentNode?.name === 'Products' || parentNode?.name === 'Services') {
+    if (parentNode?.category === 'Version' || parentNode?.category === 'product' || parentNode?.category === 'service' || parentNode?.name === 'Products' || parentNode?.name === 'Services') {
       activityTypeForNode = 'deepwork';
     } else if (parentNode?.category === 'Content Bundle' || parentNode?.name === 'Content Bundles') {
       activityTypeForNode = 'branding';
@@ -690,9 +691,9 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         </div>
         
         <div className="absolute top-0 right-0 flex">
-            {node.category === 'Release' && (
+            {node.category === 'Version' && (
                 <Button variant="ghost" size="icon" className="h-6 w-6"
-                    onClick={() => setInlineAddInfo({ parentReleaseId: node.id, newFeatureName: '' })}
+                    onClick={() => setInlineAddInfo({ parentVersionId: node.id, newFeatureName: '' })}
                 >
                     <PlusCircle className="h-4 w-4 text-primary" />
                 </Button>
@@ -771,7 +772,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         </div>
 
 
-        {(node.category === 'Release' || node.category === 'product' || node.category === 'service') && node.totalLoggedHours && node.totalLoggedHours > 0 && (
+        {(node.category === 'Version' || node.category === 'product' || node.category === 'service') && node.totalLoggedHours && node.totalLoggedHours > 0 && (
           <div className="mt-1 pt-1 border-t border-muted-foreground/20">
               <Badge variant="secondary" className="w-full justify-center text-xs">
                   Total Logged: {node.totalLoggedHours.toFixed(1)}h
@@ -829,7 +830,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                 {renderNode(child, level + 1, node)}
               </li>
             ))}
-            {inlineAddInfo?.parentReleaseId === node.id && (
+            {inlineAddInfo?.parentVersionId === node.id && (
                 <li className="relative">
                     <div className="absolute -right-4 top-1/2 w-4 h-px bg-border" />
                     <div className="flex items-center flex-row-reverse">

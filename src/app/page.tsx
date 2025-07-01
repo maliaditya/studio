@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils';
 import { CalendarIcon } from 'lucide-react';
 
 
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Version } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
 const slotEndHours: Record<string, number> = {
@@ -477,19 +477,19 @@ function HomePageContent() {
           };
       };
 
-      const getUpcomingReleases = () => {
+      const getUpcomingVersions = () => {
         if (!productizationPlans && !offerizationPlans) return [];
     
-        const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
+        const allVersions: { topic: string, version: Version, type: 'product' | 'service' }[] = [];
     
         if (productizationPlans) {
           Object.entries(productizationPlans).forEach(([topic, plan]) => {
-              if (plan.releases) {
-                  plan.releases.forEach(release => {
-                      const featureNames = (release.focusAreaIds || [])
+              if (plan.versions) {
+                  plan.versions.forEach(version => {
+                      const featureNames = (version.focusAreaIds || [])
                           .map(id => deepWorkDefinitions.find(def => def.id === id)?.name)
                           .filter((name): name is string => !!name);
-                      allReleases.push({ topic, release: { ...release, features: featureNames }, type: 'product' });
+                      allVersions.push({ topic, version: { ...version, features: featureNames }, type: 'product' });
                   });
               }
           });
@@ -497,12 +497,12 @@ function HomePageContent() {
         
         if (offerizationPlans) {
             Object.entries(offerizationPlans).forEach(([topic, plan]) => {
-                if (plan.releases) {
-                    plan.releases.forEach(release => {
-                        const featureNames = (release.focusAreaIds || [])
+                if (plan.versions) {
+                    plan.versions.forEach(version => {
+                        const featureNames = (version.focusAreaIds || [])
                             .map(id => deepWorkDefinitions.find(def => def.id === id)?.name)
                             .filter((name): name is string => !!name);
-                        allReleases.push({ topic, release: { ...release, features: featureNames }, type: 'service' });
+                        allVersions.push({ topic, version: { ...version, features: featureNames }, type: 'service' });
                     });
                 }
             });
@@ -511,12 +511,12 @@ function HomePageContent() {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
     
-        return allReleases
-            .filter(({ release }) => {
-                try { return parseISO(release.launchDate) >= today; } 
+        return allVersions
+            .filter(({ version }) => {
+                try { return parseISO(version.launchDate) >= today; } 
                 catch (e) { return false; }
             })
-            .sort((a, b) => new Date(a.release.launchDate).getTime() - new Date(b.release.launchDate).getTime());
+            .sort((a, b) => new Date(a.version.launchDate).getTime() - new Date(b.version.launchDate).getTime());
       };
 
       const learningStats = calculateLearningStats(allUpskillLogs, topicGoals);
@@ -553,7 +553,7 @@ function HomePageContent() {
           latestConsistency: consistencyData[consistencyData.length - 1]?.score || 0,
           brandingStatus: calculateBrandingStatus(),
           totalHoursData, todayHoursData,
-          upcomingReleases: getUpcomingReleases(),
+          upcomingVersions: getUpcomingVersions(),
       };
   }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, consistencyData, brandingLogs, deepWorkDefinitions, productizationPlans, offerizationPlans]);
     

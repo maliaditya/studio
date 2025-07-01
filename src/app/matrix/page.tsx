@@ -48,7 +48,7 @@ function MatrixPageContent() {
             ? !!plan.productType
             : !!(plan.offerTypes && plan.offerTypes.length > 0);
 
-        const status: MatrixRow['status'] = (plan.releases && plan.releases.length > 0)
+        const status: MatrixRow['status'] = (plan.versions && plan.versions.length > 0)
           ? 'In Progress'
           : isDefined ? 'Defined' : 'Planning';
         
