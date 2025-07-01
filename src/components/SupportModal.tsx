@@ -13,7 +13,7 @@ import {
 import { Button } from './ui/button';
 import { Heart, ArrowLeft, Calendar, Rocket, Loader2 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import type { Version } from '@/types/workout';
+import type { Release } from '@/types/workout';
 import { format, parseISO } from 'date-fns';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
@@ -26,7 +26,7 @@ interface SupportModalProps {
 export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
   const isMobile = useIsMobile();
   const [showQr, setShowQr] = useState(false);
-  const [versions, setVersions] = useState<Version[]>([]);
+  const [releases, setReleases] = useState<Release[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -34,17 +34,17 @@ export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
     if (!isOpen) {
       setShowQr(false);
       setIsLoading(true); // Reset loading state
-      setVersions([]); // Clear old data
+      setReleases([]); // Clear old data
     } else {
-      // Fetch versions when modal opens
-      const fetchVersions = async () => {
+      // Fetch releases when modal opens
+      const fetchReleases = async () => {
         setIsLoading(true);
         try {
           const response = await fetch('/api/publish-releases');
-          if (!response.ok) throw new Error('Failed to fetch versions');
+          if (!response.ok) throw new Error('Failed to fetch releases');
           const data = await response.json();
-          const futureVersions = (data.versions || [])
-            .filter((r: Version) => {
+          const futureReleases = (data.releases || [])
+            .filter((r: Release) => {
               try {
                 // Ensure date is valid and in the future or today
                 const launchDate = parseISO(r.launchDate);
@@ -55,17 +55,17 @@ export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
                 return false;
               }
             })
-            .sort((a: Version, b: Version) => new Date(a.launchDate).getTime() - new Date(b.launchDate).getTime());
-          setVersions(futureVersions);
+            .sort((a: Release, b: Release) => new Date(a.launchDate).getTime() - new Date(b.launchDate).getTime());
+          setReleases(futureReleases);
         } catch (error) {
-          console.error("Failed to fetch versions:", error);
+          console.error("Failed to fetch releases:", error);
           // Silently fail, don't show an error to the user in the support modal
         } finally {
           setIsLoading(false);
         }
       };
 
-      fetchVersions();
+      fetchReleases();
     }
   }, [isOpen]);
   
@@ -86,7 +86,7 @@ export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
     }
   };
   
-  const renderVersions = () => {
+  const renderReleases = () => {
     if (isLoading) {
       return (
         <div className="flex justify-center items-center h-24">
@@ -95,12 +95,12 @@ export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
       );
     }
     
-    if (versions.length === 0) {
+    if (releases.length === 0) {
       return (
         <>
           <Separator className="my-4" />
           <p className="text-sm text-center text-muted-foreground py-4">
-            No upcoming versions are planned at the moment. Your support will help fund what's next!
+            No upcoming releases are planned at the moment. Your support will help fund what's next!
           </p>
         </>
       );
@@ -110,21 +110,21 @@ export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
       <>
         <Separator className="my-4" />
         <div className="space-y-3">
-          <h4 className="font-semibold text-center text-sm flex items-center justify-center gap-2"><Rocket className="h-4 w-4"/> Upcoming Life OS Versions</h4>
+          <h4 className="font-semibold text-center text-sm flex items-center justify-center gap-2"><Rocket className="h-4 w-4"/> Upcoming Life OS Releases</h4>
           <ul className="space-y-3">
-            {versions.map(version => (
-              <li key={version.id} className="text-sm p-3 rounded-md bg-muted/50">
+            {releases.map(release => (
+              <li key={release.id} className="text-sm p-3 rounded-md bg-muted/50">
                 <div className="flex justify-between items-center">
-                    <span className="font-medium">{version.name}</span>
+                    <span className="font-medium">{release.name}</span>
                     <Badge variant="secondary" className="flex items-center gap-1.5">
                       <Calendar className="h-3 w-3" />
-                      {format(parseISO(version.launchDate), 'MMM dd')}
+                      {format(parseISO(release.launchDate), 'MMM dd')}
                     </Badge>
                 </div>
-                {version.features && version.features.length > 0 && (
+                {release.features && release.features.length > 0 && (
                     <div className="mt-2 pt-2 border-t border-muted-foreground/20">
                         <ul className="list-disc list-inside space-y-1 text-muted-foreground text-xs">
-                            {version.features.map((feature, index) => (
+                            {release.features.map((feature, index) => (
                                 <li key={index}>{feature}</li>
                             ))}
                         </ul>
@@ -143,7 +143,7 @@ export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Heart className="text-red-500" /> Support for Future Versions
+            <Heart className="text-red-500" /> Support for Future Releases
           </DialogTitle>
           <DialogDescription>
             {showQr
@@ -186,7 +186,7 @@ export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
           </div>
         )}
         
-        {renderVersions()}
+        {renderReleases()}
         
       </DialogContent>
     </Dialog>

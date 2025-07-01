@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { Version } from '@/types/workout';
+import type { Release } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
 
 interface ProductivitySnapshotProps {
@@ -40,17 +40,17 @@ interface ProductivitySnapshotProps {
 export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsModal, onOpenMindMapModal }: ProductivitySnapshotProps) {
   const router = useRouter();
   const [isAddFeatureModalOpen, setIsAddFeatureModalOpen] = useState(false);
-  const [selectedVersionInfo, setSelectedVersionInfo] = useState<{ version: Version, topic: string, type: 'product' | 'service' } | null>(null);
+  const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service' } | null>(null);
   const [newFeatureName, setNewFeatureName] = useState('');
-  const { addFeatureToVersion } = useAuth();
+  const { addFeatureToRelease } = useAuth();
 
   const learningItems = Object.entries(stats.learningStats);
   const brandingItems = stats.brandingStatus?.status === 'in_progress' ? stats.brandingStatus.items : [];
-  const roadmapItems = stats.upcomingVersions || [];
+  const roadmapItems = stats.upcomingReleases || [];
 
   const handleAddFeature = () => {
-    if (selectedVersionInfo) {
-      addFeatureToVersion(selectedVersionInfo.version, selectedVersionInfo.topic, newFeatureName, selectedVersionInfo.type);
+    if (selectedReleaseInfo) {
+      addFeatureToRelease(selectedReleaseInfo.release, selectedReleaseInfo.topic, newFeatureName, selectedReleaseInfo.type);
       setNewFeatureName('');
       // Keep the modal open after adding
     }
@@ -226,25 +226,25 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                           <div 
                             className="flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 h-[88px] cursor-pointer" 
                             onClick={() => {
-                              setSelectedVersionInfo({ version: item.version, topic: item.topic, type: item.type });
+                              setSelectedReleaseInfo({ release: item.release, topic: item.topic, type: item.type });
                               setIsAddFeatureModalOpen(true);
                             }}
                           >
                               <div className="flex justify-between items-start">
                                   <div className='min-w-0'>
-                                      <p className="font-bold text-foreground truncate" title={item.version.name}>{item.version.name}</p>
+                                      <p className="font-bold text-foreground truncate" title={item.release.name}>{item.release.name}</p>
                                       <p className="text-xs text-muted-foreground truncate" title={item.topic}>Topic: <span className="font-medium">{item.topic}</span></p>
                                   </div>
                                   <div className="flex flex-col items-end ml-2 flex-shrink-0">
                                       <Badge variant="outline" className="capitalize text-xs mb-1">{item.type}</Badge>
                                       <p className="text-xs text-muted-foreground whitespace-nowrap">
-                                          {format(parseISO(item.version.launchDate), 'PPP')}
+                                          {format(parseISO(item.release.launchDate), 'PPP')}
                                       </p>
                                   </div>
                               </div>
                               <p className="text-sm text-muted-foreground mt-1 truncate">
-                                {item.version.features?.length > 0
-                                  ? `${item.version.features.length} features planned.`
+                                {item.release.features?.length > 0
+                                  ? `${item.release.features.length} features planned.`
                                   : "No features planned yet."}
                               </p>
                           </div>
@@ -252,8 +252,8 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                       />
                   ) : (
                       <div className="text-sm text-muted-foreground p-2 min-h-[6rem] flex flex-col justify-center">
-                      <p>No upcoming versions planned.</p>
-                      <p className="text-xs mt-1">Go to Productization or Offerization to create a version plan.</p>
+                      <p>No upcoming releases planned.</p>
+                      <p className="text-xs mt-1">Go to Productization or Offerization to create a release plan.</p>
                       </div>
                   )}
                 </motion.div>
@@ -296,22 +296,22 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
         </CardContent>
       </Card>
 
-      {selectedVersionInfo && (
+      {selectedReleaseInfo && (
         <Dialog open={isAddFeatureModalOpen} onOpenChange={setIsAddFeatureModalOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Manage Features for "{selectedVersionInfo.version.name}"</DialogTitle>
+              <DialogTitle>Manage Features for "{selectedReleaseInfo.release.name}"</DialogTitle>
               <DialogDescription>
-                 View existing features or add a new one. This will also create a new focus area in your Deep Work library under the "{selectedVersionInfo.topic}" topic.
+                 View existing features or add a new one. This will also create a new focus area in your Deep Work library under the "{selectedReleaseInfo.topic}" topic.
               </DialogDescription>
             </DialogHeader>
             
-            {selectedVersionInfo.version.features && selectedVersionInfo.version.features.length > 0 && (
+            {selectedReleaseInfo.release.features && selectedReleaseInfo.release.features.length > 0 && (
                 <div className="space-y-2">
                     <Label className="font-semibold">Current Features</Label>
                     <ScrollArea className="h-24 w-full rounded-md border p-2">
                         <ul className="space-y-1">
-                            {selectedVersionInfo.version.features.map((feature, index) => (
+                            {selectedReleaseInfo.release.features.map((feature, index) => (
                                 <li key={index} className="text-sm text-muted-foreground">{feature}</li>
                             ))}
                         </ul>
