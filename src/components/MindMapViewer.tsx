@@ -147,6 +147,9 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
   
   const timeSlots = [ 'Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night' ];
 
+  // State for hover highlight
+  const [hoveredNodeIds, setHoveredNodeIds] = useState<Set<string>>(new Set());
+
   // State for linking learning popover
   const [isLinkLearningPopoverOpen, setIsLinkLearningPopoverOpen] = useState(false);
   const [linkingLearningToFocusArea, setLinkingLearningToFocusArea] = useState<MindMapNode | null>(null);
@@ -619,6 +622,25 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     return (upskillDefinitions || []).filter(def => loggedIds.has(def.id));
   }, [allUpskillLogs, upskillDefinitions]);
 
+  const getDescendantIds = useCallback((node: MindMapNode): string[] => {
+    let ids: string[] = [];
+    if (node.children) {
+        for (const child of node.children) {
+            ids.push(child.id);
+            ids = ids.concat(getDescendantIds(child));
+        }
+    }
+    return ids;
+  }, []);
+
+  const handleNodeMouseEnter = useCallback((node: MindMapNode) => {
+      const allIds = new Set<string>([node.id, ...getDescendantIds(node)]);
+      setHoveredNodeIds(allIds);
+  }, [getDescendantIds]);
+
+  const handleNodeMouseLeave = useCallback(() => {
+      setHoveredNodeIds(new Set());
+  }, []);
 
   const renderNode = (node: MindMapNode, level: number, parentNode?: MindMapNode) => {
     const nodeIcons: Record<string, React.ReactNode> = {
@@ -673,12 +695,15 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     <div className="flex items-center flex-row-reverse">
       <div 
         id={node.id}
+        onMouseEnter={() => handleNodeMouseEnter(node)}
+        onMouseLeave={handleNodeMouseLeave}
         className={cn(
-        "relative flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border",
+        "relative flex-shrink-0 w-48 p-2 rounded-lg shadow-md bg-card border transition-all duration-200",
         isLoggedToday && "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700",
         isScheduledToday && !isLoggedToday && "bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700",
         isPending && "bg-orange-100 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700",
-        isPastAndDone && "bg-background border-green-500/50"
+        isPastAndDone && "bg-background border-green-500/50",
+        hoveredNodeIds.has(node.id) && "border-primary ring-2 ring-primary"
       )}>
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted flex-shrink-0">
