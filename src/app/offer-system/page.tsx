@@ -93,21 +93,96 @@ Format / Delivery: ${offer.format || '-'}
     }
 
     const inlineStyles = `
-      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; background-color: #f9fafb; color: #111827; padding: 2rem; }
-      .container { max-width: 1200px; margin: 0 auto; }
-      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; }
-      .card { background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 0.75rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); display: flex; flex-direction: column; overflow: hidden; }
-      .card-header { padding: 1rem 1.5rem; border-bottom: 1px solid #e5e7eb; }
-      .card-title { font-size: 1.125rem; line-height: 1.75rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
-      .card-description { color: #6b7280; font-size: 0.875rem; line-height: 1.25rem; margin-top: 0.25rem; }
-      .card-content { padding: 1.5rem; flex-grow: 1; }
-      .card-footer { padding: 1rem 1.5rem; border-top: 1px solid #e5e7eb; background-color: #f9fafb; }
-      h4 { font-weight: 600; font-size: 0.875rem; margin-bottom: 0.25rem; }
-      p, ul { color: #6b7280; font-size: 0.875rem; margin: 0; }
-      ul { list-style-position: inside; padding-left: 0.5rem; }
-      li { margin-bottom: 0.25rem; }
-      .grid-cols-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
-      svg { display: inline-block; width: 1.25em; height: 1.25em; }
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+      body { 
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+        background-color: #f8f9fa; 
+        color: #212529; 
+        padding: 2rem; 
+        line-height: 1.6;
+      }
+      .container { 
+        max-width: 1200px; 
+        margin: 0 auto; 
+      }
+      .grid { 
+        display: grid; 
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); 
+        gap: 1.75rem; 
+      }
+      .card { 
+        background-color: #ffffff; 
+        border: 1px solid #dee2e6; 
+        border-radius: 0.75rem; 
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.07);
+        display: flex; 
+        flex-direction: column; 
+        overflow: hidden; 
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+      }
+      .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+      }
+      .card-header { 
+        padding: 1.25rem 1.5rem; 
+        border-bottom: 1px solid #e9ecef; 
+      }
+      .card-title { 
+        font-size: 1.25rem; 
+        line-height: 1.2; 
+        font-weight: 600; 
+        display: flex; 
+        align-items: center; 
+        gap: 0.75rem; 
+        color: #0d1b2a;
+      }
+      .card-description { 
+        color: #6c757d; 
+        font-size: 0.875rem; 
+        margin-top: 0.25rem; 
+      }
+      .card-content { 
+        padding: 1.5rem; 
+        flex-grow: 1; 
+      }
+      .card-footer { 
+        padding: 1.25rem 1.5rem; 
+        border-top: 1px solid #e9ecef; 
+        background-color: #f8f9fa; 
+      }
+      h4 { 
+        font-weight: 600; 
+        font-size: 0.9rem; 
+        margin-bottom: 0.5rem; 
+        color: #495057;
+      }
+      p, ul { 
+        color: #495057; 
+        font-size: 0.875rem; 
+        margin: 0; 
+      }
+      ul { 
+        list-style-position: inside; 
+        padding-left: 0;
+        list-style-type: '— ';
+      }
+      li { 
+        margin-bottom: 0.3rem; 
+        padding-left: 0.5rem;
+      }
+      .grid-cols-2 { 
+        display: grid; 
+        grid-template-columns: repeat(2, minmax(0, 1fr)); 
+        gap: 1.5rem; 
+        margin-top: 1rem; 
+      }
+      svg { 
+        display: inline-block; 
+        width: 1.25em; 
+        height: 1.25em; 
+        vertical-align: middle;
+      }
     `;
 
     // Clone the node to avoid modifying the live DOM
