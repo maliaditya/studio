@@ -174,7 +174,7 @@ export function TodaysLearningModal({
     return (
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
-          <DialogHeader>
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>{info.title}</DialogTitle>
             <DialogDescription>{info.description}</DialogDescription>
           </DialogHeader>
@@ -186,7 +186,7 @@ export function TodaysLearningModal({
                     <div className="space-y-4 p-4 border rounded-lg">
                     {eligibleFocusAreas.length > 0 ? (
                         <>
-                        <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                        <div className="space-y-2">
                             <p className="text-xs text-muted-foreground">Select focus areas to bundle:</p>
                             {eligibleFocusAreas.map(area => (
                             <div key={area.id} className="flex items-center space-x-3">
@@ -262,7 +262,7 @@ export function TodaysLearningModal({
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
-        <DialogHeader>
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>{info.title}</DialogTitle>
           <DialogDescription>{info.description}</DialogDescription>
         </DialogHeader>
