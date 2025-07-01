@@ -38,7 +38,7 @@ function OfferizationPageContent() {
   const { toast } = useToast();
   const [newActionTasks, setNewActionTasks] = useState<Record<string, string>>({});
   
-  // State for release planning
+  // State for expertise planning
   const [editingRelease, setEditingRelease] = useState<{ topic: string; release: Partial<Release> } | null>(null);
   const [selectedReleaseForTask, setSelectedReleaseForTask] = useState<Record<string, string>>({});
 
@@ -152,7 +152,7 @@ function OfferizationPageContent() {
 
     setNewActionTasks(prev => ({ ...prev, [topic]: '' }));
     setSelectedReleaseForTask(prev => ({...prev, [topic]: ''}));
-    toast({ title: 'Focus Area Added', description: `"${taskName}" is now in your Deep Work library and linked to the release if selected.` });
+    toast({ title: 'Focus Area Added', description: `"${taskName}" is now in your Deep Work library and linked to the expertise if selected.` });
   };
 
   const handleGapAnalysisChange = (topic: string, field: keyof GapAnalysis, value: string) => {
@@ -228,7 +228,7 @@ function OfferizationPageContent() {
     if (!editingRelease) return;
     const { topic, release } = editingRelease;
     if (!release.name?.trim()) {
-      toast({ title: "Error", description: "Release name cannot be empty.", variant: "destructive" });
+      toast({ title: "Error", description: "Expertise name cannot be empty.", variant: "destructive" });
       return;
     }
 
@@ -251,7 +251,7 @@ function OfferizationPageContent() {
         return newPlans;
     });
 
-    toast({ title: "Release Saved", description: `"${release.name}" has been saved.`});
+    toast({ title: "Expertise Saved", description: `"${release.name}" has been saved.`});
     setEditingRelease(null);
   };
 
@@ -266,26 +266,26 @@ function OfferizationPageContent() {
         
         return newPlans;
     });
-    toast({ title: "Release Deleted", description: "The release has been removed from your plan.", variant: "destructive" });
+    toast({ title: "Expertise Deleted", description: "The expertise has been removed from your plan.", variant: "destructive" });
   };
 
 
-  const renderReleaseForm = (topic: string, focusAreas: ExerciseDefinition[]) => {
+  const renderExpertiseForm = (topic: string, focusAreas: ExerciseDefinition[]) => {
     if (!editingRelease || editingRelease.topic !== topic) return null;
     const { release } = editingRelease;
     
     return (
       <Card className="mt-4 bg-muted/50">
         <CardHeader>
-          <CardTitle className="text-lg">{release.id?.startsWith('release_') ? 'Add New Release' : 'Edit Release'}</CardTitle>
+          <CardTitle className="text-lg">{release.id?.startsWith('release_') ? 'Add New Expertise' : 'Edit Expertise'}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="release-name">Release Name</Label>
-            <Input id="release-name" value={release.name || ''} onChange={(e) => handleUpdateEditingRelease('name', e.target.value)} placeholder="e.g., V1 Launch, MVP"/>
+            <Label htmlFor="release-name">Expertise Name</Label>
+            <Input id="release-name" value={release.name || ''} onChange={(e) => handleUpdateEditingRelease('name', e.target.value)} placeholder="e.g., CUDA Optimization, WebGL Development"/>
           </div>
           <div>
-            <Label htmlFor="release-date">Launch Date</Label>
+            <Label htmlFor="release-date">Start Date</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button id="release-date" variant="outline" className="w-full justify-start text-left font-normal">
@@ -300,7 +300,7 @@ function OfferizationPageContent() {
           </div>
            <div>
             <Label htmlFor="release-desc">Description</Label>
-            <Textarea id="release-desc" value={release.description || ''} onChange={(e) => handleUpdateEditingRelease('description', e.target.value)} placeholder="What is the goal of this release?"/>
+            <Textarea id="release-desc" value={release.description || ''} onChange={(e) => handleUpdateEditingRelease('description', e.target.value)} placeholder="What is the goal of this expertise area?"/>
           </div>
           <div>
             <Label>Included Focus Areas</Label>
@@ -319,7 +319,7 @@ function OfferizationPageContent() {
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setEditingRelease(null)}>Cancel</Button>
-            <Button onClick={handleSaveRelease}>Save Release</Button>
+            <Button onClick={handleSaveRelease}>Save Expertise</Button>
           </div>
         </CardContent>
       </Card>
@@ -369,7 +369,7 @@ function OfferizationPageContent() {
                                     <AlertDialogHeader>
                                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        This action cannot be undone. This will permanently delete the topic "{topic}" and all of its associated data, including focus areas, logged sessions, and release plans.
+                                        This action cannot be undone. This will permanently delete the topic "{topic}" and all of its associated data, including focus areas, logged sessions, and expertise plans.
                                     </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
@@ -486,7 +486,7 @@ function OfferizationPageContent() {
                         </AccordionItem>
 
                         <AccordionItem value="item-4">
-                           <AccordionTrigger>Release Planner</AccordionTrigger>
+                           <AccordionTrigger>Expertise Planner</AccordionTrigger>
                            <AccordionContent>
                                 {releases.map(release => (
                                 <Card key={release.id} className="mb-3">
@@ -505,7 +505,7 @@ function OfferizationPageContent() {
                                         <AlertDialogContent>
                                             <AlertDialogHeader>
                                             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                            <AlertDialogDescription>This will permanently delete the release "{release.name}". This action cannot be undone.</AlertDialogDescription>
+                                            <AlertDialogDescription>This will permanently delete the expertise "{release.name}". This action cannot be undone.</AlertDialogDescription>
                                             </AlertDialogHeader>
                                             <AlertDialogFooter>
                                             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -528,9 +528,9 @@ function OfferizationPageContent() {
                                 </Card>
                             ))}
 
-                            {editingRelease?.topic === topic ? renderReleaseForm(topic, focusAreas) : (
+                            {editingRelease?.topic === topic ? renderExpertiseForm(topic, focusAreas) : (
                                 <Button className="w-full mt-2" variant="outline" onClick={() => handleStartEditingRelease(topic)}>
-                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Release
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Expertise
                                 </Button>
                             )}
                            </AccordionContent>
@@ -557,13 +557,13 @@ function OfferizationPageContent() {
                                </div>
                                {releases.length > 0 && (
                                 <div>
-                                    <Label htmlFor={`release-select-${topic}`} className="text-xs">Add to Release (Optional)</Label>
+                                    <Label htmlFor={`release-select-${topic}`} className="text-xs">Add to Expertise (Optional)</Label>
                                     <Select 
                                         value={selectedReleaseForTask[topic] || ''} 
                                         onValueChange={(value) => setSelectedReleaseForTask(prev => ({...prev, [topic]: value}))}
                                     >
                                         <SelectTrigger id={`release-select-${topic}`}>
-                                            <SelectValue placeholder="Select a release..." />
+                                            <SelectValue placeholder="Select an expertise..." />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {releases.map(r => (
