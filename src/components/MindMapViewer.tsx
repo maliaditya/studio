@@ -5,7 +5,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle, Link as LinkIcon, Save } from 'lucide-react';
+import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle, Link as LinkIcon, Save, MinusCircle } from 'lucide-react';
 import type { ExerciseDefinition, Version, DatedWorkout, ActivityType as ActivityTypeType } from '@/types/workout'; // Renaming imported ActivityType to avoid conflict with lucide-react
 import { TransformWrapper, TransformComponent, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
@@ -149,6 +149,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
 
   // State for hover highlight
   const [hoveredNodeIds, setHoveredNodeIds] = useState<Set<string>>(new Set());
+  const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
 
   // State for linking learning popover
   const [isLinkLearningPopoverOpen, setIsLinkLearningPopoverOpen] = useState(false);
@@ -157,6 +158,18 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
 
   // State for inline adding
   const [inlineAddInfo, setInlineAddInfo] = useState<{ parentVersionId: string; newFeatureName: string } | null>(null);
+
+  const toggleNode = useCallback((nodeId: string) => {
+    setCollapsedNodes(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(nodeId)) {
+            newSet.delete(nodeId);
+        } else {
+            newSet.add(nodeId);
+        }
+        return newSet;
+    });
+  }, []);
 
   useEffect(() => {
     if (defaultView) {
@@ -690,6 +703,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     }
     
     const isSchedulable = activityTypeForNode && ['FocusArea', 'Learning Task', 'Content Bundle'].includes(node.category);
+    const isCollapsed = collapsedNodes.has(node.id);
 
     return (
     <div className="flex items-center flex-row-reverse">
@@ -705,6 +719,20 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         isPastAndDone && "bg-background border-green-500/50",
         hoveredNodeIds.has(node.id) && "border-primary ring-2 ring-primary"
       )}>
+        {node.children && node.children.length > 0 && (
+          <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                  e.stopPropagation();
+                  toggleNode(node.id);
+              }}
+              className="absolute -left-3 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-background z-10"
+          >
+              {isCollapsed ? <PlusCircle className="h-4 w-4 text-primary" /> : <MinusCircle className="h-4 w-4 text-muted-foreground" />}
+              <span className="sr-only">{isCollapsed ? 'Expand' : 'Collapse'}</span>
+          </Button>
+        )}
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted flex-shrink-0">
             {nodeIcons[iconKey] || <GitBranch className="h-3.5 w-3.5 text-primary" />}
@@ -845,7 +873,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         ) : null}
       </div>
   
-      {node.children && node.children.length > 0 && (
+      {!isCollapsed && node.children && node.children.length > 0 && (
         <div className="flex items-center flex-row-reverse">
           <div className="w-4 h-px bg-border self-center" />
           <ul className="flex flex-col justify-center border-r border-border pr-4 space-y-2 py-1">
@@ -978,3 +1006,5 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     </>
   );
 }
+
+    
