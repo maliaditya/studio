@@ -32,7 +32,7 @@ export function Header() {
     { href: '/deep-work', label: 'Deep Work' },
     { href: '/personal-branding', label: 'Personal Branding' },
     { href: '/lead-generation', label: 'Lead Gen' },
-    { href: '/offer-system', label: 'Offer System' },
+    { href: '/offer-system', label: 'Defined Offers' },
     { href: '/productization', label: 'Productization' },
     { href: '/offerization', label: 'Offerization' },
     { href: '/matrix', label: 'Matrix' },
