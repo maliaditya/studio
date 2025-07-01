@@ -162,6 +162,19 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     }
   }, [defaultView, showControls]);
   
+  const totalTimePerFocusArea = useMemo(() => {
+    const timeMap = new Map<string, number>();
+    (allDeepWorkLogs || []).forEach(log => {
+        (log.exercises || []).forEach(ex => {
+            const duration = ex.loggedSets.reduce((sum, set) => sum + set.weight, 0);
+            if (duration > 0) {
+                timeMap.set(ex.definitionId, (timeMap.get(ex.definitionId) || 0) + duration);
+            }
+        });
+    });
+    return timeMap;
+  }, [allDeepWorkLogs]);
+
   const mindMapData = useMemo((): MindMapNode | null => {
     if (!selectedTopic) return null;
 
@@ -293,7 +306,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
 
     return () => clearTimeout(timer);
   }, [mindMapData]);
-
+  
   const scheduledTaskInfo = useMemo(() => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const todaysActivities = schedule[todayKey];
@@ -486,18 +499,6 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     return infoMap;
   }, [allUpskillLogs, allDeepWorkLogs, brandingLogs, deepWorkDefinitions]);
   
-  const totalTimePerFocusArea = useMemo(() => {
-    const timeMap = new Map<string, number>();
-    allDeepWorkLogs.forEach(log => {
-        log.exercises.forEach(ex => {
-            const duration = ex.loggedSets.reduce((sum, set) => sum + set.weight, 0);
-            if (duration > 0) {
-                timeMap.set(ex.definitionId, (timeMap.get(ex.definitionId) || 0) + duration);
-            }
-        });
-    });
-    return timeMap;
-  }, [allDeepWorkLogs]);
 
 
   const toggleFullScreen = () => {
@@ -654,7 +655,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     const loggedInfoForNode = loggedTaskInfo.get(node.definitionId);
     const pendingInfoForNode = pendingTaskInfo.get(node.definitionId);
     const pastLogForNode = pastLoggedTaskInfo.get(node.definitionId);
-
+    
     const isLoggedToday = !!loggedInfoForNode && loggedInfoForNode.type === activityTypeForNode;
     const isScheduledToday = !!scheduledInfoForNode && scheduledInfoForNode.type === activityTypeForNode;
     const isPending = !!pendingInfoForNode && pendingInfoForNode.type === activityTypeForNode && !isLoggedToday && !isScheduledToday;
@@ -689,6 +690,16 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         </div>
         
         <div className="absolute top-0 right-0 flex">
+            {node.category === 'Release' && (
+                <Button variant="ghost" size="icon" className="h-6 w-6"
+                    onClick={() => setInlineAddInfo({ parentReleaseId: node.id, newFeatureName: '' })}
+                >
+                    <PlusCircle className="h-4 w-4 text-primary" />
+                </Button>
+            )}
+        </div>
+        
+        <div className="absolute bottom-0 right-0 flex">
             {isSchedulable && !isLoggedToday && !isScheduledToday && !isPending && (
                 <Popover>
                     <PopoverTrigger asChild>
@@ -717,7 +728,6 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                     </PopoverContent>
                 </Popover>
             )}
-
             {node.category === 'FocusArea' && (
                 <Popover open={isLinkLearningPopoverOpen && linkingLearningToFocusArea?.id === node.id} onOpenChange={(isOpen) => { if (!isOpen) { setIsLinkLearningPopoverOpen(false); } }}>
                     <PopoverTrigger asChild>
@@ -758,15 +768,8 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
                     </PopoverContent>
                 </Popover>
             )}
-            
-            {node.category === 'Release' && (
-                <Button variant="ghost" size="icon" className="h-6 w-6"
-                    onClick={() => setInlineAddInfo({ parentReleaseId: node.id, newFeatureName: '' })}
-                >
-                    <PlusCircle className="h-4 w-4 text-primary" />
-                </Button>
-            )}
         </div>
+
 
         {(node.category === 'Release' || node.category === 'product' || node.category === 'service') && node.totalLoggedHours && node.totalLoggedHours > 0 && (
           <div className="mt-1 pt-1 border-t border-muted-foreground/20">
