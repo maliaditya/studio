@@ -1,12 +1,12 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
-import { Package, ArrowRight, DraftingCompass, Copy } from 'lucide-react';
+import { Package, ArrowRight, DraftingCompass, Copy, Download } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 
@@ -14,6 +14,7 @@ function OfferSystemPageContent() {
   const { offerizationPlans } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+  const offersContainerRef = useRef<HTMLDivElement>(null);
 
   const allOffers = useMemo(() => {
     return Object.entries(offerizationPlans || {})
@@ -81,19 +82,103 @@ Format / Delivery: ${offer.format || '-'}
     });
   };
 
+  const handleDownloadHtml = () => {
+    if (!offersContainerRef.current) {
+        toast({
+            title: "Download Failed",
+            description: "Could not find the content to download.",
+            variant: "destructive",
+        });
+        return;
+    }
+
+    const inlineStyles = `
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; background-color: #f9fafb; color: #111827; padding: 2rem; }
+      .container { max-width: 1200px; margin: 0 auto; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; }
+      .card { background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 0.75rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); display: flex; flex-direction: column; overflow: hidden; }
+      .card-header { padding: 1rem 1.5rem; border-bottom: 1px solid #e5e7eb; }
+      .card-title { font-size: 1.125rem; line-height: 1.75rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+      .card-description { color: #6b7280; font-size: 0.875rem; line-height: 1.25rem; margin-top: 0.25rem; }
+      .card-content { padding: 1.5rem; flex-grow: 1; }
+      .card-footer { padding: 1rem 1.5rem; border-top: 1px solid #e5e7eb; background-color: #f9fafb; }
+      h4 { font-weight: 600; font-size: 0.875rem; margin-bottom: 0.25rem; }
+      p, ul { color: #6b7280; font-size: 0.875rem; margin: 0; }
+      ul { list-style-position: inside; padding-left: 0.5rem; }
+      li { margin-bottom: 0.25rem; }
+      .grid-cols-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
+      svg { display: inline-block; width: 1.25em; height: 1.25em; }
+    `;
+
+    // Clone the node to avoid modifying the live DOM
+    const containerClone = offersContainerRef.current.cloneNode(true) as HTMLElement;
+    
+    // Remove all buttons from the cloned element
+    containerClone.querySelectorAll('button').forEach(btn => btn.remove());
+    
+    // Get the HTML of the cleaned content
+    const pageHtml = containerClone.innerHTML;
+
+    const fullHtml = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>LifeOS - Defined Offers</title>
+        <style>
+          ${inlineStyles}
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <header style="text-align: center; margin-bottom: 2rem;">
+            <h1 style="font-size: 2.25rem; font-weight: 700;">Defined Service Offers</h1>
+            <p style="font-size: 1.125rem; color: #6b7280; margin-top: 0.5rem;">A complete overview of all your tangible service offerings.</p>
+          </header>
+          <div class="grid">
+            ${pageHtml}
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([fullHtml], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'lifeos-offers.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Download Started",
+      description: "Your offers page is being downloaded as an HTML file."
+    });
+  };
+
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold tracking-tight text-primary">
-          Defined Service Offers
-        </h1>
+        <div className="flex justify-center items-center gap-4">
+            <h1 className="text-4xl font-bold tracking-tight text-primary">
+                Defined Service Offers
+            </h1>
+            <Button variant="outline" size="icon" onClick={handleDownloadHtml}>
+                <Download className="h-5 w-5" />
+                <span className="sr-only">Download as HTML</span>
+            </Button>
+        </div>
         <p className="mt-4 text-lg text-muted-foreground">
           A complete overview of all your tangible service offerings.
         </p>
       </div>
 
       {allOffers.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div ref={offersContainerRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {allOffers.map(offer => (
             <Card key={offer.id} className="flex flex-col">
               <CardHeader>
