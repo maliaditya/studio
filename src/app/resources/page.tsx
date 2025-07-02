@@ -590,7 +590,7 @@ function ResourcesPageContent() {
 
     <Dialog open={!!embedUrl} onOpenChange={(isOpen) => !isOpen && setEmbedUrl(null)}>
         <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
-            <DialogHeader className="p-4 pb-0 flex-shrink-0">
+            <DialogHeader className="sr-only">
                 <DialogTitle>Embedded Resource</DialogTitle>
                 <DialogDescriptionComponent className="truncate">
                     Viewing content from: <a href={embedUrl || ''} target="_blank" rel="noopener noreferrer" className="underline">{embedUrl}</a>
