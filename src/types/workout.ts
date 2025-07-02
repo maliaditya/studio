@@ -201,18 +201,12 @@ export interface Resource {
   name: string;
   link: string;
   description: string;
-  categoryId: string;
-  subcategoryId?: string;
+  folderId: string;
 }
 
-export interface ResourceCategory {
+export interface ResourceFolder {
   id: string;
   name: string;
-  icon: string; // Suggest using Lucide icon names
-}
-
-export interface ResourceSubcategory {
-  id: string;
-  name: string;
-  categoryId: string;
+  parentId: string | null;
+  icon?: string; // Optional: for root folders or special folders
 }

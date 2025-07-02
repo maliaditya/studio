@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceCategory, ResourceSubcategory } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -101,12 +101,10 @@ interface AuthContextType {
   copyOffer: (topic: string, offerId: string) => void;
 
   // Resources
+  resourceFolders: ResourceFolder[];
+  setResourceFolders: React.Dispatch<React.SetStateAction<ResourceFolder[]>>;
   resources: Resource[];
   setResources: React.Dispatch<React.SetStateAction<Resource[]>>;
-  resourceCategories: ResourceCategory[];
-  setResourceCategories: React.Dispatch<React.SetStateAction<ResourceCategory[]>>;
-  resourceSubcategories: ResourceSubcategory[];
-  setResourceSubcategories: React.Dispatch<React.SetStateAction<ResourceSubcategory[]>>;
 
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
@@ -169,8 +167,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Resources State
   const [resources, setResources] = useState<Resource[]>([]);
-  const [resourceCategories, setResourceCategories] = useState<ResourceCategory[]>([]);
-  const [resourceSubcategories, setResourceSubcategories] = useState<ResourceSubcategory[]>([]);
+  const [resourceFolders, setResourceFolders] = useState<ResourceFolder[]>([]);
 
 
   useEffect(() => {
@@ -227,10 +224,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`productization_plans_${username}`); setProductizationPlans(d ? JSON.parse(d) : {}); } catch (e) { setProductizationPlans({}); }
       try { const d = loadItem(`offerization_plans_${username}`); setOfferizationPlans(d ? JSON.parse(d) : {}); } catch (e) { setOfferizationPlans({}); }
 
-      // Resources
-      try { const d = loadItem(`resources_${username}`); setResources(d ? JSON.parse(d) : []); } catch (e) { setResources([]); }
-      try { const d = loadItem(`resourceCategories_${username}`); setResourceCategories(d ? JSON.parse(d) : []); } catch (e) { setResourceCategories([]); }
-      try { const d = loadItem(`resourceSubcategories_${username}`); setResourceSubcategories(d ? JSON.parse(d) : []); } catch (e) { setResourceSubcategories([]); }
+      // Resources Data Migration
+      const storedCategories = localStorage.getItem(`resourceCategories_${username}`);
+      const storedSubcategories = localStorage.getItem(`resourceSubcategories_${username}`);
+      const storedFolders = localStorage.getItem(`resourceFolders_${username}`);
+
+      if (storedFolders) {
+        setResourceFolders(JSON.parse(storedFolders));
+      } else if (storedCategories) {
+        const categories = JSON.parse(storedCategories);
+        const subcategories = storedSubcategories ? JSON.parse(storedSubcategories) : [];
+        const migratedFolders: ResourceFolder[] = [];
+        categories.forEach((cat: any) => {
+          migratedFolders.push({ id: cat.id, name: cat.name, parentId: null, icon: cat.icon });
+        });
+        subcategories.forEach((sub: any) => {
+          migratedFolders.push({ id: sub.id, name: sub.name, parentId: sub.categoryId });
+        });
+        setResourceFolders(migratedFolders);
+      } else {
+        setResourceFolders([]);
+      }
+
+      const storedResources = localStorage.getItem(`resources_${username}`);
+      if (storedResources) {
+          let resourcesData = JSON.parse(storedResources);
+          if (resourcesData.length > 0 && resourcesData[0].categoryId) {
+              resourcesData = resourcesData.map((res: any) => ({
+                  id: res.id,
+                  name: res.name,
+                  link: res.link,
+                  description: res.description,
+                  folderId: res.subcategoryId || res.categoryId,
+              }));
+          }
+          setResources(resourcesData);
+      } else {
+          setResources([]);
+      }
 
     } else {
       // Clear all data on logout
@@ -243,7 +274,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLeadGenDefinitions(LEAD_GEN_DEFINITIONS);
       setProductizationPlans({});
       setOfferizationPlans({});
-      setResources([]); setResourceCategories([]); setResourceSubcategories([]);
+      setResources([]); setResourceFolders([]);
     }
   }, [currentUser]);
 
@@ -281,15 +312,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Resources
       localStorage.setItem(`resources_${username}`, JSON.stringify(resources));
-      localStorage.setItem(`resourceCategories_${username}`, JSON.stringify(resourceCategories));
-      localStorage.setItem(`resourceSubcategories_${username}`, JSON.stringify(resourceSubcategories));
+      localStorage.setItem(`resourceFolders_${username}`, JSON.stringify(resourceFolders));
+      
+      // Clean up old resource keys after migration
+      localStorage.removeItem(`resourceCategories_${username}`);
+      localStorage.removeItem(`resourceSubcategories_${username}`);
     }
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
     schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
     exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, deepWorkTopicMetadata, leadGenDefinitions,
     productizationPlans, offerizationPlans,
-    resources, resourceCategories, resourceSubcategories,
+    resources, resourceFolders,
     currentUser, loading
   ]);
 
@@ -438,9 +472,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setDateOfBirth(data.dateOfBirth || null);
     setGender(data.gender || null);
     
-    setResources(data.resources || []);
-    setResourceCategories(data.resourceCategories || []);
-    setResourceSubcategories(data.resourceSubcategories || []);
+    // Resource Migration Logic
+    if (data.resourceFolders) {
+        setResourceFolders(data.resourceFolders);
+    } else if (data.resourceCategories) {
+        const migratedFolders: ResourceFolder[] = [];
+        data.resourceCategories.forEach((cat: any) => {
+            migratedFolders.push({ id: cat.id, name: cat.name, parentId: null, icon: cat.icon });
+        });
+        (data.resourceSubcategories || []).forEach((sub: any) => {
+            migratedFolders.push({ id: sub.id, name: sub.name, parentId: sub.categoryId });
+        });
+        setResourceFolders(migratedFolders);
+    } else {
+        setResourceFolders([]);
+    }
+
+    let resourcesData = data.resources || [];
+    if (resourcesData.length > 0 && resourcesData[0].categoryId) {
+        resourcesData = resourcesData.map((res: any) => ({
+            id: res.id, name: res.name, link: res.link, description: res.description,
+            folderId: res.subcategoryId || res.categoryId,
+        }));
+    }
+    setResources(resourcesData);
   };
   
   const register = async (username: string, password: string) => {
@@ -494,7 +549,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       offerizationPlans,
       schedule,
       dietPlan, weightLogs, goalWeight, height, dateOfBirth, gender,
-      resources, resourceCategories, resourceSubcategories,
+      resources, resourceFolders,
     };
   }
 
@@ -1191,7 +1246,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     updateTopic,
     deleteTopic,
     copyOffer,
-    resources, setResources, resourceCategories, setResourceCategories, resourceSubcategories, setResourceSubcategories,
+    resourceFolders, setResourceFolders,
+    resources, setResources,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
   };
