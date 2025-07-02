@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, FormEvent } from 'react';
+import React, { useState, useMemo, FormEvent, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
@@ -12,6 +12,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceCategory, ResourceSubcategory } from '@/types/workout';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 function ResourcesPageContent() {
   const { toast } = useToast();
@@ -32,6 +36,16 @@ function ResourcesPageContent() {
   const [editingCategory, setEditingCategory] = useState<ResourceCategory | null>(null);
   const [editingSubcategory, setEditingSubcategory] = useState<ResourceSubcategory | null>(null);
   
+  // State for editing a resource
+  const [editingResource, setEditingResource] = useState<Resource | null>(null);
+  const [editedResourceData, setEditedResourceData] = useState<Partial<Resource>>({});
+
+  useEffect(() => {
+    if (editingResource) {
+        setEditedResourceData(editingResource);
+    }
+  }, [editingResource]);
+
   const filteredResources = useMemo(() => {
     if (!selectedCategoryId) return [];
     let filtered = resources.filter(r => r.categoryId === selectedCategoryId);
@@ -134,8 +148,45 @@ function ResourcesPageContent() {
   const handleDeleteResource = (resourceId: string) => {
       setResources(prev => prev.filter(r => r.id !== resourceId));
   };
+  
+  const handleResourceDataChange = (field: keyof Resource, value: string) => {
+    if (field === 'categoryId') {
+        setEditedResourceData(prev => ({
+            ...prev,
+            categoryId: value,
+            subcategoryId: undefined
+        }));
+    } else if (field === 'subcategoryId') {
+        setEditedResourceData(prev => ({
+            ...prev,
+            subcategoryId: value === 'none' ? undefined : value
+        }));
+    } else {
+        setEditedResourceData(prev => ({...prev, [field]: value}));
+    }
+  };
+
+  const handleSaveResourceEdit = () => {
+    if (!editingResource || !editedResourceData.name?.trim() || !editedResourceData.link?.trim() || !editedResourceData.categoryId) {
+        toast({ title: "Error", description: "Name, link, and category are required.", variant: "destructive"});
+        return;
+    }
+    setResources(prev =>
+        prev.map(res =>
+            res.id === editingResource.id ? { ...res, ...editedResourceData } as Resource : res
+        )
+    );
+    setEditingResource(null);
+    toast({ title: "Resource Updated", description: `"${editedResourceData.name}" has been updated.` });
+  };
+  
+  const subcategoriesForSelectedCategoryInDialog = useMemo(() => {
+    if (!editedResourceData.categoryId) return [];
+    return resourceSubcategories.filter(sc => sc.categoryId === editedResourceData.categoryId);
+  }, [editedResourceData.categoryId, resourceSubcategories]);
 
   return (
+    <>
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
         {/* Left Sidebar */}
@@ -262,9 +313,12 @@ function ResourcesPageContent() {
                                         Visit Site <ExternalLink className="ml-2 h-4 w-4"/>
                                     </a>
                                 </Button>
-                                <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteResource(res.id)}>
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
+                                <div className="flex">
+                                    <Button variant="ghost" size="icon" onClick={() => setEditingResource(res)}><Edit className="h-4 w-4" /></Button>
+                                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteResource(res.id)}>
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
                             </CardFooter>
                         </Card>
                     ))}
@@ -279,6 +333,61 @@ function ResourcesPageContent() {
         </main>
       </div>
     </div>
+    
+    <Dialog open={!!editingResource} onOpenChange={(isOpen) => !isOpen && setEditingResource(null)}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Edit Resource</DialogTitle>
+                <DialogDescription>Update the details or move this resource to a new category.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="res-name" className="text-right">Name</Label>
+                    <Input id="res-name" value={editedResourceData.name || ''} onChange={(e) => handleResourceDataChange('name', e.target.value)} className="col-span-3"/>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="res-link" className="text-right">Link</Label>
+                    <Input id="res-link" value={editedResourceData.link || ''} onChange={(e) => handleResourceDataChange('link', e.target.value)} className="col-span-3"/>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="res-desc" className="text-right">Description</Label>
+                    <Textarea id="res-desc" value={editedResourceData.description || ''} onChange={(e) => handleResourceDataChange('description', e.target.value)} className="col-span-3"/>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="res-cat" className="text-right">Category</Label>
+                    <Select value={editedResourceData.categoryId || ''} onValueChange={(value) => handleResourceDataChange('categoryId', value)}>
+                        <SelectTrigger id="res-cat" className="col-span-3">
+                            <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {resourceCategories.map(cat => (
+                                <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                 <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="res-subcat" className="text-right">Subcategory</Label>
+                    <Select value={editedResourceData.subcategoryId || 'none'} onValueChange={(value) => handleResourceDataChange('subcategoryId', value)} disabled={!editedResourceData.categoryId}>
+                        <SelectTrigger id="res-subcat" className="col-span-3">
+                            <SelectValue placeholder="Select (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="none">-- Main Category --</SelectItem>
+                            {subcategoriesForSelectedCategoryInDialog.map(sub => (
+                                <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingResource(null)}>Cancel</Button>
+                <Button onClick={handleSaveResourceEdit}>Save Changes</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
