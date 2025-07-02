@@ -360,21 +360,19 @@ function ResourcesPageContent() {
                         <ChevronDown className={cn("h-4 w-4 transition-transform", collapsedFolders.has(folder.id) && "-rotate-90", resourceFolders.every(f => f.parentId !== folder.id) && "invisible")} />
                         <Folder className="h-4 w-4"/>
                         <span className='flex-grow truncate'>{folder.name}</span>
-                        {level === 0 && (
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setMindMapRootFolderId(folder.id);
-                                    setIsMindMapModalOpen(true);
-                                }}
-                            >
-                                <GitMerge className="h-4 w-4" />
-                                <span className="sr-only">View Mind Map for {folder.name}</span>
-                            </Button>
-                        )}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setMindMapRootFolderId(folder.id);
+                                setIsMindMapModalOpen(true);
+                            }}
+                        >
+                            <GitMerge className="h-4 w-4" />
+                            <span className="sr-only">View Mind Map for {folder.name}</span>
+                        </Button>
                     </div>
                 )}
                 {!collapsedFolders.has(folder.id) && renderSidebarFolders(folder.id, level + 1)}
