@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2 } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -52,6 +52,23 @@ const getYouTubeEmbedUrl = (url: string): string | null => {
     return null;
 };
 
+const isNotionUrl = (url: string): boolean => {
+    try {
+        const urlObj = new URL(url);
+        return urlObj.hostname.endsWith('notion.so');
+    } catch (e) {
+        return false;
+    }
+};
+
+const isObsidianUrl = (url: string): boolean => {
+    try {
+        const urlObj = new URL(url);
+        return urlObj.hostname === 'share.note.sx';
+    } catch (e) {
+        return false;
+    }
+};
 
 function ResourcesPageContent() {
   const { toast } = useToast();
@@ -70,6 +87,7 @@ function ResourcesPageContent() {
   
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   const [editedResourceData, setEditedResourceData] = useState<Partial<Resource>>({});
+  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
 
   const [contextMenu, setContextMenu] = useState<{
     mouseX: number;
@@ -410,15 +428,17 @@ function ResourcesPageContent() {
                   )}
 
                   {filteredResources.map(res => {
-                    const embedUrl = getYouTubeEmbedUrl(res.link);
+                    const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
+                    const isSpecialEmbed = isNotionUrl(res.link) || isObsidianUrl(res.link);
+                    
                     return (
                         <Card key={res.id} className="flex flex-col">
-                            {embedUrl ? (
+                            {youtubeEmbedUrl ? (
                                 <div className="aspect-video w-full bg-black rounded-t-lg">
                                     <iframe
                                         width="100%"
                                         height="100%"
-                                        src={embedUrl}
+                                        src={youtubeEmbedUrl}
                                         title={res.name}
                                         frameBorder="0"
                                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -429,30 +449,38 @@ function ResourcesPageContent() {
                             ) : null}
                             <CardHeader>
                                 <CardTitle className="text-lg flex items-center gap-2">
-                                    {res.iconUrl ? (
+                                    {isSpecialEmbed ? (
+                                        <Globe className="h-4 w-4" />
+                                    ) : res.iconUrl ? (
                                         <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm" />
                                     ) : (
                                         <LinkIcon className="h-4 w-4" />
                                     )}
                                     <span className="truncate" title={res.name}>{res.name}</span>
                                 </CardTitle>
-                                {!embedUrl && (
+                                {!youtubeEmbedUrl && (
                                     <CardDescription className="flex items-center gap-1 text-xs truncate">
                                         <a href={res.link} target="_blank" rel="noopener noreferrer" className="hover:underline">{res.link}</a>
                                     </CardDescription>
                                 )}
                             </CardHeader>
-                            {!embedUrl && (
+                            {!youtubeEmbedUrl && (
                                 <CardContent className="flex-grow">
                                     <p className="text-sm text-muted-foreground">{res.description || 'No description.'}</p>
                                 </CardContent>
                             )}
                             <CardFooter className="flex justify-between items-center mt-auto pt-6">
-                                <Button asChild variant="outline">
-                                <a href={res.link} target="_blank" rel="noopener noreferrer">
-                                    Visit Site <ExternalLink className="ml-2 h-4 w-4" />
-                                </a>
-                                </Button>
+                                {isSpecialEmbed ? (
+                                  <Button variant="outline" onClick={() => setEmbedUrl(res.link)}>
+                                      View in App
+                                  </Button>
+                                ) : (
+                                  <Button asChild variant="outline">
+                                      <a href={res.link} target="_blank" rel="noopener noreferrer">
+                                          Visit Site <ExternalLink className="ml-2 h-4 w-4" />
+                                      </a>
+                                  </Button>
+                                )}
                                 <div className="flex">
                                 <Button variant="ghost" size="icon" onClick={() => setEditingResource(res)}><Edit className="h-4 w-4" /></Button>
                                 <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteResource(res.id)}>
@@ -559,6 +587,27 @@ function ResourcesPageContent() {
             </DialogFooter>
         </DialogContent>
     </Dialog>
+
+    <Dialog open={!!embedUrl} onOpenChange={(isOpen) => !isOpen && setEmbedUrl(null)}>
+        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
+            <DialogHeader className="p-4 pb-0 flex-shrink-0">
+                <DialogTitle>Embedded Resource</DialogTitle>
+                <DialogDescriptionComponent className="truncate">
+                    Viewing content from: <a href={embedUrl || ''} target="_blank" rel="noopener noreferrer" className="underline">{embedUrl}</a>
+                </DialogDescriptionComponent>
+            </DialogHeader>
+            <div className="flex-grow min-h-0">
+                {embedUrl && (
+                    <iframe
+                        src={embedUrl}
+                        className="w-full h-full border-0 rounded-md"
+                        title="Embedded Resource"
+                        sandbox="allow-scripts allow-same-origin allow-forms"
+                    ></iframe>
+                )}
+            </div>
+        </DialogContent>
+    </Dialog>
     </>
   );
 }
@@ -566,4 +615,3 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
-
