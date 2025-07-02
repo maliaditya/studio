@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
@@ -16,6 +17,20 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const getFaviconUrl = (link: string): string | undefined => {
+  try {
+      let url = link;
+      if (!url.startsWith('http')) {
+          url = `https://${url}`;
+      }
+      const urlObject = new URL(url);
+      return `https://www.google.com/s2/favicons?domain=${urlObject.hostname}&sz=32`;
+  } catch (e) {
+      console.error("Invalid URL for favicon:", e);
+      return undefined;
+  }
+};
 
 function ResourcesPageContent() {
   const { toast } = useToast();
@@ -185,6 +200,7 @@ function ResourcesPageContent() {
         link: fullLink,
         description: newResource.description.trim(),
         folderId: selectedFolderId,
+        iconUrl: getFaviconUrl(fullLink),
     };
     setResources(prev => [...prev, newRes]);
     setNewResource({ name: '', link: '', description: '' });
@@ -204,9 +220,15 @@ function ResourcesPageContent() {
         toast({ title: "Error", description: "Name, link, and folder are required.", variant: "destructive"});
         return;
     }
+    
+    const finalData = { ...editedResourceData };
+    if (finalData.link && finalData.link !== editingResource?.link) {
+        finalData.iconUrl = getFaviconUrl(finalData.link);
+    }
+
     setResources(prev =>
         prev.map(res =>
-            res.id === editingResource.id ? { ...res, ...editedResourceData } as Resource : res
+            res.id === editingResource.id ? { ...res, ...finalData } as Resource : res
         )
     );
     setEditingResource(null);
@@ -334,9 +356,15 @@ function ResourcesPageContent() {
                   {filteredResources.map(res => (
                     <Card key={res.id} className="flex flex-col">
                       <CardHeader>
-                        <CardTitle className="text-lg">{res.name}</CardTitle>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            {res.iconUrl ? (
+                                <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm" />
+                            ) : (
+                                <LinkIcon className="h-4 w-4" />
+                            )}
+                            <span>{res.name}</span>
+                        </CardTitle>
                         <CardDescription className="flex items-center gap-1 text-xs truncate">
-                          <LinkIcon className="h-3 w-3" />
                           <a href={res.link} target="_blank" rel="noopener noreferrer" className="hover:underline">{res.link}</a>
                         </CardDescription>
                       </CardHeader>

@@ -202,6 +202,7 @@ export interface Resource {
   link: string;
   description: string;
   folderId: string;
+  iconUrl?: string;
 }
 
 export interface ResourceFolder {
