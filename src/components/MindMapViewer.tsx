@@ -5,8 +5,8 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle, Link as LinkIcon, Save, MinusCircle } from 'lucide-react';
-import type { ExerciseDefinition, Release, DatedWorkout, ActivityType as ActivityTypeType } from '@/types/workout'; // Renaming imported ActivityType to avoid conflict with lucide-react
+import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle, Link as LinkIcon, Save, MinusCircle, Folder, ExternalLink } from 'lucide-react';
+import type { ExerciseDefinition, Release, DatedWorkout, ActivityType as ActivityTypeType, Resource, ResourceFolder as ResourceFolderType } from '@/types/workout'; // Renaming imported ActivityType to avoid conflict with lucide-react
 import { TransformWrapper, TransformComponent, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -108,7 +108,7 @@ const ConceptualFlowDiagram = () => {
 };
 
 
-interface MindMapNode extends Partial<ExerciseDefinition>, Partial<Release> {
+interface MindMapNode extends Partial<ExerciseDefinition>, Partial<Release>, Partial<Resource> {
   id: string;
   definitionId: string;
   name: string;
@@ -139,6 +139,8 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
       scheduleTaskFromMindMap,
       addFeatureToRelease,
       setDeepWorkDefinitions,
+      resources,
+      resourceFolders,
   } = useAuth();
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -191,6 +193,23 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     });
     return timeMap;
   }, [allDeepWorkLogs]);
+
+  const allTopics = useMemo(() => {
+    const productAndServiceTopics = Object.keys(deepWorkTopicMetadata).sort();
+    const hasBundles = deepWorkDefinitions.some(def => Array.isArray(def.focusAreaIds));
+    const hasResources = resourceFolders.length > 0;
+    
+    const availableTopics = [];
+    if (hasBundles) {
+      availableTopics.push("Content Bundles");
+    }
+    if (hasResources) {
+        availableTopics.push("Resources");
+    }
+    availableTopics.push(...productAndServiceTopics);
+    
+    return ["Strategic Overview", ...availableTopics.sort()];
+  }, [deepWorkTopicMetadata, deepWorkDefinitions, resourceFolders]);
 
   const mindMapData = useMemo((): MindMapNode | null => {
     if (!selectedTopic) return null;
@@ -247,6 +266,46 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
             totalLoggedHours: totalTopicHours > 0 ? totalTopicHours : undefined
         };
     };
+
+    if (selectedTopic === 'Resources') {
+        const buildFolderTree = (parentId: string | null): MindMapNode[] => {
+            const folders = resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => a.name.localeCompare(b.name));
+            
+            const nodes = folders.map(folder => {
+                const childrenResources = resources
+                    .filter(r => r.folderId === folder.id)
+                    .sort((a,b) => a.name.localeCompare(b.name))
+                    .map(resource => ({
+                        ...resource,
+                        id: resource.id,
+                        definitionId: resource.id,
+                        category: 'Resource',
+                        children: [],
+                    }));
+                
+                const childrenFolders = buildFolderTree(folder.id);
+    
+                return {
+                    id: folder.id,
+                    definitionId: folder.id,
+                    name: folder.name,
+                    category: 'Folder',
+                    children: [...childrenFolders, ...childrenResources],
+                };
+            });
+            return nodes;
+        };
+    
+        const rootFolders = buildFolderTree(null);
+        
+        return {
+            id: 'resources-root',
+            definitionId: 'resources-root',
+            name: 'Resource Library',
+            category: 'System',
+            children: rootFolders,
+        };
+    }
 
     if (selectedTopic === 'Strategic Overview') {
         const productNodes = Object.keys(productizationPlans)
@@ -312,7 +371,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     const type = productizationPlans[selectedTopic] ? 'product' : 'service';
     return buildFullTopicTree(selectedTopic, plan, type);
 
-  }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, totalTimePerFocusArea]);
+  }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, totalTimePerFocusArea, resources, resourceFolders]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -540,18 +599,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     return () => document.removeEventListener('fullscreenchange', handleFullScreenChange);
   }, []);
 
-  const allTopics = useMemo(() => {
-    const productAndServiceTopics = Object.keys(deepWorkTopicMetadata).sort();
-    const hasBundles = deepWorkDefinitions.some(def => Array.isArray(def.focusAreaIds));
-    
-    const availableTopics = [];
-    if (hasBundles) {
-      availableTopics.push("Content Bundles");
-    }
-    availableTopics.push(...productAndServiceTopics);
-    
-    return ["Strategic Overview", ...availableTopics.sort()];
-  }, [deepWorkTopicMetadata, deepWorkDefinitions]);
+  
 
   // Modal Handlers
   const handleSaveNewFeature = () => {
@@ -670,13 +718,17 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         'Social:X/Twitter': <TwitterIcon className="h-3 w-3 text-muted-foreground" />,
         'Social:LinkedIn': <Linkedin className="h-3 w-3 text-muted-foreground" />,
         'Social:Dev.to': <DevToIcon className="h-3 w-3 text-muted-foreground" />,
+        'Folder': <Folder className="h-3.5 w-3.5 text-yellow-600" />,
+        'Resource': <LinkIcon className="h-3 w-3 text-muted-foreground" />,
     };
     
     let iconKey = node.category;
     if (node.category === 'System Branch') iconKey = `System Branch:${node.name}`;
     if (node.category === 'Social') iconKey = `Social:${node.name}`;
     if (node.category === deepWorkTopicMetadata[node.name]?.classification) iconKey = node.category;
-    if (!nodeIcons[iconKey] && level >= 4) iconKey = 'FocusArea';
+    if (!nodeIcons[iconKey] && level >= 4 && selectedTopic !== 'Resources') iconKey = 'FocusArea';
+    if (node.category === 'Folder') iconKey = 'Folder';
+    if (node.category === 'Resource') iconKey = 'Resource';
 
     let activityTypeForNode: ActivityTypeType | undefined;
     if (parentNode?.category === 'Release' || parentNode?.category === 'product' || parentNode?.category === 'service' || parentNode?.name === 'Products' || parentNode?.name === 'Services') {
@@ -744,6 +796,13 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
         </div>
         
         <div className="absolute top-0 right-0 flex">
+            {node.category === 'Resource' && node.link && (
+                <a href={node.link} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6">
+                        <ExternalLink className="h-4 w-4 text-primary" />
+                    </Button>
+                </a>
+            )}
             {node.category === 'Release' && (
                 <Button variant="ghost" size="icon" className="h-6 w-6"
                     onClick={() => setInlineAddInfo({ parentReleaseId: node.id, newFeatureName: '' })}
