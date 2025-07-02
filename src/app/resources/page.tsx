@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Sparkles } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -59,6 +59,7 @@ function ResourcesPageContent() {
 
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ item: ResourceFolder } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [isFetchingMeta, setIsFetchingMeta] = useState(false);
 
   useEffect(() => {
     if (editingResource) {
@@ -221,7 +222,7 @@ function ResourcesPageContent() {
         return;
     }
     
-    const finalData = { ...editedResourceData };
+    let finalData = { ...editedResourceData };
     if (finalData.link && finalData.link !== editingResource?.link) {
         finalData.iconUrl = getFaviconUrl(finalData.link);
     }
@@ -233,6 +234,38 @@ function ResourcesPageContent() {
     );
     setEditingResource(null);
     toast({ title: "Resource Updated", description: `"${editedResourceData.name}" has been updated.` });
+  };
+  
+  const handleFetchMetadata = async () => {
+    if (!newResource.link.trim()) {
+      toast({ title: "No URL", description: "Please enter a URL to fetch info.", variant: "destructive" });
+      return;
+    }
+    setIsFetchingMeta(true);
+    try {
+      const response = await fetch('/api/get-link-metadata', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: newResource.link }),
+      });
+      
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fetch metadata.');
+      }
+      
+      setNewResource(prev => ({
+        ...prev,
+        name: result.title || prev.name,
+        description: result.description || prev.description,
+      }));
+      toast({ title: "Metadata Fetched!", description: "Name and description have been populated." });
+
+    } catch (error) {
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Could not fetch metadata from URL.", variant: "destructive" });
+    } finally {
+      setIsFetchingMeta(false);
+    }
   };
   
   const renderFolderOptions = useCallback((parentId: string | null, level: number): JSX.Element[] => {
@@ -335,7 +368,13 @@ function ResourcesPageContent() {
                       </CardHeader>
                       <CardContent className="p-4 pt-0 space-y-3 flex-grow">
                           <Input autoFocus placeholder="Name (e.g., Google Fonts)" value={newResource.name} onChange={e => setNewResource({...newResource, name: e.target.value})} />
-                          <Input placeholder="URL (e.g., fonts.google.com)" value={newResource.link} onChange={e => setNewResource({...newResource, link: e.target.value})} />
+                          <div className="flex gap-2">
+                            <Input placeholder="URL" value={newResource.link} onChange={e => setNewResource({...newResource, link: e.target.value})} className="flex-grow" />
+                            <Button variant="outline" size="icon" onClick={handleFetchMetadata} disabled={isFetchingMeta}>
+                              {isFetchingMeta ? <Loader2 className="h-4 w-4 animate-spin"/> : <Sparkles className="h-4 w-4"/>}
+                              <span className="sr-only">Fetch Info</span>
+                            </Button>
+                          </div>
                           <Textarea placeholder="Description (optional)" value={newResource.description} onChange={e => setNewResource({...newResource, description: e.target.value})} className="min-h-[50px] flex-grow" />
                       </CardContent>
                       <CardFooter className="p-4 pt-0 flex justify-end gap-2">
@@ -362,7 +401,7 @@ function ResourcesPageContent() {
                             ) : (
                                 <LinkIcon className="h-4 w-4" />
                             )}
-                            <span>{res.name}</span>
+                            <span className="truncate" title={res.name}>{res.name}</span>
                         </CardTitle>
                         <CardDescription className="flex items-center gap-1 text-xs truncate">
                           <a href={res.link} target="_blank" rel="noopener noreferrer" className="hover:underline">{res.link}</a>
