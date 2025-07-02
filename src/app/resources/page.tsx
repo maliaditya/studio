@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -416,49 +416,53 @@ function ResourcesPageContent() {
               </h2>
               
               {selectedFolderId ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                   {isAdding ? (
-                    <Card className="flex flex-col border-primary ring-2 ring-primary">
-                        <div className="p-3 flex flex-col flex-grow justify-between">
-                            <div>
-                                <p className="text-sm font-semibold">Add New Resource</p>
-                                <p className="text-xs text-muted-foreground mb-3">Enter a URL to fetch its details.</p>
-                                <Input
-                                    className="h-9"
-                                    autoFocus
-                                    placeholder="https://example.com"
-                                    value={newResource.link}
-                                    onChange={(e) => setNewResource({ name: '', link: e.target.value, description: '' })}
-                                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddResource(); }}
-                                />
-                            </div>
-                            <div className="flex justify-end gap-2 mt-3">
-                                <Button variant="ghost" size="sm" onClick={() => { setIsAdding(false); setNewResource({ name: '', link: '', description: '' }); }}>Cancel</Button>
-                                <Button size="sm" onClick={handleAddResource} disabled={isFetchingMeta}>
-                                    {isFetchingMeta ? <Loader2 className="h-4 w-4 animate-spin"/> : "Save"}
-                                </Button>
-                            </div>
+                    <Card className="rounded-3xl flex flex-col border-primary ring-2 ring-primary shadow-xl">
+                      <div className="p-5 flex flex-col flex-grow justify-between">
+                        <div>
+                          <p className="text-base font-semibold">Add New Resource</p>
+                          <p className="text-sm text-muted-foreground mb-4">Enter a URL to fetch its details.</p>
+                          <Input
+                            className="h-10 text-base"
+                            autoFocus
+                            placeholder="https://example.com"
+                            value={newResource.link}
+                            onChange={(e) => setNewResource({ name: '', link: e.target.value, description: '' })}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleAddResource(); }}
+                          />
                         </div>
+                        <div className="flex justify-end gap-2 mt-4">
+                          <Button variant="ghost" size="sm" onClick={() => { setIsAdding(false); setNewResource({ name: '', link: '', description: '' }); }}>Cancel</Button>
+                          <Button size="sm" onClick={handleAddResource} disabled={isFetchingMeta}>
+                            {isFetchingMeta ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                          </Button>
+                        </div>
+                      </div>
                     </Card>
                   ) : (
                     <Card 
                       onClick={() => setIsAdding(true)}
-                      className="flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-colors cursor-pointer min-h-[180px]"
+                      className="rounded-3xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[220px] hover:shadow-xl hover:-translate-y-1"
                     >
-                        <PlusCircle className="h-8 w-8 text-muted-foreground" />
-                        <p className="mt-2 text-sm font-semibold text-muted-foreground">Add New Resource</p>
+                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add New Resource</p>
                     </Card>
                   )}
 
                   {filteredResources.map(res => {
                     const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                     const isSpecialEmbed = isNotionUrl(res.link) || isObsidianUrl(res.link);
-                    
+                    const isLongContent = res.name.length > 20 && res.description.length > 30;
+
                     return (
-                        <Card key={res.id} className="flex flex-col overflow-hidden">
+                        <Card key={res.id} className={cn(
+                            "rounded-3xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5",
+                            isLongContent ? "bg-gradient-to-br from-card to-muted/20" : "bg-card"
+                        )}>
                             {youtubeEmbedUrl ? (
                                 <>
-                                    <div className="aspect-video w-full bg-black">
+                                    <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl">
                                         <iframe
                                             width="100%"
                                             height="100%"
@@ -469,12 +473,12 @@ function ResourcesPageContent() {
                                             allowFullScreen
                                         ></iframe>
                                     </div>
-                                    <div className="p-3">
+                                    <div className="p-4">
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="flex-grow min-w-0">
                                                 <div className="flex items-center gap-2">
-                                                    <Youtube className="h-4 w-4 flex-shrink-0 text-red-500" />
-                                                    <p className="text-sm font-semibold truncate" title={res.name}>{res.name}</p>
+                                                    <Youtube className="h-5 w-5 flex-shrink-0 text-red-500" />
+                                                    <p className="text-base font-bold truncate" title={res.name}>{res.name}</p>
                                                 </div>
                                             </div>
                                             <DropdownMenu>
@@ -492,20 +496,19 @@ function ResourcesPageContent() {
                                     </div>
                                 </>
                             ) : (
-                                <div className="p-3 flex flex-col flex-grow">
+                                <div className="p-5 flex flex-col flex-grow">
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="flex-grow min-w-0">
                                             <div className="flex items-center gap-2">
                                                 {isSpecialEmbed ? (
-                                                    <Globe className="h-4 w-4 flex-shrink-0" />
+                                                    <Globe className="h-4 w-4 flex-shrink-0 text-primary" />
                                                 ) : res.iconUrl ? (
                                                     <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm flex-shrink-0" />
                                                 ) : (
                                                     <LinkIcon className="h-4 w-4 flex-shrink-0" />
                                                 )}
-                                                <p className="text-sm font-semibold truncate" title={res.name}>{res.name}</p>
+                                                <p className="text-base font-bold" title={res.name}>{res.name}</p>
                                             </div>
-                                            <a href={res.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline mt-0.5">{res.link}</a>
                                         </div>
                                          <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
@@ -519,16 +522,17 @@ function ResourcesPageContent() {
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </div>
-                                    <p className="text-xs text-muted-foreground mt-2 line-clamp-2 flex-grow min-h-[40px]">
+                                    <a href={res.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline mt-1">{res.link}</a>
+                                    <p className="text-sm text-muted-foreground mt-3 line-clamp-3 flex-grow min-h-[60px]">
                                         {res.description || 'No description available.'}
                                     </p>
-                                    <div className="mt-auto pt-3 border-t">
+                                    <div className="mt-auto pt-4">
                                         {isSpecialEmbed ? (
-                                          <Button variant="outline" size="sm" className="w-full" onClick={() => setEmbedUrl(res.link)}>
+                                          <Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(res.link)}>
                                               View in App
                                           </Button>
                                         ) : (
-                                          <Button asChild variant="outline" size="sm" className="w-full">
+                                          <Button asChild variant="secondary" size="sm" className="w-full">
                                               <a href={res.link} target="_blank" rel="noopener noreferrer">
                                                   Visit Site <ExternalLink className="ml-2 h-3 w-3" />
                                               </a>
@@ -639,9 +643,6 @@ function ResourcesPageContent() {
 
     <Dialog open={!!embedUrl} onOpenChange={(isOpen) => !isOpen && setEmbedUrl(null)}>
         <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
-            <DialogHeader className="sr-only">
-                <DialogTitle>Embedded Resource</DialogTitle>
-            </DialogHeader>
             <div className="flex-grow min-h-0">
                 {embedUrl && (
                     <iframe
