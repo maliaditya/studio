@@ -27,7 +27,6 @@ function ResourcesPageContent() {
   
   // State for forms
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [newSubcategoryName, setNewSubcategoryName] = useState('');
   const [newResource, setNewResource] = useState({ name: '', link: '', description: '' });
 
   // State for UI control
@@ -93,19 +92,15 @@ function ResourcesPageContent() {
     setEditingCategory(null);
   };
   
-  const handleAddSubcategory = (e: FormEvent) => {
-    e.preventDefault();
-    if (!selectedCategoryId || !newSubcategoryName.trim()) {
-        toast({ title: "Error", description: "Select a category and provide a subcategory name.", variant: "destructive" });
-        return;
-    }
+  const handleAddNewSubcategory = (categoryId: string) => {
+    if (!categoryId) return;
     const newSub: ResourceSubcategory = {
-        id: `sub_${Date.now()}`,
-        name: newSubcategoryName.trim(),
-        categoryId: selectedCategoryId,
+      id: `sub_${Date.now()}`,
+      name: "New Subcategory",
+      categoryId: categoryId,
     };
     setResourceSubcategories(prev => [...prev, newSub]);
-    setNewSubcategoryName('');
+    setEditingSubcategory(newSub); // Enter edit mode immediately
   };
 
   const handleDeleteSubcategory = (subcategoryId: string) => {
@@ -215,6 +210,7 @@ function ResourcesPageContent() {
                           <Folder className="h-4 w-4"/> {cat.name}
                         </Button>
                         <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handleAddNewSubcategory(cat.id)}><PlusCircle className="h-4 w-4" /></Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingCategory(cat)}><Edit className="h-4 w-4"/></Button>
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
@@ -229,7 +225,7 @@ function ResourcesPageContent() {
                       </div>
                     )}
                     {selectedCategoryId === cat.id && (
-                        <div className="pl-4 mt-2 space-y-2">
+                        <div className="pl-4 mt-2">
                            <ul className="space-y-1">
                                 {resourceSubcategories.filter(sc => sc.categoryId === cat.id).map(sub => (
                                     <li key={sub.id} className="group/sub">
@@ -259,10 +255,6 @@ function ResourcesPageContent() {
                                     </li>
                                 ))}
                             </ul>
-                            <form onSubmit={handleAddSubcategory} className="flex gap-2">
-                                <Input value={newSubcategoryName} onChange={e => setNewSubcategoryName(e.target.value)} placeholder="New Subcategory" className="h-9"/>
-                                <Button size="icon" type="submit" className="h-9 w-9"><PlusCircle className="h-4 w-4" /></Button>
-                            </form>
                         </div>
                     )}
                   </li>
