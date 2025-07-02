@@ -122,9 +122,10 @@ interface MindMapNode extends Partial<ExerciseDefinition>, Partial<Release>, Par
 interface MindMapViewerProps {
     defaultView?: string | null;
     showControls?: boolean;
+    rootFolderId?: string | null;
 }
 
-export function MindMapViewer({ defaultView, showControls = true }: MindMapViewerProps) {
+export function MindMapViewer({ defaultView, showControls = true, rootFolderId = null }: MindMapViewerProps) {
   const { toast } = useToast();
   const { 
       deepWorkDefinitions, 
@@ -296,6 +297,30 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
             return nodes;
         };
     
+        if (rootFolderId) {
+            const rootFolder = resourceFolders.find(f => f.id === rootFolderId);
+            if (rootFolder) {
+                 const childrenFolders = buildFolderTree(rootFolder.id);
+                 const childrenResources = resources.filter(r => r.folderId === rootFolder.id)
+                    .sort((a,b) => a.name.localeCompare(b.name))
+                    .map(resource => ({
+                        ...resource,
+                        id: resource.id,
+                        definitionId: resource.id,
+                        category: 'Resource',
+                        children: [],
+                    }));
+
+                 return {
+                    id: rootFolder.id,
+                    definitionId: rootFolder.id,
+                    name: rootFolder.name,
+                    category: 'Folder',
+                    children: [...childrenFolders, ...childrenResources],
+                };
+            }
+        }
+    
         const rootFolders = buildFolderTree(null);
         
         return {
@@ -371,7 +396,7 @@ export function MindMapViewer({ defaultView, showControls = true }: MindMapViewe
     const type = productizationPlans[selectedTopic] ? 'product' : 'service';
     return buildFullTopicTree(selectedTopic, plan, type);
 
-  }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, totalTimePerFocusArea, resources, resourceFolders]);
+  }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, totalTimePerFocusArea, resources, resourceFolders, rootFolderId]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

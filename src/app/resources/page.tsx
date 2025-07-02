@@ -100,7 +100,9 @@ function ResourcesPageContent() {
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ item: ResourceFolder } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isFetchingMeta, setIsFetchingMeta] = useState(false);
+  
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
+  const [mindMapRootFolderId, setMindMapRootFolderId] = useState<string | null>(null);
 
   useEffect(() => {
     if (editingResource) {
@@ -179,7 +181,7 @@ function ResourcesPageContent() {
     if (!editingFolder) return;
     if (!editingFolder.name.trim()) {
         toast({ title: "Rename Cancelled", description: "Folder name cannot be empty.", variant: "destructive" });
-        setEditingFolder(null);
+        cancelFolderEdit();
         return;
     }
     setResourceFolders(prev => prev.map(f => f.id === editingFolder.id ? editingFolder : f));
@@ -352,11 +354,26 @@ function ResourcesPageContent() {
                         onClick={() => { setSelectedFolderId(folder.id); toggleFolderCollapse(folder.id); }}
                         onDoubleClick={() => setEditingFolder(folder)}
                         onContextMenu={(e) => handleContextMenu(e, folder)}
-                        className={cn("flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer", selectedFolderId === folder.id && "bg-muted")}
+                        className={cn("flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer group", selectedFolderId === folder.id && "bg-muted")}
                     >
                         <ChevronDown className={cn("h-4 w-4 transition-transform", collapsedFolders.has(folder.id) && "-rotate-90", resourceFolders.every(f => f.parentId !== folder.id) && "invisible")} />
                         <Folder className="h-4 w-4"/>
                         <span className='flex-grow truncate'>{folder.name}</span>
+                        {level === 0 && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setMindMapRootFolderId(folder.id);
+                                    setIsMindMapModalOpen(true);
+                                }}
+                            >
+                                <GitMerge className="h-4 w-4" />
+                                <span className="sr-only">View Mind Map for {folder.name}</span>
+                            </Button>
+                        )}
                     </div>
                 )}
                 {!collapsedFolders.has(folder.id) && renderSidebarFolders(folder.id, level + 1)}
@@ -376,10 +393,6 @@ function ResourcesPageContent() {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle>Folders</CardTitle>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsMindMapModalOpen(true)}>
-                    <GitMerge className="h-4 w-4" />
-                    <span className="sr-only">Open Resource Mind Map</span>
-                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -600,9 +613,6 @@ function ResourcesPageContent() {
         <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
             <DialogHeader className="sr-only">
                 <DialogTitle>Embedded Resource</DialogTitle>
-                <DialogDescriptionComponent className="truncate">
-                    Viewing content from: <a href={embedUrl || ''} target="_blank" rel="noopener noreferrer" className="underline">{embedUrl}</a>
-                </DialogDescriptionComponent>
             </DialogHeader>
             <div className="flex-grow min-h-0">
                 {embedUrl && (
@@ -621,7 +631,7 @@ function ResourcesPageContent() {
             <DialogHeader className="sr-only">
               <DialogTitle>Resource Mind Map</DialogTitle>
             </DialogHeader>
-            <MindMapViewer defaultView="Resources" showControls={false} />
+            <MindMapViewer defaultView="Resources" rootFolderId={mindMapRootFolderId} showControls={false} />
         </DialogContent>
     </Dialog>
     </>
