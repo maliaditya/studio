@@ -43,6 +43,7 @@ function ResourcesPageContent() {
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ item: ResourceFolder } | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
 
   useEffect(() => {
     if (editingResource) {
@@ -165,8 +166,7 @@ function ResourcesPageContent() {
     });
   };
   
-  const handleAddResource = (e: FormEvent) => {
-    e.preventDefault();
+  const handleAddResource = () => {
     if (!selectedFolderId) {
       toast({ title: "Error", description: "Please select a folder first.", variant: "destructive" });
       return;
@@ -188,6 +188,7 @@ function ResourcesPageContent() {
     };
     setResources(prev => [...prev, newRes]);
     setNewResource({ name: '', link: '', description: '' });
+    setIsAdding(false);
   };
   
   const handleDeleteResource = (resourceId: string) => {
@@ -295,64 +296,77 @@ function ResourcesPageContent() {
         </aside>
 
         {/* Main Content */}
-        <main className="md:col-span-3 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Add a New Resource</CardTitle>
-              <CardDescription>Select a folder and add your resource details below.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleAddResource} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input value={newResource.name} onChange={e => setNewResource({...newResource, name: e.target.value})} placeholder="Resource Name (e.g., Google Fonts)" disabled={!selectedFolderId} />
-                  <Input value={newResource.link} onChange={e => setNewResource({...newResource, link: e.target.value})} placeholder="URL (e.g., fonts.google.com)" disabled={!selectedFolderId} />
-                  <Input value={newResource.description} onChange={e => setNewResource({...newResource, description: e.target.value})} placeholder="Description (optional)" className="sm:col-span-2" disabled={!selectedFolderId} />
-                  <Button type="submit" className="sm:col-span-2" disabled={!selectedFolderId}>
-                    <PlusCircle className="mr-2 h-4 w-4"/> Add Resource
-                  </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          <div>
-            <h2 className="text-2xl font-bold mb-4">Resources</h2>
-            {filteredResources.length > 0 ? (
+        <main className="md:col-span-3">
+            <div>
+              <h2 className="text-2xl font-bold mb-4">
+                {selectedFolderId
+                  ? resourceFolders.find(f => f.id === selectedFolderId)?.name
+                  : 'Resources'}
+              </h2>
+              
+              {selectedFolderId ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {filteredResources.map(res => (
-                        <Card key={res.id} className="flex flex-col">
-                            <CardHeader>
-                                <CardTitle className="text-lg">{res.name}</CardTitle>
-                                <CardDescription className="flex items-center gap-1 text-xs truncate">
-                                    <LinkIcon className="h-3 w-3"/>
-                                    <a href={res.link} target="_blank" rel="noopener noreferrer" className="hover:underline">{res.link}</a>
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="flex-grow">
-                                <p className="text-sm text-muted-foreground">{res.description || 'No description.'}</p>
-                            </CardContent>
-                            <CardFooter className="flex justify-between items-center">
-                                <Button asChild variant="outline">
-                                    <a href={res.link} target="_blank" rel="noopener noreferrer">
-                                        Visit Site <ExternalLink className="ml-2 h-4 w-4"/>
-                                    </a>
-                                </Button>
-                                <div className="flex">
-                                    <Button variant="ghost" size="icon" onClick={() => setEditingResource(res)}><Edit className="h-4 w-4" /></Button>
-                                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteResource(res.id)}>
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </CardFooter>
-                        </Card>
-                    ))}
+                  {isAdding ? (
+                    <Card className="flex flex-col border-primary ring-2 ring-primary">
+                      <CardHeader className="p-4">
+                          <CardTitle className="text-lg">New Resource</CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0 space-y-3 flex-grow">
+                          <Input autoFocus placeholder="Name (e.g., Google Fonts)" value={newResource.name} onChange={e => setNewResource({...newResource, name: e.target.value})} />
+                          <Input placeholder="URL (e.g., fonts.google.com)" value={newResource.link} onChange={e => setNewResource({...newResource, link: e.target.value})} />
+                          <Textarea placeholder="Description (optional)" value={newResource.description} onChange={e => setNewResource({...newResource, description: e.target.value})} className="min-h-[50px] flex-grow" />
+                      </CardContent>
+                      <CardFooter className="p-4 pt-0 flex justify-end gap-2">
+                          <Button variant="ghost" onClick={() => { setIsAdding(false); setNewResource({ name: '', link: '', description: '' }); }}>Cancel</Button>
+                          <Button onClick={handleAddResource}>Save</Button>
+                      </CardFooter>
+                    </Card>
+                  ) : (
+                    <Card 
+                      onClick={() => setIsAdding(true)}
+                      className="flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-colors cursor-pointer min-h-[220px]"
+                    >
+                        <PlusCircle className="h-10 w-10 text-muted-foreground" />
+                        <p className="mt-2 text-sm font-semibold text-muted-foreground">Add New Resource</p>
+                    </Card>
+                  )}
+
+                  {filteredResources.map(res => (
+                    <Card key={res.id} className="flex flex-col">
+                      <CardHeader>
+                        <CardTitle className="text-lg">{res.name}</CardTitle>
+                        <CardDescription className="flex items-center gap-1 text-xs truncate">
+                          <LinkIcon className="h-3 w-3" />
+                          <a href={res.link} target="_blank" rel="noopener noreferrer" className="hover:underline">{res.link}</a>
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex-grow">
+                        <p className="text-sm text-muted-foreground">{res.description || 'No description.'}</p>
+                      </CardContent>
+                      <CardFooter className="flex justify-between items-center">
+                        <Button asChild variant="outline">
+                          <a href={res.link} target="_blank" rel="noopener noreferrer">
+                            Visit Site <ExternalLink className="ml-2 h-4 w-4" />
+                          </a>
+                        </Button>
+                        <div className="flex">
+                          <Button variant="ghost" size="icon" onClick={() => setEditingResource(res)}><Edit className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteResource(res.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardFooter>
+                    </Card>
+                  ))}
                 </div>
-            ) : (
+              ) : (
                 <div className="text-center py-12 border-2 border-dashed rounded-lg">
-                    <Library className="mx-auto h-12 w-12 text-muted-foreground mb-4"/>
-                    <p className="text-muted-foreground">{selectedFolderId ? "No resources in this folder yet." : "Select a folder to view resources."}</p>
+                  <Library className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">Select a folder to view or add resources.</p>
                 </div>
-            )}
-          </div>
-        </main>
+              )}
+            </div>
+          </main>
       </div>
     </div>
     
