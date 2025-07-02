@@ -32,6 +32,27 @@ const getFaviconUrl = (link: string): string | undefined => {
   }
 };
 
+const getYouTubeEmbedUrl = (url: string): string | null => {
+    try {
+        const urlObj = new URL(url);
+        let videoId: string | null = null;
+
+        if (urlObj.hostname.includes('youtube.com')) {
+            videoId = urlObj.searchParams.get('v');
+        } else if (urlObj.hostname.includes('youtu.be')) {
+            videoId = urlObj.pathname.slice(1);
+        }
+
+        if (videoId) {
+            return `https://www.youtube.com/embed/${videoId}`;
+        }
+    } catch (e) {
+        // Silently fail for invalid URLs
+    }
+    return null;
+};
+
+
 function ResourcesPageContent() {
   const { toast } = useToast();
   const { 
@@ -388,39 +409,56 @@ function ResourcesPageContent() {
                     </Card>
                   )}
 
-                  {filteredResources.map(res => (
-                    <Card key={res.id} className="flex flex-col">
-                      <CardHeader>
-                        <CardTitle className="text-lg flex items-center gap-2">
-                            {res.iconUrl ? (
-                                <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm" />
-                            ) : (
-                                <LinkIcon className="h-4 w-4" />
-                            )}
-                            <span className="truncate" title={res.name}>{res.name}</span>
-                        </CardTitle>
-                        <CardDescription className="flex items-center gap-1 text-xs truncate">
-                          <a href={res.link} target="_blank" rel="noopener noreferrer" className="hover:underline">{res.link}</a>
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="flex-grow">
-                        <p className="text-sm text-muted-foreground">{res.description || 'No description.'}</p>
-                      </CardContent>
-                      <CardFooter className="flex justify-between items-center">
-                        <Button asChild variant="outline">
-                          <a href={res.link} target="_blank" rel="noopener noreferrer">
-                            Visit Site <ExternalLink className="ml-2 h-4 w-4" />
-                          </a>
-                        </Button>
-                        <div className="flex">
-                          <Button variant="ghost" size="icon" onClick={() => setEditingResource(res)}><Edit className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteResource(res.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </CardFooter>
-                    </Card>
-                  ))}
+                  {filteredResources.map(res => {
+                    const embedUrl = getYouTubeEmbedUrl(res.link);
+                    return (
+                        <Card key={res.id} className="flex flex-col">
+                            {embedUrl ? (
+                                <div className="aspect-video w-full bg-black rounded-t-lg">
+                                    <iframe
+                                        width="100%"
+                                        height="100%"
+                                        src={embedUrl}
+                                        title={res.name}
+                                        frameBorder="0"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowFullScreen
+                                        className="rounded-t-lg"
+                                    ></iframe>
+                                </div>
+                            ) : null}
+                            <CardHeader>
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    {res.iconUrl ? (
+                                        <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm" />
+                                    ) : (
+                                        <LinkIcon className="h-4 w-4" />
+                                    )}
+                                    <span className="truncate" title={res.name}>{res.name}</span>
+                                </CardTitle>
+                                <CardDescription className="flex items-center gap-1 text-xs truncate">
+                                <a href={res.link} target="_blank" rel="noopener noreferrer" className="hover:underline">{res.link}</a>
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="flex-grow">
+                                <p className="text-sm text-muted-foreground">{res.description || 'No description.'}</p>
+                            </CardContent>
+                            <CardFooter className="flex justify-between items-center">
+                                <Button asChild variant="outline">
+                                <a href={res.link} target="_blank" rel="noopener noreferrer">
+                                    Visit Site <ExternalLink className="ml-2 h-4 w-4" />
+                                </a>
+                                </Button>
+                                <div className="flex">
+                                <Button variant="ghost" size="icon" onClick={() => setEditingResource(res)}><Edit className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteResource(res.id)}>
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                                </div>
+                            </CardFooter>
+                        </Card>
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-12 border-2 border-dashed rounded-lg">
