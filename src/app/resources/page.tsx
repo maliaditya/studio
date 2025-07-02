@@ -7,13 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Sparkles } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2 } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder } from '@/types/workout';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -182,30 +182,57 @@ function ResourcesPageContent() {
     });
   };
   
-  const handleAddResource = () => {
+  const handleAddResource = async () => {
     if (!selectedFolderId) {
       toast({ title: "Error", description: "Please select a folder first.", variant: "destructive" });
       return;
     }
-    if (!newResource.name.trim() || !newResource.link.trim()) {
-      toast({ title: "Error", description: "Resource name and link are required.", variant: "destructive" });
+    if (!newResource.link.trim()) {
+      toast({ title: "Error", description: "Resource link is required.", variant: "destructive" });
       return;
     }
+
     let fullLink = newResource.link.trim();
     if (!fullLink.startsWith('http://') && !fullLink.startsWith('https://')) {
         fullLink = 'https://' + fullLink;
     }
-    const newRes: Resource = {
-        id: `res_${Date.now()}`,
-        name: newResource.name.trim(),
-        link: fullLink,
-        description: newResource.description.trim(),
-        folderId: selectedFolderId,
-        iconUrl: getFaviconUrl(fullLink),
-    };
-    setResources(prev => [...prev, newRes]);
-    setNewResource({ name: '', link: '', description: '' });
-    setIsAdding(false);
+
+    setIsFetchingMeta(true);
+
+    try {
+      const response = await fetch('/api/get-link-metadata', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: fullLink }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fetch metadata.');
+      }
+
+      const newRes: Resource = {
+          id: `res_${Date.now()}`,
+          name: result.title || 'Untitled Resource',
+          link: fullLink,
+          description: result.description || '',
+          folderId: selectedFolderId,
+          iconUrl: getFaviconUrl(fullLink),
+      };
+      setResources(prev => [...prev, newRes]);
+      setNewResource({ name: '', link: '', description: '' });
+      setIsAdding(false);
+      toast({ title: "Resource Added", description: `"${newRes.name}" has been saved.`});
+
+    } catch (error) {
+        toast({
+            title: "Error adding resource",
+            description: error instanceof Error ? error.message : "Could not fetch metadata from URL.",
+            variant: "destructive",
+        });
+    } finally {
+        setIsFetchingMeta(false);
+    }
   };
   
   const handleDeleteResource = (resourceId: string) => {
@@ -234,38 +261,6 @@ function ResourcesPageContent() {
     );
     setEditingResource(null);
     toast({ title: "Resource Updated", description: `"${editedResourceData.name}" has been updated.` });
-  };
-  
-  const handleFetchMetadata = async () => {
-    if (!newResource.link.trim()) {
-      toast({ title: "No URL", description: "Please enter a URL to fetch info.", variant: "destructive" });
-      return;
-    }
-    setIsFetchingMeta(true);
-    try {
-      const response = await fetch('/api/get-link-metadata', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: newResource.link }),
-      });
-      
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to fetch metadata.');
-      }
-      
-      setNewResource(prev => ({
-        ...prev,
-        name: result.title || prev.name,
-        description: result.description || prev.description,
-      }));
-      toast({ title: "Metadata Fetched!", description: "Name and description have been populated." });
-
-    } catch (error) {
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Could not fetch metadata from URL.", variant: "destructive" });
-    } finally {
-      setIsFetchingMeta(false);
-    }
   };
   
   const renderFolderOptions = useCallback((parentId: string | null, level: number): JSX.Element[] => {
@@ -364,22 +359,23 @@ function ResourcesPageContent() {
                   {isAdding ? (
                     <Card className="flex flex-col border-primary ring-2 ring-primary">
                       <CardHeader className="p-4">
-                          <CardTitle className="text-lg">New Resource</CardTitle>
+                          <CardTitle className="text-lg">Add New Resource</CardTitle>
+                          <CardDescription>Enter a URL to automatically fetch its details.</CardDescription>
                       </CardHeader>
                       <CardContent className="p-4 pt-0 space-y-3 flex-grow">
-                          <Input autoFocus placeholder="Name (e.g., Google Fonts)" value={newResource.name} onChange={e => setNewResource({...newResource, name: e.target.value})} />
-                          <div className="flex gap-2">
-                            <Input placeholder="URL" value={newResource.link} onChange={e => setNewResource({...newResource, link: e.target.value})} className="flex-grow" />
-                            <Button variant="outline" size="icon" onClick={handleFetchMetadata} disabled={isFetchingMeta}>
-                              {isFetchingMeta ? <Loader2 className="h-4 w-4 animate-spin"/> : <Sparkles className="h-4 w-4"/>}
-                              <span className="sr-only">Fetch Info</span>
-                            </Button>
-                          </div>
-                          <Textarea placeholder="Description (optional)" value={newResource.description} onChange={e => setNewResource({...newResource, description: e.target.value})} className="min-h-[50px] flex-grow" />
+                          <Input
+                            autoFocus
+                            placeholder="https://example.com"
+                            value={newResource.link}
+                            onChange={(e) => setNewResource({ name: '', link: e.target.value, description: '' })}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleAddResource(); }}
+                          />
                       </CardContent>
                       <CardFooter className="p-4 pt-0 flex justify-end gap-2">
                           <Button variant="ghost" onClick={() => { setIsAdding(false); setNewResource({ name: '', link: '', description: '' }); }}>Cancel</Button>
-                          <Button onClick={handleAddResource}>Save</Button>
+                          <Button onClick={handleAddResource} disabled={isFetchingMeta}>
+                            {isFetchingMeta ? <Loader2 className="h-4 w-4 animate-spin"/> : "Save Resource"}
+                          </Button>
                       </CardFooter>
                     </Card>
                   ) : (
@@ -488,7 +484,7 @@ function ResourcesPageContent() {
         <DialogContent className="sm:max-w-md">
             <DialogHeader>
                 <DialogTitle>Edit Resource</DialogTitle>
-                <DialogDescription>Update the details or move this resource to a new folder.</DialogDescription>
+                <DialogDescriptionComponent>Update the details or move this resource to a new folder.</DialogDescriptionComponent>
             </DialogHeader>
             <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-4 items-center gap-4">
