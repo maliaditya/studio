@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Puzzle, ChevronDown, ChevronUp, Briefcase, LineChart as LineChartIcon, BookCopy, ClipboardList, Link as LinkIcon } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Puzzle, ChevronDown, ChevronUp, Briefcase, LineChart as LineChartIcon, BookCopy, ClipboardList, Link as LinkIcon, MoreHorizontal } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,7 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -680,15 +681,7 @@ function DeepWorkPageContent() {
                                             </div>
                                         </div>
                                         <div className="flex-shrink-0 flex items-center">
-                                          <Button variant="ghost" size="icon" onClick={() => handleOpenDetailsModal(def)} className="h-8 w-8" aria-label={`View details for ${def.name}`}> <ClipboardList className="h-4 w-4" /> </Button>
-                                          <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
-                                          
                                           <Popover open={isLinkLearningPopoverOpen && linkingLearningToFocusArea?.id === def.id} onOpenChange={(isOpen) => { if (!isOpen) { setIsLinkLearningPopoverOpen(false); } }}>
-                                            <PopoverTrigger asChild>
-                                                <Button variant="ghost" size="icon" onClick={() => handleOpenLinkLearningPopover(def)} className="h-8 w-8" aria-label={`Link learning tasks to ${def.name}`}>
-                                                    <BookCopy className="h-4 w-4" />
-                                                </Button>
-                                            </PopoverTrigger>
                                             <PopoverContent className="w-80">
                                                 <div className="grid gap-4">
                                                     <div className="space-y-2">
@@ -721,11 +714,45 @@ function DeepWorkPageContent() {
                                                 </div>
                                             </PopoverContent>
                                           </Popover>
+                                          
+                                          <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                <MoreHorizontal className="h-4 w-4" />
+                                              </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                              <DropdownMenuItem onSelect={() => handleOpenDetailsModal(def)}>
+                                                <ClipboardList className="mr-2 h-4 w-4" />
+                                                <span>View Details</span>
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem onSelect={() => handleViewProgress(def)}>
+                                                <TrendingUp className="mr-2 h-4 w-4" />
+                                                <span>View Progress</span>
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem onSelect={() => handleOpenLinkLearningPopover(def)}>
+                                                <BookCopy className="mr-2 h-4 w-4" />
+                                                <span>Link Learning</span>
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem onSelect={() => handleOpenLinkDeepWorkModal(def)}>
+                                                <LinkIcon className="mr-2 h-4 w-4" />
+                                                <span>Link Work</span>
+                                              </DropdownMenuItem>
+                                              <DropdownMenuSeparator />
+                                              <DropdownMenuItem onSelect={() => handleStartEditDefinition(def)}>
+                                                <Edit3 className="mr-2 h-4 w-4" />
+                                                <span>Edit</span>
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(def.id)} className="text-destructive">
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                <span>Delete</span>
+                                              </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                          </DropdownMenu>
 
-                                          <Button variant="ghost" size="icon" onClick={() => handleOpenLinkDeepWorkModal(def)} className="h-8 w-8" aria-label={`Link other work to ${def.name}`}> <LinkIcon className="h-4 w-4" /> </Button>
-                                          <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8" aria-label={`Edit ${def.name}`}> <Edit3 className="h-4 w-4" /> </Button>
-                                          <Button variant="ghost" size="icon" onClick={() => handleDeleteExerciseDefinition(def.id)} className="h-8 w-8" aria-label={`Delete ${def.name}`}> <Trash2 className="h-4 w-4" /> </Button>
-                                          <Button variant="ghost" size="icon" onClick={() => handleAddTaskToSession(def)} className="h-8 w-8" aria-label={`Add ${def.name} to session`}> <ChevronRight className="h-5 w-5" /> </Button>
+                                          <Button variant="ghost" size="icon" onClick={() => handleAddTaskToSession(def)} className="h-8 w-8" aria-label={`Add ${def.name} to session`}>
+                                            <ChevronRight className="h-5 w-5" />
+                                          </Button>
                                         </div>
                                       </div>
                                       <div className="flex items-center space-x-2 pt-3 mt-3 border-t">
