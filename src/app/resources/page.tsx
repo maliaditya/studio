@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, Save, X, ExternalLink, ChevronsRight, ChevronDown } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronsRight, ChevronDown } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -34,6 +34,7 @@ function ResourcesPageContent() {
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<ResourceCategory | null>(null);
   const [editingSubcategory, setEditingSubcategory] = useState<ResourceSubcategory | null>(null);
+  const [newlyCreatedSubcategoryId, setNewlyCreatedSubcategoryId] = useState<string | null>(null);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   
   // State for editing a resource
@@ -128,8 +129,13 @@ function ResourcesPageContent() {
     toast({ title: "Category Deleted", description: "The category and all its contents have been removed." });
   };
   
-  const handleSaveCategory = () => {
-    if (!editingCategory || !editingCategory.name.trim()) return;
+  const commitCategoryEdit = () => {
+    if (!editingCategory) return;
+    if (!editingCategory.name.trim()) {
+        toast({ title: "Rename Cancelled", description: "Category name cannot be empty.", variant: "destructive" });
+        setEditingCategory(null);
+        return;
+    }
     setResourceCategories(prev => prev.map(c => c.id === editingCategory.id ? editingCategory : c));
     setEditingCategory(null);
   };
@@ -143,6 +149,7 @@ function ResourcesPageContent() {
     };
     setResourceSubcategories(prev => [...prev, newSub]);
     setEditingSubcategory(newSub);
+    setNewlyCreatedSubcategoryId(newSub.id);
 
     // Ensure parent is expanded
     setCollapsedCategories(prev => {
@@ -161,14 +168,37 @@ function ResourcesPageContent() {
     toast({ title: "Subcategory Deleted", description: "The subcategory and its resources have been removed." });
   };
 
-  const handleSaveSubcategory = () => {
-    if (!editingSubcategory || !editingSubcategory.name.trim()) return;
-    setResourceSubcategories(prev => prev.map(sc => sc.id === editingSubcategory.id ? editingSubcategory : sc));
-    setEditingSubcategory(null);
+  const commitSubcategoryEdit = () => {
+    if (!editingSubcategory) return;
+
+    if (editingSubcategory.name.trim() === '') {
+        if (editingSubcategory.id === newlyCreatedSubcategoryId) {
+            // It's a new, empty subcategory, so delete it on blur/enter.
+            handleDeleteSubcategory(editingSubcategory.id);
+        }
+        // For existing items, just cancel the edit.
+        setEditingSubcategory(null);
+        setNewlyCreatedSubcategoryId(null);
+    } else {
+        // Name is valid, save it.
+        setResourceSubcategories(prev => prev.map(sc => sc.id === editingSubcategory.id ? editingSubcategory : sc));
+        setEditingSubcategory(null);
+        setNewlyCreatedSubcategoryId(null);
+    }
   };
+  
+  const cancelSubcategoryEdit = () => {
+    if (!editingSubcategory) return;
+    if (editingSubcategory.id === newlyCreatedSubcategoryId) {
+        handleDeleteSubcategory(editingSubcategory.id);
+    }
+    setEditingSubcategory(null);
+    setNewlyCreatedSubcategoryId(null);
+  }
 
   const handleContextMenu = (e: React.MouseEvent, item: ResourceCategory | ResourceSubcategory, type: 'category' | 'subcategory') => {
     e.preventDefault();
+    e.stopPropagation(); // Prevent parent context menus
     setContextMenu({
         mouseX: e.clientX,
         mouseY: e.clientY,
@@ -187,10 +217,14 @@ function ResourcesPageContent() {
       toast({ title: "Error", description: "Resource name and link are required.", variant: "destructive" });
       return;
     }
+    let fullLink = newResource.link.trim();
+    if (!fullLink.startsWith('http://') && !fullLink.startsWith('https://')) {
+        fullLink = 'https://' + fullLink;
+    }
     const newRes: Resource = {
         id: `res_${Date.now()}`,
         name: newResource.name.trim(),
-        link: newResource.link.trim(),
+        link: fullLink,
         description: newResource.description.trim(),
         categoryId: selectedCategoryId,
         subcategoryId: selectedSubcategoryId || undefined,
@@ -241,7 +275,7 @@ function ResourcesPageContent() {
 
   return (
     <>
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+    <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
         {/* Left Sidebar */}
         <aside className="md:col-span-1 space-y-6">
@@ -258,10 +292,24 @@ function ResourcesPageContent() {
                 {resourceCategories.map(cat => (
                   <li key={cat.id}>
                     {editingCategory?.id === cat.id ? (
-                      <div className="flex gap-2 items-center p-1">
-                        <Input value={editingCategory.name} onChange={e => setEditingCategory({...editingCategory, name: e.target.value})} className="h-8"/>
-                        <Button size="icon" onClick={handleSaveCategory} className="h-8 w-8"><Save className="h-4 w-4"/></Button>
-                        <Button size="icon" variant="ghost" onClick={() => setEditingCategory(null)} className="h-8 w-8"><X className="h-4 w-4"/></Button>
+                      <div className="flex items-center gap-2 p-1 w-full">
+                        <Folder className="h-4 w-4 flex-shrink-0"/>
+                        <Input
+                          value={editingCategory.name}
+                          onChange={e => setEditingCategory({...editingCategory, name: e.target.value})}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              commitCategoryEdit();
+                              e.preventDefault();
+                            } else if (e.key === 'Escape') {
+                              setEditingCategory(null);
+                            }
+                          }}
+                          onBlur={commitCategoryEdit}
+                          className="h-7 border-primary ring-primary"
+                          autoFocus
+                          onFocus={(e) => e.target.select()}
+                        />
                       </div>
                     ) : (
                       <div 
@@ -271,7 +319,7 @@ function ResourcesPageContent() {
                         className={cn("flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer", selectedCategoryId === cat.id && !selectedSubcategoryId && "bg-muted")}
                       >
                          {resourceSubcategories.some(sc => sc.categoryId === cat.id) ? (
-                            <ChevronDown className={cn("h-4 w-4 transition-transform", !collapsedCategories.has(cat.id) && "rotate-[-90deg]")} />
+                            <ChevronDown className={cn("h-4 w-4 transition-transform", collapsedCategories.has(cat.id) && "-rotate-90")} />
                           ) : (
                             <ChevronsRight className="h-4 w-4 text-muted-foreground/50"/>
                          )}
@@ -285,10 +333,24 @@ function ResourcesPageContent() {
                                 {resourceSubcategories.filter(sc => sc.categoryId === cat.id).map(sub => (
                                     <li key={sub.id}>
                                         {editingSubcategory?.id === sub.id ? (
-                                            <div className="flex gap-2 items-center p-1">
-                                                <Input value={editingSubcategory.name} onChange={e => setEditingSubcategory({...editingSubcategory, name: e.target.value})} className="h-8"/>
-                                                <Button size="icon" onClick={handleSaveSubcategory} className="h-8 w-8"><Save className="h-4 w-4"/></Button>
-                                                <Button size="icon" variant="ghost" onClick={() => setEditingSubcategory(null)} className="h-8 w-8"><X className="h-4 w-4"/></Button>
+                                           <div className="flex items-center gap-2 p-1 w-full">
+                                                <Folder className="h-4 w-4 flex-shrink-0"/>
+                                                <Input
+                                                value={editingSubcategory.name}
+                                                onChange={e => setEditingSubcategory({...editingSubcategory, name: e.target.value})}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        commitSubcategoryEdit();
+                                                        e.preventDefault();
+                                                    } else if (e.key === 'Escape') {
+                                                        cancelSubcategoryEdit();
+                                                    }
+                                                }}
+                                                onBlur={commitSubcategoryEdit}
+                                                className="h-7 border-primary ring-primary"
+                                                autoFocus
+                                                onFocus={(e) => e.target.select()}
+                                                />
                                             </div>
                                         ) : (
                                             <div 
@@ -323,7 +385,7 @@ function ResourcesPageContent() {
             <CardContent>
               <form onSubmit={handleAddResource} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input value={newResource.name} onChange={e => setNewResource({...newResource, name: e.target.value})} placeholder="Resource Name (e.g., Google Fonts)" disabled={!selectedCategoryId} />
-                  <Input value={newResource.link} onChange={e => setNewResource({...newResource, link: e.target.value})} placeholder="URL (e.g., https://fonts.google.com)" disabled={!selectedCategoryId} />
+                  <Input value={newResource.link} onChange={e => setNewResource({...newResource, link: e.target.value})} placeholder="URL (e.g., fonts.google.com)" disabled={!selectedCategoryId} />
                   <Input value={newResource.description} onChange={e => setNewResource({...newResource, description: e.target.value})} placeholder="Description (optional)" className="sm:col-span-2" disabled={!selectedCategoryId} />
                   <Button type="submit" className="sm:col-span-2" disabled={!selectedCategoryId}>
                     <PlusCircle className="mr-2 h-4 w-4"/> Add Resource
@@ -380,6 +442,7 @@ function ResourcesPageContent() {
             ref={contextMenuRef}
             style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }}
             className="fixed z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
         >
             {contextMenu.type === 'category' && (
                 <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleAddNewSubcategory((contextMenu.item as ResourceCategory).id); setContextMenu(null); }}>
@@ -485,3 +548,4 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
