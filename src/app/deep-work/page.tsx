@@ -110,10 +110,9 @@ function DeepWorkPageContent() {
   // State for details modal
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
-  const [isDetailsEditing, setIsDetailsEditing] = useState(false);
   
   // State for linking learning popover
-  const [isLinkLearningPopoverOpen, setIsLinkLearningPopoverOpen] = useState(false);
+  const [isLinkLearningModalOpen, setIsLinkLearningModalOpen] = useState(false);
   const [linkingLearningToFocusArea, setLinkingLearningToFocusArea] = useState<ExerciseDefinition | null>(null);
   const [editableLinkedUpskillIds, setEditableLinkedUpskillIds] = useState<string[]>([]);
   
@@ -413,18 +412,6 @@ function DeepWorkPageContent() {
   const handleOpenDetailsModal = (def: ExerciseDefinition) => {
     setSelectedFocusArea(def);
     setIsDetailsModalOpen(true);
-    setIsDetailsEditing(false);
-  };
-
-  const handleSaveDetails = () => {
-    if (!selectedFocusArea) return;
-    setDeepWorkDefinitions(prevDefs => prevDefs.map(def =>
-        def.id === selectedFocusArea.id
-            ? { ...def, linkedUpskillIds: editableLinkedUpskillIds }
-            : def
-    ));
-    setIsDetailsEditing(false);
-    toast({ title: "Saved", description: "Focus area details have been updated." });
   };
   
   const handleOpenLinkDeepWorkModal = (def: ExerciseDefinition) => {
@@ -456,10 +443,10 @@ function DeepWorkPageContent() {
       toast({ title: "Saved", description: "Deep work links have been updated." });
   };
 
-  const handleOpenLinkLearningPopover = (def: ExerciseDefinition) => {
+  const handleOpenLinkLearningModal = (def: ExerciseDefinition) => {
     setLinkingLearningToFocusArea(def);
     setEditableLinkedUpskillIds(def.linkedUpskillIds || []);
-    setIsLinkLearningPopoverOpen(true);
+    setIsLinkLearningModalOpen(true);
   };
   
   const handleToggleUpskillLink = (upskillId: string) => {
@@ -481,7 +468,7 @@ function DeepWorkPageContent() {
             ? { ...def, linkedUpskillIds: editableLinkedUpskillIds }
             : def
     ));
-    setIsLinkLearningPopoverOpen(false);
+    setIsLinkLearningModalOpen(false);
     toast({ title: "Saved", description: "Learning tasks have been linked." });
   };
 
@@ -681,40 +668,6 @@ function DeepWorkPageContent() {
                                             </div>
                                         </div>
                                         <div className="flex-shrink-0 flex items-center">
-                                          <Popover open={isLinkLearningPopoverOpen && linkingLearningToFocusArea?.id === def.id} onOpenChange={(isOpen) => { if (!isOpen) { setIsLinkLearningPopoverOpen(false); } }}>
-                                            <PopoverContent className="w-80">
-                                                <div className="grid gap-4">
-                                                    <div className="space-y-2">
-                                                        <h4 className="font-medium leading-none">Link Learning to "{def.name}"</h4>
-                                                        <p className="text-sm text-muted-foreground">Select learning tasks that support this focus area.</p>
-                                                    </div>
-                                                    <div className="py-2">
-                                                        <ScrollArea className="h-40 w-full rounded-md border p-2">
-                                                            {loggedUpskillDefinitions.length > 0 ? (
-                                                              <div className="space-y-2">
-                                                                  {loggedUpskillDefinitions.map(upskillDef => (
-                                                                      <div key={upskillDef.id} className="flex items-center space-x-3">
-                                                                          <Checkbox
-                                                                              id={`link-popover-${upskillDef.id}`}
-                                                                              checked={editableLinkedUpskillIds.includes(upskillDef.id)}
-                                                                              onCheckedChange={() => handleToggleUpskillLink(upskillDef.id)}
-                                                                          />
-                                                                          <Label htmlFor={`link-popover-${upskillDef.id}`} className="font-normal w-full cursor-pointer">
-                                                                              {upskillDef.name} <span className="text-muted-foreground/80">({upskillDef.category})</span>
-                                                                          </Label>
-                                                                      </div>
-                                                                  ))}
-                                                              </div>
-                                                            ) : (
-                                                                <p className="text-center text-sm text-muted-foreground p-4">No logged learning tasks found. Go to the Upskill page to log some progress.</p>
-                                                            )}
-                                                        </ScrollArea>
-                                                    </div>
-                                                    <Button onClick={handleSaveLearningLinks}>Save Links</Button>
-                                                </div>
-                                            </PopoverContent>
-                                          </Popover>
-                                          
                                           <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                               <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -730,7 +683,7 @@ function DeepWorkPageContent() {
                                                 <TrendingUp className="mr-2 h-4 w-4" />
                                                 <span>View Progress</span>
                                               </DropdownMenuItem>
-                                              <DropdownMenuItem onSelect={() => handleOpenLinkLearningPopover(def)}>
+                                              <DropdownMenuItem onSelect={() => handleOpenLinkLearningModal(def)}>
                                                 <BookCopy className="mr-2 h-4 w-4" />
                                                 <span>Link Learning</span>
                                               </DropdownMenuItem>
@@ -1018,6 +971,43 @@ function DeepWorkPageContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={isLinkLearningModalOpen} onOpenChange={setIsLinkLearningModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Link Learning to "{linkingLearningToFocusArea?.name}"</DialogTitle>
+            <DialogDescription>
+              Select learning tasks that support this focus area.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <ScrollArea className="h-40 w-full rounded-md border p-2">
+              {loggedUpskillDefinitions.length > 0 ? (
+                <div className="space-y-2">
+                  {loggedUpskillDefinitions.map(upskillDef => (
+                    <div key={upskillDef.id} className="flex items-center space-x-3">
+                      <Checkbox
+                        id={`link-modal-${upskillDef.id}`}
+                        checked={editableLinkedUpskillIds.includes(upskillDef.id)}
+                        onCheckedChange={() => handleToggleUpskillLink(upskillDef.id)}
+                      />
+                      <Label htmlFor={`link-modal-${upskillDef.id}`} className="font-normal w-full cursor-pointer">
+                        {upskillDef.name} <span className="text-muted-foreground/80">({upskillDef.category})</span>
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-sm text-muted-foreground p-4">No logged learning tasks found. Go to the Upskill page to log some progress.</p>
+              )}
+            </ScrollArea>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsLinkLearningModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveLearningLinks}>Save Links</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -1025,7 +1015,3 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
-
-    
-
-    
