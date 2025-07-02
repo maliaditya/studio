@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent,
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MindMapViewer } from '@/components/MindMapViewer';
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -99,6 +100,7 @@ function ResourcesPageContent() {
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ item: ResourceFolder } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isFetchingMeta, setIsFetchingMeta] = useState(false);
+  const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
 
   useEffect(() => {
     if (editingResource) {
@@ -372,7 +374,13 @@ function ResourcesPageContent() {
         <aside className="md:col-span-1 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Folders</CardTitle>
+              <div className="flex justify-between items-center">
+                <CardTitle>Folders</CardTitle>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsMindMapModalOpen(true)}>
+                    <GitMerge className="h-4 w-4" />
+                    <span className="sr-only">Open Resource Mind Map</span>
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleAddFolder} className="flex gap-2 mb-4">
@@ -606,6 +614,14 @@ function ResourcesPageContent() {
                     ></iframe>
                 )}
             </div>
+        </DialogContent>
+    </Dialog>
+    <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
+        <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Resource Mind Map</DialogTitle>
+            </DialogHeader>
+            <MindMapViewer defaultView="Resources" showControls={false} />
         </DialogContent>
     </Dialog>
     </>
