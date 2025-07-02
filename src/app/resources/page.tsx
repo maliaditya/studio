@@ -1,15 +1,15 @@
 
 "use client";
 
-import React, { useState, useMemo, FormEvent, useEffect } from 'react';
+import React, { useState, useMemo, FormEvent, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, Save, X, ExternalLink } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, Save, X, ExternalLink, ChevronsRight, ChevronDown } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceCategory, ResourceSubcategory } from '@/types/workout';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -34,16 +34,46 @@ function ResourcesPageContent() {
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<ResourceCategory | null>(null);
   const [editingSubcategory, setEditingSubcategory] = useState<ResourceSubcategory | null>(null);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   
   // State for editing a resource
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   const [editedResourceData, setEditedResourceData] = useState<Partial<Resource>>({});
+
+  // State for custom context menu
+  const [contextMenu, setContextMenu] = useState<{
+    mouseX: number;
+    mouseY: number;
+    item: ResourceCategory | ResourceSubcategory;
+    type: 'category' | 'subcategory';
+  } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  // State for delete confirmation
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    item: ResourceCategory | ResourceSubcategory;
+    type: 'category' | 'subcategory';
+  } | null>(null);
+
 
   useEffect(() => {
     if (editingResource) {
         setEditedResourceData(editingResource);
     }
   }, [editingResource]);
+
+  // Effect to close context menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+        if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as Node)) {
+            setContextMenu(null);
+        }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [contextMenuRef]);
 
   const filteredResources = useMemo(() => {
     if (!selectedCategoryId) return [];
@@ -54,6 +84,18 @@ function ResourcesPageContent() {
     // Show resources in the main category that don't have a subcategory
     return filtered.filter(r => !r.subcategoryId);
   }, [resources, selectedCategoryId, selectedSubcategoryId]);
+
+  const toggleCategoryCollapse = (categoryId: string) => {
+    setCollapsedCategories(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(categoryId)) {
+            newSet.delete(categoryId);
+        } else {
+            newSet.add(categoryId);
+        }
+        return newSet;
+    });
+  };
 
   const handleSelectCategory = (categoryId: string) => {
     setSelectedCategoryId(categoryId);
@@ -69,7 +111,7 @@ function ResourcesPageContent() {
     const newCategory: ResourceCategory = {
         id: `cat_${Date.now()}`,
         name: newCategoryName.trim(),
-        icon: 'Folder', // Default icon
+        icon: 'Folder',
     };
     setResourceCategories(prev => [...prev, newCategory]);
     setNewCategoryName('');
@@ -100,7 +142,14 @@ function ResourcesPageContent() {
       categoryId: categoryId,
     };
     setResourceSubcategories(prev => [...prev, newSub]);
-    setEditingSubcategory(newSub); // Enter edit mode immediately
+    setEditingSubcategory(newSub);
+
+    // Ensure parent is expanded
+    setCollapsedCategories(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(categoryId);
+      return newSet;
+    });
   };
 
   const handleDeleteSubcategory = (subcategoryId: string) => {
@@ -116,6 +165,16 @@ function ResourcesPageContent() {
     if (!editingSubcategory || !editingSubcategory.name.trim()) return;
     setResourceSubcategories(prev => prev.map(sc => sc.id === editingSubcategory.id ? editingSubcategory : sc));
     setEditingSubcategory(null);
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, item: ResourceCategory | ResourceSubcategory, type: 'category' | 'subcategory') => {
+    e.preventDefault();
+    setContextMenu({
+        mouseX: e.clientX,
+        mouseY: e.clientY,
+        item,
+        type,
+    });
   };
   
   const handleAddResource = (e: FormEvent) => {
@@ -197,59 +256,49 @@ function ResourcesPageContent() {
               </form>
               <ul className="space-y-1">
                 {resourceCategories.map(cat => (
-                  <li key={cat.id} className="group">
+                  <li key={cat.id}>
                     {editingCategory?.id === cat.id ? (
-                      <div className="flex gap-2 items-center">
+                      <div className="flex gap-2 items-center p-1">
                         <Input value={editingCategory.name} onChange={e => setEditingCategory({...editingCategory, name: e.target.value})} className="h-8"/>
                         <Button size="icon" onClick={handleSaveCategory} className="h-8 w-8"><Save className="h-4 w-4"/></Button>
                         <Button size="icon" variant="ghost" onClick={() => setEditingCategory(null)} className="h-8 w-8"><X className="h-4 w-4"/></Button>
                       </div>
                     ) : (
-                      <div className={cn("flex justify-between items-center rounded-md hover:bg-muted", selectedCategoryId === cat.id && "bg-muted")}>
-                        <Button variant="ghost" className="w-full justify-start gap-2" onClick={() => handleSelectCategory(cat.id)}>
-                          <Folder className="h-4 w-4"/> {cat.name}
-                        </Button>
-                        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handleAddNewSubcategory(cat.id)}><PlusCircle className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingCategory(cat)}><Edit className="h-4 w-4"/></Button>
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                <AlertDialogHeader><AlertDialogTitle>Delete Category?</AlertDialogTitle><AlertDialogDescription>This will delete "{cat.name}" and all its subcategories and resources. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                                <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteCategory(cat.id)}>Delete</AlertDialogAction></AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        </div>
+                      <div 
+                        onClick={() => { handleSelectCategory(cat.id); toggleCategoryCollapse(cat.id); }}
+                        onDoubleClick={() => setEditingCategory(cat)}
+                        onContextMenu={(e) => handleContextMenu(e, cat, 'category')}
+                        className={cn("flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer", selectedCategoryId === cat.id && !selectedSubcategoryId && "bg-muted")}
+                      >
+                         {resourceSubcategories.some(sc => sc.categoryId === cat.id) ? (
+                            <ChevronDown className={cn("h-4 w-4 transition-transform", !collapsedCategories.has(cat.id) && "rotate-[-90deg]")} />
+                          ) : (
+                            <ChevronsRight className="h-4 w-4 text-muted-foreground/50"/>
+                         )}
+                         <Folder className="h-4 w-4"/>
+                         <span className='flex-grow truncate'>{cat.name}</span>
                       </div>
                     )}
-                    {selectedCategoryId === cat.id && (
-                        <div className="pl-4 mt-2">
+                    {!collapsedCategories.has(cat.id) && (
+                        <div className="pl-6 mt-1">
                            <ul className="space-y-1">
                                 {resourceSubcategories.filter(sc => sc.categoryId === cat.id).map(sub => (
-                                    <li key={sub.id} className="group/sub">
+                                    <li key={sub.id}>
                                         {editingSubcategory?.id === sub.id ? (
-                                            <div className="flex gap-2 items-center">
+                                            <div className="flex gap-2 items-center p-1">
                                                 <Input value={editingSubcategory.name} onChange={e => setEditingSubcategory({...editingSubcategory, name: e.target.value})} className="h-8"/>
                                                 <Button size="icon" onClick={handleSaveSubcategory} className="h-8 w-8"><Save className="h-4 w-4"/></Button>
                                                 <Button size="icon" variant="ghost" onClick={() => setEditingSubcategory(null)} className="h-8 w-8"><X className="h-4 w-4"/></Button>
                                             </div>
                                         ) : (
-                                            <div className={cn("flex justify-between items-center rounded-md hover:bg-muted/50", selectedSubcategoryId === sub.id && "bg-muted/50")}>
-                                                <Button variant="ghost" size="sm" className="w-full justify-start gap-2" onClick={() => setSelectedSubcategoryId(sub.id)}>
-                                                    <Folder className="h-4 w-4"/> {sub.name}
-                                                </Button>
-                                                <div className="flex items-center opacity-0 group-hover/sub:opacity-100 transition-opacity">
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingSubcategory(sub)}><Edit className="h-3 w-3"/></Button>
-                                                    <AlertDialog>
-                                                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="h-3 w-3"/></Button></AlertDialogTrigger>
-                                                        <AlertDialogContent>
-                                                            <AlertDialogHeader><AlertDialogTitle>Delete Subcategory?</AlertDialogTitle><AlertDialogDescription>This will delete "{sub.name}" and all its resources.</AlertDialogDescription></AlertDialogHeader>
-                                                            <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteSubcategory(sub.id)}>Delete</AlertDialogAction></AlertDialogFooter>
-                                                        </AlertDialogContent>
-                                                    </AlertDialog>
-                                                </div>
+                                            <div 
+                                                onClick={() => { handleSelectCategory(cat.id); setSelectedSubcategoryId(sub.id); }}
+                                                onDoubleClick={() => setEditingSubcategory(sub)}
+                                                onContextMenu={(e) => handleContextMenu(e, sub, 'subcategory')}
+                                                className={cn("flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 cursor-pointer", selectedSubcategoryId === sub.id && "bg-muted/50")}
+                                            >
+                                                <Folder className="h-4 w-4"/>
+                                                <span className='flex-grow truncate'>{sub.name}</span>
                                             </div>
                                         )}
                                     </li>
@@ -326,6 +375,56 @@ function ResourcesPageContent() {
       </div>
     </div>
     
+    {contextMenu && (
+        <div
+            ref={contextMenuRef}
+            style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }}
+            className="fixed z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
+        >
+            {contextMenu.type === 'category' && (
+                <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleAddNewSubcategory((contextMenu.item as ResourceCategory).id); setContextMenu(null); }}>
+                    New Subcategory
+                </Button>
+            )}
+            <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => {
+                if (contextMenu.type === 'category') setEditingCategory(contextMenu.item as ResourceCategory);
+                else setEditingSubcategory(contextMenu.item as ResourceSubcategory);
+                setContextMenu(null);
+            }}>
+                Rename
+            </Button>
+            <Button variant="ghost" className="w-full h-9 justify-start px-2 text-destructive hover:text-destructive" onClick={() => {
+                setDeleteConfirmation({ type: contextMenu.type, item: contextMenu.item });
+                setContextMenu(null);
+            }}>
+                Delete
+            </Button>
+        </div>
+    )}
+    
+    {deleteConfirmation && (
+        <AlertDialog open={!!deleteConfirmation} onOpenChange={() => setDeleteConfirmation(null)}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This will permanently delete "{deleteConfirmation.item.name}" and all its contents. This action cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setDeleteConfirmation(null)}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => {
+                        if (deleteConfirmation.type === 'category') handleDeleteCategory(deleteConfirmation.item.id);
+                        else handleDeleteSubcategory(deleteConfirmation.item.id);
+                        setDeleteConfirmation(null);
+                    }}>
+                        Delete
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    )}
+
     <Dialog open={!!editingResource} onOpenChange={(isOpen) => !isOpen && setEditingResource(null)}>
         <DialogContent className="sm:max-w-md">
             <DialogHeader>
