@@ -194,3 +194,25 @@ export interface GapAnalysis {
   coreSolution: string;
   outcomeGoal: string;
 }
+
+// Resource Library Types
+export interface Resource {
+  id: string;
+  name: string;
+  link: string;
+  description: string;
+  categoryId: string;
+  subcategoryId?: string;
+}
+
+export interface ResourceCategory {
+  id: string;
+  name: string;
+  icon: string; // Suggest using Lucide icon names
+}
+
+export interface ResourceSubcategory {
+  id: string;
+  name: string;
+  categoryId: string;
+}

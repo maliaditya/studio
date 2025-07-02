@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceCategory, ResourceSubcategory } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -100,6 +100,14 @@ interface AuthContextType {
   deleteTopic: (topic: string) => void;
   copyOffer: (topic: string, offerId: string) => void;
 
+  // Resources
+  resources: Resource[];
+  setResources: React.Dispatch<React.SetStateAction<Resource[]>>;
+  resourceCategories: ResourceCategory[];
+  setResourceCategories: React.Dispatch<React.SetStateAction<ResourceCategory[]>>;
+  resourceSubcategories: ResourceSubcategory[];
+  setResourceSubcategories: React.Dispatch<React.SetStateAction<ResourceSubcategory[]>>;
+
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
   updateWorkoutSet: (date: Date, exerciseId: string, setId: string, reps: number, weight: number) => void;
@@ -159,6 +167,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [productizationPlans, setProductizationPlans] = useState<Record<string, ProductizationPlan>>({});
   const [offerizationPlans, setOfferizationPlans] = useState<Record<string, ProductizationPlan>>({});
 
+  // Resources State
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [resourceCategories, setResourceCategories] = useState<ResourceCategory[]>([]);
+  const [resourceSubcategories, setResourceSubcategories] = useState<ResourceSubcategory[]>([]);
+
 
   useEffect(() => {
     const user = getCurrentLocalUser();
@@ -214,6 +227,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`productization_plans_${username}`); setProductizationPlans(d ? JSON.parse(d) : {}); } catch (e) { setProductizationPlans({}); }
       try { const d = loadItem(`offerization_plans_${username}`); setOfferizationPlans(d ? JSON.parse(d) : {}); } catch (e) { setOfferizationPlans({}); }
 
+      // Resources
+      try { const d = loadItem(`resources_${username}`); setResources(d ? JSON.parse(d) : []); } catch (e) { setResources([]); }
+      try { const d = loadItem(`resourceCategories_${username}`); setResourceCategories(d ? JSON.parse(d) : []); } catch (e) { setResourceCategories([]); }
+      try { const d = loadItem(`resourceSubcategories_${username}`); setResourceSubcategories(d ? JSON.parse(d) : []); } catch (e) { setResourceSubcategories([]); }
+
     } else {
       // Clear all data on logout
       setWeightLogs([]); setGoalWeight(null); setHeight(null); setDateOfBirth(null); setGender(null); setDietPlan([]);
@@ -225,6 +243,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLeadGenDefinitions(LEAD_GEN_DEFINITIONS);
       setProductizationPlans({});
       setOfferizationPlans({});
+      setResources([]); setResourceCategories([]); setResourceSubcategories([]);
     }
   }, [currentUser]);
 
@@ -259,12 +278,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`leadgen_definitions_${username}`, JSON.stringify(leadGenDefinitions));
       localStorage.setItem(`productization_plans_${username}`, JSON.stringify(productizationPlans));
       localStorage.setItem(`offerization_plans_${username}`, JSON.stringify(offerizationPlans));
+
+      // Resources
+      localStorage.setItem(`resources_${username}`, JSON.stringify(resources));
+      localStorage.setItem(`resourceCategories_${username}`, JSON.stringify(resourceCategories));
+      localStorage.setItem(`resourceSubcategories_${username}`, JSON.stringify(resourceSubcategories));
     }
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
     schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
     exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, deepWorkTopicMetadata, leadGenDefinitions,
     productizationPlans, offerizationPlans,
+    resources, resourceCategories, resourceSubcategories,
     currentUser, loading
   ]);
 
@@ -412,6 +437,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setHeight(data.height ? parseFloat(data.height) : null);
     setDateOfBirth(data.dateOfBirth || null);
     setGender(data.gender || null);
+    
+    setResources(data.resources || []);
+    setResourceCategories(data.resourceCategories || []);
+    setResourceSubcategories(data.resourceSubcategories || []);
   };
   
   const register = async (username: string, password: string) => {
@@ -465,6 +494,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       offerizationPlans,
       schedule,
       dietPlan, weightLogs, goalWeight, height, dateOfBirth, gender,
+      resources, resourceCategories, resourceSubcategories,
     };
   }
 
@@ -1161,6 +1191,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     updateTopic,
     deleteTopic,
     copyOffer,
+    resources, setResources, resourceCategories, setResourceCategories, resourceSubcategories, setResourceSubcategories,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
   };
