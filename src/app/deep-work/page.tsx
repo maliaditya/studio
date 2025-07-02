@@ -14,7 +14,7 @@ import { format, parse, getISOWeek, isMonday, getYear, subYears, addDays, parseI
 import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, WeightLog, Gender, ProductizationPlan } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
@@ -194,6 +194,14 @@ function DeepWorkPageContent() {
     if (selectedCategories.length === 0) return deepWorkDefinitions;
     return deepWorkDefinitions.filter(def => selectedCategories.includes(def.category));
   }, [deepWorkDefinitions, selectedCategories]);
+
+  const handleReorderDefinitions = (newOrder: ExerciseDefinition[]) => {
+    // Reordering is only enabled when no filters are applied.
+    // In that case, filteredExerciseDefinitions is the same as deepWorkDefinitions.
+    if (selectedCategories.length === 0) {
+      setDeepWorkDefinitions(newOrder);
+    }
+  };
 
   const handleCategoryFilterChange = (category: string) => {
     setSelectedCategories(prev => 
@@ -631,10 +639,10 @@ function DeepWorkPageContent() {
                         ) : filteredExerciseDefinitions.length === 0 ? (
                           <p className="text-muted-foreground text-sm text-center py-4">Library empty. Add a new topic and focus area to get started!</p>
                         ) : (
-                          <ul className="space-y-2">
+                          <Reorder.Group as="ul" axis="y" values={filteredExerciseDefinitions} onReorder={handleReorderDefinitions} className="space-y-2">
                             <AnimatePresence>
-                              {filteredExerciseDefinitions.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
-                                <motion.li key={def.id} layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} className="p-3 bg-card border rounded-lg shadow-sm">
+                              {filteredExerciseDefinitions.map(def => (
+                                <Reorder.Item as="li" key={def.id} value={def} layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} className={cn("p-3 bg-card border rounded-lg shadow-sm", selectedCategories.length === 0 && "cursor-grab")}>
                                   {editingDefinition?.id === def.id ? (
                                     <div className="space-y-2">
                                       <Input value={editingDefinitionCategory} onChange={(e) => setEditingDefinitionCategory(e.target.value)} className="h-9" aria-label="Edit topic name"/>
@@ -647,6 +655,9 @@ function DeepWorkPageContent() {
                                   ) : (
                                     <>
                                       <div className="flex items-center justify-between gap-2">
+                                        {selectedCategories.length === 0 && (
+                                            <GripVertical className="h-5 w-5 flex-shrink-0 text-muted-foreground/50" />
+                                        )}
                                         <div className="flex-grow min-w-0">
                                             <span className="font-medium text-foreground block" title={def.name}>{def.name}</span>
                                             <div className="flex flex-wrap items-center gap-1.5 mt-1">
@@ -729,10 +740,10 @@ function DeepWorkPageContent() {
                                       </div>
                                     </>
                                   )}
-                                </motion.li>
+                                </Reorder.Item>
                               ))}
                             </AnimatePresence>
-                          </ul>
+                          </Reorder.Group>
                         )}
                       </div>
                     </motion.div>
