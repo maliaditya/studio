@@ -436,14 +436,18 @@ function ResourcesPageContent() {
                                     )}
                                     <span className="truncate" title={res.name}>{res.name}</span>
                                 </CardTitle>
-                                <CardDescription className="flex items-center gap-1 text-xs truncate">
-                                <a href={res.link} target="_blank" rel="noopener noreferrer" className="hover:underline">{res.link}</a>
-                                </CardDescription>
+                                {!embedUrl && (
+                                    <CardDescription className="flex items-center gap-1 text-xs truncate">
+                                        <a href={res.link} target="_blank" rel="noopener noreferrer" className="hover:underline">{res.link}</a>
+                                    </CardDescription>
+                                )}
                             </CardHeader>
-                            <CardContent className="flex-grow">
-                                <p className="text-sm text-muted-foreground">{res.description || 'No description.'}</p>
-                            </CardContent>
-                            <CardFooter className="flex justify-between items-center">
+                            {!embedUrl && (
+                                <CardContent className="flex-grow">
+                                    <p className="text-sm text-muted-foreground">{res.description || 'No description.'}</p>
+                                </CardContent>
+                            )}
+                            <CardFooter className="flex justify-between items-center mt-auto pt-6">
                                 <Button asChild variant="outline">
                                 <a href={res.link} target="_blank" rel="noopener noreferrer">
                                     Visit Site <ExternalLink className="ml-2 h-4 w-4" />
@@ -562,3 +566,4 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
