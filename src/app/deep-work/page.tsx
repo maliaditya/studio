@@ -63,10 +63,7 @@ function DeepWorkPageContent() {
     updateTopic, deleteTopic,
   } = useAuth();
 
-  const [newSubtopicName, setNewSubtopicName] = useState('');
   const [newTopicName, setNewTopicName] = useState('');
-  const [newTopicClassification, setNewTopicClassification] = useState<'product' | 'service'>('product');
-  const newSubtopicInputRef = useRef<HTMLInputElement>(null);
   
   const [editingDefinition, setEditingDefinition] = useState<ExerciseDefinition | null>(null);
   const [editingDefinitionName, setEditingDefinitionName] = useState('');
@@ -74,6 +71,10 @@ function DeepWorkPageContent() {
   const [editingTopic, setEditingTopic] = useState<string | null>(null);
   const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
   const [newTopicNameForEdit, setNewTopicNameForEdit] = useState('');
+
+  // State for adding a focus area inline
+  const [addingFocusToTopic, setAddingFocusToTopic] = useState<string | null>(null);
+  const [newFocusAreaName, setNewFocusAreaName] = useState('');
 
   useEffect(() => {
     if (editingTopic) {
@@ -99,21 +100,27 @@ function DeepWorkPageContent() {
   const [createLinkModalConfig, setCreateLinkModalConfig] = useState<{type: 'upskill' | 'deepwork', parent: ExerciseDefinition} | null>(null);
   const [newLinkedItemName, setNewLinkedItemName] = useState('');
   const [newLinkedItemTopic, setNewLinkedItemTopic] = useState('');
-  
+
+  const allKnownTopics = useMemo(() => {
+    const topicsFromDefs = new Set(deepWorkDefinitions.map(def => def.category));
+    const topicsFromMeta = new Set(Object.keys(deepWorkTopicMetadata));
+    return Array.from(new Set([...topicsFromDefs, ...topicsFromMeta])).sort();
+  }, [deepWorkDefinitions, deepWorkTopicMetadata]);
+
   const topicsWithFocusAreas = useMemo(() => {
-    const grouped: Record<string, ExerciseDefinition[]> = {};
-    deepWorkDefinitions.forEach(def => {
-      if (!grouped[def.category]) {
-        grouped[def.category] = [];
-      }
-      grouped[def.category].push(def);
+    const grouped: { [key: string]: ExerciseDefinition[] } = {};
+    allKnownTopics.forEach(topic => {
+        grouped[topic] = [];
     });
-    return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
-  }, [deepWorkDefinitions]);
+    deepWorkDefinitions.forEach(def => {
+        if (grouped[def.category]) {
+            grouped[def.category].push(def);
+        }
+    });
 
-  const allTopics = useMemo(() => topicsWithFocusAreas.map(([topic]) => topic), [topicsWithFocusAreas]);
+    return allKnownTopics.map(topic => [topic, grouped[topic] || []] as [string, ExerciseDefinition[]]);
+  }, [allKnownTopics, deepWorkDefinitions]);
 
-  const isNewTopic = newTopicName.trim() !== '' && !allTopics.includes(newTopicName.trim());
 
   useEffect(() => {
     setIsLoadingPage(false); // Data is loaded from context
@@ -164,37 +171,49 @@ function DeepWorkPageContent() {
     });
   };
 
-  const handleAddTaskDefinition = (e: FormEvent) => {
+  const handleAddTopic = (e: FormEvent) => {
     e.preventDefault();
-    if (!currentUser) return;
-    if (newSubtopicName.trim() === '' || newTopicName.trim() === '') {
-      toast({ title: "Error", description: "Topic and Focus Area cannot be empty.", variant: "destructive" });
-      return;
+    if (!newTopicName.trim()) {
+        toast({ title: "Error", description: "Topic name cannot be empty.", variant: "destructive" });
+        return;
     }
     const topic = newTopicName.trim();
-    if (deepWorkDefinitions.some(def => def.name.toLowerCase() === newSubtopicName.trim().toLowerCase() && def.category.toLowerCase() === topic.toLowerCase())) {
-      toast({ title: "Error", description: "This focus area already exists for this topic.", variant: "destructive" });
-      return;
+    if (allKnownTopics.some(t => t.toLowerCase() === topic.toLowerCase())) {
+        toast({ title: "Error", description: "This topic already exists.", variant: "destructive" });
+        return;
     }
-    
-    if (isNewTopic) {
-        setDeepWorkTopicMetadata(prev => ({
-            ...prev,
-            [topic]: { classification: newTopicClassification }
-        }));
+    setDeepWorkTopicMetadata(prev => ({
+        ...prev,
+        [topic]: { classification: 'product' }
+    }));
+    setNewTopicName('');
+    toast({ title: "Topic Created", description: `"${topic}" has been added to your library.` });
+  }
+
+  const handleAddFocusArea = (topic: string) => {
+    if (!newFocusAreaName.trim()) {
+        setAddingFocusToTopic(null); // Cancel if empty
+        return;
+    }
+
+    if (deepWorkDefinitions.some(def => def.name.toLowerCase() === newFocusAreaName.trim().toLowerCase() && def.category.toLowerCase() === topic.toLowerCase())) {
+        toast({ title: "Error", description: "This focus area already exists for this topic.", variant: "destructive" });
+        return;
     }
 
     const newDef: ExerciseDefinition = { 
-      id: `def_${Date.now()}_${Math.random()}`, 
-      name: newSubtopicName.trim(),
-      category: topic as ExerciseCategory,
-      isReadyForBranding: false,
-      sharingStatus: { twitter: false, linkedin: false, devto: false }
+        id: `def_${Date.now()}_${Math.random()}`, 
+        name: newFocusAreaName.trim(),
+        category: topic as ExerciseCategory,
+        isReadyForBranding: false,
+        sharingStatus: { twitter: false, linkedin: false, devto: false }
     };
     setDeepWorkDefinitions(prev => [...prev, newDef]);
-    setNewSubtopicName('');
-    toast({ title: "Success", description: `Focus Area "${newDef.name}" added to library.` });
+    setNewFocusAreaName('');
+    setAddingFocusToTopic(null);
+    toast({ title: "Success", description: `Focus Area "${newDef.name}" added to ${topic}.` });
   };
+
 
   const handleDeleteExerciseDefinition = (id: string) => {
     const defToDelete = deepWorkDefinitions.find(def => def.id === id);
@@ -379,22 +398,9 @@ function DeepWorkPageContent() {
                 <CardDescription>Organize your focus areas by topic.</CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleAddTaskDefinition} className="space-y-3 mb-4 p-3 border rounded-lg bg-muted/30">
-                  <Input type="text" placeholder="New or Existing Topic" value={newTopicName} onChange={(e) => setNewTopicName(e.target.value)} list="topics-datalist" aria-label="New topic name" className="h-10 text-sm" />
-                  <datalist id="topics-datalist">
-                    {allTopics.map(topic => <option key={topic} value={topic} />)}
-                  </datalist>
-                  <Input ref={newSubtopicInputRef} type="text" placeholder="New Focus Area" value={newSubtopicName} onChange={(e) => setNewSubtopicName(e.target.value)} aria-label="New focus area" className="h-10 text-sm" />
-                  {isNewTopic && (
-                    <div className="space-y-2 rounded-md border p-3 bg-background/50">
-                      <Label className="text-xs font-medium">Classify this new topic</Label>
-                      <RadioGroup value={newTopicClassification} onValueChange={(v) => setNewTopicClassification(v as 'product' | 'service')} className="flex gap-4 pt-1">
-                        <div className="flex items-center space-x-2"><RadioGroupItem value="product" id="class-product-new" /><Label htmlFor="class-product-new" className="font-normal">Product</Label></div>
-                        <div className="flex items-center space-x-2"><RadioGroupItem value="service" id="class-service-new" /><Label htmlFor="class-service-new" className="font-normal">Service</Label></div>
-                      </RadioGroup>
-                    </div>
-                  )}
-                  <Button type="submit" size="sm" className="w-full"> <PlusCircle className="mr-2 h-4 w-4" /> Add to Library </Button>
+                <form onSubmit={handleAddTopic} className="flex gap-2 mb-4">
+                  <Input value={newTopicName} onChange={e => setNewTopicName(e.target.value)} placeholder="New Topic" />
+                  <Button size="icon" type="submit"><PlusCircle className="h-4 w-4" /></Button>
                 </form>
                 <div className="space-y-2">
                   {topicsWithFocusAreas.map(([topic, focusAreas]) => (
@@ -411,7 +417,7 @@ function DeepWorkPageContent() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => { setNewTopicName(topic); newSubtopicInputRef.current?.focus(); }}>
+                            <DropdownMenuItem onSelect={() => setAddingFocusToTopic(topic)}>
                               <PlusCircle className="mr-2 h-4 w-4" /> New Focus Area
                             </DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => setEditingTopic(topic)}>
@@ -460,6 +466,22 @@ function DeepWorkPageContent() {
                               )}
                             </li>
                           ))}
+                           {addingFocusToTopic === topic && (
+                              <li className="p-1.5">
+                                <form onSubmit={(e) => { e.preventDefault(); handleAddFocusArea(topic); }} className="flex items-center gap-2">
+                                    <Input 
+                                        value={newFocusAreaName}
+                                        onChange={(e) => setNewFocusAreaName(e.target.value)}
+                                        className="h-8"
+                                        autoFocus
+                                        placeholder="New Focus Area Name"
+                                        onKeyDown={e => e.key === 'Escape' && setAddingFocusToTopic(null)}
+                                    />
+                                    <Button size="icon" className="h-8 w-8" type="submit"><Save className="h-4 w-4"/></Button>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAddingFocusToTopic(null)}><X className="h-4 w-4"/></Button>
+                                </form>
+                              </li>
+                          )}
                         </ul>
                     </div>
                   ))}
