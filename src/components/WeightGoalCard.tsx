@@ -79,7 +79,7 @@ export function WeightGoalCard({
     const [newWeight, setNewWeight] = useState('');
     const [weightDate, setWeightDate] = useState<Date | undefined>(new Date());
     const [showLogForm, setShowLogForm] = useState(false);
-    const [weightView, setWeightView] = useState<'chart' | 'details'>('chart');
+    const [weightView, setWeightView] = useState<'chart' | 'details'>('details');
     const [mainView, setMainView] = useState<'weight' | 'diet' | 'projects'>('weight');
 
     const [heightInput, setHeightInput] = useState('');
@@ -312,17 +312,11 @@ export function WeightGoalCard({
 
         const projectedDate = addWeeks(lastLog.dateObj, weeksToGo);
         const nextProjectedWeight = currentWeight + projectionRate;
-        const nextWeekDate = addWeeks(lastLog.dateObj, 1);
-        const daysToNextWeek = differenceInDays(nextWeekDate, new Date());
-        const daysToGoal = differenceInDays(projectedDate, new Date());
-
+        
         return {
             ...baseSummary,
             projectedDate: format(projectedDate, 'PPP'),
             nextProjectedWeight: parseFloat(nextProjectedWeight.toFixed(1)),
-            weeksToGo,
-            daysToNextWeek,
-            daysToGoal,
         };
     }, [goalWeight, weightLogs, areDetailsSet]);
 
@@ -497,18 +491,17 @@ export function WeightGoalCard({
                             </span>
                         </div>
                         )}
-                        {projectionSummary.projectedDate && (
-                        <>
+                        {projectionSummary.nextProjectedWeight && (
                             <div className="flex justify-between items-center">
                                 <span className="text-muted-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Next Week Est.</span>
                                 <span className="font-bold">{projectionSummary.nextProjectedWeight} kg/lb</span>
                             </div>
-                            <Separator className="my-2"/>
+                        )}
+                        {projectionSummary.projectedDate && (
                             <div className="flex justify-between items-center">
                                 <span className="text-muted-foreground flex items-center gap-2"><CalendarIcon className="h-4 w-4" /> Est. Goal Date</span>
                                 <span className="font-bold">{projectionSummary.projectedDate}</span>
                             </div>
-                        </>
                         )}
                     </div>
                 </div>
@@ -570,16 +563,19 @@ export function WeightGoalCard({
         weight: {
           icon: <Target />,
           title: "Weight Goal",
+          description: "Your weekly weight trend and projections.",
           content: renderWeightContent()
         },
         diet: {
           icon: <Utensils />,
           title: "Today's Diet",
+          description: `Your planned meals for ${format(new Date(), 'EEEE')}.`,
           content: renderDietContent()
         },
         projects: {
           icon: <Briefcase />,
           title: "Active Projects",
+          description: "A high-level view of your current work.",
           content: renderProjectsContent()
         }
     };
@@ -596,9 +592,25 @@ export function WeightGoalCard({
                                 {currentViewData.icon}
                                 {currentViewData.title}
                             </CardTitle>
-                            {mainView === 'diet' && <CardDescription>Your planned meals for {format(new Date(), 'EEEE')}.</CardDescription>}
+                            <CardDescription>{currentViewData.description}</CardDescription>
                         </div>
                         <div className="flex items-center gap-1">
+                            {mainView === 'weight' && (
+                                <>
+                                    <Button variant="outline" size="icon" onClick={() => setWeightView('details')} className={cn("h-8 w-8", weightView === 'details' && 'bg-accent')}>
+                                        <Activity className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="outline" size="icon" onClick={() => setWeightView('chart')} className={cn("h-8 w-8", weightView === 'chart' && 'bg-accent')}>
+                                        <LineChartIcon className="h-4 w-4" />
+                                    </Button>
+                                    <Separator orientation="vertical" className="h-6 mx-1" />
+                                </>
+                            )}
+                             {mainView === 'diet' && (
+                                <Button variant="outline" size="sm" onClick={onEditDietClick} className="h-8">
+                                    Edit Plan
+                                </Button>
+                            )}
                             <Button variant="outline" size="icon" onClick={() => setMainView('weight')} className={cn("h-8 w-8", mainView === 'weight' && 'bg-accent')}>
                                 <Target className="h-4 w-4" />
                             </Button>
