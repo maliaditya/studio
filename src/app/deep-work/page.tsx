@@ -570,7 +570,7 @@ function DeepWorkPageContent() {
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
           
           <aside className="lg:col-span-1 space-y-6">
             <Card>
@@ -693,7 +693,7 @@ function DeepWorkPageContent() {
             </Card>
           </aside>
 
-          <section aria-labelledby="main-panel-heading" className="lg:col-span-2 space-y-6">
+          <section aria-labelledby="main-panel-heading" className="lg:col-span-3 space-y-6">
               <Card>
                   <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
@@ -742,7 +742,7 @@ function DeepWorkPageContent() {
                             <div className="space-y-6">
                               <div className="space-y-3">
                                 <h3 className="font-semibold flex items-center gap-2"><BookCopy className="h-5 w-5 text-primary" /> Linked Learning</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                                   {(selectedFocusArea.linkedUpskillIds || []).map(id => {
                                     const upskillDef = upskillDefinitions.find(ud => ud.id === id);
                                     if (!upskillDef) return null;
@@ -797,7 +797,7 @@ function DeepWorkPageContent() {
                               </div>
                               <div className="space-y-3">
                                 <h3 className="font-semibold flex items-center gap-2"><LinkIcon className="h-5 w-5 text-primary" /> Linked Work</h3>
-                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                                   {(selectedFocusArea.linkedDeepWorkIds || []).map(id => {
                                     const deepworkDef = deepWorkDefinitions.find(dd => dd.id === id);
                                     if (!deepworkDef) return null;
@@ -832,7 +832,7 @@ function DeepWorkPageContent() {
                               </div>
                               <div className="space-y-3">
                                 <h3 className="font-semibold flex items-center gap-2"><Library className="h-5 w-5 text-primary" /> Linked Resources</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                                   {(selectedFocusArea.linkedResourceIds || []).map(id => {
                                     const resource = resources.find(r => r.id === id);
                                     if (!resource) return null;
