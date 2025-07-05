@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -455,11 +455,33 @@ function ResourcesPageContent() {
 
                     return (
                         <Card key={res.id} className={cn(
-                            "rounded-3xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5",
+                            "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5",
                             isLongContent ? "bg-gradient-to-br from-card to-muted/20" : "bg-card"
                         )}>
                             {youtubeEmbedUrl ? (
                                 <>
+                                    <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"
+                                            onClick={(e) => { e.stopPropagation(); setEmbedUrl(youtubeEmbedUrl); }}
+                                            aria-label="View in App"
+                                        >
+                                            <Expand className="h-4 w-4" />
+                                        </Button>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white">
+                                                    <MoreVertical className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                                <DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
+                                                <DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
                                     <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl">
                                         <iframe
                                             width="100%"
@@ -469,6 +491,7 @@ function ResourcesPageContent() {
                                             frameBorder="0"
                                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                             allowFullScreen
+                                            className="pointer-events-none"
                                         ></iframe>
                                     </div>
                                     <div className="p-4 flex-grow">
@@ -479,24 +502,8 @@ function ResourcesPageContent() {
                                                     <p className="text-base font-bold truncate" title={res.name}>{res.name}</p>
                                                 </div>
                                             </div>
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 -mr-2 -mt-1">
-                                                        <MoreVertical className="h-4 w-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
-                                                    <DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
                                         </div>
                                     </div>
-                                    <CardFooter className="p-4 pt-0">
-                                        <Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(youtubeEmbedUrl)}>
-                                            View in App
-                                        </Button>
-                                    </CardFooter>
                                 </>
                             ) : (
                                 <div className="p-5 flex flex-col flex-grow">
