@@ -19,7 +19,6 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
-// This is a new component for the Kanban page.
 function KanbanPageContent() {
     const {
         schedule,
@@ -45,7 +44,6 @@ function KanbanPageContent() {
 
     const allTasks = useMemo(() => {
         const upskillTasks = upskillDefinitions.map(t => ({...t, taskType: 'upskill' as const}));
-        // Ensure we differentiate focus areas from content bundles in the initial list
         const deepWorkTasks = deepWorkDefinitions.map(t => ({...t, taskType: (Array.isArray(t.focusAreaIds) ? 'branding' : 'deepwork') as 'branding' | 'deepwork'}));
         return [...upskillTasks, ...deepWorkTasks];
     }, [upskillDefinitions, deepWorkDefinitions]);
@@ -53,19 +51,16 @@ function KanbanPageContent() {
     const taskStatusMaps = useMemo(() => {
         const todayKey = format(new Date(), 'yyyy-MM-dd');
         
-        // --- Maps definitionId to its status ---
         const scheduledTaskInfo = new Map<string, { slot: string; type: ActivityType }[]>();
         const loggedTaskInfo = new Map<string, { type: ActivityType; totalTime: number }>();
         const pendingTaskInfo = new Map<string, { oldestDate: string; type: ActivityType }>();
         const pastLoggedTaskInfo = new Map<string, { lastLogDate: string; type: ActivityType; }>();
 
-        // --- Helper to get mapping from instance ID to definition ID for all tasks ---
         const instanceIdToDefIdMap = new Map<string, string>();
         [...allUpskillLogs, ...allDeepWorkLogs, ...brandingLogs].forEach(log => {
             (log.exercises || []).forEach(ex => instanceIdToDefIdMap.set(ex.id, ex.definitionId));
         });
 
-        // --- Populate Scheduled for Today ---
         const todaysActivities = schedule[todayKey];
         if (todaysActivities) {
             Object.entries(todaysActivities).forEach(([slotName, activities]) => {
@@ -82,7 +77,6 @@ function KanbanPageContent() {
                             }
                         };
                         
-                        // For branding, mark the constituent focus areas, not the bundle itself
                         if (activity.type === 'branding') {
                              const bundleDef = deepWorkDefinitions.find(d => d.id === defId);
                              if (bundleDef?.focusAreaIds) {
@@ -96,7 +90,6 @@ function KanbanPageContent() {
             });
         }
         
-        // --- Populate Logged Today ---
         const processLogsForToday = (logs: DatedWorkout[], activityType: ActivityType, timeField: 'reps' | 'weight') => {
             const todayLog = logs.find(log => log.date === todayKey);
             if(todayLog) {
@@ -117,9 +110,8 @@ function KanbanPageContent() {
         };
         processLogsForToday(allUpskillLogs, 'upskill', 'reps');
         processLogsForToday(allDeepWorkLogs, 'deepwork', 'weight');
-        processLogsForToday(brandingLogs, 'branding', 'reps'); // 'reps' is just a placeholder here
+        processLogsForToday(brandingLogs, 'branding', 'reps');
         
-        // --- Populate Pending from Past ---
         Object.keys(schedule).forEach(dateKey => {
             if (dateKey < todayKey) {
                 Object.values(schedule[dateKey]).flat().forEach(activity => {
@@ -149,7 +141,6 @@ function KanbanPageContent() {
             }
         });
         
-        // --- Populate Completed in Past ---
         const processLogsForPast = (logs: DatedWorkout[], activityType: ActivityType) => {
             logs.forEach(log => {
                 if (log.date < todayKey) {
@@ -193,7 +184,6 @@ function KanbanPageContent() {
 
         const processedIds = new Set<string>();
         
-        // We only want to show individual focus areas and learning tasks on the board
         const individualTasks = allTasks.filter(task => 
             task.taskType !== 'branding' && 
             !Array.isArray(task.focusAreaIds) &&
@@ -219,7 +209,6 @@ function KanbanPageContent() {
             }
         });
 
-        // Sort by topic then by other criteria
         pendingFromPast.sort((a,b) => a.category.localeCompare(b.category) || b.daysPending - a.daysPending);
         completed.sort((a,b) => a.category.localeCompare(b.category) || new Date(b.lastLogDate).getTime() - new Date(a.lastLogDate).getTime());
         logged.sort((a,b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
@@ -326,5 +315,3 @@ export default function KanbanPage() {
         </AuthGuard>
     );
 }
-
-    
