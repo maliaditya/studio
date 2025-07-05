@@ -21,7 +21,6 @@ import { DashboardStats } from '@/components/DashboardStats';
 import { ProductivitySnapshot } from '@/components/ProductivitySnapshot';
 import { TimeSlots } from '@/components/TimeSlots';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
-import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -563,23 +562,28 @@ function HomePageContent() {
     if (!daySchedule) return durations;
 
     for (const slotName in daySchedule) {
-        const activities = daySchedule[slotName] || [];
-        const deepWorkCount = activities.filter(a => a.type === 'deepwork').length;
+        const activitiesInSlot = daySchedule[slotName] || [];
+        const totalActivitiesInSlot = activitiesInSlot.length;
 
-        for (const activity of activities) {
+        for (const activity of activitiesInSlot) {
             switch (activity.type) {
                 case 'workout':
-                    durations[activity.id] = '1h 30m'; break;
-                case 'planning': case 'tracking':
-                    durations[activity.id] = '30m'; break;
+                    durations[activity.id] = '1h 30m';
+                    break;
+                case 'planning':
+                case 'tracking':
+                    durations[activity.id] = '30m';
+                    break;
                 case 'deepwork':
-                    durations[activity.id] = deepWorkCount === 1 ? '4h' : '2h'; break;
                 case 'branding':
-                    durations[activity.id] = '4h'; break;
+                    durations[activity.id] = totalActivitiesInSlot === 1 ? '4h' : '2h';
+                    break;
                 case 'lead-generation':
-                    durations[activity.id] = '45m'; break;
+                    durations[activity.id] = '45m';
+                    break;
                 case 'upskill':
-                    durations[activity.id] = '30m'; break;
+                    durations[activity.id] = '30m';
+                    break;
             }
         }
     }
