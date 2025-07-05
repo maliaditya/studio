@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2 } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -570,7 +570,7 @@ function DeepWorkPageContent() {
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           
           <aside className="lg:col-span-1 space-y-6">
             <Card>
@@ -693,7 +693,7 @@ function DeepWorkPageContent() {
             </Card>
           </aside>
 
-          <section aria-labelledby="main-panel-heading" className="lg:col-span-3 space-y-6">
+          <section aria-labelledby="main-panel-heading" className="lg:col-span-2 space-y-6">
               <Card>
                   <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
@@ -753,8 +753,8 @@ function DeepWorkPageContent() {
                                     const embedLinkForModal = youtubeEmbedUrl || upskillDef.link;
 
                                     return (
-                                       <Card key={id} className="flex flex-col">
-                                          <CardHeader className="pb-2">
+                                       <Card key={id} className="rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
+                                          <CardHeader className="pb-3">
                                             <CardTitle className="text-base flex items-center gap-2">
                                               {youtubeEmbedUrl ? (
                                                   <Youtube className="h-5 w-5 text-red-500 flex-shrink-0" />
@@ -763,15 +763,15 @@ function DeepWorkPageContent() {
                                               ) : (
                                                   <Globe className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                                               )}
-                                              <span>{upskillDef.name}</span>
+                                              <span className="truncate" title={upskillDef.name}>{upskillDef.name}</span>
                                             </CardTitle>
                                             <CardDescription>{upskillDef.category}</CardDescription>
                                           </CardHeader>
                                           <CardContent className="flex-grow">
-                                            <p className="text-sm text-muted-foreground line-clamp-3">{upskillDef.description || "No description provided."}</p>
+                                            <p className="text-sm text-muted-foreground line-clamp-2">{upskillDef.description || "No description provided."}</p>
                                           </CardContent>
                                           {upskillDef.link && (
-                                              <CardFooter>
+                                              <CardFooter className="pt-3">
                                                 {isEmbeddable ? (
                                                   <Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(embedLinkForModal!)}>View in App</Button>
                                                 ) : (
@@ -786,11 +786,12 @@ function DeepWorkPageContent() {
                                        </Card>
                                     )
                                   })}
-                                  <Card className="border-dashed hover:border-primary hover:bg-muted transition-colors cursor-pointer" onClick={() => handleOpenManageLinksModal('upskill', selectedFocusArea)}>
-                                    <CardContent className="p-3 h-full flex flex-col items-center justify-center text-center">
-                                      <PlusCircle className="h-6 w-6 text-muted-foreground mb-1" />
-                                      <p className="text-sm font-medium">Add / Link Task</p>
-                                    </CardContent>
+                                  <Card 
+                                    onClick={() => handleOpenManageLinksModal('upskill', selectedFocusArea)}
+                                    className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
+                                  >
+                                    <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                    <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
                                   </Card>
                                 </div>
                               </div>
@@ -799,15 +800,33 @@ function DeepWorkPageContent() {
                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   {(selectedFocusArea.linkedDeepWorkIds || []).map(id => {
                                     const deepworkDef = deepWorkDefinitions.find(dd => dd.id === id);
-                                    return deepworkDef ? (
-                                       <Card key={id}><CardContent className="p-3"><p className="font-medium">{deepworkDef.name}</p><p className="text-sm text-muted-foreground">{deepworkDef.category}</p></CardContent></Card>
-                                    ) : null;
+                                    if (!deepworkDef) return null;
+                                    return (
+                                       <Card key={id} className="rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
+                                         <CardHeader className="pb-3">
+                                            <CardTitle className="text-base flex items-center gap-2">
+                                              <Briefcase className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                              <span className="truncate" title={deepworkDef.name}>{deepworkDef.name}</span>
+                                            </CardTitle>
+                                            <CardDescription>{deepworkDef.category}</CardDescription>
+                                         </CardHeader>
+                                         <CardContent className="flex-grow">
+                                            <p className="text-sm text-muted-foreground line-clamp-2">{deepworkDef.description || "This focus area can be expanded by linking learning tasks and resources to it."}</p>
+                                         </CardContent>
+                                         <CardFooter className="pt-3">
+                                            <Button variant="secondary" size="sm" className="w-full" onClick={() => { setSelectedFocusArea(deepworkDef); setViewMode('library'); }}>
+                                              View Details <ArrowRight className="ml-2 h-3 w-3" />
+                                            </Button>
+                                          </CardFooter>
+                                       </Card>
+                                    );
                                   })}
-                                  <Card className="border-dashed hover:border-primary hover:bg-muted transition-colors cursor-pointer" onClick={() => handleOpenManageLinksModal('deepwork', selectedFocusArea)}>
-                                    <CardContent className="p-3 h-full flex flex-col items-center justify-center text-center">
-                                      <PlusCircle className="h-6 w-6 text-muted-foreground mb-1" />
-                                      <p className="text-sm font-medium">Add / Link Focus Area</p>
-                                    </CardContent>
+                                  <Card 
+                                    onClick={() => handleOpenManageLinksModal('deepwork', selectedFocusArea)}
+                                    className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
+                                  >
+                                    <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                    <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Focus Area</p>
                                   </Card>
                                 </div>
                               </div>
@@ -822,23 +841,23 @@ function DeepWorkPageContent() {
                                     const embedLinkForModal = isEmbeddable ? (getYouTubeEmbedUrl(resource.link) || resource.link) : null;
 
                                     return (
-                                        <Card key={id} className="flex flex-col">
-                                        <CardHeader className="pb-2">
+                                        <Card key={id} className="rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
+                                        <CardHeader className="pb-3">
                                             <CardTitle className="text-base flex items-center gap-2">
                                             {resource.iconUrl ? (
                                                 <Image src={resource.iconUrl} alt="" width={20} height={20} className="h-5 w-5 rounded-sm flex-shrink-0" unoptimized />
                                             ) : (
                                                 <Globe className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                                             )}
-                                            <span>{resource.name}</span>
+                                            <span className="truncate" title={resource.name}>{resource.name}</span>
                                             </CardTitle>
                                             <CardDescription>{resourceFolders.find(f => f.id === resource.folderId)?.name || 'Uncategorized'}</CardDescription>
                                         </CardHeader>
                                         <CardContent className="flex-grow">
-                                            <p className="text-sm text-muted-foreground line-clamp-3">{resource.description || "No description provided."}</p>
+                                            <p className="text-sm text-muted-foreground line-clamp-2">{resource.description || "No description provided."}</p>
                                         </CardContent>
                                         {resource.link && (
-                                            <CardFooter>
+                                            <CardFooter className="pt-3">
                                                 {isEmbeddable ? (
                                                 <Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(embedLinkForModal!)}>View in App</Button>
                                                 ) : (
@@ -853,11 +872,12 @@ function DeepWorkPageContent() {
                                         </Card>
                                     )
                                   })}
-                                  <Card className="border-dashed hover:border-primary hover:bg-muted transition-colors cursor-pointer" onClick={() => handleOpenManageLinksModal('resource', selectedFocusArea)}>
-                                    <CardContent className="p-3 h-full flex flex-col items-center justify-center text-center">
-                                      <PlusCircle className="h-6 w-6 text-muted-foreground mb-1" />
-                                      <p className="text-sm font-medium">Add / Link Resource</p>
-                                    </CardContent>
+                                  <Card 
+                                    onClick={() => handleOpenManageLinksModal('resource', selectedFocusArea)}
+                                    className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
+                                  >
+                                    <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                    <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p>
                                   </Card>
                                 </div>
                               </div>
