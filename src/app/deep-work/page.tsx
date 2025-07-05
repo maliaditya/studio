@@ -1041,8 +1041,8 @@ function DeepWorkPageContent() {
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end">
-                                                            <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}>Edit</DropdownMenuItem>
-                                                            <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-destructive">Unlink</DropdownMenuItem>
+                                                            <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                                            <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
                                                 </div>
@@ -1076,8 +1076,20 @@ function DeepWorkPageContent() {
                                                         </Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}>Edit</DropdownMenuItem>
-                                                        <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-destructive">Unlink</DropdownMenuItem>
+                                                         {upskillDef.link && (isNotionObsidianEmbed ? (
+                                                            <DropdownMenuItem onSelect={() => setEmbedUrl(embedLinkForModal!)}>
+                                                                <Expand className="mr-2 h-4 w-4"/> View in App
+                                                            </DropdownMenuItem>
+                                                        ) : (
+                                                            <DropdownMenuItem asChild>
+                                                                <a href={upskillDef.link} target="_blank" rel="noopener noreferrer">
+                                                                    <ExternalLink className="mr-2 h-4 w-4"/> Visit Site
+                                                                </a>
+                                                            </DropdownMenuItem>
+                                                        ))}
+                                                        {upskillDef.link && <DropdownMenuSeparator />}
+                                                        <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                                        <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                                 <CardHeader className="pb-3">
@@ -1094,18 +1106,7 @@ function DeepWorkPageContent() {
                                                 <CardContent className="flex-grow">
                                                   <p className="text-sm text-muted-foreground line-clamp-2">{upskillDef.description || "No description provided."}</p>
                                                 </CardContent>
-                                                <CardFooter className="pt-3 flex items-center justify-between">
-                                                  {upskillDef.link ? (
-                                                      isNotionObsidianEmbed ? (
-                                                          <Button variant="secondary" size="sm" className="flex-grow" onClick={() => setEmbedUrl(embedLinkForModal!)}>View in App</Button>
-                                                      ) : (
-                                                          <Button asChild variant="secondary" size="sm" className="flex-grow">
-                                                              <a href={upskillDef.link} target="_blank" rel="noopener noreferrer">
-                                                                  Visit Site <ExternalLink className="ml-2 h-3 w-3" />
-                                                              </a>
-                                                          </Button>
-                                                      )
-                                                  ) : <div />}
+                                                <CardFooter className="pt-3 flex items-center justify-end">
                                                   <div className="flex items-center gap-1 flex-shrink-0">
                                                     {upskillDef.estimatedHours && <Badge variant="outline" className="flex-shrink-0">{upskillDef.estimatedHours}h est.</Badge>}
                                                     {loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}
@@ -1144,8 +1145,12 @@ function DeepWorkPageContent() {
                                                  </Button>
                                              </DropdownMenuTrigger>
                                              <DropdownMenuContent align="end">
-                                                 <DropdownMenuItem onSelect={() => handleStartEditDefinition(deepworkDef)}>Edit</DropdownMenuItem>
-                                                 <DropdownMenuItem onSelect={() => handleUnlinkItem('deepwork', id)} className="text-destructive">Unlink</DropdownMenuItem>
+                                                  <DropdownMenuItem onSelect={() => { setSelectedFocusArea(deepworkDef); setViewMode('library'); }}>
+                                                      <ArrowRight className="mr-2 h-4 w-4"/> View Details
+                                                  </DropdownMenuItem>
+                                                  <DropdownMenuSeparator />
+                                                 <DropdownMenuItem onSelect={() => handleStartEditDefinition(deepworkDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                                 <DropdownMenuItem onSelect={() => handleUnlinkItem('deepwork', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
                                              </DropdownMenuContent>
                                          </DropdownMenu>
                                          <CardHeader className="pb-3">
@@ -1158,10 +1163,7 @@ function DeepWorkPageContent() {
                                          <CardContent className="flex-grow">
                                             <p className="text-sm text-muted-foreground line-clamp-2">{deepworkDef.description || "This focus area can be expanded by linking learning tasks and resources to it."}</p>
                                          </CardContent>
-                                         <CardFooter className="pt-3 flex items-center justify-between">
-                                            <Button variant="secondary" size="sm" className="flex-grow" onClick={() => { setSelectedFocusArea(deepworkDef); setViewMode('library'); }}>
-                                              View Details <ArrowRight className="ml-2 h-3 w-3" />
-                                            </Button>
+                                         <CardFooter className="pt-3 flex items-center justify-end">
                                             <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                                                 {deepworkDef.estimatedHours && <Badge variant="outline">{deepworkDef.estimatedHours}h est.</Badge>}
                                                 {loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}
@@ -1205,8 +1207,8 @@ function DeepWorkPageContent() {
                                                                 </Button>
                                                             </DropdownMenuTrigger>
                                                             <DropdownMenuContent align="end">
-                                                                <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}>Edit</DropdownMenuItem>
-                                                                <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', id)} className="text-destructive">Unlink</DropdownMenuItem>
+                                                                <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                                                <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
                                                     </div>
@@ -1234,8 +1236,20 @@ function DeepWorkPageContent() {
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end">
-                                                            <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}>Edit</DropdownMenuItem>
-                                                            <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', id)} className="text-destructive">Unlink</DropdownMenuItem>
+                                                            {resource.link && (isNotionObsidianEmbed ? (
+                                                                <DropdownMenuItem onSelect={() => setEmbedUrl(embedLinkForModal!)}>
+                                                                    <Expand className="mr-2 h-4 w-4"/> View in App
+                                                                </DropdownMenuItem>
+                                                            ) : (
+                                                                <DropdownMenuItem asChild>
+                                                                    <a href={resource.link} target="_blank" rel="noopener noreferrer">
+                                                                        <ExternalLink className="mr-2 h-4 w-4"/> Visit Site
+                                                                    </a>
+                                                                </DropdownMenuItem>
+                                                            ))}
+                                                            {resource.link && <DropdownMenuSeparator/>}
+                                                            <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                                            <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
                                                     <CardHeader className="pb-3">
@@ -1252,19 +1266,6 @@ function DeepWorkPageContent() {
                                                     <CardContent className="flex-grow">
                                                       <p className="text-sm text-muted-foreground line-clamp-2">{resource.description || "No description provided."}</p>
                                                     </CardContent>
-                                                    {resource.link && (
-                                                      <CardFooter className="pt-3">
-                                                          {isNotionObsidianEmbed ? (
-                                                          <Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(embedLinkForModal!)}>View in App</Button>
-                                                          ) : (
-                                                          <Button asChild variant="secondary" size="sm" className="w-full">
-                                                              <a href={resource.link} target="_blank" rel="noopener noreferrer">
-                                                              Visit Site <ExternalLink className="ml-2 h-3 w-3" />
-                                                              </a>
-                                                          </Button>
-                                                          )}
-                                                      </CardFooter>
-                                                    )}
                                                 </>
                                             )}
                                         </Card>
