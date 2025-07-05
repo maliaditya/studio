@@ -171,6 +171,7 @@ export interface Release {
   features?: string[];
   daysRemaining?: number;
   availableHours?: number;
+  totalAvailableHours?: number;
 }
 
 export interface Offer {

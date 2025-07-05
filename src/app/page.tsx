@@ -526,6 +526,7 @@ function HomePageContent() {
                 const launchDate = parseISO(release.launchDate);
                 const daysRemaining = differenceInDays(launchDate, today);
                 const availableHours = daysRemaining * avgProductiveHours;
+                const totalAvailableHours = daysRemaining * 24;
 
                 return {
                     topic,
@@ -533,7 +534,8 @@ function HomePageContent() {
                     release: {
                         ...release,
                         daysRemaining,
-                        availableHours
+                        availableHours,
+                        totalAvailableHours,
                     }
                 };
             })

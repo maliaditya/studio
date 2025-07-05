@@ -248,9 +248,11 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                                   </div>
                               </div>
                               <p className="text-sm text-muted-foreground mt-1 truncate">
-                                {item.release.features?.length > 0
-                                  ? `${item.release.features.length} features planned.`
-                                  : "No features planned yet."}
+                                {item.release.availableHours !== undefined && item.release.totalAvailableHours !== undefined ? (
+                                  `Prod. Hours: ${item.release.availableHours.toFixed(1)} / ${item.release.totalAvailableHours}`
+                                ) : (
+                                  `${item.release.features?.length || 0} features planned.`
+                                )}
                               </p>
                           </div>
                         )}
@@ -311,14 +313,18 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
               </DialogDescription>
             </DialogHeader>
 
-            <div className="grid grid-cols-2 gap-4 text-center my-4">
+            <div className="grid grid-cols-3 gap-4 text-center my-4">
                 <div className="p-2 bg-muted/50 rounded-md">
                     <p className="text-sm text-muted-foreground">Days Remaining</p>
                     <p className="text-2xl font-bold">{selectedReleaseInfo.release.daysRemaining}</p>
                 </div>
                 <div className="p-2 bg-muted/50 rounded-md">
-                    <p className="text-sm text-muted-foreground">Available Hours</p>
+                    <p className="text-sm text-muted-foreground">Productive Hours</p>
                     <p className="text-2xl font-bold">{selectedReleaseInfo.release.availableHours?.toFixed(1) ?? 'N/A'}</p>
+                </div>
+                <div className="p-2 bg-muted/50 rounded-md">
+                    <p className="text-sm text-muted-foreground">Total Hours</p>
+                    <p className="text-2xl font-bold">{selectedReleaseInfo.release.totalAvailableHours ?? 'N/A'}</p>
                 </div>
             </div>
             
