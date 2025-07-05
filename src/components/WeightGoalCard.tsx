@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -597,11 +596,8 @@ export function WeightGoalCard({
                         <div className="flex items-center gap-1">
                             {mainView === 'weight' && (
                                 <>
-                                    <Button variant="outline" size="icon" onClick={() => setWeightView('details')} className={cn("h-8 w-8", weightView === 'details' && 'bg-accent')}>
-                                        <Activity className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="outline" size="icon" onClick={() => setWeightView('chart')} className={cn("h-8 w-8", weightView === 'chart' && 'bg-accent')}>
-                                        <LineChartIcon className="h-4 w-4" />
+                                    <Button variant="outline" size="icon" onClick={() => setWeightView(v => v === 'chart' ? 'details' : 'chart')} className="h-8 w-8">
+                                        {weightView === 'chart' ? <Activity className="h-4 w-4" /> : <LineChartIcon className="h-4 w-4" />}
                                     </Button>
                                     <Separator orientation="vertical" className="h-6 mx-1" />
                                 </>
