@@ -234,7 +234,7 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
             <ScrollArea className="h-full">
                 <div className="space-y-3 pr-4">
                     {tasks && tasks.map(task => (
-                        <Card key={task.id} className="p-3 shadow-sm hover:shadow-md transition-shadow">
+                        <Card key={task.id} className="p-4 rounded-xl bg-card/80 backdrop-blur-sm shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-200">
                            <div className="flex items-start gap-3">
                                 {taskIcons[task.taskType]}
                                 <div className="flex-grow min-w-0">
