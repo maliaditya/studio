@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -70,7 +70,6 @@ function DeepWorkPageContent() {
   
   const [editingDefinition, setEditingDefinition] = useState<ExerciseDefinition | null>(null);
   const [editingDefinitionName, setEditingDefinitionName] = useState('');
-  const [editingDefinitionCategory, setEditingDefinitionCategory] = useState<string>('');
   
   const [editingTopic, setEditingTopic] = useState<string | null>(null);
   const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
@@ -212,17 +211,19 @@ function DeepWorkPageContent() {
   const handleStartEditDefinition = (def: ExerciseDefinition) => {
     setEditingDefinition(def);
     setEditingDefinitionName(def.name);
-    setEditingDefinitionCategory(def.category);
   };
 
   const handleSaveEditDefinition = () => {
-    if (!editingDefinition || editingDefinitionName.trim() === '' || editingDefinitionCategory.trim() === '') {
-      toast({ title: "Error", description: "Topic and Focus Area cannot be empty.", variant: "destructive" });
+    if (!editingDefinition || editingDefinitionName.trim() === '') {
+      toast({ title: "Error", description: "Focus Area name cannot be empty.", variant: "destructive" });
       return;
     }
-    const updatedDef = { ...editingDefinition, name: editingDefinitionName.trim(), category: editingDefinitionCategory.trim() as ExerciseCategory };
+    const updatedDef = { ...editingDefinition, name: editingDefinitionName.trim() };
     setDeepWorkDefinitions(prev => prev.map(def => def.id === editingDefinition.id ? updatedDef : def));
-    setAllDeepWorkLogs(prevLogs => prevLogs.map(log => ({...log, exercises: log.exercises.map(ex => ex.definitionId === editingDefinition.id ? { ...ex, name: updatedDef.name, category: updatedDef.category } : ex)})));
+    setAllDeepWorkLogs(prevLogs => prevLogs.map(log => ({...log, exercises: log.exercises.map(ex => ex.definitionId === editingDefinition.id ? { ...ex, name: updatedDef.name } : ex)})));
+    if(selectedFocusArea?.id === editingDefinition.id) {
+        setSelectedFocusArea(updatedDef);
+    }
     toast({ title: "Success", description: `Focus Area updated to "${updatedDef.name}".` });
     setEditingDefinition(null);
   };
@@ -397,9 +398,12 @@ function DeepWorkPageContent() {
                 </form>
                 <div className="space-y-2">
                   {topicsWithFocusAreas.map(([topic, focusAreas]) => (
-                    <div key={topic} className="rounded-md">
-                      <div className="group flex items-center justify-between p-2 hover:bg-muted">
-                        <h4 className="font-semibold text-sm flex-grow">{topic}</h4>
+                    <div key={topic}>
+                      <div className="group flex items-center justify-between p-2 rounded-md hover:bg-muted">
+                        <div className="flex items-center gap-2 min-w-0 flex-grow">
+                          <ChevronDown className="h-4 w-4 flex-shrink-0" />
+                          <h4 className="font-semibold text-sm truncate">{topic}</h4>
+                        </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0">
@@ -420,24 +424,40 @@ function DeepWorkPageContent() {
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                      <ul className="space-y-1 pl-4 border-l-2 border-muted ml-2">
+                      <ul className="space-y-1 pl-4 border-l-2 border-muted ml-4">
                           {focusAreas.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
                             <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted">
-                              <span className="flex-grow truncate cursor-pointer pl-1" onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} title={`View details for ${def.name}`}>{def.name}</span>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onSelect={() => handleAddTaskToSession(def)}><PlusCircle className="mr-2 h-4 w-4" /><span>Add to Session</span></DropdownMenuItem>
-                                  <DropdownMenuItem onSelect={() => handleViewProgress(def)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onSelect={() => handleStartEditDefinition(def)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
-                                  <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(def.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                              {editingDefinition?.id === def.id ? (
+                                <div className='flex-grow flex items-center gap-2'>
+                                  <Input 
+                                    value={editingDefinitionName}
+                                    onChange={(e) => setEditingDefinitionName(e.target.value)}
+                                    className="h-8"
+                                    autoFocus
+                                    onKeyDown={e => e.key === 'Enter' && handleSaveEditDefinition()}
+                                  />
+                                  <Button size="icon" className="h-8 w-8" onClick={handleSaveEditDefinition}><Save className="h-4 w-4"/></Button>
+                                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingDefinition(null)}><X className="h-4 w-4"/></Button>
+                                </div>
+                              ) : (
+                                <>
+                                  <span className="flex-grow truncate cursor-pointer pl-1" onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} title={`View details for ${def.name}`}>{def.name}</span>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0">
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onSelect={() => handleAddTaskToSession(def)}><PlusCircle className="mr-2 h-4 w-4" /><span>Add to Session</span></DropdownMenuItem>
+                                      <DropdownMenuItem onSelect={() => handleViewProgress(def)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem onSelect={() => handleStartEditDefinition(def)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
+                                      <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(def.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </>
+                              )}
                             </li>
                           ))}
                         </ul>
@@ -607,7 +627,7 @@ function DeepWorkPageContent() {
         </DialogContent>
       </Dialog>
       
-      <AlertDialog open={!!topicToDelete} onOpenChange={setTopicToDelete}>
+      <AlertDialog open={!!topicToDelete} onOpenChange={(isOpen) => !isOpen && setTopicToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
@@ -617,7 +637,7 @@ function DeepWorkPageContent() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteTopic}>
+            <AlertDialogAction onClick={handleDeleteTopic} className="bg-destructive hover:bg-destructive/90">
                 Delete Topic
             </AlertDialogAction>
           </AlertDialogFooter>
