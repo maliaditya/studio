@@ -5,7 +5,7 @@ import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } f
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
@@ -13,7 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder } from '@/types/workout';
-import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogFooter as DialogFooterComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -471,7 +471,7 @@ function ResourcesPageContent() {
                                             allowFullScreen
                                         ></iframe>
                                     </div>
-                                    <div className="p-4">
+                                    <div className="p-4 flex-grow">
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="flex-grow min-w-0">
                                                 <div className="flex items-center gap-2">
@@ -492,6 +492,11 @@ function ResourcesPageContent() {
                                             </DropdownMenu>
                                         </div>
                                     </div>
+                                    <CardFooter className="p-4 pt-0">
+                                        <Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(youtubeEmbedUrl)}>
+                                            View in App
+                                        </Button>
+                                    </CardFooter>
                                 </>
                             ) : (
                                 <div className="p-5 flex flex-col flex-grow">
@@ -632,10 +637,10 @@ function ResourcesPageContent() {
                     </Select>
                 </div>
             </div>
-            <DialogFooter>
+            <DialogFooterComponent>
                 <Button variant="outline" onClick={() => setEditingResource(null)}>Cancel</Button>
                 <Button onClick={handleSaveResourceEdit}>Save Changes</Button>
-            </DialogFooter>
+            </DialogFooterComponent>
         </DialogContent>
     </Dialog>
 
