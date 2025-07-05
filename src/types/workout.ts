@@ -58,6 +58,7 @@ export interface ExerciseDefinition {
   sourceUpskillId?: string;
   linkedUpskillIds?: string[];
   linkedDeepWorkIds?: string[];
+  linkedResourceIds?: string[];
   isReadyForBranding?: boolean;
   // Personal Branding
   brandingStatus?: 'converted' | 'published';

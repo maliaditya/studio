@@ -12,7 +12,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, getISOWeek, isMonday, getYear } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, DeepWorkTopicMetadata } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, DeepWorkTopicMetadata, Resource, ResourceFolder } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { AuthGuard } from '@/components/AuthGuard';
@@ -50,6 +50,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -115,6 +116,8 @@ function DeepWorkPageContent() {
     upskillDefinitions, setUpskillDefinitions,
     deepWorkTopicMetadata, setDeepWorkTopicMetadata,
     updateTopic, deleteTopic,
+    resources, setResources,
+    resourceFolders,
   } = useAuth();
 
   const [newTopicName, setNewTopicName] = useState('');
@@ -167,11 +170,12 @@ function DeepWorkPageContent() {
 
   // State for the "Manage Links" functionality
   const [isManageLinksModalOpen, setIsManageLinksModalOpen] = useState(false);
-  const [manageLinksConfig, setManageLinksConfig] = useState<{type: 'upskill' | 'deepwork', parent: ExerciseDefinition} | null>(null);
+  const [manageLinksConfig, setManageLinksConfig] = useState<{type: 'upskill' | 'deepwork' | 'resource', parent: ExerciseDefinition} | null>(null);
   const [newLinkedItemName, setNewLinkedItemName] = useState('');
   const [newLinkedItemTopic, setNewLinkedItemTopic] = useState('');
   const [newLinkedItemDescription, setNewLinkedItemDescription] = useState('');
   const [newLinkedItemLink, setNewLinkedItemLink] = useState('');
+  const [newLinkedItemFolderId, setNewLinkedItemFolderId] = useState('');
   const [linkSearchTerm, setLinkSearchTerm] = useState('');
   const [tempLinkedIds, setTempLinkedIds] = useState<string[]>([]);
 
@@ -431,30 +435,37 @@ function DeepWorkPageContent() {
     setIsProgressModalOpen(true);
   };
   
-  const handleOpenManageLinksModal = (type: 'upskill' | 'deepwork', parent: ExerciseDefinition) => {
+  const handleOpenManageLinksModal = (type: 'upskill' | 'deepwork' | 'resource', parent: ExerciseDefinition) => {
     setManageLinksConfig({ type, parent });
     if (type === 'upskill') {
         setTempLinkedIds(parent.linkedUpskillIds || []);
-    } else {
+    } else if (type === 'deepwork') {
         setTempLinkedIds(parent.linkedDeepWorkIds || []);
+    } else { // resource
+        setTempLinkedIds(parent.linkedResourceIds || []);
     }
     // Reset form for "Create New" tab
     setNewLinkedItemTopic('');
     setNewLinkedItemName('');
     setNewLinkedItemDescription('');
     setNewLinkedItemLink('');
+    setNewLinkedItemFolderId('');
     setLinkSearchTerm('');
     setIsManageLinksModalOpen(true);
   };
   
   const handleCreateAndLinkItem = () => {
-    if (!manageLinksConfig || !newLinkedItemName.trim() || !newLinkedItemTopic.trim()) {
-        toast({ title: "Error", description: "Topic and Name are required.", variant: "destructive" });
+    if (!manageLinksConfig || !newLinkedItemName.trim()) {
+        toast({ title: "Error", description: "Name is required.", variant: "destructive" });
         return;
     }
     const { type, parent } = manageLinksConfig;
     let updatedParent;
     if (type === 'upskill') {
+        if (!newLinkedItemTopic.trim()) {
+            toast({ title: "Error", description: "Topic is required.", variant: "destructive" });
+            return;
+        }
         const link = newLinkedItemLink.trim();
         const newUpskillDef: ExerciseDefinition = {
             id: `def_${Date.now()}_upskill_${Math.random()}`,
@@ -466,7 +477,11 @@ function DeepWorkPageContent() {
         };
         setUpskillDefinitions(prev => [...prev, newUpskillDef]);
         updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newUpskillDef.id] };
-    } else { // 'deepwork'
+    } else if (type === 'deepwork') {
+        if (!newLinkedItemTopic.trim()) {
+            toast({ title: "Error", description: "Topic is required.", variant: "destructive" });
+            return;
+        }
         const newDeepWorkDef: ExerciseDefinition = {
             id: `def_${Date.now()}_deepwork_${Math.random()}`,
             name: newLinkedItemName.trim(),
@@ -474,7 +489,28 @@ function DeepWorkPageContent() {
         };
         setDeepWorkDefinitions(prev => [...prev, newDeepWorkDef]);
         updatedParent = { ...parent, linkedDeepWorkIds: [...(parent.linkedDeepWorkIds || []), newDeepWorkDef.id] };
+    } else { // 'resource'
+        if (!newLinkedItemFolderId) {
+            toast({ title: "Error", description: "A folder must be selected.", variant: "destructive" });
+            return;
+        }
+        if (!newLinkedItemLink.trim()) {
+            toast({ title: "Error", description: "A link is required.", variant: "destructive" });
+            return;
+        }
+        const link = newLinkedItemLink.trim();
+        const newResource: Resource = {
+            id: `res_${Date.now()}_${Math.random()}`,
+            name: newLinkedItemName.trim(),
+            link: link,
+            description: newLinkedItemDescription.trim(),
+            folderId: newLinkedItemFolderId,
+            iconUrl: getFaviconUrl(link),
+        };
+        setResources(prev => [...prev, newResource]);
+        updatedParent = { ...parent, linkedResourceIds: [...(parent.linkedResourceIds || []), newResource.id] };
     }
+
     setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
     setSelectedFocusArea(updatedParent);
     toast({ title: "Success", description: "New item created and linked." });
@@ -485,9 +521,13 @@ function DeepWorkPageContent() {
     if (!manageLinksConfig) return;
     const { type, parent } = manageLinksConfig;
 
+    const key = type === 'upskill' ? 'linkedUpskillIds' :
+                type === 'deepwork' ? 'linkedDeepWorkIds' :
+                'linkedResourceIds';
+
     const updatedParent = {
         ...parent,
-        [type === 'upskill' ? 'linkedUpskillIds' : 'linkedDeepWorkIds']: tempLinkedIds
+        [key]: tempLinkedIds
     };
 
     setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
@@ -499,14 +539,23 @@ function DeepWorkPageContent() {
   const filteredItemsForLinking = useMemo(() => {
     if (!manageLinksConfig) return [];
     const { type, parent } = manageLinksConfig;
-    const definitionsSource = type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
+    
+    let definitionsSource: any[]; // Use any[] to accommodate different types
+    if (type === 'upskill') {
+        definitionsSource = upskillDefinitions;
+    } else if (type === 'deepwork') {
+        definitionsSource = deepWorkDefinitions;
+    } else { // 'resource'
+        definitionsSource = resources;
+    }
 
     return definitionsSource.filter(def => 
+        def.name &&
         def.name !== 'placeholder' &&
         def.id !== parent.id && 
         def.name.toLowerCase().includes(linkSearchTerm.toLowerCase())
     );
-  }, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, linkSearchTerm]);
+  }, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm]);
 
 
   if (isLoadingPage) {
@@ -521,7 +570,7 @@ function DeepWorkPageContent() {
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
           
           <aside className="md:col-span-1 space-y-6">
             <Card>
@@ -644,7 +693,7 @@ function DeepWorkPageContent() {
             </Card>
           </aside>
 
-          <section aria-labelledby="main-panel-heading" className="md:col-span-3 space-y-6">
+          <section aria-labelledby="main-panel-heading" className="md:col-span-2 space-y-6">
               <Card>
                   <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
@@ -762,6 +811,56 @@ function DeepWorkPageContent() {
                                   </Card>
                                 </div>
                               </div>
+                              <div className="space-y-3">
+                                <h3 className="font-semibold flex items-center gap-2"><Library className="h-5 w-5 text-primary" /> Linked Resources</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {(selectedFocusArea.linkedResourceIds || []).map(id => {
+                                    const resource = resources.find(r => r.id === id);
+                                    if (!resource) return null;
+
+                                    const isEmbeddable = resource.link && (isNotionUrl(resource.link) || isObsidianUrl(resource.link) || getYouTubeEmbedUrl(resource.link));
+                                    const embedLinkForModal = isEmbeddable ? (getYouTubeEmbedUrl(resource.link) || resource.link) : null;
+
+                                    return (
+                                        <Card key={id} className="flex flex-col">
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-base flex items-center gap-2">
+                                            {resource.iconUrl ? (
+                                                <Image src={resource.iconUrl} alt="" width={20} height={20} className="h-5 w-5 rounded-sm flex-shrink-0" unoptimized />
+                                            ) : (
+                                                <Globe className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                            )}
+                                            <span>{resource.name}</span>
+                                            </CardTitle>
+                                            <CardDescription>{resourceFolders.find(f => f.id === resource.folderId)?.name || 'Uncategorized'}</CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="flex-grow">
+                                            <p className="text-sm text-muted-foreground line-clamp-3">{resource.description || "No description provided."}</p>
+                                        </CardContent>
+                                        {resource.link && (
+                                            <CardFooter>
+                                                {isEmbeddable ? (
+                                                <Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(embedLinkForModal!)}>View in App</Button>
+                                                ) : (
+                                                <Button asChild variant="secondary" size="sm" className="w-full">
+                                                    <a href={resource.link} target="_blank" rel="noopener noreferrer">
+                                                    Visit Site <ExternalLink className="ml-2 h-3 w-3" />
+                                                    </a>
+                                                </Button>
+                                                )}
+                                            </CardFooter>
+                                        )}
+                                        </Card>
+                                    )
+                                  })}
+                                  <Card className="border-dashed hover:border-primary hover:bg-muted transition-colors cursor-pointer" onClick={() => handleOpenManageLinksModal('resource', selectedFocusArea)}>
+                                    <CardContent className="p-3 h-full flex flex-col items-center justify-center text-center">
+                                      <PlusCircle className="h-6 w-6 text-muted-foreground mb-1" />
+                                      <p className="text-sm font-medium">Add / Link Resource</p>
+                                    </CardContent>
+                                  </Card>
+                                </div>
+                              </div>
                             </div>
                         </ScrollArea>
                       ) : (
@@ -811,25 +910,55 @@ function DeepWorkPageContent() {
                 </TabsList>
                 <TabsContent value="create-new">
                     <div className="space-y-4 py-4">
-                        <div className="space-y-1">
-                          <Label htmlFor="new-linked-topic">Topic</Label>
-                          <Input id="new-linked-topic" value={newLinkedItemTopic} onChange={e => setNewLinkedItemTopic(e.target.value)} placeholder="e.g., GPU Programming" />
-                        </div>
-                         <div className="space-y-1">
-                          <Label htmlFor="new-linked-name">Name</Label>
-                          <Input id="new-linked-name" value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} placeholder={manageLinksConfig?.type === 'upskill' ? 'e.g., CUDA Fundamentals Course' : 'e.g., Implement Ray Tracing'} />
-                        </div>
-                        {manageLinksConfig?.type === 'upskill' && (
-                          <>
-                            <div className="space-y-1">
-                              <Label htmlFor="new-linked-desc">Description</Label>
-                              <Textarea id="new-linked-desc" value={newLinkedItemDescription} onChange={e => setNewLinkedItemDescription(e.target.value)} placeholder="Key points, summary..." />
-                            </div>
-                            <div className="space-y-1">
-                              <Label htmlFor="new-linked-link">Link</Label>
-                              <Input id="new-linked-link" value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} placeholder="https://..." />
-                            </div>
-                          </>
+                        {manageLinksConfig?.type === 'resource' ? (
+                            <>
+                                <div className="space-y-1">
+                                    <Label htmlFor="new-linked-folder">Folder</Label>
+                                    <Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}>
+                                        <SelectTrigger id="new-linked-folder"><SelectValue placeholder="Select a folder..." /></SelectTrigger>
+                                        <SelectContent>
+                                            {resourceFolders.sort((a,b) => a.name.localeCompare(b.name)).map(folder => (
+                                                <SelectItem key={folder.id} value={folder.id}>{folder.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="new-linked-name">Name</Label>
+                                    <Input id="new-linked-name" value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} placeholder="e.g., Awesome Tutorial" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="new-linked-desc">Description</Label>
+                                    <Textarea id="new-linked-desc" value={newLinkedItemDescription} onChange={e => setNewLinkedItemDescription(e.target.value)} placeholder="Key points, summary..." />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="new-linked-link">Link</Label>
+                                    <Input id="new-linked-link" value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} placeholder="https://..." />
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="space-y-1">
+                                <Label htmlFor="new-linked-topic">Topic</Label>
+                                <Input id="new-linked-topic" value={newLinkedItemTopic} onChange={e => setNewLinkedItemTopic(e.target.value)} placeholder="e.g., GPU Programming" />
+                                </div>
+                                <div className="space-y-1">
+                                <Label htmlFor="new-linked-name">Name</Label>
+                                <Input id="new-linked-name" value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} placeholder={manageLinksConfig?.type === 'upskill' ? 'e.g., CUDA Fundamentals Course' : 'e.g., Implement Ray Tracing'} />
+                                </div>
+                                {manageLinksConfig?.type === 'upskill' && (
+                                <>
+                                    <div className="space-y-1">
+                                    <Label htmlFor="new-linked-desc">Description</Label>
+                                    <Textarea id="new-linked-desc" value={newLinkedItemDescription} onChange={e => setNewLinkedItemDescription(e.target.value)} placeholder="Key points, summary..." />
+                                    </div>
+                                    <div className="space-y-1">
+                                    <Label htmlFor="new-linked-link">Link</Label>
+                                    <Input id="new-linked-link" value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} placeholder="https://..." />
+                                    </div>
+                                </>
+                                )}
+                            </>
                         )}
                     </div>
                     <DialogFooter>
@@ -862,7 +991,7 @@ function DeepWorkPageContent() {
                                       />
                                       <Label htmlFor={`link-${item.id}`} className="font-normal w-full cursor-pointer">
                                           {item.name}
-                                          <span className="text-muted-foreground text-xs ml-2">({item.category})</span>
+                                          {item.category && <span className="text-muted-foreground text-xs ml-2">({item.category})</span>}
                                       </Label>
                                   </div>
                               )) : (
