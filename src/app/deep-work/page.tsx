@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -973,54 +973,89 @@ function DeepWorkPageContent() {
                                     if (!upskillDef) return null;
                                     
                                     const youtubeEmbedUrl = upskillDef.link ? getYouTubeEmbedUrl(upskillDef.link) : null;
-                                    const isNotionObsidianEmbed = upskillDef.link && (isNotionUrl(upskillDef.link) || isObsidianUrl(upskillDef.link));
-                                    const isEmbeddable = youtubeEmbedUrl || isNotionObsidianEmbed;
+                                    const isNotionObsidianEmbed = upskillDef.link ? (isNotionUrl(upskillDef.link) || isObsidianUrl(upskillDef.link)) : false;
                                     const embedLinkForModal = youtubeEmbedUrl || upskillDef.link;
 
                                     return (
-                                       <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
-                                          <DropdownMenu>
-                                              <DropdownMenuTrigger asChild>
-                                                  <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 absolute top-2 right-2 z-10">
-                                                      <MoreVertical className="h-4 w-4" />
-                                                  </Button>
-                                              </DropdownMenuTrigger>
-                                              <DropdownMenuContent align="end">
-                                                  <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}>Edit</DropdownMenuItem>
-                                                  <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-destructive">Unlink</DropdownMenuItem>
-                                              </DropdownMenuContent>
-                                          </DropdownMenu>
-                                          <CardHeader className="pb-3">
-                                            <CardTitle className="text-base flex items-center gap-2">
-                                              {youtubeEmbedUrl ? (
-                                                  <Youtube className="h-5 w-5 text-red-500 flex-shrink-0" />
-                                              ) : upskillDef.iconUrl ? (
-                                                  <Image src={upskillDef.iconUrl} alt="" width={20} height={20} className="h-5 w-5 rounded-sm flex-shrink-0" unoptimized />
-                                              ) : (
-                                                  <Globe className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                                              )}
-                                              <span className="truncate" title={upskillDef.name}>{upskillDef.name}</span>
-                                            </CardTitle>
-                                            <CardDescription>{upskillDef.category}</CardDescription>
-                                          </CardHeader>
-                                          <CardContent className="flex-grow">
-                                            <p className="text-sm text-muted-foreground line-clamp-2">{upskillDef.description || "No description provided."}</p>
-                                          </CardContent>
-                                          <CardFooter className="pt-3 flex items-center justify-between">
-                                            {upskillDef.link ? (
-                                                isEmbeddable ? (
-                                                    <Button variant="secondary" size="sm" className="flex-grow" onClick={() => setEmbedUrl(embedLinkForModal!)}>View in App</Button>
-                                                ) : (
-                                                    <Button asChild variant="secondary" size="sm" className="flex-grow">
-                                                        <a href={upskillDef.link} target="_blank" rel="noopener noreferrer">
-                                                            Visit Site <ExternalLink className="ml-2 h-3 w-3" />
-                                                        </a>
+                                      <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
+                                        {youtubeEmbedUrl ? (
+                                            <>
+                                                <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setEmbedUrl(youtubeEmbedUrl); }}>
+                                                        <Expand className="h-4 w-4" />
                                                     </Button>
-                                                )
-                                            ) : <div />}
-                                            {upskillDef.estimatedHours && <Badge variant="outline" className="flex-shrink-0">{upskillDef.estimatedHours}h est.</Badge>}
-                                          </CardFooter>
-                                       </Card>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white">
+                                                                <MoreVertical className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}>Edit</DropdownMenuItem>
+                                                            <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-destructive">Unlink</DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
+                                                <div className="aspect-video w-full bg-black overflow-hidden rounded-t-2xl">
+                                                    <iframe src={youtubeEmbedUrl} title={upskillDef.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="pointer-events-none w-full h-full"></iframe>
+                                                </div>
+                                                <div className="p-4 flex-grow">
+                                                  <div className="flex items-start justify-between gap-2">
+                                                    <div className="flex-grow min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <Youtube className="h-5 w-5 flex-shrink-0 text-red-500" />
+                                                            <p className="text-base font-bold truncate" title={upskillDef.name}>{upskillDef.name}</p>
+                                                        </div>
+                                                        <CardDescription className="text-xs">{upskillDef.category}</CardDescription>
+                                                    </div>
+                                                    {upskillDef.estimatedHours && <Badge variant="outline" className="flex-shrink-0">{upskillDef.estimatedHours}h est.</Badge>}
+                                                  </div>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 absolute top-2 right-2 z-10">
+                                                            <MoreVertical className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}>Edit</DropdownMenuItem>
+                                                        <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-destructive">Unlink</DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                                <CardHeader className="pb-3">
+                                                  <CardTitle className="text-base flex items-center gap-2">
+                                                    {upskillDef.iconUrl ? (
+                                                        <Image src={upskillDef.iconUrl} alt="" width={20} height={20} className="h-5 w-5 rounded-sm flex-shrink-0" unoptimized />
+                                                    ) : (
+                                                        <Globe className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                                    )}
+                                                    <span className="truncate" title={upskillDef.name}>{upskillDef.name}</span>
+                                                  </CardTitle>
+                                                  <CardDescription>{upskillDef.category}</CardDescription>
+                                                </CardHeader>
+                                                <CardContent className="flex-grow">
+                                                  <p className="text-sm text-muted-foreground line-clamp-2">{upskillDef.description || "No description provided."}</p>
+                                                </CardContent>
+                                                <CardFooter className="pt-3 flex items-center justify-between">
+                                                  {upskillDef.link ? (
+                                                      isNotionObsidianEmbed ? (
+                                                          <Button variant="secondary" size="sm" className="flex-grow" onClick={() => setEmbedUrl(embedLinkForModal!)}>View in App</Button>
+                                                      ) : (
+                                                          <Button asChild variant="secondary" size="sm" className="flex-grow">
+                                                              <a href={upskillDef.link} target="_blank" rel="noopener noreferrer">
+                                                                  Visit Site <ExternalLink className="ml-2 h-3 w-3" />
+                                                              </a>
+                                                          </Button>
+                                                      )
+                                                  ) : <div />}
+                                                  {upskillDef.estimatedHours && <Badge variant="outline" className="flex-shrink-0">{upskillDef.estimatedHours}h est.</Badge>}
+                                                </CardFooter>
+                                            </>
+                                        )}
+                                      </Card>
                                     )
                                   })}
                                   <Card 
