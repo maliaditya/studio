@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +50,26 @@ import { cn } from '@/lib/utils';
 
 const DEFAULT_TARGET_SESSIONS = 1;
 const DEFAULT_TARGET_DURATION = "25";
+
+const getYouTubeEmbedUrl = (url: string): string | null => {
+    try {
+        const urlObj = new URL(url);
+        let videoId: string | null = null;
+
+        if (urlObj.hostname.includes('youtube.com')) {
+            videoId = urlObj.searchParams.get('v');
+        } else if (urlObj.hostname.includes('youtu.be')) {
+            videoId = urlObj.pathname.slice(1);
+        }
+
+        if (videoId) {
+            return `https://www.youtube.com/embed/${videoId}`;
+        }
+    } catch (e) {
+        // Silently fail for invalid URLs
+    }
+    return null;
+};
 
 const isNotionUrl = (url: string): boolean => {
     try {
@@ -572,11 +592,19 @@ function DeepWorkPageContent() {
                                   {(selectedFocusArea.linkedUpskillIds || []).map(id => {
                                     const upskillDef = upskillDefinitions.find(ud => ud.id === id);
                                     if (!upskillDef) return null;
-                                    const isSpecialEmbed = upskillDef.link && (isNotionUrl(upskillDef.link) || isObsidianUrl(upskillDef.link));
+                                    
+                                    const youtubeEmbedUrl = upskillDef.link ? getYouTubeEmbedUrl(upskillDef.link) : null;
+                                    const isNotionObsidianEmbed = upskillDef.link && (isNotionUrl(upskillDef.link) || isObsidianUrl(upskillDef.link));
+                                    const isEmbeddable = youtubeEmbedUrl || isNotionObsidianEmbed;
+                                    const embedLinkForModal = youtubeEmbedUrl || upskillDef.link;
+
                                     return (
                                        <Card key={id} className="flex flex-col">
                                           <CardHeader className="pb-2">
-                                            <CardTitle className="text-base">{upskillDef.name}</CardTitle>
+                                            <CardTitle className="text-base flex items-center gap-2">
+                                              {youtubeEmbedUrl && <Youtube className="h-5 w-5 text-red-500 flex-shrink-0" />}
+                                              <span>{upskillDef.name}</span>
+                                            </CardTitle>
                                             <CardDescription>{upskillDef.category}</CardDescription>
                                           </CardHeader>
                                           <CardContent className="flex-grow">
@@ -584,8 +612,8 @@ function DeepWorkPageContent() {
                                           </CardContent>
                                           {upskillDef.link && (
                                               <CardFooter>
-                                                {isSpecialEmbed ? (
-                                                  <Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(upskillDef.link!)}>View in App</Button>
+                                                {isEmbeddable ? (
+                                                  <Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(embedLinkForModal!)}>View in App</Button>
                                                 ) : (
                                                   <Button asChild variant="secondary" size="sm" className="w-full">
                                                     <a href={upskillDef.link} target="_blank" rel="noopener noreferrer">
