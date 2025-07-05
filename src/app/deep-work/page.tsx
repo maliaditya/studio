@@ -1040,7 +1040,7 @@ function DeepWorkPageContent() {
                                                                 <MoreVertical className="h-4 w-4" />
                                                             </Button>
                                                         </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
+                                                        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                                                             <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
                                                             <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
                                                         </DropdownMenuContent>
@@ -1069,29 +1069,32 @@ function DeepWorkPageContent() {
                                             </>
                                         ) : (
                                             <>
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 absolute top-2 right-2 z-10">
-                                                            <MoreVertical className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                         {upskillDef.link && (isNotionObsidianEmbed ? (
-                                                            <DropdownMenuItem onSelect={() => setEmbedUrl(embedLinkForModal!)}>
-                                                                <Expand className="mr-2 h-4 w-4"/> View in App
-                                                            </DropdownMenuItem>
+                                                <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    {upskillDef.link && (
+                                                        isNotionObsidianEmbed ? (
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setEmbedUrl(embedLinkForModal); }}>
+                                                                <Expand className="h-4 w-4" />
+                                                            </Button>
                                                         ) : (
-                                                            <DropdownMenuItem asChild>
-                                                                <a href={upskillDef.link} target="_blank" rel="noopener noreferrer">
-                                                                    <ExternalLink className="mr-2 h-4 w-4"/> Visit Site
+                                                            <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
+                                                                <a href={upskillDef.link} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                                                                    <ExternalLink className="h-4 w-4" />
                                                                 </a>
-                                                            </DropdownMenuItem>
-                                                        ))}
-                                                        {upskillDef.link && <DropdownMenuSeparator />}
-                                                        <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                                        <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
+                                                            </Button>
+                                                        )
+                                                    )}
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
+                                                                <MoreVertical className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                                            <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                                            <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
                                                 <CardHeader className="pb-3">
                                                   <CardTitle className="text-base flex items-center gap-2">
                                                     {upskillDef.iconUrl ? (
@@ -1138,21 +1141,22 @@ function DeepWorkPageContent() {
 
                                     return (
                                        <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
-                                         <DropdownMenu>
-                                             <DropdownMenuTrigger asChild>
-                                                 <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 absolute top-2 right-2 z-10">
-                                                     <MoreVertical className="h-4 w-4" />
-                                                 </Button>
-                                             </DropdownMenuTrigger>
-                                             <DropdownMenuContent align="end">
-                                                  <DropdownMenuItem onSelect={() => { setSelectedFocusArea(deepworkDef); setViewMode('library'); }}>
-                                                      <ArrowRight className="mr-2 h-4 w-4"/> View Details
-                                                  </DropdownMenuItem>
-                                                  <DropdownMenuSeparator />
-                                                 <DropdownMenuItem onSelect={() => handleStartEditDefinition(deepworkDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                                 <DropdownMenuItem onSelect={() => handleUnlinkItem('deepwork', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
-                                             </DropdownMenuContent>
-                                         </DropdownMenu>
+                                          <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setSelectedFocusArea(deepworkDef); setViewMode('library'); }}>
+                                                  <ArrowRight className="h-4 w-4" />
+                                              </Button>
+                                              <DropdownMenu>
+                                                  <DropdownMenuTrigger asChild>
+                                                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
+                                                          <MoreVertical className="h-4 w-4" />
+                                                      </Button>
+                                                  </DropdownMenuTrigger>
+                                                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                                      <DropdownMenuItem onSelect={() => handleStartEditDefinition(deepworkDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                                      <DropdownMenuItem onSelect={() => handleUnlinkItem('deepwork', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                                                  </DropdownMenuContent>
+                                              </DropdownMenu>
+                                          </div>
                                          <CardHeader className="pb-3">
                                             <CardTitle className="text-base flex items-center gap-2">
                                               <Briefcase className="h-5 w-5 text-muted-foreground flex-shrink-0" />
@@ -1206,7 +1210,7 @@ function DeepWorkPageContent() {
                                                                     <MoreVertical className="h-4 w-4" />
                                                                 </Button>
                                                             </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end">
+                                                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                                                                 <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
                                                                 <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
                                                             </DropdownMenuContent>
@@ -1229,29 +1233,32 @@ function DeepWorkPageContent() {
                                                 </>
                                             ) : (
                                                 <>
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 absolute top-2 right-2 z-10">
-                                                                <MoreVertical className="h-4 w-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            {resource.link && (isNotionObsidianEmbed ? (
-                                                                <DropdownMenuItem onSelect={() => setEmbedUrl(embedLinkForModal!)}>
-                                                                    <Expand className="mr-2 h-4 w-4"/> View in App
-                                                                </DropdownMenuItem>
+                                                    <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        {resource.link && (
+                                                            isNotionObsidianEmbed ? (
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setEmbedUrl(embedLinkForModal); }}>
+                                                                    <Expand className="h-4 w-4" />
+                                                                </Button>
                                                             ) : (
-                                                                <DropdownMenuItem asChild>
-                                                                    <a href={resource.link} target="_blank" rel="noopener noreferrer">
-                                                                        <ExternalLink className="mr-2 h-4 w-4"/> Visit Site
+                                                                <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
+                                                                    <a href={resource.link} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                                                                        <ExternalLink className="h-4 w-4" />
                                                                     </a>
-                                                                </DropdownMenuItem>
-                                                            ))}
-                                                            {resource.link && <DropdownMenuSeparator/>}
-                                                            <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                                            <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
+                                                                </Button>
+                                                            )
+                                                        )}
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
+                                                                    <MoreVertical className="h-4 w-4" />
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                                                <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                                                <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </div>
                                                     <CardHeader className="pb-3">
                                                       <CardTitle className="text-base flex items-center gap-2">
                                                         {resource.iconUrl ? (
