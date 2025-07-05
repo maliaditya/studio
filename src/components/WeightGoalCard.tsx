@@ -9,15 +9,17 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy } from 'lucide-react';
-import type { WeightLog, Gender, UserDietPlan } from '@/types/workout';
+import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight } from 'lucide-react';
+import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition } from '@/types/workout';
 import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { ChartContainer, ChartConfig } from './ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine } from 'recharts';
-
+import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
+import { ScrollArea } from './ui/scroll-area';
+import Link from 'next/link';
 
 interface WeightGoalCardProps {
   weightLogs: WeightLog[];
@@ -32,6 +34,8 @@ interface WeightGoalCardProps {
   onSetGoalWeight: (goal: number | null) => void;
   dietPlan: UserDietPlan;
   onEditDietClick: () => void;
+  deepWorkDefinitions: ExerciseDefinition[];
+  upskillDefinitions: ExerciseDefinition[];
 }
 
 const weightChartConfig = {
@@ -67,14 +71,16 @@ export function WeightGoalCard({
     onSetGender,
     onSetGoalWeight,
     dietPlan,
-    onEditDietClick
+    onEditDietClick,
+    deepWorkDefinitions,
+    upskillDefinitions
 }: WeightGoalCardProps) {
     const { toast } = useToast();
     const [newWeight, setNewWeight] = useState('');
     const [weightDate, setWeightDate] = useState<Date | undefined>(new Date());
     const [showLogForm, setShowLogForm] = useState(false);
     const [weightView, setWeightView] = useState<'chart' | 'details'>('chart');
-    const [mainView, setMainView] = useState<'weight' | 'diet'>('weight');
+    const [mainView, setMainView] = useState<'weight' | 'diet' | 'projects'>('weight');
 
     const [heightInput, setHeightInput] = useState('');
     const [dobInput, setDobInput] = useState<Date | undefined>();
@@ -88,6 +94,31 @@ export function WeightGoalCard({
         const dayName = format(new Date(), 'EEEE');
         return dietPlan.find(plan => plan.day === dayName);
     }, [dietPlan]);
+
+    // Project Overview Logic
+    const deepWorkTopics = useMemo(() => {
+        const topics = new Map<string, number>();
+        (deepWorkDefinitions || []).forEach(def => {
+          if (!def.focusAreaIds) {
+            topics.set(def.category, (topics.get(def.category) || 0) + 1);
+          }
+        });
+        return Array.from(topics.entries())
+          .map(([topic, count]) => ({ name: topic, count }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+    }, [deepWorkDefinitions]);
+
+    const upskillTopics = useMemo(() => {
+        const topics = new Map<string, number>();
+        (upskillDefinitions || []).forEach(def => {
+          if (def.name !== 'placeholder') {
+            topics.set(def.category, (topics.get(def.category) || 0) + 1);
+          }
+        });
+        return Array.from(topics.entries())
+          .map(([topic, count]) => ({ name: topic, count }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+    }, [upskillDefinitions]);
 
     useEffect(() => {
         if (!areDetailsSet) {
@@ -357,6 +388,58 @@ export function WeightGoalCard({
         toast({ title: "Details Saved", description: "Your profile has been updated." });
     };
 
+    const renderTopicList = (topics: { name: string, count: number }[], type: 'deep-work' | 'upskill') => {
+        if (topics.length === 0) {
+          return (
+            <div className="text-center text-sm text-muted-foreground py-4">
+              <p>No active {type === 'deep-work' ? 'projects' : 'learning topics'}.</p>
+              <Link href={`/${type}`} className="text-primary hover:underline">
+                Go to {type === 'deep-work' ? 'Deep Work' : 'Upskill'} to add some.
+              </Link>
+            </div>
+          );
+        }
+        return (
+          <ul className="space-y-2">
+            {topics.map(topic => (
+              <li key={topic.name}>
+                <Link href={`/${type}`}>
+                  <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      {type === 'deep-work' ? <Briefcase className="h-4 w-4 text-primary" /> : <BookCopy className="h-4 w-4 text-primary" />}
+                      <span className="font-medium text-foreground">{topic.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">{topic.count} {topic.count === 1 ? 'item' : 'items'}</span>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        );
+      };
+
+    const renderProjectsContent = () => (
+        <Tabs defaultValue="deep-work" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="deep-work">Deep Work</TabsTrigger>
+            <TabsTrigger value="upskill">Upskill</TabsTrigger>
+          </TabsList>
+          <TabsContent value="deep-work" className="mt-4">
+            <ScrollArea className="h-48">
+              {renderTopicList(deepWorkTopics, 'deep-work')}
+            </ScrollArea>
+          </TabsContent>
+          <TabsContent value="upskill" className="mt-4">
+            <ScrollArea className="h-48">
+              {renderTopicList(upskillTopics, 'upskill')}
+            </ScrollArea>
+          </TabsContent>
+        </Tabs>
+    );
+
     const renderWeightContent = () => {
         if (weightView === 'chart') {
             return (
@@ -482,6 +565,26 @@ export function WeightGoalCard({
          }
         return <p className="text-muted-foreground text-center py-4">No diet plan set up for today.</p>;
     }
+    
+    const cardViews = {
+        weight: {
+          icon: <Target />,
+          title: "Weight Goal",
+          content: renderWeightContent()
+        },
+        diet: {
+          icon: <Utensils />,
+          title: "Today's Diet",
+          content: renderDietContent()
+        },
+        projects: {
+          icon: <Briefcase />,
+          title: "Active Projects",
+          content: renderProjectsContent()
+        }
+    };
+    
+    const currentViewData = cardViews[mainView];
 
     return (
         <Card className="bg-card/50">
@@ -490,30 +593,25 @@ export function WeightGoalCard({
                     <CardHeader className="flex flex-row items-start justify-between">
                         <div>
                             <CardTitle className="flex items-center gap-2 text-primary">
-                                {mainView === 'weight' ? <Target /> : <Utensils />}
-                                {mainView === 'weight' ? "Weight Goal" : "Today's Diet"}
+                                {currentViewData.icon}
+                                {currentViewData.title}
                             </CardTitle>
                             {mainView === 'diet' && <CardDescription>Your planned meals for {format(new Date(), 'EEEE')}.</CardDescription>}
                         </div>
                         <div className="flex items-center gap-1">
-                            {mainView === 'weight' && (
-                                <Button variant="outline" size="icon" onClick={() => setWeightView(v => v === 'chart' ? 'details' : 'chart')} className="h-8 w-8">
-                                    {weightView === 'chart' ? <Target className="h-4 w-4" /> : <LineChartIcon className="h-4 w-4" />}
-                                    <span className="sr-only">Toggle View</span>
-                                </Button>
-                            )}
-                            <Button variant="outline" size="icon" onClick={() => setMainView(v => v === 'weight' ? 'diet' : 'weight')} className="h-8 w-8">
-                                {mainView === 'weight' ? <Utensils className="h-4 w-4" /> : <Target className="h-4 w-4" />}
+                            <Button variant="outline" size="icon" onClick={() => setMainView('weight')} className={cn("h-8 w-8", mainView === 'weight' && 'bg-accent')}>
+                                <Target className="h-4 w-4" />
                             </Button>
-                             {mainView === 'diet' && (
-                                 <Button variant="outline" size="icon" onClick={onEditDietClick} className="h-8 w-8">
-                                    <BookCopy className="h-4 w-4" />
-                                </Button>
-                             )}
+                             <Button variant="outline" size="icon" onClick={() => setMainView('diet')} className={cn("h-8 w-8", mainView === 'diet' && 'bg-accent')}>
+                                <Utensils className="h-4 w-4" />
+                            </Button>
+                            <Button variant="outline" size="icon" onClick={() => setMainView('projects')} className={cn("h-8 w-8", mainView === 'projects' && 'bg-accent')}>
+                                <Briefcase className="h-4 w-4" />
+                            </Button>
                         </div>
                     </CardHeader>
                     <CardContent>
-                       {mainView === 'weight' ? renderWeightContent() : renderDietContent() }
+                       {currentViewData.content}
 
                         {showLogForm && mainView === 'weight' && (
                             <div className="mt-4 pt-4 border-t space-y-3">

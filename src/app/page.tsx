@@ -22,7 +22,6 @@ import { ProductivitySnapshot } from '@/components/ProductivitySnapshot';
 import { TimeSlots } from '@/components/TimeSlots';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
-import { ProjectOverviewCard } from '@/components/ProjectOverviewCard';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -529,7 +528,7 @@ function HomePageContent() {
           { name: 'Workout', hours: new Set(allWorkoutLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date)).size },
           { name: 'Branding', hours: parseFloat((brandingLogs.reduce((total, log) => total + log.exercises.reduce((exTotal, ex) => exTotal + ex.loggedSets.length, 0), 0) * 30 / 60).toFixed(1)) },
       ];
-      const getTodayHours = (logs: DatedWorkout[], field: 'reps' | 'weight') => (logs.find(log => log.date === todayStr)?.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (field === 'reps' ? set.reps : set.weight), 0), 0), 0) / 60;
+      const getTodayHours = (logs: DatedWorkout[], field: 'reps' | 'weight') => (logs.find(log => log.date === todayStr)?.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (field === 'reps' ? set.reps : set.weight), 0), 0) || 0) / 60;
       const todayHoursData = [
           { name: 'Learning', hours: parseFloat(getTodayHours(allUpskillLogs, 'reps').toFixed(1)) },
           { name: 'Deep Work', hours: parseFloat(getTodayHours(allDeepWorkLogs, 'weight').toFixed(1)) },
@@ -793,10 +792,6 @@ function HomePageContent() {
                         onToggleComplete={(...args) => handleToggleComplete(selectedDateKey, ...args)}
                     />
                 )}
-                <ProjectOverviewCard
-                  deepWorkDefinitions={deepWorkDefinitions}
-                  upskillDefinitions={upskillDefinitions}
-                />
                 <WeightGoalCard 
                   weightLogs={weightLogs}
                   goalWeight={goalWeight}
@@ -810,6 +805,8 @@ function HomePageContent() {
                   onSetGoalWeight={setGoalWeight}
                   dietPlan={dietPlan}
                   onEditDietClick={() => setIsDietPlanModalOpen(true)}
+                  deepWorkDefinitions={deepWorkDefinitions}
+                  upskillDefinitions={upskillDefinitions}
                 />
               </div>
             </div>
