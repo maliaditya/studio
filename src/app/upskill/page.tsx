@@ -44,6 +44,20 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 
+const getFaviconUrl = (link: string): string | undefined => {
+  try {
+    let url = link;
+    if (!url.startsWith('http')) {
+      url = `https://${url}`;
+    }
+    const urlObject = new URL(url);
+    // Use a larger size for better resolution
+    return `https://www.google.com/s2/favicons?domain=${urlObject.hostname}&sz=32`;
+  } catch (e) {
+    return undefined;
+  }
+};
+
 const DEFAULT_TARGET_SESSIONS = 1;
 const DEFAULT_TARGET_DURATION = "25";
 
@@ -218,6 +232,7 @@ function UpskillPageContent() {
       category: topic as ExerciseCategory,
       description: newDescription.trim(),
       link: newLink.trim(),
+      iconUrl: getFaviconUrl(newLink.trim()),
     };
     setUpskillDefinitions(prev => [...prev, newDef]);
     setNewSubtopicName('');
@@ -250,12 +265,16 @@ function UpskillPageContent() {
       toast({ title: "Error", description: "Topic and Subtopic cannot be empty.", variant: "destructive" });
       return;
     }
+    const newLink = editingDefinitionLink.trim();
+    const oldLink = editingDefinition.link || '';
+    
     const updatedDef: ExerciseDefinition = { 
       ...editingDefinition, 
       name: editingDefinitionName.trim(), 
       category: editingDefinitionCategory.trim() as ExerciseCategory,
       description: editingDefinitionDescription.trim(),
-      link: editingDefinitionLink.trim(),
+      link: newLink,
+      iconUrl: newLink !== oldLink ? getFaviconUrl(newLink) : editingDefinition.iconUrl,
     };
     setUpskillDefinitions(prev => prev.map(def => def.id === editingDefinition.id ? updatedDef : def));
     setAllUpskillLogs(prevLogs => 

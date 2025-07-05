@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef } from 'react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
@@ -47,6 +48,18 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
+const getFaviconUrl = (link: string): string | undefined => {
+  try {
+    let url = link;
+    if (!url.startsWith('http')) {
+      url = `https://${url}`;
+    }
+    const urlObject = new URL(url);
+    return `https://www.google.com/s2/favicons?domain=${urlObject.hostname}&sz=32`;
+  } catch (e) {
+    return undefined;
+  }
+};
 
 const DEFAULT_TARGET_SESSIONS = 1;
 const DEFAULT_TARGET_DURATION = "25";
@@ -397,12 +410,14 @@ function DeepWorkPageContent() {
     const { type, parent } = createLinkModalConfig;
     let updatedParent;
     if (type === 'upskill') {
+        const link = newLinkedItemLink.trim();
         const newUpskillDef: ExerciseDefinition = {
             id: `def_${Date.now()}_upskill_${Math.random()}`,
             name: newLinkedItemName.trim(),
             category: newLinkedItemTopic.trim() as ExerciseCategory,
             description: newLinkedItemDescription.trim(),
-            link: newLinkedItemLink.trim(),
+            link: link,
+            iconUrl: getFaviconUrl(link),
         };
         setUpskillDefinitions(prev => [...prev, newUpskillDef]);
         updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newUpskillDef.id] };
@@ -602,7 +617,13 @@ function DeepWorkPageContent() {
                                        <Card key={id} className="flex flex-col">
                                           <CardHeader className="pb-2">
                                             <CardTitle className="text-base flex items-center gap-2">
-                                              {youtubeEmbedUrl && <Youtube className="h-5 w-5 text-red-500 flex-shrink-0" />}
+                                              {youtubeEmbedUrl ? (
+                                                  <Youtube className="h-5 w-5 text-red-500 flex-shrink-0" />
+                                              ) : upskillDef.iconUrl ? (
+                                                  <Image src={upskillDef.iconUrl} alt="" width={20} height={20} className="h-5 w-5 rounded-sm flex-shrink-0" unoptimized />
+                                              ) : (
+                                                  <Globe className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                              )}
                                               <span>{upskillDef.name}</span>
                                             </CardTitle>
                                             <CardDescription>{upskillDef.category}</CardDescription>

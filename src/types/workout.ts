@@ -52,6 +52,7 @@ export interface ExerciseDefinition {
   category: ExerciseCategory; // Topic for upskill
   description?: string;
   link?: string;
+  iconUrl?: string;
   decompositionData?: DecompositionRow[];
   focusAreaIds?: string[];
   sourceUpskillId?: string;
