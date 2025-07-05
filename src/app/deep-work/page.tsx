@@ -570,9 +570,9 @@ function DeepWorkPageContent() {
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
           
-          <aside className="md:col-span-1 space-y-6">
+          <aside className="lg:col-span-1 space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg text-primary">
@@ -693,7 +693,7 @@ function DeepWorkPageContent() {
             </Card>
           </aside>
 
-          <section aria-labelledby="main-panel-heading" className="md:col-span-2 space-y-6">
+          <section aria-labelledby="main-panel-heading" className="lg:col-span-3 space-y-6">
               <Card>
                   <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
@@ -1062,6 +1062,9 @@ function DeepWorkPageContent() {
 
       <Dialog open={!!embedUrl} onOpenChange={(isOpen) => !isOpen && setEmbedUrl(null)}>
         <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Embedded Resource</DialogTitle>
+            </DialogHeader>
             <div className="flex-grow min-h-0">
                 {embedUrl && (
                     <iframe
