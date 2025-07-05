@@ -228,13 +228,13 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
         branding: <Share2 className="h-4 w-4 text-purple-500" />,
     };
 
-    const KanbanColumn = ({ title, tasks, children, isFiltered }: { title: string, tasks?: any[], children?: (task: any) => React.ReactNode, isFiltered: boolean }) => (
-        <div className="flex flex-col flex-shrink-0 w-80">
-            <h2 className="text-lg font-semibold mb-4 px-2">{title} <Badge variant="secondary" className="ml-2">{tasks?.length || 0}</Badge></h2>
+    const KanbanColumn = ({ title, tasks, children, isFiltered, isModal }: { title: string, tasks?: any[], children?: (task: any) => React.ReactNode, isFiltered: boolean, isModal?: boolean }) => (
+        <div className={cn("flex flex-col flex-shrink-0", isModal ? "w-72" : "w-80")}>
+            <h2 className={cn("font-semibold px-2", isModal ? "text-base mb-3" : "text-lg mb-4")}>{title} <Badge variant="secondary" className="ml-2">{tasks?.length || 0}</Badge></h2>
             <ScrollArea className="h-full">
-                <div className="space-y-3 pr-4">
+                <div className={cn("pr-4", isModal ? "space-y-2" : "space-y-3")}>
                     {tasks && tasks.map(task => (
-                        <Card key={task.id} className="p-4 rounded-xl bg-card/80 backdrop-blur-sm shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-200">
+                        <Card key={task.id} className={cn("rounded-xl bg-card/80 backdrop-blur-sm shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200", isModal ? "p-3" : "p-4")}>
                            <div className="flex items-start gap-3">
                                 {taskIcons[task.taskType]}
                                 <div className="flex-grow min-w-0">
@@ -246,7 +246,7 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
                         </Card>
                     ))}
                     {(!tasks || tasks.length === 0) && (
-                        <div className="flex items-center justify-center h-24 border-2 border-dashed rounded-md">
+                        <div className={cn("flex items-center justify-center border-2 border-dashed rounded-md", isModal ? "h-20" : "h-24")}>
                             <p className="text-sm text-muted-foreground">{isFiltered ? 'No matching tasks' : 'No tasks'}</p>
                         </div>
                     )}
@@ -282,7 +282,7 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
                 </div>
             )}
             <div className="flex-grow flex gap-6 overflow-x-auto pb-4 min-h-0">
-                <KanbanColumn title="Pending from Past" tasks={pending} isFiltered={selectedTopic !== 'all'}>
+                <KanbanColumn title="Pending from Past" tasks={pending} isFiltered={selectedTopic !== 'all'} isModal={isModal}>
                     {(task: any) => (
                         <div className="mt-2 pt-2 border-t flex items-center justify-end text-xs text-orange-600">
                            <AlertTriangle className="h-3 w-3 mr-1"/>
@@ -290,7 +290,7 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
                         </div>
                     )}
                 </KanbanColumn>
-                <KanbanColumn title="Scheduled for Today" tasks={scheduledToday} isFiltered={selectedTopic !== 'all'}>
+                <KanbanColumn title="Scheduled for Today" tasks={scheduledToday} isFiltered={selectedTopic !== 'all'} isModal={isModal}>
                      {(task: any) => (
                         <div className="mt-2 pt-2 border-t flex items-center justify-end text-xs text-yellow-600">
                            <Calendar className="h-3 w-3 mr-1"/>
@@ -298,7 +298,7 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
                         </div>
                     )}
                 </KanbanColumn>
-                <KanbanColumn title="Logged Today" tasks={loggedToday} isFiltered={selectedTopic !== 'all'}>
+                <KanbanColumn title="Logged Today" tasks={loggedToday} isFiltered={selectedTopic !== 'all'} isModal={isModal}>
                      {(task: any) => (
                         <div className="mt-2 pt-2 border-t flex items-center justify-end text-xs text-green-600">
                            <Check className="h-3 w-3 mr-1"/>
@@ -306,7 +306,7 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
                         </div>
                     )}
                 </KanbanColumn>
-                 <KanbanColumn title="Completed" tasks={completedPast} isFiltered={selectedTopic !== 'all'}>
+                 <KanbanColumn title="Completed" tasks={completedPast} isFiltered={selectedTopic !== 'all'} isModal={isModal}>
                     {(task: any) => (
                         <div className="mt-2 pt-2 border-t flex items-center justify-end text-xs text-muted-foreground">
                             Last log: {format(parseISO(task.lastLogDate), 'MMM dd')}
@@ -325,3 +325,5 @@ export default function KanbanPage() {
         </AuthGuard>
     );
 }
+
+    
