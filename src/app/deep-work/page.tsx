@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, FormEvent, useMemo, useRef } from 'react';
+import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -126,6 +126,20 @@ function DeepWorkPageContent() {
   // State for adding a focus area inline
   const [addingFocusToTopic, setAddingFocusToTopic] = useState<string | null>(null);
   const [newFocusAreaName, setNewFocusAreaName] = useState('');
+
+  const [collapsedTopics, setCollapsedTopics] = useState<Set<string>>(new Set());
+
+  const toggleTopicCollapse = useCallback((topic: string) => {
+    setCollapsedTopics(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(topic)) {
+            newSet.delete(topic);
+        } else {
+            newSet.add(topic);
+        }
+        return newSet;
+    });
+  }, []);
 
   useEffect(() => {
     if (editingTopic) {
@@ -464,16 +478,19 @@ function DeepWorkPageContent() {
                   <Button size="icon" type="submit"><PlusCircle className="h-4 w-4" /></Button>
                 </form>
                 <div className="space-y-2">
-                  {topicsWithFocusAreas.map(([topic, focusAreas]) => (
+                  {topicsWithFocusAreas.map(([topic, focusAreas]) => {
+                    const isCollapsed = collapsedTopics.has(topic);
+                    return (
                     <div key={topic}>
-                      <div className="group flex items-center justify-between p-2 rounded-md hover:bg-muted">
+                      <div className="group flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer" onClick={() => toggleTopicCollapse(topic)}>
                         <div className="flex items-center gap-2 min-w-0 flex-grow">
+                          <ChevronDown className={cn("h-4 w-4 transition-transform", isCollapsed && "-rotate-90")} />
                           <Folder className="h-4 w-4 flex-shrink-0 text-primary/80" />
                           <h4 className="font-semibold text-sm truncate">{topic}</h4>
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                               <MoreVertical className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
@@ -491,64 +508,66 @@ function DeepWorkPageContent() {
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                      <ul className="space-y-1 pl-4 border-l-2 border-muted ml-4">
-                          {focusAreas.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
-                            <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted">
-                              {editingDefinition?.id === def.id ? (
-                                <div className='flex-grow flex items-center gap-2'>
-                                  <Input 
-                                    value={editingDefinitionName}
-                                    onChange={(e) => setEditingDefinitionName(e.target.value)}
-                                    className="h-8"
-                                    autoFocus
-                                    onKeyDown={e => e.key === 'Enter' && handleSaveEditDefinition()}
-                                  />
-                                  <Button size="icon" className="h-8 w-8" onClick={handleSaveEditDefinition}><Save className="h-4 w-4"/></Button>
-                                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingDefinition(null)}><X className="h-4 w-4"/></Button>
-                                </div>
-                              ) : (
-                                <>
-                                  <div className="flex items-center gap-2 flex-grow min-w-0">
-                                    <Briefcase className="h-4 w-4 flex-shrink-0 text-muted-foreground/80" />
-                                    <span className="truncate cursor-pointer" onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} title={`View details for ${def.name}`}>{def.name}</span>
-                                  </div>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0">
-                                        <MoreVertical className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem onSelect={() => handleAddTaskToSession(def)}><PlusCircle className="mr-2 h-4 w-4" /><span>Add to Session</span></DropdownMenuItem>
-                                      <DropdownMenuItem onSelect={() => handleViewProgress(def)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem onSelect={() => handleStartEditDefinition(def)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
-                                      <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(def.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </>
-                              )}
-                            </li>
-                          ))}
-                           {addingFocusToTopic === topic && (
-                              <li className="p-1.5">
-                                <form onSubmit={(e) => { e.preventDefault(); handleAddFocusArea(topic); }} className="flex items-center gap-2">
+                      {!isCollapsed && (
+                        <ul className="space-y-1 pl-4 border-l-2 border-muted ml-4">
+                            {focusAreas.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
+                              <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted">
+                                {editingDefinition?.id === def.id ? (
+                                  <div className='flex-grow flex items-center gap-2'>
                                     <Input 
-                                        value={newFocusAreaName}
-                                        onChange={(e) => setNewFocusAreaName(e.target.value)}
-                                        className="h-8"
-                                        autoFocus
-                                        placeholder="New Focus Area Name"
-                                        onKeyDown={e => e.key === 'Escape' && setAddingFocusToTopic(null)}
+                                      value={editingDefinitionName}
+                                      onChange={(e) => setEditingDefinitionName(e.target.value)}
+                                      className="h-8"
+                                      autoFocus
+                                      onKeyDown={e => e.key === 'Enter' && handleSaveEditDefinition()}
                                     />
-                                    <Button size="icon" className="h-8 w-8" type="submit"><Save className="h-4 w-4"/></Button>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAddingFocusToTopic(null)}><X className="h-4 w-4"/></Button>
-                                </form>
+                                    <Button size="icon" className="h-8 w-8" onClick={handleSaveEditDefinition}><Save className="h-4 w-4"/></Button>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingDefinition(null)}><X className="h-4 w-4"/></Button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="flex items-center gap-2 flex-grow min-w-0">
+                                      <Briefcase className="h-4 w-4 flex-shrink-0 text-muted-foreground/80" />
+                                      <span className="truncate cursor-pointer" onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} title={`View details for ${def.name}`}>{def.name}</span>
+                                    </div>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0">
+                                          <MoreVertical className="h-4 w-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onSelect={() => handleAddTaskToSession(def)}><PlusCircle className="mr-2 h-4 w-4" /><span>Add to Session</span></DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={() => handleViewProgress(def)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onSelect={() => handleStartEditDefinition(def)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(def.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </>
+                                )}
                               </li>
-                          )}
-                        </ul>
+                            ))}
+                             {addingFocusToTopic === topic && (
+                                <li className="p-1.5">
+                                  <form onSubmit={(e) => { e.preventDefault(); handleAddFocusArea(topic); }} className="flex items-center gap-2">
+                                      <Input 
+                                          value={newFocusAreaName}
+                                          onChange={(e) => setNewFocusAreaName(e.target.value)}
+                                          className="h-8"
+                                          autoFocus
+                                          placeholder="New Focus Area Name"
+                                          onKeyDown={e => e.key === 'Escape' && setAddingFocusToTopic(null)}
+                                      />
+                                      <Button size="icon" className="h-8 w-8" type="submit"><Save className="h-4 w-4"/></Button>
+                                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAddingFocusToTopic(null)}><X className="h-4 w-4"/></Button>
+                                  </form>
+                                </li>
+                            )}
+                          </ul>
+                      )}
                     </div>
-                  ))}
+                  )})}
                 </div>
               </CardContent>
             </Card>
