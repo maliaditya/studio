@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -594,21 +595,21 @@ export function WeightGoalCard({
                             <CardDescription>{currentViewData.description}</CardDescription>
                         </div>
                         <div className="flex items-center gap-1">
-                            {mainView === 'weight' && (
-                                <>
-                                    <Button variant="outline" size="icon" onClick={() => setWeightView(v => v === 'chart' ? 'details' : 'chart')} className="h-8 w-8">
-                                        {weightView === 'chart' ? <Activity className="h-4 w-4" /> : <LineChartIcon className="h-4 w-4" />}
-                                    </Button>
-                                    <Separator orientation="vertical" className="h-6 mx-1" />
-                                </>
-                            )}
-                             {mainView === 'diet' && (
-                                <Button variant="outline" size="sm" onClick={onEditDietClick} className="h-8">
-                                    Edit Plan
-                                </Button>
-                            )}
-                            <Button variant="outline" size="icon" onClick={() => setMainView('weight')} className={cn("h-8 w-8", mainView === 'weight' && 'bg-accent')}>
-                                <Target className="h-4 w-4" />
+                             <Button 
+                                variant="outline" 
+                                size="icon" 
+                                onClick={() => {
+                                    if (mainView === 'weight') {
+                                        setWeightView(v => v === 'chart' ? 'details' : 'chart');
+                                    } else {
+                                        setMainView('weight');
+                                    }
+                                }} 
+                                className={cn("h-8 w-8", mainView === 'weight' && 'bg-accent')}
+                            >
+                                {mainView === 'weight' 
+                                    ? (weightView === 'chart' ? <Activity className="h-4 w-4" /> : <LineChartIcon className="h-4 w-4" />) 
+                                    : <Target className="h-4 w-4" />}
                             </Button>
                              <Button variant="outline" size="icon" onClick={() => setMainView('diet')} className={cn("h-8 w-8", mainView === 'diet' && 'bg-accent')}>
                                 <Utensils className="h-4 w-4" />
