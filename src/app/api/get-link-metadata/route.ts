@@ -13,7 +13,28 @@ export async function POST(request: Request) {
       fullUrl = `https://${url}`;
     }
 
-    // Use a common user-agent to avoid being blocked by some sites
+    const isYouTube = /(youtube\.com|youtu\.be)/.test(fullUrl);
+
+    if (isYouTube) {
+        const noembedUrl = `https://noembed.com/embed?url=${encodeURIComponent(fullUrl)}`;
+        const noembedResponse = await fetch(noembedUrl);
+        if (!noembedResponse.ok) {
+            throw new Error(`Failed to fetch from noembed. Status: ${noembedResponse.status}`);
+        }
+        const noembedData = await noembedResponse.json();
+
+        if (noembedData.error) {
+          // If noembed fails, fall back to the original method.
+          console.warn(`noembed failed for ${fullUrl}: ${noembedData.error}. Falling back to HTML scraping.`);
+        } else {
+          return NextResponse.json({
+            title: noembedData.title || 'YouTube Video',
+            description: `By ${noembedData.author_name || 'Unknown Author'}`.trim(),
+          });
+        }
+    }
+
+    // Fallback for other sites or if noembed fails for a YouTube link
     const response = await fetch(fullUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
