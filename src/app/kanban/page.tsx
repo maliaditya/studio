@@ -263,30 +263,24 @@ function KanbanPageContent() {
     
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-[calc(100vh-4rem)] flex flex-col">
-            <div className="text-center mb-8 flex-shrink-0">
-                <h1 className="text-4xl font-bold tracking-tight text-primary">Task Board</h1>
-                <p className="mt-4 text-lg text-muted-foreground">
-                    A Kanban-style view of all your tasks based on their current status.
-                </p>
-                <div className="mt-4 flex justify-center">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline">
-                                <FilterIcon className="mr-2 h-4 w-4" />
-                                {selectedTopic === 'all' ? 'All Topics' : selectedTopic}
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                            <DropdownMenuItem onSelect={() => setSelectedTopic('all')}>All Topics</DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            {allTopicsList.map(topic => (
-                                <DropdownMenuItem key={topic} onSelect={() => setSelectedTopic(topic)}>
-                                    {topic}
-                                </DropdownMenuItem>
-                            ))}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
+            <div className="flex justify-end mb-4 flex-shrink-0">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline">
+                            <FilterIcon className="mr-2 h-4 w-4" />
+                            {selectedTopic === 'all' ? 'All Topics' : selectedTopic}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                        <DropdownMenuItem onSelect={() => setSelectedTopic('all')}>All Topics</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {allTopicsList.map(topic => (
+                            <DropdownMenuItem key={topic} onSelect={() => setSelectedTopic(topic)}>
+                                {topic}
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
             <div className="flex-grow flex gap-6 overflow-x-auto pb-4 min-h-0">
                 <KanbanColumn title="Pending from Past" tasks={pending} isFiltered={selectedTopic !== 'all'}>
