@@ -6,11 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { format, parse, getISOWeek, isMonday, getYear, parseISO } from 'date-fns';
+import { format, getISOWeek, isMonday, getYear } from 'date-fns';
 import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
@@ -59,8 +59,6 @@ function DeepWorkPageContent() {
     exportData,
     allDeepWorkLogs, setAllDeepWorkLogs,
     deepWorkDefinitions, setDeepWorkDefinitions,
-    setProductizationPlans,
-    setOfferizationPlans,
     upskillDefinitions, setUpskillDefinitions,
     deepWorkTopicMetadata, setDeepWorkTopicMetadata,
   } = useAuth();
@@ -82,9 +80,11 @@ function DeepWorkPageContent() {
   
   const [showBackupPrompt, setShowBackupPrompt] = useState(false);
 
-  // New state for details modal and creation
-  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  // New state for right panel view
+  const [viewMode, setViewMode] = useState<'session' | 'library'>('session');
   const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
+
+  // State for the "Create & Link" functionality
   const [createLinkModalOpen, setCreateLinkModalOpen] = useState(false);
   const [createLinkModalConfig, setCreateLinkModalConfig] = useState<{type: 'upskill' | 'deepwork', parent: ExerciseDefinition} | null>(null);
   const [newLinkedItemName, setNewLinkedItemName] = useState('');
@@ -190,7 +190,6 @@ function DeepWorkPageContent() {
     };
     setDeepWorkDefinitions(prev => [...prev, newDef]);
     setNewSubtopicName('');
-    // Keep topic name for quicker additions
     toast({ title: "Success", description: `Focus Area "${newDef.name}" added to library.` });
   };
 
@@ -199,6 +198,10 @@ function DeepWorkPageContent() {
     if (!defToDelete) return;
     setDeepWorkDefinitions(prev => prev.filter(def => def.id !== id));
     setAllDeepWorkLogs(prevLogs => prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) })));
+    if (selectedFocusArea?.id === id) {
+        setSelectedFocusArea(null);
+        setViewMode('session');
+    }
     toast({ title: "Success", description: `Focus Area "${defToDelete.name}" removed.` });
   };
 
@@ -294,11 +297,6 @@ function DeepWorkPageContent() {
     setIsProgressModalOpen(true);
   };
   
-  const handleViewDetails = (def: ExerciseDefinition) => {
-    setSelectedFocusArea(def);
-    setDetailsModalOpen(true);
-  };
-
   const handleOpenCreateLinkModal = (type: 'upskill' | 'deepwork', parent: ExerciseDefinition) => {
     setCreateLinkModalConfig({ type, parent });
     setNewLinkedItemTopic('');
@@ -312,6 +310,7 @@ function DeepWorkPageContent() {
         return;
     }
     const { type, parent } = createLinkModalConfig;
+    let updatedParent;
     if (type === 'upskill') {
         const newUpskillDef: ExerciseDefinition = {
             id: `def_${Date.now()}_upskill_${Math.random()}`,
@@ -319,19 +318,18 @@ function DeepWorkPageContent() {
             category: newLinkedItemTopic.trim() as ExerciseCategory,
         };
         setUpskillDefinitions(prev => [...prev, newUpskillDef]);
-        const updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newUpskillDef.id] };
-        setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
-        setSelectedFocusArea(updatedParent);
+        updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newUpskillDef.id] };
     } else { // 'deepwork'
         const newDeepWorkDef: ExerciseDefinition = {
             id: `def_${Date.now()}_deepwork_${Math.random()}`,
             name: newLinkedItemName.trim(),
             category: newLinkedItemTopic.trim() as ExerciseCategory,
         };
-        const updatedParent = { ...parent, linkedDeepWorkIds: [...(parent.linkedDeepWorkIds || []), newDeepWorkDef.id] };
-        setDeepWorkDefinitions(prev => [...prev, newDeepWorkDef].map(def => def.id === parent.id ? updatedParent : def));
-        setSelectedFocusArea(updatedParent);
+        setDeepWorkDefinitions(prev => [...prev, newDeepWorkDef]);
+        updatedParent = { ...parent, linkedDeepWorkIds: [...(parent.linkedDeepWorkIds || []), newDeepWorkDef.id] };
     }
+    setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
+    setSelectedFocusArea(updatedParent);
     toast({ title: "Success", description: "New item created and linked." });
     setCreateLinkModalOpen(false);
   };
@@ -384,7 +382,7 @@ function DeepWorkPageContent() {
                         <ul className="space-y-1">
                           {focusAreas.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
                             <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted">
-                              <span className="flex-grow truncate cursor-pointer pl-1" onClick={() => handleViewDetails(def)} title={`View details for ${def.name}`}>{def.name}</span>
+                              <span className="flex-grow truncate cursor-pointer pl-1" onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} title={`View details for ${def.name}`}>{def.name}</span>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0">
@@ -392,7 +390,7 @@ function DeepWorkPageContent() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onSelect={() => handleAddTaskToSession(def)}><PlusCircle className="mr-2 h-4 w-4" /><span>Add to Today's Session</span></DropdownMenuItem>
+                                  <DropdownMenuItem onSelect={() => handleAddTaskToSession(def)}><PlusCircle className="mr-2 h-4 w-4" /><span>Add to Session</span></DropdownMenuItem>
                                   <DropdownMenuItem onSelect={() => handleViewProgress(def)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem onSelect={() => handleStartEditDefinition(def)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
@@ -410,43 +408,92 @@ function DeepWorkPageContent() {
             </Card>
           </aside>
 
-          <section aria-labelledby="current-learning-heading" className="md:col-span-2 space-y-6">
+          <section aria-labelledby="main-panel-heading" className="md:col-span-2 space-y-6">
               <Card>
                   <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
-                          <CardTitle id="current-learning-heading" className="flex items-center gap-2 text-lg">
-                              <ListChecks /> Session for: {format(selectedDate, 'PPP')}
+                          <CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">
+                              {viewMode === 'session' ? <ListChecks /> : <Library />}
+                              {viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedFocusArea?.name || 'Select an item'}`}
                           </CardTitle>
+                          {viewMode === 'library' && <CardDescription className="text-xs mt-1">{selectedFocusArea?.category}</CardDescription>}
                       </div>
-                      <Popover>
-                          <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[200px] justify-start text-left font-normal h-10",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger>
-                          <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent>
-                      </Popover>
+                      <div className='flex items-center gap-2'>
+                        <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
+                        <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('library')} disabled={!selectedFocusArea}>Library</Button>
+                        <Popover>
+                            <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger>
+                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent>
+                        </Popover>
+                      </div>
                   </CardHeader>
                   <CardContent className="p-4">
-                    <div className="max-h-[calc(100vh-16rem)] overflow-y-auto pr-2">
-                      {currentWorkoutExercises.length === 0 ? (
-                        <div className="text-center py-10"><Briefcase className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" /><p className="text-muted-foreground">No focus areas for {format(selectedDate, 'PPP')}.</p><p className="text-sm text-muted-foreground/80">Add focus areas from the library to get started!</p></div>
+                      {viewMode === 'session' ? (
+                          <div className="max-h-[calc(100vh-16rem)] overflow-y-auto pr-2">
+                              {currentWorkoutExercises.length === 0 ? (
+                                <div className="text-center py-10"><Briefcase className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" /><p className="text-muted-foreground">No focus areas for {format(selectedDate, 'PPP')}.</p><p className="text-sm text-muted-foreground/80">Add focus areas from the library to get started!</p></div>
+                              ) : (
+                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                  {currentWorkoutExercises.map((exercise) => {
+                                      const definition = deepWorkDefinitions.find(def => def.id === exercise.definitionId);
+                                      return (
+                                        <WorkoutExerciseCard 
+                                          key={exercise.id} 
+                                          exercise={exercise}
+                                          onLogSet={handleLogSet} 
+                                          onDeleteSet={handleDeleteSet} 
+                                          onUpdateSet={handleUpdateSet} 
+                                          onRemoveExercise={handleRemoveExerciseFromWorkout}
+                                          onViewProgress={definition ? () => handleViewProgress(definition) : undefined}
+                                          pageType="deepwork"
+                                        />
+                                      );
+                                  })}
+                                </div>
+                              )}
+                          </div>
+                      ) : selectedFocusArea ? (
+                          <ScrollArea className="h-[calc(100vh-16rem)] pr-2">
+                            <div className="space-y-6">
+                              <div className="space-y-3">
+                                <h3 className="font-semibold flex items-center gap-2"><BookCopy className="h-5 w-5 text-primary" /> Linked Learning</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {(selectedFocusArea.linkedUpskillIds || []).map(id => {
+                                    const upskillDef = upskillDefinitions.find(ud => ud.id === id);
+                                    return upskillDef ? (
+                                      <Card key={id}><CardContent className="p-3"><p className="font-medium">{upskillDef.name}</p><p className="text-sm text-muted-foreground">{upskillDef.category}</p></CardContent></Card>
+                                    ) : null;
+                                  })}
+                                  <Card className="border-dashed hover:border-primary hover:bg-muted transition-colors cursor-pointer" onClick={() => handleOpenCreateLinkModal('upskill', selectedFocusArea)}>
+                                    <CardContent className="p-3 h-full flex flex-col items-center justify-center text-center">
+                                      <PlusCircle className="h-6 w-6 text-muted-foreground mb-1" />
+                                      <p className="text-sm font-medium">Add & Link New Task</p>
+                                    </CardContent>
+                                  </Card>
+                                </div>
+                              </div>
+                              <div className="space-y-3">
+                                <h3 className="font-semibold flex items-center gap-2"><LinkIcon className="h-5 w-5 text-primary" /> Linked Work</h3>
+                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {(selectedFocusArea.linkedDeepWorkIds || []).map(id => {
+                                    const deepworkDef = deepWorkDefinitions.find(dd => dd.id === id);
+                                    return deepworkDef ? (
+                                       <Card key={id}><CardContent className="p-3"><p className="font-medium">{deepworkDef.name}</p><p className="text-sm text-muted-foreground">{deepworkDef.category}</p></CardContent></Card>
+                                    ) : null;
+                                  })}
+                                  <Card className="border-dashed hover:border-primary hover:bg-muted transition-colors cursor-pointer" onClick={() => handleOpenCreateLinkModal('deepwork', selectedFocusArea)}>
+                                    <CardContent className="p-3 h-full flex flex-col items-center justify-center text-center">
+                                      <PlusCircle className="h-6 w-6 text-muted-foreground mb-1" />
+                                      <p className="text-sm font-medium">Add & Link New Focus Area</p>
+                                    </CardContent>
+                                  </Card>
+                                </div>
+                              </div>
+                            </div>
+                        </ScrollArea>
                       ) : (
-                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                          {currentWorkoutExercises.map((exercise) => {
-                              const definition = deepWorkDefinitions.find(def => def.id === exercise.definitionId);
-                              return (
-                                <WorkoutExerciseCard 
-                                  key={exercise.id} 
-                                  exercise={exercise}
-                                  onLogSet={handleLogSet} 
-                                  onDeleteSet={handleDeleteSet} 
-                                  onUpdateSet={handleUpdateSet} 
-                                  onRemoveExercise={handleRemoveExerciseFromWorkout}
-                                  onViewProgress={definition ? () => handleViewProgress(definition) : undefined}
-                                  pageType="deepwork"
-                                />
-                              );
-                          })}
-                        </div>
+                          <div className="text-center py-10"><p className="text-muted-foreground">Select a Focus Area from the library to view its details.</p></div>
                       )}
-                    </div>
                   </CardContent>
               </Card>
           </section>
@@ -476,53 +523,6 @@ function DeepWorkPageContent() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={detailsModalOpen} onOpenChange={setDetailsModalOpen}>
-        <DialogContent className="sm:max-w-3xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle>Details for: {selectedFocusArea?.name}</DialogTitle>
-            <DialogDescription>{selectedFocusArea?.category}</DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="h-[60vh] -mx-6 px-6">
-              <div className="space-y-6">
-                <div className="space-y-3">
-                  <h3 className="font-semibold flex items-center gap-2"><BookCopy className="h-5 w-5 text-primary" /> Linked Learning</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(selectedFocusArea?.linkedUpskillIds || []).map(id => {
-                      const upskillDef = upskillDefinitions.find(ud => ud.id === id);
-                      return upskillDef ? (
-                        <Card key={id}><CardContent className="p-3"><p className="font-medium">{upskillDef.name}</p><p className="text-sm text-muted-foreground">{upskillDef.category}</p></CardContent></Card>
-                      ) : null;
-                    })}
-                    <Card className="border-dashed hover:border-primary hover:bg-muted transition-colors cursor-pointer" onClick={() => selectedFocusArea && handleOpenCreateLinkModal('upskill', selectedFocusArea)}>
-                      <CardContent className="p-3 h-full flex flex-col items-center justify-center text-center">
-                        <PlusCircle className="h-6 w-6 text-muted-foreground mb-1" />
-                        <p className="text-sm font-medium">Add & Link New Task</p>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <h3 className="font-semibold flex items-center gap-2"><LinkIcon className="h-5 w-5 text-primary" /> Linked Work</h3>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(selectedFocusArea?.linkedDeepWorkIds || []).map(id => {
-                      const deepworkDef = deepWorkDefinitions.find(dd => dd.id === id);
-                      return deepworkDef ? (
-                         <Card key={id}><CardContent className="p-3"><p className="font-medium">{deepworkDef.name}</p><p className="text-sm text-muted-foreground">{deepworkDef.category}</p></CardContent></Card>
-                      ) : null;
-                    })}
-                    <Card className="border-dashed hover:border-primary hover:bg-muted transition-colors cursor-pointer" onClick={() => selectedFocusArea && handleOpenCreateLinkModal('deepwork', selectedFocusArea)}>
-                      <CardContent className="p-3 h-full flex flex-col items-center justify-center text-center">
-                        <PlusCircle className="h-6 w-6 text-muted-foreground mb-1" />
-                        <p className="text-sm font-medium">Add & Link New Focus Area</p>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
-      
       <Dialog open={createLinkModalOpen} onOpenChange={setCreateLinkModalOpen}>
         <DialogContent className="sm:max-w-md">
             <DialogHeader>
@@ -555,5 +555,3 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
-
-    
