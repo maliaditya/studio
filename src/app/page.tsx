@@ -31,6 +31,7 @@ import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
+import { KanbanPageContent } from '@/app/kanban/page';
 
 const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
@@ -98,6 +99,7 @@ function HomePageContent() {
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
+  const [isKanbanModalOpen, setIsKanbanModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<{ slotName: string; activity: Activity } | null>(null);
   const [workoutActivityToLog, setWorkoutActivityToLog] = useState<Activity | null>(null);
 
@@ -781,6 +783,7 @@ function HomePageContent() {
                   timeAllocationData={timeAllocationData} 
                   onOpenStatsModal={() => setIsStatsModalOpen(true)} 
                   onOpenMindMapModal={() => setIsMindMapModalOpen(true)}
+                  onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
                 />
               </div>
               <div className="lg:col-span-2 space-y-6">
@@ -905,6 +908,15 @@ function HomePageContent() {
               <DialogTitle>Mind Map Overview</DialogTitle>
             </DialogHeader>
             <MindMapViewer defaultView="Strategic Overview" showControls={false} />
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isKanbanModalOpen} onOpenChange={setIsKanbanModalOpen}>
+        <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Kanban Board</DialogTitle>
+            </DialogHeader>
+            <KanbanPageContent isModal={true} />
         </DialogContent>
       </Dialog>
     </>

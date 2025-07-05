@@ -18,8 +18,13 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { cn } from '@/lib/utils';
 
-function KanbanPageContent() {
+interface KanbanPageContentProps {
+  isModal?: boolean;
+}
+
+export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
     const {
         schedule,
         allUpskillLogs,
@@ -251,26 +256,31 @@ function KanbanPageContent() {
     );
     
     return (
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-[calc(100vh-4rem)] flex flex-col">
-            <div className="flex justify-end mb-4 flex-shrink-0">
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="outline">
-                            <FilterIcon className="mr-2 h-4 w-4" />
-                            {selectedTopic === 'all' ? 'All Topics' : selectedTopic}
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                        <DropdownMenuItem onSelect={() => setSelectedTopic('all')}>All Topics</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        {allTopicsList.map(topic => (
-                            <DropdownMenuItem key={topic} onSelect={() => setSelectedTopic(topic)}>
-                                {topic}
-                            </DropdownMenuItem>
-                        ))}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
+        <div className={cn(
+            "container mx-auto p-4 sm:p-6 lg:p-8 flex flex-col",
+            !isModal && "h-[calc(100vh-4rem)]"
+        )}>
+            {!isModal && (
+                <div className="flex justify-end mb-4 flex-shrink-0">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline">
+                                <FilterIcon className="mr-2 h-4 w-4" />
+                                {selectedTopic === 'all' ? 'All Topics' : selectedTopic}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            <DropdownMenuItem onSelect={() => setSelectedTopic('all')}>All Topics</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            {allTopicsList.map(topic => (
+                                <DropdownMenuItem key={topic} onSelect={() => setSelectedTopic(topic)}>
+                                    {topic}
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            )}
             <div className="flex-grow flex gap-6 overflow-x-auto pb-4 min-h-0">
                 <KanbanColumn title="Pending from Past" tasks={pending} isFiltered={selectedTopic !== 'all'}>
                     {(task: any) => (
