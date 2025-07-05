@@ -261,6 +261,53 @@ function DeepWorkPageContent() {
       
       return totalMinutes;
   }, [selectedFocusArea, allUpskillLogs, allDeepWorkLogs]);
+  
+  const getUpskillLoggedMinutes = useCallback((definitionId: string) => {
+    if (!allUpskillLogs) return 0;
+    let totalMinutes = 0;
+    allUpskillLogs.forEach(log => {
+        log.exercises.forEach(ex => {
+            if (ex.definitionId === definitionId) {
+                totalMinutes += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0); // reps is duration for upskill
+            }
+        });
+    });
+    return totalMinutes;
+  }, [allUpskillLogs]);
+
+  const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition) => {
+      let totalMinutes = 0;
+      if (!definition) return 0;
+  
+      // This includes the definition itself and any of its linked children.
+      const allDeepWorkDefIdsToSum = new Set<string>([definition.id, ...(definition.linkedDeepWorkIds || [])]);
+      const allUpskillDefIdsToSum = new Set<string>(definition.linkedUpskillIds || []);
+  
+      if (allDeepWorkLogs) {
+          allDeepWorkLogs.forEach(log => {
+              log.exercises.forEach(ex => {
+                  if (allDeepWorkDefIdsToSum.has(ex.definitionId)) {
+                      ex.loggedSets.forEach(set => {
+                          totalMinutes += set.weight; // duration for deep work
+                      });
+                  }
+              });
+          });
+      }
+  
+      if (allUpskillLogs) {
+          allUpskillLogs.forEach(log => {
+              log.exercises.forEach(ex => {
+                  if (allUpskillDefIdsToSum.has(ex.definitionId)) {
+                      ex.loggedSets.forEach(set => {
+                          totalMinutes += set.reps; // duration for upskill
+                      });
+                  }
+              });
+          });
+      }
+      return totalMinutes;
+  }, [allDeepWorkLogs, allUpskillLogs]);
 
 
   useEffect(() => {
@@ -976,6 +1023,9 @@ function DeepWorkPageContent() {
                                     const isNotionObsidianEmbed = upskillDef.link ? (isNotionUrl(upskillDef.link) || isObsidianUrl(upskillDef.link)) : false;
                                     const embedLinkForModal = youtubeEmbedUrl || (isNotionObsidianEmbed ? upskillDef.link : null);
 
+                                    const loggedMinutes = getUpskillLoggedMinutes(upskillDef.id);
+                                    const loggedHours = loggedMinutes / 60;
+
                                     return (
                                       <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
                                         {youtubeEmbedUrl ? (
@@ -999,8 +1049,8 @@ function DeepWorkPageContent() {
                                                 <div className="aspect-video w-full bg-black overflow-hidden rounded-t-2xl">
                                                     <iframe src={youtubeEmbedUrl} title={upskillDef.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="pointer-events-none w-full h-full"></iframe>
                                                 </div>
-                                                <div className="p-4 flex-grow">
-                                                  <div className="flex items-start justify-between gap-2">
+                                                <div className="p-4 flex-grow flex flex-col">
+                                                  <div className="flex items-start justify-between gap-2 flex-grow">
                                                     <div className="flex-grow min-w-0">
                                                         <div className="flex items-center gap-2">
                                                             <Youtube className="h-5 w-5 flex-shrink-0 text-red-500" />
@@ -1008,7 +1058,12 @@ function DeepWorkPageContent() {
                                                         </div>
                                                         <CardDescription className="text-xs">{upskillDef.category}</CardDescription>
                                                     </div>
-                                                    {upskillDef.estimatedHours && <Badge variant="outline" className="flex-shrink-0">{upskillDef.estimatedHours}h est.</Badge>}
+                                                  </div>
+                                                  <div className="mt-auto pt-2 flex items-center justify-end">
+                                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                                        {upskillDef.estimatedHours && <Badge variant="outline">{upskillDef.estimatedHours}h est.</Badge>}
+                                                        {loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}
+                                                    </div>
                                                   </div>
                                                 </div>
                                             </>
@@ -1051,7 +1106,10 @@ function DeepWorkPageContent() {
                                                           </Button>
                                                       )
                                                   ) : <div />}
-                                                  {upskillDef.estimatedHours && <Badge variant="outline" className="flex-shrink-0">{upskillDef.estimatedHours}h est.</Badge>}
+                                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                                    {upskillDef.estimatedHours && <Badge variant="outline" className="flex-shrink-0">{upskillDef.estimatedHours}h est.</Badge>}
+                                                    {loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}
+                                                  </div>
                                                 </CardFooter>
                                             </>
                                         )}
@@ -1073,6 +1131,10 @@ function DeepWorkPageContent() {
                                   {(selectedFocusArea.linkedDeepWorkIds || []).map(id => {
                                     const deepworkDef = deepWorkDefinitions.find(dd => dd.id === id);
                                     if (!deepworkDef) return null;
+
+                                    const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
+                                    const loggedHours = loggedMinutes / 60;
+
                                     return (
                                        <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
                                          <DropdownMenu>
@@ -1100,7 +1162,10 @@ function DeepWorkPageContent() {
                                             <Button variant="secondary" size="sm" className="flex-grow" onClick={() => { setSelectedFocusArea(deepworkDef); setViewMode('library'); }}>
                                               View Details <ArrowRight className="ml-2 h-3 w-3" />
                                             </Button>
-                                            {deepworkDef.estimatedHours && <Badge variant="outline" className="flex-shrink-0 ml-2">{deepworkDef.estimatedHours}h est.</Badge>}
+                                            <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                                                {deepworkDef.estimatedHours && <Badge variant="outline">{deepworkDef.estimatedHours}h est.</Badge>}
+                                                {loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}
+                                            </div>
                                           </CardFooter>
                                        </Card>
                                     );
