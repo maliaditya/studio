@@ -407,7 +407,7 @@ function DeepWorkPageContent() {
                     <div key={topic}>
                       <div className="group flex items-center justify-between p-2 rounded-md hover:bg-muted">
                         <div className="flex items-center gap-2 min-w-0 flex-grow">
-                          <ChevronDown className="h-4 w-4 flex-shrink-0" />
+                          <Folder className="h-4 w-4 flex-shrink-0 text-primary/80" />
                           <h4 className="font-semibold text-sm truncate">{topic}</h4>
                         </div>
                         <DropdownMenu>
@@ -447,7 +447,10 @@ function DeepWorkPageContent() {
                                 </div>
                               ) : (
                                 <>
-                                  <span className="flex-grow truncate cursor-pointer pl-1" onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} title={`View details for ${def.name}`}>{def.name}</span>
+                                  <div className="flex items-center gap-2 flex-grow min-w-0">
+                                    <Briefcase className="h-4 w-4 flex-shrink-0 text-muted-foreground/80" />
+                                    <span className="truncate cursor-pointer" onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} title={`View details for ${def.name}`}>{def.name}</span>
+                                  </div>
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                       <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0">
