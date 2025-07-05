@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, FormEvent, useMemo } from 'react';
+import React, { useState, useEffect, FormEvent, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
@@ -11,7 +11,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, getISOWeek, isMonday, getYear } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, DeepWorkTopicMetadata } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { AuthGuard } from '@/components/AuthGuard';
@@ -45,7 +45,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 
 
@@ -61,15 +60,27 @@ function DeepWorkPageContent() {
     deepWorkDefinitions, setDeepWorkDefinitions,
     upskillDefinitions, setUpskillDefinitions,
     deepWorkTopicMetadata, setDeepWorkTopicMetadata,
+    updateTopic, deleteTopic,
   } = useAuth();
 
   const [newSubtopicName, setNewSubtopicName] = useState('');
   const [newTopicName, setNewTopicName] = useState('');
   const [newTopicClassification, setNewTopicClassification] = useState<'product' | 'service'>('product');
+  const newSubtopicInputRef = useRef<HTMLInputElement>(null);
   
   const [editingDefinition, setEditingDefinition] = useState<ExerciseDefinition | null>(null);
   const [editingDefinitionName, setEditingDefinitionName] = useState('');
   const [editingDefinitionCategory, setEditingDefinitionCategory] = useState<string>('');
+  
+  const [editingTopic, setEditingTopic] = useState<string | null>(null);
+  const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
+  const [newTopicNameForEdit, setNewTopicNameForEdit] = useState('');
+
+  useEffect(() => {
+    if (editingTopic) {
+      setNewTopicNameForEdit(editingTopic);
+    }
+  }, [editingTopic]);
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
@@ -89,7 +100,6 @@ function DeepWorkPageContent() {
   const [createLinkModalConfig, setCreateLinkModalConfig] = useState<{type: 'upskill' | 'deepwork', parent: ExerciseDefinition} | null>(null);
   const [newLinkedItemName, setNewLinkedItemName] = useState('');
   const [newLinkedItemTopic, setNewLinkedItemTopic] = useState('');
-  const [activeAccordionItems, setActiveAccordionItems] = useState<string[]>([]);
   
   const topicsWithFocusAreas = useMemo(() => {
     const grouped: Record<string, ExerciseDefinition[]> = {};
@@ -103,12 +113,6 @@ function DeepWorkPageContent() {
   }, [deepWorkDefinitions]);
 
   const allTopics = useMemo(() => topicsWithFocusAreas.map(([topic]) => topic), [topicsWithFocusAreas]);
-
-  useEffect(() => {
-    if (allTopics.length > 0) {
-        setActiveAccordionItems(allTopics);
-    }
-  }, [allTopics]);
 
   const isNewTopic = newTopicName.trim() !== '' && !allTopics.includes(newTopicName.trim());
 
@@ -222,6 +226,23 @@ function DeepWorkPageContent() {
     toast({ title: "Success", description: `Focus Area updated to "${updatedDef.name}".` });
     setEditingDefinition(null);
   };
+
+  const handleSaveTopicEdit = () => {
+    if (!editingTopic || !newTopicNameForEdit.trim()) return;
+    const oldClassification = deepWorkTopicMetadata[editingTopic]?.classification || 'product';
+    updateTopic(editingTopic, newTopicNameForEdit, oldClassification);
+    setEditingTopic(null);
+  }
+
+  const handleDeleteTopic = () => {
+    if (!topicToDelete) return;
+    deleteTopic(topicToDelete);
+    if (selectedFocusArea && selectedFocusArea.category === topicToDelete) {
+        setSelectedFocusArea(null);
+        setViewMode('session');
+    }
+    setTopicToDelete(null);
+  }
 
   const handleAddTaskToSession = (definition: ExerciseDefinition) => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -358,11 +379,11 @@ function DeepWorkPageContent() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleAddTaskDefinition} className="space-y-3 mb-4 p-3 border rounded-lg bg-muted/30">
-                  <Input type="text" placeholder="New Topic" value={newTopicName} onChange={(e) => setNewTopicName(e.target.value)} list="topics-datalist" aria-label="New topic name" className="h-10 text-sm" />
+                  <Input type="text" placeholder="New or Existing Topic" value={newTopicName} onChange={(e) => setNewTopicName(e.target.value)} list="topics-datalist" aria-label="New topic name" className="h-10 text-sm" />
                   <datalist id="topics-datalist">
                     {allTopics.map(topic => <option key={topic} value={topic} />)}
                   </datalist>
-                  <Input type="text" placeholder="New Focus Area" value={newSubtopicName} onChange={(e) => setNewSubtopicName(e.target.value)} aria-label="New focus area" className="h-10 text-sm" />
+                  <Input ref={newSubtopicInputRef} type="text" placeholder="New Focus Area" value={newSubtopicName} onChange={(e) => setNewSubtopicName(e.target.value)} aria-label="New focus area" className="h-10 text-sm" />
                   {isNewTopic && (
                     <div className="space-y-2 rounded-md border p-3 bg-background/50">
                       <Label className="text-xs font-medium">Classify this new topic</Label>
@@ -374,12 +395,32 @@ function DeepWorkPageContent() {
                   )}
                   <Button type="submit" size="sm" className="w-full"> <PlusCircle className="mr-2 h-4 w-4" /> Add to Library </Button>
                 </form>
-                <Accordion type="multiple" value={activeAccordionItems} onValueChange={setActiveAccordionItems} className="w-full">
+                <div className="space-y-2">
                   {topicsWithFocusAreas.map(([topic, focusAreas]) => (
-                    <AccordionItem key={topic} value={topic}>
-                      <AccordionTrigger>{topic}</AccordionTrigger>
-                      <AccordionContent>
-                        <ul className="space-y-1">
+                    <div key={topic} className="rounded-md">
+                      <div className="group flex items-center justify-between p-2 hover:bg-muted">
+                        <h4 className="font-semibold text-sm flex-grow">{topic}</h4>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={() => { setNewTopicName(topic); newSubtopicInputRef.current?.focus(); }}>
+                              <PlusCircle className="mr-2 h-4 w-4" /> New Focus Area
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setEditingTopic(topic)}>
+                              <Edit3 className="mr-2 h-4 w-4" /> Rename Topic
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive" onSelect={() => setTopicToDelete(topic)}>
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete Topic
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      <ul className="space-y-1 pl-4 border-l-2 border-muted ml-2">
                           {focusAreas.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
                             <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted">
                               <span className="flex-grow truncate cursor-pointer pl-1" onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} title={`View details for ${def.name}`}>{def.name}</span>
@@ -400,10 +441,9 @@ function DeepWorkPageContent() {
                             </li>
                           ))}
                         </ul>
-                      </AccordionContent>
-                    </AccordionItem>
+                    </div>
                   ))}
-                </Accordion>
+                </div>
               </CardContent>
             </Card>
           </aside>
@@ -547,6 +587,42 @@ function DeepWorkPageContent() {
             </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      <Dialog open={!!editingTopic} onOpenChange={(isOpen) => !isOpen && setEditingTopic(null)}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Rename Topic</DialogTitle>
+                <DialogDescription>
+                    This will rename the topic for all associated focus areas.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+                <Label htmlFor="edit-topic-name">New topic name</Label>
+                <Input id="edit-topic-name" value={newTopicNameForEdit} onChange={(e) => setNewTopicNameForEdit(e.target.value)} />
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingTopic(null)}>Cancel</Button>
+                <Button onClick={handleSaveTopicEdit}>Save</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <AlertDialog open={!!topicToDelete} onOpenChange={setTopicToDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+                This will permanently delete the topic "{topicToDelete}" and ALL of its focus areas and logged sessions. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTopic}>
+                Delete Topic
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </>
   );
