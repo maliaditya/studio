@@ -479,6 +479,9 @@ function HomePageContent() {
           };
       };
 
+      const totalProductiveMinutes = calculateAverageDuration(allUpskillLogs, 'reps') + calculateAverageDuration(allDeepWorkLogs, 'weight');
+      const avgProductiveHours = totalProductiveMinutes / 60;
+
       const getUpcomingReleases = () => {
         if (!productizationPlans && !offerizationPlans) return [];
     
@@ -518,11 +521,27 @@ function HomePageContent() {
                 try { return parseISO(release.launchDate) >= today; } 
                 catch (e) { return false; }
             })
+            .map(item => {
+                const { release, topic, type } = item;
+                const launchDate = parseISO(release.launchDate);
+                const daysRemaining = differenceInDays(launchDate, today);
+                const availableHours = daysRemaining * avgProductiveHours;
+
+                return {
+                    topic,
+                    type,
+                    release: {
+                        ...release,
+                        daysRemaining,
+                        availableHours
+                    }
+                };
+            })
             .sort((a, b) => new Date(a.release.launchDate).getTime() - new Date(b.release.launchDate).getTime());
       };
 
       const learningStats = calculateLearningStats(allUpskillLogs, topicGoals);
-      const totalProductiveMinutes = calculateAverageDuration(allUpskillLogs, 'reps') + calculateAverageDuration(allDeepWorkLogs, 'weight');
+      
       const getHours = (logs: DatedWorkout[], field: 'reps' | 'weight') => logs.reduce((total, log) => total + log.exercises.reduce((exTotal, ex) => exTotal + ex.loggedSets.reduce((setTotal, set) => setTotal + (field === 'reps' ? set.reps : set.weight), 0), 0), 0) / 60;
       const totalHoursData = [
           { name: 'Learning', hours: parseFloat(getHours(allUpskillLogs, 'reps').toFixed(1)) },
@@ -541,7 +560,7 @@ function HomePageContent() {
       const yesterdayDeepWork = getDailyDuration(allDeepWorkLogs, format(addDays(new Date(), -1), 'yyyy-MM-dd'), 'weight');
       const todayUpskill = getDailyDuration(allUpskillLogs, todayStr, 'reps');
       const yesterdayUpskill = getDailyDuration(allUpskillLogs, format(addDays(new Date(), -1), 'yyyy-MM-dd'), 'reps');
-      const avgProductiveHours = totalProductiveMinutes / 60;
+      
       const yesterdayTotalProductiveMinutes = calculateAverageDuration(allUpskillLogs, 'reps', true) + calculateAverageDuration(allDeepWorkLogs, 'weight', true);
 
       return {

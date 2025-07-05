@@ -169,6 +169,8 @@ export interface Release {
   launchDate: string; // yyyy-MM-dd format
   focusAreaIds: string[];
   features?: string[];
+  daysRemaining?: number;
+  availableHours?: number;
 }
 
 export interface Offer {

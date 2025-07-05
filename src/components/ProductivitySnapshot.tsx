@@ -243,7 +243,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                                   <div className="flex flex-col items-end ml-2 flex-shrink-0">
                                       <Badge variant="outline" className="capitalize text-xs mb-1">{item.type}</Badge>
                                       <p className="text-xs text-muted-foreground whitespace-nowrap">
-                                          {format(parseISO(item.release.launchDate), 'PPP')}
+                                          {format(parseISO(item.release.launchDate), 'MMM dd')} ({item.release.daysRemaining} days)
                                       </p>
                                   </div>
                               </div>
@@ -310,6 +310,17 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                  View existing features or add a new one. This will also create a new focus area in your Deep Work library under the "{selectedReleaseInfo.topic}" topic.
               </DialogDescription>
             </DialogHeader>
+
+            <div className="grid grid-cols-2 gap-4 text-center my-4">
+                <div className="p-2 bg-muted/50 rounded-md">
+                    <p className="text-sm text-muted-foreground">Days Remaining</p>
+                    <p className="text-2xl font-bold">{selectedReleaseInfo.release.daysRemaining}</p>
+                </div>
+                <div className="p-2 bg-muted/50 rounded-md">
+                    <p className="text-sm text-muted-foreground">Available Hours</p>
+                    <p className="text-2xl font-bold">{selectedReleaseInfo.release.availableHours?.toFixed(1) ?? 'N/A'}</p>
+                </div>
+            </div>
             
             {selectedReleaseInfo.release.features && selectedReleaseInfo.release.features.length > 0 && (
                 <div className="space-y-2">
