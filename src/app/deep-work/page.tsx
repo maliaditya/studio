@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2 } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -318,6 +319,24 @@ function DeepWorkPageContent() {
     setEditingDefinition(null);
   };
 
+  const handleToggleReadyForBranding = (definitionId: string) => {
+    const def = deepWorkDefinitions.find(d => d.id === definitionId);
+    if (!def) return;
+
+    setDeepWorkDefinitions(prevDefs => 
+      prevDefs.map(d => 
+        d.id === definitionId 
+          ? { ...d, isReadyForBranding: !d.isReadyForBranding } 
+          : d
+      )
+    );
+    
+    toast({
+      title: "Status Updated",
+      description: `"${def.name}" is now ${!def.isReadyForBranding ? 'marked as ready' : 'no longer ready'} for branding.`
+    });
+  };
+
   const handleSaveTopicEdit = () => {
     if (!editingTopic || !newTopicNameForEdit.trim()) return;
     updateTopic(editingTopic, newTopicNameForEdit, newTopicClassificationForEdit);
@@ -530,6 +549,7 @@ function DeepWorkPageContent() {
                                     <div className="flex items-center gap-2 flex-grow min-w-0">
                                       <Briefcase className="h-4 w-4 flex-shrink-0 text-muted-foreground/80" />
                                       <span className="truncate cursor-pointer" onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} title={`View details for ${def.name}`}>{def.name}</span>
+                                      {def.isReadyForBranding && <Share2 className="h-3 w-3 text-primary flex-shrink-0" title="Ready for Branding" />}
                                     </div>
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
@@ -540,6 +560,17 @@ function DeepWorkPageContent() {
                                       <DropdownMenuContent align="end">
                                         <DropdownMenuItem onSelect={() => handleAddTaskToSession(def)}><PlusCircle className="mr-2 h-4 w-4" /><span>Add to Session</span></DropdownMenuItem>
                                         <DropdownMenuItem onSelect={() => handleViewProgress(def)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuCheckboxItem
+                                            checked={!!def.isReadyForBranding}
+                                            onSelect={(e) => {
+                                                e.preventDefault();
+                                                handleToggleReadyForBranding(def.id);
+                                            }}
+                                        >
+                                            <Share2 className="mr-2 h-4 w-4" />
+                                            <span>Ready for Branding</span>
+                                        </DropdownMenuCheckboxItem>
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem onSelect={() => handleStartEditDefinition(def)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
                                         <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(def.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
