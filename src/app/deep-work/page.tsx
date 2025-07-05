@@ -197,6 +197,7 @@ function DeepWorkPageContent() {
   const [linkSearchTerm, setLinkSearchTerm] = useState('');
   const [tempLinkedIds, setTempLinkedIds] = useState<string[]>([]);
   const [linkResourceFolderId, setLinkResourceFolderId] = useState<string>('');
+  const [isCreatingLink, setIsCreatingLink] = useState(false);
 
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
 
@@ -519,13 +520,75 @@ function DeepWorkPageContent() {
     setIsManageLinksModalOpen(true);
   };
   
-  const handleCreateAndLinkItem = () => {
-    if (!manageLinksConfig || !newLinkedItemName.trim()) {
+  const handleCreateAndLinkItem = async () => {
+    if (!manageLinksConfig) return;
+
+    const { type, parent } = manageLinksConfig;
+    let updatedParent;
+
+    if (type === 'resource') {
+        if (!newLinkedItemFolderId) {
+            toast({ title: "Error", description: "A folder must be selected.", variant: "destructive" });
+            return;
+        }
+        if (!newLinkedItemLink.trim()) {
+            toast({ title: "Error", description: "A link is required.", variant: "destructive" });
+            return;
+        }
+        
+        setIsCreatingLink(true);
+        try {
+            let fullLink = newLinkedItemLink.trim();
+            if (!fullLink.startsWith('http://') && !fullLink.startsWith('https://')) {
+                fullLink = 'https://' + fullLink;
+            }
+
+            const response = await fetch('/api/get-link-metadata', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: fullLink }),
+            });
+
+            const result = await response.json();
+            if (!response.ok) {
+              throw new Error(result.error || 'Failed to fetch metadata.');
+            }
+
+            const newResource: Resource = {
+                id: `res_${Date.now()}_${Math.random()}`,
+                name: result.title || 'Untitled Resource',
+                link: fullLink,
+                description: result.description || '',
+                folderId: newLinkedItemFolderId,
+                iconUrl: getFaviconUrl(fullLink),
+            };
+
+            setResources(prev => [...prev, newResource]);
+            updatedParent = { ...parent, linkedResourceIds: [...(parent.linkedResourceIds || []), newResource.id] };
+            
+            setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
+            setSelectedFocusArea(updatedParent);
+            toast({ title: "Resource Added", description: `"${newResource.name}" has been saved and linked.`});
+            setIsManageLinksModalOpen(false);
+
+        } catch (error) {
+            toast({
+                title: "Error adding resource",
+                description: error instanceof Error ? error.message : "Could not fetch metadata from URL.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsCreatingLink(false);
+        }
+        return;
+    }
+
+    // Logic for non-resource types
+    if (!newLinkedItemName.trim()) {
         toast({ title: "Error", description: "Name is required.", variant: "destructive" });
         return;
     }
-    const { type, parent } = manageLinksConfig;
-    let updatedParent;
+
     if (type === 'upskill') {
         if (!newLinkedItemTopic.trim()) {
             toast({ title: "Error", description: "Topic is required.", variant: "destructive" });
@@ -556,32 +619,14 @@ function DeepWorkPageContent() {
         };
         setDeepWorkDefinitions(prev => [...prev, newDeepWorkDef]);
         updatedParent = { ...parent, linkedDeepWorkIds: [...(parent.linkedDeepWorkIds || []), newDeepWorkDef.id] };
-    } else { // 'resource'
-        if (!newLinkedItemFolderId) {
-            toast({ title: "Error", description: "A folder must be selected.", variant: "destructive" });
-            return;
-        }
-        if (!newLinkedItemLink.trim()) {
-            toast({ title: "Error", description: "A link is required.", variant: "destructive" });
-            return;
-        }
-        const link = newLinkedItemLink.trim();
-        const newResource: Resource = {
-            id: `res_${Date.now()}_${Math.random()}`,
-            name: newLinkedItemName.trim(),
-            link: link,
-            description: newLinkedItemDescription.trim(),
-            folderId: newLinkedItemFolderId,
-            iconUrl: getFaviconUrl(link),
-        };
-        setResources(prev => [...prev, newResource]);
-        updatedParent = { ...parent, linkedResourceIds: [...(parent.linkedResourceIds || []), newResource.id] };
     }
 
-    setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
-    setSelectedFocusArea(updatedParent);
-    toast({ title: "Success", description: "New item created and linked." });
-    setIsManageLinksModalOpen(false);
+    if (updatedParent) {
+      setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
+      setSelectedFocusArea(updatedParent);
+      toast({ title: "Success", description: "New item created and linked." });
+      setIsManageLinksModalOpen(false);
+    }
   };
 
   const handleSaveExistingLinks = () => {
@@ -1152,19 +1197,9 @@ function DeepWorkPageContent() {
                                     <Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}>
                                         <SelectTrigger id="new-linked-folder"><SelectValue placeholder="Select a folder..." /></SelectTrigger>
                                         <SelectContent>
-                                            {resourceFolders.sort((a,b) => a.name.localeCompare(b.name)).map(folder => (
-                                                <SelectItem key={folder.id} value={folder.id}>{folder.name}</SelectItem>
-                                            ))}
+                                            {renderFolderOptions(null, 0)}
                                         </SelectContent>
                                     </Select>
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="new-linked-name">Name</Label>
-                                    <Input id="new-linked-name" value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} placeholder="e.g., Awesome Tutorial" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="new-linked-desc">Description</Label>
-                                    <Textarea id="new-linked-desc" value={newLinkedItemDescription} onChange={e => setNewLinkedItemDescription(e.target.value)} placeholder="Key points, summary..." />
                                 </div>
                                 <div className="space-y-1">
                                     <Label htmlFor="new-linked-link">Link</Label>
@@ -1202,7 +1237,10 @@ function DeepWorkPageContent() {
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsManageLinksModalOpen(false)}>Cancel</Button>
-                        <Button onClick={handleCreateAndLinkItem}>Create &amp; Link</Button>
+                        <Button onClick={handleCreateAndLinkItem} disabled={isCreatingLink}>
+                          {isCreatingLink ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                          {isCreatingLink ? 'Fetching...' : 'Create & Link'}
+                        </Button>
                     </DialogFooter>
                 </TabsContent>
                 <TabsContent value="link-existing">
