@@ -832,7 +832,10 @@ function DeepWorkPageContent() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => setAddingFocusToTopic(topic)}>
+                            <DropdownMenuItem onSelect={() => {
+                                setExpandedTopics(prev => new Set(prev).add(topic));
+                                setAddingFocusToTopic(topic);
+                              }}>
                               <PlusCircle className="mr-2 h-4 w-4" /> New Focus Area
                             </DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => setEditingTopic(topic)}>
