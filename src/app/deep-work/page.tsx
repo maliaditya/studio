@@ -127,10 +127,10 @@ function DeepWorkPageContent() {
   const [addingFocusToTopic, setAddingFocusToTopic] = useState<string | null>(null);
   const [newFocusAreaName, setNewFocusAreaName] = useState('');
 
-  const [collapsedTopics, setCollapsedTopics] = useState<Set<string>>(new Set());
+  const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
 
-  const toggleTopicCollapse = useCallback((topic: string) => {
-    setCollapsedTopics(prev => {
+  const toggleTopicExpansion = useCallback((topic: string) => {
+    setExpandedTopics(prev => {
         const newSet = new Set(prev);
         if (newSet.has(topic)) {
             newSet.delete(topic);
@@ -479,10 +479,10 @@ function DeepWorkPageContent() {
                 </form>
                 <div className="space-y-2">
                   {topicsWithFocusAreas.map(([topic, focusAreas]) => {
-                    const isCollapsed = collapsedTopics.has(topic);
+                    const isCollapsed = !expandedTopics.has(topic);
                     return (
                     <div key={topic}>
-                      <div className="group flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer" onClick={() => toggleTopicCollapse(topic)}>
+                      <div className="group flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer" onClick={() => toggleTopicExpansion(topic)}>
                         <div className="flex items-center gap-2 min-w-0 flex-grow">
                           <ChevronDown className={cn("h-4 w-4 transition-transform", isCollapsed && "-rotate-90")} />
                           <Folder className="h-4 w-4 flex-shrink-0 text-primary/80" />

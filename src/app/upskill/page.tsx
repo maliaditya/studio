@@ -87,10 +87,10 @@ function UpskillPageContent() {
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   const [today, setToday] = useState<Date | null>(null);
   
-  const [collapsedTopics, setCollapsedTopics] = useState<Set<string>>(new Set());
+  const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
 
-  const toggleTopicCollapse = (topic: string) => {
-    setCollapsedTopics(prev => {
+  const toggleTopicExpansion = (topic: string) => {
+    setExpandedTopics(prev => {
         const newSet = new Set(prev);
         if (newSet.has(topic)) {
             newSet.delete(topic);
@@ -462,10 +462,10 @@ function UpskillPageContent() {
 
                     <div className="space-y-2 max-h-[calc(100vh-30rem)] overflow-y-auto pr-2">
                         {topicsWithSubtopics.map(([topic, subtopics]) => {
-                          const isCollapsed = collapsedTopics.has(topic);
+                          const isCollapsed = !expandedTopics.has(topic);
                           return (
                             <div key={topic}>
-                                <div className="group flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer" onClick={() => toggleTopicCollapse(topic)}>
+                                <div className="group flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer" onClick={() => toggleTopicExpansion(topic)}>
                                     <div className="flex items-center gap-2 min-w-0 flex-grow">
                                     <ChevronDown className={cn("h-4 w-4 transition-transform", isCollapsed && "-rotate-90")} />
                                     <Folder className="h-4 w-4 flex-shrink-0 text-primary/80" />
