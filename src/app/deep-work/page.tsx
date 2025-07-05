@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +50,24 @@ import { cn } from '@/lib/utils';
 
 const DEFAULT_TARGET_SESSIONS = 1;
 const DEFAULT_TARGET_DURATION = "25";
+
+const isNotionUrl = (url: string): boolean => {
+    try {
+        const urlObj = new URL(url);
+        return urlObj.hostname.endsWith('notion.so');
+    } catch (e) {
+        return false;
+    }
+};
+
+const isObsidianUrl = (url: string): boolean => {
+    try {
+        const urlObj = new URL(url);
+        return urlObj.hostname === 'share.note.sx';
+    } catch (e) {
+        return false;
+    }
+};
 
 function DeepWorkPageContent() {
   const { toast } = useToast();
@@ -100,6 +118,10 @@ function DeepWorkPageContent() {
   const [createLinkModalConfig, setCreateLinkModalConfig] = useState<{type: 'upskill' | 'deepwork', parent: ExerciseDefinition} | null>(null);
   const [newLinkedItemName, setNewLinkedItemName] = useState('');
   const [newLinkedItemTopic, setNewLinkedItemTopic] = useState('');
+  const [newLinkedItemDescription, setNewLinkedItemDescription] = useState('');
+  const [newLinkedItemLink, setNewLinkedItemLink] = useState('');
+
+  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
 
   const allKnownTopics = useMemo(() => {
     const topicsFromDefs = new Set(deepWorkDefinitions.map(def => def.category));
@@ -342,6 +364,8 @@ function DeepWorkPageContent() {
     setCreateLinkModalConfig({ type, parent });
     setNewLinkedItemTopic('');
     setNewLinkedItemName('');
+    setNewLinkedItemDescription('');
+    setNewLinkedItemLink('');
     setCreateLinkModalOpen(true);
   };
   
@@ -357,6 +381,8 @@ function DeepWorkPageContent() {
             id: `def_${Date.now()}_upskill_${Math.random()}`,
             name: newLinkedItemName.trim(),
             category: newLinkedItemTopic.trim() as ExerciseCategory,
+            description: newLinkedItemDescription.trim(),
+            link: newLinkedItemLink.trim(),
         };
         setUpskillDefinitions(prev => [...prev, newUpskillDef]);
         updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newUpskillDef.id] };
@@ -545,9 +571,32 @@ function DeepWorkPageContent() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   {(selectedFocusArea.linkedUpskillIds || []).map(id => {
                                     const upskillDef = upskillDefinitions.find(ud => ud.id === id);
-                                    return upskillDef ? (
-                                      <Card key={id}><CardContent className="p-3"><p className="font-medium">{upskillDef.name}</p><p className="text-sm text-muted-foreground">{upskillDef.category}</p></CardContent></Card>
-                                    ) : null;
+                                    if (!upskillDef) return null;
+                                    const isSpecialEmbed = upskillDef.link && (isNotionUrl(upskillDef.link) || isObsidianUrl(upskillDef.link));
+                                    return (
+                                       <Card key={id} className="flex flex-col">
+                                          <CardHeader className="pb-2">
+                                            <CardTitle className="text-base">{upskillDef.name}</CardTitle>
+                                            <CardDescription>{upskillDef.category}</CardDescription>
+                                          </CardHeader>
+                                          <CardContent className="flex-grow">
+                                            <p className="text-sm text-muted-foreground line-clamp-3">{upskillDef.description || "No description provided."}</p>
+                                          </CardContent>
+                                          {upskillDef.link && (
+                                              <CardFooter>
+                                                {isSpecialEmbed ? (
+                                                  <Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(upskillDef.link!)}>View in App</Button>
+                                                ) : (
+                                                  <Button asChild variant="secondary" size="sm" className="w-full">
+                                                    <a href={upskillDef.link} target="_blank" rel="noopener noreferrer">
+                                                      Visit Site <ExternalLink className="ml-2 h-3 w-3" />
+                                                    </a>
+                                                  </Button>
+                                                )}
+                                              </CardFooter>
+                                          )}
+                                       </Card>
+                                    )
                                   })}
                                   <Card className="border-dashed hover:border-primary hover:bg-muted transition-colors cursor-pointer" onClick={() => handleOpenCreateLinkModal('upskill', selectedFocusArea)}>
                                     <CardContent className="p-3 h-full flex flex-col items-center justify-center text-center">
@@ -625,6 +674,18 @@ function DeepWorkPageContent() {
                   <Label htmlFor="new-linked-name">Name</Label>
                   <Input id="new-linked-name" value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} placeholder={createLinkModalConfig?.type === 'upskill' ? 'e.g., CUDA Fundamentals Course' : 'e.g., Implement Ray Tracing'} />
                 </div>
+                {createLinkModalConfig?.type === 'upskill' && (
+                  <>
+                    <div className="space-y-1">
+                      <Label htmlFor="new-linked-desc">Description</Label>
+                      <Textarea id="new-linked-desc" value={newLinkedItemDescription} onChange={e => setNewLinkedItemDescription(e.target.value)} placeholder="Key points, summary..." />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="new-linked-link">Link</Label>
+                      <Input id="new-linked-link" value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} placeholder="https://..." />
+                    </div>
+                  </>
+                )}
             </div>
             <DialogFooter>
                 <Button variant="outline" onClick={() => setCreateLinkModalOpen(false)}>Cancel</Button>
@@ -669,6 +730,20 @@ function DeepWorkPageContent() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <Dialog open={!!embedUrl} onOpenChange={(isOpen) => !isOpen && setEmbedUrl(null)}>
+        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
+            <div className="flex-grow min-h-0">
+                {embedUrl && (
+                    <iframe
+                        src={embedUrl}
+                        className="w-full h-full border-0 rounded-md"
+                        title="Embedded Resource"
+                        sandbox="allow-scripts allow-same-origin allow-forms"
+                    ></iframe>
+                )}
+            </div>
+        </DialogContent>
+    </Dialog>
     </>
   );
 }

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, ChevronDown, ChevronUp, Target, LineChart as LineChartIcon, BookCopy } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, ChevronDown, ChevronUp, Target, LineChart as LineChartIcon, BookCopy, ExternalLink, Link as LinkIcon } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +42,7 @@ import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Textarea } from '@/components/ui/textarea';
 
 const DEFAULT_TARGET_SESSIONS = 1;
 const DEFAULT_TARGET_DURATION = "25";
@@ -70,10 +71,14 @@ function UpskillPageContent() {
   const [newTopicName, setNewTopicName] = useState('');
   const [newTopicGoalType, setNewTopicGoalType] = useState<'pages' | 'hours'>('pages');
   const [newTopicGoalValue, setNewTopicGoalValue] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [newLink, setNewLink] = useState('');
 
   const [editingDefinition, setEditingDefinition] = useState<ExerciseDefinition | null>(null);
   const [editingDefinitionName, setEditingDefinitionName] = useState('');
   const [editingDefinitionCategory, setEditingDefinitionCategory] = useState<string>('');
+  const [editingDefinitionDescription, setEditingDefinitionDescription] = useState('');
+  const [editingDefinitionLink, setEditingDefinitionLink] = useState('');
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
@@ -196,7 +201,6 @@ function UpskillPageContent() {
       return;
     }
     
-    // If it's a new topic, a goal must be provided
     const isNewTopic = !allTopics.includes(topic);
     if (isNewTopic && newTopicGoalValue.trim() !== '') {
         const goalVal = parseInt(newTopicGoalValue, 10);
@@ -212,11 +216,15 @@ function UpskillPageContent() {
       id: `def_${Date.now()}_${Math.random()}`, 
       name: subtopic,
       category: topic as ExerciseCategory,
+      description: newDescription.trim(),
+      link: newLink.trim(),
     };
     setUpskillDefinitions(prev => [...prev, newDef]);
     setNewSubtopicName('');
     setNewTopicName('');
     setNewTopicGoalValue('');
+    setNewDescription('');
+    setNewLink('');
     toast({ title: "Success", description: `Task "${newDef.name}" added to library.` });
   };
 
@@ -233,6 +241,8 @@ function UpskillPageContent() {
     setEditingDefinition(def);
     setEditingDefinitionName(def.name);
     setEditingDefinitionCategory(def.category);
+    setEditingDefinitionDescription(def.description || '');
+    setEditingDefinitionLink(def.link || '');
   };
 
   const handleSaveEditDefinition = () => {
@@ -244,6 +254,8 @@ function UpskillPageContent() {
       ...editingDefinition, 
       name: editingDefinitionName.trim(), 
       category: editingDefinitionCategory.trim() as ExerciseCategory,
+      description: editingDefinitionDescription.trim(),
+      link: editingDefinitionLink.trim(),
     };
     setUpskillDefinitions(prev => prev.map(def => def.id === editingDefinition.id ? updatedDef : def));
     setAllUpskillLogs(prevLogs => 
@@ -469,6 +481,9 @@ function UpskillPageContent() {
 
                         <Input type="text" placeholder="New Subtopic (Book, Course, etc.)" value={newSubtopicName} onChange={(e) => setNewSubtopicName(e.target.value)} aria-label="New subtopic name" className="h-10 text-sm" />
                         
+                        <Textarea placeholder="Description / Key Points..." value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="text-sm" />
+                        <Input type="text" placeholder="Link (Optional)" value={newLink} onChange={(e) => setNewLink(e.target.value)} aria-label="Link" className="h-10 text-sm" />
+
                         {!allTopics.includes(newTopicName.trim()) && newTopicName.trim() !== '' && (
                             <div>
                                 <Label className="text-xs text-muted-foreground">Set a Goal for this New Topic</Label>
@@ -501,23 +516,32 @@ function UpskillPageContent() {
                                     <div className="space-y-2">
                                       <Input value={editingDefinitionCategory} onChange={(e) => setEditingDefinitionCategory(e.target.value)} className="h-9" aria-label="Edit topic name"/>
                                       <Input value={editingDefinitionName} onChange={(e) => setEditingDefinitionName(e.target.value)} className="h-9" aria-label="Edit subtopic name"/>
-                                      {/* Goal editing would require a separate UI, removed from subtopic edit for now */}
+                                      <Textarea value={editingDefinitionDescription} onChange={(e) => setEditingDefinitionDescription(e.target.value)} placeholder="Description..." />
+                                      <Input value={editingDefinitionLink} onChange={(e) => setEditingDefinitionLink(e.target.value)} placeholder="Link..." />
                                       <div className="flex gap-2">
                                         <Button size="sm" onClick={handleSaveEditDefinition} className="flex-grow bg-green-600 hover:bg-green-500 text-white"><Save className="h-4 w-4 mr-1"/>Save</Button>
                                         <Button size="sm" variant="ghost" onClick={() => setEditingDefinition(null)} className="flex-grow"><X className="h-4 w-4 mr-1"/>Cancel</Button>
                                       </div>
                                     </div>
                                   ) : (
-                                    <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-start justify-between gap-2">
                                       <div className="flex-grow min-w-0">
-                                          <span className="font-medium text-foreground block" title={def.name}>{def.name}</span>
-                                          <div className='flex flex-wrap gap-1 mt-0.5'>
+                                          <div className="flex items-center gap-2">
+                                            <span className="font-medium text-foreground block" title={def.name}>{def.name}</span>
+                                            {def.link && (
+                                                <a href={def.link} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                                                    <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-primary" />
+                                                </a>
+                                            )}
+                                          </div>
+                                          {def.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{def.description}</p>}
+                                          <div className='flex flex-wrap gap-1 mt-2'>
                                             <Badge variant="secondary" className="text-xs">{def.category}</Badge>
                                             {topicGoal && <Badge variant="outline" className="text-xs">Goal: {topicGoal.goalValue} {topicGoal.goalType}</Badge>}
                                             {isLogged && <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700">Logged</Badge>}
                                           </div>
                                       </div>
-                                      <div className="flex-shrink-0 flex items-center">
+                                      <div className="flex-shrink-0 flex flex-col items-center -space-y-1">
                                         <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
                                         <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8 text-muted-foreground hover:text-primary" aria-label={`Edit ${def.name}`}> <Edit3 className="h-4 w-4" /> </Button>
                                         <Button variant="ghost" size="icon" onClick={() => handleDeleteExerciseDefinition(def.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label={`Delete ${def.name}`}> <Trash2 className="h-4 w-4" /> </Button>
