@@ -39,7 +39,7 @@ function OfferizationPageContent() {
   const { toast } = useToast();
   const [newActionTasks, setNewActionTasks] = useState<Record<string, string>>({});
   
-  // State for expertise planning
+  // State for project planning
   const [editingRelease, setEditingRelease] = useState<{ topic: string; release: Partial<Release> } | null>(null);
   const [selectedReleaseForTask, setSelectedReleaseForTask] = useState<Record<string, string>>({});
 
@@ -155,7 +155,7 @@ function OfferizationPageContent() {
 
     setNewActionTasks(prev => ({ ...prev, [topic]: '' }));
     setSelectedReleaseForTask(prev => ({...prev, [topic]: ''}));
-    toast({ title: 'Focus Area Added', description: `"${taskName}" is now in your Deep Work library and linked to the expertise if selected.` });
+    toast({ title: 'Focus Area Added', description: `"${taskName}" is now in your Deep Work library and linked to the project if selected.` });
   };
 
   const handleGapAnalysisChange = (topic: string, field: keyof GapAnalysis, value: string) => {
@@ -231,7 +231,7 @@ function OfferizationPageContent() {
     if (!editingRelease) return;
     const { topic, release } = editingRelease;
     if (!release.name?.trim()) {
-      toast({ title: "Error", description: "Expertise name cannot be empty.", variant: "destructive" });
+      toast({ title: "Error", description: "Project name cannot be empty.", variant: "destructive" });
       return;
     }
 
@@ -254,7 +254,7 @@ function OfferizationPageContent() {
         return newPlans;
     });
 
-    toast({ title: "Expertise Saved", description: `"${release.name}" has been saved.`});
+    toast({ title: "Project Saved", description: `"${release.name}" has been saved.`});
     setEditingRelease(null);
   };
 
@@ -269,7 +269,7 @@ function OfferizationPageContent() {
         
         return newPlans;
     });
-    toast({ title: "Expertise Deleted", description: "The expertise has been removed from your plan.", variant: "destructive" });
+    toast({ title: "Project Deleted", description: "The project has been removed from your plan.", variant: "destructive" });
   };
   
   const handleStartEditingOffer = (topic: string, offer?: Offer) => {
@@ -348,22 +348,22 @@ function OfferizationPageContent() {
   };
 
 
-  const renderExpertiseForm = (topic: string, focusAreas: ExerciseDefinition[]) => {
+  const renderProjectForm = (topic: string, focusAreas: ExerciseDefinition[]) => {
     if (!editingRelease || editingRelease.topic !== topic) return null;
     const { release } = editingRelease;
     
     return (
       <Card className="mt-4 bg-muted/50">
         <CardHeader>
-          <CardTitle className="text-lg">{release.id?.startsWith('release_') ? 'Add New Expertise' : 'Edit Expertise'}</CardTitle>
+          <CardTitle className="text-lg">{release.id?.startsWith('release_') ? 'Add New Project' : 'Edit Project'}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="release-name">Expertise Name</Label>
+            <Label htmlFor="release-name">Project Name</Label>
             <Input id="release-name" value={release.name || ''} onChange={(e) => handleUpdateEditingRelease('name', e.target.value)} placeholder="e.g., CUDA Optimization, WebGL Development"/>
           </div>
           <div>
-            <Label htmlFor="release-date">Start Date</Label>
+            <Label htmlFor="release-date">EST completion date</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button id="release-date" variant="outline" className="w-full justify-start text-left font-normal">
@@ -378,7 +378,7 @@ function OfferizationPageContent() {
           </div>
            <div>
             <Label htmlFor="release-desc">Description</Label>
-            <Textarea id="release-desc" value={release.description || ''} onChange={(e) => handleUpdateEditingRelease('description', e.target.value)} placeholder="What is the goal of this expertise area?"/>
+            <Textarea id="release-desc" value={release.description || ''} onChange={(e) => handleUpdateEditingRelease('description', e.target.value)} placeholder="What is the goal of this project?"/>
           </div>
           <div>
             <Label>Included Focus Areas</Label>
@@ -397,7 +397,7 @@ function OfferizationPageContent() {
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setEditingRelease(null)}>Cancel</Button>
-            <Button onClick={handleSaveRelease}>Save Expertise</Button>
+            <Button onClick={handleSaveRelease}>Save Project</Button>
           </div>
         </CardContent>
       </Card>
@@ -448,7 +448,7 @@ function OfferizationPageContent() {
                                     <AlertDialogHeader>
                                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        This action cannot be undone. This will permanently delete the topic "{topic}" and all of its associated data, including focus areas, logged sessions, and expertise plans.
+                                        This action cannot be undone. This will permanently delete the topic "{topic}" and all of its associated data, including focus areas, logged sessions, and project plans.
                                     </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
@@ -564,7 +564,7 @@ function OfferizationPageContent() {
                            </AccordionContent>
                         </AccordionItem>
                         <AccordionItem value="item-4">
-                           <AccordionTrigger>Expertise Planner</AccordionTrigger>
+                           <AccordionTrigger>Project Planner</AccordionTrigger>
                            <AccordionContent>
                                 {releases.map(release => (
                                 <Card key={release.id} className="mb-3">
@@ -583,7 +583,7 @@ function OfferizationPageContent() {
                                         <AlertDialogContent>
                                             <AlertDialogHeader>
                                             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                            <AlertDialogDescription>This will permanently delete the expertise "{release.name}". This action cannot be undone.</AlertDialogDescription>
+                                            <AlertDialogDescription>This will permanently delete the project "{release.name}". This action cannot be undone.</AlertDialogDescription>
                                             </AlertDialogHeader>
                                             <AlertDialogFooter>
                                             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -606,9 +606,9 @@ function OfferizationPageContent() {
                                 </Card>
                             ))}
 
-                            {editingRelease?.topic === topic ? renderExpertiseForm(topic, focusAreas) : (
+                            {editingRelease?.topic === topic ? renderProjectForm(topic, focusAreas) : (
                                 <Button className="w-full mt-2" variant="outline" onClick={() => handleStartEditingRelease(topic)}>
-                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Expertise
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Project
                                 </Button>
                             )}
                            </AccordionContent>
@@ -674,13 +674,13 @@ function OfferizationPageContent() {
                                </div>
                                {releases.length > 0 && (
                                 <div>
-                                    <Label htmlFor={`release-select-${topic}`} className="text-xs">Add to Expertise (Optional)</Label>
+                                    <Label htmlFor={`release-select-${topic}`} className="text-xs">Add to Project (Optional)</Label>
                                     <Select 
                                         value={selectedReleaseForTask[topic] || ''} 
                                         onValueChange={(value) => setSelectedReleaseForTask(prev => ({...prev, [topic]: value}))}
                                     >
                                         <SelectTrigger id={`release-select-${topic}`}>
-                                            <SelectValue placeholder="Select an expertise..." />
+                                            <SelectValue placeholder="Select a project..." />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {releases.map(r => (
