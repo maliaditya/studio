@@ -196,6 +196,7 @@ function DeepWorkPageContent() {
   const [newLinkedItemFolderId, setNewLinkedItemFolderId] = useState('');
   const [linkSearchTerm, setLinkSearchTerm] = useState('');
   const [tempLinkedIds, setTempLinkedIds] = useState<string[]>([]);
+  const [linkResourceFolderId, setLinkResourceFolderId] = useState<string>('');
 
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
 
@@ -514,6 +515,7 @@ function DeepWorkPageContent() {
     setNewLinkedItemHours('');
     setNewLinkedItemFolderId('');
     setLinkSearchTerm('');
+    setLinkResourceFolderId('');
     setIsManageLinksModalOpen(true);
   };
   
@@ -611,7 +613,8 @@ function DeepWorkPageContent() {
     } else if (type === 'deepwork') {
         definitionsSource = deepWorkDefinitions;
     } else { // 'resource'
-        definitionsSource = resources;
+        if (!linkResourceFolderId) return [];
+        definitionsSource = resources.filter(res => res.folderId === linkResourceFolderId);
     }
 
     return definitionsSource.filter(def => 
@@ -620,7 +623,7 @@ function DeepWorkPageContent() {
         def.id !== parent.id && 
         def.name.toLowerCase().includes(linkSearchTerm.toLowerCase())
     );
-  }, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm]);
+  }, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm, linkResourceFolderId]);
 
   const handleStartEditUpskill = (def: ExerciseDefinition) => {
     setEditingUpskill(def);
@@ -1204,6 +1207,17 @@ function DeepWorkPageContent() {
                 </TabsContent>
                 <TabsContent value="link-existing">
                     <div className="py-4">
+                      {manageLinksConfig?.type === 'resource' && (
+                        <div className="mb-4 space-y-1">
+                            <Label htmlFor="link-resource-folder">Select Folder</Label>
+                            <Select value={linkResourceFolderId} onValueChange={setLinkResourceFolderId}>
+                                <SelectTrigger id="link-resource-folder">
+                                    <SelectValue placeholder="Select a folder to view resources..." />
+                                </SelectTrigger>
+                                <SelectContent>{renderFolderOptions(null, 0)}</SelectContent>
+                            </Select>
+                        </div>
+                      )}
                       <Input 
                           placeholder="Search library..."
                           value={linkSearchTerm}
@@ -1228,10 +1242,15 @@ function DeepWorkPageContent() {
                                       <Label htmlFor={`link-${item.id}`} className="font-normal w-full cursor-pointer">
                                           {item.name}
                                           {item.category && <span className="text-muted-foreground text-xs ml-2">({item.category})</span>}
+                                          {item.folderId && <span className="text-muted-foreground text-xs ml-2">({resourceFolders.find(f => f.id === item.folderId)?.name})</span>}
                                       </Label>
                                   </div>
                               )) : (
-                                <p className="text-sm text-center text-muted-foreground py-4">No matching items found.</p>
+                                <p className="text-sm text-center text-muted-foreground py-4">
+                                  {manageLinksConfig?.type === 'resource' && !linkResourceFolderId 
+                                      ? "Please select a folder." 
+                                      : "No matching items found."}
+                                </p>
                               )}
                           </div>
                       </ScrollArea>
