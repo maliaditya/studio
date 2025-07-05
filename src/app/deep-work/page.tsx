@@ -122,6 +122,7 @@ function DeepWorkPageContent() {
   const [editingTopic, setEditingTopic] = useState<string | null>(null);
   const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
   const [newTopicNameForEdit, setNewTopicNameForEdit] = useState('');
+  const [newTopicClassificationForEdit, setNewTopicClassificationForEdit] = useState<'product' | 'service'>('product');
 
   // State for adding a focus area inline
   const [addingFocusToTopic, setAddingFocusToTopic] = useState<string | null>(null);
@@ -144,8 +145,9 @@ function DeepWorkPageContent() {
   useEffect(() => {
     if (editingTopic) {
       setNewTopicNameForEdit(editingTopic);
+      setNewTopicClassificationForEdit(deepWorkTopicMetadata[editingTopic]?.classification || 'product');
     }
-  }, [editingTopic]);
+  }, [editingTopic, deepWorkTopicMetadata]);
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
@@ -318,8 +320,7 @@ function DeepWorkPageContent() {
 
   const handleSaveTopicEdit = () => {
     if (!editingTopic || !newTopicNameForEdit.trim()) return;
-    const oldClassification = deepWorkTopicMetadata[editingTopic]?.classification || 'product';
-    updateTopic(editingTopic, newTopicNameForEdit, oldClassification);
+    updateTopic(editingTopic, newTopicNameForEdit, newTopicClassificationForEdit);
     setEditingTopic(null);
   }
 
@@ -499,7 +500,7 @@ function DeepWorkPageContent() {
                               <PlusCircle className="mr-2 h-4 w-4" /> New Focus Area
                             </DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => setEditingTopic(topic)}>
-                              <Edit3 className="mr-2 h-4 w-4" /> Rename Topic
+                              <Edit3 className="mr-2 h-4 w-4" /> Edit Topic
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-destructive" onSelect={() => setTopicToDelete(topic)}>
@@ -765,18 +766,33 @@ function DeepWorkPageContent() {
       <Dialog open={!!editingTopic} onOpenChange={(isOpen) => !isOpen && setEditingTopic(null)}>
         <DialogContent>
             <DialogHeader>
-                <DialogTitle>Rename Topic</DialogTitle>
+                <DialogTitle>Edit Topic</DialogTitle>
                 <DialogDescription>
-                    This will rename the topic for all associated focus areas.
+                    Rename the topic or change its classification. This will move it between the Productization and Offerization pages.
                 </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
-                <Label htmlFor="edit-topic-name">New topic name</Label>
-                <Input id="edit-topic-name" value={newTopicNameForEdit} onChange={(e) => setNewTopicNameForEdit(e.target.value)} />
+            <div className="space-y-4 py-4">
+                <div className="space-y-1">
+                  <Label htmlFor="edit-topic-name">Topic Name</Label>
+                  <Input id="edit-topic-name" value={newTopicNameForEdit} onChange={(e) => setNewTopicNameForEdit(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Classification</Label>
+                  <RadioGroup value={newTopicClassificationForEdit} onValueChange={(v) => setNewTopicClassificationForEdit(v as 'product' | 'service')} className="flex gap-4 pt-1">
+                      <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="product" id="class-product" />
+                          <Label htmlFor="class-product" className="font-normal">Product</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="service" id="class-service" />
+                          <Label htmlFor="class-service" className="font-normal">Service</Label>
+                      </div>
+                  </RadioGroup>
+                </div>
             </div>
             <DialogFooter>
                 <Button variant="outline" onClick={() => setEditingTopic(null)}>Cancel</Button>
-                <Button onClick={handleSaveTopicEdit}>Save</Button>
+                <Button onClick={handleSaveTopicEdit}>Save Changes</Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>
