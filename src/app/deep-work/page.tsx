@@ -136,6 +136,12 @@ function DeepWorkPageContent() {
 
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
 
+  // Edit states for linked items
+  const [editingUpskill, setEditingUpskill] = useState<ExerciseDefinition | null>(null);
+  const [editedUpskillData, setEditedUpskillData] = useState<Partial<ExerciseDefinition>>({});
+  const [editingResource, setEditingResource] = useState<Resource | null>(null);
+  const [editedResourceData, setEditedResourceData] = useState<Partial<Resource>>({});
+
   const toggleTopicExpansion = useCallback((topic: string) => {
     setExpandedTopics(prev => {
         const newSet = new Set(prev);
@@ -154,6 +160,14 @@ function DeepWorkPageContent() {
       setNewTopicClassificationForEdit(deepWorkTopicMetadata[editingTopic]?.classification || 'product');
     }
   }, [editingTopic, deepWorkTopicMetadata]);
+
+  useEffect(() => {
+    if (editingUpskill) setEditedUpskillData(editingUpskill);
+  }, [editingUpskill]);
+
+  useEffect(() => {
+    if (editingResource) setEditedResourceData(editingResource);
+  }, [editingResource]);
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
@@ -557,6 +571,68 @@ function DeepWorkPageContent() {
     );
   }, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm]);
 
+  const handleStartEditUpskill = (def: ExerciseDefinition) => {
+    setEditingUpskill(def);
+  };
+  
+  const handleSaveUpskillEdit = () => {
+    if (!editedUpskillData || !editingUpskill) return;
+    const finalUpskillData = { ...editedUpskillData };
+    if (finalUpskillData.link !== editingUpskill.link) {
+        finalUpskillData.iconUrl = getFaviconUrl(finalUpskillData.link || '');
+    }
+    setUpskillDefinitions(prev => prev.map(def => def.id === editingUpskill.id ? finalUpskillData as ExerciseDefinition : def));
+    setEditingUpskill(null);
+    toast({ title: 'Success', description: 'Upskill task updated.' });
+  };
+  
+  const handleStartEditResource = (res: Resource) => {
+    setEditingResource(res);
+  };
+  
+  const handleSaveResourceEdit = () => {
+    if (!editedResourceData || !editingResource) return;
+    const finalResourceData = { ...editedResourceData };
+    if (finalResourceData.link !== editingResource.link) {
+        finalResourceData.iconUrl = getFaviconUrl(finalResourceData.link || '');
+    }
+    setResources(prev => prev.map(res => res.id === editingResource.id ? finalResourceData as Resource : res));
+    setEditingResource(null);
+    toast({ title: 'Success', description: 'Resource updated.' });
+  };
+
+  const handleUnlinkItem = (type: 'upskill' | 'deepwork' | 'resource', idToUnlink: string) => {
+    if (!selectedFocusArea) return;
+    let updatedParent: ExerciseDefinition;
+    let key: 'linkedUpskillIds' | 'linkedDeepWorkIds' | 'linkedResourceIds' = 'linkedUpskillIds';
+    if (type === 'deepwork') key = 'linkedDeepWorkIds';
+    if (type === 'resource') key = 'linkedResourceIds';
+    
+    updatedParent = {
+      ...selectedFocusArea,
+      [key]: (selectedFocusArea[key] || []).filter((id: string) => id !== idToUnlink)
+    };
+    
+    setDeepWorkDefinitions(prev => prev.map(def => def.id === selectedFocusArea.id ? updatedParent : def));
+    setSelectedFocusArea(updatedParent);
+    toast({ title: "Unlinked", description: "The item has been unlinked from this focus area." });
+  };
+  
+  const renderFolderOptions = useCallback((parentId: string | null, level: number): JSX.Element[] => {
+    const folders = resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => a.name.localeCompare(b.name));
+    let options: JSX.Element[] = [];
+
+    folders.forEach(folder => {
+        options.push(
+            <SelectItem key={folder.id} value={folder.id}>
+                <span style={{ paddingLeft: `${level * 1.5}rem` }}>{folder.name}</span>
+            </SelectItem>
+        );
+        options = options.concat(renderFolderOptions(folder.id, level + 1));
+    });
+
+    return options;
+  }, [resourceFolders]);
 
   if (isLoadingPage) {
     return (
@@ -753,7 +829,18 @@ function DeepWorkPageContent() {
                                     const embedLinkForModal = youtubeEmbedUrl || upskillDef.link;
 
                                     return (
-                                       <Card key={id} className="rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
+                                       <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
+                                          <DropdownMenu>
+                                              <DropdownMenuTrigger asChild>
+                                                  <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 absolute top-2 right-2 z-10">
+                                                      <MoreVertical className="h-4 w-4" />
+                                                  </Button>
+                                              </DropdownMenuTrigger>
+                                              <DropdownMenuContent align="end">
+                                                  <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}>Edit</DropdownMenuItem>
+                                                  <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-destructive">Unlink</DropdownMenuItem>
+                                              </DropdownMenuContent>
+                                          </DropdownMenu>
                                           <CardHeader className="pb-3">
                                             <CardTitle className="text-base flex items-center gap-2">
                                               {youtubeEmbedUrl ? (
@@ -802,7 +889,18 @@ function DeepWorkPageContent() {
                                     const deepworkDef = deepWorkDefinitions.find(dd => dd.id === id);
                                     if (!deepworkDef) return null;
                                     return (
-                                       <Card key={id} className="rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
+                                       <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
+                                         <DropdownMenu>
+                                             <DropdownMenuTrigger asChild>
+                                                 <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 absolute top-2 right-2 z-10">
+                                                     <MoreVertical className="h-4 w-4" />
+                                                 </Button>
+                                             </DropdownMenuTrigger>
+                                             <DropdownMenuContent align="end">
+                                                 <DropdownMenuItem onSelect={() => handleStartEditDefinition(deepworkDef)}>Edit</DropdownMenuItem>
+                                                 <DropdownMenuItem onSelect={() => handleUnlinkItem('deepwork', id)} className="text-destructive">Unlink</DropdownMenuItem>
+                                             </DropdownMenuContent>
+                                         </DropdownMenu>
                                          <CardHeader className="pb-3">
                                             <CardTitle className="text-base flex items-center gap-2">
                                               <Briefcase className="h-5 w-5 text-muted-foreground flex-shrink-0" />
@@ -841,7 +939,18 @@ function DeepWorkPageContent() {
                                     const embedLinkForModal = isEmbeddable ? (getYouTubeEmbedUrl(resource.link) || resource.link) : null;
 
                                     return (
-                                        <Card key={id} className="rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
+                                        <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
+                                          <DropdownMenu>
+                                              <DropdownMenuTrigger asChild>
+                                                  <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 absolute top-2 right-2 z-10">
+                                                      <MoreVertical className="h-4 w-4" />
+                                                  </Button>
+                                              </DropdownMenuTrigger>
+                                              <DropdownMenuContent align="end">
+                                                  <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}>Edit</DropdownMenuItem>
+                                                  <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', id)} className="text-destructive">Unlink</DropdownMenuItem>
+                                              </DropdownMenuContent>
+                                          </DropdownMenu>
                                         <CardHeader className="pb-3">
                                             <CardTitle className="text-base flex items-center gap-2">
                                             {resource.iconUrl ? (
@@ -1095,6 +1204,48 @@ function DeepWorkPageContent() {
                     ></iframe>
                 )}
             </div>
+        </DialogContent>
+    </Dialog>
+
+    <Dialog open={!!editingUpskill} onOpenChange={() => setEditingUpskill(null)}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Edit Learning Task</DialogTitle>
+                <DialogDescription>Update the details of this learning task.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-1"><Label htmlFor="upskill-name">Name</Label><Input id="upskill-name" value={editedUpskillData.name || ''} onChange={e => setEditedUpskillData(d => ({ ...d, name: e.target.value }))} /></div>
+                <div className="space-y-1"><Label htmlFor="upskill-desc">Description</Label><Textarea id="upskill-desc" value={editedUpskillData.description || ''} onChange={e => setEditedUpskillData(d => ({ ...d, description: e.target.value }))} /></div>
+                <div className="space-y-1"><Label htmlFor="upskill-link">Link</Label><Input id="upskill-link" value={editedUpskillData.link || ''} onChange={e => setEditedUpskillData(d => ({ ...d, link: e.target.value }))} /></div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingUpskill(null)}>Cancel</Button>
+                <Button onClick={handleSaveUpskillEdit}>Save Changes</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <Dialog open={!!editingResource} onOpenChange={() => setEditingResource(null)}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Edit Resource</DialogTitle>
+                <DialogDescription>Update the details of this resource.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-1"><Label htmlFor="resource-name">Name</Label><Input id="resource-name" value={editedResourceData.name || ''} onChange={e => setEditedResourceData(d => ({ ...d, name: e.target.value }))} /></div>
+                <div className="space-y-1"><Label htmlFor="resource-folder">Folder</Label>
+                    <Select value={editedResourceData.folderId || ''} onValueChange={v => setEditedResourceData(d => ({ ...d, folderId: v }))}>
+                        <SelectTrigger id="resource-folder"><SelectValue placeholder="Select a folder..." /></SelectTrigger>
+                        <SelectContent>{renderFolderOptions(null, 0)}</SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-1"><Label htmlFor="resource-desc">Description</Label><Textarea id="resource-desc" value={editedResourceData.description || ''} onChange={e => setEditedResourceData(d => ({ ...d, description: e.target.value }))} /></div>
+                <div className="space-y-1"><Label htmlFor="resource-link">Link</Label><Input id="resource-link" value={editedResourceData.link || ''} onChange={e => setEditedResourceData(d => ({ ...d, link: e.target.value }))} /></div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingResource(null)}>Cancel</Button>
+                <Button onClick={handleSaveResourceEdit}>Save Changes</Button>
+            </DialogFooter>
         </DialogContent>
     </Dialog>
     </>
