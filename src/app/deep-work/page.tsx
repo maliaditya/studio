@@ -463,7 +463,7 @@ function DeepWorkPageContent() {
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 items-start">
           
           <aside className="md:col-span-1 space-y-6">
             <Card>
@@ -574,7 +574,7 @@ function DeepWorkPageContent() {
             </Card>
           </aside>
 
-          <section aria-labelledby="main-panel-heading" className="md:col-span-2 space-y-6">
+          <section aria-labelledby="main-panel-heading" className="md:col-span-3 space-y-6">
               <Card>
                   <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
