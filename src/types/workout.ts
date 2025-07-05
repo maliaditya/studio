@@ -53,6 +53,7 @@ export interface ExerciseDefinition {
   description?: string;
   link?: string;
   iconUrl?: string;
+  estimatedHours?: number;
   decompositionData?: DecompositionRow[];
   focusAreaIds?: string[];
   sourceUpskillId?: string;
@@ -172,6 +173,8 @@ export interface Release {
   daysRemaining?: number;
   availableHours?: number;
   totalAvailableHours?: number;
+  totalLoggedHours?: number;
+  totalEstimatedHours?: number;
 }
 
 export interface Offer {

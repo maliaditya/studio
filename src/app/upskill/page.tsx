@@ -26,6 +26,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription as DialogDescriptionComponent } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -66,11 +67,13 @@ function UpskillPageContent() {
   const [newSubtopicName, setNewSubtopicName] = useState('');
   const [newSubtopicDescription, setNewSubtopicDescription] = useState('');
   const [newSubtopicLink, setNewSubtopicLink] = useState('');
+  const [newSubtopicHours, setNewSubtopicHours] = useState('');
 
   const [editingDefinition, setEditingDefinition] = useState<ExerciseDefinition | null>(null);
   const [editingDefinitionName, setEditingDefinitionName] = useState('');
   const [editingDefinitionDescription, setEditingDefinitionDescription] = useState('');
   const [editingDefinitionLink, setEditingDefinitionLink] = useState('');
+  const [editingDefinitionHours, setEditingDefinitionHours] = useState('');
   
   const [editingTopicGoal, setEditingTopicGoal] = useState<string | null>(null);
   const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
@@ -222,12 +225,14 @@ function UpskillPageContent() {
         description: newSubtopicDescription.trim(),
         link: newSubtopicLink.trim(),
         iconUrl: getFaviconUrl(newSubtopicLink.trim()),
+        estimatedHours: parseInt(newSubtopicHours, 10) || undefined,
     };
     
     setUpskillDefinitions(prev => prev.filter(d => d.name !== 'placeholder').concat(newDef));
     setNewSubtopicName('');
     setNewSubtopicDescription('');
     setNewSubtopicLink('');
+    setNewSubtopicHours('');
     setAddingSubtopicTo(null);
     toast({ title: "Success", description: `Subtopic "${newDef.name}" added to ${topic}.` });
   };
@@ -271,6 +276,7 @@ function UpskillPageContent() {
     setEditingDefinitionName(def.name);
     setEditingDefinitionDescription(def.description || '');
     setEditingDefinitionLink(def.link || '');
+    setEditingDefinitionHours(def.estimatedHours?.toString() || '');
   };
 
   const handleSaveEditDefinition = () => {
@@ -287,6 +293,7 @@ function UpskillPageContent() {
       description: editingDefinitionDescription.trim(),
       link: newLink,
       iconUrl: newLink !== oldLink ? getFaviconUrl(newLink) : editingDefinition.iconUrl,
+      estimatedHours: parseInt(editingDefinitionHours, 10) || undefined,
     };
     
     setUpskillDefinitions(prev => prev.map(def => def.id === editingDefinition.id ? updatedDef : def));
@@ -503,6 +510,7 @@ function UpskillPageContent() {
                                               <Input value={editingDefinitionName} onChange={(e) => setEditingDefinitionName(e.target.value)} className="h-8" />
                                               <Textarea value={editingDefinitionDescription} onChange={(e) => setEditingDefinitionDescription(e.target.value)} placeholder="Description" />
                                               <Input value={editingDefinitionLink} onChange={(e) => setEditingDefinitionLink(e.target.value)} placeholder="Link" />
+                                              <Input type="number" value={editingDefinitionHours} onChange={(e) => setEditingDefinitionHours(e.target.value)} placeholder="Est. Hours" />
                                               <div className="flex gap-2 self-end">
                                                   <Button size="icon" className="h-8 w-8" onClick={handleSaveEditDefinition}><Save className="h-4 w-4"/></Button>
                                                   <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingDefinition(null)}><X className="h-4 w-4"/></Button>
@@ -511,8 +519,9 @@ function UpskillPageContent() {
                                           ) : (
                                           <>
                                               <div className="flex items-center gap-2 flex-grow min-w-0">
-                                              <BookCopy className="h-4 w-4 flex-shrink-0 text-muted-foreground/80" />
-                                              <span className="truncate" title={def.name}>{def.name}</span>
+                                                <BookCopy className="h-4 w-4 flex-shrink-0 text-muted-foreground/80" />
+                                                <span className="truncate" title={def.name}>{def.name}</span>
+                                                {def.estimatedHours && <Badge variant="outline" className="text-xs">{def.estimatedHours}h</Badge>}
                                               </div>
                                               <DropdownMenu>
                                               <DropdownMenuTrigger asChild>
@@ -538,6 +547,7 @@ function UpskillPageContent() {
                                               <Input value={newSubtopicName} onChange={(e) => setNewSubtopicName(e.target.value)} className="h-8" autoFocus placeholder="New Subtopic Name" />
                                               <Textarea value={newSubtopicDescription} onChange={(e) => setNewSubtopicDescription(e.target.value)} placeholder="Description..." />
                                               <Input value={newSubtopicLink} onChange={(e) => setNewSubtopicLink(e.target.value)} placeholder="Link..." />
+                                              <Input type="number" value={newSubtopicHours} onChange={(e) => setNewSubtopicHours(e.target.value)} placeholder="Est. Hours..." />
                                               <div className="flex justify-end gap-2">
                                                   <Button size="icon" className="h-8 w-8" type="submit"><Save className="h-4 w-4"/></Button>
                                                   <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAddingSubtopicTo(null)}><X className="h-4 w-4"/></Button>
@@ -681,6 +691,27 @@ function UpskillPageContent() {
             <DialogFooter>
                 <Button variant="outline" onClick={() => setEditingTopicGoal(null)}>Cancel</Button>
                 <Button onClick={handleSaveGoal}>Save Goal</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={!!editingDefinition} onOpenChange={() => setEditingDefinition(null)}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Edit Learning Task</DialogTitle>
+                <DialogDescriptionComponent>
+                    Update the details of this learning task.
+                </DialogDescriptionComponent>
+            </DialogHeader>
+             <div className="space-y-4 py-4">
+                <div className="space-y-1"><Label htmlFor="subtopic-name">Name</Label><Input id="subtopic-name" value={editingDefinitionName} onChange={e => setEditingDefinitionName(e.target.value)} /></div>
+                <div className="space-y-1"><Label htmlFor="subtopic-desc">Description</Label><Textarea id="subtopic-desc" value={editingDefinitionDescription} onChange={e => setEditingDefinitionDescription(e.target.value)} /></div>
+                <div className="space-y-1"><Label htmlFor="subtopic-link">Link</Label><Input id="subtopic-link" value={editingDefinitionLink} onChange={e => setEditingDefinitionLink(e.target.value)} /></div>
+                <div className="space-y-1"><Label htmlFor="subtopic-hours">Estimated Hours</Label><Input id="subtopic-hours" type="number" value={editingDefinitionHours} onChange={e => setEditingDefinitionHours(e.target.value)} /></div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingDefinition(null)}>Cancel</Button>
+                <Button onClick={handleSaveEditDefinition}>Save Changes</Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>

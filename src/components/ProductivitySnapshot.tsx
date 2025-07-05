@@ -227,35 +227,47 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                   {roadmapItems.length > 0 ? (
                       <Carousel
                         items={roadmapItems}
-                        renderItem={(item: any) => (
-                          <div 
-                            className="flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 h-[88px] cursor-pointer" 
-                            onClick={() => {
-                              setSelectedReleaseInfo({ release: item.release, topic: item.topic, type: item.type });
-                              setIsAddFeatureModalOpen(true);
-                            }}
-                          >
-                              <div className="flex justify-between items-start">
-                                  <div className='min-w-0'>
-                                      <p className="font-bold text-foreground truncate" title={item.release.name}>{item.release.name}</p>
-                                      <p className="text-xs text-muted-foreground truncate" title={item.topic}>Topic: <span className="font-medium">{item.topic}</span></p>
-                                  </div>
-                                  <div className="flex flex-col items-end ml-2 flex-shrink-0">
-                                      <Badge variant="outline" className="capitalize text-xs mb-1">{item.type}</Badge>
-                                      <p className="text-xs text-muted-foreground whitespace-nowrap">
-                                          {format(parseISO(item.release.launchDate), 'MMM dd')} ({item.release.daysRemaining} days)
-                                      </p>
-                                  </div>
-                              </div>
-                              <p className="text-sm text-muted-foreground mt-1 truncate">
-                                {item.release.availableHours !== undefined && item.release.totalAvailableHours !== undefined ? (
-                                  `Prod. Hours: ${item.release.availableHours.toFixed(1)} / ${item.release.totalAvailableHours}`
-                                ) : (
-                                  `${item.release.features?.length || 0} features planned.`
-                                )}
-                              </p>
-                          </div>
-                        )}
+                        renderItem={(item: any) => {
+                          const loggedHours = item.release.totalLoggedHours || 0;
+                          const estimatedHours = item.release.totalEstimatedHours || 0;
+
+                          return (
+                            <div 
+                              className="flex flex-col justify-between p-3 rounded-md bg-muted/30 border-b-0 h-[100px] cursor-pointer" 
+                              onClick={() => {
+                                setSelectedReleaseInfo({ release: item.release, topic: item.topic, type: item.type });
+                                setIsAddFeatureModalOpen(true);
+                              }}
+                            >
+                                <div className="flex justify-between items-start">
+                                    <div className='min-w-0'>
+                                        <p className="font-bold text-foreground truncate" title={item.release.name}>{item.release.name}</p>
+                                        <p className="text-xs text-muted-foreground truncate" title={item.topic}>Topic: <span className="font-medium">{item.topic}</span></p>
+                                    </div>
+                                    <div className="flex flex-col items-end ml-2 flex-shrink-0">
+                                        <Badge variant="outline" className="capitalize text-xs mb-1">{item.type}</Badge>
+                                        <p className="text-xs text-muted-foreground whitespace-nowrap">
+                                            {format(parseISO(item.release.launchDate), 'MMM dd')} ({item.release.daysRemaining} days)
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="space-y-1 text-xs text-muted-foreground">
+                                    <div className="flex justify-between items-center">
+                                        <span>Logged / Est.</span>
+                                        <span className="font-mono font-medium text-foreground">
+                                            {loggedHours.toFixed(1)}h / {estimatedHours > 0 ? `${estimatedHours}h` : 'N/A'}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span>Prod. / Total Hours</span>
+                                        <span className="font-mono font-medium text-foreground">
+                                            {item.release.availableHours?.toFixed(0) ?? '0'}h / {item.release.totalAvailableHours?.toFixed(0) ?? '0'}h
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                          )
+                        }}
                       />
                   ) : (
                       <div className="text-sm text-muted-foreground p-2 min-h-[6rem] flex flex-col justify-center">
@@ -327,6 +339,24 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                     <p className="text-2xl font-bold">{selectedReleaseInfo.release.totalAvailableHours ?? 'N/A'}</p>
                 </div>
             </div>
+            
+            {(selectedReleaseInfo.release.totalLoggedHours !== undefined || (selectedReleaseInfo.release.totalEstimatedHours && selectedReleaseInfo.release.totalEstimatedHours > 0)) && (
+                <div className="flex justify-around items-center text-center p-3 my-2 bg-muted/50 rounded-lg">
+                    <div>
+                        <p className="text-sm text-muted-foreground">Logged Hours</p>
+                        <p className="text-2xl font-bold">{(selectedReleaseInfo.release.totalLoggedHours || 0).toFixed(1)}h</p>
+                    </div>
+                    {selectedReleaseInfo.release.totalEstimatedHours && selectedReleaseInfo.release.totalEstimatedHours > 0 && (
+                        <>
+                            <div className="text-2xl text-muted-foreground">/</div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">Estimated Hours</p>
+                                <p className="text-2xl font-bold">{selectedReleaseInfo.release.totalEstimatedHours}h</p>
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
             
             {selectedReleaseInfo.release.features && selectedReleaseInfo.release.features.length > 0 && (
                 <div className="space-y-2">

@@ -380,6 +380,40 @@ function HomePageContent() {
           const totalDuration = Object.values(dailyDurations).reduce((sum, d) => sum + d, 0);
           return totalDuration / daysWithActivity;
       };
+
+      const calculateTotalLoggedMinutesForFocusArea = (focusAreaDef: ExerciseDefinition | undefined) => {
+        let totalMinutes = 0;
+        if (!focusAreaDef) return 0;
+    
+        const allDeepWorkDefIdsToSum = new Set<string>([focusAreaDef.id, ...(focusAreaDef.linkedDeepWorkIds || [])]);
+        const allUpskillDefIdsToSum = new Set<string>(focusAreaDef.linkedUpskillIds || []);
+    
+        if (allDeepWorkLogs) {
+            allDeepWorkLogs.forEach(log => {
+                log.exercises.forEach(ex => {
+                    if (allDeepWorkDefIdsToSum.has(ex.definitionId)) {
+                        ex.loggedSets.forEach(set => {
+                            totalMinutes += set.weight;
+                        });
+                    }
+                });
+            });
+        }
+    
+        if (allUpskillLogs) {
+            allUpskillLogs.forEach(log => {
+                log.exercises.forEach(ex => {
+                    if (allUpskillDefIdsToSum.has(ex.definitionId)) {
+                        ex.loggedSets.forEach(set => {
+                            totalMinutes += set.reps;
+                        });
+                    }
+                });
+            });
+        }
+        return totalMinutes;
+      };
+
       const calculateLearningStats = (logs: DatedWorkout[], goals: typeof topicGoals) => {
           const topicStats: Record<string, any> = {};
           const topicData: Record<string, { totalDuration: number; logs: { date: Date; progress: number }[] }> = {};
@@ -485,38 +519,55 @@ function HomePageContent() {
       const getUpcomingReleases = () => {
         if (!productizationPlans && !offerizationPlans) return [];
     
-        const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
+        const allReleasesWithDetails: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
+    
+        const processPlan = (plan: ProductizationPlan, topic: string, type: 'product' | 'service') => {
+            if (plan.releases) {
+                plan.releases.forEach(release => {
+                    const featureNames = (release.focusAreaIds || [])
+                        .map(id => deepWorkDefinitions.find(def => def.id === id)?.name)
+                        .filter((name): name is string => !!name);
+                    
+                    let totalLoggedMinutesForRelease = 0;
+                    let totalEstimatedHoursForRelease = 0;
+                    
+                    (release.focusAreaIds || []).forEach(id => {
+                        const focusAreaDef = deepWorkDefinitions.find(def => def.id === id);
+                        if (focusAreaDef) {
+                            totalLoggedMinutesForRelease += calculateTotalLoggedMinutesForFocusArea(focusAreaDef);
+                            totalEstimatedHoursForRelease += focusAreaDef.estimatedHours || 0;
+                        }
+                    });
+
+                    allReleasesWithDetails.push({ 
+                        topic, 
+                        release: { 
+                            ...release, 
+                            features: featureNames,
+                            totalLoggedHours: totalLoggedMinutesForRelease / 60,
+                            totalEstimatedHours: totalEstimatedHoursForRelease
+                        }, 
+                        type 
+                    });
+                });
+            }
+        };
     
         if (productizationPlans) {
-          Object.entries(productizationPlans).forEach(([topic, plan]) => {
-              if (plan.releases) {
-                  plan.releases.forEach(release => {
-                      const featureNames = (release.focusAreaIds || [])
-                          .map(id => deepWorkDefinitions.find(def => def.id === id)?.name)
-                          .filter((name): name is string => !!name);
-                      allReleases.push({ topic, release: { ...release, features: featureNames }, type: 'product' });
-                  });
-              }
-          });
+            Object.entries(productizationPlans).forEach(([topic, plan]) => {
+                processPlan(plan, topic, 'product');
+            });
         }
-        
         if (offerizationPlans) {
             Object.entries(offerizationPlans).forEach(([topic, plan]) => {
-                if (plan.releases) {
-                    plan.releases.forEach(release => {
-                        const featureNames = (release.focusAreaIds || [])
-                            .map(id => deepWorkDefinitions.find(def => def.id === id)?.name)
-                            .filter((name): name is string => !!name);
-                        allReleases.push({ topic, release: { ...release, features: featureNames }, type: 'service' });
-                    });
-                }
+                processPlan(plan, topic, 'service');
             });
         }
     
         const today = new Date();
         today.setHours(0, 0, 0, 0);
     
-        return allReleases
+        return allReleasesWithDetails
             .filter(({ release }) => {
                 try { return parseISO(release.launchDate) >= today; } 
                 catch (e) { return false; }

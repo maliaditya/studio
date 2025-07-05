@@ -112,6 +112,7 @@ function DeepWorkPageContent() {
     currentUser, 
     exportData,
     allDeepWorkLogs, setAllDeepWorkLogs,
+    allUpskillLogs,
     deepWorkDefinitions, setDeepWorkDefinitions,
     upskillDefinitions, setUpskillDefinitions,
     deepWorkTopicMetadata, setDeepWorkTopicMetadata,
@@ -124,6 +125,7 @@ function DeepWorkPageContent() {
   
   const [editingDefinition, setEditingDefinition] = useState<ExerciseDefinition | null>(null);
   const [editingDefinitionName, setEditingDefinitionName] = useState('');
+  const [editingDefinitionHours, setEditingDefinitionHours] = useState('');
   
   const [editingTopic, setEditingTopic] = useState<string | null>(null);
   const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
@@ -133,6 +135,7 @@ function DeepWorkPageContent() {
   // State for adding a focus area inline
   const [addingFocusToTopic, setAddingFocusToTopic] = useState<string | null>(null);
   const [newFocusAreaName, setNewFocusAreaName] = useState('');
+  const [newFocusAreaHours, setNewFocusAreaHours] = useState('');
 
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
 
@@ -189,6 +192,7 @@ function DeepWorkPageContent() {
   const [newLinkedItemTopic, setNewLinkedItemTopic] = useState('');
   const [newLinkedItemDescription, setNewLinkedItemDescription] = useState('');
   const [newLinkedItemLink, setNewLinkedItemLink] = useState('');
+  const [newLinkedItemHours, setNewLinkedItemHours] = useState('');
   const [newLinkedItemFolderId, setNewLinkedItemFolderId] = useState('');
   const [linkSearchTerm, setLinkSearchTerm] = useState('');
   const [tempLinkedIds, setTempLinkedIds] = useState<string[]>([]);
@@ -214,6 +218,47 @@ function DeepWorkPageContent() {
 
     return allKnownTopics.map(topic => [topic, grouped[topic] || []] as [string, ExerciseDefinition[]]);
   }, [allKnownTopics, deepWorkDefinitions]);
+
+  const formatMinutes = (minutes: number) => {
+    if (minutes === 0) return "0m";
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim();
+  }
+
+  const totalLoggedTime = useMemo(() => {
+      if (!selectedFocusArea) return 0;
+
+      let totalMinutes = 0;
+      const allDefIdsToSum = new Set<string>([selectedFocusArea.id, ...(selectedFocusArea.linkedDeepWorkIds || [])]);
+      const allUpskillIdsToSum = new Set<string>(selectedFocusArea.linkedUpskillIds || []);
+
+      if (allDeepWorkLogs) {
+          allDeepWorkLogs.forEach(log => {
+              log.exercises.forEach(ex => {
+                  if (allDefIdsToSum.has(ex.definitionId)) {
+                      ex.loggedSets.forEach(set => {
+                          totalMinutes += set.weight;
+                      });
+                  }
+              });
+          });
+      }
+
+      if (allUpskillLogs && allUpskillIdsToSum.size > 0) {
+          allUpskillLogs.forEach(log => {
+              log.exercises.forEach(ex => {
+                  if (allUpskillIdsToSum.has(ex.definitionId)) {
+                      ex.loggedSets.forEach(set => {
+                          totalMinutes += set.reps;
+                      });
+                  }
+              });
+          });
+      }
+      
+      return totalMinutes;
+  }, [selectedFocusArea, allUpskillLogs, allDeepWorkLogs]);
 
 
   useEffect(() => {
@@ -300,10 +345,12 @@ function DeepWorkPageContent() {
         name: newFocusAreaName.trim(),
         category: topic as ExerciseCategory,
         isReadyForBranding: false,
-        sharingStatus: { twitter: false, linkedin: false, devto: false }
+        sharingStatus: { twitter: false, linkedin: false, devto: false },
+        estimatedHours: parseInt(newFocusAreaHours, 10) || undefined,
     };
     setDeepWorkDefinitions(prev => [...prev, newDef]);
     setNewFocusAreaName('');
+    setNewFocusAreaHours('');
     setAddingFocusToTopic(null);
     toast({ title: "Success", description: `Focus Area "${newDef.name}" added to ${topic}.` });
   };
@@ -324,6 +371,7 @@ function DeepWorkPageContent() {
   const handleStartEditDefinition = (def: ExerciseDefinition) => {
     setEditingDefinition(def);
     setEditingDefinitionName(def.name);
+    setEditingDefinitionHours(def.estimatedHours?.toString() || '');
   };
 
   const handleSaveEditDefinition = () => {
@@ -331,7 +379,7 @@ function DeepWorkPageContent() {
       toast({ title: "Error", description: "Focus Area name cannot be empty.", variant: "destructive" });
       return;
     }
-    const updatedDef = { ...editingDefinition, name: editingDefinitionName.trim() };
+    const updatedDef = { ...editingDefinition, name: editingDefinitionName.trim(), estimatedHours: parseInt(editingDefinitionHours, 10) || undefined };
     setDeepWorkDefinitions(prev => prev.map(def => def.id === editingDefinition.id ? updatedDef : def));
     setAllDeepWorkLogs(prevLogs => prevLogs.map(log => ({...log, exercises: log.exercises.map(ex => ex.definitionId === editingDefinition.id ? { ...ex, name: updatedDef.name } : ex)})));
     if(selectedFocusArea?.id === editingDefinition.id) {
@@ -463,6 +511,7 @@ function DeepWorkPageContent() {
     setNewLinkedItemName('');
     setNewLinkedItemDescription('');
     setNewLinkedItemLink('');
+    setNewLinkedItemHours('');
     setNewLinkedItemFolderId('');
     setLinkSearchTerm('');
     setIsManageLinksModalOpen(true);
@@ -488,6 +537,7 @@ function DeepWorkPageContent() {
             description: newLinkedItemDescription.trim(),
             link: link,
             iconUrl: getFaviconUrl(link),
+            estimatedHours: parseInt(newLinkedItemHours, 10) || undefined,
         };
         setUpskillDefinitions(prev => [...prev, newUpskillDef]);
         updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newUpskillDef.id] };
@@ -500,6 +550,7 @@ function DeepWorkPageContent() {
             id: `def_${Date.now()}_deepwork_${Math.random()}`,
             name: newLinkedItemName.trim(),
             category: newLinkedItemTopic.trim() as ExerciseCategory,
+            estimatedHours: parseInt(newLinkedItemHours, 10) || undefined,
         };
         setDeepWorkDefinitions(prev => [...prev, newDeepWorkDef]);
         updatedParent = { ...parent, linkedDeepWorkIds: [...(parent.linkedDeepWorkIds || []), newDeepWorkDef.id] };
@@ -577,7 +628,14 @@ function DeepWorkPageContent() {
   
   const handleSaveUpskillEdit = () => {
     if (!editedUpskillData || !editingUpskill) return;
-    const finalUpskillData = { ...editedUpskillData };
+    const finalUpskillData: Partial<ExerciseDefinition> = { 
+        ...editedUpskillData,
+        estimatedHours: editedUpskillData.estimatedHours ? parseInt(String(editedUpskillData.estimatedHours)) : undefined
+    };
+    if (isNaN(finalUpskillData.estimatedHours!)) {
+        finalUpskillData.estimatedHours = undefined;
+    }
+
     if (finalUpskillData.link !== editingUpskill.link) {
         finalUpskillData.iconUrl = getFaviconUrl(finalUpskillData.link || '');
     }
@@ -646,9 +704,9 @@ function DeepWorkPageContent() {
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          <aside className="lg:col-span-1 space-y-6">
+          <aside className="lg:col-span-4 space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg text-primary">
@@ -697,16 +755,24 @@ function DeepWorkPageContent() {
                             {focusAreas.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
                               <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted">
                                 {editingDefinition?.id === def.id ? (
-                                  <div className='flex-grow flex items-center gap-2'>
+                                  <div className='flex-grow flex flex-col gap-2'>
                                     <Input 
                                       value={editingDefinitionName}
                                       onChange={(e) => setEditingDefinitionName(e.target.value)}
                                       className="h-8"
                                       autoFocus
-                                      onKeyDown={e => e.key === 'Enter' && handleSaveEditDefinition()}
                                     />
-                                    <Button size="icon" className="h-8 w-8" onClick={handleSaveEditDefinition}><Save className="h-4 w-4"/></Button>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingDefinition(null)}><X className="h-4 w-4"/></Button>
+                                    <Input
+                                        type="number"
+                                        placeholder="Est. Hours"
+                                        value={editingDefinitionHours}
+                                        onChange={(e) => setEditingDefinitionHours(e.target.value)}
+                                        className="h-8"
+                                    />
+                                    <div className="flex gap-2 self-end">
+                                        <Button size="icon" className="h-8 w-8" onClick={handleSaveEditDefinition}><Save className="h-4 w-4"/></Button>
+                                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingDefinition(null)}><X className="h-4 w-4"/></Button>
+                                    </div>
                                   </div>
                                 ) : (
                                   <>
@@ -714,6 +780,7 @@ function DeepWorkPageContent() {
                                       <Briefcase className="h-4 w-4 flex-shrink-0 text-muted-foreground/80" />
                                       <span className="truncate cursor-pointer" onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} title={`View details for ${def.name}`}>{def.name}</span>
                                       {def.isReadyForBranding && <Share2 className="h-3 w-3 text-primary flex-shrink-0" title="Ready for Branding" />}
+                                      {def.estimatedHours && <Badge variant="secondary" className="text-xs ml-auto">{def.estimatedHours}h</Badge>}
                                     </div>
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
@@ -746,7 +813,7 @@ function DeepWorkPageContent() {
                             ))}
                              {addingFocusToTopic === topic && (
                                 <li className="p-1.5">
-                                  <form onSubmit={(e) => { e.preventDefault(); handleAddFocusArea(topic); }} className="flex items-center gap-2">
+                                  <form onSubmit={(e) => { e.preventDefault(); handleAddFocusArea(topic); }} className="space-y-2">
                                       <Input 
                                           value={newFocusAreaName}
                                           onChange={(e) => setNewFocusAreaName(e.target.value)}
@@ -755,8 +822,17 @@ function DeepWorkPageContent() {
                                           placeholder="New Focus Area Name"
                                           onKeyDown={e => e.key === 'Escape' && setAddingFocusToTopic(null)}
                                       />
-                                      <Button size="icon" className="h-8 w-8" type="submit"><Save className="h-4 w-4"/></Button>
-                                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAddingFocusToTopic(null)}><X className="h-4 w-4"/></Button>
+                                      <Input 
+                                          value={newFocusAreaHours}
+                                          onChange={(e) => setNewFocusAreaHours(e.target.value)}
+                                          type="number"
+                                          className="h-8"
+                                          placeholder="Est. Hours (optional)"
+                                      />
+                                      <div className="flex justify-end gap-2">
+                                        <Button size="icon" className="h-8 w-8" type="submit"><Save className="h-4 w-4"/></Button>
+                                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAddingFocusToTopic(null)}><X className="h-4 w-4"/></Button>
+                                      </div>
                                   </form>
                                 </li>
                             )}
@@ -769,7 +845,7 @@ function DeepWorkPageContent() {
             </Card>
           </aside>
 
-          <section aria-labelledby="main-panel-heading" className="lg:col-span-3 space-y-6">
+          <section aria-labelledby="main-panel-heading" className="lg:col-span-8 space-y-6">
               <Card>
                   <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
@@ -777,9 +853,34 @@ function DeepWorkPageContent() {
                               {viewMode === 'session' ? <ListChecks /> : <Library />}
                               {viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedFocusArea?.name || 'Select an item'}`}
                           </CardTitle>
-                          {viewMode === 'library' && <CardDescription className="text-xs mt-1">{selectedFocusArea?.category}</CardDescription>}
+                          {viewMode === 'library' && selectedFocusArea && (
+                            <CardDescription className="text-xs mt-1">{selectedFocusArea.category}</CardDescription>
+                          )}
                       </div>
-                      <div className='flex items-center gap-2'>
+                      
+                      {viewMode === 'library' && selectedFocusArea && (
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {selectedFocusArea.estimatedHours && (
+                            <Badge variant="outline" className="text-sm">
+                              Est: {selectedFocusArea.estimatedHours}h
+                            </Badge>
+                          )}
+                          {totalLoggedTime > 0 && (
+                            <Badge variant="secondary" className={cn(
+                                "text-sm",
+                                (selectedFocusArea.estimatedHours && totalLoggedTime > selectedFocusArea.estimatedHours * 60)
+                                    ? "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300"
+                                    : "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300"
+                            )}>
+                                {(selectedFocusArea.estimatedHours && totalLoggedTime > selectedFocusArea.estimatedHours * 60)
+                                ? `Overspent: ${formatMinutes(totalLoggedTime - (selectedFocusArea.estimatedHours * 60))}`
+                                : `Logged: ${formatMinutes(totalLoggedTime)}`}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+
+                      <div className='flex items-center gap-2 flex-shrink-0'>
                         <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
                         <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('library')} disabled={!selectedFocusArea}>Library</Button>
                         <Popover>
@@ -857,19 +958,20 @@ function DeepWorkPageContent() {
                                           <CardContent className="flex-grow">
                                             <p className="text-sm text-muted-foreground line-clamp-2">{upskillDef.description || "No description provided."}</p>
                                           </CardContent>
-                                          {upskillDef.link && (
-                                              <CardFooter className="pt-3">
-                                                {isEmbeddable ? (
-                                                  <Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(embedLinkForModal!)}>View in App</Button>
+                                          <CardFooter className="pt-3 flex items-center justify-between">
+                                            {upskillDef.link ? (
+                                                isEmbeddable ? (
+                                                    <Button variant="secondary" size="sm" className="flex-grow" onClick={() => setEmbedUrl(embedLinkForModal!)}>View in App</Button>
                                                 ) : (
-                                                  <Button asChild variant="secondary" size="sm" className="w-full">
-                                                    <a href={upskillDef.link} target="_blank" rel="noopener noreferrer">
-                                                      Visit Site <ExternalLink className="ml-2 h-3 w-3" />
-                                                    </a>
-                                                  </Button>
-                                                )}
-                                              </CardFooter>
-                                          )}
+                                                    <Button asChild variant="secondary" size="sm" className="flex-grow">
+                                                        <a href={upskillDef.link} target="_blank" rel="noopener noreferrer">
+                                                            Visit Site <ExternalLink className="ml-2 h-3 w-3" />
+                                                        </a>
+                                                    </Button>
+                                                )
+                                            ) : <div />}
+                                            {upskillDef.estimatedHours && <Badge variant="outline" className="flex-shrink-0">{upskillDef.estimatedHours}h est.</Badge>}
+                                          </CardFooter>
                                        </Card>
                                     )
                                   })}
@@ -911,10 +1013,11 @@ function DeepWorkPageContent() {
                                          <CardContent className="flex-grow">
                                             <p className="text-sm text-muted-foreground line-clamp-2">{deepworkDef.description || "This focus area can be expanded by linking learning tasks and resources to it."}</p>
                                          </CardContent>
-                                         <CardFooter className="pt-3">
-                                            <Button variant="secondary" size="sm" className="w-full" onClick={() => { setSelectedFocusArea(deepworkDef); setViewMode('library'); }}>
+                                         <CardFooter className="pt-3 flex items-center justify-between">
+                                            <Button variant="secondary" size="sm" className="flex-grow" onClick={() => { setSelectedFocusArea(deepworkDef); setViewMode('library'); }}>
                                               View Details <ArrowRight className="ml-2 h-3 w-3" />
                                             </Button>
+                                            {deepworkDef.estimatedHours && <Badge variant="outline" className="flex-shrink-0 ml-2">{deepworkDef.estimatedHours}h est.</Badge>}
                                           </CardFooter>
                                        </Card>
                                     );
@@ -1075,6 +1178,10 @@ function DeepWorkPageContent() {
                                 <Label htmlFor="new-linked-name">Name</Label>
                                 <Input id="new-linked-name" value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} placeholder={manageLinksConfig?.type === 'upskill' ? 'e.g., CUDA Fundamentals Course' : 'e.g., Implement Ray Tracing'} />
                                 </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="new-linked-hours">Estimated Hours</Label>
+                                    <Input id="new-linked-hours" type="number" value={newLinkedItemHours} onChange={e => setNewLinkedItemHours(e.target.value)} placeholder="e.g., 20" />
+                                </div>
                                 {manageLinksConfig?.type === 'upskill' && (
                                 <>
                                     <div className="space-y-1">
@@ -1217,6 +1324,7 @@ function DeepWorkPageContent() {
                 <div className="space-y-1"><Label htmlFor="upskill-name">Name</Label><Input id="upskill-name" value={editedUpskillData.name || ''} onChange={e => setEditedUpskillData(d => ({ ...d, name: e.target.value }))} /></div>
                 <div className="space-y-1"><Label htmlFor="upskill-desc">Description</Label><Textarea id="upskill-desc" value={editedUpskillData.description || ''} onChange={e => setEditedUpskillData(d => ({ ...d, description: e.target.value }))} /></div>
                 <div className="space-y-1"><Label htmlFor="upskill-link">Link</Label><Input id="upskill-link" value={editedUpskillData.link || ''} onChange={e => setEditedUpskillData(d => ({ ...d, link: e.target.value }))} /></div>
+                <div className="space-y-1"><Label htmlFor="upskill-hours">Est. Hours</Label><Input id="upskill-hours" type="number" value={editedUpskillData.estimatedHours || ''} onChange={e => setEditedUpskillData(d => ({ ...d, estimatedHours: e.target.value ? parseInt(e.target.value, 10) : undefined }))} /></div>
             </div>
             <DialogFooter>
                 <Button variant="outline" onClick={() => setEditingUpskill(null)}>Cancel</Button>
