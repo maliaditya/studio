@@ -1,14 +1,23 @@
+
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, differenceInDays } from 'date-fns';
-import { BookCopy, Briefcase, Share2, Calendar, Check, AlertTriangle } from 'lucide-react';
+import { BookCopy, Briefcase, Share2, Calendar, Check, AlertTriangle, Filter as FilterIcon } from 'lucide-react';
 import type { DatedWorkout, ExerciseDefinition, ActivityType } from '@/types/workout';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 // This is a new component for the Kanban page.
 function KanbanPageContent() {
@@ -20,6 +29,19 @@ function KanbanPageContent() {
         upskillDefinitions,
         deepWorkDefinitions,
     } = useAuth();
+
+    const [selectedTopic, setSelectedTopic] = useState('all');
+
+    const allTopicsList = useMemo(() => {
+        const topics = new Set<string>();
+        upskillDefinitions.forEach(t => {
+            if (t.name !== 'placeholder') topics.add(t.category)
+        });
+        deepWorkDefinitions.forEach(t => {
+            if (!Array.isArray(t.focusAreaIds)) topics.add(t.category)
+        });
+        return Array.from(topics).sort();
+    }, [upskillDefinitions, deepWorkDefinitions]);
 
     const allTasks = useMemo(() => {
         const upskillTasks = upskillDefinitions.map(t => ({...t, taskType: 'upskill' as const}));
@@ -172,7 +194,11 @@ function KanbanPageContent() {
         const processedIds = new Set<string>();
         
         // We only want to show individual focus areas and learning tasks on the board
-        const individualTasks = allTasks.filter(task => task.taskType !== 'branding' && !Array.isArray(task.focusAreaIds));
+        const individualTasks = allTasks.filter(task => 
+            task.taskType !== 'branding' && 
+            !Array.isArray(task.focusAreaIds) &&
+            (selectedTopic === 'all' || task.category === selectedTopic)
+        );
 
         individualTasks.forEach(task => {
             if (task.name === 'placeholder' || processedIds.has(task.id)) return;
@@ -193,13 +219,14 @@ function KanbanPageContent() {
             }
         });
 
-        // Sort pending by most days pending
-        pendingFromPast.sort((a,b) => b.daysPending - a.daysPending);
-        // Sort completed by most recent
-        completed.sort((a,b) => new Date(b.lastLogDate).getTime() - new Date(a.lastLogDate).getTime());
+        // Sort by topic then by other criteria
+        pendingFromPast.sort((a,b) => a.category.localeCompare(b.category) || b.daysPending - a.daysPending);
+        completed.sort((a,b) => a.category.localeCompare(b.category) || new Date(b.lastLogDate).getTime() - new Date(a.lastLogDate).getTime());
+        logged.sort((a,b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+        scheduled.sort((a,b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
 
         return { loggedToday: logged, scheduledToday: scheduled, pending: pendingFromPast, completedPast: completed };
-    }, [allTasks, taskStatusMaps]);
+    }, [allTasks, taskStatusMaps, selectedTopic]);
 
     const taskIcons: Record<'upskill' | 'deepwork' | 'branding', React.ReactNode> = {
         upskill: <BookCopy className="h-4 w-4 text-blue-500" />,
@@ -207,7 +234,7 @@ function KanbanPageContent() {
         branding: <Share2 className="h-4 w-4 text-purple-500" />,
     };
 
-    const KanbanColumn = ({ title, tasks, children }: { title: string, tasks?: any[], children?: (task: any) => React.ReactNode }) => (
+    const KanbanColumn = ({ title, tasks, children, isFiltered }: { title: string, tasks?: any[], children?: (task: any) => React.ReactNode, isFiltered: boolean }) => (
         <div className="flex flex-col flex-shrink-0 w-80">
             <h2 className="text-lg font-semibold mb-4 px-2">{title} <Badge variant="secondary" className="ml-2">{tasks?.length || 0}</Badge></h2>
             <ScrollArea className="h-full">
@@ -226,7 +253,7 @@ function KanbanPageContent() {
                     ))}
                     {(!tasks || tasks.length === 0) && (
                         <div className="flex items-center justify-center h-24 border-2 border-dashed rounded-md">
-                            <p className="text-sm text-muted-foreground">No tasks</p>
+                            <p className="text-sm text-muted-foreground">{isFiltered ? 'No matching tasks' : 'No tasks'}</p>
                         </div>
                     )}
                 </div>
@@ -241,9 +268,28 @@ function KanbanPageContent() {
                 <p className="mt-4 text-lg text-muted-foreground">
                     A Kanban-style view of all your tasks based on their current status.
                 </p>
+                <div className="mt-4 flex justify-center">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline">
+                                <FilterIcon className="mr-2 h-4 w-4" />
+                                {selectedTopic === 'all' ? 'All Topics' : selectedTopic}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            <DropdownMenuItem onSelect={() => setSelectedTopic('all')}>All Topics</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            {allTopicsList.map(topic => (
+                                <DropdownMenuItem key={topic} onSelect={() => setSelectedTopic(topic)}>
+                                    {topic}
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
             </div>
             <div className="flex-grow flex gap-6 overflow-x-auto pb-4 min-h-0">
-                <KanbanColumn title="Pending from Past" tasks={pending}>
+                <KanbanColumn title="Pending from Past" tasks={pending} isFiltered={selectedTopic !== 'all'}>
                     {(task: any) => (
                         <div className="mt-2 pt-2 border-t flex items-center justify-end text-xs text-orange-600">
                            <AlertTriangle className="h-3 w-3 mr-1"/>
@@ -251,7 +297,7 @@ function KanbanPageContent() {
                         </div>
                     )}
                 </KanbanColumn>
-                <KanbanColumn title="Scheduled for Today" tasks={scheduledToday}>
+                <KanbanColumn title="Scheduled for Today" tasks={scheduledToday} isFiltered={selectedTopic !== 'all'}>
                      {(task: any) => (
                         <div className="mt-2 pt-2 border-t flex items-center justify-end text-xs text-yellow-600">
                            <Calendar className="h-3 w-3 mr-1"/>
@@ -259,7 +305,7 @@ function KanbanPageContent() {
                         </div>
                     )}
                 </KanbanColumn>
-                <KanbanColumn title="Logged Today" tasks={loggedToday}>
+                <KanbanColumn title="Logged Today" tasks={loggedToday} isFiltered={selectedTopic !== 'all'}>
                      {(task: any) => (
                         <div className="mt-2 pt-2 border-t flex items-center justify-end text-xs text-green-600">
                            <Check className="h-3 w-3 mr-1"/>
@@ -267,7 +313,7 @@ function KanbanPageContent() {
                         </div>
                     )}
                 </KanbanColumn>
-                 <KanbanColumn title="Completed" tasks={completedPast}>
+                 <KanbanColumn title="Completed" tasks={completedPast} isFiltered={selectedTopic !== 'all'}>
                     {(task: any) => (
                         <div className="mt-2 pt-2 border-t flex items-center justify-end text-xs text-muted-foreground">
                             Last log: {format(parseISO(task.lastLogDate), 'MMM dd')}
@@ -286,3 +332,5 @@ export default function KanbanPage() {
         </AuthGuard>
     );
 }
+
+    
