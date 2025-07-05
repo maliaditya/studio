@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, CalendarIcon, TrendingUp, Loader2, Folder, BookCopy, MoreVertical } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, CalendarIcon, TrendingUp, Loader2, Folder, BookCopy, MoreVertical, ChevronDown } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format, getISOWeek, isMonday, getYear, subYears, addDays, parseISO } from 'date-fns';
@@ -25,6 +25,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription as DialogDescriptionComponent } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -85,6 +86,20 @@ function UpskillPageContent() {
   
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   const [today, setToday] = useState<Date | null>(null);
+  
+  const [collapsedTopics, setCollapsedTopics] = useState<Set<string>>(new Set());
+
+  const toggleTopicCollapse = (topic: string) => {
+    setCollapsedTopics(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(topic)) {
+            newSet.delete(topic);
+        } else {
+            newSet.add(topic);
+        }
+        return newSet;
+    });
+  };
 
   const topicsWithSubtopics = useMemo(() => {
     const grouped: { [key: string]: ExerciseDefinition[] } = {};
@@ -446,10 +461,13 @@ function UpskillPageContent() {
                     </form>
 
                     <div className="space-y-2 max-h-[calc(100vh-30rem)] overflow-y-auto pr-2">
-                        {topicsWithSubtopics.map(([topic, subtopics]) => (
+                        {topicsWithSubtopics.map(([topic, subtopics]) => {
+                          const isCollapsed = collapsedTopics.has(topic);
+                          return (
                             <div key={topic}>
-                                <div className="group flex items-center justify-between p-2 rounded-md hover:bg-muted">
+                                <div className="group flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer" onClick={() => toggleTopicCollapse(topic)}>
                                     <div className="flex items-center gap-2 min-w-0 flex-grow">
+                                    <ChevronDown className={cn("h-4 w-4 transition-transform", isCollapsed && "-rotate-90")} />
                                     <Folder className="h-4 w-4 flex-shrink-0 text-primary/80" />
                                     <div className="truncate">
                                         <h4 className="font-semibold text-sm truncate">{topic}</h4>
@@ -458,7 +476,7 @@ function UpskillPageContent() {
                                     </div>
                                     <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                                         <MoreVertical className="h-4 w-4" />
                                         </Button>
                                     </DropdownMenuTrigger>
@@ -476,60 +494,61 @@ function UpskillPageContent() {
                                     </DropdownMenuContent>
                                     </DropdownMenu>
                                 </div>
-
-                                <ul className="space-y-1 pl-4 border-l-2 border-muted ml-4">
-                                    {subtopics.filter(s => s.name !== 'placeholder').sort((a,b) => a.name.localeCompare(b.name)).map(def => (
-                                    <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted">
-                                        {editingDefinition?.id === def.id ? (
-                                        <div className='flex-grow flex flex-col gap-2'>
-                                            <Input value={editingDefinitionName} onChange={(e) => setEditingDefinitionName(e.target.value)} className="h-8" />
-                                            <Textarea value={editingDefinitionDescription} onChange={(e) => setEditingDefinitionDescription(e.target.value)} placeholder="Description" />
-                                            <Input value={editingDefinitionLink} onChange={(e) => setEditingDefinitionLink(e.target.value)} placeholder="Link" />
-                                            <div className="flex gap-2 self-end">
-                                                <Button size="icon" className="h-8 w-8" onClick={handleSaveEditDefinition}><Save className="h-4 w-4"/></Button>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingDefinition(null)}><X className="h-4 w-4"/></Button>
-                                            </div>
-                                        </div>
-                                        ) : (
-                                        <>
-                                            <div className="flex items-center gap-2 flex-grow min-w-0">
-                                            <BookCopy className="h-4 w-4 flex-shrink-0 text-muted-foreground/80" />
-                                            <span className="truncate" title={def.name}>{def.name}</span>
-                                            </div>
-                                            <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0">
-                                                <MoreVertical className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onSelect={() => handleAddTaskToSession(def)}><PlusCircle className="mr-2 h-4 w-4" /><span>Add to Session</span></DropdownMenuItem>
-                                                <DropdownMenuItem onSelect={() => handleViewProgress(def)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem onSelect={() => handleStartEditDefinition(def)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
-                                                <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(def.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </>
-                                        )}
-                                    </li>
-                                    ))}
-                                    {addingSubtopicTo === topic && (
-                                    <li className="p-1.5">
-                                        <form onSubmit={(e) => { e.preventDefault(); handleAddSubtopic(topic); }} className="space-y-2">
-                                            <Input value={newSubtopicName} onChange={(e) => setNewSubtopicName(e.target.value)} className="h-8" autoFocus placeholder="New Subtopic Name" />
-                                            <Textarea value={newSubtopicDescription} onChange={(e) => setNewSubtopicDescription(e.target.value)} placeholder="Description..." />
-                                            <Input value={newSubtopicLink} onChange={(e) => setNewSubtopicLink(e.target.value)} placeholder="Link..." />
-                                            <div className="flex justify-end gap-2">
-                                                <Button size="icon" className="h-8 w-8" type="submit"><Save className="h-4 w-4"/></Button>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAddingSubtopicTo(null)}><X className="h-4 w-4"/></Button>
-                                            </div>
-                                        </form>
-                                    </li>
-                                    )}
-                                </ul>
+                                {!isCollapsed && (
+                                  <ul className="space-y-1 pl-4 border-l-2 border-muted ml-4">
+                                      {subtopics.filter(s => s.name !== 'placeholder').sort((a,b) => a.name.localeCompare(b.name)).map(def => (
+                                      <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted">
+                                          {editingDefinition?.id === def.id ? (
+                                          <div className='flex-grow flex flex-col gap-2'>
+                                              <Input value={editingDefinitionName} onChange={(e) => setEditingDefinitionName(e.target.value)} className="h-8" />
+                                              <Textarea value={editingDefinitionDescription} onChange={(e) => setEditingDefinitionDescription(e.target.value)} placeholder="Description" />
+                                              <Input value={editingDefinitionLink} onChange={(e) => setEditingDefinitionLink(e.target.value)} placeholder="Link" />
+                                              <div className="flex gap-2 self-end">
+                                                  <Button size="icon" className="h-8 w-8" onClick={handleSaveEditDefinition}><Save className="h-4 w-4"/></Button>
+                                                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingDefinition(null)}><X className="h-4 w-4"/></Button>
+                                              </div>
+                                          </div>
+                                          ) : (
+                                          <>
+                                              <div className="flex items-center gap-2 flex-grow min-w-0">
+                                              <BookCopy className="h-4 w-4 flex-shrink-0 text-muted-foreground/80" />
+                                              <span className="truncate" title={def.name}>{def.name}</span>
+                                              </div>
+                                              <DropdownMenu>
+                                              <DropdownMenuTrigger asChild>
+                                                  <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0">
+                                                  <MoreVertical className="h-4 w-4" />
+                                                  </Button>
+                                              </DropdownMenuTrigger>
+                                              <DropdownMenuContent align="end">
+                                                  <DropdownMenuItem onSelect={() => handleAddTaskToSession(def)}><PlusCircle className="mr-2 h-4 w-4" /><span>Add to Session</span></DropdownMenuItem>
+                                                  <DropdownMenuItem onSelect={() => handleViewProgress(def)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+                                                  <DropdownMenuSeparator />
+                                                  <DropdownMenuItem onSelect={() => handleStartEditDefinition(def)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
+                                                  <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(def.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
+                                              </DropdownMenuContent>
+                                              </DropdownMenu>
+                                          </>
+                                          )}
+                                      </li>
+                                      ))}
+                                      {addingSubtopicTo === topic && (
+                                      <li className="p-1.5">
+                                          <form onSubmit={(e) => { e.preventDefault(); handleAddSubtopic(topic); }} className="space-y-2">
+                                              <Input value={newSubtopicName} onChange={(e) => setNewSubtopicName(e.target.value)} className="h-8" autoFocus placeholder="New Subtopic Name" />
+                                              <Textarea value={newSubtopicDescription} onChange={(e) => setNewSubtopicDescription(e.target.value)} placeholder="Description..." />
+                                              <Input value={newSubtopicLink} onChange={(e) => setNewSubtopicLink(e.target.value)} placeholder="Link..." />
+                                              <div className="flex justify-end gap-2">
+                                                  <Button size="icon" className="h-8 w-8" type="submit"><Save className="h-4 w-4"/></Button>
+                                                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAddingSubtopicTo(null)}><X className="h-4 w-4"/></Button>
+                                              </div>
+                                          </form>
+                                      </li>
+                                      )}
+                                  </ul>
+                                )}
                             </div>
-                        ))}
+                        )})}
                     </div>
                 </CardContent>
             </Card>
