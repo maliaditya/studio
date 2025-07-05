@@ -6,43 +6,25 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, ChevronDown, ChevronUp, Target, LineChart as LineChartIcon, BookCopy, ExternalLink, Link as LinkIcon } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, CalendarIcon, TrendingUp, Loader2, Folder, BookCopy, MoreVertical } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Badge } from "@/components/ui/badge";
-import { format, parse, getISOWeek, isMonday, getYear, subYears, addDays, parseISO } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, WeightLog, Gender, TopicGoal } from '@/types/workout';
+import { format, getISOWeek, isMonday, getYear, subYears, addDays, parseISO } from 'date-fns';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, TopicGoal } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { WorkoutHeatmap } from '@/components/WorkoutHeatmap';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { WeightChartModal } from '@/components/WeightChartModal';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogFooter, DialogDescription as DialogDescriptionComponent } from '@/components/ui/dialog';
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -51,7 +33,6 @@ const getFaviconUrl = (link: string): string | undefined => {
       url = `https://${url}`;
     }
     const urlObject = new URL(url);
-    // Use a larger size for better resolution
     return `https://www.google.com/s2/favicons?domain=${urlObject.hostname}&sz=32`;
   } catch (e) {
     return undefined;
@@ -71,92 +52,72 @@ function UpskillPageContent() {
   const { 
     currentUser, 
     exportData,
-    weightLogs, setWeightLogs,
-    goalWeight, setGoalWeight,
-    height, setHeight,
-    dateOfBirth, setDateOfBirth,
-    gender, setGender,
     allUpskillLogs, setAllUpskillLogs,
     upskillDefinitions, setUpskillDefinitions,
     topicGoals, setTopicGoals
   } = useAuth();
 
-  const [newSubtopicName, setNewSubtopicName] = useState('');
   const [newTopicName, setNewTopicName] = useState('');
   const [newTopicGoalType, setNewTopicGoalType] = useState<'pages' | 'hours'>('pages');
   const [newTopicGoalValue, setNewTopicGoalValue] = useState('');
-  const [newDescription, setNewDescription] = useState('');
-  const [newLink, setNewLink] = useState('');
+
+  const [addingSubtopicTo, setAddingSubtopicTo] = useState<string | null>(null);
+  const [newSubtopicName, setNewSubtopicName] = useState('');
+  const [newSubtopicDescription, setNewSubtopicDescription] = useState('');
+  const [newSubtopicLink, setNewSubtopicLink] = useState('');
 
   const [editingDefinition, setEditingDefinition] = useState<ExerciseDefinition | null>(null);
   const [editingDefinitionName, setEditingDefinitionName] = useState('');
-  const [editingDefinitionCategory, setEditingDefinitionCategory] = useState<string>('');
   const [editingDefinitionDescription, setEditingDefinitionDescription] = useState('');
   const [editingDefinitionLink, setEditingDefinitionLink] = useState('');
+  
+  const [editingTopicGoal, setEditingTopicGoal] = useState<string | null>(null);
+  const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
+  const [currentGoal, setCurrentGoal] = useState<TopicGoal>({ goalType: 'pages', goalValue: 0 });
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-
+  
   const [viewingProgressExercise, setViewingProgressExercise] = useState<ExerciseDefinition | null>(null);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [showLoggedTasks, setShowLoggedTasks] = useState(false);
   
   const [isLoadingPage, setIsLoadingPage] = useState(true);
-  
   const [showBackupPrompt, setShowBackupPrompt] = useState(false);
-  const [isLibraryExpanded, setIsLibraryExpanded] = useState(true);
-
-  const [isWeightChartModalOpen, setIsWeightChartModalOpen] = useState(false);
-
+  
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   const [today, setToday] = useState<Date | null>(null);
 
-  const allTopics = useMemo(() => {
+  const topicsWithSubtopics = useMemo(() => {
+    const grouped: { [key: string]: ExerciseDefinition[] } = {};
     const topics = new Set(upskillDefinitions.map(def => def.category));
-    return Array.from(topics).sort();
-  }, [upskillDefinitions]);
-
-  const loggedDefinitionIds = useMemo(() => {
-    const ids = new Set<string>();
-    allUpskillLogs.forEach(log => {
-      log.exercises.forEach(ex => {
-        if (ex.loggedSets.length > 0) {
-          ids.add(ex.definitionId);
-        }
-      });
+    
+    Array.from(topics).sort().forEach(topic => {
+        grouped[topic] = [];
     });
-    return ids;
-  }, [allUpskillLogs]);
-  
-  const filteredExerciseDefinitions = useMemo(() => {
-    let definitions = [...upskillDefinitions];
+    
+    upskillDefinitions.forEach(def => {
+        if (grouped[def.category]) {
+            grouped[def.category].push(def);
+        }
+    });
 
-    if (selectedCategories.length > 0) {
-      definitions = definitions.filter(def => selectedCategories.includes(def.category));
-    }
-
-    if (!showLoggedTasks) {
-      definitions = definitions.filter(def => !loggedDefinitionIds.has(def.id));
-    }
-
-    return definitions;
-  }, [upskillDefinitions, selectedCategories, showLoggedTasks, loggedDefinitionIds]);
+    return Object.entries(grouped);
+  }, [upskillDefinitions]);
 
   useEffect(() => {
     const now = new Date();
     setToday(now);
     setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
-    setIsLoadingPage(false); // Data is now loaded from context
+    setIsLoadingPage(false);
   }, []);
 
   useEffect(() => {
-      if (!currentUser) return;
-      const today = new Date();
-      const year = getYear(today);
-      const week = getISOWeek(today);
-      const backupPromptKey = `backupPrompt_upskill_${year}-${week}`;
-      const hasBeenPrompted = localStorage.getItem(backupPromptKey);
-      if (isMonday(today) && !hasBeenPrompted) setShowBackupPrompt(true);
+    if (!currentUser) return;
+    const today = new Date();
+    const year = getYear(today);
+    const week = getISOWeek(today);
+    const backupPromptKey = `backupPrompt_upskill_${year}-${week}`;
+    const hasBeenPrompted = localStorage.getItem(backupPromptKey);
+    if (isMonday(today) && !hasBeenPrompted) setShowBackupPrompt(true);
   }, [currentUser]);
 
   const markBackupPromptAsHandled = () => {
@@ -182,12 +143,6 @@ function UpskillPageContent() {
     return currentDatedWorkout?.exercises || [];
   }, [currentDatedWorkout]);
 
-  const handleCategoryFilterChange = (category: string) => {
-    setSelectedCategories(prev => 
-      prev.includes(category) ? prev.filter(c => c !== category) : [...prev, category]
-    );
-  };
-
   const updateOrAddWorkoutLog = (updatedWorkout: DatedWorkout) => {
     setAllUpskillLogs(prevLogs => {
       const existingLogIndex = prevLogs.findIndex(log => log.id === updatedWorkout.id);
@@ -200,49 +155,93 @@ function UpskillPageContent() {
     });
   };
 
-  const handleAddTaskDefinition = (e: FormEvent) => {
+  const handleAddTopic = (e: FormEvent) => {
     e.preventDefault();
-    if (!currentUser) return;
-    if (newSubtopicName.trim() === '' || newTopicName.trim() === '') {
-      toast({ title: "Error", description: "Topic and Subtopic cannot be empty.", variant: "destructive" });
+    if (!newTopicName.trim()) {
+      toast({ title: "Error", description: "Topic name cannot be empty.", variant: "destructive" });
       return;
     }
     const topic = newTopicName.trim();
-    const subtopic = newSubtopicName.trim();
+    if (topicsWithSubtopics.some(([t]) => t.toLowerCase() === topic.toLowerCase())) {
+        toast({ title: "Error", description: "This topic already exists.", variant: "destructive" });
+        return;
+    }
 
-    if (upskillDefinitions.some(def => def.name.toLowerCase() === subtopic.toLowerCase() && def.category.toLowerCase() === topic.toLowerCase())) {
-      toast({ title: "Error", description: "This subtopic already exists for this topic.", variant: "destructive" });
+    const goalVal = parseInt(newTopicGoalValue, 10);
+    if (isNaN(goalVal) || goalVal <= 0) {
+        toast({ title: "Invalid Goal", description: "Goal value must be a positive number.", variant: "destructive" });
+        return;
+    }
+
+    setTopicGoals(prev => ({ ...prev, [topic]: { goalType: newTopicGoalType, goalValue: goalVal } }));
+    
+    // Add a dummy definition to make the topic appear in the list
+    const dummyDef: ExerciseDefinition = {
+      id: `topic_placeholder_${Date.now()}`,
+      name: 'placeholder',
+      category: topic as ExerciseCategory,
+    };
+    setUpskillDefinitions(prev => prev.filter(d => d.name !== 'placeholder').concat(dummyDef));
+
+    setNewTopicName('');
+    setNewTopicGoalValue('');
+    toast({ title: "Topic Created", description: `"${topic}" has been added to your library.` });
+  };
+  
+  const handleAddSubtopic = (topic: string) => {
+    if (!newSubtopicName.trim()) {
+      toast({ title: "Error", description: "Subtopic name cannot be empty.", variant: "destructive" });
+      setAddingSubtopicTo(null);
       return;
     }
-    
-    const isNewTopic = !allTopics.includes(topic);
-    if (isNewTopic && newTopicGoalValue.trim() !== '') {
-        const goalVal = parseInt(newTopicGoalValue, 10);
-        if (!isNaN(goalVal) && goalVal > 0) {
-            setTopicGoals(prev => ({ ...prev, [topic]: { goalType: newTopicGoalType, goalValue: goalVal } }));
-        } else {
-            toast({ title: "Invalid Goal", description: "Goal value must be a positive number.", variant: "destructive" });
-            return;
-        }
+
+    if (upskillDefinitions.some(def => def.name.toLowerCase() === newSubtopicName.trim().toLowerCase() && def.category.toLowerCase() === topic.toLowerCase())) {
+        toast({ title: "Error", description: "This subtopic already exists for this topic.", variant: "destructive" });
+        return;
     }
 
     const newDef: ExerciseDefinition = { 
-      id: `def_${Date.now()}_${Math.random()}`, 
-      name: subtopic,
-      category: topic as ExerciseCategory,
-      description: newDescription.trim(),
-      link: newLink.trim(),
-      iconUrl: getFaviconUrl(newLink.trim()),
+        id: `def_${Date.now()}_${Math.random()}`, 
+        name: newSubtopicName.trim(),
+        category: topic as ExerciseCategory,
+        description: newSubtopicDescription.trim(),
+        link: newSubtopicLink.trim(),
+        iconUrl: getFaviconUrl(newSubtopicLink.trim()),
     };
-    setUpskillDefinitions(prev => [...prev, newDef]);
+    
+    setUpskillDefinitions(prev => prev.filter(d => d.name !== 'placeholder').concat(newDef));
     setNewSubtopicName('');
-    setNewTopicName('');
-    setNewTopicGoalValue('');
-    setNewDescription('');
-    setNewLink('');
-    toast({ title: "Success", description: `Task "${newDef.name}" added to library.` });
+    setNewSubtopicDescription('');
+    setNewSubtopicLink('');
+    setAddingSubtopicTo(null);
+    toast({ title: "Success", description: `Subtopic "${newDef.name}" added to ${topic}.` });
   };
+  
+  const handleDeleteTopic = () => {
+    if (!topicToDelete) return;
+    setUpskillDefinitions(prev => prev.filter(def => def.category !== topicToDelete));
+    setTopicGoals(prev => {
+        const newGoals = {...prev};
+        delete newGoals[topicToDelete];
+        return newGoals;
+    });
+    setAllUpskillLogs(prevLogs => prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.category !== topicToDelete) })));
+    toast({ title: "Topic Deleted", description: `Topic "${topicToDelete}" and all its subtopics have been removed.`});
+    setTopicToDelete(null);
+  }
+  
+  const handleStartEditingGoal = (topic: string) => {
+    setEditingTopicGoal(topic);
+    setCurrentGoal(topicGoals[topic] || { goalType: 'pages', goalValue: 0 });
+  }
 
+  const handleSaveGoal = () => {
+    if (!editingTopicGoal) return;
+    setTopicGoals(prev => ({...prev, [editingTopicGoal]: currentGoal }));
+    toast({ title: "Goal Updated", description: `Goal for "${editingTopicGoal}" has been saved.`});
+    setEditingTopicGoal(null);
+  };
+  
   const handleDeleteExerciseDefinition = (id: string) => {
     const defToDelete = upskillDefinitions.find(def => def.id === id);
     setUpskillDefinitions(prev => prev.filter(def => def.id !== id));
@@ -255,14 +254,13 @@ function UpskillPageContent() {
   const handleStartEditDefinition = (def: ExerciseDefinition) => {
     setEditingDefinition(def);
     setEditingDefinitionName(def.name);
-    setEditingDefinitionCategory(def.category);
     setEditingDefinitionDescription(def.description || '');
     setEditingDefinitionLink(def.link || '');
   };
 
   const handleSaveEditDefinition = () => {
-    if (!editingDefinition || editingDefinitionName.trim() === '' || editingDefinitionCategory.trim() === '') {
-      toast({ title: "Error", description: "Topic and Subtopic cannot be empty.", variant: "destructive" });
+    if (!editingDefinition || !editingDefinitionName.trim()) {
+      toast({ title: "Error", description: "Subtopic name cannot be empty.", variant: "destructive" });
       return;
     }
     const newLink = editingDefinitionLink.trim();
@@ -271,12 +269,13 @@ function UpskillPageContent() {
     const updatedDef: ExerciseDefinition = { 
       ...editingDefinition, 
       name: editingDefinitionName.trim(), 
-      category: editingDefinitionCategory.trim() as ExerciseCategory,
       description: editingDefinitionDescription.trim(),
       link: newLink,
       iconUrl: newLink !== oldLink ? getFaviconUrl(newLink) : editingDefinition.iconUrl,
     };
+    
     setUpskillDefinitions(prev => prev.map(def => def.id === editingDefinition.id ? updatedDef : def));
+    
     setAllUpskillLogs(prevLogs => 
       prevLogs.map(log => ({
         ...log,
@@ -362,25 +361,6 @@ function UpskillPageContent() {
     setIsProgressModalOpen(true);
   };
   
-  const handleLogWeight = (weight: number, date: Date) => {
-    if (!currentUser) return;
-    const year = getYear(date);
-    const week = getISOWeek(date).toString().padStart(2, '0');
-    const weekKey = `${year}-W${week}`;
-    setWeightLogs(prevLogs => {
-        const logIndex = prevLogs.findIndex(log => log.date === weekKey);
-        const newLog: WeightLog = { date: weekKey, weight: weight };
-        if (logIndex > -1) {
-            const updatedLogs = [...prevLogs];
-            updatedLogs[logIndex] = newLog;
-            return updatedLogs;
-        } else {
-            return [...prevLogs, newLog].sort((a,b) => a.date.localeCompare(b.date));
-        }
-    });
-    toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved.` });
-  };
-
   const consistencyData = useMemo(() => {
     if (!allUpskillLogs || !oneYearAgo || !today) return [];
     const workoutDates = new Set(allUpskillLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date));
@@ -433,218 +413,127 @@ function UpskillPageContent() {
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-        
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-          <section aria-labelledby="task-library-heading" className="md:col-span-1 space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <CardTitle id="task-library-heading" className="flex items-center gap-2 text-lg text-primary">
-                    <BookCopy /> Task Library
-                  </CardTitle>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-8">
-                          <FilterIcon className="h-4 w-4 mr-2" />
-                          Filter ({selectedCategories.length > 0 ? selectedCategories.length : "All"})
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuLabel>Filter by Topic</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {allTopics.map((category) => (
-                          <DropdownMenuCheckboxItem
-                            key={category} checked={selectedCategories.includes(category)}
-                            onCheckedChange={() => handleCategoryFilterChange(category)}
-                            onSelect={(e) => e.preventDefault()} 
-                          > {category} </DropdownMenuCheckboxItem>
-                        ))}
-                        {selectedCategories.length > 0 && (
-                          <> <DropdownMenuSeparator />
-                            <Button variant="ghost" size="sm" className="w-full justify-start text-sm" onClick={() => setSelectedCategories([])}> Clear Filters </Button>
-                          </>)}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel>View Options</DropdownMenuLabel>
-                        <DropdownMenuCheckboxItem
-                            checked={showLoggedTasks}
-                            onCheckedChange={setShowLoggedTasks}
-                            onSelect={(e) => e.preventDefault()}
-                        >
-                            Show Logged Tasks
-                        </DropdownMenuCheckboxItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    <Button variant="ghost" size="icon" onClick={() => setIsLibraryExpanded(!isLibraryExpanded)} className="h-8 w-8" aria-label={isLibraryExpanded ? "Collapse task library" : "Expand task library"}>
-                      {isLibraryExpanded ? <ChevronUp className="h-5 w-5 text-primary" /> : <ChevronDown className="h-5 w-5 text-primary" />}
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-4">
-                <AnimatePresence>
-                  {isLibraryExpanded && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3 }}
-                      style={{ overflow: 'hidden' }}
-                      className="space-y-4"
-                    >
-                      <form onSubmit={handleAddTaskDefinition} className="space-y-3">
-                        <Input type="text" placeholder="New Topic" value={newTopicName} onChange={(e) => setNewTopicName(e.target.value)} list="topics-datalist" aria-label="New topic name" className="h-10 text-sm" />
-                        <datalist id="topics-datalist">
-                          {allTopics.map(topic => <option key={topic} value={topic} />)}
-                        </datalist>
-
-                        <Input type="text" placeholder="New Subtopic (Book, Course, etc.)" value={newSubtopicName} onChange={(e) => setNewSubtopicName(e.target.value)} aria-label="New subtopic name" className="h-10 text-sm" />
-                        
-                        <Textarea placeholder="Description / Key Points..." value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="text-sm" />
-                        <Input type="text" placeholder="Link (Optional)" value={newLink} onChange={(e) => setNewLink(e.target.value)} aria-label="Link" className="h-10 text-sm" />
-
-                        {!allTopics.includes(newTopicName.trim()) && newTopicName.trim() !== '' && (
-                            <div>
-                                <Label className="text-xs text-muted-foreground">Set a Goal for this New Topic</Label>
-                                <div className="flex gap-2 items-center mt-1">
-                                    <RadioGroup value={newTopicGoalType} onValueChange={(v) => setNewTopicGoalType(v as 'pages' | 'hours')} className="flex gap-4">
-                                        <div className="flex items-center space-x-2"><RadioGroupItem value="pages" id="type-pages-new" /><Label htmlFor="type-pages-new" className="font-normal">Pages</Label></div>
-                                        <div className="flex items-center space-x-2"><RadioGroupItem value="hours" id="type-hours-new" /><Label htmlFor="type-hours-new" className="font-normal">Hours</Label></div>
-                                    </RadioGroup>
-                                    <Input type="number" placeholder="Total" value={newTopicGoalValue} onChange={(e) => setNewTopicGoalValue(e.target.value)} aria-label="Goal value" className="h-9" />
-                                </div>
-                            </div>
-                        )}
-
-                        <Button type="submit" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs xl:text-sm xl:h-10 xl:px-4"> <PlusCircle className="mr-2 h-5 w-5" /> Add Task </Button>
-                      </form>
-                      <div className="max-h-[calc(100vh-38rem)] overflow-y-auto pr-1">
-                        {filteredExerciseDefinitions.length === 0 && upskillDefinitions.length > 0 ? (
-                          <p className="text-muted-foreground text-sm text-center py-4">No tasks match filter.</p>
-                        ) : filteredExerciseDefinitions.length === 0 ? (
-                          <p className="text-muted-foreground text-sm text-center py-4">Library empty. Add a new topic and subtopic to get started!</p>
-                        ) : (
-                          <ul className="space-y-2">
-                            <AnimatePresence>
-                              {filteredExerciseDefinitions.sort((a,b) => a.name.localeCompare(b.name)).map(def => {
-                                const topicGoal = topicGoals[def.category];
-                                const isLogged = loggedDefinitionIds.has(def.id);
-                                return (
-                                <motion.li key={def.id} layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} className="p-3 bg-card border rounded-lg shadow-sm">
-                                  {editingDefinition?.id === def.id ? (
-                                    <div className="space-y-2">
-                                      <Input value={editingDefinitionCategory} onChange={(e) => setEditingDefinitionCategory(e.target.value)} className="h-9" aria-label="Edit topic name"/>
-                                      <Input value={editingDefinitionName} onChange={(e) => setEditingDefinitionName(e.target.value)} className="h-9" aria-label="Edit subtopic name"/>
-                                      <Textarea value={editingDefinitionDescription} onChange={(e) => setEditingDefinitionDescription(e.target.value)} placeholder="Description..." />
-                                      <Input value={editingDefinitionLink} onChange={(e) => setEditingDefinitionLink(e.target.value)} placeholder="Link..." />
-                                      <div className="flex gap-2">
-                                        <Button size="sm" onClick={handleSaveEditDefinition} className="flex-grow bg-green-600 hover:bg-green-500 text-white"><Save className="h-4 w-4 mr-1"/>Save</Button>
-                                        <Button size="sm" variant="ghost" onClick={() => setEditingDefinition(null)} className="flex-grow"><X className="h-4 w-4 mr-1"/>Cancel</Button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-start justify-between gap-2">
-                                      <div className="flex-grow min-w-0">
-                                          <div className="flex items-center gap-2">
-                                            <span className="font-medium text-foreground block" title={def.name}>{def.name}</span>
-                                            {def.link && (
-                                                <a href={def.link} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-                                                    <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-primary" />
-                                                </a>
-                                            )}
-                                          </div>
-                                          {def.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{def.description}</p>}
-                                          <div className='flex flex-wrap gap-1 mt-2'>
-                                            <Badge variant="secondary" className="text-xs">{def.category}</Badge>
-                                            {topicGoal && <Badge variant="outline" className="text-xs">Goal: {topicGoal.goalValue} {topicGoal.goalType}</Badge>}
-                                            {isLogged && <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700">Logged</Badge>}
-                                          </div>
-                                      </div>
-                                      <div className="flex-shrink-0 flex flex-col items-center -space-y-1">
-                                        <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
-                                        <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8 text-muted-foreground hover:text-primary" aria-label={`Edit ${def.name}`}> <Edit3 className="h-4 w-4" /> </Button>
-                                        <Button variant="ghost" size="icon" onClick={() => handleDeleteExerciseDefinition(def.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label={`Delete ${def.name}`}> <Trash2 className="h-4 w-4" /> </Button>
-                                        <Button variant="ghost" size="icon" onClick={() => handleAddTaskToSession(def)} className="h-8 w-8 text-muted-foreground hover:text-accent" aria-label={`Add ${def.name} to session`}> <ChevronRight className="h-5 w-5" /> </Button>
-                                      </div>
-                                    </div>
-                                  )}
-                                </motion.li>
-                              )})}
-                            </AnimatePresence>
-                          </ul>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </CardContent>
-            </Card>
-
+          <aside className="md:col-span-1 space-y-6">
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg text-primary">
-                        <LineChartIcon /> Daily Learning Duration
+                        <Folder /> Topic Library
                     </CardTitle>
-                    <CardDescription>
-                       Total minutes of learning logged each day.
-                    </CardDescription>
+                    <CardDescription>Organize your learning tasks by topic and set goals.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {dailyDurationData.length > 1 ? (
-                      <ChartContainer config={durationChartConfig} className="h-[200px] w-full">
-                        <ResponsiveContainer>
-                          <LineChart data={dailyDurationData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                            <CartesianGrid vertical={false} />
-                            <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
-                            <YAxis 
-                                tickLine={false} 
-                                axisLine={false} 
-                                tickMargin={8}
-                                fontSize={12}
-                                domain={['auto', 'auto']}
-                                label={{ value: "Minutes", angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' }}}
-                            />
-                            <RechartsTooltip
-                                content={({ active, payload }) => {
-                                    if (active && payload && payload.length) {
-                                        const data = payload[0].payload;
-                                        return (
-                                            <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                <div className="font-bold text-foreground">{format(data.dateObj, 'PPP')}</div>
-                                                <div className="grid gap-1.5">
-                                                    <div className="flex w-full items-center gap-2">
-                                                        <div className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: 'hsl(var(--primary))' }} />
-                                                        <div className="flex flex-1 justify-between">
-                                                            <span className="text-muted-foreground">Duration</span>
-                                                            <span className="font-mono font-medium text-foreground">{data.totalDuration} min</span>
-                                                        </div>
-                                                    </div>
-                                                    {data.topics && (
-                                                        <div className="mt-1 pt-1.5 border-t">
-                                                            <p className="font-medium text-foreground mb-1">Subtopics:</p>
-                                                            <p className="text-muted-foreground whitespace-normal">{data.topics}</p>
-                                                        </div>
-                                                    )}
-                                                </div>
+                    <form onSubmit={handleAddTopic} className="space-y-3 p-3 border rounded-md mb-4">
+                        <Input type="text" placeholder="New Topic" value={newTopicName} onChange={(e) => setNewTopicName(e.target.value)} list="topics-datalist" aria-label="New topic name" className="h-10 text-sm" />
+                        <datalist id="topics-datalist">
+                          {topicsWithSubtopics.map(([topic]) => <option key={topic} value={topic} />)}
+                        </datalist>
+
+                        <div>
+                            <Label className="text-xs text-muted-foreground">Set a Goal for this New Topic</Label>
+                            <div className="flex gap-2 items-center mt-1">
+                                <RadioGroup value={newTopicGoalType} onValueChange={(v) => setNewTopicGoalType(v as 'pages' | 'hours')} className="flex gap-4">
+                                    <div className="flex items-center space-x-2"><RadioGroupItem value="pages" id="type-pages-new" /><Label htmlFor="type-pages-new" className="font-normal">Pages</Label></div>
+                                    <div className="flex items-center space-x-2"><RadioGroupItem value="hours" id="type-hours-new" /><Label htmlFor="type-hours-new" className="font-normal">Hours</Label></div>
+                                </RadioGroup>
+                                <Input type="number" placeholder="Total" value={newTopicGoalValue} onChange={(e) => setNewTopicGoalValue(e.target.value)} aria-label="Goal value" className="h-9" />
+                            </div>
+                        </div>
+
+                        <Button type="submit" size="sm" className="w-full">
+                            <PlusCircle className="mr-2 h-4 w-4" /> Add Topic
+                        </Button>
+                    </form>
+
+                    <div className="space-y-2 max-h-[calc(100vh-30rem)] overflow-y-auto pr-2">
+                        {topicsWithSubtopics.map(([topic, subtopics]) => (
+                            <div key={topic}>
+                                <div className="group flex items-center justify-between p-2 rounded-md hover:bg-muted">
+                                    <div className="flex items-center gap-2 min-w-0 flex-grow">
+                                    <Folder className="h-4 w-4 flex-shrink-0 text-primary/80" />
+                                    <div className="truncate">
+                                        <h4 className="font-semibold text-sm truncate">{topic}</h4>
+                                        {topicGoals[topic] && <p className="text-xs text-muted-foreground">Goal: {topicGoals[topic].goalValue} {topicGoals[topic].goalType}</p>}
+                                    </div>
+                                    </div>
+                                    <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0">
+                                        <MoreVertical className="h-4 w-4" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onSelect={() => {setAddingSubtopicTo(topic); setNewSubtopicName(''); setNewSubtopicDescription(''); setNewSubtopicLink('');}}>
+                                        <PlusCircle className="mr-2 h-4 w-4" /> New Subtopic
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={() => handleStartEditingGoal(topic)}>
+                                            <Edit3 className="mr-2 h-4 w-4" /> Edit Goal
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem className="text-destructive" onSelect={() => setTopicToDelete(topic)}>
+                                            <Trash2 className="mr-2 h-4 w-4" /> Delete Topic
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+
+                                <ul className="space-y-1 pl-4 border-l-2 border-muted ml-4">
+                                    {subtopics.filter(s => s.name !== 'placeholder').sort((a,b) => a.name.localeCompare(b.name)).map(def => (
+                                    <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted">
+                                        {editingDefinition?.id === def.id ? (
+                                        <div className='flex-grow flex flex-col gap-2'>
+                                            <Input value={editingDefinitionName} onChange={(e) => setEditingDefinitionName(e.target.value)} className="h-8" />
+                                            <Textarea value={editingDefinitionDescription} onChange={(e) => setEditingDefinitionDescription(e.target.value)} placeholder="Description" />
+                                            <Input value={editingDefinitionLink} onChange={(e) => setEditingDefinitionLink(e.target.value)} placeholder="Link" />
+                                            <div className="flex gap-2 self-end">
+                                                <Button size="icon" className="h-8 w-8" onClick={handleSaveEditDefinition}><Save className="h-4 w-4"/></Button>
+                                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingDefinition(null)}><X className="h-4 w-4"/></Button>
                                             </div>
-                                        );
-                                    }
-                                    return null;
-                                }}
-                            />
-                            <Line type="monotone" dataKey="totalDuration" stroke="var(--color-totalDuration)" strokeWidth={2} dot={false} name="totalDuration" />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </ChartContainer>
-                    ) : (
-                      <div className="flex h-[200px] items-center justify-center text-center text-sm text-muted-foreground">
-                        <p>Log learning sessions on multiple days to see a chart of your daily duration.</p>
-                      </div>
-                    )}
+                                        </div>
+                                        ) : (
+                                        <>
+                                            <div className="flex items-center gap-2 flex-grow min-w-0">
+                                            <BookCopy className="h-4 w-4 flex-shrink-0 text-muted-foreground/80" />
+                                            <span className="truncate" title={def.name}>{def.name}</span>
+                                            </div>
+                                            <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0">
+                                                <MoreVertical className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem onSelect={() => handleAddTaskToSession(def)}><PlusCircle className="mr-2 h-4 w-4" /><span>Add to Session</span></DropdownMenuItem>
+                                                <DropdownMenuItem onSelect={() => handleViewProgress(def)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onSelect={() => handleStartEditDefinition(def)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
+                                                <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(def.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </>
+                                        )}
+                                    </li>
+                                    ))}
+                                    {addingSubtopicTo === topic && (
+                                    <li className="p-1.5">
+                                        <form onSubmit={(e) => { e.preventDefault(); handleAddSubtopic(topic); }} className="space-y-2">
+                                            <Input value={newSubtopicName} onChange={(e) => setNewSubtopicName(e.target.value)} className="h-8" autoFocus placeholder="New Subtopic Name" />
+                                            <Textarea value={newSubtopicDescription} onChange={(e) => setNewSubtopicDescription(e.target.value)} placeholder="Description..." />
+                                            <Input value={newSubtopicLink} onChange={(e) => setNewSubtopicLink(e.target.value)} placeholder="Link..." />
+                                            <div className="flex justify-end gap-2">
+                                                <Button size="icon" className="h-8 w-8" type="submit"><Save className="h-4 w-4"/></Button>
+                                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAddingSubtopicTo(null)}><X className="h-4 w-4"/></Button>
+                                            </div>
+                                        </form>
+                                    </li>
+                                    )}
+                                </ul>
+                            </div>
+                        ))}
+                    </div>
                 </CardContent>
             </Card>
-
-          </section>
+          </aside>
 
           <section aria-labelledby="current-learning-heading" className="md:col-span-2 space-y-6">
               <Card>
@@ -656,7 +545,7 @@ function UpskillPageContent() {
                       </div>
                       <Popover>
                           <PopoverTrigger asChild>
-                          <Button variant={"outline"} className={cn("w-[200px] justify-start text-left font-normal h-10",!selectedDate && "text-muted-foreground")}>
+                          <Button variant={"outline"} className="w-[200px] justify-start text-left font-normal h-10">
                               <CalendarIcon className="mr-2 h-4 w-4" />
                               {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
                           </Button>
@@ -670,7 +559,7 @@ function UpskillPageContent() {
                     <div className="max-h-[calc(100vh-16rem)] overflow-y-auto pr-2">
                       {currentWorkoutExercises.length === 0 ? (
                         <div className="text-center py-10">
-                            <GripVertical className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
+                            <BookCopy className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
                             <p className="text-muted-foreground">No tasks for {format(selectedDate, 'PPP')}.</p>
                             <p className="text-sm text-muted-foreground/80">Add tasks from the library to get started!</p>
                         </div>
@@ -699,18 +588,16 @@ function UpskillPageContent() {
                     </div>
                   </CardContent>
               </Card>
-              <div>
-                <WorkoutHeatmap
-                  title="Learning Activity"
-                  description="Your learning consistency over the last year. Click a square to view that day's log."
-                  graphDescription="Your probability of learning, based on recent consistency."
-                  allWorkoutLogs={allUpskillLogs}
-                  onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
-                  consistencyData={consistencyData}
-                  oneYearAgo={oneYearAgo}
-                  today={today}
-                />
-              </div>
+              <WorkoutHeatmap
+                title="Learning Activity"
+                description="Your learning consistency over the last year. Click a square to view that day's log."
+                graphDescription="Your probability of learning, based on recent consistency."
+                allWorkoutLogs={allUpskillLogs}
+                onDateSelect={(date) => setSelectedDate(parseISO(date))}
+                consistencyData={consistencyData}
+                oneYearAgo={oneYearAgo}
+                today={today}
+              />
           </section>
         </div>
         {viewingProgressExercise && (
@@ -739,23 +626,45 @@ function UpskillPageContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      <AlertDialog open={!!topicToDelete} onOpenChange={() => setTopicToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+                This will permanently delete the topic "{topicToDelete}" and ALL of its subtopics and logged sessions. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTopic} className="bg-destructive hover:bg-destructive/90">
+                Delete Topic
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-      <WeightChartModal
-        isOpen={isWeightChartModalOpen}
-        onOpenChange={setIsWeightChartModalOpen}
-        weightLogs={weightLogs}
-        goalWeight={goalWeight}
-        height={height}
-        dateOfBirth={dateOfBirth}
-        gender={gender}
-        onLogWeight={handleLogWeight}
-        onUpdateWeightLog={(dateKey, weight) => { /* Implement if needed */ }}
-        onDeleteWeightLog={(dateKey) => { /* Implement if needed */ }}
-        onSetGoalWeight={(goal) => setGoalWeight(goal)}
-        onSetHeight={(h) => setHeight(h)}
-        onSetDateOfBirth={(dob) => setDateOfBirth(dob)}
-        onSetGender={(g) => setGender(g)}
-      />
+      <Dialog open={!!editingTopicGoal} onOpenChange={() => setEditingTopicGoal(null)}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Edit Goal for "{editingTopicGoal}"</DialogTitle>
+                <DialogDescriptionComponent>
+                    Update the target goal for this topic.
+                </DialogDescriptionComponent>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+                <RadioGroup value={currentGoal.goalType} onValueChange={(v) => setCurrentGoal(prev => ({...prev, goalType: v as 'pages' | 'hours'}))} className="flex gap-4">
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="pages" id="type-pages" /><Label htmlFor="type-pages" className="font-normal">Pages</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="hours" id="type-hours" /><Label htmlFor="type-hours" className="font-normal">Hours</Label></div>
+                </RadioGroup>
+                <Input type="number" placeholder="Total" value={currentGoal.goalValue} onChange={(e) => setCurrentGoal(prev => ({...prev, goalValue: parseInt(e.target.value, 10) || 0}))} aria-label="Goal value" />
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingTopicGoal(null)}>Cancel</Button>
+                <Button onClick={handleSaveGoal}>Save Goal</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
