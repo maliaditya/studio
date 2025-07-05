@@ -4,28 +4,24 @@
 import React, { useState, useEffect, FormEvent, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Puzzle, ChevronDown, ChevronUp, Briefcase, LineChart as LineChartIcon, BookCopy, ClipboardList, Link as LinkIcon, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { format, parse, getISOWeek, isMonday, getYear, subYears, addDays, parseISO } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, WeightLog, Gender, ProductizationPlan } from '@/types/workout';
+import { format, parse, getISOWeek, isMonday, getYear, parseISO } from 'date-fns';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
-import { motion, AnimatePresence, Reorder } from 'framer-motion';
-import { cn } from '@/lib/utils';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuItem,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -45,41 +41,27 @@ import {
   DialogDescription,
   DialogFooter
 } from "@/components/ui/dialog";
-import { WeightChartModal } from '@/components/WeightChartModal';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from '@/components/ui/textarea';
-import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { WorkoutHeatmap } from '@/components/WorkoutHeatmap';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { cn } from '@/lib/utils';
 
 
 const DEFAULT_TARGET_SESSIONS = 1;
 const DEFAULT_TARGET_DURATION = "25";
-
-const durationChartConfig = {
-  totalDuration: { label: "Duration (min)", color: "hsl(var(--primary))" },
-} satisfies ChartConfig;
 
 function DeepWorkPageContent() {
   const { toast } = useToast();
   const { 
     currentUser, 
     exportData,
-    weightLogs, setWeightLogs,
-    goalWeight, setGoalWeight,
-    height, setHeight,
-    dateOfBirth, setDateOfBirth,
-    gender, setGender,
     allDeepWorkLogs, setAllDeepWorkLogs,
     deepWorkDefinitions, setDeepWorkDefinitions,
     setProductizationPlans,
     setOfferizationPlans,
-    upskillDefinitions, allUpskillLogs,
+    upskillDefinitions, setUpskillDefinitions,
     deepWorkTopicMetadata, setDeepWorkTopicMetadata,
   } = useAuth();
 
@@ -95,76 +77,53 @@ function DeepWorkPageContent() {
   
   const [viewingProgressExercise, setViewingProgressExercise] = useState<ExerciseDefinition | null>(null);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   
   const [isLoadingPage, setIsLoadingPage] = useState(true);
   
   const [showBackupPrompt, setShowBackupPrompt] = useState(false);
-  const [isLibraryExpanded, setIsLibraryExpanded] = useState(true);
 
-  const [isWeightChartModalOpen, setIsWeightChartModalOpen] = useState(false);
-
-  const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
-  const [today, setToday] = useState<Date | null>(null);
-
-  // State for details modal
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  // New state for details modal and creation
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
+  const [createLinkModalOpen, setCreateLinkModalOpen] = useState(false);
+  const [createLinkModalConfig, setCreateLinkModalConfig] = useState<{type: 'upskill' | 'deepwork', parent: ExerciseDefinition} | null>(null);
+  const [newLinkedItemName, setNewLinkedItemName] = useState('');
+  const [newLinkedItemTopic, setNewLinkedItemTopic] = useState('');
+  const [activeAccordionItems, setActiveAccordionItems] = useState<string[]>([]);
   
-  // State for linking learning popover
-  const [isLinkLearningModalOpen, setIsLinkLearningModalOpen] = useState(false);
-  const [linkingLearningToFocusArea, setLinkingLearningToFocusArea] = useState<ExerciseDefinition | null>(null);
-  const [editableLinkedUpskillIds, setEditableLinkedUpskillIds] = useState<string[]>([]);
-  
-  // State for linking deep work modal
-  const [isLinkDeepWorkModalOpen, setIsLinkDeepWorkModalOpen] = useState(false);
-  const [linkingFocusArea, setLinkingFocusArea] = useState<ExerciseDefinition | null>(null);
-  const [editableLinkedDeepWorkIds, setEditableLinkedDeepWorkIds] = useState<string[]>([]);
-
-  const allTopics = useMemo(() => {
-    const topics = new Set(deepWorkDefinitions.map(def => def.category));
-    return Array.from(topics).sort();
+  const topicsWithFocusAreas = useMemo(() => {
+    const grouped: Record<string, ExerciseDefinition[]> = {};
+    deepWorkDefinitions.forEach(def => {
+      if (!grouped[def.category]) {
+        grouped[def.category] = [];
+      }
+      grouped[def.category].push(def);
+    });
+    return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
   }, [deepWorkDefinitions]);
 
-  const isNewTopic = newTopicName.trim() !== '' && !allTopics.includes(newTopicName.trim());
-  
-  const loggedUpskillDefinitions = useMemo(() => {
-    const loggedIds = new Set(
-        allUpskillLogs.flatMap(log => 
-            log.exercises.filter(ex => ex.loggedSets.length > 0)
-                         .map(ex => ex.definitionId)
-        )
-    );
-    return upskillDefinitions.filter(def => loggedIds.has(def.id));
-  }, [allUpskillLogs, upskillDefinitions]);
+  const allTopics = useMemo(() => topicsWithFocusAreas.map(([topic]) => topic), [topicsWithFocusAreas]);
 
   useEffect(() => {
-    const now = new Date();
-    setToday(now);
-    setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
+    if (allTopics.length > 0) {
+        setActiveAccordionItems(allTopics);
+    }
+  }, [allTopics]);
+
+  const isNewTopic = newTopicName.trim() !== '' && !allTopics.includes(newTopicName.trim());
+
+  useEffect(() => {
     setIsLoadingPage(false); // Data is loaded from context
   }, []);
 
-  const handleToggleReadyForBranding = (id: string) => {
-    setDeepWorkDefinitions(prev => 
-      prev.map(def => 
-        def.id === id 
-          ? { ...def, isReadyForBranding: !def.isReadyForBranding, sharingStatus: def.isReadyForBranding ? def.sharingStatus : { twitter: false, linkedin: false, devto: false } }
-          : def
-      )
-    );
-  };
-
-
-  // Check for backup prompt on Mondays
   useEffect(() => {
-      if (!currentUser) return;
-      const today = new Date();
-      const year = getYear(today);
-      const week = getISOWeek(today);
-      const backupPromptKey = `backupPrompt_deepwork_${year}-${week}`;
-      const hasBeenPrompted = localStorage.getItem(backupPromptKey);
-      if (isMonday(today) && !hasBeenPrompted) setShowBackupPrompt(true);
+    if (!currentUser) return;
+    const today = new Date();
+    const year = getYear(today);
+    const week = getISOWeek(today);
+    const backupPromptKey = `backupPrompt_deepwork_${year}-${week}`;
+    const hasBeenPrompted = localStorage.getItem(backupPromptKey);
+    if (isMonday(today) && !hasBeenPrompted) setShowBackupPrompt(true);
   }, [currentUser]);
 
   const markBackupPromptAsHandled = () => {
@@ -189,25 +148,6 @@ function DeepWorkPageContent() {
   const currentWorkoutExercises = useMemo(() => {
     return currentDatedWorkout?.exercises || [];
   }, [currentDatedWorkout]);
-
-  const filteredExerciseDefinitions = useMemo(() => {
-    if (selectedCategories.length === 0) return deepWorkDefinitions;
-    return deepWorkDefinitions.filter(def => selectedCategories.includes(def.category));
-  }, [deepWorkDefinitions, selectedCategories]);
-
-  const handleReorderDefinitions = (newOrder: ExerciseDefinition[]) => {
-    // Reordering is only enabled when no filters are applied.
-    // In that case, filteredExerciseDefinitions is the same as deepWorkDefinitions.
-    if (selectedCategories.length === 0) {
-      setDeepWorkDefinitions(newOrder);
-    }
-  };
-
-  const handleCategoryFilterChange = (category: string) => {
-    setSelectedCategories(prev => 
-      prev.includes(category) ? prev.filter(c => c !== category) : [...prev, category]
-    );
-  };
 
   const updateOrAddWorkoutLog = (updatedWorkout: DatedWorkout) => {
     setAllDeepWorkLogs(prevLogs => {
@@ -245,69 +185,21 @@ function DeepWorkPageContent() {
       id: `def_${Date.now()}_${Math.random()}`, 
       name: newSubtopicName.trim(),
       category: topic as ExerciseCategory,
+      isReadyForBranding: false,
+      sharingStatus: { twitter: false, linkedin: false, devto: false }
     };
     setDeepWorkDefinitions(prev => [...prev, newDef]);
     setNewSubtopicName('');
-    setNewTopicName('');
-    setNewTopicClassification('product'); // Reset to default
+    // Keep topic name for quicker additions
     toast({ title: "Success", description: `Focus Area "${newDef.name}" added to library.` });
   };
 
   const handleDeleteExerciseDefinition = (id: string) => {
     const defToDelete = deepWorkDefinitions.find(def => def.id === id);
     if (!defToDelete) return;
-  
-    const wasLastForTopic = deepWorkDefinitions.filter(d => d.category === defToDelete.category).length === 1;
-  
     setDeepWorkDefinitions(prev => prev.filter(def => def.id !== id));
-    
-    setAllDeepWorkLogs(prevLogs => 
-      prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) }))
-    );
-  
-    const cleanPlans = (plans: Record<string, ProductizationPlan>) => {
-        const newPlans = { ...plans };
-        for (const topic in newPlans) {
-            if (newPlans[topic].releases) {
-                newPlans[topic].releases = newPlans[topic].releases?.map(release => ({
-                    ...release,
-                    focusAreaIds: (release.focusAreaIds || []).filter(faId => faId !== id)
-                }));
-            }
-        }
-        return newPlans;
-    }
-  
-    if (setProductizationPlans) setProductizationPlans(cleanPlans);
-    if (setOfferizationPlans) setOfferizationPlans(cleanPlans);
-  
-    if (wasLastForTopic) {
-        const topicToRemove = defToDelete.category;
-        if (setDeepWorkTopicMetadata) {
-            setDeepWorkTopicMetadata(prev => {
-                const newMeta = { ...prev };
-                delete newMeta[topicToRemove];
-                return newMeta;
-            });
-        }
-        if (setProductizationPlans) {
-            setProductizationPlans(prev => {
-                const newPlans = { ...prev };
-                delete newPlans[topicToRemove];
-                return newPlans;
-            });
-        }
-        if (setOfferizationPlans) {
-            setOfferizationPlans(prev => {
-                const newPlans = { ...prev };
-                delete newPlans[topicToRemove];
-                return newPlans;
-            });
-        }
-        toast({ title: "Focus Area & Topic Removed", description: `"${defToDelete.name}" was removed, and because it was the last in its topic, "${defToDelete.category}" was removed as well.`});
-    } else {
-        toast({ title: "Success", description: `Focus Area "${defToDelete.name}" removed.` });
-    }
+    setAllDeepWorkLogs(prevLogs => prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) })));
+    toast({ title: "Success", description: `Focus Area "${defToDelete.name}" removed.` });
   };
 
   const handleStartEditDefinition = (def: ExerciseDefinition) => {
@@ -323,14 +215,7 @@ function DeepWorkPageContent() {
     }
     const updatedDef = { ...editingDefinition, name: editingDefinitionName.trim(), category: editingDefinitionCategory.trim() as ExerciseCategory };
     setDeepWorkDefinitions(prev => prev.map(def => def.id === editingDefinition.id ? updatedDef : def));
-    setAllDeepWorkLogs(prevLogs => 
-      prevLogs.map(log => ({
-        ...log,
-        exercises: log.exercises.map(ex => 
-          ex.definitionId === editingDefinition.id ? { ...ex, name: updatedDef.name, category: updatedDef.category } : ex
-        )
-      }))
-    );
+    setAllDeepWorkLogs(prevLogs => prevLogs.map(log => ({...log, exercises: log.exercises.map(ex => ex.definitionId === editingDefinition.id ? { ...ex, name: updatedDef.name, category: updatedDef.category } : ex)})));
     toast({ title: "Success", description: `Focus Area updated to "${updatedDef.name}".` });
     setEditingDefinition(null);
   };
@@ -409,129 +294,47 @@ function DeepWorkPageContent() {
     setIsProgressModalOpen(true);
   };
   
-  const handleOpenDetailsModal = (def: ExerciseDefinition) => {
+  const handleViewDetails = (def: ExerciseDefinition) => {
     setSelectedFocusArea(def);
-    setIsDetailsModalOpen(true);
+    setDetailsModalOpen(true);
+  };
+
+  const handleOpenCreateLinkModal = (type: 'upskill' | 'deepwork', parent: ExerciseDefinition) => {
+    setCreateLinkModalConfig({ type, parent });
+    setNewLinkedItemTopic('');
+    setNewLinkedItemName('');
+    setCreateLinkModalOpen(true);
   };
   
-  const handleOpenLinkDeepWorkModal = (def: ExerciseDefinition) => {
-    setLinkingFocusArea(def);
-    setEditableLinkedDeepWorkIds(def.linkedDeepWorkIds || []);
-    setIsLinkDeepWorkModalOpen(true);
-  };
-
-  const handleToggleDeepWorkLink = (deepWorkId: string) => {
-      setEditableLinkedDeepWorkIds(currentIds => {
-          const newIds = new Set(currentIds);
-          if (newIds.has(deepWorkId)) {
-              newIds.delete(deepWorkId);
-          } else {
-              newIds.add(deepWorkId);
-          }
-          return Array.from(newIds);
-      });
-  };
-
-  const handleSaveDeepWorkLinks = () => {
-      if (!linkingFocusArea) return;
-      setDeepWorkDefinitions(prevDefs => prevDefs.map(def =>
-          def.id === linkingFocusArea.id
-              ? { ...def, linkedDeepWorkIds: editableLinkedDeepWorkIds }
-              : def
-      ));
-      setIsLinkDeepWorkModalOpen(false);
-      toast({ title: "Saved", description: "Deep work links have been updated." });
-  };
-
-  const handleOpenLinkLearningModal = (def: ExerciseDefinition) => {
-    setLinkingLearningToFocusArea(def);
-    setEditableLinkedUpskillIds(def.linkedUpskillIds || []);
-    setIsLinkLearningModalOpen(true);
-  };
-  
-  const handleToggleUpskillLink = (upskillId: string) => {
-    setEditableLinkedUpskillIds(currentIds => {
-      const newIds = new Set(currentIds);
-      if (newIds.has(upskillId)) {
-        newIds.delete(upskillId);
-      } else {
-        newIds.add(upskillId);
-      }
-      return Array.from(newIds);
-    });
-  };
-
-  const handleSaveLearningLinks = () => {
-    if (!linkingLearningToFocusArea) return;
-    setDeepWorkDefinitions(prevDefs => prevDefs.map(def =>
-        def.id === linkingLearningToFocusArea.id
-            ? { ...def, linkedUpskillIds: editableLinkedUpskillIds }
-            : def
-    ));
-    setIsLinkLearningModalOpen(false);
-    toast({ title: "Saved", description: "Learning tasks have been linked." });
-  };
-
-
-  const handleLogWeight = (weight: number, date: Date) => {
-    if (!currentUser) return;
-    const year = getYear(date);
-    const week = getISOWeek(date).toString().padStart(2, '0');
-    const weekKey = `${year}-W${week}`;
-    setWeightLogs(prevLogs => {
-        const logIndex = prevLogs.findIndex(log => log.date === weekKey);
-        const newLog: WeightLog = { date: weekKey, weight: weight };
-        if (logIndex > -1) {
-            const updatedLogs = [...prevLogs];
-            updatedLogs[logIndex] = newLog;
-            return updatedLogs;
-        } else {
-            return [...prevLogs, newLog].sort((a,b) => a.date.localeCompare(b.date));
-        }
-    });
-    toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved.` });
-  };
-
-  const consistencyData = useMemo(() => {
-    if (!allDeepWorkLogs || !oneYearAgo || !today) return [];
-    const workoutDates = new Set(allDeepWorkLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date));
-    const data = [];
-    let score = 0.5;
-    for (let d = new Date(oneYearAgo); d <= today; d = addDays(d, 1)) {
-        const dateKey = format(d, 'yyyy-MM-dd');
-        if (workoutDates.has(dateKey)) score += (1 - score) * 0.1;
-        else score *= 0.95;
-        data.push({ date: format(d, 'MMM dd'), fullDate: format(d, 'PPP'), score: Math.round(score * 100) });
+  const handleCreateAndLinkItem = () => {
+    if (!createLinkModalConfig || !newLinkedItemName.trim() || !newLinkedItemTopic.trim()) {
+        toast({ title: "Error", description: "Topic and Name are required.", variant: "destructive" });
+        return;
     }
-    return data;
-  }, [allDeepWorkLogs, oneYearAgo, today]);
-  
-  const dailyDurationData = useMemo(() => {
-    const dailyData: Record<string, { totalDuration: number; topics: Set<string> }> = {};
-
-    allDeepWorkLogs.forEach(log => {
-        log.exercises.forEach(exercise => {
-            // In deep work, `weight` is the duration in minutes.
-            const duration = exercise.loggedSets.reduce((sum, set) => sum + set.weight, 0);
-            if (duration > 0) {
-                if (!dailyData[log.date]) {
-                    dailyData[log.date] = { totalDuration: 0, topics: new Set() };
-                }
-                dailyData[log.date].totalDuration += duration;
-                dailyData[log.date].topics.add(exercise.name);
-            }
-        });
-    });
-
-    return Object.entries(dailyData)
-        .map(([dateString, data]) => ({
-            dateObj: parseISO(dateString),
-            totalDuration: data.totalDuration,
-            topics: Array.from(data.topics).join(', '),
-            date: format(parseISO(dateString), 'MMM dd'),
-        }))
-        .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
-  }, [allDeepWorkLogs]);
+    const { type, parent } = createLinkModalConfig;
+    if (type === 'upskill') {
+        const newUpskillDef: ExerciseDefinition = {
+            id: `def_${Date.now()}_upskill_${Math.random()}`,
+            name: newLinkedItemName.trim(),
+            category: newLinkedItemTopic.trim() as ExerciseCategory,
+        };
+        setUpskillDefinitions(prev => [...prev, newUpskillDef]);
+        const updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newUpskillDef.id] };
+        setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
+        setSelectedFocusArea(updatedParent);
+    } else { // 'deepwork'
+        const newDeepWorkDef: ExerciseDefinition = {
+            id: `def_${Date.now()}_deepwork_${Math.random()}`,
+            name: newLinkedItemName.trim(),
+            category: newLinkedItemTopic.trim() as ExerciseCategory,
+        };
+        const updatedParent = { ...parent, linkedDeepWorkIds: [...(parent.linkedDeepWorkIds || []), newDeepWorkDef.id] };
+        setDeepWorkDefinitions(prev => [...prev, newDeepWorkDef].map(def => def.id === parent.id ? updatedParent : def));
+        setSelectedFocusArea(updatedParent);
+    }
+    toast({ title: "Success", description: "New item created and linked." });
+    setCreateLinkModalOpen(false);
+  };
 
   if (isLoadingPage) {
     return (
@@ -545,294 +348,92 @@ function DeepWorkPageContent() {
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-        
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-          <section aria-labelledby="task-library-heading" className="md:col-span-1 space-y-6">
+          
+          <aside className="md:col-span-1 space-y-6">
             <Card>
               <CardHeader>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <CardTitle id="task-library-heading" className="flex items-center gap-2 text-lg text-primary">
-                    <Briefcase /> Focus Area Library
-                  </CardTitle>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-8">
-                          <FilterIcon className="h-4 w-4 mr-2" />
-                          Filter ({selectedCategories.length > 0 ? selectedCategories.length : "All"})
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuLabel>Filter by Topic</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {allTopics.map((category) => (
-                          <DropdownMenuCheckboxItem
-                            key={category} checked={selectedCategories.includes(category)}
-                            onCheckedChange={() => handleCategoryFilterChange(category)}
-                            onSelect={(e) => e.preventDefault()} 
-                          > {category} </DropdownMenuCheckboxItem>
-                        ))}
-                        {selectedCategories.length > 0 && (
-                          <> <DropdownMenuSeparator />
-                            <Button variant="ghost" size="sm" className="w-full justify-start text-sm" onClick={() => setSelectedCategories([])}> Clear Filters </Button>
-                          </>)}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    <Button variant="ghost" size="icon" onClick={() => setIsLibraryExpanded(!isLibraryExpanded)} className="h-8 w-8" aria-label={isLibraryExpanded ? "Collapse library" : "Expand library"}>
-                      {isLibraryExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                    </Button>
-                  </div>
-                </div>
+                <CardTitle className="flex items-center gap-2 text-lg text-primary">
+                  <Folder /> Topic Library
+                </CardTitle>
+                <CardDescription>Organize your focus areas by topic.</CardDescription>
               </CardHeader>
-              <CardContent className="p-4">
-                <AnimatePresence>
-                  {isLibraryExpanded && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3 }}
-                      style={{ overflow: 'hidden' }}
-                      className="space-y-4"
-                    >
-                      <form onSubmit={handleAddTaskDefinition} className="space-y-3">
-                        <Input type="text" placeholder="New Topic" value={newTopicName} onChange={(e) => setNewTopicName(e.target.value)} list="topics-datalist" aria-label="New topic name" className="h-10 text-sm" />
-                        <datalist id="topics-datalist">
-                          {allTopics.map(topic => <option key={topic} value={topic} />)}
-                        </datalist>
-
-                        <Input type="text" placeholder="New Focus Area" value={newSubtopicName} onChange={(e) => setNewSubtopicName(e.target.value)} aria-label="New focus area" className="h-10 text-sm" />
-
-                        {isNewTopic && (
-                          <div className="space-y-2 rounded-md border p-3 bg-muted/50">
-                            <Label className="text-xs font-medium">Classify this new topic</Label>
-                            <RadioGroup value={newTopicClassification} onValueChange={(v) => setNewTopicClassification(v as 'product' | 'service')} className="flex gap-4 pt-1">
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="product" id="class-product-new" />
-                                <Label htmlFor="class-product-new" className="font-normal">Product</Label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="service" id="class-service-new" />
-                                <Label htmlFor="class-service-new" className="font-normal">Service</Label>
-                              </div>
-                            </RadioGroup>
-                          </div>
-                        )}
-                        
-                        <Button type="submit" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs xl:text-sm xl:h-10 xl:px-4"> <PlusCircle className="mr-2 h-5 w-5" /> Add Focus Area </Button>
-                      </form>
-                      <div className="max-h-[calc(100vh-38rem)] overflow-y-auto pr-1">
-                        {filteredExerciseDefinitions.length === 0 && deepWorkDefinitions.length > 0 ? (
-                          <p className="text-muted-foreground text-sm text-center py-4">No focus areas match filter.</p>
-                        ) : filteredExerciseDefinitions.length === 0 ? (
-                          <p className="text-muted-foreground text-sm text-center py-4">Library empty. Add a new topic and focus area to get started!</p>
-                        ) : (
-                          <Reorder.Group as="ul" axis="y" values={filteredExerciseDefinitions} onReorder={handleReorderDefinitions} className="space-y-2">
-                            <AnimatePresence>
-                              {filteredExerciseDefinitions.map(def => (
-                                <Reorder.Item as="li" key={def.id} value={def} layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} className={cn("p-3 bg-card border rounded-lg shadow-sm", selectedCategories.length === 0 && "cursor-grab")}>
-                                  {editingDefinition?.id === def.id ? (
-                                    <div className="space-y-2">
-                                      <Input value={editingDefinitionCategory} onChange={(e) => setEditingDefinitionCategory(e.target.value)} className="h-9" aria-label="Edit topic name"/>
-                                      <Input value={editingDefinitionName} onChange={(e) => setEditingDefinitionName(e.target.value)} className="h-9" aria-label="Edit focus area name"/>
-                                      <div className="flex gap-2">
-                                        <Button size="sm" onClick={handleSaveEditDefinition} className="flex-grow bg-green-600 hover:bg-green-500 text-white"><Save className="h-4 w-4 mr-1"/>Save</Button>
-                                        <Button size="sm" variant="ghost" onClick={() => setEditingDefinition(null)} className="flex-grow"><X className="h-4 w-4 mr-1"/>Cancel</Button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <div className="flex items-center justify-between gap-2">
-                                        {selectedCategories.length === 0 && (
-                                            <GripVertical className="h-5 w-5 flex-shrink-0 text-muted-foreground/50" />
-                                        )}
-                                        <div className="flex-grow min-w-0">
-                                            <span className="font-medium text-foreground block" title={def.name}>{def.name}</span>
-                                            <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                              <Badge variant="secondary" className="text-xs">{def.category}</Badge>
-                                              {deepWorkTopicMetadata[def.category] && (
-                                                  <Badge variant="outline" className="text-xs capitalize">{deepWorkTopicMetadata[def.category].classification}</Badge>
-                                              )}
-                                              {def.linkedUpskillIds && def.linkedUpskillIds.length > 0 && (
-                                                <Badge variant="outline" className="text-xs">
-                                                  <BookCopy className="h-3 w-3 mr-1" />
-                                                  {def.linkedUpskillIds.length}
-                                                </Badge>
-                                              )}
-                                              {def.linkedDeepWorkIds && def.linkedDeepWorkIds.length > 0 && (
-                                                <Badge variant="outline" className="text-xs">
-                                                    <Briefcase className="h-3 w-3 mr-1" />
-                                                    {def.linkedDeepWorkIds.length}
-                                                </Badge>
-                                              )}
-                                            </div>
-                                        </div>
-                                        <div className="flex-shrink-0 flex items-center">
-                                          <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                <MoreHorizontal className="h-4 w-4" />
-                                              </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                              <DropdownMenuItem onSelect={() => handleOpenDetailsModal(def)}>
-                                                <ClipboardList className="mr-2 h-4 w-4" />
-                                                <span>View Details</span>
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem onSelect={() => handleViewProgress(def)}>
-                                                <TrendingUp className="mr-2 h-4 w-4" />
-                                                <span>View Progress</span>
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem onSelect={() => handleOpenLinkLearningModal(def)}>
-                                                <BookCopy className="mr-2 h-4 w-4" />
-                                                <span>Link Learning</span>
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem onSelect={() => handleOpenLinkDeepWorkModal(def)}>
-                                                <LinkIcon className="mr-2 h-4 w-4" />
-                                                <span>Link Work</span>
-                                              </DropdownMenuItem>
-                                              <DropdownMenuSeparator />
-                                              <DropdownMenuItem onSelect={() => handleStartEditDefinition(def)}>
-                                                <Edit3 className="mr-2 h-4 w-4" />
-                                                <span>Edit</span>
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(def.id)} className="text-destructive">
-                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                <span>Delete</span>
-                                              </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                          </DropdownMenu>
-
-                                          <Button variant="ghost" size="icon" onClick={() => handleAddTaskToSession(def)} className="h-8 w-8" aria-label={`Add ${def.name} to session`}>
-                                            <ChevronRight className="h-5 w-5" />
-                                          </Button>
-                                        </div>
-                                      </div>
-                                      <div className="flex items-center space-x-2 pt-3 mt-3 border-t">
-                                        <Checkbox
-                                          id={`branding-${def.id}`}
-                                          checked={!!def.isReadyForBranding}
-                                          onCheckedChange={() => handleToggleReadyForBranding(def.id)}
-                                        />
-                                        <Label htmlFor={`branding-${def.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                          Ready for Branding
-                                        </Label>
-                                      </div>
-                                    </>
-                                  )}
-                                </Reorder.Item>
-                              ))}
-                            </AnimatePresence>
-                          </Reorder.Group>
-                        )}
-                      </div>
-                    </motion.div>
+              <CardContent>
+                <form onSubmit={handleAddTaskDefinition} className="space-y-3 mb-4 p-3 border rounded-lg bg-muted/30">
+                  <Input type="text" placeholder="New Topic" value={newTopicName} onChange={(e) => setNewTopicName(e.target.value)} list="topics-datalist" aria-label="New topic name" className="h-10 text-sm" />
+                  <datalist id="topics-datalist">
+                    {allTopics.map(topic => <option key={topic} value={topic} />)}
+                  </datalist>
+                  <Input type="text" placeholder="New Focus Area" value={newSubtopicName} onChange={(e) => setNewSubtopicName(e.target.value)} aria-label="New focus area" className="h-10 text-sm" />
+                  {isNewTopic && (
+                    <div className="space-y-2 rounded-md border p-3 bg-background/50">
+                      <Label className="text-xs font-medium">Classify this new topic</Label>
+                      <RadioGroup value={newTopicClassification} onValueChange={(v) => setNewTopicClassification(v as 'product' | 'service')} className="flex gap-4 pt-1">
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="product" id="class-product-new" /><Label htmlFor="class-product-new" className="font-normal">Product</Label></div>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="service" id="class-service-new" /><Label htmlFor="class-service-new" className="font-normal">Service</Label></div>
+                      </RadioGroup>
+                    </div>
                   )}
-                </AnimatePresence>
+                  <Button type="submit" size="sm" className="w-full"> <PlusCircle className="mr-2 h-4 w-4" /> Add to Library </Button>
+                </form>
+                <Accordion type="multiple" value={activeAccordionItems} onValueChange={setActiveAccordionItems} className="w-full">
+                  {topicsWithFocusAreas.map(([topic, focusAreas]) => (
+                    <AccordionItem key={topic} value={topic}>
+                      <AccordionTrigger>{topic}</AccordionTrigger>
+                      <AccordionContent>
+                        <ul className="space-y-1">
+                          {focusAreas.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
+                            <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted">
+                              <span className="flex-grow truncate cursor-pointer pl-1" onClick={() => handleViewDetails(def)} title={`View details for ${def.name}`}>{def.name}</span>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onSelect={() => handleAddTaskToSession(def)}><PlusCircle className="mr-2 h-4 w-4" /><span>Add to Today's Session</span></DropdownMenuItem>
+                                  <DropdownMenuItem onSelect={() => handleViewProgress(def)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onSelect={() => handleStartEditDefinition(def)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
+                                  <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(def.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </li>
+                          ))}
+                        </ul>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
               </CardContent>
             </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                        Daily Deep Work Duration
-                    </CardTitle>
-                    <CardDescription>
-                       Total minutes of deep work logged each day.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {dailyDurationData.length > 1 ? (
-                      <ChartContainer config={durationChartConfig} className="h-[200px] w-full">
-                        <ResponsiveContainer>
-                          <LineChart data={dailyDurationData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                            <CartesianGrid vertical={false} />
-                            <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
-                            <YAxis 
-                                tickLine={false} 
-                                axisLine={false} 
-                                tickMargin={8}
-                                fontSize={12}
-                                domain={['auto', 'auto']}
-                                label={{ value: "Minutes", angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' }}}
-                            />
-                            <RechartsTooltip
-                                content={({ active, payload }) => {
-                                    if (active && payload && payload.length) {
-                                        const data = payload[0].payload;
-                                        return (
-                                            <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                <div className="font-bold text-foreground">{format(data.dateObj, 'PPP')}</div>
-                                                <div className="grid gap-1.5">
-                                                    <div className="flex w-full items-center gap-2">
-                                                        <div className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: 'hsl(var(--primary))' }} />
-                                                        <div className="flex flex-1 justify-between">
-                                                            <span className="text-muted-foreground">Duration</span>
-                                                            <span className="font-mono font-medium text-foreground">{data.totalDuration} min</span>
-                                                        </div>
-                                                    </div>
-                                                    {data.topics && (
-                                                        <div className="mt-1 pt-1.5 border-t">
-                                                            <p className="font-medium text-foreground mb-1">Focus Areas:</p>
-                                                            <p className="text-muted-foreground whitespace-normal">{data.topics}</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    }
-                                    return null;
-                                }}
-                            />
-                            <Line type="monotone" dataKey="totalDuration" stroke="var(--color-totalDuration)" strokeWidth={2} dot={false} name="totalDuration" />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </ChartContainer>
-                    ) : (
-                      <div className="flex h-[200px] items-center justify-center text-center text-sm">
-                        <p>Log deep work sessions on multiple days to see a chart of your daily duration.</p>
-                      </div>
-                    )}
-                </CardContent>
-            </Card>
-          </section>
+          </aside>
 
           <section aria-labelledby="current-learning-heading" className="md:col-span-2 space-y-6">
               <Card>
                   <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
                           <CardTitle id="current-learning-heading" className="flex items-center gap-2 text-lg">
-                              Deep Work Session for: {format(selectedDate, 'PPP')}
+                              <ListChecks /> Session for: {format(selectedDate, 'PPP')}
                           </CardTitle>
                       </div>
                       <Popover>
-                          <PopoverTrigger asChild>
-                          <Button variant={"outline"} className={cn("w-[200px] justify-start text-left font-normal h-10",!selectedDate && "text-muted-foreground")}>
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
-                          </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                          <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus />
-                          </PopoverContent>
+                          <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[200px] justify-start text-left font-normal h-10",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger>
+                          <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent>
                       </Popover>
                   </CardHeader>
                   <CardContent className="p-4">
                     <div className="max-h-[calc(100vh-16rem)] overflow-y-auto pr-2">
                       {currentWorkoutExercises.length === 0 ? (
-                        <div className="text-center py-10">
-                            <GripVertical className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
-                            <p className="text-muted-foreground">No focus areas for {format(selectedDate, 'PPP')}.</p>
-                            <p className="text-sm text-muted-foreground/80">Add focus areas from the library to get started!</p>
-                        </div>
+                        <div className="text-center py-10"><Briefcase className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" /><p className="text-muted-foreground">No focus areas for {format(selectedDate, 'PPP')}.</p><p className="text-sm text-muted-foreground/80">Add focus areas from the library to get started!</p></div>
                       ) : (
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                          <AnimatePresence>
-                          {currentWorkoutExercises.map((exercise, index) => {
+                          {currentWorkoutExercises.map((exercise) => {
                               const definition = deepWorkDefinitions.find(def => def.id === exercise.definitionId);
                               return (
                                 <WorkoutExerciseCard 
-                                  key={`${exercise.id}-${index}`} 
+                                  key={exercise.id} 
                                   exercise={exercise}
                                   onLogSet={handleLogSet} 
                                   onDeleteSet={handleDeleteSet} 
@@ -843,27 +444,14 @@ function DeepWorkPageContent() {
                                 />
                               );
                           })}
-                          </AnimatePresence>
                         </div>
                       )}
                     </div>
                   </CardContent>
               </Card>
-
-              <div>
-                <WorkoutHeatmap
-                  title="Deep Work Activity"
-                  description="Your deep work consistency over the last year. Click a square to view that day's log."
-                  graphDescription="Your probability of doing deep work, based on recent consistency."
-                  allWorkoutLogs={allDeepWorkLogs}
-                  onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
-                  consistencyData={consistencyData}
-                  oneYearAgo={oneYearAgo}
-                  today={today}
-                />
-              </div>
           </section>
         </div>
+        
         {viewingProgressExercise && (
           <ExerciseProgressModal 
             isOpen={isProgressModalOpen} 
@@ -879,9 +467,7 @@ function DeepWorkPageContent() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Weekly Backup Reminder</AlertDialogTitle>
-            <AlertDialogDescription>
-              It's Monday! Would you like to back up your deep work data? This will download a file to your computer.
-            </AlertDialogDescription>
+            <AlertDialogDescription>It's Monday! Would you like to back up your deep work data?</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={markBackupPromptAsHandled}>Maybe Later</AlertDialogCancel>
@@ -890,124 +476,78 @@ function DeepWorkPageContent() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <WeightChartModal
-        isOpen={isWeightChartModalOpen}
-        onOpenChange={setIsWeightChartModalOpen}
-        weightLogs={weightLogs}
-        goalWeight={goalWeight}
-        height={height}
-        dateOfBirth={dateOfBirth}
-        gender={gender}
-        onLogWeight={handleLogWeight}
-        onUpdateWeightLog={(dateKey, weight) => { /* Implement if needed */ }}
-        onDeleteWeightLog={(dateKey) => { /* Implement if needed */ }}
-        onSetGoalWeight={(goal) => setGoalWeight(goal)}
-        onSetHeight={(h) => setHeight(h)}
-        onSetDateOfBirth={(dob) => setDateOfBirth(dob)}
-        onSetGender={(g) => setGender(g)}
-      />
-
-      <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader className="flex flex-row justify-between items-center">
+      <Dialog open={detailsModalOpen} onOpenChange={setDetailsModalOpen}>
+        <DialogContent className="sm:max-w-3xl max-h-[80vh]">
+          <DialogHeader>
             <DialogTitle>Details for: {selectedFocusArea?.name}</DialogTitle>
+            <DialogDescription>{selectedFocusArea?.category}</DialogDescription>
           </DialogHeader>
-          <div className="max-h-[60vh] overflow-y-auto pr-4 space-y-6">
-            
-            {/* Linked Learning Section */}
-            <div>
-              <h4 className="font-semibold mb-2">Linked Learning</h4>
-              {selectedFocusArea?.linkedUpskillIds && selectedFocusArea.linkedUpskillIds.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                        {selectedFocusArea.linkedUpskillIds.map(id => {
-                            const upskillDef = upskillDefinitions.find(ud => ud.id === id);
-                            return upskillDef ? (
-                                <Badge key={id} variant="secondary" className="text-sm">{upskillDef.name} ({upskillDef.category})</Badge>
-                            ) : null;
-                        })}
-                    </div>
-                 ) : (
-                    <p className="text-sm">No learning tasks linked.</p>
-                 )
-              }
-            </div>
-          </div>
+          <ScrollArea className="h-[60vh] -mx-6 px-6">
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <h3 className="font-semibold flex items-center gap-2"><BookCopy className="h-5 w-5 text-primary" /> Linked Learning</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(selectedFocusArea?.linkedUpskillIds || []).map(id => {
+                      const upskillDef = upskillDefinitions.find(ud => ud.id === id);
+                      return upskillDef ? (
+                        <Card key={id}><CardContent className="p-3"><p className="font-medium">{upskillDef.name}</p><p className="text-sm text-muted-foreground">{upskillDef.category}</p></CardContent></Card>
+                      ) : null;
+                    })}
+                    <Card className="border-dashed hover:border-primary hover:bg-muted transition-colors cursor-pointer" onClick={() => selectedFocusArea && handleOpenCreateLinkModal('upskill', selectedFocusArea)}>
+                      <CardContent className="p-3 h-full flex flex-col items-center justify-center text-center">
+                        <PlusCircle className="h-6 w-6 text-muted-foreground mb-1" />
+                        <p className="text-sm font-medium">Add & Link New Task</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <h3 className="font-semibold flex items-center gap-2"><LinkIcon className="h-5 w-5 text-primary" /> Linked Work</h3>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(selectedFocusArea?.linkedDeepWorkIds || []).map(id => {
+                      const deepworkDef = deepWorkDefinitions.find(dd => dd.id === id);
+                      return deepworkDef ? (
+                         <Card key={id}><CardContent className="p-3"><p className="font-medium">{deepworkDef.name}</p><p className="text-sm text-muted-foreground">{deepworkDef.category}</p></CardContent></Card>
+                      ) : null;
+                    })}
+                    <Card className="border-dashed hover:border-primary hover:bg-muted transition-colors cursor-pointer" onClick={() => selectedFocusArea && handleOpenCreateLinkModal('deepwork', selectedFocusArea)}>
+                      <CardContent className="p-3 h-full flex flex-col items-center justify-center text-center">
+                        <PlusCircle className="h-6 w-6 text-muted-foreground mb-1" />
+                        <p className="text-sm font-medium">Add & Link New Focus Area</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
       
-      <Dialog open={isLinkDeepWorkModalOpen} onOpenChange={setIsLinkDeepWorkModalOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Link work to: {linkingFocusArea?.name}</DialogTitle>
-            <DialogDescription>
-              Select other focus areas to link as related or foundational work.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <ScrollArea className="h-72 w-full">
-              <div className="pr-6 space-y-2">
-                {deepWorkDefinitions
-                  .filter(def => def.id !== linkingFocusArea?.id)
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map(def => (
-                    <div key={def.id} className="flex items-center space-x-3 p-2 rounded-md border has-[[data-state=checked]]:bg-muted/50 transition-colors">
-                        <Checkbox
-                            id={`deepwork-link-${def.id}`}
-                            checked={editableLinkedDeepWorkIds.includes(def.id)}
-                            onCheckedChange={() => handleToggleDeepWorkLink(def.id)}
-                        />
-                        <Label htmlFor={`deepwork-link-${def.id}`} className="font-normal w-full cursor-pointer">
-                            {def.name}
-                            <span className="text-muted-foreground ml-2 text-xs">({def.category})</span>
-                        </Label>
-                    </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </div>
-           <DialogFooter>
-              <Button variant="outline" onClick={() => setIsLinkDeepWorkModalOpen(false)}>Cancel</Button>
-              <Button onClick={handleSaveDeepWorkLinks}>Save Links</Button>
-          </DialogFooter>
+      <Dialog open={createLinkModalOpen} onOpenChange={setCreateLinkModalOpen}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Create & Link New {createLinkModalConfig?.type === 'upskill' ? 'Learning Task' : 'Focus Area'}</DialogTitle>
+              <DialogDescription>
+                This will create a new item in the respective library and link it to "{createLinkModalConfig?.parent.name}".
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-1">
+                  <Label htmlFor="new-linked-topic">Topic</Label>
+                  <Input id="new-linked-topic" value={newLinkedItemTopic} onChange={e => setNewLinkedItemTopic(e.target.value)} placeholder="e.g., GPU Programming" />
+                </div>
+                 <div className="space-y-1">
+                  <Label htmlFor="new-linked-name">Name</Label>
+                  <Input id="new-linked-name" value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} placeholder={createLinkModalConfig?.type === 'upskill' ? 'e.g., CUDA Fundamentals Course' : 'e.g., Implement Ray Tracing'} />
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateLinkModalOpen(false)}>Cancel</Button>
+                <Button onClick={handleCreateAndLinkItem}>Create & Link</Button>
+            </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isLinkLearningModalOpen} onOpenChange={setIsLinkLearningModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Link Learning to "{linkingLearningToFocusArea?.name}"</DialogTitle>
-            <DialogDescription>
-              Select learning tasks that support this focus area.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <ScrollArea className="h-40 w-full rounded-md border p-2">
-              {loggedUpskillDefinitions.length > 0 ? (
-                <div className="space-y-2">
-                  {loggedUpskillDefinitions.map(upskillDef => (
-                    <div key={upskillDef.id} className="flex items-center space-x-3">
-                      <Checkbox
-                        id={`link-modal-${upskillDef.id}`}
-                        checked={editableLinkedUpskillIds.includes(upskillDef.id)}
-                        onCheckedChange={() => handleToggleUpskillLink(upskillDef.id)}
-                      />
-                      <Label htmlFor={`link-modal-${upskillDef.id}`} className="font-normal w-full cursor-pointer">
-                        {upskillDef.name} <span className="text-muted-foreground/80">({upskillDef.category})</span>
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-sm text-muted-foreground p-4">No logged learning tasks found. Go to the Upskill page to log some progress.</p>
-              )}
-            </ScrollArea>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsLinkLearningModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveLearningLinks}>Save Links</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
@@ -1015,3 +555,5 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
+
+    
