@@ -48,6 +48,8 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -163,13 +165,15 @@ function DeepWorkPageContent() {
   const [viewMode, setViewMode] = useState<'session' | 'library'>('session');
   const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
 
-  // State for the "Create & Link" functionality
-  const [createLinkModalOpen, setCreateLinkModalOpen] = useState(false);
-  const [createLinkModalConfig, setCreateLinkModalConfig] = useState<{type: 'upskill' | 'deepwork', parent: ExerciseDefinition} | null>(null);
+  // State for the "Manage Links" functionality
+  const [isManageLinksModalOpen, setIsManageLinksModalOpen] = useState(false);
+  const [manageLinksConfig, setManageLinksConfig] = useState<{type: 'upskill' | 'deepwork', parent: ExerciseDefinition} | null>(null);
   const [newLinkedItemName, setNewLinkedItemName] = useState('');
   const [newLinkedItemTopic, setNewLinkedItemTopic] = useState('');
   const [newLinkedItemDescription, setNewLinkedItemDescription] = useState('');
   const [newLinkedItemLink, setNewLinkedItemLink] = useState('');
+  const [linkSearchTerm, setLinkSearchTerm] = useState('');
+  const [tempLinkedIds, setTempLinkedIds] = useState<string[]>([]);
 
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
 
@@ -427,21 +431,28 @@ function DeepWorkPageContent() {
     setIsProgressModalOpen(true);
   };
   
-  const handleOpenCreateLinkModal = (type: 'upskill' | 'deepwork', parent: ExerciseDefinition) => {
-    setCreateLinkModalConfig({ type, parent });
+  const handleOpenManageLinksModal = (type: 'upskill' | 'deepwork', parent: ExerciseDefinition) => {
+    setManageLinksConfig({ type, parent });
+    if (type === 'upskill') {
+        setTempLinkedIds(parent.linkedUpskillIds || []);
+    } else {
+        setTempLinkedIds(parent.linkedDeepWorkIds || []);
+    }
+    // Reset form for "Create New" tab
     setNewLinkedItemTopic('');
     setNewLinkedItemName('');
     setNewLinkedItemDescription('');
     setNewLinkedItemLink('');
-    setCreateLinkModalOpen(true);
+    setLinkSearchTerm('');
+    setIsManageLinksModalOpen(true);
   };
   
   const handleCreateAndLinkItem = () => {
-    if (!createLinkModalConfig || !newLinkedItemName.trim() || !newLinkedItemTopic.trim()) {
+    if (!manageLinksConfig || !newLinkedItemName.trim() || !newLinkedItemTopic.trim()) {
         toast({ title: "Error", description: "Topic and Name are required.", variant: "destructive" });
         return;
     }
-    const { type, parent } = createLinkModalConfig;
+    const { type, parent } = manageLinksConfig;
     let updatedParent;
     if (type === 'upskill') {
         const link = newLinkedItemLink.trim();
@@ -467,8 +478,36 @@ function DeepWorkPageContent() {
     setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
     setSelectedFocusArea(updatedParent);
     toast({ title: "Success", description: "New item created and linked." });
-    setCreateLinkModalOpen(false);
+    setIsManageLinksModalOpen(false);
   };
+
+  const handleSaveExistingLinks = () => {
+    if (!manageLinksConfig) return;
+    const { type, parent } = manageLinksConfig;
+
+    const updatedParent = {
+        ...parent,
+        [type === 'upskill' ? 'linkedUpskillIds' : 'linkedDeepWorkIds']: tempLinkedIds
+    };
+
+    setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
+    setSelectedFocusArea(updatedParent);
+    toast({ title: "Success", description: "Links have been updated." });
+    setIsManageLinksModalOpen(false);
+  }
+
+  const filteredItemsForLinking = useMemo(() => {
+    if (!manageLinksConfig) return [];
+    const { type, parent } = manageLinksConfig;
+    const definitionsSource = type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
+
+    return definitionsSource.filter(def => 
+        def.name !== 'placeholder' &&
+        def.id !== parent.id && 
+        def.name.toLowerCase().includes(linkSearchTerm.toLowerCase())
+    );
+  }, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, linkSearchTerm]);
+
 
   if (isLoadingPage) {
     return (
@@ -698,10 +737,10 @@ function DeepWorkPageContent() {
                                        </Card>
                                     )
                                   })}
-                                  <Card className="border-dashed hover:border-primary hover:bg-muted transition-colors cursor-pointer" onClick={() => handleOpenCreateLinkModal('upskill', selectedFocusArea)}>
+                                  <Card className="border-dashed hover:border-primary hover:bg-muted transition-colors cursor-pointer" onClick={() => handleOpenManageLinksModal('upskill', selectedFocusArea)}>
                                     <CardContent className="p-3 h-full flex flex-col items-center justify-center text-center">
                                       <PlusCircle className="h-6 w-6 text-muted-foreground mb-1" />
-                                      <p className="text-sm font-medium">Add & Link New Task</p>
+                                      <p className="text-sm font-medium">Add / Link Task</p>
                                     </CardContent>
                                   </Card>
                                 </div>
@@ -715,10 +754,10 @@ function DeepWorkPageContent() {
                                        <Card key={id}><CardContent className="p-3"><p className="font-medium">{deepworkDef.name}</p><p className="text-sm text-muted-foreground">{deepworkDef.category}</p></CardContent></Card>
                                     ) : null;
                                   })}
-                                  <Card className="border-dashed hover:border-primary hover:bg-muted transition-colors cursor-pointer" onClick={() => handleOpenCreateLinkModal('deepwork', selectedFocusArea)}>
+                                  <Card className="border-dashed hover:border-primary hover:bg-muted transition-colors cursor-pointer" onClick={() => handleOpenManageLinksModal('deepwork', selectedFocusArea)}>
                                     <CardContent className="p-3 h-full flex flex-col items-center justify-center text-center">
                                       <PlusCircle className="h-6 w-6 text-muted-foreground mb-1" />
-                                      <p className="text-sm font-medium">Add & Link New Focus Area</p>
+                                      <p className="text-sm font-medium">Add / Link Focus Area</p>
                                     </CardContent>
                                   </Card>
                                 </div>
@@ -757,40 +796,87 @@ function DeepWorkPageContent() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={createLinkModalOpen} onOpenChange={setCreateLinkModalOpen}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={isManageLinksModalOpen} onOpenChange={setIsManageLinksModalOpen}>
+        <DialogContent className="sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle>Create & Link New {createLinkModalConfig?.type === 'upskill' ? 'Learning Task' : 'Focus Area'}</DialogTitle>
+              <DialogTitle>Manage Links for "{manageLinksConfig?.parent.name}"</DialogTitle>
               <DialogDescription>
-                This will create a new item in the respective library and link it to "{createLinkModalConfig?.parent.name}".
+                Create a new item and link it, or link existing items from your library.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-                <div className="space-y-1">
-                  <Label htmlFor="new-linked-topic">Topic</Label>
-                  <Input id="new-linked-topic" value={newLinkedItemTopic} onChange={e => setNewLinkedItemTopic(e.target.value)} placeholder="e.g., GPU Programming" />
-                </div>
-                 <div className="space-y-1">
-                  <Label htmlFor="new-linked-name">Name</Label>
-                  <Input id="new-linked-name" value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} placeholder={createLinkModalConfig?.type === 'upskill' ? 'e.g., CUDA Fundamentals Course' : 'e.g., Implement Ray Tracing'} />
-                </div>
-                {createLinkModalConfig?.type === 'upskill' && (
-                  <>
-                    <div className="space-y-1">
-                      <Label htmlFor="new-linked-desc">Description</Label>
-                      <Textarea id="new-linked-desc" value={newLinkedItemDescription} onChange={e => setNewLinkedItemDescription(e.target.value)} placeholder="Key points, summary..." />
+            <Tabs defaultValue="create-new" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="create-new">Create New</TabsTrigger>
+                    <TabsTrigger value="link-existing">Link from Library</TabsTrigger>
+                </TabsList>
+                <TabsContent value="create-new">
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-1">
+                          <Label htmlFor="new-linked-topic">Topic</Label>
+                          <Input id="new-linked-topic" value={newLinkedItemTopic} onChange={e => setNewLinkedItemTopic(e.target.value)} placeholder="e.g., GPU Programming" />
+                        </div>
+                         <div className="space-y-1">
+                          <Label htmlFor="new-linked-name">Name</Label>
+                          <Input id="new-linked-name" value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} placeholder={manageLinksConfig?.type === 'upskill' ? 'e.g., CUDA Fundamentals Course' : 'e.g., Implement Ray Tracing'} />
+                        </div>
+                        {manageLinksConfig?.type === 'upskill' && (
+                          <>
+                            <div className="space-y-1">
+                              <Label htmlFor="new-linked-desc">Description</Label>
+                              <Textarea id="new-linked-desc" value={newLinkedItemDescription} onChange={e => setNewLinkedItemDescription(e.target.value)} placeholder="Key points, summary..." />
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="new-linked-link">Link</Label>
+                              <Input id="new-linked-link" value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} placeholder="https://..." />
+                            </div>
+                          </>
+                        )}
                     </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="new-linked-link">Link</Label>
-                      <Input id="new-linked-link" value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} placeholder="https://..." />
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsManageLinksModalOpen(false)}>Cancel</Button>
+                        <Button onClick={handleCreateAndLinkItem}>Create &amp; Link</Button>
+                    </DialogFooter>
+                </TabsContent>
+                <TabsContent value="link-existing">
+                    <div className="py-4">
+                      <Input 
+                          placeholder="Search library..."
+                          value={linkSearchTerm}
+                          onChange={e => setLinkSearchTerm(e.target.value)}
+                          className="mb-4"
+                      />
+                      <ScrollArea className="h-64">
+                          <div className="space-y-2 pr-4">
+                              {filteredItemsForLinking.length > 0 ? filteredItemsForLinking.map(item => (
+                                  <div key={item.id} className="flex items-center space-x-2">
+                                      <Checkbox
+                                          id={`link-${item.id}`}
+                                          checked={tempLinkedIds.includes(item.id)}
+                                          onCheckedChange={checked => {
+                                              setTempLinkedIds(prev =>
+                                                  checked
+                                                      ? [...prev, item.id]
+                                                      : prev.filter(id => id !== item.id)
+                                              );
+                                          }}
+                                      />
+                                      <Label htmlFor={`link-${item.id}`} className="font-normal w-full cursor-pointer">
+                                          {item.name}
+                                          <span className="text-muted-foreground text-xs ml-2">({item.category})</span>
+                                      </Label>
+                                  </div>
+                              )) : (
+                                <p className="text-sm text-center text-muted-foreground py-4">No matching items found.</p>
+                              )}
+                          </div>
+                      </ScrollArea>
                     </div>
-                  </>
-                )}
-            </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setCreateLinkModalOpen(false)}>Cancel</Button>
-                <Button onClick={handleCreateAndLinkItem}>Create & Link</Button>
-            </DialogFooter>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsManageLinksModalOpen(false)}>Cancel</Button>
+                        <Button onClick={handleSaveExistingLinks}>Save Links</Button>
+                    </DialogFooter>
+                </TabsContent>
+            </Tabs>
         </DialogContent>
       </Dialog>
       
