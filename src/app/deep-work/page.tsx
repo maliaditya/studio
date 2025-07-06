@@ -273,6 +273,8 @@ function DeepWorkPageContent() {
   const [linkSearchTerm, setLinkSearchTerm] = useState('');
   const [tempLinkedIds, setTempLinkedIds] = useState<string[]>([]);
   const [linkResourceFolderId, setLinkResourceFolderId] = useState<string>('');
+  const [linkUpskillTopic, setLinkUpskillTopic] = useState('');
+  const [linkDeepWorkTopic, setLinkDeepWorkTopic] = useState('');
   const [isCreatingLink, setIsCreatingLink] = useState(false);
 
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
@@ -282,6 +284,10 @@ function DeepWorkPageContent() {
     const topicsFromMeta = new Set(Object.keys(deepWorkTopicMetadata));
     return Array.from(new Set([...topicsFromDefs, ...topicsFromMeta])).sort();
   }, [deepWorkDefinitions, deepWorkTopicMetadata]);
+
+  const allUpskillTopics = useMemo(() => 
+    Array.from(new Set(upskillDefinitions.map(def => def.category))).sort()
+  , [upskillDefinitions]);
 
   // A memoized set of all focus area IDs that are linked as children.
   const linkedDeepWorkChildIds = useMemo(() =>
@@ -800,6 +806,8 @@ function DeepWorkPageContent() {
     setNewLinkedItemFolderId('');
     setLinkSearchTerm('');
     setLinkResourceFolderId('');
+    setLinkUpskillTopic('');
+    setLinkDeepWorkTopic('');
     setIsManageLinksModalOpen(true);
   };
   
@@ -941,11 +949,11 @@ function DeepWorkPageContent() {
     if (!manageLinksConfig) return [];
     const { type, parent } = manageLinksConfig;
     
-    let definitionsSource: any[]; // Use any[] to accommodate different types
+    let definitionsSource: any[];
     if (type === 'upskill') {
-        definitionsSource = upskillDefinitions;
+      definitionsSource = linkUpskillTopic ? upskillDefinitions.filter(d => d.category === linkUpskillTopic) : upskillDefinitions;
     } else if (type === 'deepwork') {
-        definitionsSource = deepWorkDefinitions;
+      definitionsSource = linkDeepWorkTopic ? deepWorkDefinitions.filter(d => d.category === linkDeepWorkTopic) : deepWorkDefinitions;
     } else { // 'resource'
         if (!linkResourceFolderId) return [];
         definitionsSource = resources.filter(res => res.folderId === linkResourceFolderId);
@@ -973,7 +981,7 @@ function DeepWorkPageContent() {
         def.id !== parent.id && 
         def.name.toLowerCase().includes(linkSearchTerm.toLowerCase());
     });
-  }, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkedDeepWorkChildIds]);
+  }, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkedDeepWorkChildIds, linkUpskillTopic, linkDeepWorkTopic]);
 
 
   const handleStartEditUpskill = (def: ExerciseDefinition) => {
@@ -1881,6 +1889,30 @@ function DeepWorkPageContent() {
                 </TabsContent>
                 <TabsContent value="link-existing">
                     <div className="py-4">
+                      {manageLinksConfig?.type === 'upskill' && (
+                        <div className="mb-4 space-y-1">
+                          <Label htmlFor="link-upskill-topic">Select Topic</Label>
+                          <Select value={linkUpskillTopic} onValueChange={setLinkUpskillTopic}>
+                            <SelectTrigger id="link-upskill-topic"><SelectValue placeholder="All Topics" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">All Topics</SelectItem>
+                              {allUpskillTopics.map(topic => (<SelectItem key={topic} value={topic}>{topic}</SelectItem>))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      {manageLinksConfig?.type === 'deepwork' && (
+                        <div className="mb-4 space-y-1">
+                          <Label htmlFor="link-deepwork-topic">Select Topic</Label>
+                          <Select value={linkDeepWorkTopic} onValueChange={setLinkDeepWorkTopic}>
+                            <SelectTrigger id="link-deepwork-topic"><SelectValue placeholder="All Topics" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">All Topics</SelectItem>
+                              {allKnownTopics.map(topic => (<SelectItem key={topic} value={topic}>{topic}</SelectItem>))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                       {manageLinksConfig?.type === 'resource' && (
                         <div className="mb-4 space-y-1">
                             <Label htmlFor="link-resource-folder">Select Folder</Label>
