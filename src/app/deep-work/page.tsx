@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Eye, EyeOff, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -173,7 +173,7 @@ function DeepWorkPageContent() {
     item: ExerciseDefinition;
   } | null>(null);
 
-  const [hideLinkedFocusAreas, setHideLinkedFocusAreas] = useState(false);
+  const [visibilityFilters, setVisibilityFilters] = useState<Set<'intention' | 'objective' | 'action'>>(new Set(['intention', 'objective', 'action']));
 
   // Mind map modal state
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
@@ -287,14 +287,35 @@ function DeepWorkPageContent() {
   const linkedDeepWorkChildIds = useMemo(() =>
     new Set<string>(deepWorkDefinitions.flatMap(def => def.linkedDeepWorkIds || []))
   , [deepWorkDefinitions]);
-  
+
+  const handleVisibilityFilterChange = (filter: 'intention' | 'objective' | 'action') => {
+    setVisibilityFilters(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(filter)) {
+            newSet.delete(filter);
+        } else {
+            newSet.add(filter);
+        }
+        return newSet;
+    });
+  };
+
   const topicsWithFocusAreas = useMemo(() => {
-    // Filter definitions based on the toggle state.
-    const visibleDefinitions = hideLinkedFocusAreas
-      ? deepWorkDefinitions.filter(def => !linkedDeepWorkChildIds.has(def.id))
-      : deepWorkDefinitions;
-      
-    // Group the visible definitions by topic.
+    const visibleDefinitions = deepWorkDefinitions.filter(def => {
+        const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+        const isLinkedAsChild = linkedDeepWorkChildIds.has(def.id);
+
+        const isIntention = isParent && !isLinkedAsChild;
+        const isObjective = isParent && isLinkedAsChild;
+        const isAction = !isParent;
+
+        if (visibilityFilters.has('intention') && isIntention) return true;
+        if (visibilityFilters.has('objective') && isObjective) return true;
+        if (visibilityFilters.has('action') && isAction) return true;
+        
+        return false;
+    });
+    
     const grouped: { [key: string]: ExerciseDefinition[] } = {};
     visibleDefinitions.forEach(def => {
         if (!grouped[def.category]) {
@@ -303,9 +324,8 @@ function DeepWorkPageContent() {
         grouped[def.category].push(def);
     });
 
-    // Use allKnownTopics to ensure even empty topics are displayed
     return allKnownTopics.map(topic => [topic, grouped[topic] || []] as [string, ExerciseDefinition[]]);
-  }, [allKnownTopics, deepWorkDefinitions, hideLinkedFocusAreas, linkedDeepWorkChildIds]);
+  }, [allKnownTopics, deepWorkDefinitions, linkedDeepWorkChildIds, visibilityFilters]);
 
 
   const formatMinutes = (minutes: number) => {
@@ -1024,23 +1044,33 @@ function DeepWorkPageContent() {
                     <CardTitle className="flex items-center gap-2 text-lg text-primary">
                       <Folder /> Topic Library
                     </CardTitle>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setHideLinkedFocusAreas(prev => !prev)}
-                            className="h-8 w-8"
-                          >
-                            {hideLinkedFocusAreas ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{hideLinkedFocusAreas ? "Show linked sub-tasks" : "Hide linked sub-tasks"}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <FilterIcon className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuCheckboxItem
+                                checked={visibilityFilters.has('intention')}
+                                onCheckedChange={() => handleVisibilityFilterChange('intention')}
+                            >
+                                Intentions
+                            </DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem
+                                checked={visibilityFilters.has('objective')}
+                                onCheckedChange={() => handleVisibilityFilterChange('objective')}
+                            >
+                                Objectives
+                            </DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem
+                                checked={visibilityFilters.has('action')}
+                                onCheckedChange={() => handleVisibilityFilterChange('action')}
+                            >
+                                Actions
+                            </DropdownMenuCheckboxItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 <CardDescription>Organize your focus areas by topic.</CardDescription>
               </CardHeader>
