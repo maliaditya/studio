@@ -158,6 +158,13 @@ function DeepWorkPageContent() {
     item: string; // The topic name
   } | null>(null);
 
+  const focusAreaContextMenuRef = useRef<HTMLDivElement>(null);
+  const [focusAreaContextMenu, setFocusAreaContextMenu] = useState<{
+    mouseX: number;
+    mouseY: number;
+    item: ExerciseDefinition;
+  } | null>(null);
+
   const [hideLinkedFocusAreas, setHideLinkedFocusAreas] = useState(false);
 
   // Mind map modal state
@@ -169,20 +176,35 @@ function DeepWorkPageContent() {
         if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as Node)) {
             setContextMenu(null);
         }
+        if (focusAreaContextMenuRef.current && !focusAreaContextMenuRef.current.contains(event.target as Node)) {
+            setFocusAreaContextMenu(null);
+        }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
         document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [contextMenuRef]);
+  }, [contextMenuRef, focusAreaContextMenuRef]);
 
   const handleContextMenu = (e: React.MouseEvent, topic: string) => {
     e.preventDefault();
     e.stopPropagation();
+    setFocusAreaContextMenu(null); // Close other menu
     setContextMenu({
       mouseX: e.clientX,
       mouseY: e.clientY,
       item: topic,
+    });
+  };
+
+  const handleFocusAreaContextMenu = (e: React.MouseEvent, item: ExerciseDefinition) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu(null); // Close other menu
+    setFocusAreaContextMenu({
+        mouseX: e.clientX,
+        mouseY: e.clientY,
+        item: item,
     });
   };
 
@@ -923,7 +945,7 @@ function DeepWorkPageContent() {
 
   return (
     <>
-      <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => { if (contextMenu) setContextMenu(null); if (focusAreaContextMenu) setFocusAreaContextMenu(null); }}>
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
           
           <aside className="lg:col-span-1 space-y-6">
@@ -983,7 +1005,7 @@ function DeepWorkPageContent() {
                             {focusAreas.sort((a,b) => a.name.localeCompare(b.name)).map(def => {
                               const isEpic = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
                               return (
-                                <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted">
+                                <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted" onContextMenu={(e) => handleFocusAreaContextMenu(e, def)}>
                                   {editingDefinition?.id === def.id ? (
                                     <div className='flex-grow flex flex-col gap-2'>
                                       <Input 
@@ -1037,30 +1059,6 @@ function DeepWorkPageContent() {
                                             <TooltipContent>{isEpic ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent>
                                           </Tooltip>
                                         </TooltipProvider>
-                                        <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                                              <MoreVertical className="h-4 w-4" />
-                                            </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="end">
-                                            <DropdownMenuItem onSelect={() => handleViewProgress(def, 'deepwork')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuCheckboxItem
-                                                checked={!!def.isReadyForBranding}
-                                                onSelect={(e) => {
-                                                    e.preventDefault();
-                                                    handleToggleReadyForBranding(def.id);
-                                                }}
-                                            >
-                                                <Share2 className="mr-2 h-4 w-4" />
-                                                <span>Ready for Branding</span>
-                                            </DropdownMenuCheckboxItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onSelect={() => handleStartEditDefinition(def)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
-                                            <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(def.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
                                       </div>
                                     </>
                                   )}
@@ -1592,6 +1590,42 @@ function DeepWorkPageContent() {
           }}>
               <Trash2 className="mr-2 h-4 w-4" /> Delete Topic
           </Button>
+        </div>
+      )}
+
+      {focusAreaContextMenu && (
+        <div
+            ref={focusAreaContextMenuRef}
+            style={{ top: focusAreaContextMenu.mouseY, left: focusAreaContextMenu.mouseX }}
+            className="fixed z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
+            onClick={(e) => {
+                e.stopPropagation();
+                setFocusAreaContextMenu(null);
+            }}
+        >
+            <Button variant="ghost" className="w-full justify-start h-9 px-2 gap-2" onMouseDown={() => handleViewProgress(focusAreaContextMenu.item, 'deepwork')}>
+                <TrendingUp /> View Progress
+            </Button>
+            <div className="-mx-1 my-1 h-px bg-muted" />
+            <Button
+                variant="ghost"
+                className="w-full justify-start h-9 px-2 gap-2"
+                onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleToggleReadyForBranding(focusAreaContextMenu.item.id);
+                    setFocusAreaContextMenu(null);
+                }}
+            >
+                <Checkbox checked={!!focusAreaContextMenu.item.isReadyForBranding} className="h-4 w-4" />
+                <span>Ready for Branding</span>
+            </Button>
+            <div className="-mx-1 my-1 h-px bg-muted" />
+            <Button variant="ghost" className="w-full justify-start h-9 px-2 gap-2" onMouseDown={() => { handleStartEditDefinition(focusAreaContextMenu.item); setFocusAreaContextMenu(null); }}>
+                <Edit3 /> Edit
+            </Button>
+            <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive h-9 px-2 gap-2" onMouseDown={() => { handleDeleteExerciseDefinition(focusAreaContextMenu.item.id); setFocusAreaContextMenu(null); }}>
+                <Trash2 /> Delete
+            </Button>
         </div>
       )}
 
