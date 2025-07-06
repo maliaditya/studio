@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Eye, EyeOff } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +51,8 @@ import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -152,6 +154,8 @@ function DeepWorkPageContent() {
     item: string; // The topic name
   } | null>(null);
 
+  const [hideLinkedFocusAreas, setHideLinkedFocusAreas] = useState(false);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
         if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as Node)) {
@@ -237,18 +241,29 @@ function DeepWorkPageContent() {
   }, [deepWorkDefinitions, deepWorkTopicMetadata]);
 
   const topicsWithFocusAreas = useMemo(() => {
+    // 1. Get a set of all focus area IDs that are linked as children.
+    const linkedFocusAreaIds = new Set<string>(
+      deepWorkDefinitions.flatMap(def => def.linkedDeepWorkIds || [])
+    );
+
+    // 2. Filter definitions based on the toggle state.
+    const visibleDefinitions = hideLinkedFocusAreas
+      ? deepWorkDefinitions.filter(def => !linkedFocusAreaIds.has(def.id))
+      : deepWorkDefinitions;
+      
+    // 3. Group the visible definitions by topic.
     const grouped: { [key: string]: ExerciseDefinition[] } = {};
-    allKnownTopics.forEach(topic => {
-        grouped[topic] = [];
-    });
-    deepWorkDefinitions.forEach(def => {
-        if (grouped[def.category]) {
-            grouped[def.category].push(def);
+    visibleDefinitions.forEach(def => {
+        if (!grouped[def.category]) {
+            grouped[def.category] = [];
         }
+        grouped[def.category].push(def);
     });
 
+    // 4. Use allKnownTopics to ensure even empty topics are displayed
     return allKnownTopics.map(topic => [topic, grouped[topic] || []] as [string, ExerciseDefinition[]]);
-  }, [allKnownTopics, deepWorkDefinitions]);
+  }, [allKnownTopics, deepWorkDefinitions, hideLinkedFocusAreas]);
+
 
   const formatMinutes = (minutes: number) => {
     if (minutes === 0) return "0m";
@@ -833,9 +848,28 @@ function DeepWorkPageContent() {
           <aside className="lg:col-span-3 space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg text-primary">
-                  <Folder /> Topic Library
-                </CardTitle>
+                <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="flex items-center gap-2 text-lg text-primary">
+                      <Folder /> Topic Library
+                    </CardTitle>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setHideLinkedFocusAreas(prev => !prev)}
+                            className="h-8 w-8"
+                          >
+                            {hideLinkedFocusAreas ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{hideLinkedFocusAreas ? "Show linked focus areas" : "Hide linked focus areas"}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                 <CardDescription>Organize your focus areas by topic.</CardDescription>
               </CardHeader>
               <CardContent>
@@ -846,6 +880,10 @@ function DeepWorkPageContent() {
                 <div className="space-y-2">
                   {topicsWithFocusAreas.map(([topic, focusAreas]) => {
                     const isCollapsed = !expandedTopics.has(topic);
+                    // Hide topics that become empty after filtering, unless they are in the metadata
+                    if (focusAreas.length === 0 && !deepWorkTopicMetadata[topic]) {
+                      return null;
+                    }
                     return (
                     <div key={topic}>
                       <div 
@@ -1338,7 +1376,8 @@ function DeepWorkPageContent() {
             className="fixed z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
             onClick={(e) => e.stopPropagation()}
         >
-          <Button variant="ghost" className="w-full justify-start h-9 px-2" onClick={() => {
+          <Button variant="ghost" className="w-full justify-start h-9 px-2" onClick={(e) => {
+              e.stopPropagation();
               setExpandedTopics(prev => new Set(prev).add(contextMenu.item));
               setAddingFocusToTopic(contextMenu.item);
               setContextMenu(null);
