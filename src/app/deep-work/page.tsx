@@ -145,6 +145,35 @@ function DeepWorkPageContent() {
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   const [editedResourceData, setEditedResourceData] = useState<Partial<Resource>>({});
 
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    mouseX: number;
+    mouseY: number;
+    item: string; // The topic name
+  } | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+        if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as Node)) {
+            setContextMenu(null);
+        }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [contextMenuRef]);
+
+  const handleContextMenu = (e: React.MouseEvent, topic: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      item: topic,
+    });
+  };
+
   const toggleTopicExpansion = useCallback((topic: string) => {
     setExpandedTopics(prev => {
         const newSet = new Set(prev);
@@ -798,7 +827,7 @@ function DeepWorkPageContent() {
 
   return (
     <>
-      <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           <aside className="lg:col-span-3 space-y-6">
@@ -819,35 +848,16 @@ function DeepWorkPageContent() {
                     const isCollapsed = !expandedTopics.has(topic);
                     return (
                     <div key={topic}>
-                      <div className="group flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer" onClick={() => toggleTopicExpansion(topic)}>
+                      <div 
+                        className="group flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer" 
+                        onClick={() => toggleTopicExpansion(topic)}
+                        onContextMenu={(e) => handleContextMenu(e, topic)}
+                      >
                         <div className="flex items-center gap-2 min-w-0 flex-grow">
                           <ChevronDown className={cn("h-4 w-4 transition-transform", isCollapsed && "-rotate-90")} />
                           <Folder className="h-4 w-4 flex-shrink-0 text-primary/80" />
                           <h4 className="font-semibold text-sm truncate">{topic}</h4>
                         </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={(e) => {
-                                e.stopPropagation();
-                                setExpandedTopics(prev => new Set(prev).add(topic));
-                                setAddingFocusToTopic(topic);
-                              }}>
-                              <PlusCircle className="mr-2 h-4 w-4" /> New Focus Area
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => setEditingTopic(topic)}>
-                              <Edit3 className="mr-2 h-4 w-4" /> Edit Topic
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive" onSelect={() => setTopicToDelete(topic)}>
-                                <Trash2 className="mr-2 h-4 w-4" /> Delete Topic
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
                       </div>
                       {!isCollapsed && (
                         <ul className="space-y-1 pl-4 border-l-2 border-muted ml-4">
@@ -1320,6 +1330,36 @@ function DeepWorkPageContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {contextMenu && (
+        <div
+            ref={contextMenuRef}
+            style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }}
+            className="fixed z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
+        >
+          <Button variant="ghost" className="w-full justify-start h-9 px-2" onClick={() => {
+              setExpandedTopics(prev => new Set(prev).add(contextMenu.item));
+              setAddingFocusToTopic(contextMenu.item);
+              setContextMenu(null);
+          }}>
+            <PlusCircle className="mr-2 h-4 w-4" /> New Focus Area
+          </Button>
+          <Button variant="ghost" className="w-full justify-start h-9 px-2" onClick={() => {
+              setEditingTopic(contextMenu.item);
+              setContextMenu(null);
+          }}>
+            <Edit3 className="mr-2 h-4 w-4" /> Edit Topic
+          </Button>
+          <div className="-mx-1 my-1 h-px bg-muted" />
+          <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive h-9 px-2" onClick={() => {
+              setTopicToDelete(contextMenu.item);
+              setContextMenu(null);
+          }}>
+              <Trash2 className="mr-2 h-4 w-4" /> Delete Topic
+          </Button>
+        </div>
+      )}
 
       <Dialog open={isManageLinksModalOpen} onOpenChange={setIsManageLinksModalOpen}>
         <DialogContent className="sm:max-w-lg">
