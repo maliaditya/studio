@@ -10,12 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
-import { CalendarIcon, Clock, Filter } from 'lucide-react';
+import { CalendarIcon, Clock, Filter, Expand } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
 import type { Activity } from '@/types/workout';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
 
 type ActivityFilter = "all" | "deepwork" | "upskill" | "deepwork_upskill";
 type ViewMode = "day" | "week" | "month";
@@ -82,12 +84,69 @@ const DayDetailPopoverContent = ({ date, activities }: { date: Date; activities:
     );
 };
 
+const DayDetailModal = ({ isOpen, onOpenChange, data }: { isOpen: boolean, onOpenChange: (open: boolean) => void, data: { date: Date; activities: ProcessedActivity[] } }) => {
+  const { date, activities } = data;
+  const totalMinutes = activities.reduce((sum, act) => sum + act.calculatedDuration, 0);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Details for {format(date, 'PPP')}</DialogTitle>
+          <DialogDescriptionComponent>
+            Total time for selected filters: {formatMinutes(totalMinutes)}
+          </DialogDescriptionComponent>
+        </DialogHeader>
+        <div className="max-h-[60vh]">
+          <ScrollArea className="h-full pr-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[120px]">Slot</TableHead>
+                  <TableHead>Details</TableHead>
+                  <TableHead className="text-right w-[100px]">Duration</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {activities.length > 0 ? (
+                  activities.map((activity) => (
+                    <TableRow key={activity.id}>
+                      <TableCell>{activity.slot}</TableCell>
+                      <TableCell>
+                        <div className="font-medium">{activity.details}</div>
+                        <div className="text-xs text-muted-foreground capitalize">
+                          {activity.type.replace('_', ' + ')}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatMinutes(activity.calculatedDuration)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={3} className="h-24 text-center">
+                      No activities for this day.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 
 function TimesheetPageContent() {
     const { schedule, allDeepWorkLogs, allUpskillLogs, activityDurations } = useAuth();
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<ViewMode>("day");
     const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
+    const [modalData, setModalData] = useState<{ date: Date; activities: ProcessedActivity[] } | null>(null);
+
 
     const timeData = useMemo(() => {
         const getLoggedMinutes = (activity: Activity, dateKey: string): number => {
@@ -227,21 +286,37 @@ function TimesheetPageContent() {
                         return (
                             <Popover key={dateKey}>
                                 <PopoverTrigger asChild>
-                                    <Card className={cn("cursor-pointer transition-all hover:shadow-md hover:-translate-y-1 hover:bg-accent", isSameDay(day, new Date()) && "bg-muted")}>
-                                        <CardHeader className="p-4">
-                                            <CardTitle className="text-base flex justify-between">
+                                    <Card className={cn("cursor-pointer transition-all hover:shadow-md hover:-translate-y-1 hover:bg-accent flex flex-col", isSameDay(day, new Date()) && "bg-muted")}>
+                                        <CardHeader className="p-4 pb-2 flex-row items-start justify-between">
+                                          <div className="flex-grow">
+                                            <CardTitle className="text-base">
                                                 {format(day, 'EEE, MMM d')}
-                                                <span className="font-bold">{totalDayMinutes > 0 ? formatMinutes(totalDayMinutes) : "-"}</span>
                                             </CardTitle>
+                                          </div>
+                                          <Button 
+                                              variant="ghost" 
+                                              size="icon" 
+                                              className="h-6 w-6 -mr-2 -mt-1 flex-shrink-0" 
+                                              onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setModalData({ date: day, activities });
+                                              }}
+                                          >
+                                              <Expand className="h-4 w-4" />
+                                          </Button>
                                         </CardHeader>
-                                        <CardContent className="p-4 pt-0 text-sm space-y-1">
-                                            {Object.entries(dailyTotals).length > 0 ? Object.entries(dailyTotals).map(([type, minutes]) => (
-                                                minutes > 0 &&
-                                                <div key={type} className="flex justify-between text-muted-foreground">
-                                                    <span className="capitalize">{type.replace('_', ' + ')}</span>
-                                                    <span className="font-medium text-foreground">{formatMinutes(minutes)}</span>
-                                                </div>
-                                            )) : <p className="text-xs text-center text-muted-foreground">No activities</p>}
+                                        <CardContent className="p-4 pt-0 text-sm space-y-2 flex-grow flex flex-col justify-end">
+                                            <p className="text-2xl font-bold">{totalDayMinutes > 0 ? formatMinutes(totalDayMinutes) : "-"}</p>
+                                            
+                                            <div className="space-y-1">
+                                                {Object.entries(dailyTotals).length > 0 ? Object.entries(dailyTotals).map(([type, minutes]) => (
+                                                    minutes > 0 &&
+                                                    <div key={type} className="flex justify-between text-muted-foreground text-xs">
+                                                        <span className="capitalize">{type.replace('_', ' + ')}</span>
+                                                        <span className="font-medium text-foreground">{formatMinutes(minutes)}</span>
+                                                    </div>
+                                                )) : <p className="text-xs text-center text-muted-foreground">No activities</p>}
+                                            </div>
                                         </CardContent>
                                     </Card>
                                 </PopoverTrigger>
@@ -284,13 +359,26 @@ function TimesheetPageContent() {
                                 <Popover key={data.dateKey}>
                                     <PopoverTrigger asChild>
                                         <Card className="flex flex-col cursor-pointer transition-all hover:shadow-md hover:-translate-y-1 hover:bg-accent">
-                                            <CardHeader className="p-3">
-                                                <CardTitle className="text-sm flex justify-between">
-                                                    {format(data.day, 'EEE, MMM d')}
-                                                    <span className="font-bold text-primary">{formatMinutes(data.totalDuration)}</span>
-                                                </CardTitle>
+                                            <CardHeader className="p-3 flex flex-row items-start justify-between">
+                                                <div className="flex-grow">
+                                                  <CardTitle className="text-sm">
+                                                      {format(data.day, 'EEE, MMM d')}
+                                                  </CardTitle>
+                                                </div>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="h-6 w-6 -mr-1 -mt-1 flex-shrink-0"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setModalData({ date: data.day, activities: data.tasks });
+                                                    }}
+                                                >
+                                                    <Expand className="h-4 w-4" />
+                                                </Button>
                                             </CardHeader>
-                                            <CardContent className="p-3 pt-0 text-xs text-muted-foreground flex-grow">
+                                            <CardContent className="p-3 pt-0 text-xs text-muted-foreground flex-grow flex flex-col justify-between">
+                                                <p className="text-xl font-bold text-primary mb-2">{formatMinutes(data.totalDuration)}</p>
                                                 <ul className="list-disc list-inside space-y-1">
                                                     {data.tasks.map((task, i) => (
                                                         task.calculatedDuration > 0 && <li key={i} className="truncate" title={task.details}>{task.details} ({formatMinutes(task.calculatedDuration)})</li>
@@ -358,6 +446,14 @@ function TimesheetPageContent() {
             {viewMode === 'day' && renderDayView()}
             {viewMode === 'week' && renderWeekView()}
             {viewMode === 'month' && renderMonthView()}
+
+            {modalData && (
+                <DayDetailModal 
+                    isOpen={!!modalData}
+                    onOpenChange={() => setModalData(null)}
+                    data={modalData}
+                />
+            )}
         </div>
     );
 }
