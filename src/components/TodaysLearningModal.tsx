@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ExerciseDefinition, WorkoutExercise } from '@/types/workout';
-import { BookOpenCheck, Briefcase, Share2, Save, PlusCircle } from 'lucide-react';
+import { BookOpenCheck, Briefcase, Share2, Save, PlusCircle, ChevronRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
@@ -51,14 +51,25 @@ export function TodaysLearningModal({
   // State for branding bundle creation
   const [newBundleName, setNewBundleName] = useState('');
   const [selectedFocusAreaIds, setSelectedFocusAreaIds] = useState<string[]>([]);
+  
+  // State for deep work selection flow
+  const [selectionStep, setSelectionStep] = useState<'topic' | 'objective' | 'action'>('topic');
+  const [selectedDeepWorkTopic, setSelectedDeepWorkTopic] = useState<string | null>(null);
+  const [selectedDeepWorkObjective, setSelectedDeepWorkObjective] = useState<ExerciseDefinition | null>(null);
+
 
   useEffect(() => {
     if (isOpen) {
-      if (pageType === 'deepwork' || pageType === 'upskill' || pageType === 'branding') {
+      if (pageType === 'deepwork') {
+        setSelectionStep('topic');
+        setSelectedDeepWorkTopic(null);
+        setSelectedDeepWorkObjective(null);
+        setSelectedRadioDefId(initialSelectedIds.length > 0 ? initialSelectedIds[0] : null);
+      } else {
         setSelectedRadioDefId(initialSelectedIds.length > 0 ? initialSelectedIds[0] : null);
       }
     }
-  }, [isOpen, initialSelectedIds, pageType]);
+  }, [isOpen, pageType, initialSelectedIds]);
   
   const handleSaveChanges = () => {
     onSave(selectedRadioDefId ? [selectedRadioDefId] : []);
@@ -119,7 +130,9 @@ export function TodaysLearningModal({
     setSelectedFocusAreaIds([]);
   };
 
+  // ----- UPSKILL-SPECIFIC LOGIC -----
   const { allTasksForToday, libraryTasks } = useMemo(() => {
+    if (pageType !== 'upskill') return { allTasksForToday: [], libraryTasks: [] };
     const todaysLogDefIds = new Set(availableTasks.filter(t => !t.id.startsWith('lib-')).map(t => t.definitionId));
     
     let currentlySelectedIds: Set<string>;
@@ -142,7 +155,29 @@ export function TodaysLearningModal({
         processedDefIds.add(task.definitionId);
     });
     return { allTasksForToday: scheduled, libraryTasks: library };
-  }, [availableTasks, selectedRadioDefId]);
+  }, [availableTasks, selectedRadioDefId, pageType]);
+  
+  // ----- DEEPWORK-SPECIFIC LOGIC -----
+  const deepWorkTopics = useMemo(() => {
+    if (pageType !== 'deepwork') return [];
+    return [...new Set(deepWorkDefinitions.map(def => def.category))].sort();
+  }, [deepWorkDefinitions, pageType]);
+
+  const objectivesForTopic = useMemo(() => {
+      if (!selectedDeepWorkTopic || pageType !== 'deepwork') return [];
+      return deepWorkDefinitions.filter(
+          def => def.category === selectedDeepWorkTopic && (def.linkedDeepWorkIds?.length ?? 0) > 0
+      ).sort((a,b) => a.name.localeCompare(b.name));
+  }, [deepWorkDefinitions, selectedDeepWorkTopic, pageType]);
+
+  const actionsForObjective = useMemo(() => {
+      if (!selectedDeepWorkObjective || pageType !== 'deepwork') return [];
+      const childIds = new Set(selectedDeepWorkObjective.linkedDeepWorkIds || []);
+      return deepWorkDefinitions.filter(
+          def => childIds.has(def.id) && (def.linkedDeepWorkIds?.length ?? 0) === 0
+      ).sort((a,b) => a.name.localeCompare(b.name));
+  }, [deepWorkDefinitions, selectedDeepWorkObjective, pageType]);
+
 
   const pageInfo = {
     upskill: {
@@ -180,7 +215,80 @@ export function TodaysLearningModal({
 
         <div className="flex-grow min-h-0">
           <ScrollArea className="h-full pr-4">
-            {pageType === 'branding' ? (
+            {pageType === 'deepwork' ? (
+                <div className="space-y-4">
+                    <div className="flex items-center text-sm text-muted-foreground mb-4">
+                      <button
+                        onClick={() => {
+                          setSelectionStep('topic');
+                          setSelectedDeepWorkTopic(null);
+                          setSelectedDeepWorkObjective(null);
+                        }}
+                        className="hover:text-foreground disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:cursor-not-allowed"
+                        disabled={selectionStep === 'topic'}
+                      >
+                        Topics
+                      </button>
+                      {selectedDeepWorkTopic && (
+                        <>
+                          <ChevronRight className="h-4 w-4 mx-1" />
+                          <button
+                            onClick={() => {
+                              setSelectionStep('objective');
+                              setSelectedDeepWorkObjective(null);
+                            }}
+                            className="hover:text-foreground disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:cursor-not-allowed"
+                            disabled={selectionStep === 'objective'}
+                          >
+                            {selectedDeepWorkTopic}
+                          </button>
+                        </>
+                      )}
+                      {selectedDeepWorkObjective && (
+                        <>
+                          <ChevronRight className="h-4 w-4 mx-1" />
+                          <span className="font-medium text-foreground truncate" title={selectedDeepWorkObjective.name}>{selectedDeepWorkObjective.name}</span>
+                        </>
+                      )}
+                    </div>
+                    {selectionStep === 'topic' && (
+                        <div className="space-y-2">
+                            {deepWorkTopics.map(topic => (
+                                <button key={topic} onClick={() => { setSelectedDeepWorkTopic(topic); setSelectionStep('objective'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
+                                    <span className="font-medium">{topic}</span>
+                                    <ChevronRight className="h-4 w-4" />
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    {selectionStep === 'objective' && (
+                        <div className="space-y-2">
+                           {objectivesForTopic.length > 0 ? objectivesForTopic.map(obj => (
+                                <button key={obj.id} onClick={() => { setSelectedDeepWorkObjective(obj); setSelectionStep('action'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
+                                    <span className="font-medium">{obj.name}</span>
+                                    <ChevronRight className="h-4 w-4" />
+                                </button>
+                            )) : <p className="text-sm text-center text-muted-foreground py-4">No objectives found in this topic.</p>}
+                        </div>
+                    )}
+                    {selectionStep === 'action' && (
+                        <div className="space-y-2">
+                           {actionsForObjective.length > 0 ? (
+                                <RadioGroup value={selectedRadioDefId ?? ''} onValueChange={setSelectedRadioDefId} className="space-y-2">
+                                {actionsForObjective.map(action => (
+                                    <div key={action.id} className="flex items-center space-x-3 p-3 rounded-md border bg-muted/20 has-[[data-state=checked]]:bg-accent transition-colors">
+                                        <RadioGroupItem value={action.id} id={`action-radio-${action.id}`} />
+                                        <Label htmlFor={`action-radio-${action.id}`} className="font-normal w-full cursor-pointer">
+                                            {action.name}
+                                        </Label>
+                                    </div>
+                                ))}
+                                </RadioGroup>
+                           ) : <p className="text-sm text-center text-muted-foreground py-4">No actions found for this objective.</p>}
+                        </div>
+                    )}
+                </div>
+            ) : pageType === 'branding' ? (
                 <div className="space-y-6">
                     <div>
                         <h4 className="mb-2 text-sm font-medium text-muted-foreground">Create New Bundle</h4>
@@ -247,7 +355,7 @@ export function TodaysLearningModal({
                         </div>
                     )}
                 </div>
-            ) : ( // For upskill and deepwork
+            ) : ( // For upskill
                 availableTasks.length > 0 ? (
                     <div className="space-y-4">
                         {allTasksForToday.length > 0 && (
