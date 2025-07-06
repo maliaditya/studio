@@ -1552,8 +1552,29 @@ function DeepWorkPageContent() {
                                             <CardDescription>{deepworkDef.category}</CardDescription>
                                          </CardHeader>
                                          <CardContent className="flex-grow">
-                                            <p className="text-sm text-muted-foreground line-clamp-2">{deepworkDef.description || "This focus area can be expanded by linking learning tasks and resources to it."}</p>
-                                         </CardContent>
+                                            {deepworkDef.description ? (
+                                                <p className="text-sm text-muted-foreground line-clamp-2">{deepworkDef.description}</p>
+                                            ) : isObjective ? (
+                                                (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 ? (
+                                                    <>
+                                                        <h4 className="text-xs font-semibold text-foreground mb-1">Sub-Tasks:</h4>
+                                                        <ul className="text-xs text-muted-foreground list-disc list-inside space-y-0.5">
+                                                            {(deepworkDef.linkedDeepWorkIds || []).slice(0, 3).map(childId => {
+                                                                const childDef = deepWorkDefinitions.find(d => d.id === childId);
+                                                                return childDef ? <li key={childId} className="truncate" title={childDef.name}>{childDef.name}</li> : null;
+                                                            })}
+                                                            {(deepworkDef.linkedDeepWorkIds?.length ?? 0) > 3 && (
+                                                                <li className="text-xs text-muted-foreground/80">...and more</li>
+                                                            )}
+                                                        </ul>
+                                                    </>
+                                                ) : (
+                                                    <p className="text-sm text-muted-foreground line-clamp-2">This objective has no sub-tasks yet. Link items to it.</p>
+                                                )
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground line-clamp-2">This is a final action. You can add it to a session to log time.</p>
+                                            )}
+                                          </CardContent>
                                          <CardFooter className="pt-3 flex items-center justify-end">
                                             <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                                                 {deepworkDef.estimatedHours && <Badge variant="outline">{deepworkDef.estimatedHours}h est.</Badge>}
