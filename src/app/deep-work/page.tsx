@@ -1607,18 +1607,19 @@ function DeepWorkPageContent() {
                 <TrendingUp /> View Progress
             </Button>
             <div className="-mx-1 my-1 h-px bg-muted" />
-            <Button
-                variant="ghost"
-                className="w-full justify-start h-9 px-2 gap-2"
+            <div
+                role="menuitemcheckbox"
+                aria-checked={!!focusAreaContextMenu.item.isReadyForBranding}
+                className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
                 onMouseDown={(e) => {
                     e.preventDefault();
                     handleToggleReadyForBranding(focusAreaContextMenu.item.id);
                     setFocusAreaContextMenu(null);
                 }}
             >
-                <Checkbox checked={!!focusAreaContextMenu.item.isReadyForBranding} className="h-4 w-4" />
-                <span>Ready for Branding</span>
-            </Button>
+                <Checkbox checked={!!focusAreaContextMenu.item.isReadyForBranding} className="h-4 w-4 pointer-events-none" />
+                <span className="pointer-events-none">Ready for Branding</span>
+            </div>
             <div className="-mx-1 my-1 h-px bg-muted" />
             <Button variant="ghost" className="w-full justify-start h-9 px-2 gap-2" onMouseDown={() => { handleStartEditDefinition(focusAreaContextMenu.item); setFocusAreaContextMenu(null); }}>
                 <Edit3 /> Edit
