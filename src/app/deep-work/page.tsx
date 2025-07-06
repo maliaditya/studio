@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Eye, EyeOff, LineChart as LineChartIcon, Unlink, GitMerge } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Eye, EyeOff, LineChart as LineChartIcon, Unlink, GitMerge, Workflow } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -1030,7 +1030,7 @@ function DeepWorkPageContent() {
                                     <>
                                       <div className="flex items-center gap-2 flex-grow min-w-0">
                                         {isEpic ? (
-                                          <GitMerge className="h-4 w-4 flex-shrink-0 text-primary/80" />
+                                          <Workflow className="h-4 w-4 flex-shrink-0 text-primary/80" />
                                         ) : (
                                           <Briefcase className="h-4 w-4 flex-shrink-0 text-muted-foreground/80" />
                                         )}
@@ -1382,7 +1382,7 @@ function DeepWorkPageContent() {
                                          <CardHeader className="pb-3">
                                             <CardTitle className="text-base flex items-center gap-2">
                                               {isParent ? (
-                                                  <GitMerge className="h-5 w-5 text-primary flex-shrink-0" />
+                                                  <Workflow className="h-5 w-5 text-primary flex-shrink-0" />
                                                 ) : (
                                                   <Briefcase className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                                                 )}
