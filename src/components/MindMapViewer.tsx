@@ -123,9 +123,10 @@ interface MindMapViewerProps {
     defaultView?: string | null;
     showControls?: boolean;
     rootFolderId?: string | null;
+    rootFocusAreaId?: string | null;
 }
 
-export function MindMapViewer({ defaultView, showControls = true, rootFolderId = null }: MindMapViewerProps) {
+export function MindMapViewer({ defaultView, showControls = true, rootFolderId = null, rootFocusAreaId = null }: MindMapViewerProps) {
   const { toast } = useToast();
   const { 
       deepWorkDefinitions, 
@@ -213,6 +214,43 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
   }, [deepWorkTopicMetadata, deepWorkDefinitions, resourceFolders]);
 
   const mindMapData = useMemo((): MindMapNode | null => {
+    const processedIds = new Set<string>();
+
+    const buildNodeRecursive = (id: string, type: 'deepwork' | 'upskill' | 'resource', parentUniqueId: string): MindMapNode | null => {
+        const uniqueId = `${id}-from-${parentUniqueId}`;
+        if (processedIds.has(uniqueId)) {
+            const item = type === 'resource' 
+                ? resources.find(r => r.id === id) 
+                : [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === id);
+            return { id: uniqueId, definitionId: id, name: `${item?.name || 'Item'} (cyclic link)`, category: 'Cyclic', children: [] };
+        }
+        processedIds.add(uniqueId);
+
+        if (type === 'resource') {
+            const resource = resources.find(r => r.id === id);
+            if (!resource) return null;
+            return { ...resource, id: uniqueId, definitionId: resource.id, category: 'Resource', children: [] };
+        }
+
+        const definition = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === id);
+        if (!definition) return null;
+        
+        const linkedUpskillNodes = (definition.linkedUpskillIds || []).map(childId => buildNodeRecursive(childId, 'upskill', uniqueId)).filter((n): n is MindMapNode => !!n);
+        const linkedDeepWorkNodes = (definition.linkedDeepWorkIds || []).map(childId => buildNodeRecursive(childId, 'deepwork', uniqueId)).filter((n): n is MindMapNode => !!n);
+        const linkedResourceNodes = (definition.linkedResourceIds || []).map(childId => buildNodeRecursive(childId, 'resource', uniqueId)).filter((n): n is MindMapNode => !!n);
+
+        return {
+            ...definition, id: uniqueId, definitionId: definition.id,
+            category: upskillDefinitions.some(ud => ud.id === id) ? 'Learning Task' : 'FocusArea',
+            children: [...linkedDeepWorkNodes, ...linkedUpskillNodes, ...linkedResourceNodes],
+        };
+    };
+    
+    if (rootFocusAreaId) {
+        processedIds.clear();
+        return buildNodeRecursive(rootFocusAreaId, 'deepwork', 'root');
+    }
+
     if (!selectedTopic) return null;
 
     const createFocusAreaNode = (focusAreaDef: ExerciseDefinition, parentId: string): MindMapNode => {
@@ -396,7 +434,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     const type = productizationPlans[selectedTopic] ? 'product' : 'service';
     return buildFullTopicTree(selectedTopic, plan, type);
 
-  }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, totalTimePerFocusArea, resources, resourceFolders, rootFolderId]);
+  }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, totalTimePerFocusArea, resources, resourceFolders, rootFolderId, rootFocusAreaId]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -690,7 +728,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
   const handleSaveLinkedLearning = () => {
     if (!linkingLearningToFocusArea) return;
     setDeepWorkDefinitions(prevDefs => prevDefs.map(def =>
-        def.id === linkingLearningToFocusArea!.id
+        def.id === linkingLearningToFocusArea!.definitionId
             ? { ...def, linkedUpskillIds: editableLinkedUpskillIds }
             : def
     ));
@@ -745,6 +783,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         'Social:Dev.to': <DevToIcon className="h-3 w-3 text-muted-foreground" />,
         'Folder': <Folder className="h-3.5 w-3.5 text-yellow-600" />,
         'Resource': <LinkIcon className="h-3 w-3 text-muted-foreground" />,
+        'Cyclic': <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
     };
     
     let iconKey = node.category;
@@ -756,7 +795,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     if (node.category === 'Resource') iconKey = 'Resource';
 
     let activityTypeForNode: ActivityTypeType | undefined;
-    if (parentNode?.category === 'Release' || parentNode?.category === 'product' || parentNode?.category === 'service' || parentNode?.name === 'Products' || parentNode?.name === 'Services') {
+    if (parentNode?.category === 'Release' || parentNode?.category === 'product' || parentNode?.category === 'service' || parentNode?.name === 'Products' || parentNode?.name === 'Services' || parentNode?.category === 'FocusArea') {
       activityTypeForNode = 'deepwork';
     } else if (parentNode?.category === 'Content Bundle' || parentNode?.name === 'Content Bundles') {
       activityTypeForNode = 'branding';
@@ -1013,7 +1052,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
             !showControls ? "h-full w-full" : "mt-2 rounded-lg bg-muted/30"
         )}
     >
-        {selectedTopic && mindMapData ? (
+        {selectedTopic || rootFocusAreaId ? mindMapData ? (
           <TransformWrapper 
             ref={transformWrapperRef}
             initialScale={0.6} 
@@ -1049,6 +1088,10 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
               </>
             )}}
           </TransformWrapper>
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-muted-foreground">No data to display for this selection.</p>
+          </div>
         ) : (
           <ConceptualFlowDiagram />
         )}

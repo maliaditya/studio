@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Eye, EyeOff, LineChart as LineChartIcon, Unlink } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Eye, EyeOff, LineChart as LineChartIcon, Unlink, GitMerge } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Progress } from '@/components/ui/progress';
 import { FocusAreaProgressModal } from '@/components/FocusAreaProgressModal';
+import { MindMapViewer } from '@/components/MindMapViewer';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -157,6 +158,10 @@ function DeepWorkPageContent() {
   } | null>(null);
 
   const [hideLinkedFocusAreas, setHideLinkedFocusAreas] = useState(false);
+
+  // Mind map modal state
+  const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
+  const [mindMapRootId, setMindMapRootId] = useState<string | null>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -315,7 +320,7 @@ function DeepWorkPageContent() {
   const totalEstimatedHours = useMemo(() => {
     if (!selectedFocusArea) return 0;
 
-    let totalHours = 0; // Only sum linked items
+    let totalHours = 0;
 
     (selectedFocusArea.linkedDeepWorkIds || []).forEach(id => {
       const def = deepWorkDefinitions.find(d => d.id === id);
@@ -904,6 +909,11 @@ function DeepWorkPageContent() {
     return { avgProductiveHours };
   }, [allUpskillLogs, allDeepWorkLogs]);
 
+  const openMindMapFor = (focusAreaId: string) => {
+    setMindMapRootId(focusAreaId);
+    setIsMindMapModalOpen(true);
+  };
+
 
   if (isLoadingPage) {
     return (
@@ -1005,6 +1015,14 @@ function DeepWorkPageContent() {
                                     </div>
                                     <div className='flex items-center flex-shrink-0 opacity-0 group-hover:opacity-100'>
                                       <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openMindMapFor(def.id)}>
+                                                    <GitMerge className="h-4 w-4" />
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>View Mind Map</TooltipContent>
+                                        </Tooltip>
                                         <Tooltip>
                                           <TooltipTrigger asChild>
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddTaskToSession(def)}>
@@ -1395,7 +1413,7 @@ function DeepWorkPageContent() {
                                             {youtubeEmbedUrl ? (
                                                 <>
                                                     <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setEmbedUrl(youtubeEmbedUrl); }}>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setEmbedUrl(embedLinkForModal); }}>
                                                             <Expand className="h-4 w-4" />
                                                         </Button>
                                                         <DropdownMenu>
@@ -1536,7 +1554,7 @@ function DeepWorkPageContent() {
         >
           <Button variant="ghost" className="w-full justify-start h-9 px-2" onClick={(e) => {
               e.stopPropagation();
-              setExpandedTopics(prev => new Set(prev).add(contextMenu.item));
+              toggleTopicExpansion(contextMenu.item);
               setAddingFocusToTopic(contextMenu.item);
               setContextMenu(null);
           }}>
@@ -1794,6 +1812,15 @@ function DeepWorkPageContent() {
                 <Button variant="outline" onClick={() => setEditingResource(null)}>Cancel</Button>
                 <Button onClick={handleSaveResourceEdit}>Save Changes</Button>
             </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
+        <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Focus Area Mind Map</DialogTitle>
+            </DialogHeader>
+            <MindMapViewer rootFocusAreaId={mindMapRootId} showControls={false} />
         </DialogContent>
     </Dialog>
     </>
