@@ -1421,6 +1421,7 @@ function DeepWorkPageContent() {
                                     const deepworkDef = deepWorkDefinitions.find(dd => dd.id === id);
                                     if (!deepworkDef) return null;
 
+                                    const nodeType = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 ? 'Objective' : 'Action';
                                     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
                                     const loggedHours = loggedMinutes / 60;
                                     const isIntention = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 || (deepworkDef.linkedUpskillIds?.length ?? 0) > 0 || (deepworkDef.linkedResourceIds?.length ?? 0) > 0;
@@ -1471,6 +1472,7 @@ function DeepWorkPageContent() {
                                                   <Briefcase className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                                                 )}
                                               <span className="truncate" title={deepworkDef.name}>{deepworkDef.name}</span>
+                                              <Badge variant="outline" className="text-xs">{nodeType}</Badge>
                                             </CardTitle>
                                             <CardDescription>{deepworkDef.category}</CardDescription>
                                          </CardHeader>
