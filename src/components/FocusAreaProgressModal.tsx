@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,9 +9,11 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { ChartContainer, ChartConfig } from '@/components/ui/chart';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceDot, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceDot, Legend, Brush } from 'recharts';
 import { format, parseISO, addDays, differenceInDays } from 'date-fns';
 import { ExerciseDefinition, DatedWorkout } from '@/types/workout';
+import { Button } from './ui/button';
+import { ZoomOut } from 'lucide-react';
 
 interface FocusAreaProgressModalProps {
   isOpen: boolean;
@@ -39,6 +41,8 @@ export function FocusAreaProgressModal({
   allUpskillLogs,
   avgDailyProductiveHours,
 }: FocusAreaProgressModalProps) {
+  const [chartKey, setChartKey] = useState(Date.now());
+  const [brushIndex, setBrushIndex] = useState<{ startIndex?: number; endIndex?: number }>({});
 
   const graphData = useMemo(() => {
     if (!focusArea || !avgDailyProductiveHours || avgDailyProductiveHours <= 0) {
@@ -125,21 +129,47 @@ export function FocusAreaProgressModal({
     return { combinedData, milestones };
   }, [focusArea, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, avgDailyProductiveHours]);
 
+  const isZoomed = useMemo(() => {
+    if (graphData.combinedData.length <= 1) return false;
+    const { startIndex, endIndex } = brushIndex;
+    return (
+      startIndex !== undefined &&
+      endIndex !== undefined &&
+      (startIndex !== 0 || endIndex !== graphData.combinedData.length - 1)
+    );
+  }, [brushIndex, graphData.combinedData.length]);
+
+  const handleResetZoom = () => {
+    setBrushIndex({});
+    setChartKey(Date.now());
+  };
+
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Progress Projection for: {focusArea?.name}</DialogTitle>
-          <DialogDescription>
-            Comparing your logged work against a projection based on your average daily productive hours.
-          </DialogDescription>
+           <div className="flex justify-between items-center">
+             <div>
+                <DialogTitle>Progress Projection for: {focusArea?.name}</DialogTitle>
+                <DialogDescription>
+                  Comparing your logged work against a projection. Drag on the timeline to zoom.
+                </DialogDescription>
+             </div>
+             {isZoomed && (
+                <Button variant="outline" size="sm" onClick={handleResetZoom} className="flex-shrink-0">
+                    <ZoomOut className="mr-2 h-4 w-4" />
+                    Reset Zoom
+                </Button>
+            )}
+           </div>
         </DialogHeader>
 
         <div className="flex-grow min-h-0 py-4">
             {graphData.combinedData.length > 0 ? (
-                <ChartContainer config={chartConfig} className="h-full w-full">
+                <ChartContainer config={chartConfig} key={chartKey} className="h-full w-full">
                     <ResponsiveContainer>
-                        <LineChart data={graphData.combinedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                        <LineChart data={graphData.combinedData} margin={{ top: 5, right: 30, left: 20, bottom: 40 }}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis 
                                 dataKey="timestamp" 
@@ -178,6 +208,14 @@ export function FocusAreaProgressModal({
                                     <title>{dot.label}</title>
                                 </ReferenceDot>
                             ))}
+                             <Brush 
+                                dataKey="timestamp" 
+                                height={40} 
+                                stroke="hsl(var(--primary))" 
+                                tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')}
+                                travellerWidth={15}
+                                onChange={(e) => setBrushIndex({startIndex: e.startIndex, endIndex: e.endIndex})}
+                            />
                         </LineChart>
                     </ResponsiveContainer>
                 </ChartContainer>
