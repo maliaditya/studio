@@ -1892,10 +1892,10 @@ function DeepWorkPageContent() {
                       {manageLinksConfig?.type === 'upskill' && (
                         <div className="mb-4 space-y-1">
                           <Label htmlFor="link-upskill-topic">Select Topic</Label>
-                          <Select value={linkUpskillTopic} onValueChange={setLinkUpskillTopic}>
+                          <Select value={linkUpskillTopic} onValueChange={(value) => setLinkUpskillTopic(value === 'all-topics-placeholder' ? '' : value)}>
                             <SelectTrigger id="link-upskill-topic"><SelectValue placeholder="All Topics" /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">All Topics</SelectItem>
+                              <SelectItem value="all-topics-placeholder">All Topics</SelectItem>
                               {allUpskillTopics.map(topic => (<SelectItem key={topic} value={topic}>{topic}</SelectItem>))}
                             </SelectContent>
                           </Select>
@@ -1904,10 +1904,10 @@ function DeepWorkPageContent() {
                       {manageLinksConfig?.type === 'deepwork' && (
                         <div className="mb-4 space-y-1">
                           <Label htmlFor="link-deepwork-topic">Select Topic</Label>
-                          <Select value={linkDeepWorkTopic} onValueChange={setLinkDeepWorkTopic}>
+                          <Select value={linkDeepWorkTopic} onValueChange={(value) => setLinkDeepWorkTopic(value === 'all-topics-placeholder' ? '' : value)}>
                             <SelectTrigger id="link-deepwork-topic"><SelectValue placeholder="All Topics" /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">All Topics</SelectItem>
+                              <SelectItem value="all-topics-placeholder">All Topics</SelectItem>
                               {allKnownTopics.map(topic => (<SelectItem key={topic} value={topic}>{topic}</SelectItem>))}
                             </SelectContent>
                           </Select>
