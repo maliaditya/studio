@@ -907,6 +907,12 @@ function DeepWorkPageContent() {
     setIsManageLinksModalOpen(false);
   }
 
+  const isSelectedFocusAreaAnAction = useMemo(() => {
+    if (!selectedFocusArea) return false;
+    const isParent = (selectedFocusArea.linkedDeepWorkIds?.length ?? 0) > 0 || (selectedFocusArea.linkedUpskillIds?.length ?? 0) > 0 || (selectedFocusArea.linkedResourceIds?.length ?? 0) > 0;
+    return !isParent;
+  }, [selectedFocusArea]);
+
   const filteredItemsForLinking = useMemo(() => {
     if (!manageLinksConfig) return [];
     const { type, parent } = manageLinksConfig;
@@ -921,13 +927,30 @@ function DeepWorkPageContent() {
         definitionsSource = resources.filter(res => res.folderId === linkResourceFolderId);
     }
 
-    return definitionsSource.filter(def => 
-        def.name &&
+    const isParentAnObjective = (() => {
+      if (type !== 'deepwork') return false;
+      const isParentParent = (parent.linkedDeepWorkIds?.length ?? 0) > 0 || (parent.linkedUpskillIds?.length ?? 0) > 0 || (parent.linkedResourceIds?.length ?? 0) > 0;
+      const isParentChild = linkedDeepWorkChildIds.has(parent.id);
+      return isParentParent && isParentChild;
+    })();
+
+    return definitionsSource.filter(def => {
+        if (type === 'deepwork' && isParentAnObjective) {
+            const isDefParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+            const isDefChild = linkedDeepWorkChildIds.has(def.id);
+            const isDefAnIntention = isDefParent && !isDefChild;
+            if (isDefAnIntention) {
+                return false;
+            }
+        }
+        
+        return def.name &&
         def.name !== 'placeholder' &&
         def.id !== parent.id && 
-        def.name.toLowerCase().includes(linkSearchTerm.toLowerCase())
-    );
-  }, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm, linkResourceFolderId]);
+        def.name.toLowerCase().includes(linkSearchTerm.toLowerCase());
+    });
+  }, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkedDeepWorkChildIds]);
+
 
   const handleStartEditUpskill = (def: ExerciseDefinition) => {
     setEditingUpskill(def);
@@ -1445,13 +1468,15 @@ function DeepWorkPageContent() {
                                       </Card>
                                     )
                                   })}
-                                  <Card 
-                                    onClick={() => handleOpenManageLinksModal('upskill', selectedFocusArea)}
-                                    className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
-                                  >
-                                    <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                    <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
-                                  </Card>
+                                  {!isSelectedFocusAreaAnAction && (
+                                    <Card 
+                                        onClick={() => handleOpenManageLinksModal('upskill', selectedFocusArea)}
+                                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
+                                    >
+                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
+                                    </Card>
+                                  )}
                                 </div>
                               </div>
                               <div className="space-y-3">
@@ -1528,13 +1553,15 @@ function DeepWorkPageContent() {
                                        </Card>
                                     );
                                   })}
-                                  <Card 
-                                    onClick={() => handleOpenManageLinksModal('deepwork', selectedFocusArea)}
-                                    className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
-                                  >
-                                    <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                    <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Focus Area</p>
-                                  </Card>
+                                  {!isSelectedFocusAreaAnAction && (
+                                    <Card 
+                                        onClick={() => handleOpenManageLinksModal('deepwork', selectedFocusArea)}
+                                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
+                                    >
+                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Focus Area</p>
+                                    </Card>
+                                  )}
                                 </div>
                               </div>
                               <div className="space-y-3">
@@ -1628,13 +1655,15 @@ function DeepWorkPageContent() {
                                         </Card>
                                     )
                                   })}
-                                  <Card 
-                                    onClick={() => handleOpenManageLinksModal('resource', selectedFocusArea)}
-                                    className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
-                                  >
-                                    <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                    <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p>
-                                  </Card>
+                                  {!isSelectedFocusAreaAnAction && (
+                                    <Card 
+                                        onClick={() => handleOpenManageLinksModal('resource', selectedFocusArea)}
+                                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
+                                    >
+                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p>
+                                    </Card>
+                                  )}
                                 </div>
                               </div>
                             </div>
