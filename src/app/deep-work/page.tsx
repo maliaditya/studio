@@ -1160,27 +1160,6 @@ function DeepWorkPageContent() {
                               const isObjective = isParent && isLinkedAsChild;
                               return (
                                 <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted" onContextMenu={(e) => handleFocusAreaContextMenu(e, def)}>
-                                  {editingDefinition?.id === def.id ? (
-                                    <div className='flex-grow flex flex-col gap-2'>
-                                      <Input 
-                                        value={editingDefinitionName}
-                                        onChange={(e) => setEditingDefinitionName(e.target.value)}
-                                        className="h-8"
-                                        autoFocus
-                                      />
-                                      <Input
-                                          type="number"
-                                          placeholder="Est. Hours"
-                                          value={editingDefinitionHours}
-                                          onChange={(e) => setEditingDefinitionHours(e.target.value)}
-                                          className="h-8"
-                                      />
-                                      <div className="flex gap-2 self-end">
-                                          <Button size="icon" className="h-8 w-8" onClick={handleSaveEditDefinition}><Save className="h-4 w-4"/></Button>
-                                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingDefinition(null)}><X className="h-4 w-4"/></Button>
-                                      </div>
-                                    </div>
-                                  ) : (
                                     <>
                                       <div className="flex items-center gap-2 flex-grow min-w-0">
                                         {isIntention ? (
@@ -1217,7 +1196,6 @@ function DeepWorkPageContent() {
                                         </TooltipProvider>
                                       </div>
                                     </>
-                                  )}
                                 </li>
                               )})}
                              {addingFocusToTopic === topic && (
@@ -2078,6 +2056,29 @@ function DeepWorkPageContent() {
               <DialogTitle>Focus Area Mind Map</DialogTitle>
             </DialogHeader>
             <MindMapViewer rootFocusAreaId={mindMapRootId} showControls={false} />
+        </DialogContent>
+    </Dialog>
+    
+    <Dialog open={!!editingDefinition} onOpenChange={() => setEditingDefinition(null)}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Edit Focus Area</DialogTitle>
+                <DialogDescription>Update the details of this focus area.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-1">
+                    <Label htmlFor="dw-name">Name</Label>
+                    <Input id="dw-name" value={editingDefinitionName} onChange={e => setEditingDefinitionName(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                    <Label htmlFor="dw-hours">Estimated Hours</Label>
+                    <Input id="dw-hours" type="number" value={editingDefinitionHours} onChange={e => setEditingDefinitionHours(e.target.value)} placeholder="e.g., 40" />
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingDefinition(null)}>Cancel</Button>
+                <Button onClick={handleSaveEditDefinition}>Save Changes</Button>
+            </DialogFooter>
         </DialogContent>
     </Dialog>
 
