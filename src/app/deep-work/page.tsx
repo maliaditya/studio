@@ -1050,7 +1050,7 @@ function DeepWorkPageContent() {
                                                     </DropdownMenu>
                                                 </div>
                                                 <div className="aspect-video w-full bg-black overflow-hidden rounded-t-2xl">
-                                                    <iframe src={youtubeEmbedUrl} title={upskillDef.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="pointer-events-none w-full h-full"></iframe>
+                                                    <iframe src={youtubeEmbedUrl} title={upskillDef.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
                                                 </div>
                                                 <div className="p-4 flex-grow flex flex-col">
                                                   <div className="flex items-start justify-between gap-2 flex-grow">
@@ -1220,7 +1220,7 @@ function DeepWorkPageContent() {
                                                         </DropdownMenu>
                                                     </div>
                                                     <div className="aspect-video w-full bg-black overflow-hidden rounded-t-2xl">
-                                                        <iframe src={youtubeEmbedUrl} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="pointer-events-none w-full h-full"></iframe>
+                                                        <iframe src={youtubeEmbedUrl} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
                                                     </div>
                                                     <div className="p-4 flex-grow">
                                                       <div className="flex items-start justify-between gap-2">

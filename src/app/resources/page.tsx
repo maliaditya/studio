@@ -491,7 +491,6 @@ function ResourcesPageContent() {
                                             frameBorder="0"
                                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                             allowFullScreen
-                                            className="pointer-events-none"
                                         ></iframe>
                                     </div>
                                     <div className="p-4 flex-grow">
