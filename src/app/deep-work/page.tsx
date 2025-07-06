@@ -1559,14 +1559,21 @@ function DeepWorkPageContent() {
                                                 (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 ? (
                                                     <>
                                                         <h4 className="text-xs font-semibold text-foreground mb-1">Sub-Tasks:</h4>
-                                                        <ul className="text-xs text-muted-foreground list-disc list-inside space-y-0.5">
-                                                            {(deepworkDef.linkedDeepWorkIds || []).slice(0, 3).map(childId => {
+                                                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 list-disc list-inside text-xs text-muted-foreground space-y-0.5">
+                                                            {(deepworkDef.linkedDeepWorkIds || []).map(childId => {
                                                                 const childDef = deepWorkDefinitions.find(d => d.id === childId);
-                                                                return childDef ? <li key={childId} className="truncate" title={childDef.name}>{childDef.name}</li> : null;
+                                                                if (!childDef) return null;
+                                                                const isChildLoggedToday = loggedTodayActionIds.has(childDef.id);
+                                                                return (
+                                                                    <li 
+                                                                        key={childId} 
+                                                                        className={cn("truncate", isChildLoggedToday && "line-through text-muted-foreground/70")} 
+                                                                        title={childDef.name}
+                                                                    >
+                                                                        {childDef.name}
+                                                                    </li>
+                                                                );
                                                             })}
-                                                            {(deepworkDef.linkedDeepWorkIds?.length ?? 0) > 3 && (
-                                                                <li className="text-xs text-muted-foreground/80">...and more</li>
-                                                            )}
                                                         </ul>
                                                     </>
                                                 ) : (
