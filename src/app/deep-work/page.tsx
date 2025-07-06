@@ -283,18 +283,18 @@ function DeepWorkPageContent() {
     return Array.from(new Set([...topicsFromDefs, ...topicsFromMeta])).sort();
   }, [deepWorkDefinitions, deepWorkTopicMetadata]);
 
+  // A memoized set of all focus area IDs that are linked as children.
+  const linkedDeepWorkChildIds = useMemo(() =>
+    new Set<string>(deepWorkDefinitions.flatMap(def => def.linkedDeepWorkIds || []))
+  , [deepWorkDefinitions]);
+  
   const topicsWithFocusAreas = useMemo(() => {
-    // 1. Get a set of all focus area IDs that are linked as children.
-    const linkedFocusAreaIds = new Set<string>(
-      deepWorkDefinitions.flatMap(def => def.linkedDeepWorkIds || [])
-    );
-
-    // 2. Filter definitions based on the toggle state.
+    // Filter definitions based on the toggle state.
     const visibleDefinitions = hideLinkedFocusAreas
-      ? deepWorkDefinitions.filter(def => !linkedFocusAreaIds.has(def.id))
+      ? deepWorkDefinitions.filter(def => !linkedDeepWorkChildIds.has(def.id))
       : deepWorkDefinitions;
       
-    // 3. Group the visible definitions by topic.
+    // Group the visible definitions by topic.
     const grouped: { [key: string]: ExerciseDefinition[] } = {};
     visibleDefinitions.forEach(def => {
         if (!grouped[def.category]) {
@@ -303,9 +303,9 @@ function DeepWorkPageContent() {
         grouped[def.category].push(def);
     });
 
-    // 4. Use allKnownTopics to ensure even empty topics are displayed
+    // Use allKnownTopics to ensure even empty topics are displayed
     return allKnownTopics.map(topic => [topic, grouped[topic] || []] as [string, ExerciseDefinition[]]);
-  }, [allKnownTopics, deepWorkDefinitions, hideLinkedFocusAreas]);
+  }, [allKnownTopics, deepWorkDefinitions, hideLinkedFocusAreas, linkedDeepWorkChildIds]);
 
 
   const formatMinutes = (minutes: number) => {
@@ -1037,7 +1037,7 @@ function DeepWorkPageContent() {
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>{hideLinkedFocusAreas ? "Show linked focus areas" : "Hide linked focus areas"}</p>
+                          <p>{hideLinkedFocusAreas ? "Show linked sub-tasks" : "Hide linked sub-tasks"}</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -1072,7 +1072,9 @@ function DeepWorkPageContent() {
                       {!isCollapsed && (
                         <ul className="space-y-1 pl-4 border-l-2 border-muted ml-4">
                             {focusAreas.sort((a,b) => a.name.localeCompare(b.name)).map(def => {
-                              const isIntention = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+                              const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+                              const isLinkedAsChild = linkedDeepWorkChildIds.has(def.id);
+                              const isIntention = isParent && !isLinkedAsChild;
                               return (
                                 <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted" onContextMenu={(e) => handleFocusAreaContextMenu(e, def)}>
                                   {editingDefinition?.id === def.id ? (
@@ -1689,9 +1691,12 @@ function DeepWorkPageContent() {
                 setFocusAreaContextMenu(null);
             }}
         >
-            <Button variant="ghost" className="w-full justify-start h-9 px-2 gap-2" onMouseDown={() => handleViewProgress(focusAreaContextMenu.item, 'deepwork')}>
+            <div
+                role="menuitem"
+                className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                onMouseDown={() => { handleViewProgress(focusAreaContextMenu.item, 'deepwork'); setFocusAreaContextMenu(null); }}>
                 <TrendingUp /> View Progress
-            </Button>
+            </div>
             <div className="-mx-1 my-1 h-px bg-muted" />
             <div
                 role="menuitemcheckbox"
@@ -1707,12 +1712,12 @@ function DeepWorkPageContent() {
                 <span className="pointer-events-none">Ready for Branding</span>
             </div>
             <div className="-mx-1 my-1 h-px bg-muted" />
-            <Button variant="ghost" className="w-full justify-start h-9 px-2 gap-2" onMouseDown={() => { handleStartEditDefinition(focusAreaContextMenu.item); setFocusAreaContextMenu(null); }}>
+            <div role="menuitem" className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground" onMouseDown={() => { handleStartEditDefinition(focusAreaContextMenu.item); setFocusAreaContextMenu(null); }}>
                 <Edit3 /> Edit
-            </Button>
-            <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive h-9 px-2 gap-2" onMouseDown={() => { handleDeleteExerciseDefinition(focusAreaContextMenu.item.id); setFocusAreaContextMenu(null); }}>
+            </div>
+            <div role="menuitem" className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors text-destructive hover:bg-accent hover:text-destructive" onMouseDown={() => { handleDeleteExerciseDefinition(focusAreaContextMenu.item.id); setFocusAreaContextMenu(null); }}>
                 <Trash2 /> Delete
-            </Button>
+            </div>
         </div>
       )}
 
