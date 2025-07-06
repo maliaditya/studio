@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Trash2, CheckSquare, Edit2, Save, X, Youtube, TrendingUp, Check, Linkedin, RefreshCw } from 'lucide-react';
-import { WorkoutExercise, LoggedSet, TopicGoal, SharingStatus, ExerciseDefinition } from '@/types/workout';
+import { WorkoutExercise, LoggedSet, TopicGoal, SharingStatus, ExerciseDefinition, DatedWorkout } from '@/types/workout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Checkbox } from './ui/checkbox';
@@ -31,7 +31,11 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 interface WorkoutExerciseCardProps {
   exercise: WorkoutExercise;
+  definition?: ExerciseDefinition;
   definitionGoal?: TopicGoal;
+  selectedDate?: Date;
+  allDeepWorkLogs?: DatedWorkout[];
+  allUpskillLogs?: DatedWorkout[];
   onLogSet: (exerciseId: string, reps: number, weight: number) => void;
   onDeleteSet: (exerciseId: string, setId: string) => void;
   onUpdateSet: (exerciseId: string, setId: string, reps: number, weight: number) => void;
@@ -46,7 +50,11 @@ interface WorkoutExerciseCardProps {
 
 export function WorkoutExerciseCard({
   exercise,
+  definition,
   definitionGoal,
+  selectedDate,
+  allDeepWorkLogs,
+  allUpskillLogs,
   onLogSet,
   onDeleteSet,
   onUpdateSet,
@@ -68,6 +76,8 @@ export function WorkoutExerciseCard({
   const [editWeight, setEditWeight] = useState('');
   const [editDuration, setEditDuration] = useState('');
   const [editProgress, setEditProgress] = useState('');
+  
+  const isParent = definition && ((definition.linkedDeepWorkIds?.length ?? 0) > 0 || (definition.linkedUpskillIds?.length ?? 0) > 0 || (definition.linkedResourceIds?.length ?? 0) > 0);
   
   const handleSharingChange = (platform: keyof SharingStatus) => {
     if (!onUpdateSharingStatus || !exercise.sharingStatus) return;
@@ -169,7 +179,40 @@ export function WorkoutExerciseCard({
   }, [exercise, pageType]);
   
 
+  const dailyTotalMinutes = useMemo(() => {
+      if (!isParent || !selectedDate || !definition) return 0;
+      
+      const dateKey = format(selectedDate, 'yyyy-MM-dd');
+      let totalMinutes = 0;
+
+      const allDeepWorkDefIds = new Set(definition.linkedDeepWorkIds || []);
+      const allUpskillDefIds = new Set(definition.linkedUpskillIds || []);
+      
+      const deepWorkLogForDay = allDeepWorkLogs?.find(log => log.date === dateKey);
+      if (deepWorkLogForDay) {
+          deepWorkLogForDay.exercises.forEach(ex => {
+              if (allDeepWorkDefIds.has(ex.definitionId)) {
+                  totalMinutes += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0);
+              }
+          });
+      }
+
+      const upskillLogForDay = allUpskillLogs?.find(log => log.date === dateKey);
+      if (upskillLogForDay) {
+          upskillLogForDay.exercises.forEach(ex => {
+              if (allUpskillDefIds.has(ex.definitionId)) {
+                  totalMinutes += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0);
+              }
+          });
+      }
+      
+      return totalMinutes;
+  }, [isParent, selectedDate, definition, allDeepWorkLogs, allUpskillLogs]);
+
   const getProgressText = () => {
+    if (isParent) {
+      return `Daily Time: ${dailyTotalMinutes} min`;
+    }
     if (pageType === 'upskill' && definitionGoal) {
       const totalProgress = exercise.loggedSets.reduce((sum, set) => sum + set.weight, 0);
       return `Topic Goal: ${definitionGoal.goalValue} ${definitionGoal.goalType}. This subtopic: ${totalProgress} logged.`;
@@ -306,39 +349,46 @@ export function WorkoutExerciseCard({
 
   const renderDefaultContent = () => (
       <>
-        <form onSubmit={handleLogSetSubmit} className="flex gap-2 mb-3 items-end">
-            {pageType === 'workout' ? (
-            <>
-                <div className="flex-1">
-                <label htmlFor={`reps-${exercise.id}`} className="sr-only">Reps</label>
-                <Input id={`reps-${exercise.id}`} type="number" placeholder="Reps" value={reps} onChange={(e) => setReps(e.target.value)} className="h-9" min="1" required />
-                </div>
-                <div className="flex-1">
-                <label htmlFor={`weight-${exercise.id}`} className="sr-only">Weight (kg/lb)</label>
-                <Input id={`weight-${exercise.id}`} type="number" placeholder="Weight" value={weight} onChange={(e) => setWeight(e.target.value)} className="h-9" min="0" step="0.1" required />
-                </div>
-            </>
-            ) : pageType === 'upskill' ? (
+        {isParent && pageType === 'deepwork' ? (
+             <div className="space-y-2 text-center py-4">
+                <p className="text-sm text-muted-foreground">Time is automatically aggregated from linked tasks.</p>
+                <p className="text-2xl font-bold">{dailyTotalMinutes > 0 ? `${dailyTotalMinutes} min` : "No time logged today"}</p>
+            </div>
+        ) : (
+            <form onSubmit={handleLogSetSubmit} className="flex gap-2 mb-3 items-end">
+                {pageType === 'workout' ? (
                 <>
                     <div className="flex-1">
-                        <label htmlFor={`progress-${exercise.id}`} className="sr-only">{placeholder}</label>
-                        <Input id={`progress-${exercise.id}`} type="number" placeholder={placeholder.replace('Log ', '')} value={progress} onChange={(e) => setProgress(e.target.value)} className="h-9" min="1" required />
+                    <label htmlFor={`reps-${exercise.id}`} className="sr-only">Reps</label>
+                    <Input id={`reps-${exercise.id}`} type="number" placeholder="Reps" value={reps} onChange={(e) => setReps(e.target.value)} className="h-9" min="1" required />
                     </div>
                     <div className="flex-1">
-                        <label htmlFor={`duration-${exercise.id}`} className="sr-only">Duration (min)</label>
-                        <Input id={`duration-${exercise.id}`} type="number" placeholder="Duration (min)" value={duration} onChange={(e) => setDuration(e.target.value)} className="h-9" min="1" required />
+                    <label htmlFor={`weight-${exercise.id}`} className="sr-only">Weight (kg/lb)</label>
+                    <Input id={`weight-${exercise.id}`} type="number" placeholder="Weight" value={weight} onChange={(e) => setWeight(e.target.value)} className="h-9" min="0" step="0.1" required />
                     </div>
                 </>
-            ) : (
-            <div className="flex-1">
-                <label htmlFor={`duration-${exercise.id}`} className="sr-only">{placeholder}</label>
-                <Input id={`duration-${exercise.id}`} type="number" placeholder={placeholder} value={duration} onChange={(e) => setDuration(e.target.value)} className="h-9" min="1" required />
-            </div>
-            )}
-            <Button type="submit" size="icon" className="h-9 w-9 shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground" aria-label="Log set">
-            <PlusCircle className="h-5 w-5" />
-            </Button>
-        </form>
+                ) : pageType === 'upskill' ? (
+                    <>
+                        <div className="flex-1">
+                            <label htmlFor={`progress-${exercise.id}`} className="sr-only">{placeholder}</label>
+                            <Input id={`progress-${exercise.id}`} type="number" placeholder={placeholder.replace('Log ', '')} value={progress} onChange={(e) => setProgress(e.target.value)} className="h-9" min="1" required />
+                        </div>
+                        <div className="flex-1">
+                            <label htmlFor={`duration-${exercise.id}`} className="sr-only">Duration (min)</label>
+                            <Input id={`duration-${exercise.id}`} type="number" placeholder="Duration (min)" value={duration} onChange={(e) => setDuration(e.target.value)} className="h-9" min="1" required />
+                        </div>
+                    </>
+                ) : (
+                <div className="flex-1">
+                    <label htmlFor={`duration-${exercise.id}`} className="sr-only">{placeholder}</label>
+                    <Input id={`duration-${exercise.id}`} type="number" placeholder={placeholder} value={duration} onChange={(e) => setDuration(e.target.value)} className="h-9" min="1" required />
+                </div>
+                )}
+                <Button type="submit" size="icon" className="h-9 w-9 shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground" aria-label="Log set">
+                <PlusCircle className="h-5 w-5" />
+                </Button>
+            </form>
+        )}
 
         {exercise.loggedSets.length > 0 && (
         <div>

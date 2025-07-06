@@ -320,23 +320,19 @@ function DeepWorkPageContent() {
   
   const totalEstimatedHours = useMemo(() => {
     if (!selectedFocusArea) return 0;
-
     let totalHours = 0;
-
     (selectedFocusArea.linkedDeepWorkIds || []).forEach(id => {
       const def = deepWorkDefinitions.find(d => d.id === id);
       if (def?.estimatedHours) {
         totalHours += def.estimatedHours;
       }
     });
-
     (selectedFocusArea.linkedUpskillIds || []).forEach(id => {
       const def = upskillDefinitions.find(d => d.id === id);
       if (def?.estimatedHours) {
         totalHours += def.estimatedHours;
       }
     });
-
     return totalHours;
   }, [selectedFocusArea, deepWorkDefinitions, upskillDefinitions]);
 
@@ -1124,8 +1120,8 @@ function DeepWorkPageContent() {
                             )}
                             {totalEstimatedHours > 0 && (
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Total Estimated Time</span>
-                                    <span className="font-medium">{totalScopeHours}h</span>
+                                    <span className="text-muted-foreground">Total Linked Est.</span>
+                                    <span className="font-medium">{totalEstimatedHours.toFixed(1)}h</span>
                                 </div>
                             )}
                         </div>
@@ -1188,6 +1184,10 @@ function DeepWorkPageContent() {
                                         <WorkoutExerciseCard 
                                           key={exercise.id} 
                                           exercise={exercise}
+                                          definition={definition}
+                                          selectedDate={selectedDate}
+                                          allDeepWorkLogs={allDeepWorkLogs}
+                                          allUpskillLogs={allUpskillLogs}
                                           onLogSet={handleLogSet} 
                                           onDeleteSet={handleDeleteSet} 
                                           onUpdateSet={handleUpdateSet} 
@@ -1333,6 +1333,7 @@ function DeepWorkPageContent() {
 
                                     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
                                     const loggedHours = loggedMinutes / 60;
+                                    const isParent = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 || (deepworkDef.linkedUpskillIds?.length ?? 0) > 0 || (deepworkDef.linkedResourceIds?.length ?? 0) > 0;
 
                                     return (
                                        <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
@@ -1340,11 +1341,13 @@ function DeepWorkPageContent() {
                                               <TooltipProvider>
                                                 <Tooltip>
                                                   <TooltipTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); handleAddTaskToSession(deepworkDef); }}>
-                                                      <PlusCircle className="h-4 w-4" />
-                                                    </Button>
+                                                    <span tabIndex={isParent ? 0 : -1}>
+                                                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); handleAddTaskToSession(deepworkDef); }} disabled={isParent}>
+                                                        <PlusCircle className="h-4 w-4" />
+                                                      </Button>
+                                                    </span>
                                                   </TooltipTrigger>
-                                                  <TooltipContent>Add to Session</TooltipContent>
+                                                  <TooltipContent>{isParent ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent>
                                                 </Tooltip>
                                               </TooltipProvider>
                                               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setSelectedFocusArea(deepworkDef); setViewMode('library'); }}>
@@ -1430,7 +1433,7 @@ function DeepWorkPageContent() {
                                                         </DropdownMenu>
                                                     </div>
                                                     <div className="aspect-video w-full bg-black overflow-hidden rounded-t-2xl">
-                                                        <iframe src={youtubeEmbedUrl} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full pointer-events-none"></iframe>
+                                                        <iframe src={youtubeEmbedUrl} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
                                                     </div>
                                                     <div className="p-4 flex-grow">
                                                       <div className="flex items-start justify-between gap-2">
@@ -1834,4 +1837,3 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
-
