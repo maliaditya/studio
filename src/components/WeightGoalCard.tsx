@@ -20,6 +20,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tool
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
 import Link from 'next/link';
+import { EpicDetailModal } from './EpicDetailModal';
 
 interface WeightGoalCardProps {
   weightLogs: WeightLog[];
@@ -81,6 +82,7 @@ export function WeightGoalCard({
     const [showLogForm, setShowLogForm] = useState(false);
     const [weightView, setWeightView] = useState<'chart' | 'details'>('details');
     const [mainView, setMainView] = useState<'weight' | 'diet' | 'projects'>('weight');
+    const [selectedEpic, setSelectedEpic] = useState<ExerciseDefinition | null>(null);
 
     const [heightInput, setHeightInput] = useState('');
     const [dobInput, setDobInput] = useState<Date | undefined>();
@@ -427,7 +429,10 @@ export function WeightGoalCard({
           <ul className="space-y-2">
             {epics.map(epic => (
               <li key={epic.id}>
-                <Link href="/deep-work">
+                <button
+                    className="w-full text-left"
+                    onClick={() => setSelectedEpic(epic)}
+                >
                   <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
                     <div className="flex items-center gap-3 min-w-0">
                       <Workflow className="h-4 w-4 text-primary flex-shrink-0" />
@@ -438,7 +443,7 @@ export function WeightGoalCard({
                       <ArrowRight className="h-4 w-4 text-muted-foreground" />
                     </div>
                   </div>
-                </Link>
+                </button>
               </li>
             ))}
           </ul>
@@ -613,152 +618,159 @@ export function WeightGoalCard({
     const currentViewData = cardViews[mainView];
 
     return (
-        <Card className="bg-card/50">
-            {areDetailsSet ? (
-                <>
-                    <CardHeader className="flex flex-row items-start justify-between">
-                        <div>
-                            <CardTitle className="flex items-center gap-2 text-primary">
-                                {currentViewData.icon}
-                                {currentViewData.title}
-                            </CardTitle>
-                            <CardDescription>{currentViewData.description}</CardDescription>
-                        </div>
-                        <div className="flex items-center gap-1">
-                             <Button 
-                                variant="outline" 
-                                size="icon" 
-                                onClick={() => {
-                                    if (mainView === 'weight') {
-                                        setWeightView(v => v === 'chart' ? 'details' : 'chart');
-                                    } else {
-                                        setMainView('weight');
-                                    }
-                                }} 
-                                className={cn("h-8 w-8", mainView === 'weight' && 'bg-accent')}
-                            >
-                                {mainView === 'weight' 
-                                    ? (weightView === 'chart' ? <Activity className="h-4 w-4" /> : <LineChartIcon className="h-4 w-4" />) 
-                                    : <Target className="h-4 w-4" />}
-                            </Button>
-                             <Button variant="outline" size="icon" onClick={() => setMainView('diet')} className={cn("h-8 w-8", mainView === 'diet' && 'bg-accent')}>
-                                <Utensils className="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" size="icon" onClick={() => setMainView('projects')} className={cn("h-8 w-8", mainView === 'projects' && 'bg-accent')}>
-                                <Briefcase className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                       {currentViewData.content}
+        <>
+            <Card className="bg-card/50">
+                {areDetailsSet ? (
+                    <>
+                        <CardHeader className="flex flex-row items-start justify-between">
+                            <div>
+                                <CardTitle className="flex items-center gap-2 text-primary">
+                                    {currentViewData.icon}
+                                    {currentViewData.title}
+                                </CardTitle>
+                                <CardDescription>{currentViewData.description}</CardDescription>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <Button 
+                                    variant="outline" 
+                                    size="icon" 
+                                    onClick={() => {
+                                        if (mainView === 'weight') {
+                                            setWeightView(v => v === 'chart' ? 'details' : 'chart');
+                                        } else {
+                                            setMainView('weight');
+                                        }
+                                    }} 
+                                    className={cn("h-8 w-8", mainView === 'weight' && 'bg-accent')}
+                                >
+                                    {mainView === 'weight' 
+                                        ? (weightView === 'chart' ? <Activity className="h-4 w-4" /> : <LineChartIcon className="h-4 w-4" />) 
+                                        : <Target className="h-4 w-4" />}
+                                </Button>
+                                <Button variant="outline" size="icon" onClick={() => onEditDietClick()} className={cn("h-8 w-8", mainView === 'diet' && 'bg-accent')}>
+                                    <Utensils className="h-4 w-4" />
+                                </Button>
+                                <Button variant="outline" size="icon" onClick={() => setMainView('projects')} className={cn("h-8 w-8", mainView === 'projects' && 'bg-accent')}>
+                                    <Briefcase className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                        {currentViewData.content}
 
-                        {showLogForm && mainView === 'weight' && (
-                            <div className="mt-4 pt-4 border-t space-y-3">
-                                <CardDescription>It's time for your weekly weigh-in.</CardDescription>
-                                <div className="flex gap-2 items-center">
+                            {showLogForm && mainView === 'weight' && (
+                                <div className="mt-4 pt-4 border-t space-y-3">
+                                    <CardDescription>It's time for your weekly weigh-in.</CardDescription>
+                                    <div className="flex gap-2 items-center">
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button variant={"outline"} className={cn("w-auto justify-start text-left font-normal h-9", !weightDate && "text-muted-foreground")}>
+                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                    {weightDate ? format(weightDate, "PPP") : <span>Pick a date</span>}
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={weightDate} onSelect={(date) => date && setWeightDate(date)} initialFocus /></PopoverContent>
+                                        </Popover>
+                                        <Input
+                                            type="number"
+                                            placeholder="Weight (kg/lb)"
+                                            value={newWeight}
+                                            onChange={(e) => setNewWeight(e.target.value)}
+                                            className="h-9 flex-grow"
+                                        />
+                                    </div>
+                                    <Button onClick={handleLogWeightClick} disabled={!newWeight || !weightDate} className="w-full">Log Weight</Button>
+                                </div>
+                            )}
+                            
+                        </CardContent>
+                    </>
+                ) : (
+                    <>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-primary"><Target/> Your Details</CardTitle>
+                            <CardDescription>Provide these details for accurate health and goal projections.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <Label className="text-xs text-muted-foreground">Gender (for BMR)</Label>
+                                    <RadioGroup
+                                        value={genderInput || ""}
+                                        onValueChange={(value) => setGenderInput(value as Gender)}
+                                        className="flex gap-4 pt-2"
+                                    >
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="male" id="gender-male-home" />
+                                            <Label htmlFor="gender-male-home" className="font-normal">Male</Label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="female" id="gender-female-home" />
+                                            <Label htmlFor="gender-female-home" className="font-normal">Female</Label>
+                                        </div>
+                                    </RadioGroup>
+                                </div>
+                                <div>
+                                    <Label htmlFor="dob-input-home" className="text-xs text-muted-foreground">Date of Birth</Label>
                                     <Popover>
                                         <PopoverTrigger asChild>
-                                            <Button variant={"outline"} className={cn("w-auto justify-start text-left font-normal h-9", !weightDate && "text-muted-foreground")}>
-                                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                                {weightDate ? format(weightDate, "PPP") : <span>Pick a date</span>}
-                                            </Button>
+                                        <Button id="dob-input-home" variant={"outline"} className={cn("h-9 w-full justify-start text-left font-normal", !dobInput && "text-muted-foreground")}>
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {dobInput ? format(dobInput, "PPP") : <span>Pick a date</span>}
+                                        </Button>
                                         </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={weightDate} onSelect={(date) => date && setWeightDate(date)} initialFocus /></PopoverContent>
+                                        <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                            mode="single"
+                                            selected={dobInput}
+                                            onSelect={setDobInput}
+                                            captionLayout="dropdown-buttons"
+                                            fromYear={1950}
+                                            toYear={new Date().getFullYear()}
+                                            disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                            initialFocus
+                                        />
+                                        </PopoverContent>
                                     </Popover>
+                                </div>
+                                <div>
+                                    <Label htmlFor="height-input-home" className="text-xs text-muted-foreground">Height (cm)</Label>
                                     <Input
+                                        id="height-input-home"
                                         type="number"
-                                        placeholder="Weight (kg/lb)"
-                                        value={newWeight}
-                                        onChange={(e) => setNewWeight(e.target.value)}
-                                        className="h-9 flex-grow"
+                                        placeholder="e.g., 180"
+                                        value={heightInput}
+                                        onChange={(e) => setHeightInput(e.target.value)}
+                                        className="h-9"
                                     />
                                 </div>
-                                <Button onClick={handleLogWeightClick} disabled={!newWeight || !weightDate} className="w-full">Log Weight</Button>
-                            </div>
-                        )}
-                        
-                    </CardContent>
-                </>
-            ) : (
-                 <>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-primary"><Target/> Your Details</CardTitle>
-                        <CardDescription>Provide these details for accurate health and goal projections.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <Label className="text-xs text-muted-foreground">Gender (for BMR)</Label>
-                                <RadioGroup
-                                    value={genderInput || ""}
-                                    onValueChange={(value) => setGenderInput(value as Gender)}
-                                    className="flex gap-4 pt-2"
-                                >
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="male" id="gender-male-home" />
-                                        <Label htmlFor="gender-male-home" className="font-normal">Male</Label>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="female" id="gender-female-home" />
-                                        <Label htmlFor="gender-female-home" className="font-normal">Female</Label>
-                                    </div>
-                                </RadioGroup>
-                            </div>
-                            <div>
-                                <Label htmlFor="dob-input-home" className="text-xs text-muted-foreground">Date of Birth</Label>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                    <Button id="dob-input-home" variant={"outline"} className={cn("h-9 w-full justify-start text-left font-normal", !dobInput && "text-muted-foreground")}>
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {dobInput ? format(dobInput, "PPP") : <span>Pick a date</span>}
-                                    </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0">
-                                    <Calendar
-                                        mode="single"
-                                        selected={dobInput}
-                                        onSelect={setDobInput}
-                                        captionLayout="dropdown-buttons"
-                                        fromYear={1950}
-                                        toYear={new Date().getFullYear()}
-                                        disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                                        initialFocus
+                                <div>
+                                    <Label htmlFor="goal-weight-input-home" className="text-xs text-muted-foreground">Goal Weight (kg/lb)</Label>
+                                    <Input
+                                        id="goal-weight-input-home"
+                                        type="number"
+                                        placeholder="e.g., 75 (Optional)"
+                                        value={goalWeightInput}
+                                        onChange={(e) => setGoalWeightInput(e.target.value)}
+                                        className="h-9"
                                     />
-                                    </PopoverContent>
-                                </Popover>
+                                </div>
                             </div>
-                            <div>
-                                <Label htmlFor="height-input-home" className="text-xs text-muted-foreground">Height (cm)</Label>
-                                <Input
-                                    id="height-input-home"
-                                    type="number"
-                                    placeholder="e.g., 180"
-                                    value={heightInput}
-                                    onChange={(e) => setHeightInput(e.target.value)}
-                                    className="h-9"
-                                />
+                            <div className="flex justify-end pt-4">
+                                <Button onClick={handleSaveDetails}>
+                                    <Save className="mr-2 h-4 w-4"/>
+                                    Save Details
+                                </Button>
                             </div>
-                            <div>
-                                <Label htmlFor="goal-weight-input-home" className="text-xs text-muted-foreground">Goal Weight (kg/lb)</Label>
-                                <Input
-                                    id="goal-weight-input-home"
-                                    type="number"
-                                    placeholder="e.g., 75 (Optional)"
-                                    value={goalWeightInput}
-                                    onChange={(e) => setGoalWeightInput(e.target.value)}
-                                    className="h-9"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex justify-end pt-4">
-                            <Button onClick={handleSaveDetails}>
-                                <Save className="mr-2 h-4 w-4"/>
-                                Save Details
-                            </Button>
-                        </div>
-                    </CardContent>
-                </>
-            )}
-        </Card>
+                        </CardContent>
+                    </>
+                )}
+            </Card>
+            <EpicDetailModal
+                isOpen={!!selectedEpic}
+                onOpenChange={() => setSelectedEpic(null)}
+                epic={selectedEpic}
+            />
+        </>
     );
 }
