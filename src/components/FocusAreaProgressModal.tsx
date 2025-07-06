@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState } from 'react';
@@ -49,31 +50,45 @@ export function FocusAreaProgressModal({
       return { combinedData: [], milestones: [] };
     }
 
-    const allRelatedDefIds = new Set([
-      focusArea.id,
-      ...(focusArea.linkedDeepWorkIds || []),
-      ...(focusArea.linkedUpskillIds || []),
-    ]);
+    const isParent = (focusArea.linkedDeepWorkIds?.length ?? 0) > 0 || (focusArea.linkedUpskillIds?.length ?? 0) > 0 || (focusArea.linkedResourceIds?.length ?? 0) > 0;
+    
+    const deepWorkIdsToSum = new Set<string>(focusArea.linkedDeepWorkIds || []);
+    if (!isParent) {
+        deepWorkIdsToSum.add(focusArea.id);
+    }
+    const upskillIdsToSum = new Set<string>(focusArea.linkedUpskillIds || []);
 
     const dailyLoggedMinutes: Record<string, number> = {};
-    const allLogs = [...allDeepWorkLogs, ...allUpskillLogs];
     let firstLogDateStr: string | null = null;
 
-    allLogs.forEach(log => {
-      let dailyMinutes = 0;
-      log.exercises.forEach(ex => {
-        if (allRelatedDefIds.has(ex.definitionId) && ex.loggedSets.length > 0) {
-          // In upskill, `reps` is duration. In deepwork, `weight` is duration.
-          const minutes = ex.loggedSets.reduce((sum, set) => sum + (ex.category === 'Upskill' ? set.reps : set.weight), 0);
-          dailyMinutes += minutes;
+    allDeepWorkLogs.forEach(log => {
+        let dailyMinutes = 0;
+        log.exercises.forEach(ex => {
+            if (deepWorkIdsToSum.has(ex.definitionId)) {
+                dailyMinutes += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0);
+            }
+        });
+        if (dailyMinutes > 0) {
+            dailyLoggedMinutes[log.date] = (dailyLoggedMinutes[log.date] || 0) + dailyMinutes;
+            if (!firstLogDateStr || log.date < firstLogDateStr) {
+                firstLogDateStr = log.date;
+            }
         }
-      });
-      if (dailyMinutes > 0) {
-        dailyLoggedMinutes[log.date] = (dailyLoggedMinutes[log.date] || 0) + dailyMinutes;
-        if (!firstLogDateStr || log.date < firstLogDateStr) {
-          firstLogDateStr = log.date;
+    });
+    
+    allUpskillLogs.forEach(log => {
+        let dailyMinutes = 0;
+        log.exercises.forEach(ex => {
+            if (upskillIdsToSum.has(ex.definitionId)) {
+                dailyMinutes += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0);
+            }
+        });
+        if (dailyMinutes > 0) {
+            dailyLoggedMinutes[log.date] = (dailyLoggedMinutes[log.date] || 0) + dailyMinutes;
+            if (!firstLogDateStr || log.date < firstLogDateStr) {
+                firstLogDateStr = log.date;
+            }
         }
-      }
     });
 
     if (!firstLogDateStr) return { combinedData: [], milestones: [] };

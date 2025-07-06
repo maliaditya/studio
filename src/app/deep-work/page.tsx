@@ -338,37 +338,43 @@ function DeepWorkPageContent() {
   }
 
   const totalLoggedTime = useMemo(() => {
-      if (!selectedFocusArea) return 0;
+    if (!selectedFocusArea) return 0;
+    
+    let totalMinutes = 0;
+    const isParent = (selectedFocusArea.linkedDeepWorkIds?.length ?? 0) > 0 || (selectedFocusArea.linkedUpskillIds?.length ?? 0) > 0 || (selectedFocusArea.linkedResourceIds?.length ?? 0) > 0;
+    
+    const deepWorkIdsToSum = new Set<string>(selectedFocusArea.linkedDeepWorkIds || []);
+    if (!isParent) {
+        deepWorkIdsToSum.add(selectedFocusArea.id);
+    }
+    
+    const upskillIdsToSum = new Set<string>(selectedFocusArea.linkedUpskillIds || []);
 
-      let totalMinutes = 0;
-      const allDefIdsToSum = new Set<string>([selectedFocusArea.id, ...(selectedFocusArea.linkedDeepWorkIds || [])]);
-      const allUpskillIdsToSum = new Set<string>(selectedFocusArea.linkedUpskillIds || []);
+    if (allDeepWorkLogs) {
+        allDeepWorkLogs.forEach(log => {
+            log.exercises.forEach(ex => {
+                if (deepWorkIdsToSum.has(ex.definitionId)) {
+                    ex.loggedSets.forEach(set => {
+                        totalMinutes += set.weight;
+                    });
+                }
+            });
+        });
+    }
 
-      if (allDeepWorkLogs) {
-          allDeepWorkLogs.forEach(log => {
-              log.exercises.forEach(ex => {
-                  if (allDefIdsToSum.has(ex.definitionId)) {
-                      ex.loggedSets.forEach(set => {
-                          totalMinutes += set.weight;
-                      });
-                  }
-              });
-          });
-      }
-
-      if (allUpskillLogs && allUpskillIdsToSum.size > 0) {
-          allUpskillLogs.forEach(log => {
-              log.exercises.forEach(ex => {
-                  if (allUpskillIdsToSum.has(ex.definitionId)) {
-                      ex.loggedSets.forEach(set => {
-                          totalMinutes += set.reps;
-                      });
-                  }
-              });
-          });
-      }
-      
-      return totalMinutes;
+    if (allUpskillLogs) {
+        allUpskillLogs.forEach(log => {
+            log.exercises.forEach(ex => {
+                if (upskillIdsToSum.has(ex.definitionId)) {
+                    ex.loggedSets.forEach(set => {
+                        totalMinutes += set.reps;
+                    });
+                }
+            });
+        });
+    }
+    
+    return totalMinutes;
   }, [selectedFocusArea, allUpskillLogs, allDeepWorkLogs]);
   
   const totalEstimatedHours = useMemo(() => {
@@ -407,15 +413,19 @@ function DeepWorkPageContent() {
   const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition) => {
       let totalMinutes = 0;
       if (!definition) return 0;
+      
+      const isParent = (definition.linkedDeepWorkIds?.length ?? 0) > 0 || (definition.linkedUpskillIds?.length ?? 0) > 0 || (definition.linkedResourceIds?.length ?? 0) > 0;
   
-      // This includes the definition itself and any of its linked children.
-      const allDeepWorkDefIdsToSum = new Set<string>([definition.id, ...(definition.linkedDeepWorkIds || [])]);
+      const deepWorkIdsToSum = new Set<string>(definition.linkedDeepWorkIds || []);
+      if (!isParent) {
+          deepWorkIdsToSum.add(definition.id);
+      }
       const allUpskillDefIdsToSum = new Set<string>(definition.linkedUpskillIds || []);
   
       if (allDeepWorkLogs) {
           allDeepWorkLogs.forEach(log => {
               log.exercises.forEach(ex => {
-                  if (allDeepWorkDefIdsToSum.has(ex.definitionId)) {
+                  if (deepWorkIdsToSum.has(ex.definitionId)) {
                       ex.loggedSets.forEach(set => {
                           totalMinutes += set.weight; // duration for deep work
                       });
