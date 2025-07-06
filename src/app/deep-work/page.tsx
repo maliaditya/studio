@@ -798,7 +798,7 @@ function DeepWorkPageContent() {
         setTempLinkedIds(parent.linkedResourceIds || []);
     }
     // Reset form for "Create New" tab
-    setNewLinkedItemTopic('');
+    setNewLinkedItemTopic(parent.category);
     setNewLinkedItemName('');
     setNewLinkedItemDescription('');
     setNewLinkedItemLink('');
@@ -1853,8 +1853,16 @@ function DeepWorkPageContent() {
                         ) : (
                             <>
                                 <div className="space-y-1">
-                                <Label htmlFor="new-linked-topic">Topic</Label>
-                                <Input id="new-linked-topic" value={newLinkedItemTopic} onChange={e => setNewLinkedItemTopic(e.target.value)} placeholder="e.g., GPU Programming" />
+                                  <Label htmlFor="new-linked-topic">Topic</Label>
+                                  <Select value={newLinkedItemTopic} onValueChange={setNewLinkedItemTopic}>
+                                      <SelectTrigger id="new-linked-topic"><SelectValue placeholder="Select a topic..." /></SelectTrigger>
+                                      <SelectContent>
+                                          {manageLinksConfig?.type === 'upskill' 
+                                              ? allUpskillTopics.map(topic => (<SelectItem key={topic} value={topic}>{topic}</SelectItem>))
+                                              : allKnownTopics.map(topic => (<SelectItem key={topic} value={topic}>{topic}</SelectItem>))
+                                          }
+                                      </SelectContent>
+                                  </Select>
                                 </div>
                                 <div className="space-y-1">
                                 <Label htmlFor="new-linked-name">Name</Label>
