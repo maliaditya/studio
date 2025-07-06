@@ -342,27 +342,51 @@ function DeepWorkPageContent() {
     const m = minutes % 60;
     return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim();
   }
-
-  const totalLoggedTime = useMemo(() => {
-    if (!selectedFocusArea) return 0;
-    
+  
+  const getUpskillLoggedMinutes = useCallback((definitionId: string) => {
+    if (!allUpskillLogs) return 0;
     let totalMinutes = 0;
-    const isParent = (selectedFocusArea.linkedDeepWorkIds?.length ?? 0) > 0 || (selectedFocusArea.linkedUpskillIds?.length ?? 0) > 0 || (selectedFocusArea.linkedResourceIds?.length ?? 0) > 0;
-    
-    const deepWorkIdsToSum = new Set<string>(selectedFocusArea.linkedDeepWorkIds || []);
-    if (!isParent) {
-        deepWorkIdsToSum.add(selectedFocusArea.id);
-    }
-    
-    const upskillIdsToSum = new Set<string>(selectedFocusArea.linkedUpskillIds || []);
+    allUpskillLogs.forEach(log => {
+        log.exercises.forEach(ex => {
+            if (ex.definitionId === definitionId) {
+                totalMinutes += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0); // reps is duration for upskill
+            }
+        });
+    });
+    return totalMinutes;
+  }, [allUpskillLogs]);
 
+  const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition) => {
+    if (!definition) return 0;
+
+    const visited = new Set<string>();
+    const deepWorkActionIds = new Set<string>();
+    const upskillIds = new Set<string>();
+
+    function recurse(nodeId: string) {
+        if (visited.has(nodeId)) return;
+        visited.add(nodeId);
+
+        const node = deepWorkDefinitions.find(d => d.id === nodeId);
+        if (!node) return;
+
+        (node.linkedUpskillIds || []).forEach(id => upskillIds.add(id));
+
+        if (!node.linkedDeepWorkIds || node.linkedDeepWorkIds.length === 0) {
+            deepWorkActionIds.add(node.id);
+        } else {
+            node.linkedDeepWorkIds.forEach(childId => recurse(childId));
+        }
+    }
+
+    recurse(definition.id);
+
+    let totalMinutes = 0;
     if (allDeepWorkLogs) {
         allDeepWorkLogs.forEach(log => {
             log.exercises.forEach(ex => {
-                if (deepWorkIdsToSum.has(ex.definitionId)) {
-                    ex.loggedSets.forEach(set => {
-                        totalMinutes += set.weight;
-                    });
+                if (deepWorkActionIds.has(ex.definitionId)) {
+                    totalMinutes += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0);
                 }
             });
         });
@@ -371,18 +395,20 @@ function DeepWorkPageContent() {
     if (allUpskillLogs) {
         allUpskillLogs.forEach(log => {
             log.exercises.forEach(ex => {
-                if (upskillIdsToSum.has(ex.definitionId)) {
-                    ex.loggedSets.forEach(set => {
-                        totalMinutes += set.reps;
-                    });
+                if (upskillIds.has(ex.definitionId)) {
+                    totalMinutes += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0);
                 }
             });
         });
     }
-    
     return totalMinutes;
-  }, [selectedFocusArea, allUpskillLogs, allDeepWorkLogs]);
-  
+  }, [allDeepWorkLogs, allUpskillLogs, deepWorkDefinitions]);
+
+  const totalLoggedTime = useMemo(() => {
+    if (!selectedFocusArea) return 0;
+    return getDeepWorkLoggedMinutes(selectedFocusArea);
+  }, [selectedFocusArea, getDeepWorkLoggedMinutes]);
+
   const totalEstimatedHours = useMemo(() => {
     if (!selectedFocusArea) return 0;
     let totalHours = 0;
@@ -402,61 +428,6 @@ function DeepWorkPageContent() {
   }, [selectedFocusArea, deepWorkDefinitions, upskillDefinitions]);
 
   const totalScopeHours = (selectedFocusArea?.estimatedHours || 0) + totalEstimatedHours;
-  
-  const getUpskillLoggedMinutes = useCallback((definitionId: string) => {
-    if (!allUpskillLogs) return 0;
-    let totalMinutes = 0;
-    allUpskillLogs.forEach(log => {
-        log.exercises.forEach(ex => {
-            if (ex.definitionId === definitionId) {
-                totalMinutes += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0); // reps is duration for upskill
-            }
-        });
-    });
-    return totalMinutes;
-  }, [allUpskillLogs]);
-
-  const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition) => {
-      let totalMinutes = 0;
-      if (!definition) return 0;
-      
-      const isParent = (definition.linkedDeepWorkIds?.length ?? 0) > 0 || (definition.linkedUpskillIds?.length ?? 0) > 0 || (definition.linkedResourceIds?.length ?? 0) > 0;
-  
-      const deepWorkIdsToSum = new Set<string>();
-      const upskillIdsToSum = new Set<string>();
-  
-      if (isParent) {
-          (definition.linkedDeepWorkIds || []).forEach(id => deepWorkIdsToSum.add(id));
-          (definition.linkedUpskillIds || []).forEach(id => upskillIdsToSum.add(id));
-      } else {
-          deepWorkIdsToSum.add(definition.id);
-      }
-  
-      if (allDeepWorkLogs) {
-          allDeepWorkLogs.forEach(log => {
-              log.exercises.forEach(ex => {
-                  if (deepWorkIdsToSum.has(ex.definitionId)) {
-                      ex.loggedSets.forEach(set => {
-                          totalMinutes += set.weight; // duration for deep work
-                      });
-                  }
-              });
-          });
-      }
-  
-      if (allUpskillLogs) {
-          allUpskillLogs.forEach(log => {
-              log.exercises.forEach(ex => {
-                  if (upskillIdsToSum.has(ex.definitionId)) {
-                      ex.loggedSets.forEach(set => {
-                          totalMinutes += set.reps; // duration for upskill
-                      });
-                  }
-              });
-          });
-      }
-      return totalMinutes;
-  }, [allDeepWorkLogs, allUpskillLogs]);
 
   const timesheetData = useMemo(() => {
     if (!selectedFocusArea) return [];
@@ -974,14 +945,13 @@ function DeepWorkPageContent() {
             const isDefParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
             const isDefChild = linkedDeepWorkChildIds.has(def.id);
             const isDefAnIntention = isDefParent && !isDefChild;
-            
-            // Rule: An Objective cannot be linked to a top-level Intention.
+            const isDefAnAction = !isDefParent;
+
             if (isParentAnObjective && isDefAnIntention) {
                 return false;
             }
             
-            // Rule: An Intention cannot be linked to a bottom-level Action.
-            if (isParentAnIntention && !isDefParent) {
+            if (isParentAnIntention && isDefAnAction) {
                 return false;
             }
         }
