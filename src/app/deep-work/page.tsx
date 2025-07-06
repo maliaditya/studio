@@ -1075,6 +1075,7 @@ function DeepWorkPageContent() {
                               const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
                               const isLinkedAsChild = linkedDeepWorkChildIds.has(def.id);
                               const isIntention = isParent && !isLinkedAsChild;
+                              const isObjective = isParent && isLinkedAsChild;
                               return (
                                 <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted" onContextMenu={(e) => handleFocusAreaContextMenu(e, def)}>
                                   {editingDefinition?.id === def.id ? (
@@ -1102,6 +1103,8 @@ function DeepWorkPageContent() {
                                       <div className="flex items-center gap-2 flex-grow min-w-0">
                                         {isIntention ? (
                                           <Lightbulb className="h-4 w-4 flex-shrink-0 text-amber-500" />
+                                        ) : isObjective ? (
+                                          <Flag className="h-4 w-4 flex-shrink-0 text-green-500" />
                                         ) : (
                                           <Bolt className="h-4 w-4 flex-shrink-0 text-blue-500" />
                                         )}
@@ -1121,13 +1124,13 @@ function DeepWorkPageContent() {
                                           </Tooltip>
                                           <Tooltip>
                                             <TooltipTrigger asChild>
-                                              <span tabIndex={isIntention ? 0 : -1}>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => !isIntention && handleAddTaskToSession(def)} disabled={isIntention}>
+                                              <span tabIndex={isParent ? 0 : -1}>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => !isParent && handleAddTaskToSession(def)} disabled={isParent}>
                                                   <PlusCircle className="h-4 w-4" />
                                                 </Button>
                                               </span>
                                             </TooltipTrigger>
-                                            <TooltipContent>{isIntention ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent>
+                                            <TooltipContent>{isParent ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent>
                                           </Tooltip>
                                         </TooltipProvider>
                                       </div>
