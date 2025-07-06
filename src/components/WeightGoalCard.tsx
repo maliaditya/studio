@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight } from 'lucide-react';
+import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight, Workflow } from 'lucide-react';
 import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition } from '@/types/workout';
 import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -95,17 +95,14 @@ export function WeightGoalCard({
         return dietPlan.find(plan => plan.day === dayName);
     }, [dietPlan]);
 
-    // Project Overview Logic
-    const deepWorkTopics = useMemo(() => {
-        const topics = new Map<string, number>();
-        (deepWorkDefinitions || []).forEach(def => {
-          if (!def.focusAreaIds) {
-            topics.set(def.category, (topics.get(def.category) || 0) + 1);
-          }
-        });
-        return Array.from(topics.entries())
-          .map(([topic, count]) => ({ name: topic, count }))
-          .sort((a, b) => a.name.localeCompare(b.name));
+    const activeEpics = useMemo(() => {
+        return (deepWorkDefinitions || [])
+            .filter(def => 
+                (def.linkedDeepWorkIds?.length ?? 0) > 0 ||
+                (def.linkedUpskillIds?.length ?? 0) > 0 ||
+                (def.linkedResourceIds?.length ?? 0) > 0
+            )
+            .sort((a, b) => a.name.localeCompare(b.name));
     }, [deepWorkDefinitions]);
 
     const upskillTopics = useMemo(() => {
@@ -414,16 +411,49 @@ export function WeightGoalCard({
           </ul>
         );
       };
+      
+    const renderEpicsList = (epics: ExerciseDefinition[]) => {
+        if (epics.length === 0) {
+          return (
+            <div className="text-center text-sm text-muted-foreground py-4">
+              <p>No active epics found.</p>
+              <Link href="/deep-work" className="text-primary hover:underline">
+                Create an epic by linking tasks in Deep Work.
+              </Link>
+            </div>
+          );
+        }
+        return (
+          <ul className="space-y-2">
+            {epics.map(epic => (
+              <li key={epic.id}>
+                <Link href="/deep-work">
+                  <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Workflow className="h-4 w-4 text-primary flex-shrink-0" />
+                      <span className="font-medium text-foreground truncate" title={epic.name}>{epic.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-sm text-muted-foreground truncate" title={epic.category}>{epic.category}</span>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        );
+      };
 
     const renderProjectsContent = () => (
         <Tabs defaultValue="deep-work" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="deep-work">Deep Work</TabsTrigger>
-            <TabsTrigger value="upskill">Upskill</TabsTrigger>
+            <TabsTrigger value="deep-work">Epics</TabsTrigger>
+            <TabsTrigger value="upskill">Topics</TabsTrigger>
           </TabsList>
           <TabsContent value="deep-work" className="mt-4">
             <ScrollArea className="h-48">
-              {renderTopicList(deepWorkTopics, 'deep-work')}
+              {renderEpicsList(activeEpics)}
             </ScrollArea>
           </TabsContent>
           <TabsContent value="upskill" className="mt-4">
