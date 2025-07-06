@@ -307,6 +307,28 @@ function DeepWorkPageContent() {
       return totalMinutes;
   }, [selectedFocusArea, allUpskillLogs, allDeepWorkLogs]);
   
+  const totalEstimatedHours = useMemo(() => {
+    if (!selectedFocusArea) return 0;
+
+    let totalHours = selectedFocusArea.estimatedHours || 0;
+
+    (selectedFocusArea.linkedDeepWorkIds || []).forEach(id => {
+      const def = deepWorkDefinitions.find(d => d.id === id);
+      if (def?.estimatedHours) {
+        totalHours += def.estimatedHours;
+      }
+    });
+
+    (selectedFocusArea.linkedUpskillIds || []).forEach(id => {
+      const def = upskillDefinitions.find(d => d.id === id);
+      if (def?.estimatedHours) {
+        totalHours += def.estimatedHours;
+      }
+    });
+
+    return totalHours;
+  }, [selectedFocusArea, deepWorkDefinitions, upskillDefinitions]);
+  
   const getUpskillLoggedMinutes = useCallback((definitionId: string) => {
     if (!allUpskillLogs) return 0;
     let totalMinutes = 0;
@@ -999,39 +1021,39 @@ function DeepWorkPageContent() {
                             Focus Area Stats
                         </CardTitle>
                         <CardDescription>
-                            Progress for "{selectedFocusArea.name}"
+                            Aggregated progress for "{selectedFocusArea.name}"
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
                             <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">Logged Time</span>
+                                <span className="text-muted-foreground">Total Logged Time</span>
                                 <span className="font-medium">{formatMinutes(totalLoggedTime)}</span>
                             </div>
-                            {selectedFocusArea.estimatedHours && (
+                            {totalEstimatedHours > 0 && (
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Estimated Time</span>
-                                    <span className="font-medium">{selectedFocusArea.estimatedHours}h</span>
+                                    <span className="text-muted-foreground">Total Estimated Time</span>
+                                    <span className="font-medium">{totalEstimatedHours}h</span>
                                 </div>
                             )}
                         </div>
                         
-                        {selectedFocusArea.estimatedHours && selectedFocusArea.estimatedHours > 0 && (
+                        {totalEstimatedHours > 0 && (
                             <div>
                                 <Progress 
-                                    value={Math.min(100, (totalLoggedTime / (selectedFocusArea.estimatedHours * 60)) * 100)} 
+                                    value={Math.min(100, (totalLoggedTime / (totalEstimatedHours * 60)) * 100)} 
                                     className="h-2" 
                                 />
                                 <div className="flex justify-between text-xs text-muted-foreground mt-1">
                                     <span>0%</span>
-                                    <span>{((totalLoggedTime / (selectedFocusArea.estimatedHours * 60)) * 100).toFixed(0)}%</span>
+                                    <span>{((totalLoggedTime / (totalEstimatedHours * 60)) * 100).toFixed(0)}%</span>
                                 </div>
                             </div>
                         )}
                         
-                        {selectedFocusArea.estimatedHours && totalLoggedTime > selectedFocusArea.estimatedHours * 60 && (
+                        {totalEstimatedHours > 0 && totalLoggedTime > totalEstimatedHours * 60 && (
                             <Badge variant="destructive" className="w-full justify-center">
-                                Overspent by {formatMinutes(totalLoggedTime - selectedFocusArea.estimatedHours * 60)}
+                                Overspent by {formatMinutes(totalLoggedTime - totalEstimatedHours * 60)}
                             </Badge>
                         )}
                     </CardContent>
