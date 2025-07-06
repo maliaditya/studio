@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -1013,7 +1014,7 @@ function DeepWorkPageContent() {
                                       {def.isReadyForBranding && <Share2 className="h-3 w-3 text-primary flex-shrink-0" title="Ready for Branding" />}
                                       {def.estimatedHours && <Badge variant="secondary" className="text-xs ml-auto">{def.estimatedHours}h</Badge>}
                                     </div>
-                                    <div className='flex items-center flex-shrink-0 opacity-0 group-hover:opacity-100'>
+                                    <div className='hidden items-center flex-shrink-0 group-hover:flex'>
                                       <TooltipProvider>
                                         <Tooltip>
                                             <TooltipTrigger asChild>
@@ -1124,7 +1125,7 @@ function DeepWorkPageContent() {
                             {totalEstimatedHours > 0 && (
                                 <div className="flex justify-between text-sm">
                                     <span className="text-muted-foreground">Total Estimated Time</span>
-                                    <span className="font-medium">{totalEstimatedHours}h</span>
+                                    <span className="font-medium">{totalScopeHours}h</span>
                                 </div>
                             )}
                         </div>
@@ -1429,7 +1430,7 @@ function DeepWorkPageContent() {
                                                         </DropdownMenu>
                                                     </div>
                                                     <div className="aspect-video w-full bg-black overflow-hidden rounded-t-2xl">
-                                                        <iframe src={youtubeEmbedUrl} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
+                                                        <iframe src={youtubeEmbedUrl} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full pointer-events-none"></iframe>
                                                     </div>
                                                     <div className="p-4 flex-grow">
                                                       <div className="flex items-start justify-between gap-2">
@@ -1550,7 +1551,10 @@ function DeepWorkPageContent() {
             ref={contextMenuRef}
             style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }}
             className="fixed z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              setContextMenu(null);
+            }}
         >
           <Button variant="ghost" className="w-full justify-start h-9 px-2" onClick={(e) => {
               e.stopPropagation();
@@ -1830,3 +1834,4 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
+
