@@ -173,7 +173,7 @@ function DeepWorkPageContent() {
     item: ExerciseDefinition;
   } | null>(null);
 
-  const [visibilityFilters, setVisibilityFilters] = useState<Set<'intention' | 'objective' | 'action'>>(new Set(['intention', 'objective', 'action']));
+  const [visibilityFilters, setVisibilityFilters] = useState<Set<'intention' | 'objective' | 'action'>>(new Set(['intention']));
 
   // Mind map modal state
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
