@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useState } from 'react';
@@ -180,7 +179,8 @@ export function ExerciseProgressModal({
             dailyMetrics[dateKey] = { dateObj: parseISO(datedLog.date), maxWeight: 0, totalVolume: 0, sets: [] };
           }
           ex.loggedSets.forEach((set) => {
-            dailyMetrics[dateKey].totalVolume += pageType === 'workout' ? set.reps * set.weight : set.weight;
+            const setVolume = pageType === 'workout' ? (set.reps || 0) * (set.weight || 0) : (set.weight || 0);
+            dailyMetrics[dateKey].totalVolume += setVolume;
             if (set.weight > dailyMetrics[dateKey].maxWeight) {
               dailyMetrics[dateKey].maxWeight = set.weight;
             }
@@ -573,5 +573,3 @@ export function ExerciseProgressModal({
     </Dialog>
   );
 }
-
-    

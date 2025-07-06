@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -7,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Eye, EyeOff, LineChart as LineChartIcon } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Eye, EyeOff, LineChart as LineChartIcon, Unlink } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -116,13 +115,14 @@ function DeepWorkPageContent() {
     currentUser, 
     exportData,
     allDeepWorkLogs, setAllDeepWorkLogs,
-    allUpskillLogs,
+    allUpskillLogs, setAllUpskillLogs,
     deepWorkDefinitions, setDeepWorkDefinitions,
     upskillDefinitions, setUpskillDefinitions,
     deepWorkTopicMetadata, setDeepWorkTopicMetadata,
     updateTopic, deleteTopic,
     resources, setResources,
     resourceFolders,
+    topicGoals,
   } = useAuth();
 
   const [newTopicName, setNewTopicName] = useState('');
@@ -209,8 +209,11 @@ function DeepWorkPageContent() {
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
-  const [viewingProgressExercise, setViewingProgressExercise] = useState<ExerciseDefinition | null>(null);
-  const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
+  const [progressModalConfig, setProgressModalConfig] = useState<{
+    isOpen: boolean;
+    exercise: ExerciseDefinition | null;
+    pageType: 'deepwork' | 'upskill';
+  }>({ isOpen: false, exercise: null, pageType: 'deepwork' });
   const [isFocusAreaProgressModalOpen, setIsFocusAreaProgressModalOpen] = useState(false);
   
   const [isLoadingPage, setIsLoadingPage] = useState(true);
@@ -611,10 +614,33 @@ function DeepWorkPageContent() {
       updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
     }
   };
+  
+  const handleViewProgress = (definition: ExerciseDefinition, pageType: 'deepwork' | 'upskill') => {
+    setProgressModalConfig({
+      isOpen: true,
+      exercise: definition,
+      pageType: pageType,
+    });
+  };
 
-  const handleViewProgress = (definition: ExerciseDefinition) => {
-    setViewingProgressExercise(definition);
-    setIsProgressModalOpen(true);
+  const handleDeleteUpskillDefinition = (id: string) => {
+    const defToDelete = upskillDefinitions.find(def => def.id === id);
+    if (!defToDelete) return;
+  
+    setUpskillDefinitions(prev => prev.filter(def => def.id !== id));
+    
+    // Also remove it from any deep work definitions that link to it
+    setDeepWorkDefinitions(prevDefs => 
+      prevDefs.map(def => ({
+        ...def,
+        linkedUpskillIds: (def.linkedUpskillIds || []).filter(linkedId => linkedId !== id)
+      }))
+    );
+  
+    setAllUpskillLogs(prevLogs => 
+      prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) }))
+    );
+    toast({ title: "Success", description: `Task "${defToDelete.name}" permanently deleted.` });
   };
   
   const handleOpenManageLinksModal = (type: 'upskill' | 'deepwork' | 'resource', parent: ExerciseDefinition) => {
@@ -977,31 +1003,42 @@ function DeepWorkPageContent() {
                                       {def.isReadyForBranding && <Share2 className="h-3 w-3 text-primary flex-shrink-0" title="Ready for Branding" />}
                                       {def.estimatedHours && <Badge variant="secondary" className="text-xs ml-auto">{def.estimatedHours}h</Badge>}
                                     </div>
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 flex-shrink-0">
-                                          <MoreVertical className="h-4 w-4" />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onSelect={() => handleAddTaskToSession(def)}><PlusCircle className="mr-2 h-4 w-4" /><span>Add to Session</span></DropdownMenuItem>
-                                        <DropdownMenuItem onSelect={() => handleViewProgress(def)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuCheckboxItem
-                                            checked={!!def.isReadyForBranding}
-                                            onSelect={(e) => {
-                                                e.preventDefault();
-                                                handleToggleReadyForBranding(def.id);
-                                            }}
-                                        >
-                                            <Share2 className="mr-2 h-4 w-4" />
-                                            <span>Ready for Branding</span>
-                                        </DropdownMenuCheckboxItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onSelect={() => handleStartEditDefinition(def)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
-                                        <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(def.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
+                                    <div className='flex items-center flex-shrink-0 opacity-0 group-hover:opacity-100'>
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddTaskToSession(def)}>
+                                              <PlusCircle className="h-4 w-4" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>Add to Session</TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                                            <MoreVertical className="h-4 w-4" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          <DropdownMenuItem onSelect={() => handleViewProgress(def, 'deepwork')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuCheckboxItem
+                                              checked={!!def.isReadyForBranding}
+                                              onSelect={(e) => {
+                                                  e.preventDefault();
+                                                  handleToggleReadyForBranding(def.id);
+                                              }}
+                                          >
+                                              <Share2 className="mr-2 h-4 w-4" />
+                                              <span>Ready for Branding</span>
+                                          </DropdownMenuCheckboxItem>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem onSelect={() => handleStartEditDefinition(def)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
+                                          <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(def.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
                                   </>
                                 )}
                               </li>
@@ -1136,7 +1173,7 @@ function DeepWorkPageContent() {
                                           onDeleteSet={handleDeleteSet} 
                                           onUpdateSet={handleUpdateSet} 
                                           onRemoveExercise={handleRemoveExerciseFromWorkout}
-                                          onViewProgress={definition ? () => handleViewProgress(definition) : undefined}
+                                          onViewProgress={definition ? () => handleViewProgress(definition, 'deepwork') : undefined}
                                           pageType="deepwork"
                                         />
                                       );
@@ -1176,8 +1213,11 @@ function DeepWorkPageContent() {
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                                            <DropdownMenuItem onSelect={() => handleViewProgress(upskillDef, 'upskill')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+                                                            <DropdownMenuSeparator />
                                                             <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                                            <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                                                            <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                                                            <DropdownMenuItem onSelect={() => handleDeleteUpskillDefinition(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
                                                 </div>
@@ -1223,8 +1263,11 @@ function DeepWorkPageContent() {
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                                            <DropdownMenuItem onSelect={() => handleViewProgress(upskillDef, 'upskill')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+                                                            <DropdownMenuSeparator />
                                                             <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                                            <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                                                            <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                                                            <DropdownMenuItem onSelect={() => handleDeleteUpskillDefinition(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
                                                 </div>
@@ -1275,6 +1318,16 @@ function DeepWorkPageContent() {
                                     return (
                                        <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
                                           <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                              <TooltipProvider>
+                                                <Tooltip>
+                                                  <TooltipTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); handleAddTaskToSession(deepworkDef); }}>
+                                                      <PlusCircle className="h-4 w-4" />
+                                                    </Button>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent>Add to Session</TooltipContent>
+                                                </Tooltip>
+                                              </TooltipProvider>
                                               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setSelectedFocusArea(deepworkDef); setViewMode('library'); }}>
                                                   <ArrowRight className="h-4 w-4" />
                                               </Button>
@@ -1285,8 +1338,16 @@ function DeepWorkPageContent() {
                                                       </Button>
                                                   </DropdownMenuTrigger>
                                                   <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                                      <DropdownMenuItem onSelect={() => handleViewProgress(deepworkDef, 'deepwork')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+                                                      <DropdownMenuSeparator />
+                                                      <DropdownMenuCheckboxItem checked={!!deepworkDef.isReadyForBranding} onSelect={(e) => { e.preventDefault(); handleToggleReadyForBranding(deepworkDef.id); }}>
+                                                          <Share2 className="mr-2 h-4 w-4" />
+                                                          <span>Ready for Branding</span>
+                                                      </DropdownMenuCheckboxItem>
+                                                      <DropdownMenuSeparator />
                                                       <DropdownMenuItem onSelect={() => handleStartEditDefinition(deepworkDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                                      <DropdownMenuItem onSelect={() => handleUnlinkItem('deepwork', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                                                      <DropdownMenuItem onSelect={() => handleUnlinkItem('deepwork', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                                                      <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(deepworkDef.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
                                                   </DropdownMenuContent>
                                               </DropdownMenu>
                                           </div>
@@ -1369,8 +1430,8 @@ function DeepWorkPageContent() {
                                                     <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         {isNotionObsidianEmbed ? (
                                                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setEmbedUrl(embedLinkForModal); }}>
-                                                                <Expand className="h-4 w-4" />
-                                                            </Button>
+                                                            <Expand className="h-4 w-4" />
+                                                        </Button>
                                                         ) : (
                                                             <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
                                                                 <a href={resource.link} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
@@ -1428,13 +1489,14 @@ function DeepWorkPageContent() {
           </section>
         </div>
         
-        {viewingProgressExercise && (
+        {progressModalConfig.isOpen && progressModalConfig.exercise && (
           <ExerciseProgressModal 
-            isOpen={isProgressModalOpen} 
-            onOpenChange={setIsProgressModalOpen}
-            exercise={viewingProgressExercise} 
-            allWorkoutLogs={allDeepWorkLogs}
-            pageType="deepwork"
+            isOpen={progressModalConfig.isOpen} 
+            onOpenChange={(isOpen) => setProgressModalConfig(prev => ({...prev, isOpen}))}
+            exercise={progressModalConfig.exercise} 
+            allWorkoutLogs={progressModalConfig.pageType === 'upskill' ? allUpskillLogs : allDeepWorkLogs}
+            pageType={progressModalConfig.pageType}
+            topicGoals={progressModalConfig.pageType === 'upskill' ? topicGoals : undefined}
           />
         )}
         
@@ -1741,5 +1803,3 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
-
-    
