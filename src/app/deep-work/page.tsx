@@ -1030,6 +1030,12 @@ function DeepWorkPageContent() {
                                 <span className="text-muted-foreground">Total Logged Time</span>
                                 <span className="font-medium">{formatMinutes(totalLoggedTime)}</span>
                             </div>
+                            {selectedFocusArea.estimatedHours && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">This Focus Area's Est.</span>
+                                    <span className="font-medium">{selectedFocusArea.estimatedHours}h</span>
+                                </div>
+                            )}
                             {totalEstimatedHours > 0 && (
                                 <div className="flex justify-between text-sm">
                                     <span className="text-muted-foreground">Total Estimated Time</span>
