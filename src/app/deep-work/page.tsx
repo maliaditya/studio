@@ -52,6 +52,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Progress } from '@/components/ui/progress';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -843,9 +844,9 @@ function DeepWorkPageContent() {
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
           
-          <aside className="lg:col-span-3 space-y-6">
+          <aside className="lg:col-span-1 space-y-6">
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between gap-2">
@@ -990,9 +991,55 @@ function DeepWorkPageContent() {
                 </div>
               </CardContent>
             </Card>
+            {selectedFocusArea && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <TrendingUp className="h-5 w-5 text-primary" />
+                            Focus Area Stats
+                        </CardTitle>
+                        <CardDescription>
+                            Progress for "{selectedFocusArea.name}"
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Logged Time</span>
+                                <span className="font-medium">{formatMinutes(totalLoggedTime)}</span>
+                            </div>
+                            {selectedFocusArea.estimatedHours && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Estimated Time</span>
+                                    <span className="font-medium">{selectedFocusArea.estimatedHours}h</span>
+                                </div>
+                            )}
+                        </div>
+                        
+                        {selectedFocusArea.estimatedHours && selectedFocusArea.estimatedHours > 0 && (
+                            <div>
+                                <Progress 
+                                    value={Math.min(100, (totalLoggedTime / (selectedFocusArea.estimatedHours * 60)) * 100)} 
+                                    className="h-2" 
+                                />
+                                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                    <span>0%</span>
+                                    <span>{((totalLoggedTime / (selectedFocusArea.estimatedHours * 60)) * 100).toFixed(0)}%</span>
+                                </div>
+                            </div>
+                        )}
+                        
+                        {selectedFocusArea.estimatedHours && totalLoggedTime > selectedFocusArea.estimatedHours * 60 && (
+                            <Badge variant="destructive" className="w-full justify-center">
+                                Overspent by {formatMinutes(totalLoggedTime - selectedFocusArea.estimatedHours * 60)}
+                            </Badge>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
           </aside>
 
-          <section aria-labelledby="main-panel-heading" className="lg:col-span-9 space-y-6">
+          <section aria-labelledby="main-panel-heading" className="lg:col-span-3 space-y-6">
               <Card>
                   <CardHeader className="flex flex-row items-center justify-between p-4">
                       <div className="flex-grow">
@@ -1004,28 +1051,6 @@ function DeepWorkPageContent() {
                             <CardDescription className="text-xs mt-1">{selectedFocusArea.category}</CardDescription>
                           )}
                       </div>
-                      
-                      {viewMode === 'library' && selectedFocusArea && (
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {selectedFocusArea.estimatedHours && (
-                            <Badge variant="outline" className="text-sm">
-                              Est: {selectedFocusArea.estimatedHours}h
-                            </Badge>
-                          )}
-                          {totalLoggedTime > 0 && (
-                            <Badge variant="secondary" className={cn(
-                                "text-sm",
-                                (selectedFocusArea.estimatedHours && totalLoggedTime > selectedFocusArea.estimatedHours * 60)
-                                    ? "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300"
-                                    : "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300"
-                            )}>
-                                {(selectedFocusArea.estimatedHours && totalLoggedTime > selectedFocusArea.estimatedHours * 60)
-                                ? `Overspent: ${formatMinutes(totalLoggedTime - (selectedFocusArea.estimatedHours * 60))}`
-                                : `Logged: ${formatMinutes(totalLoggedTime)}`}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
 
                       <div className='flex items-center gap-2 flex-shrink-0'>
                         <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
