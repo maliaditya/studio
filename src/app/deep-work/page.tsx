@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Eye, EyeOff, LineChart as LineChartIcon, Unlink, GitMerge, Workflow, Clock } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Eye, EyeOff, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -1101,9 +1101,9 @@ function DeepWorkPageContent() {
                                     <>
                                       <div className="flex items-center gap-2 flex-grow min-w-0">
                                         {isIntention ? (
-                                          <Workflow className="h-4 w-4 flex-shrink-0 text-primary/80" />
+                                          <Lightbulb className="h-4 w-4 flex-shrink-0 text-amber-500" />
                                         ) : (
-                                          <Briefcase className="h-4 w-4 flex-shrink-0 text-muted-foreground/80" />
+                                          <Bolt className="h-4 w-4 flex-shrink-0 text-blue-500" />
                                         )}
                                         <span className="truncate cursor-pointer" onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} title={`View details for ${def.name}`}>{def.name}</span>
                                         {def.isReadyForBranding && <Share2 className="h-3 w-3 text-primary flex-shrink-0" title="Ready for Branding" />}
@@ -1423,24 +1423,24 @@ function DeepWorkPageContent() {
                                     const deepworkDef = deepWorkDefinitions.find(dd => dd.id === id);
                                     if (!deepworkDef) return null;
 
-                                    const nodeType = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 ? 'Objective' : 'Action';
+                                    const isObjective = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 || (deepworkDef.linkedUpskillIds?.length ?? 0) > 0 || (deepworkDef.linkedResourceIds?.length ?? 0) > 0;
+                                    const nodeType = isObjective ? 'Objective' : 'Action';
                                     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
                                     const loggedHours = loggedMinutes / 60;
-                                    const isIntention = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 || (deepworkDef.linkedUpskillIds?.length ?? 0) > 0 || (deepworkDef.linkedResourceIds?.length ?? 0) > 0;
-
+                                    
                                     return (
                                        <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
                                           <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                               <TooltipProvider>
                                                 <Tooltip>
                                                   <TooltipTrigger asChild>
-                                                    <span tabIndex={isIntention ? 0 : -1}>
-                                                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); handleAddTaskToSession(deepworkDef); }} disabled={isIntention}>
+                                                    <span tabIndex={isObjective ? -1 : 0}>
+                                                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); handleAddTaskToSession(deepworkDef); }} disabled={isObjective}>
                                                         <PlusCircle className="h-4 w-4" />
                                                       </Button>
                                                     </span>
                                                   </TooltipTrigger>
-                                                  <TooltipContent>{isIntention ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent>
+                                                  <TooltipContent>{isObjective ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent>
                                                 </Tooltip>
                                               </TooltipProvider>
                                               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setSelectedFocusArea(deepworkDef); setViewMode('library'); }}>
@@ -1468,10 +1468,10 @@ function DeepWorkPageContent() {
                                           </div>
                                          <CardHeader className="pb-3">
                                             <CardTitle className="text-base flex items-center gap-2">
-                                              {isIntention ? (
-                                                  <Workflow className="h-5 w-5 text-primary flex-shrink-0" />
+                                              {isObjective ? (
+                                                  <Flag className="h-5 w-5 text-green-500 flex-shrink-0" />
                                                 ) : (
-                                                  <Briefcase className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                                  <Bolt className="h-5 w-5 text-blue-500 flex-shrink-0" />
                                                 )}
                                               <span className="truncate" title={deepworkDef.name}>{deepworkDef.name}</span>
                                               <Badge variant="outline" className="text-xs">{nodeType}</Badge>
@@ -1699,8 +1699,7 @@ function DeepWorkPageContent() {
             </div>
             <div className="-mx-1 my-1 h-px bg-muted" />
             <div
-                role="menuitemcheckbox"
-                aria-checked={!!focusAreaContextMenu.item.isReadyForBranding}
+                role="menuitem"
                 className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
                 onMouseDown={(e) => {
                     e.preventDefault();
@@ -1708,7 +1707,7 @@ function DeepWorkPageContent() {
                     setFocusAreaContextMenu(null);
                 }}
             >
-                <Checkbox checked={!!focusAreaContextMenu.item.isReadyForBranding} className="h-4 w-4 pointer-events-none" />
+                <Checkbox checked={!!focusAreaContextMenu.item.isReadyForBranding} className="h-4 w-4 pointer-events-none mr-2" />
                 <span className="pointer-events-none">Ready for Branding</span>
             </div>
             <div className="-mx-1 my-1 h-px bg-muted" />
