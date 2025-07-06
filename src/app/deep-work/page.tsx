@@ -422,11 +422,15 @@ function DeepWorkPageContent() {
       
       const isParent = (definition.linkedDeepWorkIds?.length ?? 0) > 0 || (definition.linkedUpskillIds?.length ?? 0) > 0 || (definition.linkedResourceIds?.length ?? 0) > 0;
   
-      const deepWorkIdsToSum = new Set<string>(definition.linkedDeepWorkIds || []);
-      if (!isParent) {
+      const deepWorkIdsToSum = new Set<string>();
+      const upskillIdsToSum = new Set<string>();
+  
+      if (isParent) {
+          (definition.linkedDeepWorkIds || []).forEach(id => deepWorkIdsToSum.add(id));
+          (definition.linkedUpskillIds || []).forEach(id => upskillIdsToSum.add(id));
+      } else {
           deepWorkIdsToSum.add(definition.id);
       }
-      const allUpskillDefIdsToSum = new Set<string>(definition.linkedUpskillIds || []);
   
       if (allDeepWorkLogs) {
           allDeepWorkLogs.forEach(log => {
@@ -443,7 +447,7 @@ function DeepWorkPageContent() {
       if (allUpskillLogs) {
           allUpskillLogs.forEach(log => {
               log.exercises.forEach(ex => {
-                  if (allUpskillDefIdsToSum.has(ex.definitionId)) {
+                  if (upskillIdsToSum.has(ex.definitionId)) {
                       ex.loggedSets.forEach(set => {
                           totalMinutes += set.reps; // duration for upskill
                       });
@@ -948,40 +952,46 @@ function DeepWorkPageContent() {
   const filteredItemsForLinking = useMemo(() => {
     if (!manageLinksConfig) return [];
     const { type, parent } = manageLinksConfig;
-    
+
     let definitionsSource: any[];
     if (type === 'upskill') {
-      definitionsSource = linkUpskillTopic ? upskillDefinitions.filter(d => d.category === linkUpskillTopic) : upskillDefinitions;
+        definitionsSource = linkUpskillTopic ? upskillDefinitions.filter(d => d.category === linkUpskillTopic) : upskillDefinitions;
     } else if (type === 'deepwork') {
-      definitionsSource = linkDeepWorkTopic ? deepWorkDefinitions.filter(d => d.category === linkDeepWorkTopic) : deepWorkDefinitions;
+        definitionsSource = linkDeepWorkTopic ? deepWorkDefinitions.filter(d => d.category === linkDeepWorkTopic) : deepWorkDefinitions;
     } else { // 'resource'
         if (!linkResourceFolderId) return [];
         definitionsSource = resources.filter(res => res.folderId === linkResourceFolderId);
     }
 
-    const isParentAnObjective = (() => {
-      if (type !== 'deepwork') return false;
-      const isParentParent = (parent.linkedDeepWorkIds?.length ?? 0) > 0 || (parent.linkedUpskillIds?.length ?? 0) > 0 || (parent.linkedResourceIds?.length ?? 0) > 0;
-      const isParentChild = linkedDeepWorkChildIds.has(parent.id);
-      return isParentParent && isParentChild;
-    })();
+    const isParentParent = (parent.linkedDeepWorkIds?.length ?? 0) > 0 || (parent.linkedUpskillIds?.length ?? 0) > 0 || (parent.linkedResourceIds?.length ?? 0) > 0;
+    const isParentChild = linkedDeepWorkChildIds.has(parent.id);
+
+    const isParentAnObjective = type === 'deepwork' && isParentParent && isParentChild;
+    const isParentAnIntention = type === 'deepwork' && isParentParent && !isParentChild;
 
     return definitionsSource.filter(def => {
-        if (type === 'deepwork' && isParentAnObjective) {
+        if (type === 'deepwork') {
             const isDefParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
             const isDefChild = linkedDeepWorkChildIds.has(def.id);
             const isDefAnIntention = isDefParent && !isDefChild;
-            if (isDefAnIntention) {
+            
+            // Rule: An Objective cannot be linked to a top-level Intention.
+            if (isParentAnObjective && isDefAnIntention) {
+                return false;
+            }
+            
+            // Rule: An Intention cannot be linked to a bottom-level Action.
+            if (isParentAnIntention && !isDefParent) {
                 return false;
             }
         }
         
         return def.name &&
-        def.name !== 'placeholder' &&
-        def.id !== parent.id && 
-        def.name.toLowerCase().includes(linkSearchTerm.toLowerCase());
+            def.name !== 'placeholder' &&
+            def.id !== parent.id &&
+            def.name.toLowerCase().includes(linkSearchTerm.toLowerCase());
     });
-  }, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkedDeepWorkChildIds, linkUpskillTopic, linkDeepWorkTopic]);
+}, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkedDeepWorkChildIds, linkUpskillTopic, linkDeepWorkTopic]);
 
 
   const handleStartEditUpskill = (def: ExerciseDefinition) => {
