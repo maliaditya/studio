@@ -980,84 +980,92 @@ function DeepWorkPageContent() {
                       </div>
                       {!isCollapsed && (
                         <ul className="space-y-1 pl-4 border-l-2 border-muted ml-4">
-                            {focusAreas.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
-                              <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted">
-                                {editingDefinition?.id === def.id ? (
-                                  <div className='flex-grow flex flex-col gap-2'>
-                                    <Input 
-                                      value={editingDefinitionName}
-                                      onChange={(e) => setEditingDefinitionName(e.target.value)}
-                                      className="h-8"
-                                      autoFocus
-                                    />
-                                    <Input
-                                        type="number"
-                                        placeholder="Est. Hours"
-                                        value={editingDefinitionHours}
-                                        onChange={(e) => setEditingDefinitionHours(e.target.value)}
+                            {focusAreas.sort((a,b) => a.name.localeCompare(b.name)).map(def => {
+                              const isEpic = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+                              return (
+                                <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted">
+                                  {editingDefinition?.id === def.id ? (
+                                    <div className='flex-grow flex flex-col gap-2'>
+                                      <Input 
+                                        value={editingDefinitionName}
+                                        onChange={(e) => setEditingDefinitionName(e.target.value)}
                                         className="h-8"
-                                    />
-                                    <div className="flex gap-2 self-end">
-                                        <Button size="icon" className="h-8 w-8" onClick={handleSaveEditDefinition}><Save className="h-4 w-4"/></Button>
-                                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingDefinition(null)}><X className="h-4 w-4"/></Button>
+                                        autoFocus
+                                      />
+                                      <Input
+                                          type="number"
+                                          placeholder="Est. Hours"
+                                          value={editingDefinitionHours}
+                                          onChange={(e) => setEditingDefinitionHours(e.target.value)}
+                                          className="h-8"
+                                      />
+                                      <div className="flex gap-2 self-end">
+                                          <Button size="icon" className="h-8 w-8" onClick={handleSaveEditDefinition}><Save className="h-4 w-4"/></Button>
+                                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingDefinition(null)}><X className="h-4 w-4"/></Button>
+                                      </div>
                                     </div>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <div className="flex items-center gap-2 flex-grow min-w-0">
-                                      <Briefcase className="h-4 w-4 flex-shrink-0 text-muted-foreground/80" />
-                                      <span className="truncate cursor-pointer" onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} title={`View details for ${def.name}`}>{def.name}</span>
-                                      {def.isReadyForBranding && <Share2 className="h-3 w-3 text-primary flex-shrink-0" title="Ready for Branding" />}
-                                      {def.estimatedHours && <Badge variant="secondary" className="text-xs ml-auto">{def.estimatedHours}h</Badge>}
-                                    </div>
-                                    <div className='hidden items-center flex-shrink-0 group-hover:flex'>
-                                      <TooltipProvider>
-                                        <Tooltip>
+                                  ) : (
+                                    <>
+                                      <div className="flex items-center gap-2 flex-grow min-w-0">
+                                        {isEpic ? (
+                                          <GitMerge className="h-4 w-4 flex-shrink-0 text-primary/80" />
+                                        ) : (
+                                          <Briefcase className="h-4 w-4 flex-shrink-0 text-muted-foreground/80" />
+                                        )}
+                                        <span className="truncate cursor-pointer" onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} title={`View details for ${def.name}`}>{def.name}</span>
+                                        {def.isReadyForBranding && <Share2 className="h-3 w-3 text-primary flex-shrink-0" title="Ready for Branding" />}
+                                        {def.estimatedHours && <Badge variant="secondary" className="text-xs ml-auto">{def.estimatedHours}h</Badge>}
+                                      </div>
+                                      <div className='hidden items-center flex-shrink-0 group-hover:flex'>
+                                        <TooltipProvider>
+                                          <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openMindMapFor(def.id)}>
+                                                      <GitMerge className="h-4 w-4" />
+                                                  </Button>
+                                              </TooltipTrigger>
+                                              <TooltipContent>View Mind Map</TooltipContent>
+                                          </Tooltip>
+                                          <Tooltip>
                                             <TooltipTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openMindMapFor(def.id)}>
-                                                    <GitMerge className="h-4 w-4" />
+                                              <span tabIndex={isEpic ? 0 : -1}>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => !isEpic && handleAddTaskToSession(def)} disabled={isEpic}>
+                                                  <PlusCircle className="h-4 w-4" />
                                                 </Button>
+                                              </span>
                                             </TooltipTrigger>
-                                            <TooltipContent>View Mind Map</TooltipContent>
-                                        </Tooltip>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddTaskToSession(def)}>
-                                              <PlusCircle className="h-4 w-4" />
+                                            <TooltipContent>{isEpic ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                                              <MoreVertical className="h-4 w-4" />
                                             </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>Add to Session</TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-7 w-7">
-                                            <MoreVertical className="h-4 w-4" />
-                                          </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                          <DropdownMenuItem onSelect={() => handleViewProgress(def, 'deepwork')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
-                                          <DropdownMenuSeparator />
-                                          <DropdownMenuCheckboxItem
-                                              checked={!!def.isReadyForBranding}
-                                              onSelect={(e) => {
-                                                  e.preventDefault();
-                                                  handleToggleReadyForBranding(def.id);
-                                              }}
-                                          >
-                                              <Share2 className="mr-2 h-4 w-4" />
-                                              <span>Ready for Branding</span>
-                                          </DropdownMenuCheckboxItem>
-                                          <DropdownMenuSeparator />
-                                          <DropdownMenuItem onSelect={() => handleStartEditDefinition(def)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
-                                          <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(def.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
-                                    </div>
-                                  </>
-                                )}
-                              </li>
-                            ))}
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onSelect={() => handleViewProgress(def, 'deepwork')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuCheckboxItem
+                                                checked={!!def.isReadyForBranding}
+                                                onSelect={(e) => {
+                                                    e.preventDefault();
+                                                    handleToggleReadyForBranding(def.id);
+                                                }}
+                                            >
+                                                <Share2 className="mr-2 h-4 w-4" />
+                                                <span>Ready for Branding</span>
+                                            </DropdownMenuCheckboxItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onSelect={() => handleStartEditDefinition(def)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(def.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </div>
+                                    </>
+                                  )}
+                                </li>
+                              )})}
                              {addingFocusToTopic === topic && (
                                 <li className="p-1.5">
                                   <form onSubmit={(e) => { e.preventDefault(); handleAddFocusArea(topic); }} className="space-y-2">
@@ -1375,7 +1383,11 @@ function DeepWorkPageContent() {
                                           </div>
                                          <CardHeader className="pb-3">
                                             <CardTitle className="text-base flex items-center gap-2">
-                                              <Briefcase className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                              {isParent ? (
+                                                  <GitMerge className="h-5 w-5 text-primary flex-shrink-0" />
+                                                ) : (
+                                                  <Briefcase className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                                )}
                                               <span className="truncate" title={deepworkDef.name}>{deepworkDef.name}</span>
                                             </CardTitle>
                                             <CardDescription>{deepworkDef.category}</CardDescription>
