@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Eye, EyeOff } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Eye, EyeOff, LineChart as LineChartIcon } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { format, getISOWeek, isMonday, getYear } from 'date-fns';
+import { format, getISOWeek, isMonday, getYear, addDays, parseISO, differenceInDays } from 'date-fns';
 import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, DeepWorkTopicMetadata, Resource, ResourceFolder } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
@@ -53,6 +53,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Progress } from '@/components/ui/progress';
+import { FocusAreaProgressModal } from '@/components/FocusAreaProgressModal';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -210,6 +211,7 @@ function DeepWorkPageContent() {
   
   const [viewingProgressExercise, setViewingProgressExercise] = useState<ExerciseDefinition | null>(null);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
+  const [isFocusAreaProgressModalOpen, setIsFocusAreaProgressModalOpen] = useState(false);
   
   const [isLoadingPage, setIsLoadingPage] = useState(true);
   
@@ -801,7 +803,7 @@ function DeepWorkPageContent() {
     if (finalUpskillData.link !== editingUpskill.link) {
         finalUpskillData.iconUrl = getFaviconUrl(finalUpskillData.link || '');
     }
-    setUpskillDefinitions(prev => prev.map(def => def.id === editingUpskill.id ? finalUpskillData as ExerciseDefinition : def));
+    setUpskillDefinitions(prev => prev.map(def => def.id === editingUpskill.id ? { ...def, ...finalUpskillData } : def));
     setEditingUpskill(null);
     toast({ title: 'Success', description: 'Upskill task updated.' });
   };
@@ -816,7 +818,7 @@ function DeepWorkPageContent() {
     if (finalResourceData.link !== editingResource.link) {
         finalResourceData.iconUrl = getFaviconUrl(finalResourceData.link || '');
     }
-    setResources(prev => prev.map(res => res.id === editingResource.id ? finalResourceData as Resource : res));
+    setResources(prev => prev.map(res => res.id === editingResource.id ? { ...res, ...finalResourceData } as Resource : res));
     setEditingResource(null);
     toast({ title: 'Success', description: 'Resource updated.' });
   };
@@ -853,6 +855,27 @@ function DeepWorkPageContent() {
 
     return options;
   }, [resourceFolders]);
+  
+  const productivityStats = useMemo(() => {
+    const calculateAverageDuration = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
+        if (!logs) return 0;
+        const dailyDurations: Record<string, number> = {};
+        logs.forEach(log => {
+            const duration = log.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
+            if (duration > 0) { dailyDurations[log.date] = (dailyDurations[log.date] || 0) + duration; }
+        });
+        const daysWithActivity = Object.keys(dailyDurations).length;
+        if (daysWithActivity === 0) return 0;
+        const totalDuration = Object.values(dailyDurations).reduce((sum, d) => sum + d, 0);
+        return totalDuration / daysWithActivity;
+    };
+
+    const totalProductiveMinutes = calculateAverageDuration(allUpskillLogs, 'reps') + calculateAverageDuration(allDeepWorkLogs, 'weight');
+    const avgProductiveHours = totalProductiveMinutes / 60;
+    
+    return { avgProductiveHours };
+  }, [allUpskillLogs, allDeepWorkLogs]);
+
 
   if (isLoadingPage) {
     return (
@@ -1015,16 +1038,21 @@ function DeepWorkPageContent() {
             </Card>
             {selectedFocusArea && (
                 <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg flex items-center gap-2">
-                            <TrendingUp className="h-5 w-5 text-primary" />
-                            Focus Area Stats
-                        </CardTitle>
-                        <CardDescription>
-                            Aggregated progress for "{selectedFocusArea.name}"
-                        </CardDescription>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <div>
+                            <CardTitle className="text-lg flex items-center gap-2">
+                                <TrendingUp className="h-5 w-5 text-primary" />
+                                Focus Area Stats
+                            </CardTitle>
+                            <CardDescription className="text-xs">
+                                Aggregated progress for "{selectedFocusArea.name}"
+                            </CardDescription>
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsFocusAreaProgressModalOpen(true)}>
+                            <LineChartIcon className="h-4 w-4"/>
+                        </Button>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-4 pt-4">
                         <div className="space-y-2">
                             <div className="flex justify-between text-sm">
                                 <span className="text-muted-foreground">Total Logged Time</span>
@@ -1406,6 +1434,19 @@ function DeepWorkPageContent() {
             allWorkoutLogs={allDeepWorkLogs}
             pageType="deepwork"
           />
+        )}
+        
+        {selectedFocusArea && (
+            <FocusAreaProgressModal 
+                isOpen={isFocusAreaProgressModalOpen}
+                onOpenChange={setIsFocusAreaProgressModalOpen}
+                focusArea={selectedFocusArea}
+                deepWorkDefinitions={deepWorkDefinitions}
+                upskillDefinitions={upskillDefinitions}
+                allDeepWorkLogs={allDeepWorkLogs}
+                allUpskillLogs={allUpskillLogs}
+                avgDailyProductiveHours={productivityStats.avgProductiveHours}
+            />
         )}
       </div>
 
