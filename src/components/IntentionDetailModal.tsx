@@ -16,10 +16,10 @@ import { BookCopy, Link as LinkIcon, Briefcase, ExternalLink, Globe, Workflow } 
 import type { ExerciseDefinition, Resource } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 
-interface EpicDetailModalProps {
+interface IntentionDetailModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  epic: ExerciseDefinition | null;
+  intention: ExerciseDefinition | null;
 }
 
 const getYouTubeThumbnailUrl = (url: string): string | null => {
@@ -33,23 +33,23 @@ const getYouTubeThumbnailUrl = (url: string): string | null => {
     return null;
 };
 
-export function EpicDetailModal({ isOpen, onOpenChange, epic }: EpicDetailModalProps) {
+export function IntentionDetailModal({ isOpen, onOpenChange, intention }: IntentionDetailModalProps) {
   const { upskillDefinitions, deepWorkDefinitions, resources, resourceFolders } = useAuth();
 
-  if (!epic) return null;
+  if (!intention) return null;
 
-  const linkedLearningTasks = (epic.linkedUpskillIds || []).map(id => upskillDefinitions.find(d => d.id === id)).filter(Boolean) as ExerciseDefinition[];
-  const linkedWorkTasks = (epic.linkedDeepWorkIds || []).map(id => deepWorkDefinitions.find(d => d.id === id)).filter(Boolean) as ExerciseDefinition[];
-  const linkedResources = (epic.linkedResourceIds || []).map(id => resources.find(r => r.id === id)).filter(Boolean) as Resource[];
-  const isEpicCheck = (def: ExerciseDefinition) => (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+  const linkedLearningTasks = (intention.linkedUpskillIds || []).map(id => upskillDefinitions.find(d => d.id === id)).filter(Boolean) as ExerciseDefinition[];
+  const linkedWorkTasks = (intention.linkedDeepWorkIds || []).map(id => deepWorkDefinitions.find(d => d.id === id)).filter(Boolean) as ExerciseDefinition[];
+  const linkedResources = (intention.linkedResourceIds || []).map(id => resources.find(r => r.id === id)).filter(Boolean) as Resource[];
+  const isIntentionCheck = (def: ExerciseDefinition) => (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Epic Details: {epic.name}</DialogTitle>
+          <DialogTitle>Intention Details: {intention.name}</DialogTitle>
           <DialogDescription>
-            A complete overview of all tasks and resources linked to this epic.
+            A complete overview of all tasks and resources linked to this intention.
           </DialogDescription>
         </DialogHeader>
         <div className="flex-grow min-h-0">
@@ -96,7 +96,7 @@ export function EpicDetailModal({ isOpen, onOpenChange, epic }: EpicDetailModalP
                         <Card key={task.id} className="rounded-lg flex flex-col">
                            <div className="p-4 flex-grow flex flex-col">
                               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                {isEpicCheck(task) ? (
+                                {isIntentionCheck(task) ? (
                                     <Workflow className="h-4 w-4 text-primary flex-shrink-0" />
                                 ) : (
                                     <Briefcase className="h-4 w-4 text-muted-foreground flex-shrink-0" />

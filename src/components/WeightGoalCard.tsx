@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -20,7 +19,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tool
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
 import Link from 'next/link';
-import { EpicDetailModal } from './EpicDetailModal';
+import { IntentionDetailModal } from './IntentionDetailModal';
 
 interface WeightGoalCardProps {
   weightLogs: WeightLog[];
@@ -82,7 +81,7 @@ export function WeightGoalCard({
     const [showLogForm, setShowLogForm] = useState(false);
     const [weightView, setWeightView] = useState<'chart' | 'details'>('details');
     const [mainView, setMainView] = useState<'weight' | 'diet' | 'projects'>('weight');
-    const [selectedEpic, setSelectedEpic] = useState<ExerciseDefinition | null>(null);
+    const [selectedIntention, setSelectedIntention] = useState<ExerciseDefinition | null>(null);
 
     const [heightInput, setHeightInput] = useState('');
     const [dobInput, setDobInput] = useState<Date | undefined>();
@@ -97,7 +96,7 @@ export function WeightGoalCard({
         return dietPlan.find(plan => plan.day === dayName);
     }, [dietPlan]);
 
-    const activeEpics = useMemo(() => {
+    const activeIntentions = useMemo(() => {
         return (deepWorkDefinitions || [])
             .filter(def => 
                 (def.linkedDeepWorkIds?.length ?? 0) > 0 ||
@@ -375,7 +374,7 @@ export function WeightGoalCard({
                 return;
             }
         } else {
-            onSetGoalWeight(null);
+            onSetGoalWeight(null); // Allow clearing the goal
         }
 
         toast({ title: "Details Saved", description: "Your profile has been updated." });
@@ -414,32 +413,32 @@ export function WeightGoalCard({
         );
       };
       
-    const renderEpicsList = (epics: ExerciseDefinition[]) => {
-        if (epics.length === 0) {
+    const renderIntentionsList = (intentions: ExerciseDefinition[]) => {
+        if (intentions.length === 0) {
           return (
             <div className="text-center text-sm text-muted-foreground py-4">
-              <p>No active epics found.</p>
+              <p>No active intentions found.</p>
               <Link href="/deep-work" className="text-primary hover:underline">
-                Create an epic by linking tasks in Deep Work.
+                Create an intention by linking tasks in Deep Work.
               </Link>
             </div>
           );
         }
         return (
           <ul className="space-y-2">
-            {epics.map(epic => (
-              <li key={epic.id}>
+            {intentions.map(intention => (
+              <li key={intention.id}>
                 <button
                     className="w-full text-left"
-                    onClick={() => setSelectedEpic(epic)}
+                    onClick={() => setSelectedIntention(intention)}
                 >
                   <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
                     <div className="flex items-center gap-3 min-w-0">
                       <Workflow className="h-4 w-4 text-primary flex-shrink-0" />
-                      <span className="font-medium text-foreground truncate" title={epic.name}>{epic.name}</span>
+                      <span className="font-medium text-foreground truncate" title={intention.name}>{intention.name}</span>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-sm text-muted-foreground truncate" title={epic.category}>{epic.category}</span>
+                      <span className="text-sm text-muted-foreground truncate" title={intention.category}>{intention.category}</span>
                       <ArrowRight className="h-4 w-4 text-muted-foreground" />
                     </div>
                   </div>
@@ -453,12 +452,12 @@ export function WeightGoalCard({
     const renderProjectsContent = () => (
         <Tabs defaultValue="deep-work" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="deep-work">Epics</TabsTrigger>
+            <TabsTrigger value="deep-work">Intentions</TabsTrigger>
             <TabsTrigger value="upskill">Topics</TabsTrigger>
           </TabsList>
           <TabsContent value="deep-work" className="mt-4">
             <ScrollArea className="h-48">
-              {renderEpicsList(activeEpics)}
+              {renderIntentionsList(activeIntentions)}
             </ScrollArea>
           </TabsContent>
           <TabsContent value="upskill" className="mt-4">
@@ -766,10 +765,10 @@ export function WeightGoalCard({
                     </>
                 )}
             </Card>
-            <EpicDetailModal
-                isOpen={!!selectedEpic}
-                onOpenChange={() => setSelectedEpic(null)}
-                epic={selectedEpic}
+            <IntentionDetailModal
+                isOpen={!!selectedIntention}
+                onOpenChange={() => setSelectedIntention(null)}
+                intention={selectedIntention}
             />
         </>
     );

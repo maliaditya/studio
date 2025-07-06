@@ -1072,7 +1072,7 @@ function DeepWorkPageContent() {
                       {!isCollapsed && (
                         <ul className="space-y-1 pl-4 border-l-2 border-muted ml-4">
                             {focusAreas.sort((a,b) => a.name.localeCompare(b.name)).map(def => {
-                              const isEpic = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+                              const isIntention = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
                               return (
                                 <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted" onContextMenu={(e) => handleFocusAreaContextMenu(e, def)}>
                                   {editingDefinition?.id === def.id ? (
@@ -1098,7 +1098,7 @@ function DeepWorkPageContent() {
                                   ) : (
                                     <>
                                       <div className="flex items-center gap-2 flex-grow min-w-0">
-                                        {isEpic ? (
+                                        {isIntention ? (
                                           <Workflow className="h-4 w-4 flex-shrink-0 text-primary/80" />
                                         ) : (
                                           <Briefcase className="h-4 w-4 flex-shrink-0 text-muted-foreground/80" />
@@ -1119,13 +1119,13 @@ function DeepWorkPageContent() {
                                           </Tooltip>
                                           <Tooltip>
                                             <TooltipTrigger asChild>
-                                              <span tabIndex={isEpic ? 0 : -1}>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => !isEpic && handleAddTaskToSession(def)} disabled={isEpic}>
+                                              <span tabIndex={isIntention ? 0 : -1}>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => !isIntention && handleAddTaskToSession(def)} disabled={isIntention}>
                                                   <PlusCircle className="h-4 w-4" />
                                                 </Button>
                                               </span>
                                             </TooltipTrigger>
-                                            <TooltipContent>{isEpic ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent>
+                                            <TooltipContent>{isIntention ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent>
                                           </Tooltip>
                                         </TooltipProvider>
                                       </div>
@@ -1423,7 +1423,7 @@ function DeepWorkPageContent() {
 
                                     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
                                     const loggedHours = loggedMinutes / 60;
-                                    const isParent = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 || (deepworkDef.linkedUpskillIds?.length ?? 0) > 0 || (deepworkDef.linkedResourceIds?.length ?? 0) > 0;
+                                    const isIntention = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 || (deepworkDef.linkedUpskillIds?.length ?? 0) > 0 || (deepworkDef.linkedResourceIds?.length ?? 0) > 0;
 
                                     return (
                                        <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
@@ -1431,13 +1431,13 @@ function DeepWorkPageContent() {
                                               <TooltipProvider>
                                                 <Tooltip>
                                                   <TooltipTrigger asChild>
-                                                    <span tabIndex={isParent ? 0 : -1}>
-                                                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); handleAddTaskToSession(deepworkDef); }} disabled={isParent}>
+                                                    <span tabIndex={isIntention ? 0 : -1}>
+                                                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); handleAddTaskToSession(deepworkDef); }} disabled={isIntention}>
                                                         <PlusCircle className="h-4 w-4" />
                                                       </Button>
                                                     </span>
                                                   </TooltipTrigger>
-                                                  <TooltipContent>{isParent ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent>
+                                                  <TooltipContent>{isIntention ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent>
                                                 </Tooltip>
                                               </TooltipProvider>
                                               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setSelectedFocusArea(deepworkDef); setViewMode('library'); }}>
@@ -1465,7 +1465,7 @@ function DeepWorkPageContent() {
                                           </div>
                                          <CardHeader className="pb-3">
                                             <CardTitle className="text-base flex items-center gap-2">
-                                              {isParent ? (
+                                              {isIntention ? (
                                                   <Workflow className="h-5 w-5 text-primary flex-shrink-0" />
                                                 ) : (
                                                   <Briefcase className="h-5 w-5 text-muted-foreground flex-shrink-0" />
