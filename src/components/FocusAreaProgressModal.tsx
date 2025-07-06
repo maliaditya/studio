@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo } from 'react';
@@ -13,7 +12,6 @@ import { ChartContainer, ChartConfig } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceDot, Legend } from 'recharts';
 import { format, parseISO, addDays, differenceInDays } from 'date-fns';
 import { ExerciseDefinition, DatedWorkout } from '@/types/workout';
-import { ScrollArea } from './ui/scroll-area';
 
 interface FocusAreaProgressModalProps {
   isOpen: boolean;
@@ -43,64 +41,88 @@ export function FocusAreaProgressModal({
 }: FocusAreaProgressModalProps) {
 
   const graphData = useMemo(() => {
-    if (!focusArea || !avgDailyProductiveHours) return { combinedData: [], milestones: [] };
-
-    const allRelatedDefIds = new Set([focusArea.id, ...(focusArea.linkedDeepWorkIds || []), ...(focusArea.linkedUpskillIds || [])]);
-    
-    // Combine all logs and calculate daily logged minutes
-    const dailyLoggedMinutes: Record<string, number> = {};
-    [...allDeepWorkLogs, ...allUpskillLogs].forEach(log => {
-        log.exercises.forEach(ex => {
-            if (allRelatedDefIds.has(ex.definitionId)) {
-                const minutes = ex.loggedSets.reduce((sum, set) => sum + (ex.category === 'Upskill' ? set.reps : set.weight), 0);
-                dailyLoggedMinutes[log.date] = (dailyLoggedMinutes[log.date] || 0) + minutes;
-            }
-        });
-    });
-
-    const sortedLogDates = Object.keys(dailyLoggedMinutes).sort();
-    if (sortedLogDates.length === 0) return { combinedData: [], milestones: [] };
-
-    const startDate = parseISO(sortedLogDates[0]);
-    const endDate = new Date();
-    
-    const combinedData: { date: string; logged?: number; estimated?: number }[] = [];
-    let cumulativeLoggedHours = 0;
-    
-    // Generate data points for each day from start to today
-    for (let d = startDate; d <= endDate; d = addDays(d, 1)) {
-      const dateKey = format(d, 'yyyy-MM-dd');
-      cumulativeLoggedHours += (dailyLoggedMinutes[dateKey] || 0) / 60;
-      
-      const daysFromStart = differenceInDays(d, startDate);
-      const estimatedHours = daysFromStart * avgDailyProductiveHours;
-
-      combinedData.push({
-        date: format(d, 'MMM dd'),
-        logged: parseFloat(cumulativeLoggedHours.toFixed(2)),
-        estimated: parseFloat(estimatedHours.toFixed(2)),
-      });
+    if (!focusArea || !avgDailyProductiveHours || avgDailyProductiveHours <= 0) {
+      return { combinedData: [], milestones: [] };
     }
 
-    // Milestone calculation
-    const allRelatedDefs = [...deepWorkDefinitions, ...upskillDefinitions].filter(def => allRelatedDefIds.has(def.id));
-    let cumulativeEstHoursForMilestones = 0;
-    const milestones = allRelatedDefs
-      .filter(d => d.estimatedHours)
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map(def => {
-        cumulativeEstHoursForMilestones += def.estimatedHours!;
-        const daysToMilestone = cumulativeEstHoursForMilestones / avgDailyProductiveHours;
-        const milestoneDate = addDays(startDate, daysToMilestone);
-        return {
-          x: milestoneDate.getTime(),
-          y: cumulativeEstHoursForMilestones,
-          label: def.name,
-        };
+    const allRelatedDefIds = new Set([
+      focusArea.id,
+      ...(focusArea.linkedDeepWorkIds || []),
+      ...(focusArea.linkedUpskillIds || []),
+    ]);
+
+    const dailyLoggedMinutes: Record<string, number> = {};
+    const allLogs = [...allDeepWorkLogs, ...allUpskillLogs];
+    let firstLogDateStr: string | null = null;
+
+    allLogs.forEach(log => {
+      let dailyMinutes = 0;
+      log.exercises.forEach(ex => {
+        if (allRelatedDefIds.has(ex.definitionId) && ex.loggedSets.length > 0) {
+          // In upskill, `reps` is duration. In deepwork, `weight` is duration.
+          const minutes = ex.loggedSets.reduce((sum, set) => sum + (ex.category === 'Upskill' ? set.reps : set.weight), 0);
+          dailyMinutes += minutes;
+        }
       });
+      if (dailyMinutes > 0) {
+        dailyLoggedMinutes[log.date] = (dailyLoggedMinutes[log.date] || 0) + dailyMinutes;
+        if (!firstLogDateStr || log.date < firstLogDateStr) {
+          firstLogDateStr = log.date;
+        }
+      }
+    });
+
+    if (!firstLogDateStr) return { combinedData: [], milestones: [] };
+
+    const startDate = parseISO(firstLogDateStr);
+    const endDate = new Date();
+    
+    const combinedData: { date: string; timestamp: number; logged?: number; estimated?: number }[] = [];
+    let cumulativeLoggedHours = 0;
+
+    // Milestone calculation
+    const allMilestoneDefs = [
+      focusArea,
+      ...(focusArea.linkedDeepWorkIds || []).map(id => deepWorkDefinitions.find(def => def.id === id)),
+      ...(focusArea.linkedUpskillIds || []).map(id => upskillDefinitions.find(def => def.id === id))
+    ].filter((def): def is ExerciseDefinition => !!(def && def.estimatedHours && def.estimatedHours > 0));
+
+    let cumulativeEstHoursForMilestones = 0;
+    const milestones = allMilestoneDefs.map(def => {
+      cumulativeEstHoursForMilestones += def.estimatedHours!;
+      const daysToMilestone = cumulativeEstHoursForMilestones / avgDailyProductiveHours;
+      const milestoneDate = addDays(startDate, Math.ceil(daysToMilestone));
+      return {
+        x: milestoneDate.getTime(),
+        y: cumulativeEstHoursForMilestones,
+        label: def.name,
+      };
+    });
+
+    const totalEstimatedHours = cumulativeEstHoursForMilestones;
+    const totalDaysToComplete = totalEstimatedHours > 0 ? totalEstimatedHours / avgDailyProductiveHours : 0;
+    const lastProjectedDate = addDays(startDate, Math.ceil(totalDaysToComplete));
+    const finalDate = endDate > lastProjectedDate ? endDate : lastProjectedDate;
+    
+    for (let d = new Date(startDate); d <= finalDate; d = addDays(d, 1)) {
+        const dateKey = format(d, 'yyyy-MM-dd');
+        
+        if (d <= endDate) {
+            cumulativeLoggedHours += (dailyLoggedMinutes[dateKey] || 0) / 60;
+        }
+
+        const daysFromStart = differenceInDays(d, startDate);
+        const estimatedHours = daysFromStart * avgDailyProductiveHours;
+        
+        combinedData.push({
+            date: format(d, 'MMM dd'),
+            timestamp: d.getTime(),
+            logged: (d <= endDate) ? parseFloat(cumulativeLoggedHours.toFixed(2)) : undefined,
+            estimated: parseFloat(estimatedHours.toFixed(2)),
+        });
+    }
 
     return { combinedData, milestones };
-
   }, [focusArea, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, avgDailyProductiveHours]);
 
   return (
@@ -119,18 +141,27 @@ export function FocusAreaProgressModal({
                     <ResponsiveContainer>
                         <LineChart data={graphData.combinedData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="date" />
+                            <XAxis 
+                                dataKey="timestamp" 
+                                type="number"
+                                scale="time"
+                                domain={['dataMin', 'dataMax']}
+                                tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')}
+                            />
                             <YAxis label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} />
                             <RechartsTooltip 
                                 content={({ active, payload, label }) => {
                                     if (active && payload?.length) {
+                                        const dateLabel = format(new Date(label), 'PPP');
                                         return (
                                             <div className="rounded-lg border bg-background p-2.5 shadow-sm">
-                                                <p className="font-bold text-foreground">{label}</p>
+                                                <p className="font-bold text-foreground">{dateLabel}</p>
                                                 {payload.map(p => (
+                                                  p.value !== undefined && p.value !== null && (
                                                     <p key={p.name} style={{ color: p.color }}>
                                                         {p.name}: {p.value?.toFixed(1)}h
                                                     </p>
+                                                  )
                                                 ))}
                                             </div>
                                         )
@@ -139,11 +170,11 @@ export function FocusAreaProgressModal({
                                 }}
                             />
                             <Legend />
-                            <Line type="monotone" dataKey="logged" stroke="var(--color-logged)" name="Logged" dot={false} strokeWidth={2} />
+                            <Line type="monotone" dataKey="logged" stroke="var(--color-logged)" name="Logged" dot={false} strokeWidth={2} connectNulls={false} />
                             <Line type="monotone" dataKey="estimated" stroke="var(--color-estimated)" name="Projected" strokeDasharray="5 5" dot={false} strokeWidth={2} />
                             
                             {graphData.milestones.map((dot, i) => (
-                                <ReferenceDot key={i} x={dot.label} y={dot.y} r={5} fill="var(--color-estimated)" stroke="white" >
+                                <ReferenceDot key={i} x={dot.x} y={dot.y} r={5} fill="var(--color-estimated)" stroke="white" >
                                     <title>{dot.label}</title>
                                 </ReferenceDot>
                             ))}
@@ -152,7 +183,7 @@ export function FocusAreaProgressModal({
                 </ChartContainer>
             ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
-                    <p>Not enough data to create a projection chart. Log some time for this focus area.</p>
+                    <p>Not enough data to create a projection chart. Log some time for this focus area and ensure it has an average daily productive hours value.</p>
                 </div>
             )}
         </div>
