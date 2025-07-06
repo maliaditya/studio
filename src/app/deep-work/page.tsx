@@ -832,7 +832,8 @@ function DeepWorkPageContent() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => {
+                            <DropdownMenuItem onSelect={(e) => {
+                                e.stopPropagation();
                                 setExpandedTopics(prev => new Set(prev).add(topic));
                                 setAddingFocusToTopic(topic);
                               }}>
@@ -1073,18 +1074,16 @@ function DeepWorkPageContent() {
                                         ) : (
                                             <>
                                                 <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    {upskillDef.link && (
-                                                        isNotionObsidianEmbed ? (
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setEmbedUrl(embedLinkForModal); }}>
-                                                                <Expand className="h-4 w-4" />
-                                                            </Button>
-                                                        ) : (
-                                                            <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
-                                                                <a href={upskillDef.link} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                                                                    <ExternalLink className="h-4 w-4" />
-                                                                </a>
-                                                            </Button>
-                                                        )
+                                                    {isNotionObsidianEmbed ? (
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setEmbedUrl(embedLinkForModal); }}>
+                                                            <Expand className="h-4 w-4" />
+                                                        </Button>
+                                                    ) : (
+                                                        <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
+                                                            <a href={upskillDef.link} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                                                                <ExternalLink className="h-4 w-4" />
+                                                            </a>
+                                                        </Button>
                                                     )}
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
@@ -1237,18 +1236,16 @@ function DeepWorkPageContent() {
                                             ) : (
                                                 <>
                                                     <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        {resource.link && (
-                                                            isNotionObsidianEmbed ? (
-                                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setEmbedUrl(embedLinkForModal); }}>
-                                                                    <Expand className="h-4 w-4" />
-                                                                </Button>
-                                                            ) : (
-                                                                <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
-                                                                    <a href={resource.link} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                                                                        <ExternalLink className="h-4 w-4" />
-                                                                    </a>
-                                                                </Button>
-                                                            )
+                                                        {isNotionObsidianEmbed ? (
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setEmbedUrl(embedLinkForModal); }}>
+                                                                <Expand className="h-4 w-4" />
+                                                            </Button>
+                                                        ) : (
+                                                            <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
+                                                                <a href={resource.link} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                                                                    <ExternalLink className="h-4 w-4" />
+                                                                </a>
+                                                            </Button>
                                                         )}
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger asChild>
