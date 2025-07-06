@@ -312,7 +312,7 @@ function DeepWorkPageContent() {
   const totalEstimatedHours = useMemo(() => {
     if (!selectedFocusArea) return 0;
 
-    let totalHours = selectedFocusArea.estimatedHours || 0;
+    let totalHours = 0; // Only sum linked items
 
     (selectedFocusArea.linkedDeepWorkIds || []).forEach(id => {
       const def = deepWorkDefinitions.find(d => d.id === id);
@@ -330,6 +330,8 @@ function DeepWorkPageContent() {
 
     return totalHours;
   }, [selectedFocusArea, deepWorkDefinitions, upskillDefinitions]);
+
+  const totalScopeHours = (selectedFocusArea?.estimatedHours || 0) + totalEstimatedHours;
   
   const getUpskillLoggedMinutes = useCallback((definitionId: string) => {
     if (!allUpskillLogs) return 0;
@@ -1072,22 +1074,22 @@ function DeepWorkPageContent() {
                             )}
                         </div>
                         
-                        {totalEstimatedHours > 0 && (
+                        {totalScopeHours > 0 && (
                             <div>
                                 <Progress 
-                                    value={Math.min(100, (totalLoggedTime / (totalEstimatedHours * 60)) * 100)} 
+                                    value={Math.min(100, (totalLoggedTime / (totalScopeHours * 60)) * 100)} 
                                     className="h-2" 
                                 />
                                 <div className="flex justify-between text-xs text-muted-foreground mt-1">
                                     <span>0%</span>
-                                    <span>{((totalLoggedTime / (totalEstimatedHours * 60)) * 100).toFixed(0)}%</span>
+                                    <span>{((totalLoggedTime / (totalScopeHours * 60)) * 100).toFixed(0)}%</span>
                                 </div>
                             </div>
                         )}
                         
-                        {totalEstimatedHours > 0 && totalLoggedTime > totalEstimatedHours * 60 && (
+                        {totalScopeHours > 0 && totalLoggedTime > totalScopeHours * 60 && (
                             <Badge variant="destructive" className="w-full justify-center">
-                                Overspent by {formatMinutes(totalLoggedTime - totalEstimatedHours * 60)}
+                                Overspent by {formatMinutes(totalLoggedTime - totalScopeHours * 60)}
                             </Badge>
                         )}
                     </CardContent>
@@ -1739,3 +1741,5 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
+
+    
