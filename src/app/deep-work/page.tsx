@@ -301,6 +301,8 @@ function DeepWorkPageContent() {
   };
 
   const topicsWithFocusAreas = useMemo(() => {
+    const effectiveFilters = visibilityFilters.size === 0 ? new Set(['intention']) : visibilityFilters;
+
     const visibleDefinitions = deepWorkDefinitions.filter(def => {
         const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
         const isLinkedAsChild = linkedDeepWorkChildIds.has(def.id);
@@ -309,9 +311,9 @@ function DeepWorkPageContent() {
         const isObjective = isParent && isLinkedAsChild;
         const isAction = !isParent;
 
-        if (visibilityFilters.has('intention') && isIntention) return true;
-        if (visibilityFilters.has('objective') && isObjective) return true;
-        if (visibilityFilters.has('action') && isAction) return true;
+        if (effectiveFilters.has('intention') && isIntention) return true;
+        if (effectiveFilters.has('objective') && isObjective) return true;
+        if (effectiveFilters.has('action') && isAction) return true;
         
         return false;
     });
@@ -1055,19 +1057,22 @@ function DeepWorkPageContent() {
                                 checked={visibilityFilters.has('intention')}
                                 onCheckedChange={() => handleVisibilityFilterChange('intention')}
                             >
-                                Intentions
+                                <Lightbulb className="mr-2 h-4 w-4 text-amber-500" />
+                                <span>Intentions</span>
                             </DropdownMenuCheckboxItem>
                             <DropdownMenuCheckboxItem
                                 checked={visibilityFilters.has('objective')}
                                 onCheckedChange={() => handleVisibilityFilterChange('objective')}
                             >
-                                Objectives
+                                <Flag className="mr-2 h-4 w-4 text-green-500" />
+                                <span>Objectives</span>
                             </DropdownMenuCheckboxItem>
                             <DropdownMenuCheckboxItem
                                 checked={visibilityFilters.has('action')}
                                 onCheckedChange={() => handleVisibilityFilterChange('action')}
                             >
-                                Actions
+                                <Bolt className="mr-2 h-4 w-4 text-blue-500" />
+                                <span>Actions</span>
                             </DropdownMenuCheckboxItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
