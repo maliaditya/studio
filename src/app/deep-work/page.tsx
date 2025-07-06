@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Eye, EyeOff, LineChart as LineChartIcon, Unlink, GitMerge, Workflow } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Eye, EyeOff, LineChart as LineChartIcon, Unlink, GitMerge, Workflow, Clock } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +55,14 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/comp
 import { Progress } from '@/components/ui/progress';
 import { FocusAreaProgressModal } from '@/components/FocusAreaProgressModal';
 import { MindMapViewer } from '@/components/MindMapViewer';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -243,6 +251,7 @@ function DeepWorkPageContent() {
     pageType: 'deepwork' | 'upskill';
   }>({ isOpen: false, exercise: null, pageType: 'deepwork' });
   const [isFocusAreaProgressModalOpen, setIsFocusAreaProgressModalOpen] = useState(false);
+  const [isFocusAreaTimesheetModalOpen, setIsFocusAreaTimesheetModalOpen] = useState(false);
   
   const [isLoadingPage, setIsLoadingPage] = useState(true);
   
@@ -406,6 +415,66 @@ function DeepWorkPageContent() {
       }
       return totalMinutes;
   }, [allDeepWorkLogs, allUpskillLogs]);
+
+  const timesheetData = useMemo(() => {
+    if (!selectedFocusArea) return [];
+
+    const allDefIds = new Set([
+        selectedFocusArea.id,
+        ...(selectedFocusArea.linkedDeepWorkIds || []),
+        ...(selectedFocusArea.linkedUpskillIds || []),
+    ]);
+
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+    const defIdToNameMap = new Map(allDefs.map(def => [def.id, def.name]));
+
+    const entries: { date: string; taskName: string; duration: number }[] = [];
+
+    allDeepWorkLogs.forEach(log => {
+        log.exercises.forEach(ex => {
+            if (allDefIds.has(ex.definitionId)) {
+                ex.loggedSets.forEach(set => {
+                    if (set.weight > 0) { // weight is duration for deepwork
+                        entries.push({
+                            date: log.date,
+                            taskName: defIdToNameMap.get(ex.definitionId) || ex.name,
+                            duration: set.weight
+                        });
+                    }
+                });
+            }
+        });
+    });
+
+    allUpskillLogs.forEach(log => {
+        log.exercises.forEach(ex => {
+            if (allDefIds.has(ex.definitionId)) {
+                ex.loggedSets.forEach(set => {
+                    if (set.reps > 0) { // reps is duration for upskill
+                        entries.push({
+                            date: log.date,
+                            taskName: defIdToNameMap.get(ex.definitionId) || ex.name,
+                            duration: set.reps
+                        });
+                    }
+                });
+            }
+        });
+    });
+
+    // Group by date
+    const groupedByDate: Record<string, { taskName: string; duration: number }[]> = {};
+    entries.forEach(entry => {
+        if (!groupedByDate[entry.date]) {
+            groupedByDate[entry.date] = [];
+        }
+        groupedByDate[entry.date].push({ taskName: entry.taskName, duration: entry.duration });
+    });
+
+    return Object.entries(groupedByDate)
+        .map(([date, tasks]) => ({ date, tasks, totalDuration: tasks.reduce((sum, task) => sum + task.duration, 0) }))
+        .sort((a, b) => b.date.localeCompare(a.date)); // Sort by most recent date first
+}, [selectedFocusArea, allDeepWorkLogs, allUpskillLogs, deepWorkDefinitions, upskillDefinitions]);
 
 
   useEffect(() => {
@@ -1171,6 +1240,21 @@ function DeepWorkPageContent() {
                       <div className='flex items-center gap-2 flex-shrink-0'>
                         <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
                         <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('library')} disabled={!selectedFocusArea}>Library</Button>
+                        {viewMode === 'library' && selectedFocusArea && (
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setIsFocusAreaTimesheetModalOpen(true)}>
+                                            <Clock className="h-4 w-4"/>
+                                            <span className="sr-only">View Timesheet</span>
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>View Timesheet</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        )}
                         <Popover>
                             <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger>
                             <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent>
@@ -1875,6 +1959,51 @@ function DeepWorkPageContent() {
               <DialogTitle>Focus Area Mind Map</DialogTitle>
             </DialogHeader>
             <MindMapViewer rootFocusAreaId={mindMapRootId} showControls={false} />
+        </DialogContent>
+    </Dialog>
+
+    <Dialog open={isFocusAreaTimesheetModalOpen} onOpenChange={setIsFocusAreaTimesheetModalOpen}>
+        <DialogContent className="max-w-3xl">
+            <DialogHeader>
+                <DialogTitle>Timesheet for "{selectedFocusArea?.name}"</DialogTitle>
+                <DialogDescription>
+                    A detailed log of all time spent on this focus area and its linked tasks.
+                </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-[60vh] mt-4 pr-6">
+                <div className="space-y-4">
+                    {timesheetData.length > 0 ? timesheetData.map(day => (
+                        <Card key={day.date}>
+                            <CardHeader className="p-3 flex flex-row justify-between items-center">
+                                <div>
+                                    <CardTitle className="text-base">{format(parseISO(day.date), 'PPP')}</CardTitle>
+                                    <CardDescription className="text-xs">Total: {formatMinutes(day.totalDuration)}</CardDescription>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="p-3 pt-0">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Task</TableHead>
+                                            <TableHead className="text-right w-24">Duration</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {day.tasks.map((task, index) => (
+                                            <TableRow key={index}>
+                                                <TableCell className="font-medium">{task.taskName}</TableCell>
+                                                <TableCell className="text-right">{formatMinutes(task.duration)}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+                    )) : (
+                        <p className="text-center text-muted-foreground py-8">No time logged for this focus area yet.</p>
+                    )}
+                </div>
+            </ScrollArea>
         </DialogContent>
     </Dialog>
     </>
