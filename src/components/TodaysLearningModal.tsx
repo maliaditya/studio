@@ -164,11 +164,20 @@ export function TodaysLearningModal({
   }, [deepWorkDefinitions, pageType]);
 
   const objectivesForTopic = useMemo(() => {
-      if (!selectedDeepWorkTopic || pageType !== 'deepwork') return [];
-      return deepWorkDefinitions.filter(
-          def => def.category === selectedDeepWorkTopic && (def.linkedDeepWorkIds?.length ?? 0) > 0
-      ).sort((a,b) => a.name.localeCompare(b.name));
-  }, [deepWorkDefinitions, selectedDeepWorkTopic, pageType]);
+    if (!selectedDeepWorkTopic || pageType !== 'deepwork') return [];
+    
+    return deepWorkDefinitions.filter(objectiveDef => {
+        if (objectiveDef.category !== selectedDeepWorkTopic) return false;
+        if ((objectiveDef.linkedDeepWorkIds?.length ?? 0) === 0) return false; // Must be an objective
+
+        // Check if any of its children are actual "actions"
+        return objectiveDef.linkedDeepWorkIds!.some(childId => {
+            const childDef = deepWorkDefinitions.find(d => d.id === childId);
+            // An "Action" is a definition that itself has no children.
+            return childDef && (childDef.linkedDeepWorkIds?.length ?? 0) === 0;
+        });
+    }).sort((a,b) => a.name.localeCompare(b.name));
+}, [deepWorkDefinitions, selectedDeepWorkTopic, pageType]);
 
   const actionsForObjective = useMemo(() => {
       if (!selectedDeepWorkObjective || pageType !== 'deepwork') return [];
@@ -268,7 +277,7 @@ export function TodaysLearningModal({
                                     <span className="font-medium">{obj.name}</span>
                                     <ChevronRight className="h-4 w-4" />
                                 </button>
-                            )) : <p className="text-sm text-center text-muted-foreground py-4">No objectives found in this topic.</p>}
+                            )) : <p className="text-sm text-center text-muted-foreground py-4">No objectives with actions found in this topic.</p>}
                         </div>
                     )}
                     {selectionStep === 'action' && (
