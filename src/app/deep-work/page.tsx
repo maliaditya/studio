@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -362,19 +362,15 @@ function DeepWorkPageContent() {
 
   const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition) => {
     if (!definition) return 0;
-
     const visited = new Set<string>();
     const deepWorkActionIds = new Set<string>();
     const upskillIds = new Set<string>();
     
-    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-    const nodeMap = new Map(allDefs.map(d => [d.id, d]));
-
     function recurse(nodeId: string) {
         if (visited.has(nodeId)) return;
         visited.add(nodeId);
 
-        const node = nodeMap.get(nodeId);
+        const node = deepWorkDefinitions.find(d => d.id === nodeId);
         if (!node) return;
 
         (node.linkedUpskillIds || []).forEach(id => upskillIds.add(id));
@@ -385,7 +381,6 @@ function DeepWorkPageContent() {
             node.linkedDeepWorkIds.forEach(childId => recurse(childId));
         }
     }
-
     recurse(definition.id);
 
     let totalMinutes = 0;
@@ -509,6 +504,19 @@ function DeepWorkPageContent() {
     });
     return loggedIds;
   }, [allDeepWorkLogs]);
+
+  const permanentlyLoggedVisualizationIds = useMemo(() => {
+    const loggedIds = new Set<string>();
+    if (!allUpskillLogs) return loggedIds;
+    allUpskillLogs.forEach(log => {
+      log.exercises.forEach(ex => {
+        if (ex.loggedSets.length > 0) {
+          loggedIds.add(ex.definitionId);
+        }
+      });
+    });
+    return loggedIds;
+  }, [allUpskillLogs]);
 
 
   useEffect(() => {
@@ -934,7 +942,7 @@ function DeepWorkPageContent() {
     let definitionsSource: any[];
     if (type === 'upskill') {
         const allUpskillDefs = linkUpskillTopic ? upskillDefinitions.filter(d => d.category === linkUpskillTopic) : upskillDefinitions;
-        // NEW: Only show top-level "Curiosities" from Upskill
+        // Only show top-level "Curiosities" from Upskill
         definitionsSource = allUpskillDefs.filter(def => {
             const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
             const isChild = linkedUpskillChildIds.has(def.id);
@@ -1072,6 +1080,37 @@ function DeepWorkPageContent() {
     setMindMapRootId(focusAreaId);
     setIsMindMapModalOpen(true);
   };
+  
+  const isUpskillObjectiveComplete = useCallback((objectiveId: string): boolean => {
+    const visited = new Set<string>();
+    const visualizations = new Set<string>();
+    const queue: string[] = [objectiveId];
+
+    while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        if (visited.has(currentId)) continue;
+        visited.add(currentId);
+
+        const node = upskillDefinitions.find(d => d.id === currentId);
+        if (!node) continue;
+
+        const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+
+        if (!isParent) { // It's a Visualization
+            visualizations.add(node.id);
+        } else { // It's an Objective or Curiosity, so recurse
+            (node.linkedUpskillIds || []).forEach(childId => {
+                if (!visited.has(childId)) {
+                    queue.push(childId);
+                }
+            });
+        }
+    }
+    
+    if (visualizations.size === 0) return false;
+
+    return Array.from(visualizations).every(vizId => permanentlyLoggedVisualizationIds.has(vizId));
+  }, [upskillDefinitions, permanentlyLoggedVisualizationIds]);
 
 
   if (isLoadingPage) {
@@ -1449,17 +1488,31 @@ function DeepWorkPageContent() {
                                                 </div>
                                                 <CardHeader className="pb-3">
                                                   <CardTitle className="text-base flex items-center gap-2">
-                                                    {upskillDef.iconUrl ? (
-                                                        <Image src={upskillDef.iconUrl} alt="" width={20} height={20} className="h-5 w-5 rounded-sm flex-shrink-0" unoptimized />
-                                                    ) : (
-                                                        <Globe className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                                                    )}
+                                                    <Flashlight className="h-5 w-5 text-amber-500 flex-shrink-0" />
                                                     <span className="truncate" title={upskillDef.name}>{upskillDef.name}</span>
                                                   </CardTitle>
                                                   <CardDescription>{upskillDef.category}</CardDescription>
                                                 </CardHeader>
                                                 <CardContent className="flex-grow">
-                                                  <p className="text-sm text-muted-foreground line-clamp-2">{upskillDef.description || "No description provided."}</p>
+                                                  {(upskillDef.linkedUpskillIds?.length ?? 0) > 0 ? (
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                                                      {(upskillDef.linkedUpskillIds || []).map(childId => {
+                                                        const childDef = upskillDefinitions.find(d => d.id === childId);
+                                                        if (!childDef) return null;
+                                                        const isChildComplete = isUpskillObjectiveComplete(childId);
+                                                        return (
+                                                          <div key={childId} className="flex items-center gap-1.5" title={childDef.name}>
+                                                              <Focus className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
+                                                              <div className={cn("text-xs text-muted-foreground truncate", isChildComplete && "line-through text-muted-foreground/70")}>
+                                                                  {childDef.name}
+                                                              </div>
+                                                          </div>
+                                                        );
+                                                      })}
+                                                    </div>
+                                                  ) : (
+                                                    <p className="text-sm text-muted-foreground line-clamp-2">{upskillDef.description || "This curiosity has no objectives yet."}</p>
+                                                  )}
                                                 </CardContent>
                                                 <CardFooter className="pt-3 flex items-center justify-end">
                                                   <div className="flex items-center gap-1 flex-shrink-0">
