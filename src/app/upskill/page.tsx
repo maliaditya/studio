@@ -135,19 +135,20 @@ function UpskillPageContent() {
 
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
 
-  const loggedTodayVisualizationIds = useMemo(() => {
-    const todayKey = format(selectedDate, 'yyyy-MM-dd');
-    const todaysLog = allUpskillLogs.find(log => log.date === todayKey);
-    if (!todaysLog) return new Set<string>();
-
+  const permanentlyLoggedVisualizationIds = useMemo(() => {
     const loggedIds = new Set<string>();
-    todaysLog.exercises.forEach(ex => {
+    if (!allUpskillLogs) return loggedIds;
+
+    allUpskillLogs.forEach(log => {
+      log.exercises.forEach(ex => {
         if (ex.loggedSets.length > 0) {
-            loggedIds.add(ex.definitionId);
+          loggedIds.add(ex.definitionId);
         }
+      });
     });
+
     return loggedIds;
-  }, [allUpskillLogs, selectedDate]);
+  }, [allUpskillLogs]);
   
   const allKnownTopics = useMemo(() => {
     const topicsFromDefs = new Set(upskillDefinitions.map(def => def.category));
@@ -834,11 +835,11 @@ function UpskillPageContent() {
                                                                 const isChildAViz = childDef && (childDef.linkedUpskillIds?.length ?? 0) === 0 && (childDef.linkedResourceIds?.length ?? 0) === 0;
                                                                 if (!childDef || !isChildAViz) return null;
 
-                                                                const isChildLoggedToday = loggedTodayVisualizationIds.has(childDef.id);
+                                                                const isChildPermanentlyLogged = permanentlyLoggedVisualizationIds.has(childDef.id);
                                                                 return (
                                                                     <li
                                                                         key={childId}
-                                                                        className={cn("truncate", isChildLoggedToday && "line-through text-muted-foreground/70")}
+                                                                        className={cn("truncate", isChildPermanentlyLogged && "line-through text-muted-foreground/70")}
                                                                         title={childDef.name}
                                                                     >
                                                                         {childDef.name}

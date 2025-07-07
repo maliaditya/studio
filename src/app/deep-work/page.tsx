@@ -489,19 +489,19 @@ function DeepWorkPageContent() {
         .sort((a, b) => b.date.localeCompare(a.date)); // Sort by most recent date first
 }, [selectedFocusArea, allDeepWorkLogs, allUpskillLogs, deepWorkDefinitions, upskillDefinitions]);
 
-  const loggedTodayActionIds = useMemo(() => {
-    const todayKey = format(selectedDate, 'yyyy-MM-dd');
-    const todaysLog = allDeepWorkLogs.find(log => log.date === todayKey);
-    if (!todaysLog) return new Set<string>();
-
+  const permanentlyLoggedActionIds = useMemo(() => {
     const loggedIds = new Set<string>();
-    todaysLog.exercises.forEach(ex => {
+    if (!allDeepWorkLogs) return loggedIds;
+
+    allDeepWorkLogs.forEach(log => {
+      log.exercises.forEach(ex => {
         if (ex.loggedSets.length > 0) {
-            loggedIds.add(ex.definitionId);
+          loggedIds.add(ex.definitionId);
         }
+      });
     });
     return loggedIds;
-  }, [allDeepWorkLogs, selectedDate]);
+  }, [allDeepWorkLogs]);
 
 
   useEffect(() => {
@@ -1480,10 +1480,10 @@ function DeepWorkPageContent() {
                                     const nodeType = isObjective ? 'Objective' : 'Action';
                                     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
                                     const loggedHours = loggedMinutes / 60;
-                                    const isLoggedToday = loggedTodayActionIds.has(deepworkDef.id);
+                                    const isPermanentlyLogged = permanentlyLoggedActionIds.has(deepworkDef.id);
                                     
                                     return (
-                                       <Card key={id} className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]", isLoggedToday && "opacity-70 bg-muted/30")}>
+                                       <Card key={id} className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]", isPermanentlyLogged && "opacity-70 bg-muted/30")}>
                                           <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                               <TooltipProvider>
                                                 <Tooltip>
@@ -1527,7 +1527,7 @@ function DeepWorkPageContent() {
                                                 ) : (
                                                   <Bolt className="h-5 w-5 text-blue-500 flex-shrink-0" />
                                                 )}
-                                              <span className={cn("truncate", isLoggedToday && !isObjective && "line-through text-muted-foreground")} title={deepworkDef.name}>{deepworkDef.name}</span>
+                                              <span className={cn("truncate", isPermanentlyLogged && !isObjective && "line-through text-muted-foreground")} title={deepworkDef.name}>{deepworkDef.name}</span>
                                               <Badge variant="outline" className="text-xs">{nodeType}</Badge>
                                             </CardTitle>
                                             <CardDescription>{deepworkDef.category}</CardDescription>
@@ -1543,11 +1543,11 @@ function DeepWorkPageContent() {
                                                             {(deepworkDef.linkedDeepWorkIds || []).map(childId => {
                                                                 const childDef = deepWorkDefinitions.find(d => d.id === childId);
                                                                 if (!childDef) return null;
-                                                                const isChildLoggedToday = loggedTodayActionIds.has(childDef.id);
+                                                                const isChildPermanentlyLogged = permanentlyLoggedActionIds.has(childDef.id);
                                                                 return (
                                                                     <li 
                                                                         key={childId} 
-                                                                        className={cn("truncate", isChildLoggedToday && "line-through text-muted-foreground/70")} 
+                                                                        className={cn("truncate", isChildPermanentlyLogged && "line-through text-muted-foreground/70")} 
                                                                         title={childDef.name}
                                                                     >
                                                                         {childDef.name}
