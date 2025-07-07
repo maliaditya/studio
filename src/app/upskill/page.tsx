@@ -534,13 +534,47 @@ function UpskillPageContent() {
   const filteredItemsForLinking = useMemo(() => {
     if (!manageLinksConfig) return [];
     const { type, parent } = manageLinksConfig;
+
     if (type === 'resource') {
         if (!linkResourceFolderId) return [];
         return resources.filter(res => res.folderId === linkResourceFolderId && res.name.toLowerCase().includes(linkSearchTerm.toLowerCase()));
     }
+    
+    // This is for type === 'upskill'
     let definitionsSource = linkUpskillTopic ? upskillDefinitions.filter(d => d.category === linkUpskillTopic) : upskillDefinitions;
-    return definitionsSource.filter(def => def.name && def.name !== 'placeholder' && def.id !== parent.id && def.name.toLowerCase().includes(linkSearchTerm.toLowerCase()));
-  }, [manageLinksConfig, upskillDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkUpskillTopic]);
+
+    // Determine parent type
+    const isParentParent = (parent.linkedUpskillIds?.length ?? 0) > 0 || (parent.linkedResourceIds?.length ?? 0) > 0;
+    const isParentChild = linkedUpskillChildIds.has(parent.id);
+    const isParentACuriosity = isParentParent && !isParentChild;
+    const isParentAnObjective = isParentParent && isParentChild;
+
+    return definitionsSource.filter(def => {
+        if (!def.name || def.name === 'placeholder' || def.id === parent.id || !def.name.toLowerCase().includes(linkSearchTerm.toLowerCase())) {
+            return false;
+        }
+        
+        // Determine child type
+        const isDefParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+        const isDefChild = linkedUpskillChildIds.has(def.id);
+        const isDefACuriosity = isDefParent && !isDefChild;
+        const isDefAnObjective = isDefParent && isDefChild;
+        const isDefAVisualization = !isDefParent;
+
+        if (isParentACuriosity) {
+            // A Curiosity can ONLY link to Objectives.
+            return isDefAnObjective;
+        }
+
+        if (isParentAnObjective) {
+            // An Objective can link to other Objectives or Visualizations.
+            return !isDefACuriosity;
+        }
+        
+        // A Visualization shouldn't be a parent in the first place, but if it is, it can't link anything.
+        return false;
+    });
+}, [manageLinksConfig, upskillDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkUpskillTopic, linkedUpskillChildIds]);
 
   const handleUnlinkItem = (type: 'upskill' | 'resource', idToUnlink: string) => {
     if (!selectedSubtopic) return;
@@ -657,7 +691,7 @@ function UpskillPageContent() {
                                     </div>
                                     <div className='hidden items-center flex-shrink-0 group-hover:flex'>
                                         <TooltipProvider>
-                                          <Tooltip><TooltipTrigger asChild><span tabIndex={isParent ? 0 : -1}><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => !isParent && handleAddTaskToSession(def)} disabled={isParent}><PlusCircle className="h-4 w-4" /></Button></span></TooltipTrigger><TooltipContent>{isParent ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent></Tooltip>
+                                          <Tooltip><TooltipTrigger asChild><span tabIndex={isVisualization ? 0 : -1}><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => isVisualization && handleAddTaskToSession(def)} disabled={!isVisualization}><PlusCircle className="h-4 w-4" /></Button></span></TooltipTrigger><TooltipContent>{isVisualization ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent></Tooltip>
                                         </TooltipProvider>
                                     </div>
                                 </li>
@@ -763,13 +797,15 @@ function UpskillPageContent() {
                                       </Card>
                                     )
                                   })}
-                                  <Card 
-                                      onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
-                                      className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
-                                  >
-                                      <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                      <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
-                                  </Card>
+                                  {!isSelectedSubtopicAVisualization && (
+                                    <Card 
+                                        onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
+                                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
+                                    >
+                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
+                                    </Card>
+                                  )}
                                 </div>
                               </div>
                               <div className="space-y-3">
@@ -790,7 +826,9 @@ function UpskillPageContent() {
                                       </Card>
                                     )
                                   })}
-                                  <Card onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)} className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"><PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" /><p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p></Card>
+                                  {!isSelectedSubtopicAVisualization && (
+                                    <Card onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)} className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"><PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" /><p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p></Card>
+                                  )}
                                 </div>
                               </div>
                             </div>
