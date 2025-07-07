@@ -107,7 +107,7 @@ function UpskillPageContent() {
   const [subtopicContextMenu, setSubtopicContextMenu] = useState<{ mouseX: number; mouseY: number; item: ExerciseDefinition; } | null>(null);
   const subtopicContextMenuRef = useRef<HTMLDivElement>(null);
 
-  const [visibilityFilters, setVisibilityFilters] = useState<Set<'intention' | 'objective' | 'curiosity'>>(new Set(['intention']));
+  const [visibilityFilters, setVisibilityFilters] = useState<Set<'intention' | 'objective' | 'curiosity'>>(new Set(['intention', 'objective', 'curiosity']));
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
@@ -155,10 +155,12 @@ function UpskillPageContent() {
   };
 
   const topicsWithSubtopics = useMemo(() => {
-    const effectiveFilters = visibilityFilters.size === 0 ? new Set(['intention']) : visibilityFilters;
-
     const visibleDefinitions = upskillDefinitions.filter(def => {
         if(def.name === 'placeholder') return false;
+        
+        // If no filters are selected, show nothing.
+        if (visibilityFilters.size === 0) return false;
+
         const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
         const isLinkedAsChild = linkedUpskillChildIds.has(def.id);
 
@@ -166,9 +168,9 @@ function UpskillPageContent() {
         const isObjective = isParent && isLinkedAsChild;
         const isCuriosity = !isParent;
 
-        if (effectiveFilters.has('intention') && isIntention) return true;
-        if (effectiveFilters.has('objective') && isObjective) return true;
-        if (effectiveFilters.has('curiosity') && isCuriosity) return true;
+        if (visibilityFilters.has('intention') && isIntention) return true;
+        if (visibilityFilters.has('objective') && isObjective) return true;
+        if (visibilityFilters.has('curiosity') && isCuriosity) return true;
         
         return false;
     });
