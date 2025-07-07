@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -21,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Input } from './ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 interface TodaysLearningModalProps {
   isOpen: boolean;
@@ -57,6 +57,9 @@ export function TodaysLearningModal({
   const [selectedDeepWorkTopic, setSelectedDeepWorkTopic] = useState<string | null>(null);
   const [selectedDeepWorkObjective, setSelectedDeepWorkObjective] = useState<ExerciseDefinition | null>(null);
 
+  // State for upskill topic selection
+  const [selectedUpskillTopic, setSelectedUpskillTopic] = useState<string | null>(null);
+
 
   useEffect(() => {
     if (isOpen) {
@@ -68,6 +71,7 @@ export function TodaysLearningModal({
       } else {
         setSelectedRadioDefId(initialSelectedIds.length > 0 ? initialSelectedIds[0] : null);
       }
+      setSelectedUpskillTopic(null); // Reset upskill topic on open
     }
   }, [isOpen, pageType, initialSelectedIds]);
   
@@ -157,6 +161,13 @@ export function TodaysLearningModal({
     return { allTasksForToday: scheduled, libraryTasks: library };
   }, [availableTasks, selectedRadioDefId, pageType]);
   
+  const upskillTopics = useMemo(() => {
+    if (pageType !== 'upskill') return [];
+    const topics = new Set<string>();
+    libraryTasks.forEach(task => topics.add(task.category));
+    return Array.from(topics).sort();
+  }, [libraryTasks, pageType]);
+
   // ----- DEEPWORK-SPECIFIC LOGIC -----
   const deepWorkTopics = useMemo(() => {
     if (pageType !== 'deepwork') return [];
@@ -168,12 +179,13 @@ export function TodaysLearningModal({
     
     return deepWorkDefinitions.filter(objectiveDef => {
         if (objectiveDef.category !== selectedDeepWorkTopic) return false;
-        if ((objectiveDef.linkedDeepWorkIds?.length ?? 0) === 0) return false; // Must be an objective
+        
+        // It must have children to be considered an objective.
+        if ((objectiveDef.linkedDeepWorkIds?.length ?? 0) === 0) return false;
 
-        // Check if any of its children are actual "actions"
+        // At least one of its children must be an "Action" (a task with no children).
         return objectiveDef.linkedDeepWorkIds!.some(childId => {
             const childDef = deepWorkDefinitions.find(d => d.id === childId);
-            // An "Action" is a definition that itself has no children.
             return childDef && (childDef.linkedDeepWorkIds?.length ?? 0) === 0;
         });
     }).sort((a,b) => a.name.localeCompare(b.name));
@@ -390,19 +402,32 @@ export function TodaysLearningModal({
                         {libraryTasks.length > 0 && (
                             <div>
                                 <h4 className="mb-2 mt-4 text-sm font-medium text-muted-foreground">Available from Library</h4>
-                                <div className="space-y-2">
-                                {libraryTasks.map(task => (
-                                    <div key={task.id} className="flex items-center justify-between space-x-3 p-3 rounded-md border bg-muted/20 transition-colors">
-                                        <Label htmlFor={`task-${task.id}`} className="font-normal w-full cursor-default">
-                                            <p className="font-medium">{task.name}</p>
-                                            <p className="text-xs text-muted-foreground">{task.category}</p>
-                                        </Label>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-accent-foreground" onClick={() => setSelectedRadioDefId(task.definitionId)} aria-label={`Add and select ${task.name}`}>
-                                            <PlusCircle className="h-5 w-5" />
-                                        </Button>
+                                <Select value={selectedUpskillTopic || ''} onValueChange={setSelectedUpskillTopic}>
+                                    <SelectTrigger className="mb-2">
+                                        <SelectValue placeholder="Select a topic to view tasks..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {upskillTopics.map(topic => (
+                                            <SelectItem key={topic} value={topic}>{topic}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                
+                                {selectedUpskillTopic && (
+                                    <div className="space-y-2 mt-2">
+                                        {libraryTasks.filter(task => task.category === selectedUpskillTopic).map(task => (
+                                            <div key={task.id} className="flex items-center justify-between space-x-3 p-3 rounded-md border bg-muted/20 transition-colors">
+                                                <Label htmlFor={`task-${task.id}`} className="font-normal w-full cursor-default">
+                                                    <p className="font-medium">{task.name}</p>
+                                                    <p className="text-xs text-muted-foreground">{task.category}</p>
+                                                </Label>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-accent-foreground" onClick={() => setSelectedRadioDefId(task.definitionId)} aria-label={`Add and select ${task.name}`}>
+                                                    <PlusCircle className="h-5 w-5" />
+                                                </Button>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
-                                </div>
+                                )}
                             </div>
                         )}
                     </div>
