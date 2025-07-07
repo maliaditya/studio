@@ -347,18 +347,45 @@ function DeepWorkPageContent() {
     return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim();
   }
   
-  const getUpskillLoggedMinutes = useCallback((definitionId: string) => {
-    if (!allUpskillLogs) return 0;
+  const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefinition) => {
+    if (!definition) return 0;
+    const visited = new Set<string>();
+    const visualizationIds = new Set<string>();
+
+    function recurse(nodeId: string) {
+        if (visited.has(nodeId)) return;
+        visited.add(nodeId);
+
+        const node = upskillDefinitions.find(d => d.id === nodeId);
+        if (!node) return;
+
+        const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+        
+        if (!isParent) { // It's a Visualization, the actionable item
+            visualizationIds.add(node.id);
+        } else { // It's an Objective or Curiosity, so recurse
+            (node.linkedUpskillIds || []).forEach(childId => {
+                if (!visited.has(childId)) {
+                    recurse(childId);
+                }
+            });
+        }
+    }
+    
+    recurse(definition.id);
+
     let totalMinutes = 0;
-    allUpskillLogs.forEach(log => {
-        log.exercises.forEach(ex => {
-            if (ex.definitionId === definitionId) {
-                totalMinutes += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0); // reps is duration for upskill
-            }
+    if (allUpskillLogs) {
+        allUpskillLogs.forEach(log => {
+            log.exercises.forEach(ex => {
+                if (visualizationIds.has(ex.definitionId)) {
+                    totalMinutes += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0); // reps is duration for upskill
+                }
+            });
         });
-    });
+    }
     return totalMinutes;
-  }, [allUpskillLogs]);
+  }, [allUpskillLogs, upskillDefinitions]);
 
   const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition) => {
     if (!definition) return 0;
@@ -1410,7 +1437,7 @@ function DeepWorkPageContent() {
                                     const isNotionObsidianEmbed = upskillDef.link ? (isNotionUrl(upskillDef.link) || isObsidianUrl(upskillDef.link)) : false;
                                     const embedLinkForModal = youtubeEmbedUrl || (isNotionObsidianEmbed ? upskillDef.link : null);
 
-                                    const loggedMinutes = getUpskillLoggedMinutes(upskillDef.id);
+                                    const loggedMinutes = getUpskillLoggedMinutesRecursive(upskillDef);
                                     const loggedHours = loggedMinutes / 60;
 
                                     return (
