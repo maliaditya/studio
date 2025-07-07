@@ -89,9 +89,9 @@ function UpskillPageContent() {
   const [newTopicGoalType, setNewTopicGoalType] = useState<'pages' | 'hours'>('pages');
   const [newTopicGoalValue, setNewTopicGoalValue] = useState('');
 
-  const [addingCuriosityToTopic, setAddingCuriosityToTopic] = useState<string | null>(null);
-  const [newCuriosityName, setNewCuriosityName] = useState('');
-  const [newCuriosityHours, setNewCuriosityHours] = useState('');
+  const [addingVisualizationToTopic, setAddingVisualizationToTopic] = useState<string | null>(null);
+  const [newVisualizationName, setNewVisualizationName] = useState('');
+  const [newVisualizationHours, setNewVisualizationHours] = useState('');
   
   const [editingSubtopic, setEditingSubtopic] = useState<ExerciseDefinition | null>(null);
   const [editedSubtopicData, setEditedSubtopicData] = useState<Partial<ExerciseDefinition>>({});
@@ -107,7 +107,7 @@ function UpskillPageContent() {
   const [subtopicContextMenu, setSubtopicContextMenu] = useState<{ mouseX: number; mouseY: number; item: ExerciseDefinition; } | null>(null);
   const subtopicContextMenuRef = useRef<HTMLDivElement>(null);
 
-  const [visibilityFilters, setVisibilityFilters] = useState<Set<'intention' | 'objective' | 'curiosity'>>(new Set(['intention', 'objective', 'curiosity']));
+  const [visibilityFilters, setVisibilityFilters] = useState<Set<'curiosity' | 'objective' | 'visualization'>>(new Set(['curiosity', 'objective', 'visualization']));
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
@@ -145,7 +145,7 @@ function UpskillPageContent() {
     new Set<string>(upskillDefinitions.flatMap(def => def.linkedUpskillIds || []))
   , [upskillDefinitions]);
 
-  const handleVisibilityFilterChange = (filter: 'intention' | 'objective' | 'curiosity') => {
+  const handleVisibilityFilterChange = (filter: 'curiosity' | 'objective' | 'visualization') => {
     setVisibilityFilters(prev => {
         const newSet = new Set(prev);
         if (newSet.has(filter)) {
@@ -161,19 +161,18 @@ function UpskillPageContent() {
     const visibleDefinitions = upskillDefinitions.filter(def => {
         if(def.name === 'placeholder') return false;
         
-        // If no filters are selected, show nothing.
         if (visibilityFilters.size === 0) return false;
 
         const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
         const isLinkedAsChild = linkedUpskillChildIds.has(def.id);
 
-        const isIntention = isParent && !isLinkedAsChild;
+        const isCuriosity = isParent && !isLinkedAsChild;
         const isObjective = isParent && isLinkedAsChild;
-        const isCuriosity = !isParent;
+        const isVisualization = !isParent;
 
-        if (visibilityFilters.has('intention') && isIntention) return true;
-        if (visibilityFilters.has('objective') && isObjective) return true;
         if (visibilityFilters.has('curiosity') && isCuriosity) return true;
+        if (visibilityFilters.has('objective') && isObjective) return true;
+        if (visibilityFilters.has('visualization') && isVisualization) return true;
         
         return false;
     });
@@ -203,7 +202,7 @@ function UpskillPageContent() {
   const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefinition) => {
     if (!definition) return 0;
     const visited = new Set<string>();
-    const curiosityIds = new Set<string>();
+    const visualizationIds = new Set<string>();
 
     function recurse(nodeId: string) {
         if (visited.has(nodeId)) return;
@@ -211,7 +210,7 @@ function UpskillPageContent() {
         const node = upskillDefinitions.find(d => d.id === nodeId);
         if (!node) return;
         if (!node.linkedUpskillIds || node.linkedUpskillIds.length === 0) {
-            curiosityIds.add(node.id);
+            visualizationIds.add(node.id);
         } else {
             node.linkedUpskillIds.forEach(childId => recurse(childId));
         }
@@ -222,7 +221,7 @@ function UpskillPageContent() {
     if (allUpskillLogs) {
         allUpskillLogs.forEach(log => {
             log.exercises.forEach(ex => {
-                if (curiosityIds.has(ex.definitionId)) {
+                if (visualizationIds.has(ex.definitionId)) {
                     totalMinutes += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0);
                 }
             });
@@ -329,18 +328,18 @@ function UpskillPageContent() {
     toast({ title: "Topic Created", description: `"${topic}" has been added.` });
   };
   
-  const handleAddCuriosity = (topic: string) => {
-    if (!newCuriosityName.trim()) { setAddingCuriosityToTopic(null); return; }
-    if (upskillDefinitions.some(def => def.name.toLowerCase() === newCuriosityName.trim().toLowerCase() && def.category.toLowerCase() === topic.toLowerCase())) {
+  const handleAddVisualization = (topic: string) => {
+    if (!newVisualizationName.trim()) { setAddingVisualizationToTopic(null); return; }
+    if (upskillDefinitions.some(def => def.name.toLowerCase() === newVisualizationName.trim().toLowerCase() && def.category.toLowerCase() === topic.toLowerCase())) {
         toast({ title: "Error", description: "This subtopic already exists for this topic.", variant: "destructive" }); return;
     }
     const newDef: ExerciseDefinition = { 
-        id: `def_${Date.now()}_${Math.random()}`, name: newCuriosityName.trim(), category: topic as ExerciseCategory,
-        estimatedHours: parseInt(newCuriosityHours, 10) || undefined,
+        id: `def_${Date.now()}_${Math.random()}`, name: newVisualizationName.trim(), category: topic as ExerciseCategory,
+        estimatedHours: parseInt(newVisualizationHours, 10) || undefined,
     };
     setUpskillDefinitions(prev => prev.filter(d => d.name !== 'placeholder').concat(newDef));
-    setNewCuriosityName(''); setNewCuriosityHours(''); setAddingCuriosityToTopic(null);
-    toast({ title: "Success", description: `Subtopic "${newDef.name}" added to ${topic}.` });
+    setNewVisualizationName(''); setNewVisualizationHours(''); setAddingVisualizationToTopic(null);
+    toast({ title: "Success", description: `Visualization "${newDef.name}" added to ${topic}.` });
   };
 
   const handleDeleteSubtopic = (id: string) => {
@@ -574,6 +573,12 @@ function UpskillPageContent() {
   }, [selectedSubtopic, upskillDefinitions]);
 
   const totalScopeHours = (selectedSubtopic?.estimatedHours || 0) + totalEstimatedHours;
+  
+  const isSelectedSubtopicAVisualization = useMemo(() => {
+    if (!selectedSubtopic) return false;
+    const isParent = (selectedSubtopic.linkedUpskillIds?.length ?? 0) > 0 || (selectedSubtopic.linkedResourceIds?.length ?? 0) > 0;
+    return !isParent;
+  }, [selectedSubtopic]);
 
   if (isLoadingPage) {
     return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your upskill data...</p></div>;
@@ -592,9 +597,9 @@ function UpskillPageContent() {
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><FilterIcon className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('intention')} onCheckedChange={() => handleVisibilityFilterChange('intention')}><Lightbulb className="mr-2 h-4 w-4 text-amber-500" /><span>Intentions</span></DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('curiosity')} onCheckedChange={() => handleVisibilityFilterChange('curiosity')}><Lightbulb className="mr-2 h-4 w-4 text-amber-500" /><span>Curiosities</span></DropdownMenuCheckboxItem>
                             <DropdownMenuCheckboxItem checked={visibilityFilters.has('objective')} onCheckedChange={() => handleVisibilityFilterChange('objective')}><Flag className="mr-2 h-4 w-4 text-green-500" /><span>Objectives</span></DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('curiosity')} onCheckedChange={() => handleVisibilityFilterChange('curiosity')}><Search className="mr-2 h-4 w-4 text-blue-500" /><span>Curiosities</span></DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('visualization')} onCheckedChange={() => handleVisibilityFilterChange('visualization')}><Search className="mr-2 h-4 w-4 text-blue-500" /><span>Visualizations</span></DropdownMenuCheckboxItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -637,12 +642,14 @@ function UpskillPageContent() {
                             {subtopics.sort((a,b) => a.name.localeCompare(b.name)).map(def => {
                               const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
                               const isLinkedAsChild = linkedUpskillChildIds.has(def.id);
-                              const isIntention = isParent && !isLinkedAsChild;
+                              const isCuriosity = isParent && !isLinkedAsChild;
                               const isObjective = isParent && isLinkedAsChild;
+                              const isVisualization = !isParent;
+
                               return (
                                 <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted" onContextMenu={(e) => handleSubtopicContextMenu(e, def)}>
                                     <div className="flex items-center gap-2 flex-grow min-w-0">
-                                      {isIntention ? <Lightbulb className="h-4 w-4 flex-shrink-0 text-amber-500" />
+                                      {isCuriosity ? <Lightbulb className="h-4 w-4 flex-shrink-0 text-amber-500" />
                                        : isObjective ? <Flag className="h-4 w-4 flex-shrink-0 text-green-500" />
                                        : <Search className="h-4 w-4 flex-shrink-0 text-blue-500" />}
                                       <span className="truncate cursor-pointer" onClick={() => { setSelectedSubtopic(def); setViewMode('library'); }}>{def.name}</span>
@@ -655,12 +662,12 @@ function UpskillPageContent() {
                                     </div>
                                 </li>
                               )})}
-                             {addingCuriosityToTopic === topic && (
+                             {addingVisualizationToTopic === topic && (
                                 <li className="p-1.5">
-                                  <form onSubmit={(e) => { e.preventDefault(); handleAddCuriosity(topic); }} className="space-y-2">
-                                      <Input value={newCuriosityName} onChange={(e) => setNewCuriosityName(e.target.value)} className="h-8" autoFocus placeholder="New Curiosity Name" onKeyDown={e => e.key === 'Escape' && setAddingCuriosityToTopic(null)}/>
-                                      <Input value={newCuriosityHours} onChange={(e) => setNewCuriosityHours(e.target.value)} type="number" className="h-8" placeholder="Est. Hours (optional)"/>
-                                      <div className="flex justify-end gap-2"><Button size="icon" className="h-8 w-8" type="submit"><Save className="h-4 w-4"/></Button><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAddingCuriosityToTopic(null)}><X className="h-4 w-4"/></Button></div>
+                                  <form onSubmit={(e) => { e.preventDefault(); handleAddVisualization(topic); }} className="space-y-2">
+                                      <Input value={newVisualizationName} onChange={(e) => setNewVisualizationName(e.target.value)} className="h-8" autoFocus placeholder="New Visualization Name" onKeyDown={e => e.key === 'Escape' && setAddingVisualizationToTopic(null)}/>
+                                      <Input value={newVisualizationHours} onChange={(e) => setNewVisualizationHours(e.target.value)} type="number" className="h-8" placeholder="Est. Hours (optional)"/>
+                                      <div className="flex justify-end gap-2"><Button size="icon" className="h-8 w-8" type="submit"><Save className="h-4 w-4"/></Button><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAddingVisualizationToTopic(null)}><X className="h-4 w-4"/></Button></div>
                                   </form>
                                 </li>
                             )}
@@ -756,13 +763,15 @@ function UpskillPageContent() {
                                       </Card>
                                     )
                                   })}
-                                  <Card 
-                                      onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
-                                      className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
-                                  >
-                                      <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                      <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
-                                  </Card>
+                                  {!isSelectedSubtopicAVisualization && (
+                                    <Card 
+                                        onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
+                                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
+                                    >
+                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
+                                    </Card>
+                                  )}
                                 </div>
                               </div>
                               <div className="space-y-3">
@@ -783,7 +792,9 @@ function UpskillPageContent() {
                                       </Card>
                                     )
                                   })}
-                                  <Card onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)} className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"><PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" /><p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p></Card>
+                                  {!isSelectedSubtopicAVisualization && (
+                                    <Card onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)} className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"><PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" /><p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p></Card>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -802,7 +813,7 @@ function UpskillPageContent() {
       <AlertDialog open={showBackupPrompt} onOpenChange={setShowBackupPrompt}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Weekly Backup Reminder</AlertDialogTitle><AlertDialogDescription>It's Monday! Would you like to back up your upskilling data?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={markBackupPromptAsHandled}>Maybe Later</AlertDialogCancel><AlertDialogAction onClick={handleBackupConfirm}>Yes, Back Up Now</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       {contextMenu && (
         <div ref={contextMenuRef} style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }} className="fixed z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => { e.stopPropagation(); setContextMenu(null); }}>
-          <Button variant="ghost" className="w-full justify-start h-9 px-2" onClick={(e) => { e.stopPropagation(); toggleTopicExpansion(contextMenu.item); setAddingCuriosityToTopic(contextMenu.item); setContextMenu(null); }}><PlusCircle className="mr-2 h-4 w-4" /> New Subtopic</Button>
+          <Button variant="ghost" className="w-full justify-start h-9 px-2" onClick={(e) => { e.stopPropagation(); toggleTopicExpansion(contextMenu.item); setAddingVisualizationToTopic(contextMenu.item); setContextMenu(null); }}><PlusCircle className="mr-2 h-4 w-4" /> New Visualization</Button>
           <Button variant="ghost" className="w-full justify-start h-9 px-2" onClick={() => { handleStartEditingGoal(contextMenu.item); setContextMenu(null); }}><Edit3 className="mr-2 h-4 w-4" /> Edit Goal</Button>
           <div className="-mx-1 my-1 h-px bg-muted" /><Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive h-9 px-2" onClick={() => { setTopicToDelete(contextMenu.item); setContextMenu(null); }}><Trash2 className="mr-2 h-4 w-4" /> Delete Topic</Button>
         </div>
