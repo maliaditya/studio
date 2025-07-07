@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -172,11 +173,10 @@ function UpskillPageContent() {
   };
 
   const topicsWithSubtopics = useMemo(() => {
+    const effectiveFilters = visibilityFilters.size === 0 ? new Set<never>() : visibilityFilters;
     const visibleDefinitions = upskillDefinitions.filter(def => {
         if(def.name === 'placeholder') return false;
         
-        if (visibilityFilters.size === 0) return false;
-
         const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
         const isLinkedAsChild = linkedUpskillChildIds.has(def.id);
 
@@ -184,9 +184,9 @@ function UpskillPageContent() {
         const isObjective = isParent && isLinkedAsChild;
         const isVisualization = !isParent;
 
-        if (visibilityFilters.has('curiosity') && isCuriosity) return true;
-        if (visibilityFilters.has('objective') && isObjective) return true;
-        if (visibilityFilters.has('visualization') && isVisualization) return true;
+        if (effectiveFilters.has('curiosity') && isCuriosity) return true;
+        if (effectiveFilters.has('objective') && isObjective) return true;
+        if (effectiveFilters.has('visualization') && isVisualization) return true;
         
         return false;
     });
@@ -570,8 +570,7 @@ function UpskillPageContent() {
         
         // Determine child type
         const isDefParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-        const isDefChild = linkedUpskillChildIds.has(def.id);
-        const isDefAnObjective = isDefParent && isDefChild;
+        const isDefAnObjective = isDefParent; // For upskill, any parent is an objective
         const isDefAVisualization = !isDefParent;
 
         if (isParentACuriosity) {
@@ -802,6 +801,18 @@ function UpskillPageContent() {
                                     return (
                                       <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[150px]">
                                         <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                    <span tabIndex={isVisualization ? 0 : -1}>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); handleAddTaskToSession(upskillDef); }} disabled={!isVisualization}>
+                                                            <PlusCircle className="h-4 w-4" />
+                                                        </Button>
+                                                    </span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>{isVisualization ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
                                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setSelectedSubtopic(upskillDef); setViewMode('library'); }}><ArrowRight className="h-4 w-4" /></Button>
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
@@ -858,15 +869,13 @@ function UpskillPageContent() {
                                       </Card>
                                     )
                                   })}
-                                  {!isSelectedSubtopicAVisualization && (
-                                    <Card 
-                                        onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
-                                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
-                                    >
-                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
-                                    </Card>
-                                  )}
+                                  <Card 
+                                      onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
+                                      className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
+                                  >
+                                      <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                      <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
+                                  </Card>
                                 </div>
                               </div>
                               <div className="space-y-3">
@@ -887,9 +896,7 @@ function UpskillPageContent() {
                                       </Card>
                                     )
                                   })}
-                                  {!isSelectedSubtopicAVisualization && (
-                                    <Card onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)} className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"><PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" /><p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p></Card>
-                                  )}
+                                  <Card onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)} className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"><PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" /><p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p></Card>
                                 </div>
                               </div>
                             </div>
