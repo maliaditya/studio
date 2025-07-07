@@ -343,7 +343,7 @@ function DeepWorkPageContent() {
   const formatMinutes = (minutes: number) => {
     if (minutes === 0) return "0m";
     const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
+    const m = Math.round(minutes % 60);
     return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim();
   }
   
@@ -389,27 +389,32 @@ function DeepWorkPageContent() {
 
   const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition) => {
     if (!definition) return 0;
-    const visited = new Set<string>();
+
+    const visitedDeepWork = new Set<string>();
     const deepWorkActionIds = new Set<string>();
-    const upskillIds = new Set<string>();
-    
-    function recurse(nodeId: string) {
-        if (visited.has(nodeId)) return;
-        visited.add(nodeId);
+    const directUpskillLinkIds = new Set<string>(); 
+
+    // 1. Traverse the Deep Work tree to find all leaf nodes (actions)
+    //    and all directly linked upskill items (curiosities).
+    function findDeepWorkActionsAndUpskillLinks(nodeId: string) {
+        if (visitedDeepWork.has(nodeId)) return;
+        visitedDeepWork.add(nodeId);
 
         const node = deepWorkDefinitions.find(d => d.id === nodeId);
         if (!node) return;
 
-        (node.linkedUpskillIds || []).forEach(id => upskillIds.add(id));
+        (node.linkedUpskillIds || []).forEach(id => directUpskillLinkIds.add(id));
 
         if (!node.linkedDeepWorkIds || node.linkedDeepWorkIds.length === 0) {
             deepWorkActionIds.add(node.id);
         } else {
-            node.linkedDeepWorkIds.forEach(childId => recurse(childId));
+            node.linkedDeepWorkIds.forEach(childId => findDeepWorkActionsAndUpskillLinks(childId));
         }
     }
-    recurse(definition.id);
 
+    findDeepWorkActionsAndUpskillLinks(definition.id);
+
+    // 2. Calculate total minutes from the deep work actions.
     let totalMinutes = 0;
     if (allDeepWorkLogs) {
         allDeepWorkLogs.forEach(log => {
@@ -421,15 +426,40 @@ function DeepWorkPageContent() {
         });
     }
 
+    // 3. For each linked upskill 'Curiosity', traverse its own tree to find all
+    //    leaf nodes ('Visualizations') and sum their logged times.
+    const visitedUpskill = new Set<string>();
+    const allUpskillVisualizationIds = new Set<string>();
+
+    function findUpskillVisualizations(nodeId: string) {
+        if (visitedUpskill.has(nodeId)) return;
+        visitedUpskill.add(nodeId);
+
+        const node = upskillDefinitions.find(d => d.id === nodeId);
+        if (!node) return;
+
+        const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+        
+        if (!isParent) { // It's a Visualization (leaf node)
+            allUpskillVisualizationIds.add(node.id);
+        } else { // It's a Curiosity or Objective, so recurse
+            (node.linkedUpskillIds || []).forEach(childId => findUpskillVisualizations(childId));
+        }
+    }
+    
+    directUpskillLinkIds.forEach(curiosityId => findUpskillVisualizations(curiosityId));
+
+    // 4. Calculate total minutes from the collected upskill visualizations.
     if (allUpskillLogs) {
         allUpskillLogs.forEach(log => {
             log.exercises.forEach(ex => {
-                if (upskillIds.has(ex.definitionId)) {
-                    totalMinutes += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0);
+                if (allUpskillVisualizationIds.has(ex.definitionId)) {
+                    totalMinutes += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0); // reps is duration for upskill
                 }
             });
         });
     }
+    
     return totalMinutes;
   }, [allDeepWorkLogs, allUpskillLogs, deepWorkDefinitions, upskillDefinitions]);
 
