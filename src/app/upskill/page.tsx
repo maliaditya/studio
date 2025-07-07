@@ -134,6 +134,20 @@ function UpskillPageContent() {
   const [isCreatingLink, setIsCreatingLink] = useState(false);
 
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+
+  const loggedTodayVisualizationIds = useMemo(() => {
+    const todayKey = format(selectedDate, 'yyyy-MM-dd');
+    const todaysLog = allUpskillLogs.find(log => log.date === todayKey);
+    if (!todaysLog) return new Set<string>();
+
+    const loggedIds = new Set<string>();
+    todaysLog.exercises.forEach(ex => {
+        if (ex.loggedSets.length > 0) {
+            loggedIds.add(ex.definitionId);
+        }
+    });
+    return loggedIds;
+  }, [allUpskillLogs, selectedDate]);
   
   const allKnownTopics = useMemo(() => {
     const topicsFromDefs = new Set(upskillDefinitions.map(def => def.category));
@@ -808,20 +822,49 @@ function UpskillPageContent() {
                                           </CardTitle>
                                           <CardDescription>{upskillDef.category}</CardDescription>
                                         </CardHeader>
-                                        <CardContent className="flex-grow"><p className="text-sm text-muted-foreground line-clamp-2">{upskillDef.description || "No description provided."}</p></CardContent>
+                                        <CardContent className="flex-grow">
+                                            {isObjective ? (
+                                                (upskillDef.linkedUpskillIds?.length ?? 0) > 0 ? (
+                                                    <>
+                                                        <h4 className="text-xs font-semibold text-foreground mb-1">Visualizations:</h4>
+                                                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 list-disc list-inside text-xs text-muted-foreground space-y-0.5">
+                                                            {(upskillDef.linkedUpskillIds || []).map(childId => {
+                                                                const childDef = upskillDefinitions.find(d => d.id === childId);
+                                                                // A Visualization is a task with no children
+                                                                const isChildAViz = childDef && (childDef.linkedUpskillIds?.length ?? 0) === 0 && (childDef.linkedResourceIds?.length ?? 0) === 0;
+                                                                if (!childDef || !isChildAViz) return null;
+
+                                                                const isChildLoggedToday = loggedTodayVisualizationIds.has(childDef.id);
+                                                                return (
+                                                                    <li
+                                                                        key={childId}
+                                                                        className={cn("truncate", isChildLoggedToday && "line-through text-muted-foreground/70")}
+                                                                        title={childDef.name}
+                                                                    >
+                                                                        {childDef.name}
+                                                                    </li>
+                                                                );
+                                                            })}
+                                                        </ul>
+                                                    </>
+                                                ) : (
+                                                    <p className="text-sm text-muted-foreground line-clamp-2">{upskillDef.description || "This objective has no visualizations yet."}</p>
+                                                )
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground line-clamp-2">{upskillDef.description || "No description provided."}</p>
+                                            )}
+                                        </CardContent>
                                         <CardFooter className="pt-3 flex items-center justify-end"><div className="flex items-center gap-1 flex-shrink-0">{upskillDef.estimatedHours && <Badge variant="outline" className="flex-shrink-0">{upskillDef.estimatedHours}h est.</Badge>}{loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}</div></CardFooter>
                                       </Card>
                                     )
                                   })}
-                                  {!isSelectedSubtopicAVisualization && (
-                                    <Card 
-                                        onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
-                                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
-                                    >
-                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
-                                    </Card>
-                                  )}
+                                  <Card 
+                                      onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
+                                      className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
+                                  >
+                                      <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                      <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
+                                  </Card>
                                 </div>
                               </div>
                               <div className="space-y-3">
@@ -842,9 +885,7 @@ function UpskillPageContent() {
                                       </Card>
                                     )
                                   })}
-                                  {!isSelectedSubtopicAVisualization && (
-                                    <Card onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)} className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"><PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" /><p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p></Card>
-                                  )}
+                                  <Card onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)} className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"><PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" /><p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p></Card>
                                 </div>
                               </div>
                             </div>
