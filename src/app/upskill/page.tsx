@@ -776,7 +776,15 @@ function UpskillPageContent() {
                                   {(selectedSubtopic.linkedUpskillIds || []).map(id => {
                                     const upskillDef = upskillDefinitions.find(ud => ud.id === id);
                                     if (!upskillDef) return null;
-                                    const loggedMinutes = getUpskillLoggedMinutes(upskillDef.id); const loggedHours = loggedMinutes / 60;
+
+                                    const isParent = (upskillDef.linkedUpskillIds?.length ?? 0) > 0 || (upskillDef.linkedResourceIds?.length ?? 0) > 0;
+                                    const isLinkedAsChild = linkedUpskillChildIds.has(upskillDef.id);
+                                    const isCuriosity = isParent && !isLinkedAsChild;
+                                    const isObjective = isParent && isLinkedAsChild;
+
+                                    const loggedMinutes = getUpskillLoggedMinutes(upskillDef.id);
+                                    const loggedHours = loggedMinutes / 60;
+                                    
                                     return (
                                       <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[150px]">
                                         <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -791,7 +799,15 @@ function UpskillPageContent() {
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </div>
-                                        <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2">{upskillDef.iconUrl ? <Image src={upskillDef.iconUrl} alt="" width={20} height={20} className="h-5 w-5 rounded-sm flex-shrink-0" unoptimized /> : <BookCopy className="h-5 w-5 text-muted-foreground flex-shrink-0" />}<span className="truncate" title={upskillDef.name}>{upskillDef.name}</span></CardTitle><CardDescription>{upskillDef.category}</CardDescription></CardHeader>
+                                        <CardHeader className="pb-3">
+                                          <CardTitle className="text-base flex items-center gap-2">
+                                            {isCuriosity ? <Flashlight className="h-5 w-5 text-amber-500 flex-shrink-0" />
+                                              : isObjective ? <Focus className="h-5 w-5 text-green-500 flex-shrink-0" />
+                                              : <Frame className="h-5 w-5 text-blue-500 flex-shrink-0" />}
+                                            <span className="truncate" title={upskillDef.name}>{upskillDef.name}</span>
+                                          </CardTitle>
+                                          <CardDescription>{upskillDef.category}</CardDescription>
+                                        </CardHeader>
                                         <CardContent className="flex-grow"><p className="text-sm text-muted-foreground line-clamp-2">{upskillDef.description || "No description provided."}</p></CardContent>
                                         <CardFooter className="pt-3 flex items-center justify-end"><div className="flex items-center gap-1 flex-shrink-0">{upskillDef.estimatedHours && <Badge variant="outline" className="flex-shrink-0">{upskillDef.estimatedHours}h est.</Badge>}{loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}</div></CardFooter>
                                       </Card>
