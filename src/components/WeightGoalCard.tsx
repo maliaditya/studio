@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -8,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight, Workflow } from 'lucide-react';
+import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight, Workflow, Lightbulb } from 'lucide-react';
 import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition } from '@/types/workout';
 import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -96,15 +97,23 @@ export function WeightGoalCard({
         return dietPlan.find(plan => plan.day === dayName);
     }, [dietPlan]);
 
+    const linkedDeepWorkChildIds = useMemo(() => {
+        return new Set<string>(
+            (deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])
+        );
+    }, [deepWorkDefinitions]);
+
     const activeIntentions = useMemo(() => {
         return (deepWorkDefinitions || [])
-            .filter(def => 
-                (def.linkedDeepWorkIds?.length ?? 0) > 0 ||
-                (def.linkedUpskillIds?.length ?? 0) > 0 ||
-                (def.linkedResourceIds?.length ?? 0) > 0
-            )
+            .filter(def => {
+                const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 ||
+                               (def.linkedUpskillIds?.length ?? 0) > 0 ||
+                               (def.linkedResourceIds?.length ?? 0) > 0;
+                const isChild = linkedDeepWorkChildIds.has(def.id);
+                return isParent && !isChild;
+            })
             .sort((a, b) => a.name.localeCompare(b.name));
-    }, [deepWorkDefinitions]);
+    }, [deepWorkDefinitions, linkedDeepWorkChildIds]);
 
     const upskillTopics = useMemo(() => {
         const topics = new Map<string, number>();
@@ -434,7 +443,7 @@ export function WeightGoalCard({
                 >
                   <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
                     <div className="flex items-center gap-3 min-w-0">
-                      <Workflow className="h-4 w-4 text-primary flex-shrink-0" />
+                      <Lightbulb className="h-4 w-4 text-primary flex-shrink-0" />
                       <span className="font-medium text-foreground truncate" title={intention.name}>{intention.name}</span>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
