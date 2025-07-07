@@ -293,6 +293,10 @@ function DeepWorkPageContent() {
   const linkedDeepWorkChildIds = useMemo(() =>
     new Set<string>(deepWorkDefinitions.flatMap(def => def.linkedDeepWorkIds || []))
   , [deepWorkDefinitions]);
+  
+  const linkedUpskillChildIds = useMemo(() => 
+    new Set<string>(upskillDefinitions.flatMap(def => def.linkedUpskillIds || []))
+  , [upskillDefinitions]);
 
   const handleVisibilityFilterChange = (filter: 'intention' | 'objective' | 'action') => {
     setVisibilityFilters(prev => {
@@ -362,12 +366,15 @@ function DeepWorkPageContent() {
     const visited = new Set<string>();
     const deepWorkActionIds = new Set<string>();
     const upskillIds = new Set<string>();
+    
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+    const nodeMap = new Map(allDefs.map(d => [d.id, d]));
 
     function recurse(nodeId: string) {
         if (visited.has(nodeId)) return;
         visited.add(nodeId);
 
-        const node = deepWorkDefinitions.find(d => d.id === nodeId);
+        const node = nodeMap.get(nodeId);
         if (!node) return;
 
         (node.linkedUpskillIds || []).forEach(id => upskillIds.add(id));
@@ -402,7 +409,7 @@ function DeepWorkPageContent() {
         });
     }
     return totalMinutes;
-  }, [allDeepWorkLogs, allUpskillLogs, deepWorkDefinitions]);
+  }, [allDeepWorkLogs, allUpskillLogs, deepWorkDefinitions, upskillDefinitions]);
 
   const totalLoggedTime = useMemo(() => {
     if (!selectedFocusArea) return 0;
@@ -926,7 +933,14 @@ function DeepWorkPageContent() {
 
     let definitionsSource: any[];
     if (type === 'upskill') {
-        definitionsSource = linkUpskillTopic ? upskillDefinitions.filter(d => d.category === linkUpskillTopic) : upskillDefinitions;
+        const allUpskillDefs = linkUpskillTopic ? upskillDefinitions.filter(d => d.category === linkUpskillTopic) : upskillDefinitions;
+        // NEW: Only show top-level "Curiosities" from Upskill
+        definitionsSource = allUpskillDefs.filter(def => {
+            const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+            const isChild = linkedUpskillChildIds.has(def.id);
+            // A curiosity is a parent that is not a child of another upskill item.
+            return isParent && !isChild;
+        });
     } else if (type === 'deepwork') {
         definitionsSource = linkDeepWorkTopic ? deepWorkDefinitions.filter(d => d.category === linkDeepWorkTopic) : deepWorkDefinitions;
     } else { // 'resource'
@@ -961,7 +975,7 @@ function DeepWorkPageContent() {
             def.id !== parent.id &&
             def.name.toLowerCase().includes(linkSearchTerm.toLowerCase());
     });
-}, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkedDeepWorkChildIds, linkUpskillTopic, linkDeepWorkTopic]);
+}, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkedDeepWorkChildIds, linkedUpskillChildIds, linkUpskillTopic, linkDeepWorkTopic]);
 
 
   const handleStartEditUpskill = (def: ExerciseDefinition) => {
@@ -1537,25 +1551,22 @@ function DeepWorkPageContent() {
                                                 <p className="text-sm text-muted-foreground line-clamp-2">{deepworkDef.description}</p>
                                             ) : isObjective ? (
                                                 (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 ? (
-                                                    <>
-                                                        <h4 className="text-xs font-semibold text-foreground mb-1">Sub-Tasks:</h4>
-                                                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 list-disc list-inside text-xs text-muted-foreground space-y-0.5">
-                                                            {(deepworkDef.linkedDeepWorkIds || []).map(childId => {
-                                                                const childDef = deepWorkDefinitions.find(d => d.id === childId);
-                                                                if (!childDef) return null;
-                                                                const isChildPermanentlyLogged = permanentlyLoggedActionIds.has(childDef.id);
-                                                                return (
-                                                                    <li 
-                                                                        key={childId} 
-                                                                        className={cn("truncate", isChildPermanentlyLogged && "line-through text-muted-foreground/70")} 
-                                                                        title={childDef.name}
-                                                                    >
-                                                                        {childDef.name}
-                                                                    </li>
-                                                                );
-                                                            })}
-                                                        </ul>
-                                                    </>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                                                        {(deepworkDef.linkedDeepWorkIds || []).map(childId => {
+                                                            const childDef = deepWorkDefinitions.find(d => d.id === childId);
+                                                            if (!childDef) return null;
+                                                            const isChildPermanentlyLogged = permanentlyLoggedActionIds.has(childDef.id);
+                                                            return (
+                                                                <div 
+                                                                    key={childId} 
+                                                                    className={cn("text-xs text-muted-foreground truncate", isChildPermanentlyLogged && "line-through text-muted-foreground/70")} 
+                                                                    title={childDef.name}
+                                                                >
+                                                                    - {childDef.name}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 ) : (
                                                     <p className="text-sm text-muted-foreground line-clamp-2">This objective has no sub-tasks yet. Link items to it.</p>
                                                 )
