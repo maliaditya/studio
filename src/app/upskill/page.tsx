@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, GitMerge, Clock, Lightbulb, Flag, Bolt, Search, Unlink } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, GitMerge, Clock, Unlink, Flashlight, Focus, Frame } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -597,9 +597,9 @@ function UpskillPageContent() {
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><FilterIcon className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('curiosity')} onCheckedChange={() => handleVisibilityFilterChange('curiosity')}><Lightbulb className="mr-2 h-4 w-4 text-amber-500" /><span>Curiosities</span></DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('objective')} onCheckedChange={() => handleVisibilityFilterChange('objective')}><Flag className="mr-2 h-4 w-4 text-green-500" /><span>Objectives</span></DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('visualization')} onCheckedChange={() => handleVisibilityFilterChange('visualization')}><Search className="mr-2 h-4 w-4 text-blue-500" /><span>Visualizations</span></DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('curiosity')} onCheckedChange={() => handleVisibilityFilterChange('curiosity')}><Flashlight className="mr-2 h-4 w-4 text-amber-500" /><span>Curiosities</span></DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('objective')} onCheckedChange={() => handleVisibilityFilterChange('objective')}><Focus className="mr-2 h-4 w-4 text-green-500" /><span>Objectives</span></DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('visualization')} onCheckedChange={() => handleVisibilityFilterChange('visualization')}><Frame className="mr-2 h-4 w-4 text-blue-500" /><span>Visualizations</span></DropdownMenuCheckboxItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -649,9 +649,9 @@ function UpskillPageContent() {
                               return (
                                 <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted" onContextMenu={(e) => handleSubtopicContextMenu(e, def)}>
                                     <div className="flex items-center gap-2 flex-grow min-w-0">
-                                      {isCuriosity ? <Lightbulb className="h-4 w-4 flex-shrink-0 text-amber-500" />
-                                       : isObjective ? <Flag className="h-4 w-4 flex-shrink-0 text-green-500" />
-                                       : <Search className="h-4 w-4 flex-shrink-0 text-blue-500" />}
+                                      {isCuriosity ? <Flashlight className="h-4 w-4 flex-shrink-0 text-amber-500" />
+                                       : isObjective ? <Focus className="h-4 w-4 flex-shrink-0 text-green-500" />
+                                       : <Frame className="h-4 w-4 flex-shrink-0 text-blue-500" />}
                                       <span className="truncate cursor-pointer" onClick={() => { setSelectedSubtopic(def); setViewMode('library'); }}>{def.name}</span>
                                       {def.estimatedHours && <Badge variant="secondary" className="text-xs ml-auto">{def.estimatedHours}h</Badge>}
                                     </div>
@@ -763,15 +763,13 @@ function UpskillPageContent() {
                                       </Card>
                                     )
                                   })}
-                                  {!isSelectedSubtopicAVisualization && (
-                                    <Card 
-                                        onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
-                                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
-                                    >
-                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
-                                    </Card>
-                                  )}
+                                  <Card 
+                                      onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
+                                      className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
+                                  >
+                                      <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                      <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
+                                  </Card>
                                 </div>
                               </div>
                               <div className="space-y-3">
@@ -792,9 +790,7 @@ function UpskillPageContent() {
                                       </Card>
                                     )
                                   })}
-                                  {!isSelectedSubtopicAVisualization && (
-                                    <Card onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)} className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"><PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" /><p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p></Card>
-                                  )}
+                                  <Card onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)} className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"><PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" /><p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p></Card>
                                 </div>
                               </div>
                             </div>
