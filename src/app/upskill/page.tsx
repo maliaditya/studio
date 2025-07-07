@@ -130,7 +130,7 @@ function UpskillPageContent() {
   const [linkSearchTerm, setLinkSearchTerm] = useState('');
   const [tempLinkedIds, setTempLinkedIds] = useState<string[]>([]);
   const [linkResourceFolderId, setLinkResourceFolderId] = useState<string>('');
-  const [linkUpskillTopic, setLinkUpskillTopic] = useState('');
+  const [linkUpskillTopic, setLinkUpskillTopic] = useState<string>('');
   const [isCreatingLink, setIsCreatingLink] = useState(false);
 
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
@@ -148,8 +148,11 @@ function UpskillPageContent() {
   const handleVisibilityFilterChange = (filter: 'intention' | 'objective' | 'curiosity') => {
     setVisibilityFilters(prev => {
         const newSet = new Set(prev);
-        if (newSet.has(filter)) newSet.delete(filter);
-        else newSet.add(filter);
+        if (newSet.has(filter)) {
+            newSet.delete(filter);
+        } else {
+            newSet.add(filter);
+        }
         return newSet;
     });
   };
@@ -239,12 +242,6 @@ function UpskillPageContent() {
     const m = minutes % 60;
     return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim();
   }
-
-  const isSelectedSubtopicACuriosity = useMemo(() => {
-    if (!selectedSubtopic) return false;
-    const isParent = (selectedSubtopic.linkedUpskillIds?.length ?? 0) > 0 || (selectedSubtopic.linkedResourceIds?.length ?? 0) > 0;
-    return !isParent;
-  }, [selectedSubtopic]);
 
   useEffect(() => {
     if (editingSubtopic) setEditedSubtopicData(editingSubtopic);
@@ -759,9 +756,13 @@ function UpskillPageContent() {
                                       </Card>
                                     )
                                   })}
-                                  {!isSelectedSubtopicACuriosity && (
-                                    <Card onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)} className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"><PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" /><p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p></Card>
-                                  )}
+                                  <Card 
+                                      onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
+                                      className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
+                                  >
+                                      <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                      <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
+                                  </Card>
                                 </div>
                               </div>
                               <div className="space-y-3">
