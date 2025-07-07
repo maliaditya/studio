@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -572,7 +571,6 @@ function UpskillPageContent() {
         // Determine child type
         const isDefParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
         const isDefChild = linkedUpskillChildIds.has(def.id);
-        const isDefACuriosity = isDefParent && !isDefChild;
         const isDefAnObjective = isDefParent && isDefChild;
         const isDefAVisualization = !isDefParent;
 
@@ -583,7 +581,7 @@ function UpskillPageContent() {
 
         if (isParentAnObjective) {
             // An Objective can link to other Objectives or Visualizations.
-            return !isDefACuriosity;
+            return isDefAnObjective || isDefAVisualization;
         }
         
         // A Visualization shouldn't be a parent in the first place, but if it is, it can't link anything.
@@ -796,6 +794,7 @@ function UpskillPageContent() {
                                     const isLinkedAsChild = linkedUpskillChildIds.has(upskillDef.id);
                                     const isCuriosity = isParent && !isLinkedAsChild;
                                     const isObjective = isParent && isLinkedAsChild;
+                                    const isVisualization = !isParent;
 
                                     const loggedMinutes = getUpskillLoggedMinutes(upskillDef.id);
                                     const loggedHours = loggedMinutes / 60;
@@ -859,13 +858,15 @@ function UpskillPageContent() {
                                       </Card>
                                     )
                                   })}
-                                  <Card 
-                                      onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
-                                      className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
-                                  >
-                                      <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                      <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
-                                  </Card>
+                                  {!isSelectedSubtopicAVisualization && (
+                                    <Card 
+                                        onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
+                                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
+                                    >
+                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
+                                    </Card>
+                                  )}
                                 </div>
                               </div>
                               <div className="space-y-3">
@@ -886,7 +887,9 @@ function UpskillPageContent() {
                                       </Card>
                                     )
                                   })}
-                                  <Card onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)} className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"><PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" /><p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p></Card>
+                                  {!isSelectedSubtopicAVisualization && (
+                                    <Card onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)} className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"><PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" /><p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p></Card>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -912,9 +915,15 @@ function UpskillPageContent() {
       )}
       {subtopicContextMenu && (
         <div ref={subtopicContextMenuRef} style={{ top: subtopicContextMenu.mouseY, left: subtopicContextMenu.mouseX }} className="fixed z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => { e.stopPropagation(); setSubtopicContextMenu(null); }}>
-            <DropdownMenuItem onSelect={() => handleViewProgress(subtopicContextMenu.item)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => handleStartEditSubtopic(subtopicContextMenu.item)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => handleDeleteSubtopic(subtopicContextMenu.item.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete</DropdownMenuItem>
+            <Button variant="ghost" className="w-full justify-start h-9 px-2" onClick={() => handleViewProgress(subtopicContextMenu.item)}>
+                <TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span>
+            </Button>
+            <Button variant="ghost" className="w-full justify-start h-9 px-2" onClick={() => handleStartEditSubtopic(subtopicContextMenu.item)}>
+                <Edit3 className="mr-2 h-4 w-4"/>Edit
+            </Button>
+            <Button variant="ghost" className="w-full justify-start h-9 px-2 text-destructive hover:text-destructive" onClick={() => handleDeleteSubtopic(subtopicContextMenu.item.id)}>
+                <Trash2 className="mr-2 h-4 w-4"/>Delete
+            </Button>
         </div>
       )}
       <Dialog open={isManageLinksModalOpen} onOpenChange={setIsManageLinksModalOpen}>
