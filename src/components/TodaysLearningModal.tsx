@@ -1,6 +1,7 @@
+
 "use client"
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -11,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ExerciseDefinition, WorkoutExercise } from '@/types/workout';
-import { BookOpenCheck, Briefcase, Share2, Save, PlusCircle, ChevronRight } from 'lucide-react';
+import { BookOpenCheck, Briefcase, Share2, Save, PlusCircle, ChevronRight, Flashlight, Focus, Frame } from 'lucide-react';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
@@ -31,6 +32,7 @@ interface TodaysLearningModalProps {
   pageType: 'upskill' | 'deepwork' | 'branding';
   disabledTaskIds?: string[];
   deepWorkDefinitions?: ExerciseDefinition[];
+  upskillDefinitions?: ExerciseDefinition[];
   setDeepWorkDefinitions?: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
 }
 
@@ -43,6 +45,7 @@ export function TodaysLearningModal({
   pageType,
   disabledTaskIds = [],
   deepWorkDefinitions = [],
+  upskillDefinitions = [],
   setDeepWorkDefinitions,
 }: TodaysLearningModalProps) {
   const { toast } = useToast();
@@ -57,8 +60,10 @@ export function TodaysLearningModal({
   const [selectedDeepWorkTopic, setSelectedDeepWorkTopic] = useState<string | null>(null);
   const [selectedDeepWorkObjective, setSelectedDeepWorkObjective] = useState<ExerciseDefinition | null>(null);
 
-  // State for upskill topic selection
+  // State for upskill selection flow
+  const [upskillSelectionStep, setUpskillSelectionStep] = useState<'topic' | 'curiosity' | 'visualization'>('topic');
   const [selectedUpskillTopic, setSelectedUpskillTopic] = useState<string | null>(null);
+  const [selectedUpskillCuriosity, setSelectedUpskillCuriosity] = useState<ExerciseDefinition | null>(null);
 
 
   useEffect(() => {
@@ -68,10 +73,15 @@ export function TodaysLearningModal({
         setSelectedDeepWorkTopic(null);
         setSelectedDeepWorkObjective(null);
         setSelectedRadioDefId(initialSelectedIds.length > 0 ? initialSelectedIds[0] : null);
-      } else {
+      } else if (pageType === 'upskill') {
+        setUpskillSelectionStep('topic');
+        setSelectedUpskillTopic(null);
+        setSelectedUpskillCuriosity(null);
         setSelectedRadioDefId(initialSelectedIds.length > 0 ? initialSelectedIds[0] : null);
       }
-      setSelectedUpskillTopic(null); // Reset upskill topic on open
+      else {
+        setSelectedRadioDefId(initialSelectedIds.length > 0 ? initialSelectedIds[0] : null);
+      }
     }
   }, [isOpen, pageType, initialSelectedIds]);
   
@@ -135,38 +145,61 @@ export function TodaysLearningModal({
   };
 
   // ----- UPSKILL-SPECIFIC LOGIC -----
-  const { allTasksForToday, libraryTasks } = useMemo(() => {
-    if (pageType !== 'upskill') return { allTasksForToday: [], libraryTasks: [] };
-    const todaysLogDefIds = new Set(availableTasks.filter(t => !t.id.startsWith('lib-')).map(t => t.definitionId));
-    
-    let currentlySelectedIds: Set<string>;
-    currentlySelectedIds = new Set(selectedRadioDefId ? [selectedRadioDefId] : []);
-    
-    const allConsideredDefIds = new Set([...todaysLogDefIds, ...currentlySelectedIds]);
-
-    const scheduled: WorkoutExercise[] = [];
-    const library: WorkoutExercise[] = [];
-    const processedDefIds = new Set<string>();
-
-    availableTasks.forEach(task => {
-        if (processedDefIds.has(task.definitionId)) return;
-
-        if (allConsideredDefIds.has(task.definitionId)) {
-            scheduled.push(task);
-        } else {
-            library.push(task);
-        }
-        processedDefIds.add(task.definitionId);
-    });
-    return { allTasksForToday: scheduled, libraryTasks: library };
-  }, [availableTasks, selectedRadioDefId, pageType]);
-  
   const upskillTopics = useMemo(() => {
     if (pageType !== 'upskill') return [];
-    const topics = new Set<string>();
-    libraryTasks.forEach(task => topics.add(task.category));
-    return Array.from(topics).sort();
-  }, [libraryTasks, pageType]);
+    return [...new Set(upskillDefinitions.map(def => def.category))].sort();
+  }, [upskillDefinitions, pageType]);
+
+  const linkedUpskillChildIds = useMemo(() => 
+    new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []))
+  , [upskillDefinitions]);
+
+  const curiositiesForTopic = useMemo(() => {
+    if (!selectedUpskillTopic || pageType !== 'upskill') return [];
+
+    return (upskillDefinitions || []).filter(def => {
+        if (def.category !== selectedUpskillTopic) return false;
+        
+        const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+        const isLinkedAsChild = linkedUpskillChildIds.has(def.id);
+        
+        return isParent && !isLinkedAsChild;
+    }).sort((a,b) => a.name.localeCompare(b.name));
+  }, [upskillDefinitions, selectedUpskillTopic, pageType, linkedUpskillChildIds]);
+  
+  const getVisualizationsRecursive = useCallback((nodeId: string): ExerciseDefinition[] => {
+      const visited = new Set<string>();
+      const visualizations: ExerciseDefinition[] = [];
+      const queue: string[] = [nodeId];
+  
+      while (queue.length > 0) {
+          const currentId = queue.shift()!;
+          if (visited.has(currentId)) continue;
+          visited.add(currentId);
+  
+          const node = upskillDefinitions.find(d => d.id === currentId);
+          if (!node) continue;
+  
+          const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+  
+          if (!isParent) { // It's a Visualization
+              visualizations.push(node);
+          } else { // It's a Curiosity or Objective, so recurse
+              (node.linkedUpskillIds || []).forEach(childId => {
+                  if (!visited.has(childId)) {
+                      queue.push(childId);
+                  }
+              });
+          }
+      }
+      return visualizations.sort((a,b) => a.name.localeCompare(b.name));
+  }, [upskillDefinitions]);
+
+  const visualizationsForCuriosity = useMemo(() => {
+    if (!selectedUpskillCuriosity || pageType !== 'upskill') return [];
+    return getVisualizationsRecursive(selectedUpskillCuriosity.id);
+  }, [selectedUpskillCuriosity, pageType, getVisualizationsRecursive]);
+
 
   // ----- DEEPWORK-SPECIFIC LOGIC -----
   const deepWorkTopics = useMemo(() => {
@@ -377,73 +410,83 @@ export function TodaysLearningModal({
                     )}
                 </div>
             ) : ( // For upskill
-                availableTasks.length > 0 ? (
-                    <div className="space-y-4">
-                        {allTasksForToday.length > 0 && (
-                            <div>
-                                <h4 className="mb-2 text-sm font-medium text-muted-foreground">Scheduled for Today</h4>
+                <div className="space-y-4">
+                    <div className="flex items-center text-sm text-muted-foreground mb-4">
+                        <button
+                            onClick={() => {
+                                setUpskillSelectionStep('topic');
+                                setSelectedUpskillTopic(null);
+                                setSelectedUpskillCuriosity(null);
+                            }}
+                            className="hover:text-foreground disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:cursor-not-allowed"
+                            disabled={upskillSelectionStep === 'topic'}
+                        >
+                            Topics
+                        </button>
+                        {selectedUpskillTopic && (
+                            <>
+                                <ChevronRight className="h-4 w-4 mx-1" />
+                                <button
+                                    onClick={() => {
+                                        setUpskillSelectionStep('curiosity');
+                                        setSelectedUpskillCuriosity(null);
+                                    }}
+                                    className="hover:text-foreground disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:cursor-not-allowed truncate max-w-[150px]"
+                                    disabled={upskillSelectionStep === 'curiosity'}
+                                    title={selectedUpskillTopic}
+                                >
+                                    {selectedUpskillTopic}
+                                </button>
+                            </>
+                        )}
+                        {selectedUpskillCuriosity && (
+                            <>
+                                <ChevronRight className="h-4 w-4 mx-1" />
+                                <span className="font-medium text-foreground truncate max-w-[150px]" title={selectedUpskillCuriosity.name}>{selectedUpskillCuriosity.name}</span>
+                            </>
+                        )}
+                    </div>
+                    {upskillSelectionStep === 'topic' && (
+                        <div className="space-y-2">
+                            {upskillTopics.map(topic => (
+                                <button key={topic} onClick={() => { setSelectedUpskillTopic(topic); setUpskillSelectionStep('curiosity'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
+                                    <span className="font-medium">{topic}</span>
+                                    <ChevronRight className="h-4 w-4" />
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    {upskillSelectionStep === 'curiosity' && (
+                         <div className="space-y-2">
+                            {curiositiesForTopic.length > 0 ? curiositiesForTopic.map(curiosity => (
+                                <button key={curiosity.id} onClick={() => { setSelectedUpskillCuriosity(curiosity); setUpskillSelectionStep('visualization'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
+                                    <div className='flex items-center gap-2 min-w-0'>
+                                        <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                                        <span className="font-medium truncate">{curiosity.name}</span>
+                                    </div>
+                                    <ChevronRight className="h-4 w-4" />
+                                </button>
+                            )) : <p className="text-sm text-center text-muted-foreground py-4">No curiosities found in this topic.</p>}
+                        </div>
+                    )}
+                    {upskillSelectionStep === 'visualization' && (
+                        <div className="space-y-2">
+                            {visualizationsForCuriosity.length > 0 ? (
                                 <RadioGroup value={selectedRadioDefId ?? ''} onValueChange={setSelectedRadioDefId} className="space-y-2">
-                                {allTasksForToday.map(task => (
-                                    <div key={task.id} className="flex items-center space-x-3 p-3 rounded-md border bg-muted/20 has-[[data-state=checked]]:bg-accent transition-colors">
-                                    <RadioGroupItem
-                                        value={task.definitionId}
-                                        id={`task-radio-${task.id}`}
-                                        disabled={disabledTaskIds.includes(task.definitionId)}
-                                    />
-                                    <Label htmlFor={`task-radio-${task.id}`} className={cn("font-normal w-full", disabledTaskIds.includes(task.definitionId) ? "cursor-not-allowed text-muted-foreground/50" : "cursor-pointer")}>
-                                        <p className="font-medium">{task.name}</p>
-                                        <p className="text-xs text-muted-foreground">{task.category}</p>
-                                    </Label>
+                                {visualizationsForCuriosity.map(viz => (
+                                    <div key={viz.id} className="flex items-center space-x-3 p-3 rounded-md border bg-muted/20 has-[[data-state=checked]]:bg-accent transition-colors">
+                                        <RadioGroupItem value={viz.id} id={`viz-radio-${viz.id}`} />
+                                        <Label htmlFor={`viz-radio-${viz.id}`} className="font-normal w-full cursor-pointer flex items-center gap-2">
+                                            <Frame className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                                            {viz.name}
+                                        </Label>
                                     </div>
                                 ))}
                                 </RadioGroup>
-                            </div>
-                        )}
-                        {libraryTasks.length > 0 && (
-                            <div>
-                                <h4 className="mb-2 mt-4 text-sm font-medium text-muted-foreground">Available from Library</h4>
-                                <Select value={selectedUpskillTopic || ''} onValueChange={setSelectedUpskillTopic}>
-                                    <SelectTrigger className="mb-2">
-                                        <SelectValue placeholder="Select a topic to view tasks..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {upskillTopics.map(topic => (
-                                            <SelectItem key={topic} value={topic}>{topic}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                
-                                {selectedUpskillTopic && (
-                                    <div className="space-y-2 mt-2">
-                                        {libraryTasks.filter(task => task.category === selectedUpskillTopic).map(task => (
-                                            <div key={task.id} className="flex items-center justify-between space-x-3 p-3 rounded-md border bg-muted/20 transition-colors">
-                                                <Label htmlFor={`task-${task.id}`} className="font-normal w-full cursor-default">
-                                                    <p className="font-medium">{task.name}</p>
-                                                    <p className="text-xs text-muted-foreground">{task.category}</p>
-                                                </Label>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-accent-foreground" onClick={() => setSelectedRadioDefId(task.definitionId)} aria-label={`Add and select ${task.name}`}>
-                                                    <PlusCircle className="h-5 w-5" />
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8">
-                        {info.icon}
-                        <p className="font-semibold">No Available Tasks</p>
-                        <p className="text-sm mt-2">
-                            Visit the{' '}
-                            <Link href={info.pageLink} className="font-medium text-primary underline underline-offset-4">
-                                {info.pageName} page
-                            </Link>
-                            {' '}to add new tasks to your library.
-                        </p>
-                    </div>
-                )
+                            ) : <p className="text-sm text-center text-muted-foreground py-4">No actionable visualizations found for this curiosity.</p>}
+                        </div>
+                    )}
+                </div>
             )}
           </ScrollArea>
         </div>

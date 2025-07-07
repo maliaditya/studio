@@ -746,7 +746,7 @@ function HomePageContent() {
   
   const learningModalProps = useMemo(() => {
     if (!editingActivity) {
-      return { availableTasks: [], initialSelectedIds: [], pageType: 'upskill' as const, disabledTaskIds: [] };
+      return { availableTasks: [], initialSelectedIds: [], pageType: 'upskill' as const, disabledTaskIds: [], upskillDefinitions: [] };
     }
 
     const { activity } = editingActivity;
@@ -812,6 +812,7 @@ function HomePageContent() {
         initialSelectedIds, 
         pageType, 
         disabledTaskIds, 
+        upskillDefinitions,
     };
 
 }, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, schedule, upskillDefinitions, deepWorkDefinitions]);
@@ -951,6 +952,7 @@ function HomePageContent() {
               pageType={learningModalProps.pageType}
               disabledTaskIds={learningModalProps.disabledTaskIds}
               deepWorkDefinitions={deepWorkDefinitions}
+              upskillDefinitions={learningModalProps.upskillDefinitions}
               setDeepWorkDefinitions={setDeepWorkDefinitions}
           />
         )}
