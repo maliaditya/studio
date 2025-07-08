@@ -99,10 +99,11 @@ function UpskillPageContent() {
 
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
   
-  const [contextMenu, setContextMenu] = useState<{ mouseX: number; mouseY: number; item: string; } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
-  const [subtopicContextMenu, setSubtopicContextMenu] = useState<{ mouseX: number; mouseY: number; item: ExerciseDefinition; } | null>(null);
   const subtopicContextMenuRef = useRef<HTMLDivElement>(null);
+  
+  const [subtopicContextMenu, setSubtopicContextMenu] = useState<{ mouseX: number; mouseY: number; item: ExerciseDefinition; } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ mouseX: number; mouseY: number; item: string; } | null>(null);
 
   const [visibilityFilters, setVisibilityFilters] = useState<Set<'curiosity' | 'objective' | 'visualization' | 'standalone'>>(new Set(['curiosity', 'objective', 'visualization', 'standalone']));
 
@@ -186,10 +187,8 @@ function UpskillPageContent() {
         if (!node) continue;
 
         const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
-        const isChild = linkedUpskillChildIds.has(node.id);
-        const isVisualization = !isParent && isChild;
-
-        if (isVisualization) {
+        
+        if (!isParent) { // It's a Visualization
             visualizations.add(node.id);
         } else { // It's an Objective or Curiosity, so recurse
             (node.linkedUpskillIds || []).forEach(childId => {
@@ -203,7 +202,7 @@ function UpskillPageContent() {
     if (visualizations.size === 0) return false;
 
     return Array.from(visualizations).every(vizId => permanentlyLoggedVisualizationIds.has(vizId));
-  }, [upskillDefinitions, permanentlyLoggedVisualizationIds, linkedUpskillChildIds]);
+  }, [upskillDefinitions, permanentlyLoggedVisualizationIds]);
 
 
   const topicsWithSubtopics = useMemo(() => {
@@ -261,9 +260,8 @@ function UpskillPageContent() {
         if (!node) return;
         
         const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
-        const isChild = linkedUpskillChildIds.has(node.id);
 
-        if (!isParent && isChild) {
+        if (!isParent) {
             visualizationIds.add(node.id);
         } else {
             (node.linkedUpskillIds || []).forEach(childId => recurse(childId));
@@ -282,7 +280,7 @@ function UpskillPageContent() {
         });
     }
     return totalMinutes;
-  }, [allUpskillLogs, upskillDefinitions, linkedUpskillChildIds]);
+  }, [allUpskillLogs, upskillDefinitions]);
 
   const totalLoggedTime = useMemo(() => {
     if (!selectedSubtopic) return 0;
@@ -609,7 +607,7 @@ function UpskillPageContent() {
   const filteredItemsForLinking = useMemo(() => {
     if (!manageLinksConfig) return [];
     const { type, parent } = manageLinksConfig;
-
+    
     if (type === 'resource') {
         if (!linkResourceFolderId) return [];
         return resources.filter(res => res.folderId === linkResourceFolderId && res.name.toLowerCase().includes(linkSearchTerm.toLowerCase()));
@@ -619,25 +617,29 @@ function UpskillPageContent() {
 
     const isParentParent = (parent.linkedUpskillIds?.length ?? 0) > 0 || (parent.linkedResourceIds?.length ?? 0) > 0;
     const isParentChild = linkedUpskillChildIds.has(parent.id);
-    const isParentACuriosity = isParentParent && !isParentChild;
-    const isParentAnObjective = isParentParent && isParentChild;
-    const isParentAStandalone = !isParentParent && !isParentChild;
+    const isParentAVisualization = !isParentParent && isParentChild;
 
     return definitionsSource.filter(def => {
         if (!def.name || def.name === 'placeholder' || def.id === parent.id || !def.name.toLowerCase().includes(linkSearchTerm.toLowerCase())) {
             return false;
         }
-        
+
         const isDefParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
         const isDefChild = linkedUpskillChildIds.has(def.id);
-        const isDefAnObjective = isDefParent && isDefChild;
         const isDefAVisualization = !isDefParent && isDefChild;
+
+        if (isParentAVisualization) {
+            return isDefAVisualization;
+        }
         
-        if(isParentAStandalone) return true; // Standalone can link to anything
+        const isParentACuriosity = isParentParent && !isParentChild;
+        const isParentAnObjective = isParentParent && isParentChild;
+        const isDefAnObjective = isDefParent && isDefChild;
+        
         if (isParentACuriosity) return isDefAnObjective;
         if (isParentAnObjective) return isDefAnObjective || isDefAVisualization;
         
-        return false;
+        return true;
     });
 }, [manageLinksConfig, upskillDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkUpskillTopic, linkedUpskillChildIds]);
 
@@ -672,13 +674,6 @@ function UpskillPageContent() {
   }, [selectedSubtopic, upskillDefinitions]);
 
   const totalScopeHours = (selectedSubtopic?.estimatedHours || 0) + totalEstimatedHours;
-  
-  const isSelectedSubtopicAVisualization = useMemo(() => {
-    if (!selectedSubtopic) return false;
-    const isParent = (selectedSubtopic.linkedUpskillIds?.length ?? 0) > 0 || (selectedSubtopic.linkedResourceIds?.length ?? 0) > 0;
-    const isChild = linkedUpskillChildIds.has(selectedSubtopic.id);
-    return !isParent && isChild;
-  }, [selectedSubtopic, linkedUpskillChildIds]);
 
   if (isLoadingPage) {
     return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your upskill data...</p></div>;
@@ -867,11 +862,7 @@ function UpskillPageContent() {
                                             <TooltipProvider>
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
-                                                    <span tabIndex={isVisualization ? 0 : -1}>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); isVisualization && handleAddTaskToSession(upskillDef); }} disabled={!isVisualization}>
-                                                            <PlusCircle className="h-4 w-4" />
-                                                        </Button>
-                                                    </span>
+                                                    <span tabIndex={isVisualization ? 0 : -1}><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); isVisualization && handleAddTaskToSession(upskillDef); }} disabled={!isVisualization}><PlusCircle className="h-4 w-4" /></Button></span>
                                                     </TooltipTrigger>
                                                     <TooltipContent>{isVisualization ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent>
                                                 </Tooltip>
@@ -897,7 +888,9 @@ function UpskillPageContent() {
                                                         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 list-disc list-inside text-xs text-muted-foreground space-y-0.5">
                                                             {(upskillDef.linkedUpskillIds || []).map(childId => {
                                                                 const childDef = upskillDefinitions.find(d => d.id === childId);
-                                                                if (!childDef || !((childDef.linkedUpskillIds?.length ?? 0) === 0 && (childDef.linkedResourceIds?.length ?? 0) === 0)) return null;
+                                                                if (!childDef) return null;
+                                                                const isChildAViz = (childDef.linkedUpskillIds?.length ?? 0) === 0 && (childDef.linkedResourceIds?.length ?? 0) === 0;
+                                                                if (!isChildAViz) return null;
 
                                                                 const isChildPermanentlyLogged = permanentlyLoggedVisualizationIds.has(childDef.id);
                                                                 return (
@@ -923,15 +916,13 @@ function UpskillPageContent() {
                                       </Card>
                                     )
                                   })}
-                                  {!isSelectedSubtopicAVisualization && (
-                                    <Card 
-                                        onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
-                                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
-                                    >
-                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
-                                    </Card>
-                                  )}
+                                  <Card 
+                                      onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
+                                      className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
+                                  >
+                                      <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                      <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
+                                  </Card>
                                 </div>
                               </div>
                               <div className="space-y-3">
@@ -952,9 +943,13 @@ function UpskillPageContent() {
                                       </Card>
                                     )
                                   })}
-                                  {!isSelectedSubtopicAVisualization &&
-                                    <Card onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)} className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"><PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" /><p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p></Card>
-                                  }
+                                  <Card 
+                                      onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)}
+                                      className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
+                                  >
+                                      <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                      <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p>
+                                  </Card>
                                 </div>
                               </div>
                             </div>

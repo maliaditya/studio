@@ -295,7 +295,7 @@ function DeepWorkPageContent() {
   , [deepWorkDefinitions]);
   
   const linkedUpskillChildIds = useMemo(() => 
-    new Set<string>(upskillDefinitions.flatMap(def => def.linkedUpskillIds || []))
+    new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []))
   , [upskillDefinitions]);
 
   const handleVisibilityFilterChange = (filter: 'intention' | 'objective' | 'action' | 'standalone') => {
@@ -990,33 +990,16 @@ function DeepWorkPageContent() {
     setIsManageLinksModalOpen(false);
   }
 
-  const isSelectedFocusAreaAnAction = useMemo(() => {
-    if (!selectedFocusArea) return false;
-    const isParent = (selectedFocusArea.linkedDeepWorkIds?.length ?? 0) > 0 || (selectedFocusArea.linkedUpskillIds?.length ?? 0) > 0 || (selectedFocusArea.linkedResourceIds?.length ?? 0) > 0;
-    const isLinkedAsChild = linkedDeepWorkChildIds.has(selectedFocusArea.id);
-    const isAction = !isParent && isLinkedAsChild;
-    return isAction;
-  }, [selectedFocusArea, linkedDeepWorkChildIds]);
-
-
   const filteredItemsForLinking = useMemo(() => {
     if (!manageLinksConfig) return [];
     const { type, parent } = manageLinksConfig;
 
     let definitionsSource: any[];
     if (type === 'upskill') {
-        // When linking upskill items to deep work, only show top-level "Curiosities"
-        definitionsSource = upskillDefinitions.filter(def => {
-            const isUpskillParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-            const isUpskillChild = linkedUpskillChildIds.has(def.id);
-            // A curiosity is a parent that is not a child of another upskill item.
-            return isUpskillParent && !isUpskillChild;
-        });
-
+        definitionsSource = upskillDefinitions;
         if (linkUpskillTopic) {
             definitionsSource = definitionsSource.filter(def => def.category === linkUpskillTopic);
         }
-
     } else if (type === 'deepwork') {
         definitionsSource = linkDeepWorkTopic ? deepWorkDefinitions.filter(d => d.category === linkDeepWorkTopic) : deepWorkDefinitions;
     } else { // 'resource'
@@ -1024,20 +1007,40 @@ function DeepWorkPageContent() {
         definitionsSource = resources.filter(res => res.folderId === linkResourceFolderId);
     }
 
-    const isParentAnIntention = (parent.linkedDeepWorkIds?.length ?? 0) > 0 && !linkedDeepWorkChildIds.has(parent.id);
-
+    const isParentAnAction = !((parent.linkedDeepWorkIds?.length ?? 0) > 0 || (parent.linkedUpskillIds?.length ?? 0) > 0 || (parent.linkedResourceIds?.length ?? 0) > 0) && linkedDeepWorkChildIds.has(parent.id);
+    
     return definitionsSource.filter(def => {
-        if (type === 'deepwork') {
-            const isDefAnAction = (def.linkedDeepWorkIds?.length ?? 0) === 0;
-            if (isParentAnIntention && isDefAnAction) {
-                return false;
-            }
+        if (!def.name || def.name === 'placeholder' || def.id === parent.id || (linkSearchTerm && !def.name.toLowerCase().includes(linkSearchTerm.toLowerCase()))) {
+          return false;
+        }
+
+        if (isParentAnAction) {
+          if (type === 'deepwork') {
+            const isDefParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+            const isDefAnAction = !isDefParent && linkedDeepWorkChildIds.has(def.id);
+            return isDefAnAction;
+          }
+          if (type === 'upskill') {
+            const isDefParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+            const isDefAVisualization = !isDefParent && linkedUpskillChildIds.has(def.id);
+            return isDefAVisualization;
+          }
         }
         
-        return def.name &&
-            def.name !== 'placeholder' &&
-            def.id !== parent.id &&
-            def.name.toLowerCase().includes(linkSearchTerm.toLowerCase());
+        const isParentAnIntention = (parent.linkedDeepWorkIds?.length ?? 0) > 0 && !linkedDeepWorkChildIds.has(parent.id);
+        if (isParentAnIntention && type === 'upskill') {
+            // When parent is an Intention, it must link to a top-level Curiosity
+            const isCuriosity = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+            const isLinkedAsUpskillChild = linkedUpskillChildIds.has(def.id);
+            return isCuriosity && !isLinkedAsUpskillChild;
+        }
+        if (isParentAnIntention && type === 'deepwork') {
+            // An Intention cannot link directly to an Action. It must link to an Objective.
+            const isDefAnObjective = (def.linkedDeepWorkIds?.length ?? 0) > 0 && linkedDeepWorkChildIds.has(def.id);
+            return isDefAnObjective;
+        }
+        
+        return true;
     });
 }, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkedDeepWorkChildIds, linkedUpskillChildIds, linkUpskillTopic, linkDeepWorkTopic]);
 
@@ -1481,7 +1484,7 @@ function DeepWorkPageContent() {
 
                                     const loggedMinutes = getUpskillLoggedMinutesRecursive(upskillDef);
                                     const loggedHours = loggedMinutes / 60;
-                                    const isComplete = isUpskillObjectiveComplete(upskillDef.id);
+                                    const isComplete = permanentlyLoggedVisualizationIds.has(upskillDef.id) || isUpskillObjectiveComplete(upskillDef.id);
 
                                     return (
                                       <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
@@ -1595,15 +1598,13 @@ function DeepWorkPageContent() {
                                       </Card>
                                     )
                                   })}
-                                  {!isSelectedFocusAreaAnAction && (
-                                    <Card 
-                                        onClick={() => handleOpenManageLinksModal('upskill', selectedFocusArea)}
-                                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
-                                    >
-                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
-                                    </Card>
-                                  )}
+                                  <Card 
+                                      onClick={() => handleOpenManageLinksModal('upskill', selectedFocusArea)}
+                                      className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
+                                  >
+                                      <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                      <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
+                                  </Card>
                                 </div>
                               </div>
                               <div className="space-y-3">
@@ -1706,15 +1707,13 @@ function DeepWorkPageContent() {
                                        </Card>
                                     );
                                   })}
-                                  {!isSelectedFocusAreaAnAction && (
-                                    <Card 
-                                        onClick={() => handleOpenManageLinksModal('deepwork', selectedFocusArea)}
-                                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
-                                    >
-                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Focus Area</p>
-                                    </Card>
-                                  )}
+                                  <Card 
+                                      onClick={() => handleOpenManageLinksModal('deepwork', selectedFocusArea)}
+                                      className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
+                                  >
+                                      <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                      <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Focus Area</p>
+                                  </Card>
                                 </div>
                               </div>
                               <div className="space-y-3">
@@ -1808,15 +1807,13 @@ function DeepWorkPageContent() {
                                         </Card>
                                     )
                                   })}
-                                  {!isSelectedFocusAreaAnAction && (
-                                    <Card 
-                                        onClick={() => handleOpenManageLinksModal('resource', selectedFocusArea)}
-                                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
-                                    >
-                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p>
-                                    </Card>
-                                  )}
+                                  <Card 
+                                      onClick={() => handleOpenManageLinksModal('resource', selectedFocusArea)}
+                                      className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
+                                  >
+                                      <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                      <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p>
+                                  </Card>
                                 </div>
                               </div>
                             </div>
