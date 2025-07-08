@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -108,7 +107,7 @@ const ConceptualFlowDiagram = () => {
 };
 
 
-interface MindMapNode extends Partial<ExerciseDefinition>, Partial<Release>, Partial<Resource> {
+interface MindMapNode extends Partial<ExerciseDefinition>, Partial<Release>, Partial<Resource>, Partial<ResourceFolderType> {
   id: string;
   definitionId: string;
   name: string;
@@ -212,57 +211,29 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     
     return ["Strategic Overview", ...availableTopics.sort()];
   }, [deepWorkTopicMetadata, deepWorkDefinitions, resourceFolders]);
-
+  
   const mindMapData = useMemo((): MindMapNode | null => {
+    // This map prevents infinite recursion for circular dependencies.
     const processedIds = new Set<string>();
 
-    const buildNodeRecursive = (id: string, type: 'deepwork' | 'upskill' | 'resource', parentUniqueId: string): MindMapNode | null => {
-        const uniqueId = `${id}-from-${parentUniqueId}`;
+    const buildUpskillSubTree = (id: string, parentUniqueId: string): MindMapNode | null => {
+        const uniqueId = `upskill-${id}-from-${parentUniqueId}`;
         if (processedIds.has(uniqueId)) {
-            const item = type === 'resource' 
-                ? resources.find(r => r.id === id) 
-                : [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === id);
-            return { id: uniqueId, definitionId: id, name: `${item?.name || 'Item'} (cyclic link)`, category: 'Cyclic', children: [] };
+            const item = upskillDefinitions.find(d => d.id === id);
+            return { id: uniqueId, definitionId: id, name: `${item?.name || 'Task'} (cyclic link)`, category: 'Cyclic', children: [] };
         }
         processedIds.add(uniqueId);
 
-        if (type === 'resource') {
-            const resource = resources.find(r => r.id === id);
-            if (!resource) return null;
-            return { ...resource, id: uniqueId, definitionId: resource.id, category: 'Resource', children: [] };
-        }
-
-        const definition = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === id);
+        const definition = upskillDefinitions.find(d => d.id === id);
         if (!definition) return null;
-        
-        const linkedDeepWorkNodes = (definition.linkedDeepWorkIds || []).map(childId => buildNodeRecursive(childId, 'deepwork', uniqueId)).filter((n): n is MindMapNode => !!n);
-        const linkedResourceNodes = (definition.linkedResourceIds || []).map(childId => buildNodeRecursive(childId, 'resource', uniqueId)).filter((n): n is MindMapNode => !!n);
 
-        const linkedUpskillNodes = (definition.linkedUpskillIds || []).map(childId => buildNodeRecursive(childId, 'upskill', uniqueId)).filter((n): n is MindMapNode => !!n);
+        const children = (definition.linkedUpskillIds || []).map(childId => buildUpskillSubTree(childId, uniqueId)).filter((n): n is MindMapNode => !!n);
+        const resourceChildren = (definition.linkedResourceIds || [])
+            .map(resId => resources.find(r => r.id === resId))
+            .filter((r): r is Resource => !!r)
+            .map(r => ({ ...r, id: `resource-${r.id}-from-${uniqueId}`, definitionId: r.id, category: 'Resource', children: [] }));
 
-        return {
-            ...definition, id: uniqueId, definitionId: definition.id,
-            category: upskillDefinitions.some(ud => ud.id === id) ? 'Learning Task' : 'FocusArea',
-            children: [...linkedDeepWorkNodes, ...linkedUpskillNodes, ...linkedResourceNodes],
-        };
-    };
-    
-    if (rootFocusAreaId) {
-        processedIds.clear();
-        return buildNodeRecursive(rootFocusAreaId, 'deepwork', 'root');
-    }
-
-    if (!selectedTopic) return null;
-
-    const createFocusAreaNode = (focusAreaDef: ExerciseDefinition, parentId: string): MindMapNode => {
-        const uniqueNode = buildNodeRecursive(focusAreaDef.id, 'deepwork', parentId);
-        return uniqueNode || { 
-            id: `${focusAreaDef.id}-in-${parentId}`, 
-            definitionId: focusAreaDef.id,
-            name: focusAreaDef.name, 
-            category: 'FocusArea', 
-            children: [] 
-        };
+        return { ...definition, id: uniqueId, definitionId: id, category: 'Learning Task', children: [...children, ...resourceChildren] };
     };
 
     const buildFullTopicTree = (topic: string, plan: any, type: 'product' | 'service'): MindMapNode => {
@@ -270,133 +241,129 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
             const focusAreaNodes = (release.focusAreaIds || [])
                 .map(id => deepWorkDefinitions.find(def => def.id === id))
                 .filter((def): def is ExerciseDefinition => !!def)
-                .map(fa => createFocusAreaNode(fa, release.id));
+                .map(fa => ({ ...fa, id: `${fa.id}-in-${release.id}`, definitionId: fa.id, category: 'FocusArea', children: [] }));
             
-            const totalMinutes = (release.focusAreaIds || [])
-                .reduce((sum, id) => sum + (totalTimePerFocusArea.get(id) || 0), 0);
-
-            return { 
-              ...release,
-              id: release.id, 
-              definitionId: release.id, 
-              name: release.name, 
-              category: 'Release', 
-              children: focusAreaNodes,
-              totalLoggedHours: totalMinutes > 0 ? totalMinutes / 60 : 0,
-              topic: topic,
-              type: type
+            const totalMinutes = (release.focusAreaIds || []).reduce((sum, id) => sum + (totalTimePerFocusArea.get(id) || 0), 0);
+            return { ...release, id: release.id, definitionId: release.id, name: release.name, category: 'Release', children: focusAreaNodes, totalLoggedHours: totalMinutes > 0 ? totalMinutes / 60 : 0, topic: topic, type: type };
+        });
+        const totalTopicHours = releaseNodes.reduce((sum, release) => sum + (release.totalLoggedHours || 0), 0);
+        return { id: topic, definitionId: topic, name: topic, category: type, children: releaseNodes, totalLoggedHours: totalTopicHours > 0 ? totalTopicHours : undefined };
+    };
+    
+    if (rootFocusAreaId) {
+        const intentionDef = deepWorkDefinitions.find(d => d.id === rootFocusAreaId);
+        if (!intentionDef) return null;
+    
+        const actions: ExerciseDefinition[] = [];
+        const visitedActions = new Set<string>();
+        const findActionsRecursive = (id: string) => {
+            if (visitedActions.has(id)) return;
+            visitedActions.add(id);
+    
+            const node = deepWorkDefinitions.find(d => d.id === id);
+            if (!node) return;
+    
+            const isAction = (node.linkedDeepWorkIds?.length ?? 0) === 0;
+            if (isAction) {
+                if (!actions.some(a => a.id === node.id)) {
+                    actions.push(node);
+                }
+            } else {
+                (node.linkedDeepWorkIds || []).forEach(childId => findActionsRecursive(childId));
+            }
+        };
+        findActionsRecursive(intentionDef.id);
+    
+        const actionNodes: MindMapNode[] = actions.map(action => {
+            processedIds.clear(); // Reset for each action's tree
+    
+            const upstreamCuriosityTrees = (action.linkedUpskillIds || [])
+                .map(upskillId => {
+                    let rootId = upskillId;
+                    let currentId = upskillId;
+                    const visitedUpskill = new Set<string>();
+                    while (currentId && !visitedUpskill.has(currentId)) {
+                        visitedUpskill.add(currentId);
+                        const parent = upskillDefinitions.find(d => d.linkedUpskillIds?.includes(currentId));
+                        if (parent) { rootId = parent.id; currentId = parent.id; } else { break; }
+                    }
+                    return buildUpskillSubTree(rootId, action.id);
+                }).filter((n): n is MindMapNode => !!n);
+    
+            const findParentObjective = (actionId: string): ExerciseDefinition | undefined => {
+                return deepWorkDefinitions.find(d => d.linkedDeepWorkIds?.includes(actionId));
+            };
+            const parentObjective = findParentObjective(action.id);
+    
+            const projectHierarchyNodes: MindMapNode[] = [];
+            if (parentObjective) {
+                projectHierarchyNodes.push({
+                    ...parentObjective, id: `objective-parent-of-${action.id}`, definitionId: parentObjective.id, category: 'Objective',
+                    children: [{
+                        ...intentionDef, id: `intention-parent-of-${parentObjective.id}`, definitionId: intentionDef.id, category: 'Intention', children: []
+                    }]
+                });
+            }
+    
+            const learningBranch: MindMapNode = {
+                id: `learning-branch-for-${action.id}`, definitionId: `learning-branch-for-${action.id}`, name: 'Learning Dependencies', category: 'System Branch', children: upstreamCuriosityTrees
+            };
+            const projectBranch: MindMapNode = {
+                id: `project-branch-for-${action.id}`, definitionId: `project-branch-for-${action.id}`, name: 'Project Context', category: 'System Branch', children: projectHierarchyNodes
+            };
+    
+            return {
+                ...action, id: `action-root-${action.id}`, definitionId: action.id, category: 'FocusArea',
+                children: [
+                    ...(learningBranch.children.length > 0 ? [learningBranch] : []),
+                    ...(projectBranch.children.length > 0 ? [projectBranch] : []),
+                ],
             };
         });
-
-        const totalTopicHours = releaseNodes.reduce((sum, release) => sum + (release.totalLoggedHours || 0), 0);
-        return { 
-            id: topic, 
-            definitionId: topic, 
-            name: topic, 
-            category: type, 
-            children: releaseNodes,
-            totalLoggedHours: totalTopicHours > 0 ? totalTopicHours : undefined
+    
+        return {
+            ...intentionDef, id: intentionDef.id, definitionId: intentionDef.id, name: `Flow: ${intentionDef.name}`, category: 'Intention', children: actionNodes,
         };
-    };
+    }
+
+    if (!selectedTopic) return null;
 
     if (selectedTopic === 'Resources') {
         const buildFolderTree = (parentId: string | null): MindMapNode[] => {
             const folders = resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => a.name.localeCompare(b.name));
-            
-            const nodes = folders.map(folder => {
-                const childrenResources = resources
-                    .filter(r => r.folderId === folder.id)
-                    .sort((a,b) => a.name.localeCompare(b.name))
-                    .map(resource => ({
-                        ...resource,
-                        id: resource.id,
-                        definitionId: resource.id,
-                        category: 'Resource',
-                        children: [],
-                    }));
-                
+            return folders.map(folder => {
+                const childrenResources = resources.filter(r => r.folderId === folder.id).sort((a,b) => a.name.localeCompare(b.name))
+                    .map(r => ({ ...r, id: r.id, definitionId: r.id, category: 'Resource', children: [] }));
                 const childrenFolders = buildFolderTree(folder.id);
-    
-                return {
-                    id: folder.id,
-                    definitionId: folder.id,
-                    name: folder.name,
-                    category: 'Folder',
-                    children: [...childrenFolders, ...childrenResources],
-                };
+                return { ...folder, definitionId: folder.id, category: 'Folder', children: [...childrenFolders, ...childrenResources] };
             });
-            return nodes;
         };
-    
         if (rootFolderId) {
             const rootFolder = resourceFolders.find(f => f.id === rootFolderId);
             if (rootFolder) {
                  const childrenFolders = buildFolderTree(rootFolder.id);
-                 const childrenResources = resources.filter(r => r.folderId === rootFolder.id)
-                    .sort((a,b) => a.name.localeCompare(b.name))
-                    .map(resource => ({
-                        ...resource,
-                        id: resource.id,
-                        definitionId: resource.id,
-                        category: 'Resource',
-                        children: [],
-                    }));
-
-                 return {
-                    id: rootFolder.id,
-                    definitionId: rootFolder.id,
-                    name: rootFolder.name,
-                    category: 'Folder',
-                    children: [...childrenFolders, ...childrenResources],
-                };
+                 const childrenResources = resources.filter(r => r.folderId === rootFolder.id).sort((a,b) => a.name.localeCompare(b.name))
+                    .map(r => ({ ...r, id: r.id, definitionId: r.id, category: 'Resource', children: [] }));
+                 return { ...rootFolder, definitionId: rootFolder.id, category: 'Folder', children: [...childrenFolders, ...childrenResources] };
             }
         }
-    
-        const rootFolders = buildFolderTree(null);
-        
-        return {
-            id: 'resources-root',
-            definitionId: 'resources-root',
-            name: 'Resource Library',
-            category: 'System',
-            children: rootFolders,
-        };
+        return { id: 'resources-root', definitionId: 'resources-root', name: 'Resource Library', category: 'System', children: buildFolderTree(null) };
     }
 
     if (selectedTopic === 'Strategic Overview') {
-        const productNodes = Object.keys(productizationPlans)
-            .map(topic => buildFullTopicTree(topic, productizationPlans[topic], 'product'));
-        
-        const serviceNodes = Object.keys(offerizationPlans)
-            .map(topic => buildFullTopicTree(topic, offerizationPlans[topic], 'service'));
-        
+        const productNodes = Object.keys(productizationPlans).map(topic => buildFullTopicTree(topic, productizationPlans[topic], 'product'));
+        const serviceNodes = Object.keys(offerizationPlans).map(topic => buildFullTopicTree(topic, offerizationPlans[topic], 'service'));
         const bundles = deepWorkDefinitions.filter(def => def.focusAreaIds && def.focusAreaIds.length > 0);
         const bundleNodes: MindMapNode[] = bundles.map(bundle => {
             const socialChildren: MindMapNode[] = [];
             if (bundle.sharingStatus?.twitter) socialChildren.push({ id: `${bundle.id}-twitter`, definitionId: `${bundle.id}-twitter`, name: 'X/Twitter', category: 'Social', children: [] });
             if (bundle.sharingStatus?.linkedin) socialChildren.push({ id: `${bundle.id}-linkedin`, definitionId: `${bundle.id}-linkedin`, name: 'LinkedIn', category: 'Social', children: [] });
             if (bundle.sharingStatus?.devto) socialChildren.push({ id: `${bundle.id}-devto`, definitionId: `${bundle.id}-devto`, name: 'Dev.to', category: 'Social', children: [] });
-
-            const focusAreaChildren = (bundle.focusAreaIds || [])
-                .map(id => deepWorkDefinitions.find(d => d.id === id))
-                .filter((def): def is ExerciseDefinition => !!def)
-                .map(fa => createFocusAreaNode(fa, bundle.id));
-
+            const focusAreaChildren = (bundle.focusAreaIds || []).map(id => deepWorkDefinitions.find(d => d.id === id)).filter((def): def is ExerciseDefinition => !!def)
+                .map(fa => ({ ...fa, id: `${fa.id}-in-${bundle.id}`, definitionId: fa.id, category: 'FocusArea', children: [] }));
             return { ...bundle, definitionId: bundle.id, children: [...focusAreaChildren, ...socialChildren] };
         });
-
-        const rootNode: MindMapNode = {
-            id: 'strategic-overview',
-            definitionId: 'strategic-overview',
-            name: 'Strategic Overview',
-            category: 'System',
-            children: [
-                { id: 'products-branch', definitionId: 'products-branch', name: 'Products', category: 'System Branch', children: productNodes },
-                { id: 'services-branch', definitionId: 'services-branch', name: 'Services', category: 'System Branch', children: serviceNodes },
-                { id: 'bundles-branch', definitionId: 'bundles-branch', name: 'Content Bundles', category: 'System Branch', children: bundleNodes },
-            ].filter(branch => branch.children.length > 0)
-        };
-        return rootNode;
+        return { id: 'strategic-overview', definitionId: 'strategic-overview', name: 'Strategic Overview', category: 'System', children: [{ id: 'products-branch', definitionId: 'products-branch', name: 'Products', category: 'System Branch', children: productNodes }, { id: 'services-branch', definitionId: 'services-branch', name: 'Services', category: 'System Branch', children: serviceNodes }, { id: 'bundles-branch', definitionId: 'bundles-branch', name: 'Content Bundles', category: 'System Branch', children: bundleNodes }].filter(b => b.children.length > 0) };
     }
 
     if (selectedTopic === 'Content Bundles') {
@@ -406,21 +373,11 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
             if (bundle.sharingStatus?.twitter) socialChildren.push({ id: `${bundle.id}-twitter`, definitionId: `${bundle.id}-twitter`, name: 'X/Twitter', category: 'Social', children: [] });
             if (bundle.sharingStatus?.linkedin) socialChildren.push({ id: `${bundle.id}-linkedin`, definitionId: `${bundle.id}-linkedin`, name: 'LinkedIn', category: 'Social', children: [] });
             if (bundle.sharingStatus?.devto) socialChildren.push({ id: `${bundle.id}-devto`, definitionId: `${bundle.id}-devto`, name: 'Dev.to', category: 'Social', children: [] });
-            
-            const focusAreaChildren = (bundle.focusAreaIds || [])
-                .map(id => deepWorkDefinitions.find(d => d.id === id))
-                .filter((def): def is ExerciseDefinition => !!def)
-                .map(faDef => createFocusAreaNode(faDef, bundle.id));
-
+            const focusAreaChildren = (bundle.focusAreaIds || []).map(id => deepWorkDefinitions.find(d => d.id === id)).filter((def): def is ExerciseDefinition => !!def)
+                .map(fa => ({ ...fa, id: `${fa.id}-in-${bundle.id}`, definitionId: fa.id, category: 'FocusArea', children: [] }));
             return { ...bundle, definitionId: bundle.id, children: [...focusAreaChildren, ...socialChildren] };
         });
-        return {
-            id: 'content-bundles-root',
-            definitionId: 'content-bundles-root',
-            name: 'Content Bundles',
-            category: 'Branding',
-            children: bundleNodes,
-        };
+        return { id: 'content-bundles-root', definitionId: 'content-bundles-root', name: 'Content Bundles', category: 'Branding', children: bundleNodes };
     }
     
     const plan = productizationPlans[selectedTopic] || offerizationPlans[selectedTopic];
@@ -428,6 +385,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     return buildFullTopicTree(selectedTopic, plan, type);
 
   }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, totalTimePerFocusArea, resources, resourceFolders, rootFolderId, rootFocusAreaId]);
+
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -762,11 +720,12 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
   const renderNode = (node: MindMapNode, level: number, parentNode?: MindMapNode) => {
     const nodeIcons: Record<string, React.ReactNode> = {
         'System': <GitMerge className="h-3.5 w-3.5 text-primary" />,
-        'System Branch:Products': <Package className="h-3.5 w-3.5 text-blue-500" />,
-        'System Branch:Services': <Briefcase className="h-3.5 w-3.5 text-green-500" />,
-        'System Branch:Content Bundles': <Share2 className="h-3.5 w-3.5 text-purple-500" />,
-        'product': <GitBranch className="h-3.5 w-3.5 text-secondary-foreground" />,
-        'service': <GitBranch className="h-3.5 w-3.5 text-secondary-foreground" />,
+        'System Branch': <GitBranch className="h-3.5 w-3.5 text-muted-foreground" />,
+        'product': <Package className="h-3.5 w-3.5 text-blue-500" />,
+        'service': <Briefcase className="h-3.5 w-3.5 text-green-500" />,
+        'Branding': <Share2 className="h-3.5 w-3.5 text-purple-500" />,
+        'Intention': <Lightbulb className="h-3.5 w-3.5 text-amber-500" />,
+        'Objective': <Focus className="h-3.5 w-3.5 text-green-500" />,
         'Release': <Rocket className="h-3 w-3 text-muted-foreground" />,
         'FocusArea': <Workflow className="h-3 w-3 text-muted-foreground" />,
         'Learning Task': <BookCopy className="h-3 w-3 text-muted-foreground" />,
@@ -780,28 +739,24 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     };
     
     let iconKey = node.category;
-    if (node.category === 'System Branch') iconKey = `System Branch:${node.name}`;
+    if (node.category === 'System Branch' && (node.name === 'Products' || node.name === 'Services' || node.name === 'Content Bundles')) iconKey = node.name === 'Content Bundles' ? 'Branding' : node.name.slice(0, -1).toLowerCase();
     if (node.category === 'Social') iconKey = `Social:${node.name}`;
-    if (node.category === deepWorkTopicMetadata[node.name]?.classification) iconKey = node.category;
     if (node.category === 'Learning Task') {
         const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
         const linkedUpskillChildIds = new Set(upskillDefinitions.flatMap(def => def.linkedUpskillIds || []));
         const isChild = linkedUpskillChildIds.has(node.definitionId);
-        
-        if (isParent && !isChild) iconKey = 'Curiosity'; // Flashlight
-        else if (isParent && isChild) iconKey = 'Objective'; // Focus
-        else if (!isParent && isChild) iconKey = 'Visualization'; // Frame
-        else iconKey = 'Standalone'; // Lightbulb
+        if (isParent && !isChild) iconKey = 'Curiosity';
+        else if (isParent && isChild) iconKey = 'Objective';
+        else if (!isParent && isChild) iconKey = 'Visualization';
+        else iconKey = 'Standalone';
     }
-    if (node.category === 'Folder') iconKey = 'Folder';
-    if (node.category === 'Resource') iconKey = 'Resource';
 
     const finalIcon = {
         ...nodeIcons,
-        'Curiosity': <Flashlight className="h-3 w-3 text-muted-foreground" />,
-        'Objective': <Focus className="h-3 w-3 text-muted-foreground" />,
-        'Visualization': <Frame className="h-3 w-3 text-muted-foreground" />,
-        'Standalone': <Lightbulb className="h-3 w-3 text-muted-foreground" />,
+        'Curiosity': <Flashlight className="h-3.5 w-3.5 text-amber-500" />,
+        'Objective': <Focus className="h-3.5 w-3.5 text-green-500" />,
+        'Visualization': <Frame className="h-3.5 w-3.5 text-blue-500" />,
+        'Standalone': <Lightbulb className="h-3.5 w-3.5 text-purple-500" />,
     }[iconKey] || <GitBranch className="h-3.5 w-3.5 text-primary" />;
 
     let activityTypeForNode: ActivityTypeType | undefined;
