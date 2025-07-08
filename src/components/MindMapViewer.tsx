@@ -215,36 +215,6 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
 
   const mindMapData = useMemo((): MindMapNode | null => {
     const processedIds = new Set<string>();
-    
-    const buildUpskillSubTree = (id: string, parentUniqueId: string): MindMapNode | null => {
-        const uniqueId = `upskill-subtree-${id}-from-${parentUniqueId}`;
-        if (processedIds.has(uniqueId)) {
-            const item = upskillDefinitions.find(d => d.id === id);
-            return { id: uniqueId, definitionId: id, name: `${item?.name || 'Item'} (cyclic link)`, category: 'Cyclic', children: [] };
-        }
-        processedIds.add(uniqueId);
-
-        const definition = upskillDefinitions.find(d => d.id === id);
-        if (!definition) return null;
-
-        const linkedUpskillNodes = (definition.linkedUpskillIds || []).map(childId => buildUpskillSubTree(childId, uniqueId)).filter((n): n is MindMapNode => !!n);
-        const linkedResourceNodes = (definition.linkedResourceIds || []).map(childId => buildNodeRecursive(childId, 'resource', uniqueId)).filter((n): n is MindMapNode => !!n);
-
-        return {
-            ...definition,
-            id: uniqueId,
-            definitionId: definition.id,
-            category: 'Learning Task',
-            children: [...linkedUpskillNodes, ...linkedResourceNodes],
-        };
-    };
-
-    const upskillParentMap = new Map<string, string>();
-    upskillDefinitions.forEach(parent => {
-      (parent.linkedUpskillIds || []).forEach(childId => {
-        upskillParentMap.set(childId, parent.id);
-      });
-    });
 
     const buildNodeRecursive = (id: string, type: 'deepwork' | 'upskill' | 'resource', parentUniqueId: string): MindMapNode | null => {
         const uniqueId = `${id}-from-${parentUniqueId}`;
@@ -268,29 +238,12 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         const linkedDeepWorkNodes = (definition.linkedDeepWorkIds || []).map(childId => buildNodeRecursive(childId, 'deepwork', uniqueId)).filter((n): n is MindMapNode => !!n);
         const linkedResourceNodes = (definition.linkedResourceIds || []).map(childId => buildNodeRecursive(childId, 'resource', uniqueId)).filter((n): n is MindMapNode => !!n);
 
-        const linkedUpskillIds = definition.linkedUpskillIds || [];
-        const rootCuriosityIds = new Set<string>();
-        linkedUpskillIds.forEach(visualizationId => {
-            let currentId = visualizationId;
-            let rootId = visualizationId;
-            while(upskillParentMap.has(currentId)) {
-                currentId = upskillParentMap.get(currentId)!;
-                rootId = currentId;
-            }
-            const rootDef = upskillDefinitions.find(d => d.id === rootId);
-            if (rootDef) {
-                 rootCuriosityIds.add(rootId);
-            }
-        });
-        
-        const upstreamCuriosityTrees = Array.from(rootCuriosityIds)
-            .map(curiosityId => buildUpskillSubTree(curiosityId, uniqueId))
-            .filter((n): n is MindMapNode => !!n);
-        
+        const linkedUpskillNodes = (definition.linkedUpskillIds || []).map(childId => buildNodeRecursive(childId, 'upskill', uniqueId)).filter((n): n is MindMapNode => !!n);
+
         return {
             ...definition, id: uniqueId, definitionId: definition.id,
             category: upskillDefinitions.some(ud => ud.id === id) ? 'Learning Task' : 'FocusArea',
-            children: [...linkedDeepWorkNodes, ...upstreamCuriosityTrees, ...linkedResourceNodes],
+            children: [...linkedDeepWorkNodes, ...linkedUpskillNodes, ...linkedResourceNodes],
         };
     };
     
@@ -830,7 +783,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     if (node.category === 'System Branch') iconKey = `System Branch:${node.name}`;
     if (node.category === 'Social') iconKey = `Social:${node.name}`;
     if (node.category === deepWorkTopicMetadata[node.name]?.classification) iconKey = node.category;
-    if (node.category === 'Learning Task' || (parentNode?.category === 'Learning Task' && upskillDefinitions.some(d => d.id === node.definitionId))) {
+    if (node.category === 'Learning Task') {
         const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
         const linkedUpskillChildIds = new Set(upskillDefinitions.flatMap(def => def.linkedUpskillIds || []));
         const isChild = linkedUpskillChildIds.has(node.definitionId);
