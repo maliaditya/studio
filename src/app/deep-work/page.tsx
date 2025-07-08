@@ -120,6 +120,328 @@ const isObsidianUrl = (url: string): boolean => {
     }
 };
 
+const DraggableSubtaskItem: React.FC<{ 
+    childId: string;
+    parentId: string;
+    childName: string;
+    isLogged: boolean;
+  }> = ({ childId, parentId, childName, isLogged }) => {
+    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+        id: `subtask-${childId}-from-${parentId}`,
+    });
+  
+    const style = transform ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        zIndex: 100,
+        backgroundColor: 'hsl(var(--card))',
+        padding: '2px 4px',
+        borderRadius: '4px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+    } : undefined;
+  
+    return (
+        <div 
+            ref={setNodeRef} 
+            style={style} 
+            {...listeners} 
+            {...attributes} 
+            className={cn(
+                "text-xs text-muted-foreground truncate cursor-grab transition-transform", 
+                isLogged && "line-through text-muted-foreground/70",
+                isDragging && "opacity-50 scale-90"
+            )} 
+            title={childName}
+        >
+            - {childName}
+        </div>
+    );
+};
+
+function LinkedUpskillCard({ 
+    id,
+    upskillDef,
+    isUpskillObjectiveComplete,
+    getUpskillLoggedMinutesRecursive,
+    setEmbedUrl,
+    handleViewProgress,
+    handleStartEditUpskill,
+    handleUnlinkItem,
+    handleDeleteUpskillDefinition,
+    upskillDefinitions
+} : {
+    id: string;
+    upskillDef: ExerciseDefinition;
+    isUpskillObjectiveComplete: (id: string) => boolean;
+    getUpskillLoggedMinutesRecursive: (def: ExerciseDefinition) => number;
+    setEmbedUrl: (url: string | null) => void;
+    handleViewProgress: (def: ExerciseDefinition, type: 'deepwork' | 'upskill') => void;
+    handleStartEditUpskill: (def: ExerciseDefinition) => void;
+    handleUnlinkItem: (type: 'upskill' | 'deepwork' | 'resource', id: string) => void;
+    handleDeleteUpskillDefinition: (id: string) => void;
+    upskillDefinitions: ExerciseDefinition[];
+}) {
+    const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id });
+    const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
+    
+    const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: isDragging ? 100 : 'auto', } : undefined;
+
+    const setCombinedRefs = (node: HTMLElement | null) => {
+        setNodeRef(node);
+        setDroppableNodeRef(node);
+    };
+
+    const youtubeEmbedUrl = upskillDef.link ? getYouTubeEmbedUrl(upskillDef.link) : null;
+    const isNotionObsidianEmbed = upskillDef.link ? (isNotionUrl(upskillDef.link) || isObsidianUrl(upskillDef.link)) : false;
+    const embedLinkForModal = youtubeEmbedUrl || (isNotionObsidianEmbed ? upskillDef.link : null);
+
+    const loggedMinutes = getUpskillLoggedMinutesRecursive(upskillDef);
+    const loggedHours = loggedMinutes / 60;
+    const isComplete = isUpskillObjectiveComplete(upskillDef.id);
+
+    return (
+        <div ref={setCombinedRefs} style={style} className={cn(isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-2xl", isDragging && "opacity-80 shadow-2xl")}>
+            <Card className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]">
+                <button ref={setActivatorNodeRef} {...listeners} {...attributes} className="absolute top-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
+                  <GripVertical className="h-5 w-5 text-muted-foreground" />
+                </button>
+                {youtubeEmbedUrl ? (
+                    <>
+                        <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
+                                <Expand className="h-4 w-4" />
+                            </Button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onMouseDown={(e) => e.stopPropagation()}>
+                                        <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" onMouseDown={(e) => e.stopPropagation()}>
+                                    <DropdownMenuItem onSelect={() => handleViewProgress(upskillDef, 'upskill')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => handleDeleteUpskillDefinition(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                        <div className="aspect-video w-full bg-black overflow-hidden rounded-t-2xl">
+                            <iframe src={youtubeEmbedUrl} title={upskillDef.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
+                        </div>
+                        <div className="p-4 flex-grow flex flex-col">
+                          <div className="flex items-start justify-between gap-2 flex-grow">
+                            <div className="flex-grow min-w-0">
+                                <div className="flex items-center gap-2">
+                                    <Youtube className="h-5 w-5 flex-shrink-0 text-red-500" />
+                                    <p className="text-base font-bold truncate" title={upskillDef.name}>{upskillDef.name}</p>
+                                </div>
+                                <CardDescription className="text-xs">{upskillDef.category}</CardDescription>
+                            </div>
+                          </div>
+                          <div className="mt-auto pt-2 flex items-center justify-end">
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                                {upskillDef.estimatedHours && <Badge variant="outline">{upskillDef.estimatedHours}h est.</Badge>}
+                                {loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}
+                            </div>
+                          </div>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {isNotionObsidianEmbed ? (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
+                                    <Expand className="h-4 w-4" />
+                                </Button>
+                            ) : (
+                                <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
+                                    <a href={upskillDef.link} target="_blank" rel="noopener noreferrer" onMouseDown={(e) => e.stopPropagation()}>
+                                        <ExternalLink className="h-4 w-4" />
+                                    </a>
+                                </Button>
+                            )}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onMouseDown={(e) => e.stopPropagation()}>
+                                        <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" onMouseDown={(e) => e.stopPropagation()}>
+                                    <DropdownMenuItem onSelect={() => handleViewProgress(upskillDef, 'upskill')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => handleDeleteUpskillDefinition(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <Flashlight className="h-5 w-5 text-amber-500 flex-shrink-0" />
+                            <span className="truncate" title={upskillDef.name}>{upskillDef.name}</span>
+                          </CardTitle>
+                          <CardDescription>{upskillDef.category}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex-grow">
+                            {(upskillDef.linkedUpskillIds?.length ?? 0) > 0 ? (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                                {(upskillDef.linkedUpskillIds || []).map(childId => {
+                                  const childDef = upskillDefinitions.find(d => d.id === childId);
+                                  if (!childDef) return null;
+                                  const isChildComplete = isUpskillObjectiveComplete(childId);
+                                  return (
+                                    <DraggableSubtaskItem key={childId} childId={childId} parentId={upskillDef.id} childName={childDef.name} isLogged={isChildComplete} />
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground line-clamp-2">{upskillDef.description || "This curiosity has no objectives yet."}</p>
+                            )}
+                        </CardContent>
+                        <CardFooter className="pt-3 flex items-center justify-end">
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {upskillDef.estimatedHours && <Badge variant="outline" className="flex-shrink-0">{upskillDef.estimatedHours}h est.</Badge>}
+                            {loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}
+                          </div>
+                        </CardFooter>
+                    </>
+                )}
+            </Card>
+        </div>
+    )
+}
+
+function LinkedDeepWorkCard({
+    id,
+    deepworkDef,
+    getDeepWorkLoggedMinutes,
+    permanentlyLoggedActionIds,
+    handleAddTaskToSession,
+    setSelectedFocusArea,
+    setViewMode,
+    handleToggleReadyForBranding,
+    handleStartEditDefinition,
+    handleUnlinkItem,
+    handleDeleteExerciseDefinition,
+    handleViewProgress,
+    deepWorkDefinitions
+} : {
+    id: string;
+    deepworkDef: ExerciseDefinition;
+    getDeepWorkLoggedMinutes: (def: ExerciseDefinition) => number;
+    permanentlyLoggedActionIds: Set<string>;
+    handleAddTaskToSession: (def: ExerciseDefinition) => void;
+    setSelectedFocusArea: (def: ExerciseDefinition) => void;
+    setViewMode: (mode: 'session' | 'library') => void;
+    handleToggleReadyForBranding: (id: string) => void;
+    handleStartEditDefinition: (def: ExerciseDefinition) => void;
+    handleUnlinkItem: (type: 'upskill' | 'deepwork' | 'resource', id: string) => void;
+    handleDeleteExerciseDefinition: (id: string) => void;
+    handleViewProgress: (def: ExerciseDefinition, type: 'deepwork' | 'upskill') => void;
+    deepWorkDefinitions: ExerciseDefinition[];
+}) {
+    const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id });
+    const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
+    
+    const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: isDragging ? 100 : 'auto', } : undefined;
+
+    const setCombinedRefs = (node: HTMLElement | null) => {
+        setNodeRef(node);
+        setDroppableNodeRef(node);
+    };
+
+    const isObjective = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 || (deepworkDef.linkedUpskillIds?.length ?? 0) > 0 || (deepworkDef.linkedResourceIds?.length ?? 0) > 0;
+    const nodeType = isObjective ? 'Objective' : 'Action';
+    const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
+    const loggedHours = loggedMinutes / 60;
+    const isPermanentlyLogged = permanentlyLoggedActionIds.has(deepworkDef.id);
+
+    return (
+        <div ref={setCombinedRefs} style={style} className={cn(isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-2xl", isDragging && "opacity-80 shadow-2xl")}>
+         <Card className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isPermanentlyLogged && !isObjective && "opacity-70 bg-muted/30")}>
+            <button ref={setActivatorNodeRef} {...listeners} {...attributes} className="absolute top-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
+                <GripVertical className="h-5 w-5 text-muted-foreground" />
+            </button>
+            <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span tabIndex={isObjective ? -1 : 0}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => handleAddTaskToSession(deepworkDef)} disabled={isObjective} onMouseDown={(e) => e.stopPropagation()}>
+                          <PlusCircle className="h-4 w-4" />
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{isObjective ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => { setSelectedFocusArea(deepworkDef); setViewMode('library'); }} onMouseDown={(e) => e.stopPropagation()}>
+                    <ArrowRight className="h-4 w-4" />
+                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onMouseDown={(e) => e.stopPropagation()}>
+                            <MoreVertical className="h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" onMouseDown={(e) => e.stopPropagation()}>
+                        <DropdownMenuItem onSelect={() => handleViewProgress(deepworkDef, 'deepwork')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem checked={!!deepworkDef.isReadyForBranding} onSelect={(e) => { e.preventDefault(); handleToggleReadyForBranding(deepworkDef.id); }}>
+                            <Share2 className="mr-2 h-4 w-4" />
+                            <span>Ready for Branding</span>
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => handleStartEditDefinition(deepworkDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => handleUnlinkItem('deepwork', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(deepworkDef.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+           <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                {isObjective ? (
+                    <Flag className="h-5 w-5 text-green-500 flex-shrink-0" />
+                  ) : (
+                    <Bolt className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                  )}
+                <span className={cn("truncate", isPermanentlyLogged && !isObjective && "line-through text-muted-foreground")} title={deepworkDef.name}>{deepworkDef.name}</span>
+                <Badge variant="outline" className="text-xs">{nodeType}</Badge>
+              </CardTitle>
+              <CardDescription>{deepworkDef.category}</CardDescription>
+           </CardHeader>
+           <CardContent className="flex-grow">
+              {deepworkDef.description ? (
+                  <p className="text-sm text-muted-foreground line-clamp-2">{deepworkDef.description}</p>
+              ) : isObjective ? (
+                  (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                          {(deepworkDef.linkedDeepWorkIds || []).map(childId => {
+                              const childDef = deepWorkDefinitions.find(d => d.id === childId);
+                              if (!childDef) return null;
+                              const isChildPermanentlyLogged = permanentlyLoggedActionIds.has(childDef.id);
+                              return (
+                                  <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={isChildPermanentlyLogged} />
+                              );
+                          })}
+                      </div>
+                  ) : (
+                      <p className="text-sm text-muted-foreground line-clamp-2">This objective has no sub-tasks yet. Link items to it.</p>
+                  )
+              ) : (
+                  <p className="text-sm text-muted-foreground line-clamp-2">This is a final action. You can add it to a session to log time.</p>
+              )}
+            </CardContent>
+           <CardFooter className="pt-3 flex items-center justify-end">
+              <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                  {deepworkDef.estimatedHours && <Badge variant="outline">{deepworkDef.estimatedHours}h est.</Badge>}
+                  {loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}
+              </div>
+            </CardFooter>
+         </Card>
+        </div>
+    )
+}
 
 function DeepWorkPageContent() {
   const { toast } = useToast();
@@ -1254,43 +1576,6 @@ function DeepWorkPageContent() {
     );
   };
   
-  const DraggableSubtaskItem: React.FC<{ 
-    childId: string;
-    parentId: string;
-    childName: string;
-    isLogged: boolean;
-  }> = ({ childId, parentId, childName, isLogged }) => {
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-        id: `subtask-${childId}-from-${parentId}`,
-    });
-  
-    const style = transform ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-        zIndex: 100,
-        backgroundColor: 'hsl(var(--card))',
-        padding: '2px 4px',
-        borderRadius: '4px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-    } : undefined;
-  
-    return (
-        <div 
-            ref={setNodeRef} 
-            style={style} 
-            {...listeners} 
-            {...attributes} 
-            className={cn(
-                "text-xs text-muted-foreground truncate cursor-grab transition-transform", 
-                isLogged && "line-through text-muted-foreground/70",
-                isDragging && "opacity-50 scale-90"
-            )} 
-            title={childName}
-        >
-            - {childName}
-        </div>
-    );
-  };
-
   if (isLoadingPage) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
@@ -1597,152 +1882,20 @@ function DeepWorkPageContent() {
                                     {Array.from(new Set(selectedFocusArea.linkedUpskillIds || [])).map((id, index) => {
                                       const upskillDef = upskillDefinitions.find(ud => ud.id === id);
                                       if (!upskillDef) return null;
-                                      
-                                      const youtubeEmbedUrl = upskillDef.link ? getYouTubeEmbedUrl(upskillDef.link) : null;
-                                      const isNotionObsidianEmbed = upskillDef.link ? (isNotionUrl(upskillDef.link) || isObsidianUrl(upskillDef.link)) : false;
-                                      const embedLinkForModal = youtubeEmbedUrl || (isNotionObsidianEmbed ? upskillDef.link : null);
-  
-                                      const loggedMinutes = getUpskillLoggedMinutesRecursive(upskillDef);
-                                      const loggedHours = loggedMinutes / 60;
-                                      const isComplete = isUpskillObjectiveComplete(upskillDef.id);
-                                      
-                                      const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id });
-                                      const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
-                                      
-                                      const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: isDragging ? 100 : 'auto', } : undefined;
-
-                                      const setCombinedRefs = (node: HTMLElement | null) => {
-                                          setNodeRef(node);
-                                          setDroppableNodeRef(node);
-                                      };
-
                                       return (
-                                        <div 
-                                            ref={setCombinedRefs} 
-                                            style={style} 
+                                        <LinkedUpskillCard
                                             key={`${id}-${index}`}
-                                            className={cn(isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-2xl", isDragging && "opacity-80 shadow-2xl")}
-                                        >
-                                            <Card className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]">
-                                                <button
-                                                  ref={setActivatorNodeRef}
-                                                  {...listeners}
-                                                  {...attributes}
-                                                  className="absolute top-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted"
-                                                  onMouseDown={(e) => e.stopPropagation()}
-                                                >
-                                                  <GripVertical className="h-5 w-5 text-muted-foreground" />
-                                                </button>
-                                                {youtubeEmbedUrl ? (
-                                                    <>
-                                                        <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
-                                                                <Expand className="h-4 w-4" />
-                                                            </Button>
-                                                            <DropdownMenu>
-                                                                <DropdownMenuTrigger asChild>
-                                                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onMouseDown={(e) => e.stopPropagation()}>
-                                                                        <MoreVertical className="h-4 w-4" />
-                                                                    </Button>
-                                                                </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end" onMouseDown={(e) => e.stopPropagation()}>
-                                                                    <DropdownMenuItem onSelect={() => handleViewProgress(upskillDef, 'upskill')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
-                                                                    <DropdownMenuSeparator />
-                                                                    <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                                                    <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
-                                                                    <DropdownMenuItem onSelect={() => handleDeleteUpskillDefinition(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
-                                                                </DropdownMenuContent>
-                                                            </DropdownMenu>
-                                                        </div>
-                                                        <div className="aspect-video w-full bg-black overflow-hidden rounded-t-2xl">
-                                                            <iframe src={youtubeEmbedUrl} title={upskillDef.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
-                                                        </div>
-                                                        <div className="p-4 flex-grow flex flex-col">
-                                                          <div className="flex items-start justify-between gap-2 flex-grow">
-                                                            <div className="flex-grow min-w-0">
-                                                                <div className="flex items-center gap-2">
-                                                                    <Youtube className="h-5 w-5 flex-shrink-0 text-red-500" />
-                                                                    <p className="text-base font-bold truncate" title={upskillDef.name}>{upskillDef.name}</p>
-                                                                </div>
-                                                                <CardDescription className="text-xs">{upskillDef.category}</CardDescription>
-                                                            </div>
-                                                          </div>
-                                                          <div className="mt-auto pt-2 flex items-center justify-end">
-                                                            <div className="flex items-center gap-1 flex-shrink-0">
-                                                                {upskillDef.estimatedHours && <Badge variant="outline">{upskillDef.estimatedHours}h est.</Badge>}
-                                                                {loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}
-                                                            </div>
-                                                          </div>
-                                                        </div>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            {isNotionObsidianEmbed ? (
-                                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
-                                                                    <Expand className="h-4 w-4" />
-                                                                </Button>
-                                                            ) : (
-                                                                <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
-                                                                    <a href={upskillDef.link} target="_blank" rel="noopener noreferrer" onMouseDown={(e) => e.stopPropagation()}>
-                                                                        <ExternalLink className="h-4 w-4" />
-                                                                    </a>
-                                                                </Button>
-                                                            )}
-                                                            <DropdownMenu>
-                                                                <DropdownMenuTrigger asChild>
-                                                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onMouseDown={(e) => e.stopPropagation()}>
-                                                                        <MoreVertical className="h-4 w-4" />
-                                                                    </Button>
-                                                                </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end" onMouseDown={(e) => e.stopPropagation()}>
-                                                                    <DropdownMenuItem onSelect={() => handleViewProgress(upskillDef, 'upskill')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
-                                                                    <DropdownMenuSeparator />
-                                                                    <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                                                    <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
-                                                                    <DropdownMenuItem onSelect={() => handleDeleteUpskillDefinition(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
-                                                                </DropdownMenuContent>
-                                                            </DropdownMenu>
-                                                        </div>
-                                                        <CardHeader className="pb-3">
-                                                          <CardTitle className="text-base flex items-center gap-2">
-                                                            <Flashlight className="h-5 w-5 text-amber-500 flex-shrink-0" />
-                                                            <span className="truncate" title={upskillDef.name}>{upskillDef.name}</span>
-                                                          </CardTitle>
-                                                          <CardDescription>{upskillDef.category}</CardDescription>
-                                                        </CardHeader>
-                                                        <CardContent className="flex-grow">
-                                                            {(upskillDef.linkedUpskillIds?.length ?? 0) > 0 ? (
-                                                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                                                                {(upskillDef.linkedUpskillIds || []).map(childId => {
-                                                                  const childDef = upskillDefinitions.find(d => d.id === childId);
-                                                                  if (!childDef) return null;
-                                                                  const isChildComplete = isUpskillObjectiveComplete(childId);
-                                                                  return (
-                                                                    <DraggableSubtaskItem 
-                                                                        key={childId}
-                                                                        childId={childId}
-                                                                        parentId={upskillDef.id}
-                                                                        childName={childDef.name}
-                                                                        isLogged={isChildComplete}
-                                                                    />
-                                                                  );
-                                                                })}
-                                                              </div>
-                                                            ) : (
-                                                              <p className="text-sm text-muted-foreground line-clamp-2">{upskillDef.description || "This curiosity has no objectives yet."}</p>
-                                                            )}
-                                                        </CardContent>
-                                                        <CardFooter className="pt-3 flex items-center justify-end">
-                                                          <div className="flex items-center gap-1 flex-shrink-0">
-                                                            {upskillDef.estimatedHours && <Badge variant="outline" className="flex-shrink-0">{upskillDef.estimatedHours}h est.</Badge>}
-                                                            {loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}
-                                                          </div>
-                                                        </CardFooter>
-                                                    </>
-                                                )}
-                                            </Card>
-                                        </div>
+                                            id={id}
+                                            upskillDef={upskillDef}
+                                            getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
+                                            isUpskillObjectiveComplete={isUpskillObjectiveComplete}
+                                            setEmbedUrl={setEmbedUrl}
+                                            handleViewProgress={handleViewProgress}
+                                            handleStartEditUpskill={handleStartEditUpskill}
+                                            handleUnlinkItem={handleUnlinkItem}
+                                            handleDeleteUpskillDefinition={handleDeleteUpskillDefinition}
+                                            upskillDefinitions={upskillDefinitions}
+                                        />
                                       )
                                     })}
                                     <Card 
@@ -1761,119 +1914,23 @@ function DeepWorkPageContent() {
                                     {Array.from(new Set(selectedFocusArea.linkedDeepWorkIds || [])).map((id, index) => {
                                       const deepworkDef = deepWorkDefinitions.find(dd => dd.id === id);
                                       if (!deepworkDef) return null;
-  
-                                      const isObjective = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 || (deepworkDef.linkedUpskillIds?.length ?? 0) > 0 || (deepworkDef.linkedResourceIds?.length ?? 0) > 0;
-                                      const nodeType = isObjective ? 'Objective' : 'Action';
-                                      const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
-                                      const loggedHours = loggedMinutes / 60;
-                                      const isPermanentlyLogged = permanentlyLoggedActionIds.has(deepworkDef.id);
-                                      
-                                      const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id });
-                                      const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
-                                      
-                                      const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: isDragging ? 100 : 'auto', } : undefined;
-
-                                      const setCombinedRefs = (node: HTMLElement | null) => {
-                                          setNodeRef(node);
-                                          setDroppableNodeRef(node);
-                                      };
-                                      
                                       return (
-                                        <div ref={setCombinedRefs} style={style} key={`${id}-${index}`} className={cn(isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-2xl", isDragging && "opacity-80 shadow-2xl")}>
-                                         <Card className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isPermanentlyLogged && !isObjective && "opacity-70 bg-muted/30")}>
-                                            <button
-                                                ref={setActivatorNodeRef}
-                                                {...listeners}
-                                                {...attributes}
-                                                className="absolute top-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted"
-                                                onMouseDown={(e) => e.stopPropagation()}
-                                            >
-                                                <GripVertical className="h-5 w-5 text-muted-foreground" />
-                                            </button>
-                                            <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <TooltipProvider>
-                                                  <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                      <span tabIndex={isObjective ? -1 : 0}>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => handleAddTaskToSession(deepworkDef)} disabled={isObjective} onMouseDown={(e) => e.stopPropagation()}>
-                                                          <PlusCircle className="h-4 w-4" />
-                                                        </Button>
-                                                      </span>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>{isObjective ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent>
-                                                  </Tooltip>
-                                                </TooltipProvider>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => { setSelectedFocusArea(deepworkDef); setViewMode('library'); }} onMouseDown={(e) => e.stopPropagation()}>
-                                                    <ArrowRight className="h-4 w-4" />
-                                                </Button>
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onMouseDown={(e) => e.stopPropagation()}>
-                                                            <MoreVertical className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" onMouseDown={(e) => e.stopPropagation()}>
-                                                        <DropdownMenuItem onSelect={() => handleViewProgress(deepworkDef, 'deepwork')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuCheckboxItem checked={!!deepworkDef.isReadyForBranding} onSelect={(e) => { e.preventDefault(); handleToggleReadyForBranding(deepworkDef.id); }}>
-                                                            <Share2 className="mr-2 h-4 w-4" />
-                                                            <span>Ready for Branding</span>
-                                                        </DropdownMenuCheckboxItem>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem onSelect={() => handleStartEditDefinition(deepworkDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                                        <DropdownMenuItem onSelect={() => handleUnlinkItem('deepwork', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
-                                                        <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(deepworkDef.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
-                                           <CardHeader className="pb-3">
-                                              <CardTitle className="text-base flex items-center gap-2">
-                                                {isObjective ? (
-                                                    <Flag className="h-5 w-5 text-green-500 flex-shrink-0" />
-                                                  ) : (
-                                                    <Bolt className="h-5 w-5 text-blue-500 flex-shrink-0" />
-                                                  )}
-                                                <span className={cn("truncate", isPermanentlyLogged && !isObjective && "line-through text-muted-foreground")} title={deepworkDef.name}>{deepworkDef.name}</span>
-                                                <Badge variant="outline" className="text-xs">{nodeType}</Badge>
-                                              </CardTitle>
-                                              <CardDescription>{deepworkDef.category}</CardDescription>
-                                           </CardHeader>
-                                           <CardContent className="flex-grow">
-                                              {deepworkDef.description ? (
-                                                  <p className="text-sm text-muted-foreground line-clamp-2">{deepworkDef.description}</p>
-                                              ) : isObjective ? (
-                                                  (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 ? (
-                                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                                                          {(deepworkDef.linkedDeepWorkIds || []).map(childId => {
-                                                              const childDef = deepWorkDefinitions.find(d => d.id === childId);
-                                                              if (!childDef) return null;
-                                                              const isChildPermanentlyLogged = permanentlyLoggedActionIds.has(childDef.id);
-                                                              return (
-                                                                  <DraggableSubtaskItem
-                                                                      key={childId}
-                                                                      childId={childId}
-                                                                      parentId={deepworkDef.id}
-                                                                      childName={childDef.name}
-                                                                      isLogged={isChildPermanentlyLogged}
-                                                                  />
-                                                              );
-                                                          })}
-                                                      </div>
-                                                  ) : (
-                                                      <p className="text-sm text-muted-foreground line-clamp-2">This objective has no sub-tasks yet. Link items to it.</p>
-                                                  )
-                                              ) : (
-                                                  <p className="text-sm text-muted-foreground line-clamp-2">This is a final action. You can add it to a session to log time.</p>
-                                              )}
-                                            </CardContent>
-                                           <CardFooter className="pt-3 flex items-center justify-end">
-                                              <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                                                  {deepworkDef.estimatedHours && <Badge variant="outline">{deepworkDef.estimatedHours}h est.</Badge>}
-                                                  {loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}
-                                              </div>
-                                            </CardFooter>
-                                         </Card>
-                                        </div>
+                                        <LinkedDeepWorkCard 
+                                            key={`${id}-${index}`}
+                                            id={id}
+                                            deepworkDef={deepworkDef}
+                                            getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes}
+                                            permanentlyLoggedActionIds={permanentlyLoggedActionIds}
+                                            handleAddTaskToSession={handleAddTaskToSession}
+                                            setSelectedFocusArea={setSelectedFocusArea}
+                                            setViewMode={setViewMode}
+                                            handleToggleReadyForBranding={handleToggleReadyForBranding}
+                                            handleStartEditDefinition={handleStartEditDefinition}
+                                            handleUnlinkItem={handleUnlinkItem}
+                                            handleDeleteExerciseDefinition={handleDeleteExerciseDefinition}
+                                            handleViewProgress={handleViewProgress}
+                                            deepWorkDefinitions={deepWorkDefinitions}
+                                        />
                                       );
                                     })}
                                     <Card 
