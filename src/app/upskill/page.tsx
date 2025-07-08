@@ -30,6 +30,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Progress } from '@/components/ui/progress';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -669,17 +670,29 @@ function UpskillPageContent() {
                 <form onSubmit={handleAddTopic} className="space-y-3 p-3 border rounded-md mb-4">
                     <Input type="text" placeholder="New Topic" value={newTopicName} onChange={(e) => setNewTopicName(e.target.value)} list="topics-datalist" aria-label="New topic name" className="h-10 text-sm" />
                     <datalist id="topics-datalist">{topicsWithSubtopics.map(([topic]) => <option key={topic} value={topic} />)}</datalist>
-                    <div>
-                        <Label className="text-xs text-muted-foreground">Set a Goal for this New Topic</Label>
-                        <div className="flex gap-2 items-center mt-1">
-                            <RadioGroup value={newTopicGoalType} onValueChange={(v) => setNewTopicGoalType(v as 'pages' | 'hours')} className="flex gap-4">
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="pages" id="type-pages-new" /><Label htmlFor="type-pages-new" className="font-normal">Pages</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="hours" id="type-hours-new" /><Label htmlFor="type-hours-new" className="font-normal">Hours</Label></div>
-                            </RadioGroup>
-                            <Input type="number" placeholder="Total" value={newTopicGoalValue} onChange={(e) => setNewTopicGoalValue(e.target.value)} aria-label="Goal value" className="h-9" />
-                        </div>
-                    </div>
-                    <Button type="submit" size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Add Topic</Button>
+                    <AnimatePresence>
+                      {newTopicName.trim() && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="space-y-3 overflow-hidden"
+                        >
+                          <div>
+                              <Label className="text-xs text-muted-foreground">Set a Goal for this New Topic</Label>
+                              <div className="flex gap-2 items-center mt-1">
+                                  <RadioGroup value={newTopicGoalType} onValueChange={(v) => setNewTopicGoalType(v as 'pages' | 'hours')} className="flex gap-4">
+                                      <div className="flex items-center space-x-2"><RadioGroupItem value="pages" id="type-pages-new" /><Label htmlFor="type-pages-new" className="font-normal">Pages</Label></div>
+                                      <div className="flex items-center space-x-2"><RadioGroupItem value="hours" id="type-hours-new" /><Label htmlFor="type-hours-new" className="font-normal">Hours</Label></div>
+                                  </RadioGroup>
+                                  <Input type="number" placeholder="Total" value={newTopicGoalValue} onChange={(e) => setNewTopicGoalValue(e.target.value)} aria-label="Goal value" className="h-9" />
+                              </div>
+                          </div>
+                          <Button type="submit" size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Add Topic</Button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                 </form>
                 <div className="space-y-2 max-h-[calc(100vh-30rem)] overflow-y-auto pr-2">
                   {topicsWithSubtopics.map(([topic, subtopics]) => {
@@ -921,9 +934,8 @@ function UpskillPageContent() {
       <AlertDialog open={showBackupPrompt} onOpenChange={setShowBackupPrompt}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Weekly Backup Reminder</AlertDialogTitle><AlertDialogDescription>It's Monday! Would you like to back up your upskilling data?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={markBackupPromptAsHandled}>Maybe Later</AlertDialogCancel><AlertDialogAction onClick={handleBackupConfirm}>Yes, Back Up Now</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       {contextMenu && (
         <div ref={contextMenuRef} style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }} className="fixed z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => e.stopPropagation()}>
-          <button
-              role="menuitem"
-              className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground w-full"
+          <Button
+              variant="ghost" className="w-full h-9 justify-start px-2"
               onMouseDown={(e) => { 
                 e.stopPropagation(); 
                 setNewSubtopicParentTopic(contextMenu.item);
@@ -931,21 +943,19 @@ function UpskillPageContent() {
                 setIsNewSubtopicModalOpen(true);
                 setContextMenu(null);
               }}>
-              <PlusCircle className="h-4 w-4" /> New Sub Topic
-          </button>
-          <button
-              role="menuitem"
-              className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground w-full"
+              <PlusCircle className="mr-2 h-4 w-4" /> New Sub Topic
+          </Button>
+          <Button
+              variant="ghost" className="w-full h-9 justify-start px-2"
               onMouseDown={() => { handleStartEditingGoal(contextMenu.item); setContextMenu(null); }}>
-              <Edit3 className="h-4 w-4" /> Edit Goal
-          </button>
+              <Edit3 className="mr-2 h-4 w-4" /> Edit Goal
+          </Button>
           <div className="-mx-1 my-1 h-px bg-muted" />
-          <button
-              role="menuitem"
-              className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors text-destructive hover:bg-accent hover:text-destructive w-full"
+          <Button
+              variant="ghost" className="w-full h-9 justify-start px-2 text-destructive hover:text-destructive"
               onMouseDown={() => { setTopicToDelete(contextMenu.item); setContextMenu(null); }}>
-              <Trash2 className="h-4 w-4" /> Delete Topic
-          </button>
+              <Trash2 className="mr-2 h-4 w-4" /> Delete Topic
+          </Button>
         </div>
       )}
       {subtopicContextMenu && (
@@ -958,15 +968,15 @@ function UpskillPageContent() {
                 setSubtopicContextMenu(null);
             }}
         >
-            <button role="menuitem" className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground w-full" onMouseDown={() => { handleViewProgress(subtopicContextMenu.item); setSubtopicContextMenu(null); }}>
+            <Button variant="ghost" className="w-full h-9 justify-start px-2" onMouseDown={() => { handleViewProgress(subtopicContextMenu.item); setSubtopicContextMenu(null); }}>
                 <TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span>
-            </button>
-            <button role="menuitem" className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground w-full" onMouseDown={() => { handleStartEditSubtopic(subtopicContextMenu.item); setSubtopicContextMenu(null); }}>
+            </Button>
+            <Button variant="ghost" className="w-full h-9 justify-start px-2" onMouseDown={() => { handleStartEditSubtopic(subtopicContextMenu.item); setSubtopicContextMenu(null); }}>
                 <Edit3 className="mr-2 h-4 w-4"/>Edit
-            </button>
-            <button role="menuitem" className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors text-destructive hover:bg-accent hover:text-destructive w-full" onMouseDown={() => { handleDeleteSubtopic(subtopicContextMenu.item.id); setSubtopicContextMenu(null); }}>
+            </Button>
+            <Button variant="ghost" className="w-full h-9 justify-start px-2 text-destructive hover:text-destructive" onMouseDown={() => { handleDeleteSubtopic(subtopicContextMenu.item.id); setSubtopicContextMenu(null); }}>
                 <Trash2 className="mr-2 h-4 w-4"/>Delete
-            </button>
+            </Button>
         </div>
       )}
       <Dialog open={isManageLinksModalOpen} onOpenChange={setIsManageLinksModalOpen}>
