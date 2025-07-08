@@ -145,8 +145,8 @@ const DraggableDroppableCard: React.FC<{
     className: cn(
       (children as React.ReactElement).props.className,
       isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background",
-      isDragging && "opacity-50 shadow-2xl",
-      "transition-all"
+      // Apply scale and other effects when dragging
+      isDragging && "scale-95 opacity-80 shadow-2xl",
     )
   });
 
@@ -1319,9 +1319,9 @@ function DeepWorkPageContent() {
             {...listeners} 
             {...attributes} 
             className={cn(
-                "text-xs text-muted-foreground truncate cursor-grab", 
+                "text-xs text-muted-foreground truncate cursor-grab transition-transform", 
                 isLogged && "line-through text-muted-foreground/70",
-                isDragging && "opacity-50"
+                isDragging && "opacity-50 scale-90"
             )} 
             title={childName}
         >
