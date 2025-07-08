@@ -5,7 +5,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle, Link as LinkIcon, Save, MinusCircle, Folder, ExternalLink } from 'lucide-react';
+import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle, Link as LinkIcon, Save, MinusCircle, Folder, ExternalLink, Lightbulb, Focus, Frame, Flashlight } from 'lucide-react';
 import type { ExerciseDefinition, Release, DatedWorkout, ActivityType as ActivityTypeType, Resource, ResourceFolder as ResourceFolderType } from '@/types/workout'; // Renaming imported ActivityType to avoid conflict with lucide-react
 import { TransformWrapper, TransformComponent, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
@@ -216,6 +216,13 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
   const mindMapData = useMemo((): MindMapNode | null => {
     const processedIds = new Set<string>();
 
+    const upskillParentMap = new Map<string, string>();
+    upskillDefinitions.forEach(parent => {
+      (parent.linkedUpskillIds || []).forEach(childId => {
+        upskillParentMap.set(childId, parent.id);
+      });
+    });
+
     const buildNodeRecursive = (id: string, type: 'deepwork' | 'upskill' | 'resource', parentUniqueId: string): MindMapNode | null => {
         const uniqueId = `${id}-from-${parentUniqueId}`;
         if (processedIds.has(uniqueId)) {
@@ -235,14 +242,33 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         const definition = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === id);
         if (!definition) return null;
         
-        const linkedUpskillNodes = (definition.linkedUpskillIds || []).map(childId => buildNodeRecursive(childId, 'upskill', uniqueId)).filter((n): n is MindMapNode => !!n);
         const linkedDeepWorkNodes = (definition.linkedDeepWorkIds || []).map(childId => buildNodeRecursive(childId, 'deepwork', uniqueId)).filter((n): n is MindMapNode => !!n);
         const linkedResourceNodes = (definition.linkedResourceIds || []).map(childId => buildNodeRecursive(childId, 'resource', uniqueId)).filter((n): n is MindMapNode => !!n);
 
+        // -- New logic for full-flow upskill linking --
+        const linkedUpskillIds = definition.linkedUpskillIds || [];
+        const rootCuriosityIds = new Set<string>();
+        linkedUpskillIds.forEach(visualizationId => {
+            let currentId = visualizationId;
+            let rootId = visualizationId;
+            while(upskillParentMap.has(currentId)) {
+                currentId = upskillParentMap.get(currentId)!;
+                rootId = currentId;
+            }
+            const rootDef = upskillDefinitions.find(d => d.id === rootId);
+            if (rootDef) {
+                 rootCuriosityIds.add(rootId);
+            }
+        });
+        
+        const upstreamCuriosityTrees = Array.from(rootCuriosityIds)
+            .map(curiosityId => buildNodeRecursive(curiosityId, 'upskill', uniqueId))
+            .filter((n): n is MindMapNode => !!n);
+        
         return {
             ...definition, id: uniqueId, definitionId: definition.id,
             category: upskillDefinitions.some(ud => ud.id === id) ? 'Learning Task' : 'FocusArea',
-            children: [...linkedDeepWorkNodes, ...linkedUpskillNodes, ...linkedResourceNodes],
+            children: [...linkedDeepWorkNodes, ...upstreamCuriosityTrees, ...linkedResourceNodes],
         };
     };
     
@@ -254,21 +280,13 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     if (!selectedTopic) return null;
 
     const createFocusAreaNode = (focusAreaDef: ExerciseDefinition, parentId: string): MindMapNode => {
-        const linkedLearningTasks = (focusAreaDef.linkedUpskillIds || [])
-            .map(id => upskillDefinitions.find(ud => ud.id === id))
-            .filter((task): task is ExerciseDefinition => !!task)
-            .map(task => ({ 
-                ...task, 
-                definitionId: task.id,
-                id: `${task.id}-from-${focusAreaDef.id}-in-${parentId}`, 
-                category: 'Learning Task', 
-                children: [] 
-            }));
-        return { 
-            ...focusAreaDef, 
-            definitionId: focusAreaDef.id,
+        const uniqueNode = buildNodeRecursive(focusAreaDef.id, 'deepwork', parentId);
+        return uniqueNode || { 
             id: `${focusAreaDef.id}-in-${parentId}`, 
-            children: linkedLearningTasks 
+            definitionId: focusAreaDef.id,
+            name: focusAreaDef.name, 
+            category: 'FocusArea', 
+            children: [] 
         };
     };
 
@@ -790,9 +808,27 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     if (node.category === 'System Branch') iconKey = `System Branch:${node.name}`;
     if (node.category === 'Social') iconKey = `Social:${node.name}`;
     if (node.category === deepWorkTopicMetadata[node.name]?.classification) iconKey = node.category;
+    if (node.category === 'Learning Task' || (parentNode?.category === 'Learning Task' && upskillDefinitions.some(d => d.id === node.definitionId))) {
+        const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+        const linkedUpskillChildIds = new Set(upskillDefinitions.flatMap(def => def.linkedUpskillIds || []));
+        const isChild = linkedUpskillChildIds.has(node.definitionId);
+        
+        if (isParent && !isChild) iconKey = 'Curiosity'; // Flashlight
+        else if (isParent && isChild) iconKey = 'Objective'; // Focus
+        else if (!isParent && isChild) iconKey = 'Visualization'; // Frame
+        else iconKey = 'Standalone'; // Lightbulb
+    }
     if (!nodeIcons[iconKey] && level >= 4 && selectedTopic !== 'Resources') iconKey = 'FocusArea';
     if (node.category === 'Folder') iconKey = 'Folder';
     if (node.category === 'Resource') iconKey = 'Resource';
+
+    const finalIcon = {
+        ...nodeIcons,
+        'Curiosity': <Flashlight className="h-3 w-3 text-muted-foreground" />,
+        'Objective': <Focus className="h-3 w-3 text-muted-foreground" />,
+        'Visualization': <Frame className="h-3 w-3 text-muted-foreground" />,
+        'Standalone': <Lightbulb className="h-3 w-3 text-muted-foreground" />,
+    }[iconKey] || <GitBranch className="h-3.5 w-3.5 text-primary" />;
 
     let activityTypeForNode: ActivityTypeType | undefined;
     if (parentNode?.category === 'Release' || parentNode?.category === 'product' || parentNode?.category === 'service' || parentNode?.name === 'Products' || parentNode?.name === 'Services' || parentNode?.category === 'FocusArea') {
@@ -851,7 +887,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         )}
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted flex-shrink-0">
-            {nodeIcons[iconKey] || <GitBranch className="h-3.5 w-3.5 text-primary" />}
+            {finalIcon}
           </div>
           <div className="min-w-0 flex-grow">
             <p className="font-semibold text-xs text-foreground truncate" title={node.name}>{node.name}</p>
