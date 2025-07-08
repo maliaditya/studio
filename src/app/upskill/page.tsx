@@ -130,7 +130,6 @@ function UpskillPageContent() {
   const [linkUpskillTopic, setLinkUpskillTopic] = useState<string>('');
   const [isCreatingLink, setIsCreatingLink] = useState(false);
 
-  // State for the new subtopic modal
   const [isNewSubtopicModalOpen, setIsNewSubtopicModalOpen] = useState(false);
   const [newSubtopicParentTopic, setNewSubtopicParentTopic] = useState<string | null>(null);
   const [newSubtopicData, setNewSubtopicData] = useState({ name: '', description: '', link: '', hours: '' });
@@ -140,7 +139,6 @@ function UpskillPageContent() {
   const permanentlyLoggedVisualizationIds = useMemo(() => {
     const loggedIds = new Set<string>();
     if (!allUpskillLogs) return loggedIds;
-
     allUpskillLogs.forEach(log => {
       log.exercises.forEach(ex => {
         if (ex.loggedSets.length > 0) {
@@ -148,7 +146,6 @@ function UpskillPageContent() {
         }
       });
     });
-
     return loggedIds;
   }, [allUpskillLogs]);
   
@@ -181,10 +178,10 @@ function UpskillPageContent() {
         if(def.name === 'placeholder') return false;
         
         const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-        const isLinkedAsChild = linkedUpskillChildIds.has(def.id);
+        const isChild = linkedUpskillChildIds.has(def.id);
 
-        const isCuriosity = isParent && !isLinkedAsChild;
-        const isObjective = isParent && isLinkedAsChild;
+        const isCuriosity = isParent && !isChild;
+        const isObjective = isParent && isChild;
         const isVisualization = !isParent;
 
         if (effectiveFilters.has('curiosity') && isCuriosity) return true;
@@ -714,9 +711,9 @@ function UpskillPageContent() {
                         <ul className="space-y-1 pl-4 border-l-2 border-muted ml-4">
                             {subtopics.sort((a,b) => a.name.localeCompare(b.name)).map(def => {
                               const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-                              const isLinkedAsChild = linkedUpskillChildIds.has(def.id);
-                              const isCuriosity = isParent && !isLinkedAsChild;
-                              const isObjective = isParent && isLinkedAsChild;
+                              const isChild = linkedUpskillChildIds.has(def.id);
+                              const isCuriosity = isParent && !isChild;
+                              const isObjective = isParent && isChild;
                               const isVisualization = !isParent;
 
                               return (
@@ -808,9 +805,10 @@ function UpskillPageContent() {
                                     if (!upskillDef) return null;
 
                                     const isParent = (upskillDef.linkedUpskillIds?.length ?? 0) > 0 || (upskillDef.linkedResourceIds?.length ?? 0) > 0;
-                                    const isLinkedAsChild = linkedUpskillChildIds.has(upskillDef.id);
-                                    const isCuriosity = isParent && !isLinkedAsChild;
-                                    const isObjective = isParent && isLinkedAsChild;
+                                    const isChild = linkedUpskillChildIds.has(upskillDef.id);
+                                    
+                                    const isCuriosity = isParent && !isChild;
+                                    const isObjective = isParent && isChild;
                                     const isVisualization = !isParent;
 
                                     const loggedMinutes = getUpskillLoggedMinutes(upskillDef.id);
@@ -886,13 +884,15 @@ function UpskillPageContent() {
                                       </Card>
                                     )
                                   })}
-                                  <Card 
-                                      onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
-                                      className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
-                                  >
-                                      <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                      <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
-                                  </Card>
+                                  {!isSelectedSubtopicAVisualization && (
+                                    <Card 
+                                        onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
+                                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
+                                    >
+                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
+                                    </Card>
+                                  )}
                                 </div>
                               </div>
                               <div className="space-y-3">
@@ -936,8 +936,7 @@ function UpskillPageContent() {
         <div ref={contextMenuRef} style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }} className="fixed z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => e.stopPropagation()}>
           <Button
               variant="ghost" className="w-full h-9 justify-start px-2"
-              onMouseDown={(e) => { 
-                e.stopPropagation(); 
+              onClick={() => { 
                 setNewSubtopicParentTopic(contextMenu.item);
                 setNewSubtopicData({ name: '', description: '', link: '', hours: '' });
                 setIsNewSubtopicModalOpen(true);
@@ -947,13 +946,13 @@ function UpskillPageContent() {
           </Button>
           <Button
               variant="ghost" className="w-full h-9 justify-start px-2"
-              onMouseDown={() => { handleStartEditingGoal(contextMenu.item); setContextMenu(null); }}>
+              onClick={() => { handleStartEditingGoal(contextMenu.item); setContextMenu(null); }}>
               <Edit3 className="mr-2 h-4 w-4" /> Edit Goal
           </Button>
           <div className="-mx-1 my-1 h-px bg-muted" />
           <Button
               variant="ghost" className="w-full h-9 justify-start px-2 text-destructive hover:text-destructive"
-              onMouseDown={() => { setTopicToDelete(contextMenu.item); setContextMenu(null); }}>
+              onClick={() => { setTopicToDelete(contextMenu.item); setContextMenu(null); }}>
               <Trash2 className="mr-2 h-4 w-4" /> Delete Topic
           </Button>
         </div>
@@ -963,18 +962,15 @@ function UpskillPageContent() {
             ref={subtopicContextMenuRef}
             style={{ top: subtopicContextMenu.mouseY, left: subtopicContextMenu.mouseX }}
             className="fixed z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
-            onClick={(e) => {
-                e.stopPropagation();
-                setSubtopicContextMenu(null);
-            }}
+            onClick={(e) => e.stopPropagation()}
         >
-            <Button variant="ghost" className="w-full h-9 justify-start px-2" onMouseDown={() => { handleViewProgress(subtopicContextMenu.item); setSubtopicContextMenu(null); }}>
+            <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleViewProgress(subtopicContextMenu.item); setSubtopicContextMenu(null); }}>
                 <TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span>
             </Button>
-            <Button variant="ghost" className="w-full h-9 justify-start px-2" onMouseDown={() => { handleStartEditSubtopic(subtopicContextMenu.item); setSubtopicContextMenu(null); }}>
+            <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleStartEditSubtopic(subtopicContextMenu.item); setSubtopicContextMenu(null); }}>
                 <Edit3 className="mr-2 h-4 w-4"/>Edit
             </Button>
-            <Button variant="ghost" className="w-full h-9 justify-start px-2 text-destructive hover:text-destructive" onMouseDown={() => { handleDeleteSubtopic(subtopicContextMenu.item.id); setSubtopicContextMenu(null); }}>
+            <Button variant="ghost" className="w-full h-9 justify-start px-2 text-destructive hover:text-destructive" onClick={() => { handleDeleteSubtopic(subtopicContextMenu.item.id); setSubtopicContextMenu(null); }}>
                 <Trash2 className="mr-2 h-4 w-4"/>Delete
             </Button>
         </div>
