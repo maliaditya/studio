@@ -88,10 +88,6 @@ function UpskillPageContent() {
   const [newTopicName, setNewTopicName] = useState('');
   const [newTopicGoalType, setNewTopicGoalType] = useState<'pages' | 'hours'>('pages');
   const [newTopicGoalValue, setNewTopicGoalValue] = useState('');
-
-  const [addingVisualizationToTopic, setAddingVisualizationToTopic] = useState<string | null>(null);
-  const [newVisualizationName, setNewVisualizationName] = useState('');
-  const [newVisualizationHours, setNewVisualizationHours] = useState('');
   
   const [editingSubtopic, setEditingSubtopic] = useState<ExerciseDefinition | null>(null);
   const [editedSubtopicData, setEditedSubtopicData] = useState<Partial<ExerciseDefinition>>({});
@@ -133,6 +129,11 @@ function UpskillPageContent() {
   const [linkUpskillTopic, setLinkUpskillTopic] = useState<string>('');
   const [isCreatingLink, setIsCreatingLink] = useState(false);
 
+  // State for the new subtopic modal
+  const [isNewSubtopicModalOpen, setIsNewSubtopicModalOpen] = useState(false);
+  const [newSubtopicParentTopic, setNewSubtopicParentTopic] = useState<string | null>(null);
+  const [newSubtopicData, setNewSubtopicData] = useState({ name: '', description: '', link: '', hours: '' });
+
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
 
   const permanentlyLoggedVisualizationIds = useMemo(() => {
@@ -157,7 +158,7 @@ function UpskillPageContent() {
   }, [upskillDefinitions, topicGoals]);
 
   const linkedUpskillChildIds = useMemo(() => 
-    new Set<string>(upskillDefinitions.flatMap(def => def.linkedUpskillIds || []))
+    new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []))
   , [upskillDefinitions]);
 
   const handleVisibilityFilterChange = (filter: 'curiosity' | 'objective' | 'visualization') => {
@@ -168,6 +169,7 @@ function UpskillPageContent() {
         } else {
             newSet.add(filter);
         }
+        if(newSet.size === 0) return new Set(['curiosity', 'objective', 'visualization']);
         return newSet;
     });
   };
@@ -341,19 +343,40 @@ function UpskillPageContent() {
     setNewTopicName(''); setNewTopicGoalValue('');
     toast({ title: "Topic Created", description: `"${topic}" has been added.` });
   };
-  
-  const handleAddVisualization = (topic: string) => {
-    if (!newVisualizationName.trim()) { setAddingVisualizationToTopic(null); return; }
-    if (upskillDefinitions.some(def => def.name.toLowerCase() === newVisualizationName.trim().toLowerCase() && def.category.toLowerCase() === topic.toLowerCase())) {
-        toast({ title: "Error", description: "This subtopic already exists for this topic.", variant: "destructive" }); return;
+
+  const handleCreateSubtopic = () => {
+    if (!newSubtopicParentTopic || !newSubtopicData.name.trim()) {
+        toast({ title: "Error", description: "Name is required.", variant: "destructive" });
+        return;
     }
+
     const newDef: ExerciseDefinition = { 
-        id: `def_${Date.now()}_${Math.random()}`, name: newVisualizationName.trim(), category: topic as ExerciseCategory,
-        estimatedHours: parseInt(newVisualizationHours, 10) || undefined,
+        id: `def_${Date.now()}_${Math.random()}`, 
+        name: newSubtopicData.name.trim(), 
+        category: newSubtopicParentTopic as ExerciseCategory,
+        description: newSubtopicData.description.trim(),
+        link: newSubtopicData.link.trim(),
+        iconUrl: getFaviconUrl(newSubtopicData.link.trim()),
+        estimatedHours: parseInt(newSubtopicData.hours, 10) || undefined,
     };
-    setUpskillDefinitions(prev => prev.filter(d => d.name !== 'placeholder').concat(newDef));
-    setNewVisualizationName(''); setNewVisualizationHours(''); setAddingVisualizationToTopic(null);
-    toast({ title: "Success", description: `Visualization "${newDef.name}" added to ${topic}.` });
+    
+    setUpskillDefinitions(prev => [...prev.filter(d => d.name !== 'placeholder'), newDef]);
+    
+    setIsNewSubtopicModalOpen(false);
+    setNewSubtopicData({ name: '', description: '', link: '', hours: '' });
+    
+    toast({ title: "Success", description: `Subtopic "${newDef.name}" created.` });
+
+    setExpandedTopics(prev => {
+        const newSet = new Set(prev);
+        if (newSubtopicParentTopic) {
+            newSet.add(newSubtopicParentTopic);
+        }
+        return newSet;
+    });
+
+    setSelectedSubtopic(newDef);
+    setViewMode('library');
   };
 
   const handleDeleteSubtopic = (id: string) => {
@@ -554,10 +577,8 @@ function UpskillPageContent() {
         return resources.filter(res => res.folderId === linkResourceFolderId && res.name.toLowerCase().includes(linkSearchTerm.toLowerCase()));
     }
     
-    // This is for type === 'upskill'
     let definitionsSource = linkUpskillTopic ? upskillDefinitions.filter(d => d.category === linkUpskillTopic) : upskillDefinitions;
 
-    // Determine parent type
     const isParentParent = (parent.linkedUpskillIds?.length ?? 0) > 0 || (parent.linkedResourceIds?.length ?? 0) > 0;
     const isParentChild = linkedUpskillChildIds.has(parent.id);
     const isParentACuriosity = isParentParent && !isParentChild;
@@ -568,22 +589,15 @@ function UpskillPageContent() {
             return false;
         }
         
-        // Determine child type
         const isDefParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-        const isDefAnObjective = isDefParent; // For upskill, any parent is an objective
+        const isDefChild = linkedUpskillChildIds.has(def.id);
+        const isDefACuriosity = isDefParent && !isDefChild;
+        const isDefAnObjective = isDefParent && isDefChild;
         const isDefAVisualization = !isDefParent;
 
-        if (isParentACuriosity) {
-            // A Curiosity can ONLY link to Objectives.
-            return isDefAnObjective;
-        }
-
-        if (isParentAnObjective) {
-            // An Objective can link to other Objectives or Visualizations.
-            return isDefAnObjective || isDefAVisualization;
-        }
+        if (isParentACuriosity) return isDefAnObjective;
+        if (isParentAnObjective) return isDefAnObjective || isDefAVisualization;
         
-        // A Visualization shouldn't be a parent in the first place, but if it is, it can't link anything.
         return false;
     });
 }, [manageLinksConfig, upskillDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkUpskillTopic, linkedUpskillChildIds]);
@@ -708,15 +722,6 @@ function UpskillPageContent() {
                                     </div>
                                 </li>
                               )})}
-                             {addingVisualizationToTopic === topic && (
-                                <li className="p-1.5">
-                                  <form onSubmit={(e) => { e.preventDefault(); handleAddVisualization(topic); }} className="space-y-2">
-                                      <Input value={newVisualizationName} onChange={(e) => setNewVisualizationName(e.target.value)} className="h-8" autoFocus placeholder="New Visualization Name" onKeyDown={e => e.key === 'Escape' && setAddingVisualizationToTopic(null)}/>
-                                      <Input value={newVisualizationHours} onChange={(e) => setNewVisualizationHours(e.target.value)} type="number" className="h-8" placeholder="Est. Hours (optional)"/>
-                                      <div className="flex justify-end gap-2"><Button size="icon" className="h-8 w-8" type="submit"><Save className="h-4 w-4"/></Button><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAddingVisualizationToTopic(null)}><X className="h-4 w-4"/></Button></div>
-                                  </form>
-                                </li>
-                            )}
                         </ul>
                       )}
                     </div>
@@ -805,7 +810,7 @@ function UpskillPageContent() {
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
                                                     <span tabIndex={isVisualization ? 0 : -1}>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); handleAddTaskToSession(upskillDef); }} disabled={!isVisualization}>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); isVisualization && handleAddTaskToSession(upskillDef); }} disabled={!isVisualization}>
                                                             <PlusCircle className="h-4 w-4" />
                                                         </Button>
                                                     </span>
@@ -841,7 +846,6 @@ function UpskillPageContent() {
                                                         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 list-disc list-inside text-xs text-muted-foreground space-y-0.5">
                                                             {(upskillDef.linkedUpskillIds || []).map(childId => {
                                                                 const childDef = upskillDefinitions.find(d => d.id === childId);
-                                                                // A Visualization is a task with no children
                                                                 const isChildAViz = childDef && (childDef.linkedUpskillIds?.length ?? 0) === 0 && (childDef.linkedResourceIds?.length ?? 0) === 0;
                                                                 if (!childDef || !isChildAViz) return null;
 
@@ -896,7 +900,9 @@ function UpskillPageContent() {
                                       </Card>
                                     )
                                   })}
-                                  <Card onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)} className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"><PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" /><p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p></Card>
+                                  {!isSelectedSubtopicAVisualization &&
+                                    <Card onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)} className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"><PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" /><p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p></Card>
+                                  }
                                 </div>
                               </div>
                             </div>
@@ -914,23 +920,53 @@ function UpskillPageContent() {
       </div>
       <AlertDialog open={showBackupPrompt} onOpenChange={setShowBackupPrompt}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Weekly Backup Reminder</AlertDialogTitle><AlertDialogDescription>It's Monday! Would you like to back up your upskilling data?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={markBackupPromptAsHandled}>Maybe Later</AlertDialogCancel><AlertDialogAction onClick={handleBackupConfirm}>Yes, Back Up Now</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       {contextMenu && (
-        <div ref={contextMenuRef} style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }} className="fixed z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => { e.stopPropagation(); setContextMenu(null); }}>
-          <Button variant="ghost" className="w-full justify-start h-9 px-2" onClick={(e) => { e.stopPropagation(); toggleTopicExpansion(contextMenu.item); setAddingVisualizationToTopic(contextMenu.item); setContextMenu(null); }}><PlusCircle className="mr-2 h-4 w-4" /> New Visualization</Button>
-          <Button variant="ghost" className="w-full justify-start h-9 px-2" onClick={() => { handleStartEditingGoal(contextMenu.item); setContextMenu(null); }}><Edit3 className="mr-2 h-4 w-4" /> Edit Goal</Button>
-          <div className="-mx-1 my-1 h-px bg-muted" /><Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive h-9 px-2" onClick={() => { setTopicToDelete(contextMenu.item); setContextMenu(null); }}><Trash2 className="mr-2 h-4 w-4" /> Delete Topic</Button>
+        <div ref={contextMenuRef} style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }} className="fixed z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => e.stopPropagation()}>
+          <button
+              role="menuitem"
+              className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground w-full"
+              onMouseDown={(e) => { 
+                e.stopPropagation(); 
+                setNewSubtopicParentTopic(contextMenu.item);
+                setNewSubtopicData({ name: '', description: '', link: '', hours: '' });
+                setIsNewSubtopicModalOpen(true);
+                setContextMenu(null);
+              }}>
+              <PlusCircle className="h-4 w-4" /> New Sub Topic
+          </button>
+          <button
+              role="menuitem"
+              className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground w-full"
+              onMouseDown={() => { handleStartEditingGoal(contextMenu.item); setContextMenu(null); }}>
+              <Edit3 className="h-4 w-4" /> Edit Goal
+          </button>
+          <div className="-mx-1 my-1 h-px bg-muted" />
+          <button
+              role="menuitem"
+              className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors text-destructive hover:bg-accent hover:text-destructive w-full"
+              onMouseDown={() => { setTopicToDelete(contextMenu.item); setContextMenu(null); }}>
+              <Trash2 className="h-4 w-4" /> Delete Topic
+          </button>
         </div>
       )}
       {subtopicContextMenu && (
-        <div ref={subtopicContextMenuRef} style={{ top: subtopicContextMenu.mouseY, left: subtopicContextMenu.mouseX }} className="fixed z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => { e.stopPropagation(); setSubtopicContextMenu(null); }}>
-            <Button variant="ghost" className="w-full justify-start h-9 px-2" onClick={() => handleViewProgress(subtopicContextMenu.item)}>
+        <div
+            ref={subtopicContextMenuRef}
+            style={{ top: subtopicContextMenu.mouseY, left: subtopicContextMenu.mouseX }}
+            className="fixed z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
+            onClick={(e) => {
+                e.stopPropagation();
+                setSubtopicContextMenu(null);
+            }}
+        >
+            <button role="menuitem" className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground w-full" onMouseDown={() => { handleViewProgress(subtopicContextMenu.item); setSubtopicContextMenu(null); }}>
                 <TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span>
-            </Button>
-            <Button variant="ghost" className="w-full justify-start h-9 px-2" onClick={() => handleStartEditSubtopic(subtopicContextMenu.item)}>
+            </button>
+            <button role="menuitem" className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground w-full" onMouseDown={() => { handleStartEditSubtopic(subtopicContextMenu.item); setSubtopicContextMenu(null); }}>
                 <Edit3 className="mr-2 h-4 w-4"/>Edit
-            </Button>
-            <Button variant="ghost" className="w-full justify-start h-9 px-2 text-destructive hover:text-destructive" onClick={() => handleDeleteSubtopic(subtopicContextMenu.item.id)}>
+            </button>
+            <button role="menuitem" className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors text-destructive hover:bg-accent hover:text-destructive w-full" onMouseDown={() => { handleDeleteSubtopic(subtopicContextMenu.item.id); setSubtopicContextMenu(null); }}>
                 <Trash2 className="mr-2 h-4 w-4"/>Delete
-            </Button>
+            </button>
         </div>
       )}
       <Dialog open={isManageLinksModalOpen} onOpenChange={setIsManageLinksModalOpen}>
@@ -954,6 +990,38 @@ function UpskillPageContent() {
       <Dialog open={!!editingTopicGoal} onOpenChange={() => setEditingTopicGoal(null)}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Edit Goal for "{editingTopicGoal}"</DialogTitle><DialogDescription>Update the target goal for this topic.</DialogDescription></DialogHeader><div className="grid gap-4 py-4"><RadioGroup value={currentGoal.goalType} onValueChange={(v) => setCurrentGoal(prev => ({...prev, goalType: v as 'pages' | 'hours'}))} className="flex gap-4"><div className="flex items-center space-x-2"><RadioGroupItem value="pages" id="type-pages" /><Label htmlFor="type-pages" className="font-normal">Pages</Label></div><div className="flex items-center space-x-2"><RadioGroupItem value="hours" id="type-hours" /><Label htmlFor="type-hours" className="font-normal">Hours</Label></div></RadioGroup><Input type="number" placeholder="Total" value={currentGoal.goalValue} onChange={(e) => setCurrentGoal(prev => ({...prev, goalValue: parseInt(e.target.value, 10) || 0}))} aria-label="Goal value" /></div><DialogFooter><Button variant="outline" onClick={() => setEditingTopicGoal(null)}>Cancel</Button><Button onClick={handleSaveGoal}>Save Goal</Button></DialogFooter></DialogContent></Dialog>
       <Dialog open={!!editingSubtopic} onOpenChange={() => setEditingSubtopic(null)}><DialogContent><DialogHeader><DialogTitle>Edit Learning Task</DialogTitle><DialogDescription>Update the details of this learning task.</DialogDescription></DialogHeader><div className="space-y-4 py-4"><div className="space-y-1"><Label htmlFor="subtopic-name">Name</Label><Input id="subtopic-name" value={editedSubtopicData.name || ''} onChange={e => setEditedSubtopicData(d => ({ ...d, name: e.target.value }))} /></div><div className="space-y-1"><Label htmlFor="subtopic-desc">Description</Label><Textarea id="subtopic-desc" value={editedSubtopicData.description || ''} onChange={e => setEditedSubtopicData(d => ({ ...d, description: e.target.value }))} /></div><div className="space-y-1"><Label htmlFor="subtopic-link">Link</Label><Input id="subtopic-link" value={editedSubtopicData.link || ''} onChange={e => setEditedSubtopicData(d => ({ ...d, link: e.target.value }))} /></div><div className="space-y-1"><Label htmlFor="subtopic-hours">Est. Hours</Label><Input id="subtopic-hours" type="number" value={editedSubtopicData.estimatedHours || ''} onChange={e => setEditedSubtopicData(d => ({ ...d, estimatedHours: e.target.value ? parseInt(e.target.value, 10) : undefined }))} /></div></div><DialogFooter><Button variant="outline" onClick={() => setEditingSubtopic(null)}>Cancel</Button><Button onClick={handleSaveSubtopicEdit}>Save Changes</Button></DialogFooter></DialogContent></Dialog>
       <Dialog open={!!embedUrl} onOpenChange={(isOpen) => !isOpen && setEmbedUrl(null)}><DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2"><div className="flex-grow min-h-0">{embedUrl && (<iframe src={embedUrl} className="w-full h-full border-0 rounded-md" title="Embedded Resource" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>)}</div></DialogContent></Dialog>
+      <Dialog open={isNewSubtopicModalOpen} onOpenChange={setIsNewSubtopicModalOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Create New Sub Topic for "{newSubtopicParentTopic}"</DialogTitle>
+                <DialogDescription>
+                    This will create a new learning task. You can link it to others later to build a hierarchy.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-1">
+                    <Label htmlFor="new-subtopic-name">Name</Label>
+                    <Input id="new-subtopic-name" value={newSubtopicData.name} onChange={e => setNewSubtopicData(d => ({ ...d, name: e.target.value }))} placeholder="e.g., Learn about React Hooks" />
+                </div>
+                <div className="space-y-1">
+                    <Label htmlFor="new-subtopic-desc">Description (Optional)</Label>
+                    <Textarea id="new-subtopic-desc" value={newSubtopicData.description} onChange={e => setNewSubtopicData(d => ({ ...d, description: e.target.value }))} placeholder="Key points, summary..." />
+                </div>
+                <div className="space-y-1">
+                    <Label htmlFor="new-subtopic-link">Link (Optional)</Label>
+                    <Input id="new-subtopic-link" value={newSubtopicData.link} onChange={e => setNewSubtopicData(d => ({ ...d, link: e.target.value }))} placeholder="https://..." />
+                </div>
+                <div className="space-y-1">
+                    <Label htmlFor="new-subtopic-hours">Estimated Hours (Optional)</Label>
+                    <Input id="new-subtopic-hours" type="number" value={newSubtopicData.hours} onChange={e => setNewSubtopicData(d => ({ ...d, hours: e.target.value }))} placeholder="e.g., 10" />
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsNewSubtopicModalOpen(false)}>Cancel</Button>
+                <Button onClick={handleCreateSubtopic}>Create & Select</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
     </>
   );
 }
