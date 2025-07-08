@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef } from 'react';
-import { DndContext, useDraggable, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, useDraggable, type DragEndEvent, PointerSensor, useSensor, useSensors, DragStartEvent } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
@@ -13,22 +13,36 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { PlusCircle, Link, X, Lightbulb, Focus, Frame, Flashlight, AlertTriangle, Briefcase, GitMerge, BookCopy } from 'lucide-react';
+import { Link, X, Lightbulb, Focus, Frame, Flashlight, Briefcase, GitMerge, GitBranch, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react';
 import type { ExerciseDefinition, CanvasNode, ActivityType, CanvasEdge } from '@/types/workout';
 import { format } from 'date-fns';
+import { TransformWrapper, TransformComponent, useControls, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
+
+const Controls = () => {
+    const { zoomIn, zoomOut, resetTransform } = useControls();
+    return (
+        <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2">
+            <Button size="icon" onClick={() => zoomIn()}><ZoomIn/></Button>
+            <Button size="icon" onClick={() => zoomOut()}><ZoomOut/></Button>
+            <Button size="icon" onClick={() => resetTransform()}><RefreshCw/></Button>
+        </div>
+    );
+};
 
 // Draggable Node Component
-function DraggableNode({ node, definition, status, onConnectClick, onRemoveClick, onExpandNode, onClickForConnection, isConnecting, isHovered, canExpand }: {
+function DraggableNode({ node, definition, status, onConnectClick, onRemoveClick, onExpandChildren, onRevealParents, onClickForConnection, isConnecting, isHovered, canExpandChildren, canRevealParents }: {
   node: CanvasNode;
   definition: ExerciseDefinition;
   status: any;
   onConnectClick: (e: React.MouseEvent, nodeId: string) => void;
   onRemoveClick: (nodeId: string) => void;
-  onExpandNode: (nodeId: string) => void;
+  onExpandChildren: (nodeId: string) => void;
+  onRevealParents: (nodeId: string) => void;
   onClickForConnection: (nodeId: string) => void;
   isConnecting: boolean;
   isHovered: boolean;
-  canExpand: boolean;
+  canExpandChildren: boolean;
+  canRevealParents: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: node.id,
@@ -77,9 +91,14 @@ function DraggableNode({ node, definition, status, onConnectClick, onRemoveClick
           </div>
         </div>
         <CardContent className="p-2 border-t flex justify-end gap-1">
-          {canExpand && (
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onExpandNode(node.id)}>
-                <PlusCircle className="h-4 w-4" />
+          {canExpandChildren && (
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onExpandChildren(node.id)}>
+                <GitBranch className="h-4 w-4 text-green-500" />
+            </Button>
+          )}
+          {canRevealParents && (
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRevealParents(node.id)}>
+                <GitMerge className="h-4 w-4 text-amber-500" />
             </Button>
           )}
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => onConnectClick(e, node.id)}>
@@ -110,12 +129,14 @@ function CanvasPageContent() {
   const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const transformWrapperRef = useRef<ReactZoomPanPinchRef>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // Require mouse to move 8px before a drag is initiated
+        distance: 8,
       },
     })
   );
@@ -127,13 +148,18 @@ function CanvasPageContent() {
     const canvasRect = canvasRef.current?.getBoundingClientRect();
     const newNode: CanvasNode = {
       id: definition.id,
-      x: canvasRect ? (canvasRect.width / 2) - 96 : 200, // Center it horizontally
-      y: canvasRect ? (canvasRect.height / 2) - 50 : 200, // Center it vertically
+      x: canvasRect ? (canvasRect.width / 2) - 96 : 200,
+      y: canvasRect ? (canvasRect.height / 2) - 50 : 200,
     };
     setCanvasLayout(prev => ({ ...prev, nodes: [...prev.nodes, newNode] }));
   };
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setIsDragging(true);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
+    setIsDragging(false);
     const { active, delta } = event;
     setCanvasLayout(prev => ({
       ...prev,
@@ -146,12 +172,10 @@ function CanvasPageContent() {
   const handleConnectClick = (e: React.MouseEvent, nodeId: string) => {
     e.stopPropagation();
     if (connectingFrom) {
-      // Trying to connect to the same node
       if (connectingFrom === nodeId) {
         setConnectingFrom(null);
         return;
       }
-      // Create edge
       const edgeId = `${connectingFrom}-${nodeId}`;
       const reverseEdgeId = `${nodeId}-${connectingFrom}`;
       if (!canvasLayout.edges.some(e => e.id === edgeId || e.id === reverseEdgeId)) {
@@ -194,9 +218,7 @@ function CanvasPageContent() {
     allDefinitions.forEach(def => {
         const childIds = [...(def.linkedDeepWorkIds || []), ...(def.linkedUpskillIds || [])];
         childIds.forEach(childId => {
-            if (!map.has(childId)) {
-                map.set(childId, []);
-            }
+            if (!map.has(childId)) map.set(childId, []);
             map.get(childId)!.push(def.id);
         });
     });
@@ -206,13 +228,12 @@ function CanvasPageContent() {
   const nodePositions = useMemo(() => new Map(
       canvasLayout.nodes.map(node => [node.id, { x: node.x, y: node.y }])
   ), [canvasLayout.nodes]);
-
-  const handleExpandNode = (nodeId: string) => {
+  
+  const handleExpandChildren = (nodeId: string) => {
     const currentNodeDef = allDefinitions.get(nodeId);
     const currentNode = canvasLayout.nodes.find(n => n.id === nodeId);
     if (!currentNodeDef || !currentNode) return;
-
-    // --- Part 1: Expand Children (current logic) ---
+    
     const childIds = [
         ...(currentNodeDef.linkedDeepWorkIds || []),
         ...(currentNodeDef.linkedUpskillIds || []),
@@ -228,47 +249,14 @@ function CanvasPageContent() {
             if (!existingNodeIds.has(childId)) {
                 newNodes.push({
                     id: childId,
-                    x: currentNode.x + 240, // Position children to the right
+                    x: currentNode.x + 240, 
                     y: currentNode.y + (index * 90) - ((validChildIds.length - 1) * 45),
                 });
                 existingNodeIds.add(childId);
             }
-            
             const edgeId = `${nodeId}-${childId}`;
-            const reverseEdgeId = `${childId}-${nodeId}`;
-            if (!canvasLayout.edges.some(e => e.id === edgeId || e.id === reverseEdgeId)) {
+            if (!canvasLayout.edges.some(e => e.id === edgeId || e.id === `${childId}-${nodeId}`)) {
                 newEdges.push({ id: edgeId, source: nodeId, target: childId });
-            }
-        });
-
-        if (newNodes.length > 0 || newEdges.length > 0) {
-            setCanvasLayout(prev => ({
-                nodes: [...prev.nodes, ...newNodes],
-                edges: [...prev.edges, ...newEdges],
-            }));
-        }
-        return; // Prioritize expanding children
-    }
-    
-    // --- Part 2: Expand Parents (new logic) ---
-    const potentialParents = parentMap.get(nodeId) || [];
-    const parentsToLoad = potentialParents.filter(parentId => !nodePositions.has(parentId));
-
-    if (parentsToLoad.length > 0) {
-        const newNodes: CanvasNode[] = [];
-        const newEdges: CanvasEdge[] = [];
-
-        parentsToLoad.forEach((parentId, index) => {
-            newNodes.push({
-                id: parentId,
-                x: currentNode.x - 240, // Position parents to the left
-                y: currentNode.y + (index * 90) - ((parentsToLoad.length - 1) * 45),
-            });
-            
-            const edgeId = `${parentId}-${nodeId}`;
-            const reverseEdgeId = `${nodeId}-${parentId}`;
-            if (!canvasLayout.edges.some(e => e.id === edgeId || e.id === reverseEdgeId)) {
-                newEdges.push({ id: edgeId, source: parentId, target: nodeId });
             }
         });
 
@@ -281,6 +269,38 @@ function CanvasPageContent() {
     }
   };
   
+  const handleRevealParents = (nodeId: string) => {
+    const currentNode = canvasLayout.nodes.find(n => n.id === nodeId);
+    if (!currentNode) return;
+    
+    const potentialParents = parentMap.get(nodeId) || [];
+    const parentsToLoad = potentialParents.filter(parentId => !nodePositions.has(parentId));
+
+    if (parentsToLoad.length > 0) {
+        const newNodes: CanvasNode[] = [];
+        const newEdges: CanvasEdge[] = [];
+
+        parentsToLoad.forEach((parentId, index) => {
+            newNodes.push({
+                id: parentId,
+                x: currentNode.x + 240, // Place to the right
+                y: currentNode.y + (index * 90) - ((parentsToLoad.length - 1) * 45),
+            });
+            const edgeId = `${parentId}-${nodeId}`;
+             if (!canvasLayout.edges.some(e => e.id === edgeId || e.id === `${nodeId}-${parentId}`)) {
+                newEdges.push({ id: edgeId, source: parentId, target: nodeId });
+            }
+        });
+
+        if (newNodes.length > 0 || newEdges.length > 0) {
+            setCanvasLayout(prev => ({
+                nodes: [...prev.nodes, ...newNodes],
+                edges: [...prev.edges, ...newEdges],
+            }));
+        }
+    }
+  };
+
   const getNodeStatus = useCallback((defId: string, category: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const scheduledInfo = schedule[todayKey] ? Object.values(schedule[todayKey]).flat().find(act => act.taskIds?.some(tid => tid.startsWith(defId))) : undefined;
@@ -298,7 +318,7 @@ function CanvasPageContent() {
     return {
         isLoggedToday: loggedTimeToday > 0,
         isScheduledToday: !!scheduledInfo,
-        isPending: false, // This logic can be expanded if needed
+        isPending: false,
         totalTime: loggedTimeToday,
     };
 }, [schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs]);
@@ -316,13 +336,17 @@ function CanvasPageContent() {
   }, [searchTerm, deepWorkDefinitions, upskillDefinitions]);
 
   const getPath = (sourcePos: {x:number, y:number}, targetPos: {x:number, y:number}) => {
-    const startX = sourcePos.x + 192 / 2;
+    const sourceIsLeft = sourcePos.x < targetPos.x;
+    const startX = sourceIsLeft ? sourcePos.x + 192 : sourcePos.x;
     const startY = sourcePos.y + 78 / 2;
-    const endX = targetPos.x + 192 / 2;
+    const endX = sourceIsLeft ? targetPos.x : targetPos.x + 192;
     const endY = targetPos.y + 78 / 2;
+    
     const dx = endX - startX;
-    const dy = endY - startY;
-    return `M ${startX},${startY} C ${startX + dx / 2},${startY} ${endX - dx / 2},${endY} ${endX},${endY}`;
+    const controlPointX1 = startX + dx / 2;
+    const controlPointX2 = endX - dx / 2;
+    
+    return `M ${startX},${startY} C ${controlPointX1},${startY} ${controlPointX2},${endY} ${endX},${endY}`;
   };
 
   return (
@@ -374,51 +398,60 @@ function CanvasPageContent() {
       </aside>
 
       <main ref={canvasRef} className="flex-grow relative bg-muted/30 overflow-hidden">
-        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-          <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
-            <defs>
-              <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--border))" />
-              </marker>
-            </defs>
-            {canvasLayout.edges.map(edge => {
-              const sourcePos = nodePositions.get(edge.source);
-              const targetPos = nodePositions.get(edge.target);
-              if (!sourcePos || !targetPos) return null;
-              return (
-                <g key={edge.id} onMouseEnter={() => setHoveredEdge(edge.id)} onMouseLeave={() => setHoveredEdge(null)}>
-                    <path d={getPath(sourcePos, targetPos)} stroke="hsl(var(--border))" strokeWidth="2" fill="none" markerEnd="url(#arrowhead)" />
-                    <path d={getPath(sourcePos, targetPos)} stroke="transparent" strokeWidth="10" fill="none" className="cursor-pointer pointer-events-auto" onClick={() => handleRemoveEdge(edge.id)}/>
-                    {hoveredEdge === edge.id && <path d={getPath(sourcePos, targetPos)} stroke="hsl(var(--destructive))" strokeWidth="2" fill="none" />}
-                </g>
-              );
-            })}
-          </svg>
-          {canvasLayout.nodes.map(node => {
-            const definition = allDefinitions.get(node.id);
-            if (!definition) return null;
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+            <TransformWrapper ref={transformWrapperRef} disabled={isDragging} wheel={{ step: 0.1 }} >
+                <Controls/>
+                <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '200vw', height: '200vh' }}>
+                  <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
+                    <defs>
+                      <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--border))" />
+                      </marker>
+                    </defs>
+                    {canvasLayout.edges.map(edge => {
+                      const sourcePos = nodePositions.get(edge.source);
+                      const targetPos = nodePositions.get(edge.target);
+                      if (!sourcePos || !targetPos) return null;
+                      return (
+                        <g key={edge.id} onMouseEnter={() => setHoveredEdge(edge.id)} onMouseLeave={() => setHoveredEdge(null)}>
+                            <path d={getPath(sourcePos, targetPos)} stroke="hsl(var(--border))" strokeWidth="2" fill="none" markerEnd="url(#arrowhead)" />
+                            <path d={getPath(sourcePos, targetPos)} stroke="transparent" strokeWidth="10" fill="none" className="cursor-pointer pointer-events-auto" onClick={() => handleRemoveEdge(edge.id)}/>
+                            {hoveredEdge === edge.id && <path d={getPath(sourcePos, targetPos)} stroke="hsl(var(--destructive))" strokeWidth="2" fill="none" />}
+                        </g>
+                      );
+                    })}
+                  </svg>
+                  {canvasLayout.nodes.map(node => {
+                    const definition = allDefinitions.get(node.id);
+                    if (!definition) return null;
 
-            const hasChildren = (definition.linkedDeepWorkIds?.length ?? 0) > 0 || (definition.linkedUpskillIds?.length ?? 0) > 0;
-            const potentialParents = parentMap.get(node.id) || [];
-            const hasUnloadedParent = potentialParents.some(parentId => !nodePositions.has(parentId));
-            const canExpand = hasChildren || hasUnloadedParent;
+                    const hasChildren = (definition.linkedDeepWorkIds?.length ?? 0) > 0 || (definition.linkedUpskillIds?.length ?? 0) > 0 || (definition.linkedResourceIds?.length ?? 0) > 0;
+                    const potentialParents = parentMap.get(node.id) || [];
+                    const hasUnloadedParent = potentialParents.some(parentId => !nodePositions.has(parentId));
+                    
+                    const canExpandChildren = hasChildren;
+                    const canRevealParents = hasUnloadedParent;
 
-            return (
-              <DraggableNode
-                key={node.id}
-                node={node}
-                definition={definition}
-                status={getNodeStatus(node.id, definition.category)}
-                onConnectClick={handleConnectClick}
-                onRemoveClick={handleRemoveNode}
-                onExpandNode={handleExpandNode}
-                onClickForConnection={handleNodeClickForConnection}
-                isConnecting={!!connectingFrom}
-                isHovered={connectingFrom === node.id}
-                canExpand={canExpand}
-              />
-            );
-          })}
+                    return (
+                      <DraggableNode
+                        key={node.id}
+                        node={node}
+                        definition={definition}
+                        status={getNodeStatus(node.id, definition.category)}
+                        onConnectClick={handleConnectClick}
+                        onRemoveClick={handleRemoveNode}
+                        onExpandChildren={handleExpandChildren}
+                        onRevealParents={handleRevealParents}
+                        onClickForConnection={handleNodeClickForConnection}
+                        isConnecting={!!connectingFrom}
+                        isHovered={connectingFrom === node.id}
+                        canExpandChildren={canExpandChildren}
+                        canRevealParents={canRevealParents}
+                      />
+                    );
+                  })}
+                </TransformComponent>
+            </TransformWrapper>
         </DndContext>
       </main>
     </div>
