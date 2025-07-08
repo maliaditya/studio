@@ -237,14 +237,47 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
       return newNode;
     };
     
-    const buildDeepWorkTree = (defId: string): MindMapNode | null => {
-      const def = deepWorkDefinitions.find(d => d.id === defId);
+    const buildUpskillTree = (defId: string): MindMapNode | null => {
+      const def = upskillDefinitions.find(d => d.id === defId);
       if (!def) return null;
-      const node = getNode(def, 'FocusArea');
-      const linkedLearningChildren = (def.linkedUpskillIds || []).map(id => upskillDefinitions.find(d => d.id === id)).filter((d): d is ExerciseDefinition => !!d).map(childDef => getNode(childDef, 'Learning Task'));
-      const linkedWorkChildren = (def.linkedDeepWorkIds || []).map(buildDeepWorkTree).filter((n): n is MindMapNode => !!n);
-      node.children = [...linkedWorkChildren, ...linkedLearningChildren];
+      if (nodeRegistry.has(def.id)) {
+        return nodeRegistry.get(def.id)!;
+      }
+  
+      const node = getNode(def, 'Learning Task');
+  
+      const linkedUpskillChildren = (def.linkedUpskillIds || [])
+        .map(buildUpskillTree)
+        .filter((n): n is MindMapNode => !!n);
+      
+      const linkedResourceChildren = (def.linkedResourceIds || [])
+        .map(id => resources.find(r => r.id === id))
+        .filter((r): r is Resource => !!r)
+        .map(r => getNode(r, 'Resource'));
+  
+      node.children = [...linkedUpskillChildren, ...linkedResourceChildren];
       return node;
+    }
+
+    const buildDeepWorkTree = (defId: string): MindMapNode | null => {
+        const def = deepWorkDefinitions.find(d => d.id === defId);
+        if (!def) return null;
+        if (nodeRegistry.has(def.id)) {
+            return nodeRegistry.get(def.id)!;
+        }
+        
+        const node = getNode(def, 'FocusArea');
+        
+        const linkedWorkChildren = (def.linkedDeepWorkIds || [])
+            .map(buildDeepWorkTree)
+            .filter((n): n is MindMapNode => !!n);
+
+        const linkedLearningChildren = (def.linkedUpskillIds || [])
+            .map(buildUpskillTree)
+            .filter((n): n is MindMapNode => !!n);
+        
+        node.children = [...linkedWorkChildren, ...linkedLearningChildren];
+        return node;
     };
 
     if (rootFocusAreaId) {
@@ -255,13 +288,14 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         let currentId = rootFocusAreaId;
         let trueRootId = rootFocusAreaId;
 
+        // Traverse up the tree to find the absolute root (the 'Intention')
         while (linkedDeepWorkChildIds.has(currentId)) {
             const parent = deepWorkDefinitions.find(def => (def.linkedDeepWorkIds || []).includes(currentId));
             if (parent) {
                 currentId = parent.id;
                 trueRootId = parent.id;
             } else {
-                break;
+                break; // No parent found, we are at the root
             }
         }
         
