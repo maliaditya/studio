@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -213,47 +214,67 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
   }, [deepWorkTopicMetadata, deepWorkDefinitions, resourceFolders]);
   
   const mindMapData = useMemo((): MindMapNode | null => {
-    // A map to store unique nodes to avoid duplicates. Key is definitionId.
     const nodeRegistry = new Map<string, MindMapNode>();
 
-    const getNode = (def: any, category: string, children: MindMapNode[] = []): MindMapNode => {
-        const definitionId = def.id;
-        if (nodeRegistry.has(definitionId)) {
-            return nodeRegistry.get(definitionId)!;
+    const getNode = (def: any, category: string, children: MindMapNode[] = [], extraProps: Partial<MindMapNode> = {}): MindMapNode => {
+      const definitionId = def.id;
+      if (nodeRegistry.has(definitionId)) {
+        const existingNode = nodeRegistry.get(definitionId)!;
+        if (existingNode.children.length === 0 && children.length > 0) {
+          existingNode.children = children;
         }
-        const newNode: MindMapNode = {
-            ...def,
-            id: definitionId,
-            definitionId: definitionId,
-            category: category,
-            children: children
-        };
-        nodeRegistry.set(definitionId, newNode);
-        return newNode;
+        return existingNode;
+      }
+      const newNode: MindMapNode = {
+        ...def,
+        id: definitionId,
+        definitionId: definitionId,
+        category: category,
+        children: children,
+        ...extraProps,
+      };
+      nodeRegistry.set(definitionId, newNode);
+      return newNode;
     };
     
-    // Recursive function to build the tree for a Deep Work definition
     const buildDeepWorkTree = (defId: string): MindMapNode | null => {
-        const def = deepWorkDefinitions.find(d => d.id === defId);
-        if (!def) return null;
-
-        const node = getNode(def, 'FocusArea');
-
-        const linkedLearningChildren = (def.linkedUpskillIds || [])
-            .map(id => upskillDefinitions.find(d => d.id === id))
-            .filter((d): d is ExerciseDefinition => !!d)
-            .map(childDef => getNode(childDef, 'Learning Task'));
-        
-        const linkedWorkChildren = (def.linkedDeepWorkIds || [])
-            .map(buildDeepWorkTree)
-            .filter((n): n is MindMapNode => !!n);
-
-        node.children = [...linkedWorkChildren, ...linkedLearningChildren];
-        return node;
+      const def = deepWorkDefinitions.find(d => d.id === defId);
+      if (!def) return null;
+      const node = getNode(def, 'FocusArea');
+      const linkedLearningChildren = (def.linkedUpskillIds || []).map(id => upskillDefinitions.find(d => d.id === id)).filter((d): d is ExerciseDefinition => !!d).map(childDef => getNode(childDef, 'Learning Task'));
+      const linkedWorkChildren = (def.linkedDeepWorkIds || []).map(buildDeepWorkTree).filter((n): n is MindMapNode => !!n);
+      node.children = [...linkedWorkChildren, ...linkedLearningChildren];
+      return node;
     };
 
     if (rootFocusAreaId) {
-        return buildDeepWorkTree(rootFocusAreaId);
+        const linkedDeepWorkChildIds = new Set<string>(
+            (deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])
+        );
+
+        let currentId = rootFocusAreaId;
+        let trueRootId = rootFocusAreaId;
+
+        while (linkedDeepWorkChildIds.has(currentId)) {
+            const parent = deepWorkDefinitions.find(def => (def.linkedDeepWorkIds || []).includes(currentId));
+            if (parent) {
+                currentId = parent.id;
+                trueRootId = parent.id;
+            } else {
+                break;
+            }
+        }
+        
+        const rootNode = buildDeepWorkTree(trueRootId);
+        if (!rootNode) return null;
+
+        return { 
+            id: 'mind-map-root',
+            definitionId: 'mind-map-root',
+            name: 'Focus Area View',
+            category: 'System',
+            children: [rootNode]
+        };
     }
     
     if (!selectedTopic) return null;
