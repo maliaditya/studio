@@ -212,117 +212,100 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     return ["Strategic Overview", ...availableTopics.sort()];
   }, [deepWorkTopicMetadata, deepWorkDefinitions, resourceFolders]);
   
-  const mindMapData = useMemo((): MindMapNode | null => {
-    // This map prevents infinite recursion for circular dependencies.
-    const processedIds = new Set<string>();
-
-    const buildUpskillSubTree = (id: string, parentUniqueId: string): MindMapNode | null => {
-        const uniqueId = `upskill-${id}-from-${parentUniqueId}`;
-        if (processedIds.has(uniqueId)) {
-            const item = upskillDefinitions.find(d => d.id === id);
-            return { id: uniqueId, definitionId: id, name: `${item?.name || 'Task'} (cyclic link)`, category: 'Cyclic', children: [] };
-        }
-        processedIds.add(uniqueId);
-
-        const definition = upskillDefinitions.find(d => d.id === id);
-        if (!definition) return null;
-
-        const children = (definition.linkedUpskillIds || []).map(childId => buildUpskillSubTree(childId, uniqueId)).filter((n): n is MindMapNode => !!n);
-        const resourceChildren = (definition.linkedResourceIds || [])
-            .map(resId => resources.find(r => r.id === resId))
-            .filter((r): r is Resource => !!r)
-            .map(r => ({ ...r, id: `resource-${r.id}-from-${uniqueId}`, definitionId: r.id, category: 'Resource', children: [] }));
-
-        return { ...definition, id: uniqueId, definitionId: id, category: 'Learning Task', children: [...children, ...resourceChildren] };
-    };
-
-    const buildFullTopicTree = (topic: string, plan: any, type: 'product' | 'service'): MindMapNode => {
-        const releaseNodes: MindMapNode[] = (plan?.releases || []).map((release: Release) => {
-            const focusAreaNodes = (release.focusAreaIds || [])
-                .map(id => deepWorkDefinitions.find(def => def.id === id))
-                .filter((def): def is ExerciseDefinition => !!def)
-                .map(fa => ({ ...fa, id: `${fa.id}-in-${release.id}`, definitionId: fa.id, category: 'FocusArea', children: [] }));
-            
-            const totalMinutes = (release.focusAreaIds || []).reduce((sum, id) => sum + (totalTimePerFocusArea.get(id) || 0), 0);
-            return { ...release, id: release.id, definitionId: release.id, name: release.name, category: 'Release', children: focusAreaNodes, totalLoggedHours: totalMinutes > 0 ? totalMinutes / 60 : 0, topic: topic, type: type };
-        });
-        const totalTopicHours = releaseNodes.reduce((sum, release) => sum + (release.totalLoggedHours || 0), 0);
-        return { id: topic, definitionId: topic, name: topic, category: type, children: releaseNodes, totalLoggedHours: totalTopicHours > 0 ? totalTopicHours : undefined };
-    };
-    
+    const mindMapData = useMemo((): MindMapNode | null => {
     if (rootFocusAreaId) {
         const intentionDef = deepWorkDefinitions.find(d => d.id === rootFocusAreaId);
         if (!intentionDef) return null;
-    
-        const actions: ExerciseDefinition[] = [];
-        const visitedActions = new Set<string>();
-        const findActionsRecursive = (id: string) => {
-            if (visitedActions.has(id)) return;
-            visitedActions.add(id);
-    
-            const node = deepWorkDefinitions.find(d => d.id === id);
+
+        // Step 1: Find all final "Action" nodes under the selected "Intention".
+        const allActionIds = new Set<string>();
+        const findActionsRecursive = (nodeId: string) => {
+            const node = deepWorkDefinitions.find(d => d.id === nodeId);
             if (!node) return;
-    
+
             const isAction = (node.linkedDeepWorkIds?.length ?? 0) === 0;
             if (isAction) {
-                if (!actions.some(a => a.id === node.id)) {
-                    actions.push(node);
-                }
+                allActionIds.add(node.id);
             } else {
-                (node.linkedDeepWorkIds || []).forEach(childId => findActionsRecursive(childId));
+                (node.linkedDeepWorkIds || []).forEach(findActionsRecursive);
             }
         };
         findActionsRecursive(intentionDef.id);
-    
-        const actionNodes: MindMapNode[] = actions.map(action => {
-            processedIds.clear(); // Reset for each action's tree
-    
-            const upstreamCuriosityTrees = (action.linkedUpskillIds || [])
-                .map(upskillId => {
-                    let rootId = upskillId;
-                    let currentId = upskillId;
-                    const visitedUpskill = new Set<string>();
-                    while (currentId && !visitedUpskill.has(currentId)) {
-                        visitedUpskill.add(currentId);
-                        const parent = upskillDefinitions.find(d => d.linkedUpskillIds?.includes(currentId));
-                        if (parent) { rootId = parent.id; currentId = parent.id; } else { break; }
+
+        // Step 2 & 3: Map visualizations to actions and find their root curiosities.
+        const visualizationToActionMap = new Map<string, string[]>();
+        const rootCuriosities = new Map<string, ExerciseDefinition>();
+
+        const findVisualizationsRecursive = (upskillNodeId: string): string[] => {
+            const node = upskillDefinitions.find(d => d.id === upskillNodeId);
+            if (!node) return [];
+
+            const isVisualization = (node.linkedUpskillIds?.length ?? 0) === 0 && (node.linkedResourceIds?.length ?? 0) === 0;
+            if (isVisualization) return [node.id];
+
+            return (node.linkedUpskillIds || []).flatMap(findVisualizationsRecursive);
+        };
+        
+        const findRootCuriosity = (nodeId: string): ExerciseDefinition | null => {
+            const parent = upskillDefinitions.find(d => d.linkedUpskillIds?.includes(nodeId));
+            if (!parent) return upskillDefinitions.find(d => d.id === nodeId) || null;
+            return findRootCuriosity(parent.id);
+        };
+
+        allActionIds.forEach(actionId => {
+            const actionDef = deepWorkDefinitions.find(d => d.id === actionId);
+            if (!actionDef) return;
+
+            (actionDef.linkedUpskillIds || []).forEach(upskillId => {
+                const visualizations = findVisualizationsRecursive(upskillId);
+                visualizations.forEach(vizId => {
+                    if (!visualizationToActionMap.has(vizId)) visualizationToActionMap.set(vizId, []);
+                    visualizationToActionMap.get(vizId)!.push(actionId);
+
+                    const rootCuriosity = findRootCuriosity(vizId);
+                    if (rootCuriosity && !rootCuriosities.has(rootCuriosity.id)) {
+                        rootCuriosities.set(rootCuriosity.id, rootCuriosity);
                     }
-                    return buildUpskillSubTree(rootId, action.id);
-                }).filter((n): n is MindMapNode => !!n);
-    
-            const findParentObjective = (actionId: string): ExerciseDefinition | undefined => {
-                return deepWorkDefinitions.find(d => d.linkedDeepWorkIds?.includes(actionId));
-            };
-            const parentObjective = findParentObjective(action.id);
-    
-            const projectHierarchyNodes: MindMapNode[] = [];
-            if (parentObjective) {
-                projectHierarchyNodes.push({
-                    ...parentObjective, id: `objective-parent-of-${action.id}`, definitionId: parentObjective.id, category: 'Objective',
-                    children: [{
-                        ...intentionDef, id: `intention-parent-of-${parentObjective.id}`, definitionId: intentionDef.id, category: 'Intention', children: []
-                    }]
+                });
+            });
+        });
+
+        // Step 4: Build the final tree structure.
+        const processedNodes = new Set<string>();
+        const buildFullFlowTree = (upskillId: string): MindMapNode | null => {
+            const uniqueId = `upskill-flow-${upskillId}`;
+            if (processedNodes.has(uniqueId)) return null;
+            processedNodes.add(uniqueId);
+            
+            const upskillDef = upskillDefinitions.find(d => d.id === upskillId);
+            if (!upskillDef) return null;
+            
+            const children = (upskillDef.linkedUpskillIds || []).map(buildFullFlowTree).filter((n): n is MindMapNode => !!n);
+
+            // If it's a visualization, add the deep work path as a child.
+            const actionIds = visualizationToActionMap.get(upskillId);
+            if (actionIds) {
+                actionIds.forEach(actionId => {
+                    const actionDef = deepWorkDefinitions.find(d => d.id === actionId);
+                    if (!actionDef) return;
+                    
+                    const objective = deepWorkDefinitions.find(d => d.linkedDeepWorkIds?.includes(actionId));
+                    const objectiveNode: MindMapNode = objective ? { ...objective, id: `objective-${objective.id}-for-${actionId}`, definitionId: objective.id, category: 'Objective', children: [
+                        { ...intentionDef, id: `intention-${intentionDef.id}-for-${objective.id}`, definitionId: intentionDef.id, category: 'Intention', children: [] }
+                    ]} : { ...intentionDef, id: `intention-${intentionDef.id}-for-${actionId}`, definitionId: intentionDef.id, category: 'Intention', children: [] };
+                    
+                    const actionNode: MindMapNode = { ...actionDef, id: `action-${actionId}-from-${upskillId}`, definitionId: actionId, category: 'FocusArea', children: [objectiveNode] };
+                    children.push(actionNode);
                 });
             }
-    
-            const learningBranch: MindMapNode = {
-                id: `learning-branch-for-${action.id}`, definitionId: `learning-branch-for-${action.id}`, name: 'Learning Dependencies', category: 'System Branch', children: upstreamCuriosityTrees
-            };
-            const projectBranch: MindMapNode = {
-                id: `project-branch-for-${action.id}`, definitionId: `project-branch-for-${action.id}`, name: 'Project Context', category: 'System Branch', children: projectHierarchyNodes
-            };
-    
-            return {
-                ...action, id: `action-root-${action.id}`, definitionId: action.id, category: 'FocusArea',
-                children: [
-                    ...(learningBranch.children.length > 0 ? [learningBranch] : []),
-                    ...(projectBranch.children.length > 0 ? [projectBranch] : []),
-                ],
-            };
-        });
-    
+
+            return { ...upskillDef, id: uniqueId, definitionId: upskillId, category: 'Learning Task', children };
+        };
+
+        const curiosityNodes = Array.from(rootCuriosities.values()).map(curiosity => buildFullFlowTree(curiosity.id)).filter((n): n is MindMapNode => !!n);
+        
         return {
-            ...intentionDef, id: intentionDef.id, definitionId: intentionDef.id, name: `Flow: ${intentionDef.name}`, category: 'Intention', children: actionNodes,
+            id: intentionDef.id, definitionId: intentionDef.id, name: `Flow: ${intentionDef.name}`, category: 'System', children: curiosityNodes
         };
     }
 
@@ -349,6 +332,20 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         }
         return { id: 'resources-root', definitionId: 'resources-root', name: 'Resource Library', category: 'System', children: buildFolderTree(null) };
     }
+    
+    const buildFullTopicTree = (topic: string, plan: any, type: 'product' | 'service'): MindMapNode => {
+        const releaseNodes: MindMapNode[] = (plan?.releases || []).map((release: Release) => {
+            const focusAreaNodes = (release.focusAreaIds || [])
+                .map(id => deepWorkDefinitions.find(def => def.id === id))
+                .filter((def): def is ExerciseDefinition => !!def)
+                .map(fa => ({ ...fa, id: `${fa.id}-in-${release.id}`, definitionId: fa.id, category: 'FocusArea', children: [] }));
+            
+            const totalMinutes = (release.focusAreaIds || []).reduce((sum, id) => sum + (totalTimePerFocusArea.get(id) || 0), 0);
+            return { ...release, id: release.id, definitionId: release.id, name: release.name, category: 'Release', children: focusAreaNodes, totalLoggedHours: totalMinutes > 0 ? totalMinutes / 60 : 0, topic: topic, type: type };
+        });
+        const totalTopicHours = releaseNodes.reduce((sum, release) => sum + (release.totalLoggedHours || 0), 0);
+        return { id: topic, definitionId: topic, name: topic, category: type, children: releaseNodes, totalLoggedHours: totalTopicHours > 0 ? totalTopicHours : undefined };
+    };
 
     if (selectedTopic === 'Strategic Overview') {
         const productNodes = Object.keys(productizationPlans).map(topic => buildFullTopicTree(topic, productizationPlans[topic], 'product'));
@@ -384,7 +381,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     const type = productizationPlans[selectedTopic] ? 'product' : 'service';
     return buildFullTopicTree(selectedTopic, plan, type);
 
-  }, [selectedTopic, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, totalTimePerFocusArea, resources, resourceFolders, rootFolderId, rootFocusAreaId]);
+  }, [selectedTopic, rootFocusAreaId, rootFolderId, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, totalTimePerFocusArea, resources, resourceFolders]);
 
 
   useEffect(() => {
