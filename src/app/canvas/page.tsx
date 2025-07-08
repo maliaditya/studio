@@ -14,16 +14,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { PlusCircle, Link, X, Lightbulb, Focus, Frame, Flashlight, AlertTriangle, Briefcase, GitMerge, BookCopy } from 'lucide-react';
-import type { ExerciseDefinition, CanvasNode, ActivityType } from '@/types/workout';
+import type { ExerciseDefinition, CanvasNode, ActivityType, CanvasEdge } from '@/types/workout';
 import { format } from 'date-fns';
 
 // Draggable Node Component
-function DraggableNode({ node, definition, status, onConnectClick, onRemoveClick, onClickForConnection, isConnecting, isHovered }: {
+function DraggableNode({ node, definition, status, onConnectClick, onRemoveClick, onExpandNode, onClickForConnection, isConnecting, isHovered }: {
   node: CanvasNode;
   definition: ExerciseDefinition;
   status: any;
   onConnectClick: (e: React.MouseEvent, nodeId: string) => void;
   onRemoveClick: (nodeId: string) => void;
+  onExpandNode: (nodeId: string) => void;
   onClickForConnection: (nodeId: string) => void;
   isConnecting: boolean;
   isHovered: boolean;
@@ -35,6 +36,8 @@ function DraggableNode({ node, definition, status, onConnectClick, onRemoveClick
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
   } : undefined;
+  
+  const hasChildren = (definition.linkedDeepWorkIds?.length ?? 0) > 0 || (definition.linkedUpskillIds?.length ?? 0) > 0;
 
   const getIcon = () => {
     if (definition.category === 'Learning Task') {
@@ -75,6 +78,11 @@ function DraggableNode({ node, definition, status, onConnectClick, onRemoveClick
           </div>
         </div>
         <CardContent className="p-2 border-t flex justify-end gap-1">
+          {hasChildren && (
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onExpandNode(node.id)}>
+                <PlusCircle className="h-4 w-4" />
+            </Button>
+          )}
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => onConnectClick(e, node.id)}>
             <Link className="h-3 w-3" />
           </Button>
@@ -181,6 +189,55 @@ function CanvasPageContent() {
   const allDefinitions = useMemo(() => new Map(
       [...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])
   ), [deepWorkDefinitions, upskillDefinitions]);
+
+  const handleExpandNode = (nodeId: string) => {
+    const parentDef = allDefinitions.get(nodeId);
+    const parentNode = canvasLayout.nodes.find(n => n.id === nodeId);
+    if (!parentDef || !parentNode) return;
+
+    const childIds = [
+        ...(parentDef.linkedDeepWorkIds || []),
+        ...(parentDef.linkedUpskillIds || []),
+    ];
+    
+    if (childIds.length === 0) return;
+
+    const newNodes: CanvasNode[] = [];
+    const newEdges: CanvasEdge[] = [];
+    const existingNodeIds = new Set(canvasLayout.nodes.map(n => n.id));
+
+    const validChildIds = childIds.filter(id => allDefinitions.has(id));
+
+    validChildIds.forEach((childId, index) => {
+        if (!existingNodeIds.has(childId)) {
+            newNodes.push({
+                id: childId,
+                x: parentNode.x + 240,
+                y: parentNode.y + (index * 90) - ((validChildIds.length - 1) * 45),
+            });
+            existingNodeIds.add(childId);
+        }
+        
+        const edgeId = `${nodeId}-${childId}`;
+        const reverseEdgeId = `${childId}-${nodeId}`;
+        const edgeExists = canvasLayout.edges.some(e => e.id === edgeId || e.id === reverseEdgeId);
+        
+        if (!edgeExists) {
+            newEdges.push({
+                id: edgeId,
+                source: nodeId,
+                target: childId,
+            });
+        }
+    });
+
+    if (newNodes.length > 0 || newEdges.length > 0) {
+        setCanvasLayout(prev => ({
+            nodes: [...prev.nodes, ...newNodes],
+            edges: [...prev.edges, ...newEdges],
+        }));
+    }
+  };
 
   const nodePositions = useMemo(() => new Map(
       canvasLayout.nodes.map(node => [node.id, { x: node.x, y: node.y }])
@@ -310,6 +367,7 @@ function CanvasPageContent() {
                 status={getNodeStatus(node.id, definition.category)}
                 onConnectClick={handleConnectClick}
                 onRemoveClick={handleRemoveNode}
+                onExpandNode={handleExpandNode}
                 onClickForConnection={handleNodeClickForConnection}
                 isConnecting={!!connectingFrom}
                 isHovered={connectingFrom === node.id}
