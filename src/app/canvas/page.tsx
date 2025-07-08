@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef } from 'react';
-import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
+import { DndContext, useDraggable, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
@@ -104,6 +104,14 @@ function CanvasPageContent() {
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require mouse to move 8px before a drag is initiated
+      },
+    })
+  );
 
   const handleAddNode = (definition: ExerciseDefinition) => {
     if (canvasLayout.nodes.find(n => n.id === definition.id)) {
@@ -271,7 +279,7 @@ function CanvasPageContent() {
       </aside>
 
       <main ref={canvasRef} className="flex-grow relative bg-muted/30 overflow-hidden">
-        <DndContext onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
           <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
             <defs>
               <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
