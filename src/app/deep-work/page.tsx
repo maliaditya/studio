@@ -173,7 +173,7 @@ function DeepWorkPageContent() {
     item: ExerciseDefinition;
   } | null>(null);
 
-  const [visibilityFilters, setVisibilityFilters] = useState<Set<'intention' | 'objective' | 'action'>>(new Set(['intention']));
+  const [visibilityFilters, setVisibilityFilters] = useState<Set<'intention' | 'objective' | 'action' | 'standalone'>>(new Set(['intention', 'objective', 'action', 'standalone']));
 
   // Mind map modal state
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
@@ -298,7 +298,7 @@ function DeepWorkPageContent() {
     new Set<string>(upskillDefinitions.flatMap(def => def.linkedUpskillIds || []))
   , [upskillDefinitions]);
 
-  const handleVisibilityFilterChange = (filter: 'intention' | 'objective' | 'action') => {
+  const handleVisibilityFilterChange = (filter: 'intention' | 'objective' | 'action' | 'standalone') => {
     setVisibilityFilters(prev => {
         const newSet = new Set(prev);
         if (newSet.has(filter)) {
@@ -319,11 +319,13 @@ function DeepWorkPageContent() {
 
         const isIntention = isParent && !isLinkedAsChild;
         const isObjective = isParent && isLinkedAsChild;
-        const isAction = !isParent;
+        const isAction = !isParent && isLinkedAsChild;
+        const isStandalone = !isParent && !isLinkedAsChild;
 
         if (effectiveFilters.has('intention') && isIntention) return true;
         if (effectiveFilters.has('objective') && isObjective) return true;
         if (effectiveFilters.has('action') && isAction) return true;
+        if (effectiveFilters.has('standalone') && isStandalone) return true;
         
         return false;
     });
@@ -404,11 +406,13 @@ function DeepWorkPageContent() {
         if (!node) return;
 
         (node.linkedUpskillIds || []).forEach(id => directUpskillLinkIds.add(id));
+        
+        const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0 || (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
 
-        if (!node.linkedDeepWorkIds || node.linkedDeepWorkIds.length === 0) {
+        if (!isParent) { // It's an Action (leaf node)
             deepWorkActionIds.add(node.id);
-        } else {
-            node.linkedDeepWorkIds.forEach(childId => findDeepWorkActionsAndUpskillLinks(childId));
+        } else { // It's an Intention or Objective, so recurse
+            (node.linkedDeepWorkIds || []).forEach(childId => findDeepWorkActionsAndUpskillLinks(childId));
         }
     }
 
@@ -989,8 +993,11 @@ function DeepWorkPageContent() {
   const isSelectedFocusAreaAnAction = useMemo(() => {
     if (!selectedFocusArea) return false;
     const isParent = (selectedFocusArea.linkedDeepWorkIds?.length ?? 0) > 0 || (selectedFocusArea.linkedUpskillIds?.length ?? 0) > 0 || (selectedFocusArea.linkedResourceIds?.length ?? 0) > 0;
-    return !isParent;
-  }, [selectedFocusArea]);
+    const isLinkedAsChild = linkedDeepWorkChildIds.has(selectedFocusArea.id);
+    const isAction = !isParent && isLinkedAsChild;
+    return isAction;
+  }, [selectedFocusArea, linkedDeepWorkChildIds]);
+
 
   const filteredItemsForLinking = useMemo(() => {
     if (!manageLinksConfig) return [];
@@ -998,14 +1005,18 @@ function DeepWorkPageContent() {
 
     let definitionsSource: any[];
     if (type === 'upskill') {
-        const allUpskillDefs = linkUpskillTopic ? upskillDefinitions.filter(d => d.category === linkUpskillTopic) : upskillDefinitions;
-        // Only show top-level "Curiosities" from Upskill
-        definitionsSource = allUpskillDefs.filter(def => {
-            const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-            const isChild = linkedUpskillChildIds.has(def.id);
+        // When linking upskill items to deep work, only show top-level "Curiosities"
+        definitionsSource = upskillDefinitions.filter(def => {
+            const isUpskillParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+            const isUpskillChild = linkedUpskillChildIds.has(def.id);
             // A curiosity is a parent that is not a child of another upskill item.
-            return isParent && !isChild;
+            return isUpskillParent && !isUpskillChild;
         });
+
+        if (linkUpskillTopic) {
+            definitionsSource = definitionsSource.filter(def => def.category === linkUpskillTopic);
+        }
+
     } else if (type === 'deepwork') {
         definitionsSource = linkDeepWorkTopic ? deepWorkDefinitions.filter(d => d.category === linkDeepWorkTopic) : deepWorkDefinitions;
     } else { // 'resource'
@@ -1013,23 +1024,11 @@ function DeepWorkPageContent() {
         definitionsSource = resources.filter(res => res.folderId === linkResourceFolderId);
     }
 
-    const isParentParent = (parent.linkedDeepWorkIds?.length ?? 0) > 0 || (parent.linkedUpskillIds?.length ?? 0) > 0 || (parent.linkedResourceIds?.length ?? 0) > 0;
-    const isParentChild = linkedDeepWorkChildIds.has(parent.id);
-
-    const isParentAnObjective = type === 'deepwork' && isParentParent && isParentChild;
-    const isParentAnIntention = type === 'deepwork' && isParentParent && !isParentChild;
+    const isParentAnIntention = (parent.linkedDeepWorkIds?.length ?? 0) > 0 && !linkedDeepWorkChildIds.has(parent.id);
 
     return definitionsSource.filter(def => {
         if (type === 'deepwork') {
-            const isDefParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-            const isDefChild = linkedDeepWorkChildIds.has(def.id);
-            const isDefAnIntention = isDefParent && !isDefChild;
-            const isDefAnAction = !isDefParent;
-
-            if (isParentAnObjective && isDefAnIntention) {
-                return false;
-            }
-            
+            const isDefAnAction = (def.linkedDeepWorkIds?.length ?? 0) === 0;
             if (isParentAnIntention && isDefAnAction) {
                 return false;
             }
@@ -1219,6 +1218,13 @@ function DeepWorkPageContent() {
                                 <Bolt className="mr-2 h-4 w-4 text-blue-500" />
                                 <span>Actions</span>
                             </DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem
+                                checked={visibilityFilters.has('standalone')}
+                                onCheckedChange={() => handleVisibilityFilterChange('standalone')}
+                            >
+                                <Focus className="mr-2 h-4 w-4 text-purple-500" />
+                                <span>Standalone</span>
+                            </DropdownMenuCheckboxItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -1254,8 +1260,12 @@ function DeepWorkPageContent() {
                             {focusAreas.sort((a,b) => a.name.localeCompare(b.name)).map(def => {
                               const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
                               const isLinkedAsChild = linkedDeepWorkChildIds.has(def.id);
+                              
                               const isIntention = isParent && !isLinkedAsChild;
                               const isObjective = isParent && isLinkedAsChild;
+                              const isStandalone = !isParent && !isLinkedAsChild;
+                              const isAction = !isParent && isLinkedAsChild;
+
                               return (
                                 <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted" onContextMenu={(e) => handleFocusAreaContextMenu(e, def)}>
                                     <>
@@ -1264,6 +1274,8 @@ function DeepWorkPageContent() {
                                           <Lightbulb className="h-4 w-4 flex-shrink-0 text-amber-500" />
                                         ) : isObjective ? (
                                           <Flag className="h-4 w-4 flex-shrink-0 text-green-500" />
+                                        ) : isStandalone ? (
+                                          <Focus className="h-4 w-4 flex-shrink-0 text-purple-500" />
                                         ) : (
                                           <Bolt className="h-4 w-4 flex-shrink-0 text-blue-500" />
                                         )}
@@ -1469,6 +1481,7 @@ function DeepWorkPageContent() {
 
                                     const loggedMinutes = getUpskillLoggedMinutesRecursive(upskillDef);
                                     const loggedHours = loggedMinutes / 60;
+                                    const isComplete = isUpskillObjectiveComplete(upskillDef.id);
 
                                     return (
                                       <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
