@@ -350,7 +350,7 @@ function LinkedDeepWorkCard({
         setDroppableNodeRef(node);
     };
 
-    const isObjective = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 || (deepworkDef.linkedUpskillIds?.length ?? 0) > 0 || (deepworkDef.linkedResourceIds?.length ?? 0) > 0;
+    const isObjective = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0;
     const nodeType = isObjective ? 'Objective' : 'Action';
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
     const loggedHours = loggedMinutes / 60;
@@ -638,7 +638,7 @@ function DeepWorkPageContent() {
     const effectiveFilters = visibilityFilters.size === 0 ? new Set(['intention']) : visibilityFilters;
 
     const visibleDefinitions = deepWorkDefinitions.filter(def => {
-        const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+        const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
         const isLinkedAsChild = linkedDeepWorkChildIds.has(def.id);
 
         const isIntention = isParent && !isLinkedAsChild;
@@ -731,7 +731,7 @@ function DeepWorkPageContent() {
 
         (node.linkedUpskillIds || []).forEach(id => directUpskillLinkIds.add(id));
         
-        const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0 || (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+        const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0;
 
         if (!isParent) { // It's an Action (leaf node)
             deepWorkActionIds.add(node.id);
@@ -1665,7 +1665,7 @@ function DeepWorkPageContent() {
                       {!isCollapsed && (
                         <ul className="space-y-1 pl-4 border-l-2 border-muted ml-4">
                             {focusAreas.sort((a,b) => a.name.localeCompare(b.name)).map(def => {
-                              const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+                              const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
                               const isLinkedAsChild = linkedDeepWorkChildIds.has(def.id);
                               
                               const isIntention = isParent && !isLinkedAsChild;
