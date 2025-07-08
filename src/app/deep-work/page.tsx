@@ -1651,7 +1651,7 @@ function DeepWorkPageContent() {
                                           {youtubeEmbedUrl ? (
                                               <>
                                                   <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setEmbedUrl(embedLinkForModal); }} onMouseDown={(e) => e.stopPropagation()}>
+                                                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
                                                           <Expand className="h-4 w-4" />
                                                       </Button>
                                                       <DropdownMenu>
@@ -1694,12 +1694,12 @@ function DeepWorkPageContent() {
                                               <>
                                                   <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                       {isNotionObsidianEmbed ? (
-                                                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setEmbedUrl(embedLinkForModal); }} onMouseDown={(e) => e.stopPropagation()}>
+                                                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
                                                               <Expand className="h-4 w-4" />
                                                           </Button>
                                                       ) : (
                                                           <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
-                                                              <a href={upskillDef.link} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                                                              <a href={upskillDef.link} target="_blank" rel="noopener noreferrer" onMouseDown={(e) => e.stopPropagation()}>
                                                                   <ExternalLink className="h-4 w-4" />
                                                               </a>
                                                           </Button>
@@ -1791,7 +1791,7 @@ function DeepWorkPageContent() {
                                                   <Tooltip>
                                                     <TooltipTrigger asChild>
                                                       <span tabIndex={isObjective ? -1 : 0}>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); handleAddTaskToSession(deepworkDef); }} disabled={isObjective} onMouseDown={(e) => e.stopPropagation()}>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => handleAddTaskToSession(deepworkDef)} disabled={isObjective} onMouseDown={(e) => e.stopPropagation()}>
                                                           <PlusCircle className="h-4 w-4" />
                                                         </Button>
                                                       </span>
@@ -1799,7 +1799,7 @@ function DeepWorkPageContent() {
                                                     <TooltipContent>{isObjective ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent>
                                                   </Tooltip>
                                                 </TooltipProvider>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setSelectedFocusArea(deepworkDef); setViewMode('library'); }} onMouseDown={(e) => e.stopPropagation()}>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => { setSelectedFocusArea(deepworkDef); setViewMode('library'); }} onMouseDown={(e) => e.stopPropagation()}>
                                                     <ArrowRight className="h-4 w-4" />
                                                 </Button>
                                                 <DropdownMenu>
@@ -1898,12 +1898,12 @@ function DeepWorkPageContent() {
                                               {youtubeEmbedUrl ? (
                                                   <>
                                                       <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setEmbedUrl(embedLinkForModal); }}>
+                                                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
                                                               <Expand className="h-4 w-4" />
                                                           </Button>
                                                           <DropdownMenu>
                                                               <DropdownMenuTrigger asChild>
-                                                                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white">
+                                                                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onMouseDown={(e) => e.stopPropagation()}>
                                                                       <MoreVertical className="h-4 w-4" />
                                                                   </Button>
                                                               </DropdownMenuTrigger>
@@ -1932,19 +1932,19 @@ function DeepWorkPageContent() {
                                                   <>
                                                       <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                           {isNotionObsidianEmbed ? (
-                                                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setEmbedUrl(embedLinkForModal); }}>
+                                                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
                                                               <Expand className="h-4 w-4" />
                                                           </Button>
                                                           ) : (
                                                               <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
-                                                                  <a href={resource.link} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                                                                  <a href={resource.link} target="_blank" rel="noopener noreferrer" onMouseDown={(e) => e.stopPropagation()}>
                                                                       <ExternalLink className="h-4 w-4" />
                                                                   </a>
                                                               </Button>
                                                           )}
                                                           <DropdownMenu>
                                                               <DropdownMenuTrigger asChild>
-                                                                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
+                                                                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onMouseDown={(e) => e.stopPropagation()}>
                                                                       <MoreVertical className="h-4 w-4" />
                                                                   </Button>
                                                               </DropdownMenuTrigger>
