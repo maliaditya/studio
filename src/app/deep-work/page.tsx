@@ -1633,7 +1633,7 @@ function DeepWorkPageContent() {
                                 <div className="space-y-3">
                                   <h3 className="font-semibold flex items-center gap-2"><BookCopy className="h-5 w-5 text-primary" /> Linked Learning</h3>
                                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {(selectedFocusArea.linkedUpskillIds || []).map(id => {
+                                    {(selectedFocusArea.linkedUpskillIds || []).map((id, index) => {
                                       const upskillDef = upskillDefinitions.find(ud => ud.id === id);
                                       if (!upskillDef) return null;
                                       
@@ -1646,7 +1646,7 @@ function DeepWorkPageContent() {
                                       const isComplete = isUpskillObjectiveComplete(upskillDef.id);
   
                                       return (
-                                        <DraggableDroppableCard key={id} id={id}>
+                                        <DraggableDroppableCard key={`${id}-${index}`} id={id}>
                                         <Card className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
                                           {youtubeEmbedUrl ? (
                                               <>
@@ -1773,7 +1773,7 @@ function DeepWorkPageContent() {
                                   <h3 className="font-semibold flex items-center gap-2"><LinkIcon className="h-5 w-5 text-primary" /> Linked Work</h3>
                                   <DroppableArea id={`linked-work-area-${selectedFocusArea.id}`} className="-m-2 p-2">
                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {(selectedFocusArea.linkedDeepWorkIds || []).map(id => {
+                                    {(selectedFocusArea.linkedDeepWorkIds || []).map((id, index) => {
                                       const deepworkDef = deepWorkDefinitions.find(dd => dd.id === id);
                                       if (!deepworkDef) return null;
   
@@ -1784,7 +1784,7 @@ function DeepWorkPageContent() {
                                       const isPermanentlyLogged = permanentlyLoggedActionIds.has(deepworkDef.id);
                                       
                                       return (
-                                        <DraggableDroppableCard key={id} id={id}>
+                                        <DraggableDroppableCard key={`${id}-${index}`} id={id}>
                                          <Card className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]", isPermanentlyLogged && !isObjective && "opacity-70 bg-muted/30")}>
                                             <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <TooltipProvider>
@@ -1885,7 +1885,7 @@ function DeepWorkPageContent() {
                                 <div className="space-y-3">
                                   <h3 className="font-semibold flex items-center gap-2"><Library className="h-5 w-5 text-primary" /> Linked Resources</h3>
                                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {(selectedFocusArea.linkedResourceIds || []).map(id => {
+                                    {(selectedFocusArea.linkedResourceIds || []).map((id, index) => {
                                       const resource = resources.find(r => r.id === id);
                                       if (!resource) return null;
   
@@ -1894,7 +1894,7 @@ function DeepWorkPageContent() {
                                       const embedLinkForModal = youtubeEmbedUrl || (isNotionObsidianEmbed ? resource.link : null);
   
                                       return (
-                                          <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
+                                          <Card key={`${id}-${index}`} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
                                               {youtubeEmbedUrl ? (
                                                   <>
                                                       <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
