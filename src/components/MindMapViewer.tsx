@@ -215,6 +215,29 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
 
   const mindMapData = useMemo((): MindMapNode | null => {
     const processedIds = new Set<string>();
+    
+    const buildUpskillSubTree = (id: string, parentUniqueId: string): MindMapNode | null => {
+        const uniqueId = `upskill-subtree-${id}-from-${parentUniqueId}`;
+        if (processedIds.has(uniqueId)) {
+            const item = upskillDefinitions.find(d => d.id === id);
+            return { id: uniqueId, definitionId: id, name: `${item?.name || 'Item'} (cyclic link)`, category: 'Cyclic', children: [] };
+        }
+        processedIds.add(uniqueId);
+
+        const definition = upskillDefinitions.find(d => d.id === id);
+        if (!definition) return null;
+
+        const linkedUpskillNodes = (definition.linkedUpskillIds || []).map(childId => buildUpskillSubTree(childId, uniqueId)).filter((n): n is MindMapNode => !!n);
+        const linkedResourceNodes = (definition.linkedResourceIds || []).map(childId => buildNodeRecursive(childId, 'resource', uniqueId)).filter((n): n is MindMapNode => !!n);
+
+        return {
+            ...definition,
+            id: uniqueId,
+            definitionId: definition.id,
+            category: 'Learning Task',
+            children: [...linkedUpskillNodes, ...linkedResourceNodes],
+        };
+    };
 
     const upskillParentMap = new Map<string, string>();
     upskillDefinitions.forEach(parent => {
@@ -245,7 +268,6 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         const linkedDeepWorkNodes = (definition.linkedDeepWorkIds || []).map(childId => buildNodeRecursive(childId, 'deepwork', uniqueId)).filter((n): n is MindMapNode => !!n);
         const linkedResourceNodes = (definition.linkedResourceIds || []).map(childId => buildNodeRecursive(childId, 'resource', uniqueId)).filter((n): n is MindMapNode => !!n);
 
-        // -- New logic for full-flow upskill linking --
         const linkedUpskillIds = definition.linkedUpskillIds || [];
         const rootCuriosityIds = new Set<string>();
         linkedUpskillIds.forEach(visualizationId => {
@@ -262,7 +284,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         });
         
         const upstreamCuriosityTrees = Array.from(rootCuriosityIds)
-            .map(curiosityId => buildNodeRecursive(curiosityId, 'upskill', uniqueId))
+            .map(curiosityId => buildUpskillSubTree(curiosityId, uniqueId))
             .filter((n): n is MindMapNode => !!n);
         
         return {
@@ -818,7 +840,6 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         else if (!isParent && isChild) iconKey = 'Visualization'; // Frame
         else iconKey = 'Standalone'; // Lightbulb
     }
-    if (!nodeIcons[iconKey] && level >= 4 && selectedTopic !== 'Resources') iconKey = 'FocusArea';
     if (node.category === 'Folder') iconKey = 'Folder';
     if (node.category === 'Resource') iconKey = 'Resource';
 
