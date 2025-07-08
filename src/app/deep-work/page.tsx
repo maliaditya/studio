@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -118,45 +118,6 @@ const isObsidianUrl = (url: string): boolean => {
     } catch (e) {
         return false;
     }
-};
-
-// Helper component for drag and drop functionality
-const DraggableDroppableCard: React.FC<{
-  id: string;
-  children: React.ReactNode;
-  disabled?: boolean;
-}> = ({ id, children, disabled = false }) => {
-  const { attributes, listeners, setNodeRef: setDraggableNodeRef, transform, isDragging } = useDraggable({
-    id,
-    disabled,
-  });
-
-  const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({
-    id,
-    disabled,
-  });
-
-  const style = transform ? {
-    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-    zIndex: 100, // Make sure it's on top while dragging
-  } : undefined;
-  
-  const clonedChild = React.cloneElement(children as React.ReactElement, {
-    className: cn(
-      (children as React.ReactElement).props.className,
-      isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background",
-      // Apply scale and other effects when dragging
-      isDragging && "scale-95 opacity-80 shadow-2xl",
-    )
-  });
-
-  return (
-    <div ref={setDroppableNodeRef}>
-      <div ref={setDraggableNodeRef} style={style} {...attributes} {...listeners}>
-        {clonedChild}
-      </div>
-    </div>
-  );
 };
 
 
@@ -1644,120 +1605,144 @@ function DeepWorkPageContent() {
                                       const loggedMinutes = getUpskillLoggedMinutesRecursive(upskillDef);
                                       const loggedHours = loggedMinutes / 60;
                                       const isComplete = isUpskillObjectiveComplete(upskillDef.id);
-  
+                                      
+                                      const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id });
+                                      const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
+                                      
+                                      const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: isDragging ? 100 : 'auto', } : undefined;
+
+                                      const setCombinedRefs = (node: HTMLElement | null) => {
+                                          setNodeRef(node);
+                                          setDroppableNodeRef(node);
+                                      };
+
                                       return (
-                                        <DraggableDroppableCard key={`${id}-${index}`} id={id}>
-                                        <Card className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
-                                          {youtubeEmbedUrl ? (
-                                              <>
-                                                  <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
-                                                          <Expand className="h-4 w-4" />
-                                                      </Button>
-                                                      <DropdownMenu>
-                                                          <DropdownMenuTrigger asChild>
-                                                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onMouseDown={(e) => e.stopPropagation()}>
-                                                                  <MoreVertical className="h-4 w-4" />
-                                                              </Button>
-                                                          </DropdownMenuTrigger>
-                                                          <DropdownMenuContent align="end" onMouseDown={(e) => e.stopPropagation()}>
-                                                              <DropdownMenuItem onSelect={() => handleViewProgress(upskillDef, 'upskill')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
-                                                              <DropdownMenuSeparator />
-                                                              <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                                              <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
-                                                              <DropdownMenuItem onSelect={() => handleDeleteUpskillDefinition(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
-                                                          </DropdownMenuContent>
-                                                      </DropdownMenu>
-                                                  </div>
-                                                  <div className="aspect-video w-full bg-black overflow-hidden rounded-t-2xl">
-                                                      <iframe src={youtubeEmbedUrl} title={upskillDef.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
-                                                  </div>
-                                                  <div className="p-4 flex-grow flex flex-col">
-                                                    <div className="flex items-start justify-between gap-2 flex-grow">
-                                                      <div className="flex-grow min-w-0">
-                                                          <div className="flex items-center gap-2">
-                                                              <Youtube className="h-5 w-5 flex-shrink-0 text-red-500" />
-                                                              <p className="text-base font-bold truncate" title={upskillDef.name}>{upskillDef.name}</p>
-                                                          </div>
-                                                          <CardDescription className="text-xs">{upskillDef.category}</CardDescription>
-                                                      </div>
-                                                    </div>
-                                                    <div className="mt-auto pt-2 flex items-center justify-end">
-                                                      <div className="flex items-center gap-1 flex-shrink-0">
-                                                          {upskillDef.estimatedHours && <Badge variant="outline">{upskillDef.estimatedHours}h est.</Badge>}
-                                                          {loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}
-                                                      </div>
-                                                    </div>
-                                                  </div>
-                                              </>
-                                          ) : (
-                                              <>
-                                                  <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                      {isNotionObsidianEmbed ? (
-                                                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
-                                                              <Expand className="h-4 w-4" />
-                                                          </Button>
-                                                      ) : (
-                                                          <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
-                                                              <a href={upskillDef.link} target="_blank" rel="noopener noreferrer" onMouseDown={(e) => e.stopPropagation()}>
-                                                                  <ExternalLink className="h-4 w-4" />
-                                                              </a>
-                                                          </Button>
-                                                      )}
-                                                      <DropdownMenu>
-                                                          <DropdownMenuTrigger asChild>
-                                                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onMouseDown={(e) => e.stopPropagation()}>
-                                                                  <MoreVertical className="h-4 w-4" />
-                                                              </Button>
-                                                          </DropdownMenuTrigger>
-                                                          <DropdownMenuContent align="end" onMouseDown={(e) => e.stopPropagation()}>
-                                                              <DropdownMenuItem onSelect={() => handleViewProgress(upskillDef, 'upskill')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
-                                                              <DropdownMenuSeparator />
-                                                              <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                                              <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
-                                                              <DropdownMenuItem onSelect={() => handleDeleteUpskillDefinition(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
-                                                          </DropdownMenuContent>
-                                                      </DropdownMenu>
-                                                  </div>
-                                                  <CardHeader className="pb-3">
-                                                    <CardTitle className="text-base flex items-center gap-2">
-                                                      <Flashlight className="h-5 w-5 text-amber-500 flex-shrink-0" />
-                                                      <span className="truncate" title={upskillDef.name}>{upskillDef.name}</span>
-                                                    </CardTitle>
-                                                    <CardDescription>{upskillDef.category}</CardDescription>
-                                                  </CardHeader>
-                                                  <CardContent className="flex-grow">
-                                                      {(upskillDef.linkedUpskillIds?.length ?? 0) > 0 ? (
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                                                          {(upskillDef.linkedUpskillIds || []).map(childId => {
-                                                            const childDef = upskillDefinitions.find(d => d.id === childId);
-                                                            if (!childDef) return null;
-                                                            const isChildComplete = isUpskillObjectiveComplete(childId);
-                                                            return (
-                                                              <DraggableSubtaskItem 
-                                                                  key={childId}
-                                                                  childId={childId}
-                                                                  parentId={upskillDef.id}
-                                                                  childName={childDef.name}
-                                                                  isLogged={isChildComplete}
-                                                              />
-                                                            );
-                                                          })}
+                                        <div 
+                                            ref={setCombinedRefs} 
+                                            style={style} 
+                                            key={`${id}-${index}`}
+                                            className={cn(isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-2xl", isDragging && "opacity-80 shadow-2xl")}
+                                        >
+                                            <Card className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]">
+                                                <button
+                                                  ref={setActivatorNodeRef}
+                                                  {...listeners}
+                                                  {...attributes}
+                                                  className="absolute top-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted"
+                                                  onMouseDown={(e) => e.stopPropagation()}
+                                                >
+                                                  <GripVertical className="h-5 w-5 text-muted-foreground" />
+                                                </button>
+                                                {youtubeEmbedUrl ? (
+                                                    <>
+                                                        <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
+                                                                <Expand className="h-4 w-4" />
+                                                            </Button>
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onMouseDown={(e) => e.stopPropagation()}>
+                                                                        <MoreVertical className="h-4 w-4" />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end" onMouseDown={(e) => e.stopPropagation()}>
+                                                                    <DropdownMenuItem onSelect={() => handleViewProgress(upskillDef, 'upskill')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+                                                                    <DropdownMenuSeparator />
+                                                                    <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                                                    <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                                                                    <DropdownMenuItem onSelect={() => handleDeleteUpskillDefinition(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
                                                         </div>
-                                                      ) : (
-                                                        <p className="text-sm text-muted-foreground line-clamp-2">{upskillDef.description || "This curiosity has no objectives yet."}</p>
-                                                      )}
-                                                  </CardContent>
-                                                  <CardFooter className="pt-3 flex items-center justify-end">
-                                                    <div className="flex items-center gap-1 flex-shrink-0">
-                                                      {upskillDef.estimatedHours && <Badge variant="outline" className="flex-shrink-0">{upskillDef.estimatedHours}h est.</Badge>}
-                                                      {loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}
-                                                    </div>
-                                                  </CardFooter>
-                                              </>
-                                          )}
-                                        </Card>
-                                        </DraggableDroppableCard>
+                                                        <div className="aspect-video w-full bg-black overflow-hidden rounded-t-2xl">
+                                                            <iframe src={youtubeEmbedUrl} title={upskillDef.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
+                                                        </div>
+                                                        <div className="p-4 flex-grow flex flex-col">
+                                                          <div className="flex items-start justify-between gap-2 flex-grow">
+                                                            <div className="flex-grow min-w-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <Youtube className="h-5 w-5 flex-shrink-0 text-red-500" />
+                                                                    <p className="text-base font-bold truncate" title={upskillDef.name}>{upskillDef.name}</p>
+                                                                </div>
+                                                                <CardDescription className="text-xs">{upskillDef.category}</CardDescription>
+                                                            </div>
+                                                          </div>
+                                                          <div className="mt-auto pt-2 flex items-center justify-end">
+                                                            <div className="flex items-center gap-1 flex-shrink-0">
+                                                                {upskillDef.estimatedHours && <Badge variant="outline">{upskillDef.estimatedHours}h est.</Badge>}
+                                                                {loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}
+                                                            </div>
+                                                          </div>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            {isNotionObsidianEmbed ? (
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
+                                                                    <Expand className="h-4 w-4" />
+                                                                </Button>
+                                                            ) : (
+                                                                <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
+                                                                    <a href={upskillDef.link} target="_blank" rel="noopener noreferrer" onMouseDown={(e) => e.stopPropagation()}>
+                                                                        <ExternalLink className="h-4 w-4" />
+                                                                    </a>
+                                                                </Button>
+                                                            )}
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onMouseDown={(e) => e.stopPropagation()}>
+                                                                        <MoreVertical className="h-4 w-4" />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end" onMouseDown={(e) => e.stopPropagation()}>
+                                                                    <DropdownMenuItem onSelect={() => handleViewProgress(upskillDef, 'upskill')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+                                                                    <DropdownMenuSeparator />
+                                                                    <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                                                    <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                                                                    <DropdownMenuItem onSelect={() => handleDeleteUpskillDefinition(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </div>
+                                                        <CardHeader className="pb-3">
+                                                          <CardTitle className="text-base flex items-center gap-2">
+                                                            <Flashlight className="h-5 w-5 text-amber-500 flex-shrink-0" />
+                                                            <span className="truncate" title={upskillDef.name}>{upskillDef.name}</span>
+                                                          </CardTitle>
+                                                          <CardDescription>{upskillDef.category}</CardDescription>
+                                                        </CardHeader>
+                                                        <CardContent className="flex-grow">
+                                                            {(upskillDef.linkedUpskillIds?.length ?? 0) > 0 ? (
+                                                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                                                                {(upskillDef.linkedUpskillIds || []).map(childId => {
+                                                                  const childDef = upskillDefinitions.find(d => d.id === childId);
+                                                                  if (!childDef) return null;
+                                                                  const isChildComplete = isUpskillObjectiveComplete(childId);
+                                                                  return (
+                                                                    <DraggableSubtaskItem 
+                                                                        key={childId}
+                                                                        childId={childId}
+                                                                        parentId={upskillDef.id}
+                                                                        childName={childDef.name}
+                                                                        isLogged={isChildComplete}
+                                                                    />
+                                                                  );
+                                                                })}
+                                                              </div>
+                                                            ) : (
+                                                              <p className="text-sm text-muted-foreground line-clamp-2">{upskillDef.description || "This curiosity has no objectives yet."}</p>
+                                                            )}
+                                                        </CardContent>
+                                                        <CardFooter className="pt-3 flex items-center justify-end">
+                                                          <div className="flex items-center gap-1 flex-shrink-0">
+                                                            {upskillDef.estimatedHours && <Badge variant="outline" className="flex-shrink-0">{upskillDef.estimatedHours}h est.</Badge>}
+                                                            {loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}
+                                                          </div>
+                                                        </CardFooter>
+                                                    </>
+                                                )}
+                                            </Card>
+                                        </div>
                                       )
                                     })}
                                     <Card 
@@ -1783,9 +1768,28 @@ function DeepWorkPageContent() {
                                       const loggedHours = loggedMinutes / 60;
                                       const isPermanentlyLogged = permanentlyLoggedActionIds.has(deepworkDef.id);
                                       
+                                      const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id });
+                                      const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
+                                      
+                                      const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: isDragging ? 100 : 'auto', } : undefined;
+
+                                      const setCombinedRefs = (node: HTMLElement | null) => {
+                                          setNodeRef(node);
+                                          setDroppableNodeRef(node);
+                                      };
+                                      
                                       return (
-                                        <DraggableDroppableCard key={`${id}-${index}`} id={id}>
-                                         <Card className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]", isPermanentlyLogged && !isObjective && "opacity-70 bg-muted/30")}>
+                                        <div ref={setCombinedRefs} style={style} key={`${id}-${index}`} className={cn(isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-2xl", isDragging && "opacity-80 shadow-2xl")}>
+                                         <Card className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isPermanentlyLogged && !isObjective && "opacity-70 bg-muted/30")}>
+                                            <button
+                                                ref={setActivatorNodeRef}
+                                                {...listeners}
+                                                {...attributes}
+                                                className="absolute top-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted"
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                            >
+                                                <GripVertical className="h-5 w-5 text-muted-foreground" />
+                                            </button>
                                             <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <TooltipProvider>
                                                   <Tooltip>
@@ -1869,7 +1873,7 @@ function DeepWorkPageContent() {
                                               </div>
                                             </CardFooter>
                                          </Card>
-                                        </DraggableDroppableCard>
+                                        </div>
                                       );
                                     })}
                                     <Card 
