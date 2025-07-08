@@ -1171,18 +1171,72 @@ function DeepWorkPageContent() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-
-    if (!over || active.id === over.id) {
-      return;
+  
+    if (!over) return;
+  
+    // Case 1: Promoting a sub-task to a main linked task
+    if (typeof active.id === 'string' && active.id.startsWith('subtask-') && typeof over.id === 'string' && over.id.startsWith('linked-work-area')) {
+        const [_, childId, __, parentId] = active.id.split('-');
+        
+        // Determine if child is deep work or upskill
+        const childIsDeepWork = deepWorkDefinitions.some(d => d.id === childId);
+        const childIsUpskill = upskillDefinitions.some(d => d.id === childId);
+  
+        // Remove from old parent (which can be deep work or upskill def)
+        setDeepWorkDefinitions(prev => prev.map(def => {
+            if (def.id === parentId) {
+                return {
+                    ...def,
+                    linkedDeepWorkIds: (def.linkedDeepWorkIds || []).filter(id => id !== childId),
+                    linkedUpskillIds: (def.linkedUpskillIds || []).filter(id => id !== childId)
+                };
+            }
+            return def;
+        }));
+        setUpskillDefinitions(prev => prev.map(def => {
+            if (def.id === parentId) {
+                return {
+                    ...def,
+                    linkedUpskillIds: (def.linkedUpskillIds || []).filter(id => id !== childId)
+                };
+            }
+            return def;
+        }));
+  
+        // Add the child to the main selectedFocusArea
+        if (selectedFocusArea) {
+            let updatedFocusArea: ExerciseDefinition;
+            if (childIsDeepWork) {
+                updatedFocusArea = {
+                    ...selectedFocusArea,
+                    linkedDeepWorkIds: [...(selectedFocusArea.linkedDeepWorkIds || []), childId]
+                }
+            } else if (childIsUpskill) {
+                updatedFocusArea = {
+                    ...selectedFocusArea,
+                    linkedUpskillIds: [...(selectedFocusArea.linkedUpskillIds || []), childId]
+                }
+            } else {
+                return; // should not happen
+            }
+  
+            setDeepWorkDefinitions(prev => prev.map(def => def.id === selectedFocusArea.id ? updatedFocusArea : def));
+            setSelectedFocusArea(updatedFocusArea);
+            toast({ title: "Task Promoted", description: "The sub-task is now a direct child of the focus area." });
+        }
+        return;
     }
-
+  
+    // Case 2: Linking one main task to another (existing logic)
+    if (active.id === over.id) return;
+  
     const draggedId = active.id as string;
     const targetId = over.id as string;
-
+  
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
     const draggedDef = allDefs.find(d => d.id === draggedId);
     const targetDef = allDefs.find(d => d.id === targetId);
-
+  
     if (!draggedDef || !targetDef || !selectedFocusArea) {
       toast({ title: "Error", description: "Could not find items to link.", variant: "destructive" });
       return;
@@ -1192,15 +1246,15 @@ function DeepWorkPageContent() {
       ...(selectedFocusArea.linkedDeepWorkIds || []),
       ...(selectedFocusArea.linkedUpskillIds || []),
     ]);
-
+  
     if (!parentChildrenIds.has(draggedId) || !parentChildrenIds.has(targetId)) {
         toast({ title: "Link Error", description: "Can only link sibling items within the same focus area.", variant: "destructive" });
         return;
     }
-
+  
     const isDraggedUpskill = upskillDefinitions.some(d => d.id === draggedId);
     const isTargetUpskill = upskillDefinitions.some(d => d.id === targetId);
-
+  
     if (isTargetUpskill) {
         toast({ title: "Invalid Link", description: "You can only link items to a Deep Work Focus Area, not a Learning Task.", variant: "destructive" });
         return;
@@ -1226,10 +1280,55 @@ function DeepWorkPageContent() {
     setDeepWorkDefinitions(prev => prev.map(def => def.id === selectedFocusArea.id ? updatedParent : def));
     
     setSelectedFocusArea(updatedParent);
-
+  
     toast({ title: "Re-linked!", description: `"${draggedDef.name}" is now a sub-task of "${targetDef.name}".` });
   };
 
+  const DroppableArea: React.FC<{ id: string; children: React.ReactNode; className?: string; }> = ({ id, children, className }) => {
+    const { isOver, setNodeRef } = useDroppable({ id });
+    return (
+        <div ref={setNodeRef} className={cn("rounded-lg transition-colors", isOver && "bg-primary/10", className)}>
+            {children}
+        </div>
+    );
+  };
+  
+  const DraggableSubtaskItem: React.FC<{ 
+    childId: string;
+    parentId: string;
+    childName: string;
+    isLogged: boolean;
+  }> = ({ childId, parentId, childName, isLogged }) => {
+    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+        id: `subtask-${childId}-from-${parentId}`,
+    });
+  
+    const style = transform ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        zIndex: 100,
+        backgroundColor: 'hsl(var(--card))',
+        padding: '2px 4px',
+        borderRadius: '4px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+    } : undefined;
+  
+    return (
+        <div 
+            ref={setNodeRef} 
+            style={style} 
+            {...listeners} 
+            {...attributes} 
+            className={cn(
+                "text-xs text-muted-foreground truncate cursor-grab", 
+                isLogged && "line-through text-muted-foreground/70",
+                isDragging && "opacity-50"
+            )} 
+            title={childName}
+        >
+            - {childName}
+        </div>
+    );
+  };
 
   if (isLoadingPage) {
     return (
@@ -1635,12 +1734,13 @@ function DeepWorkPageContent() {
                                                             if (!childDef) return null;
                                                             const isChildComplete = isUpskillObjectiveComplete(childId);
                                                             return (
-                                                              <div key={childId} className="flex items-center gap-1.5" title={childDef.name}>
-                                                                  <Focus className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
-                                                                  <div className={cn("text-xs text-muted-foreground truncate", isChildComplete && "line-through text-muted-foreground/70")}>
-                                                                      {childDef.name}
-                                                                  </div>
-                                                              </div>
+                                                              <DraggableSubtaskItem 
+                                                                  key={childId}
+                                                                  childId={childId}
+                                                                  parentId={upskillDef.id}
+                                                                  childName={childDef.name}
+                                                                  isLogged={isChildComplete}
+                                                              />
                                                             );
                                                           })}
                                                         </div>
@@ -1671,6 +1771,7 @@ function DeepWorkPageContent() {
                                 </div>
                                 <div className="space-y-3">
                                   <h3 className="font-semibold flex items-center gap-2"><LinkIcon className="h-5 w-5 text-primary" /> Linked Work</h3>
+                                  <DroppableArea id={`linked-work-area-${selectedFocusArea.id}`} className="-m-2 p-2">
                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                                     {(selectedFocusArea.linkedDeepWorkIds || []).map(id => {
                                       const deepworkDef = deepWorkDefinitions.find(dd => dd.id === id);
@@ -1744,13 +1845,13 @@ function DeepWorkPageContent() {
                                                               if (!childDef) return null;
                                                               const isChildPermanentlyLogged = permanentlyLoggedActionIds.has(childDef.id);
                                                               return (
-                                                                  <div 
-                                                                      key={childId} 
-                                                                      className={cn("text-xs text-muted-foreground truncate", isChildPermanentlyLogged && "line-through text-muted-foreground/70")} 
-                                                                      title={childDef.name}
-                                                                  >
-                                                                      - {childDef.name}
-                                                                  </div>
+                                                                  <DraggableSubtaskItem
+                                                                      key={childId}
+                                                                      childId={childId}
+                                                                      parentId={deepworkDef.id}
+                                                                      childName={childDef.name}
+                                                                      isLogged={isChildPermanentlyLogged}
+                                                                  />
                                                               );
                                                           })}
                                                       </div>
@@ -1779,6 +1880,7 @@ function DeepWorkPageContent() {
                                         <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Focus Area</p>
                                     </Card>
                                   </div>
+                                  </DroppableArea>
                                 </div>
                                 <div className="space-y-3">
                                   <h3 className="font-semibold flex items-center gap-2"><Library className="h-5 w-5 text-primary" /> Linked Resources</h3>
