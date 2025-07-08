@@ -18,7 +18,7 @@ import type { ExerciseDefinition, CanvasNode, ActivityType, CanvasEdge } from '@
 import { format } from 'date-fns';
 
 // Draggable Node Component
-function DraggableNode({ node, definition, status, onConnectClick, onRemoveClick, onExpandNode, onClickForConnection, isConnecting, isHovered }: {
+function DraggableNode({ node, definition, status, onConnectClick, onRemoveClick, onExpandNode, onClickForConnection, isConnecting, isHovered, canExpand }: {
   node: CanvasNode;
   definition: ExerciseDefinition;
   status: any;
@@ -28,6 +28,7 @@ function DraggableNode({ node, definition, status, onConnectClick, onRemoveClick
   onClickForConnection: (nodeId: string) => void;
   isConnecting: boolean;
   isHovered: boolean;
+  canExpand: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: node.id,
@@ -36,8 +37,6 @@ function DraggableNode({ node, definition, status, onConnectClick, onRemoveClick
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
   } : undefined;
-  
-  const hasChildren = (definition.linkedDeepWorkIds?.length ?? 0) > 0 || (definition.linkedUpskillIds?.length ?? 0) > 0;
 
   const getIcon = () => {
     if (definition.category === 'Learning Task') {
@@ -78,7 +77,7 @@ function DraggableNode({ node, definition, status, onConnectClick, onRemoveClick
           </div>
         </div>
         <CardContent className="p-2 border-t flex justify-end gap-1">
-          {hasChildren && (
+          {canExpand && (
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onExpandNode(node.id)}>
                 <PlusCircle className="h-4 w-4" />
             </Button>
@@ -190,58 +189,97 @@ function CanvasPageContent() {
       [...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])
   ), [deepWorkDefinitions, upskillDefinitions]);
 
-  const handleExpandNode = (nodeId: string) => {
-    const parentDef = allDefinitions.get(nodeId);
-    const parentNode = canvasLayout.nodes.find(n => n.id === nodeId);
-    if (!parentDef || !parentNode) return;
-
-    const childIds = [
-        ...(parentDef.linkedDeepWorkIds || []),
-        ...(parentDef.linkedUpskillIds || []),
-    ];
-    
-    if (childIds.length === 0) return;
-
-    const newNodes: CanvasNode[] = [];
-    const newEdges: CanvasEdge[] = [];
-    const existingNodeIds = new Set(canvasLayout.nodes.map(n => n.id));
-
-    const validChildIds = childIds.filter(id => allDefinitions.has(id));
-
-    validChildIds.forEach((childId, index) => {
-        if (!existingNodeIds.has(childId)) {
-            newNodes.push({
-                id: childId,
-                x: parentNode.x + 240,
-                y: parentNode.y + (index * 90) - ((validChildIds.length - 1) * 45),
-            });
-            existingNodeIds.add(childId);
-        }
-        
-        const edgeId = `${nodeId}-${childId}`;
-        const reverseEdgeId = `${childId}-${nodeId}`;
-        const edgeExists = canvasLayout.edges.some(e => e.id === edgeId || e.id === reverseEdgeId);
-        
-        if (!edgeExists) {
-            newEdges.push({
-                id: edgeId,
-                source: nodeId,
-                target: childId,
-            });
-        }
+  const parentMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    allDefinitions.forEach(def => {
+        const childIds = [...(def.linkedDeepWorkIds || []), ...(def.linkedUpskillIds || [])];
+        childIds.forEach(childId => {
+            if (!map.has(childId)) {
+                map.set(childId, []);
+            }
+            map.get(childId)!.push(def.id);
+        });
     });
-
-    if (newNodes.length > 0 || newEdges.length > 0) {
-        setCanvasLayout(prev => ({
-            nodes: [...prev.nodes, ...newNodes],
-            edges: [...prev.edges, ...newEdges],
-        }));
-    }
-  };
+    return map;
+  }, [allDefinitions]);
 
   const nodePositions = useMemo(() => new Map(
       canvasLayout.nodes.map(node => [node.id, { x: node.x, y: node.y }])
   ), [canvasLayout.nodes]);
+
+  const handleExpandNode = (nodeId: string) => {
+    const currentNodeDef = allDefinitions.get(nodeId);
+    const currentNode = canvasLayout.nodes.find(n => n.id === nodeId);
+    if (!currentNodeDef || !currentNode) return;
+
+    // --- Part 1: Expand Children (current logic) ---
+    const childIds = [
+        ...(currentNodeDef.linkedDeepWorkIds || []),
+        ...(currentNodeDef.linkedUpskillIds || []),
+    ];
+    
+    if (childIds.length > 0) {
+        const newNodes: CanvasNode[] = [];
+        const newEdges: CanvasEdge[] = [];
+        const existingNodeIds = new Set(canvasLayout.nodes.map(n => n.id));
+        const validChildIds = childIds.filter(id => allDefinitions.has(id));
+
+        validChildIds.forEach((childId, index) => {
+            if (!existingNodeIds.has(childId)) {
+                newNodes.push({
+                    id: childId,
+                    x: currentNode.x + 240, // Position children to the right
+                    y: currentNode.y + (index * 90) - ((validChildIds.length - 1) * 45),
+                });
+                existingNodeIds.add(childId);
+            }
+            
+            const edgeId = `${nodeId}-${childId}`;
+            const reverseEdgeId = `${childId}-${nodeId}`;
+            if (!canvasLayout.edges.some(e => e.id === edgeId || e.id === reverseEdgeId)) {
+                newEdges.push({ id: edgeId, source: nodeId, target: childId });
+            }
+        });
+
+        if (newNodes.length > 0 || newEdges.length > 0) {
+            setCanvasLayout(prev => ({
+                nodes: [...prev.nodes, ...newNodes],
+                edges: [...prev.edges, ...newEdges],
+            }));
+        }
+        return; // Prioritize expanding children
+    }
+    
+    // --- Part 2: Expand Parents (new logic) ---
+    const potentialParents = parentMap.get(nodeId) || [];
+    const parentsToLoad = potentialParents.filter(parentId => !nodePositions.has(parentId));
+
+    if (parentsToLoad.length > 0) {
+        const newNodes: CanvasNode[] = [];
+        const newEdges: CanvasEdge[] = [];
+
+        parentsToLoad.forEach((parentId, index) => {
+            newNodes.push({
+                id: parentId,
+                x: currentNode.x - 240, // Position parents to the left
+                y: currentNode.y + (index * 90) - ((parentsToLoad.length - 1) * 45),
+            });
+            
+            const edgeId = `${parentId}-${nodeId}`;
+            const reverseEdgeId = `${nodeId}-${parentId}`;
+            if (!canvasLayout.edges.some(e => e.id === edgeId || e.id === reverseEdgeId)) {
+                newEdges.push({ id: edgeId, source: parentId, target: nodeId });
+            }
+        });
+
+        if (newNodes.length > 0 || newEdges.length > 0) {
+            setCanvasLayout(prev => ({
+                nodes: [...prev.nodes, ...newNodes],
+                edges: [...prev.edges, ...newEdges],
+            }));
+        }
+    }
+  };
   
   const getNodeStatus = useCallback((defId: string, category: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -359,6 +397,12 @@ function CanvasPageContent() {
           {canvasLayout.nodes.map(node => {
             const definition = allDefinitions.get(node.id);
             if (!definition) return null;
+
+            const hasChildren = (definition.linkedDeepWorkIds?.length ?? 0) > 0 || (definition.linkedUpskillIds?.length ?? 0) > 0;
+            const potentialParents = parentMap.get(node.id) || [];
+            const hasUnloadedParent = potentialParents.some(parentId => !nodePositions.has(parentId));
+            const canExpand = hasChildren || hasUnloadedParent;
+
             return (
               <DraggableNode
                 key={node.id}
@@ -371,6 +415,7 @@ function CanvasPageContent() {
                 onClickForConnection={handleNodeClickForConnection}
                 isConnecting={!!connectingFrom}
                 isHovered={connectingFrom === node.id}
+                canExpand={canExpand}
               />
             );
           })}
