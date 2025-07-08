@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, GitMerge, Clock, Unlink, Flashlight, Focus, Frame } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, GitMerge, Clock, Unlink, Flashlight, Focus, Frame, Lightbulb } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -104,7 +104,7 @@ function UpskillPageContent() {
   const [subtopicContextMenu, setSubtopicContextMenu] = useState<{ mouseX: number; mouseY: number; item: ExerciseDefinition; } | null>(null);
   const subtopicContextMenuRef = useRef<HTMLDivElement>(null);
 
-  const [visibilityFilters, setVisibilityFilters] = useState<Set<'curiosity' | 'objective' | 'visualization'>>(new Set(['curiosity', 'objective', 'visualization']));
+  const [visibilityFilters, setVisibilityFilters] = useState<Set<'curiosity' | 'objective' | 'visualization' | 'standalone'>>(new Set(['curiosity', 'objective', 'visualization', 'standalone']));
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
@@ -159,7 +159,7 @@ function UpskillPageContent() {
     new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []))
   , [upskillDefinitions]);
 
-  const handleVisibilityFilterChange = (filter: 'curiosity' | 'objective' | 'visualization') => {
+  const handleVisibilityFilterChange = (filter: 'curiosity' | 'objective' | 'visualization' | 'standalone') => {
     setVisibilityFilters(prev => {
         const newSet = new Set(prev);
         if (newSet.has(filter)) {
@@ -167,10 +167,44 @@ function UpskillPageContent() {
         } else {
             newSet.add(filter);
         }
-        if(newSet.size === 0) return new Set(['curiosity', 'objective', 'visualization']);
+        if(newSet.size === 0) return new Set(['curiosity', 'objective', 'visualization', 'standalone']);
         return newSet;
     });
   };
+  
+  const isUpskillObjectiveComplete = useCallback((objectiveId: string): boolean => {
+    const visited = new Set<string>();
+    const visualizations = new Set<string>();
+    const queue: string[] = [objectiveId];
+
+    while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        if (visited.has(currentId)) continue;
+        visited.add(currentId);
+
+        const node = upskillDefinitions.find(d => d.id === currentId);
+        if (!node) continue;
+
+        const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+        const isChild = linkedUpskillChildIds.has(node.id);
+        const isVisualization = !isParent && isChild;
+
+        if (isVisualization) {
+            visualizations.add(node.id);
+        } else { // It's an Objective or Curiosity, so recurse
+            (node.linkedUpskillIds || []).forEach(childId => {
+                if (!visited.has(childId)) {
+                    queue.push(childId);
+                }
+            });
+        }
+    }
+    
+    if (visualizations.size === 0) return false;
+
+    return Array.from(visualizations).every(vizId => permanentlyLoggedVisualizationIds.has(vizId));
+  }, [upskillDefinitions, permanentlyLoggedVisualizationIds, linkedUpskillChildIds]);
+
 
   const topicsWithSubtopics = useMemo(() => {
     const effectiveFilters = visibilityFilters.size === 0 ? new Set<never>() : visibilityFilters;
@@ -182,11 +216,13 @@ function UpskillPageContent() {
 
         const isCuriosity = isParent && !isChild;
         const isObjective = isParent && isChild;
-        const isVisualization = !isParent;
+        const isVisualization = !isParent && isChild;
+        const isStandalone = !isParent && !isChild;
 
         if (effectiveFilters.has('curiosity') && isCuriosity) return true;
         if (effectiveFilters.has('objective') && isObjective) return true;
         if (effectiveFilters.has('visualization') && isVisualization) return true;
+        if (effectiveFilters.has('standalone') && isStandalone) return true;
         
         return false;
     });
@@ -223,10 +259,14 @@ function UpskillPageContent() {
         visited.add(nodeId);
         const node = upskillDefinitions.find(d => d.id === nodeId);
         if (!node) return;
-        if (!node.linkedUpskillIds || node.linkedUpskillIds.length === 0) {
+        
+        const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+        const isChild = linkedUpskillChildIds.has(node.id);
+
+        if (!isParent && isChild) {
             visualizationIds.add(node.id);
         } else {
-            node.linkedUpskillIds.forEach(childId => recurse(childId));
+            (node.linkedUpskillIds || []).forEach(childId => recurse(childId));
         }
     }
     recurse(definition.id);
@@ -242,7 +282,7 @@ function UpskillPageContent() {
         });
     }
     return totalMinutes;
-  }, [allUpskillLogs, upskillDefinitions]);
+  }, [allUpskillLogs, upskillDefinitions, linkedUpskillChildIds]);
 
   const totalLoggedTime = useMemo(() => {
     if (!selectedSubtopic) return 0;
@@ -581,6 +621,7 @@ function UpskillPageContent() {
     const isParentChild = linkedUpskillChildIds.has(parent.id);
     const isParentACuriosity = isParentParent && !isParentChild;
     const isParentAnObjective = isParentParent && isParentChild;
+    const isParentAStandalone = !isParentParent && !isParentChild;
 
     return definitionsSource.filter(def => {
         if (!def.name || def.name === 'placeholder' || def.id === parent.id || !def.name.toLowerCase().includes(linkSearchTerm.toLowerCase())) {
@@ -589,10 +630,10 @@ function UpskillPageContent() {
         
         const isDefParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
         const isDefChild = linkedUpskillChildIds.has(def.id);
-        const isDefACuriosity = isDefParent && !isDefChild;
         const isDefAnObjective = isDefParent && isDefChild;
-        const isDefAVisualization = !isDefParent;
-
+        const isDefAVisualization = !isDefParent && isDefChild;
+        
+        if(isParentAStandalone) return true; // Standalone can link to anything
         if (isParentACuriosity) return isDefAnObjective;
         if (isParentAnObjective) return isDefAnObjective || isDefAVisualization;
         
@@ -635,8 +676,9 @@ function UpskillPageContent() {
   const isSelectedSubtopicAVisualization = useMemo(() => {
     if (!selectedSubtopic) return false;
     const isParent = (selectedSubtopic.linkedUpskillIds?.length ?? 0) > 0 || (selectedSubtopic.linkedResourceIds?.length ?? 0) > 0;
-    return !isParent;
-  }, [selectedSubtopic]);
+    const isChild = linkedUpskillChildIds.has(selectedSubtopic.id);
+    return !isParent && isChild;
+  }, [selectedSubtopic, linkedUpskillChildIds]);
 
   if (isLoadingPage) {
     return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your upskill data...</p></div>;
@@ -658,6 +700,7 @@ function UpskillPageContent() {
                             <DropdownMenuCheckboxItem checked={visibilityFilters.has('curiosity')} onCheckedChange={() => handleVisibilityFilterChange('curiosity')}><Flashlight className="mr-2 h-4 w-4 text-amber-500" /><span>Curiosities</span></DropdownMenuCheckboxItem>
                             <DropdownMenuCheckboxItem checked={visibilityFilters.has('objective')} onCheckedChange={() => handleVisibilityFilterChange('objective')}><Focus className="mr-2 h-4 w-4 text-green-500" /><span>Objectives</span></DropdownMenuCheckboxItem>
                             <DropdownMenuCheckboxItem checked={visibilityFilters.has('visualization')} onCheckedChange={() => handleVisibilityFilterChange('visualization')}><Frame className="mr-2 h-4 w-4 text-blue-500" /><span>Visualizations</span></DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('standalone')} onCheckedChange={() => handleVisibilityFilterChange('standalone')}><Lightbulb className="mr-2 h-4 w-4 text-purple-500" /><span>Standalone</span></DropdownMenuCheckboxItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -712,16 +755,19 @@ function UpskillPageContent() {
                             {subtopics.sort((a,b) => a.name.localeCompare(b.name)).map(def => {
                               const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
                               const isChild = linkedUpskillChildIds.has(def.id);
+                              
                               const isCuriosity = isParent && !isChild;
                               const isObjective = isParent && isChild;
-                              const isVisualization = !isParent;
-
+                              const isVisualization = !isParent && isChild;
+                              const isStandalone = !isParent && !isChild;
+                              
                               return (
                                 <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted" onContextMenu={(e) => handleSubtopicContextMenu(e, def)}>
                                     <div className="flex items-center gap-2 flex-grow min-w-0">
                                       {isCuriosity ? <Flashlight className="h-4 w-4 flex-shrink-0 text-amber-500" />
                                        : isObjective ? <Focus className="h-4 w-4 flex-shrink-0 text-green-500" />
-                                       : <Frame className="h-4 w-4 flex-shrink-0 text-blue-500" />}
+                                       : isVisualization ? <Frame className="h-4 w-4 flex-shrink-0 text-blue-500" />
+                                       : <Lightbulb className="h-4 w-4 flex-shrink-0 text-purple-500" />}
                                       <span className="truncate cursor-pointer" onClick={() => { setSelectedSubtopic(def); setViewMode('library'); }}>{def.name}</span>
                                       {def.estimatedHours && <Badge variant="secondary" className="text-xs ml-auto">{def.estimatedHours}h</Badge>}
                                     </div>
@@ -809,7 +855,8 @@ function UpskillPageContent() {
                                     
                                     const isCuriosity = isParent && !isChild;
                                     const isObjective = isParent && isChild;
-                                    const isVisualization = !isParent;
+                                    const isVisualization = !isParent && isChild;
+                                    const isStandalone = !isParent && !isChild;
 
                                     const loggedMinutes = getUpskillLoggedMinutes(upskillDef.id);
                                     const loggedHours = loggedMinutes / 60;
@@ -830,21 +877,14 @@ function UpskillPageContent() {
                                                 </Tooltip>
                                             </TooltipProvider>
                                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setSelectedSubtopic(upskillDef); setViewMode('library'); }}><ArrowRight className="h-4 w-4" /></Button>
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                                                    <DropdownMenuItem onSelect={() => handleViewProgress(upskillDef)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem><DropdownMenuSeparator />
-                                                    <DropdownMenuItem onSelect={() => handleStartEditSubtopic(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                                    <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
-                                                    <DropdownMenuItem onSelect={() => handleDeleteSubtopic(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                            <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => handleViewProgress(upskillDef)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => handleStartEditSubtopic(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem><DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteSubtopic(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                                         </div>
                                         <CardHeader className="pb-3">
                                           <CardTitle className="text-base flex items-center gap-2">
-                                            {isCuriosity ? <Flashlight className="h-5 w-5 text-amber-500 flex-shrink-0" />
-                                              : isObjective ? <Focus className="h-5 w-5 text-green-500 flex-shrink-0" />
-                                              : <Frame className="h-5 w-5 text-blue-500 flex-shrink-0" />}
+                                              {isCuriosity ? <Flashlight className="h-5 w-5 text-amber-500 flex-shrink-0" />
+                                                : isObjective ? <Focus className="h-5 w-5 text-green-500 flex-shrink-0" />
+                                                : isVisualization ? <Frame className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                                                : <Lightbulb className="h-5 w-5 text-purple-500 flex-shrink-0" />}
                                             <span className="truncate" title={upskillDef.name}>{upskillDef.name}</span>
                                           </CardTitle>
                                           <CardDescription>{upskillDef.category}</CardDescription>
@@ -857,8 +897,7 @@ function UpskillPageContent() {
                                                         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 list-disc list-inside text-xs text-muted-foreground space-y-0.5">
                                                             {(upskillDef.linkedUpskillIds || []).map(childId => {
                                                                 const childDef = upskillDefinitions.find(d => d.id === childId);
-                                                                const isChildAViz = childDef && (childDef.linkedUpskillIds?.length ?? 0) === 0 && (childDef.linkedResourceIds?.length ?? 0) === 0;
-                                                                if (!childDef || !isChildAViz) return null;
+                                                                if (!childDef || !((childDef.linkedUpskillIds?.length ?? 0) === 0 && (childDef.linkedResourceIds?.length ?? 0) === 0)) return null;
 
                                                                 const isChildPermanentlyLogged = permanentlyLoggedVisualizationIds.has(childDef.id);
                                                                 return (
