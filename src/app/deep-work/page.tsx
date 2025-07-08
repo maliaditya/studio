@@ -201,7 +201,7 @@ function LinkedUpskillCard({
     return (
         <div ref={setCombinedRefs} style={style} className={cn(isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-2xl", isDragging && "opacity-80 shadow-2xl")}>
             <Card className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]">
-                <button ref={setActivatorNodeRef} {...listeners} {...attributes} className="absolute top-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
+                <button ref={setActivatorNodeRef} {...listeners} {...attributes} className="absolute bottom-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
                   <GripVertical className="h-5 w-5 text-muted-foreground" />
                 </button>
                 {youtubeEmbedUrl ? (
@@ -359,7 +359,7 @@ function LinkedDeepWorkCard({
     return (
         <div ref={setCombinedRefs} style={style} className={cn(isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-2xl", isDragging && "opacity-80 shadow-2xl")}>
          <Card className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isPermanentlyLogged && !isObjective && "opacity-70 bg-muted/30")}>
-            <button ref={setActivatorNodeRef} {...listeners} {...attributes} className="absolute top-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
+            <button ref={setActivatorNodeRef} {...listeners} {...attributes} className="absolute bottom-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
                 <GripVertical className="h-5 w-5 text-muted-foreground" />
             </button>
             <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
