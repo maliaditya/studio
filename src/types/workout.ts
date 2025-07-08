@@ -98,7 +98,7 @@ export interface WorkoutExercise {
   description?: string;
   loggedSets: LoggedSet[];
   targetSets: number;
-  targetReps: string; // e.g., "10-15"
+  targetReps: string; // e.g., "8-12"
   focusAreaIds?: string[];
   lastPerformance?: {
     reps: number;
@@ -219,4 +219,22 @@ export interface ResourceFolder {
   name: string;
   parentId: string | null;
   icon?: string; // Optional: for root folders or special folders
+}
+
+// Canvas Types
+export interface CanvasNode {
+  id: string; // This will be the definitionId
+  x: number;
+  y: number;
+}
+
+export interface CanvasEdge {
+  id: string;
+  source: string; // definitionId of source node
+  target: string; // definitionId of target node
+}
+
+export interface CanvasLayout {
+  nodes: CanvasNode[];
+  edges: CanvasEdge[];
 }

@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -112,6 +112,10 @@ interface AuthContextType {
   deleteWorkoutSet: (date: Date, exerciseId: string, setId: string) => void;
   removeExerciseFromWorkout: (date: Date, exerciseId: string) => void;
   swapWorkoutExercise: (date: Date, oldExerciseId: string, newExerciseDefinition: ExerciseDefinition) => void;
+  
+  // Canvas
+  canvasLayout: CanvasLayout;
+  setCanvasLayout: React.Dispatch<React.SetStateAction<CanvasLayout>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -168,6 +172,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Resources State
   const [resources, setResources] = useState<Resource[]>([]);
   const [resourceFolders, setResourceFolders] = useState<ResourceFolder[]>([]);
+
+  // Canvas State
+  const [canvasLayout, setCanvasLayout] = useState<CanvasLayout>({ nodes: [], edges: [] });
 
 
   useEffect(() => {
@@ -262,6 +269,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
           setResources([]);
       }
+      
+      // Canvas Data
+      try { const d = localStorage.getItem(`canvas_layout_${username}`); setCanvasLayout(d ? JSON.parse(d) : { nodes: [], edges: [] }); } catch (e) { setCanvasLayout({ nodes: [], edges: [] }); }
+
 
     } else {
       // Clear all data on logout
@@ -275,6 +286,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setProductizationPlans({});
       setOfferizationPlans({});
       setResources([]); setResourceFolders([]);
+      setCanvasLayout({ nodes: [], edges: [] });
     }
   }, [currentUser]);
 
@@ -314,6 +326,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`resources_${username}`, JSON.stringify(resources));
       localStorage.setItem(`resourceFolders_${username}`, JSON.stringify(resourceFolders));
       
+      // Canvas
+      localStorage.setItem(`canvas_layout_${username}`, JSON.stringify(canvasLayout));
+
       // Clean up old resource keys after migration
       localStorage.removeItem(`resourceCategories_${username}`);
       localStorage.removeItem(`resourceSubcategories_${username}`);
@@ -324,6 +339,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, deepWorkTopicMetadata, leadGenDefinitions,
     productizationPlans, offerizationPlans,
     resources, resourceFolders,
+    canvasLayout,
     currentUser, loading
   ]);
 
@@ -496,6 +512,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }));
     }
     setResources(resourcesData);
+
+    setCanvasLayout(data.canvasLayout || { nodes: [], edges: [] });
   };
   
   const register = async (username: string, password: string) => {
@@ -550,6 +568,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       schedule,
       dietPlan, weightLogs, goalWeight, height, dateOfBirth, gender,
       resources, resourceFolders,
+      canvasLayout,
     };
   }
 
@@ -1250,6 +1269,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     resources, setResources,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
+    canvasLayout, setCanvasLayout,
   };
 
   return (
