@@ -115,12 +115,9 @@ function MyPlatePageContent() {
     currentUser, 
     schedule,
     allUpskillLogs,
+    upskillDefinitions,
     topicGoals, 
     deepWorkDefinitions, 
-    upskillDefinitions,
-    workoutMode, 
-    workoutPlans, 
-    exerciseDefinitions,
     goalWeight,
     weightLogs,
     leadGenDefinitions,
@@ -140,36 +137,6 @@ function MyPlatePageContent() {
     return Object.values(todaySchedule).flat();
   }, [schedule]);
 
-  const { todaysMuscleGroups } = useMemo(() => {
-    if (!workoutPlans || !exerciseDefinitions || !workoutMode) return { todaysMuscleGroups: [] };
-    const { exercises } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions);
-    const muscleGroups = Array.from(new Set(exercises.map(ex => ex.category)));
-    return { todaysMuscleGroups: muscleGroups };
-  }, [workoutMode, workoutPlans, exerciseDefinitions]);
-  
-  const upskillProgress = useMemo(() => {
-    const stats: { topic: string, progress: number, goal: number, unit: string }[] = [];
-    if (!topicGoals || !allUpskillLogs) return stats;
-
-    Object.entries(topicGoals).forEach(([topic, goal]) => {
-      let totalProgress = 0;
-      allUpskillLogs.forEach(log => {
-        log.exercises.forEach(ex => {
-          if (ex.category === topic) {
-            totalProgress += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0);
-          }
-        });
-      });
-      stats.push({
-        topic,
-        progress: totalProgress,
-        goal: goal.goalValue,
-        unit: goal.goalType,
-      });
-    });
-    return stats;
-  }, [topicGoals, allUpskillLogs]);
-  
   const brandingPipeline = useMemo(() => {
     const activeTasks = (deepWorkDefinitions || []).filter(task => 
       task.isReadyForBranding && 
@@ -206,11 +173,6 @@ function MyPlatePageContent() {
         .slice(0, 3);
   }, [productizationPlans, offerizationPlans]);
 
-  const latestWeightLog = useMemo(() => {
-    if (!weightLogs || weightLogs.length === 0) return null;
-    return [...weightLogs].sort((a, b) => a.date.localeCompare(b.date)).pop();
-  }, [weightLogs]);
-
   const userContext = useMemo(() => {
     const age = dateOfBirth ? differenceInYears(new Date(), parseISO(dateOfBirth)) : null;
     return { username: currentUser?.username, age };
@@ -245,35 +207,32 @@ function MyPlatePageContent() {
     return { deepWork: { current: currentDeepWork, prev: prevDeepWork }, upskill: { current: currentUpskill, prev: prevUpskill, currentDaysToGoal, prevDaysToGoal }, workouts: { current: currentWorkouts, prev: prevWorkouts }, weight: { current: latestWeight?.weight || 0, prev: prevWeightLog?.weight || 0, change: (latestWeight?.weight || 0) - (prevWeightLog?.weight || 0) }};
   }, [allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, weightLogs, topicGoals]);
 
-  const lifePerspectiveData = useMemo(() => {
-    // Health Perspective
+  const lifePerspectiveNarrative = useMemo(() => {
+    const nextWeek = addDays(new Date(), 7);
+    const header = `🌱 A Glimpse Into Your Future – ${format(nextWeek, 'MMMM d, yyyy')}`;
+    
+    // Health
     const workoutLogsForYear = allWorkoutLogs.filter(log => isAfter(parseISO(log.date), subDays(new Date(), 365)));
     const workoutDates = new Set(workoutLogsForYear.map(log => log.date));
-    let score = 0.5;
+    let currentScore = 0.5;
     for (let i = 0; i < 365; i++) {
         const date = subDays(new Date(), 365 - i);
         const dateKey = format(date, 'yyyy-MM-dd');
-        if (workoutDates.has(dateKey)) score += (1 - score) * 0.1;
-        else score *= 0.95;
+        if (workoutDates.has(dateKey)) currentScore += (1 - currentScore) * 0.1;
+        else currentScore *= 0.95;
     }
-    const currentConsistency = Math.round(score * 100);
-    const scoreWithWorkout = Math.round((score + (1 - score) * 0.1) * 100);
-    const scoreWithoutWorkout = Math.round((score * 0.95) * 100);
+    const currentConsistency = Math.round(currentScore * 100);
+    const scoreWithWorkouts = Math.round((currentScore + (1 - currentScore) * 0.3) * 100); // 3 workouts
+    const scoreWithoutWorkouts = Math.round(currentScore * Math.pow(0.95, 7));
+    const healthNarrative = `Your energy is steady—a quiet reward for your work. Your health score has gently climbed from ${currentConsistency}% to ${scoreWithWorkouts}%.`;
+    const healthAlternative = `But if you skip this week's rhythm, the score may drift down to ${scoreWithoutWorkouts}%.`;
 
-    const healthPerspective = {
-      currentConsistency,
-      nextWeekWithWorkouts: scoreWithWorkout,
-      nextWeekWithoutWorkouts: scoreWithoutWorkout,
-      suggestion: "3 workouts this week will maintain a 40%+ score."
-    };
-    
-    // Intention Perspective
+    // Deep Work
     const linkedChildIds = new Set(deepWorkDefinitions.flatMap(def => def.linkedDeepWorkIds || []));
     const activeIntention = deepWorkDefinitions.find(def => ((def.linkedDeepWorkIds?.length ?? 0) > 0) && !linkedChildIds.has(def.id));
-    let intentionPerspective = null;
+    let deepWorkNarrative = "";
     if (activeIntention) {
         let totalLoggedHours = 0;
-        let totalEstimatedHours = 0;
         const descendantIds = new Set<string>();
         const queue: string[] = [activeIntention.id];
         while(queue.length > 0) {
@@ -281,32 +240,17 @@ function MyPlatePageContent() {
             if (descendantIds.has(id)) continue;
             descendantIds.add(id);
             const def = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === id);
-            if(def) {
-                totalEstimatedHours += def.estimatedHours || 0;
-                (def.linkedDeepWorkIds || []).forEach(childId => queue.push(childId));
-                (def.linkedUpskillIds || []).forEach(childId => queue.push(childId));
-            }
+            if(def) { (def.linkedDeepWorkIds || []).forEach(childId => queue.push(childId)); (def.linkedUpskillIds || []).forEach(childId => queue.push(childId)); }
         }
         allDeepWorkLogs.forEach(log => {log.exercises.forEach(ex => {if(descendantIds.has(ex.definitionId)) totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0) / 60})});
         allUpskillLogs.forEach(log => {log.exercises.forEach(ex => {if(descendantIds.has(ex.definitionId)) totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0) / 60})});
-        
         const avgDailyProductiveHours = (weeklyStats.deepWork.current + weeklyStats.upskill.current) / 7;
-        const remainingHours = totalEstimatedHours > totalLoggedHours ? totalEstimatedHours - totalLoggedHours : 0;
-        const daysRemaining = avgDailyProductiveHours > 0 ? Math.ceil(remainingHours / avgDailyProductiveHours) : null;
-
-        intentionPerspective = {
-            name: activeIntention.name,
-            avgHours: avgDailyProductiveHours,
-            totalEstimated: totalEstimatedHours,
-            completed: totalLoggedHours,
-            forecastHours: totalLoggedHours + (avgDailyProductiveHours * 7),
-            forecastPercent: totalEstimatedHours > 0 ? ((totalLoggedHours + (avgDailyProductiveHours * 7)) / totalEstimatedHours) * 100 : 0,
-            estCompletionDate: daysRemaining ? format(addDays(new Date(), daysRemaining), 'MMM d, yyyy') : 'N/A',
-        };
+        const projectedHours = totalLoggedHours + (avgDailyProductiveHours * 7);
+        deepWorkNarrative = `Your intention, '${activeIntention.name}', is beginning to take shape. You now stand at ${projectedHours.toFixed(0)} hours—clarity is emerging.`;
     }
 
-    // Upskill Perspective
-    let upskillPerspective = null;
+    // Upskill
+    let upskillNarrative = "";
     if (Object.keys(topicGoals).length > 0) {
         const topic = Object.keys(topicGoals)[0];
         const goal = topicGoals[topic];
@@ -316,21 +260,20 @@ function MyPlatePageContent() {
         const firstDay = sortedLogs.length > 0 ? new Date(sortedLogs[0]) : new Date();
         const durationDays = differenceInDays(new Date(), firstDay) + 1;
         const avgRate = durationDays > 0 ? totalProgress / durationDays : 0;
-
-        upskillPerspective = {
-            topic,
-            goal: goal.goalValue,
-            unit: goal.goalType,
-            completed: totalProgress,
-            avgRate: avgRate,
-            forecastPages: totalProgress + (avgRate * 7),
-            forecastPercent: (totalProgress + (avgRate * 7)) / goal.goalValue * 100,
-            suggestion: `Complete Chapter 3 by Friday.`
-        };
+        const projectedProgress = totalProgress + (avgRate * 7);
+        upskillNarrative = `On your desk, the ${topic} material lies open. You've crossed ${projectedProgress.toFixed(0)} ${goal.goalType}—each concept is less foreign, more intuitive.`;
     }
 
-    return { health: healthPerspective, intention: intentionPerspective, upskill: upskillPerspective };
-  }, [allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, weeklyStats, topicGoals]);
+    const affirmations = [
+        "Consistency is not about pressure, it's about rhythm.",
+        "One hour each day rewrites the next ten years of your life.",
+        "You are not chasing progress—you are becoming it."
+    ];
+    const affirmation = affirmations[Math.floor(Math.random() * affirmations.length)];
+    
+    return { header, healthNarrative, deepWorkNarrative, upskillNarrative, healthAlternative, affirmation };
+
+  }, [allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, topicGoals, weeklyStats]);
 
   const getInsight = (current: number, prev: number, burnoutThreshold: number): { trend: 'up' | 'down' | 'stable' | 'burnout'; message: string } => { if (current > burnoutThreshold) return { trend: 'burnout', message: getRandomMessage('burnout', userContext) }; if (current > prev * 1.2) return { trend: 'up', message: getRandomMessage('up', userContext) }; if (current < prev * 0.8) { if (prev > 0) return { trend: 'down', message: getRandomMessage('down', userContext) }; return { trend: 'down', message: getRandomMessage('new_week', userContext) }; } if (current > 0) return { trend: 'stable', message: getRandomMessage('stable', userContext) }; return { trend: 'stable', message: getRandomMessage('new_week', userContext) }; };
   const getUpskillInsight = (currentHours: number, prevHours: number, currentDays: number | null, prevDays: number | null) => { if (currentDays !== null && prevDays !== null) { if (currentDays < prevDays) return { trend: 'up' as const, message: getRandomMessage('goal_getting_closer', userContext) }; if (currentDays > prevDays) return { trend: 'down' as const, message: getRandomMessage('goal_slipping', userContext) }; return { trend: 'stable' as const, message: getRandomMessage('goal_stable', userContext) }; } return getInsight(currentHours, prevHours, 28); };
@@ -406,7 +349,7 @@ function MyPlatePageContent() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-xl"><ProductivityInsightsIcon /> Productivity Insights</CardTitle>
+                    <CardTitle className="flex items-center gap-2 text-xl"><ActivityIcon /> Weekly Insights</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div>
@@ -428,90 +371,47 @@ function MyPlatePageContent() {
                         <p className="text-xs text-muted-foreground">vs {weeklyStats.upskill.prev.toFixed(1)} hours last week</p>
                         <p className="mt-4 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: upskillInsight.message }}></p>
                     </div>
-                </CardContent>
-            </Card>
-            
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-xl"><HealthInsightsIcon /> Health Insights</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div>
-                        <div className="flex justify-between items-start">
-                            <h3 className="font-semibold">Workout Consistency</h3>
-                            {renderTrend(workoutInsight.trend, `${weeklyStats.workouts.current} sessions`)}
-                        </div>
-                        <p className="mt-4 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: workoutInsight.message }}></p>
-                    </div>
                     <Separator />
                     <div>
                         <div className="flex justify-between items-start">
-                            <h3 className="font-semibold">Weight Trend</h3>
-                            {renderTrend(weightInsight.trend, `${weeklyStats.weight.change.toFixed(1)} kg/lb`)}
+                            <h3 className="font-semibold">Health</h3>
                         </div>
+                        <p className="mt-2 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: workoutInsight.message }}></p>
                          <p className="mt-4 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: weightInsight.message }}></p>
                     </div>
                 </CardContent>
             </Card>
+            
         </div>
 
         <div className="lg:col-span-2 space-y-8">
           <Card>
             <CardHeader>
-                <CardTitle>Vision & Trajectory</CardTitle>
-                <CardDescription>A 1-week forecast based on your current momentum.</CardDescription>
+                <CardTitle>{lifePerspectiveNarrative.header}</CardTitle>
             </CardHeader>
-            <CardContent>
-                <Tabs defaultValue="health" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="health"><Heart className="h-4 w-4 mr-2"/>Health</TabsTrigger>
-                        <TabsTrigger value="intention"><Workflow className="h-4 w-4 mr-2"/>Intention</TabsTrigger>
-                        <TabsTrigger value="upskill"><BookCopy className="h-4 w-4 mr-2"/>Upskill</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="health" className="pt-4">
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div className="p-3 bg-muted rounded-lg">
-                                <p className="font-semibold">Current Consistency</p>
-                                <p className="text-2xl font-bold text-primary">{lifePerspectiveData.health.currentConsistency}%</p>
-                                <p className="text-xs text-muted-foreground">Keep it above 40%</p>
-                            </div>
-                            <div className="p-3 bg-muted/80 rounded-lg">
-                                <p className="font-semibold">Next Week's Forecast</p>
-                                <p className="text-lg font-bold text-green-500">{lifePerspectiveData.health.nextWeekWithWorkouts}% <span className="text-xs font-normal text-muted-foreground">(with workouts)</span></p>
-                                <p className="text-lg font-bold text-red-500">{lifePerspectiveData.health.nextWeekWithoutWorkouts}% <span className="text-xs font-normal text-muted-foreground">(without workouts)</span></p>
-                            </div>
-                        </div>
-                         <p className="text-xs text-center text-muted-foreground mt-3 italic">{lifePerspectiveData.health.suggestion}</p>
-                    </TabsContent>
-                    <TabsContent value="intention" className="pt-4">
-                        {lifePerspectiveData.intention ? (
-                            <div className="space-y-3">
-                                <p className="font-semibold text-center">Project: <Link href="/deep-work" className="text-primary hover:underline">{lifePerspectiveData.intention.name}</Link></p>
-                                <Progress value={(lifePerspectiveData.intention.completed / lifePerspectiveData.intention.totalEstimated) * 100} className="h-2" />
-                                <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                                    <div className="p-2 bg-muted rounded-md"><p className="font-semibold">{lifePerspectiveData.intention.completed.toFixed(1)}h</p><p>Completed</p></div>
-                                    <div className="p-2 bg-muted rounded-md"><p className="font-semibold">{lifePerspectiveData.intention.forecastHours.toFixed(1)}h</p><p>Next Week</p></div>
-                                    <div className="p-2 bg-muted rounded-md"><p className="font-semibold">{lifePerspectiveData.intention.totalEstimated}h</p><p>Total Est.</p></div>
-                                </div>
-                                <p className="text-xs text-center text-muted-foreground italic">Est. completion: {lifePerspectiveData.intention.estCompletionDate}</p>
-                            </div>
-                        ) : <p className="text-sm text-center text-muted-foreground py-4">No active intention with an estimate found in Deep Work.</p>}
-                    </TabsContent>
-                    <TabsContent value="upskill" className="pt-4">
-                        {lifePerspectiveData.upskill ? (
-                             <div className="space-y-3">
-                                <p className="font-semibold text-center">Topic: <Link href="/upskill" className="text-primary hover:underline">{lifePerspectiveData.upskill.topic}</Link></p>
-                                <Progress value={(lifePerspectiveData.upskill.completed / lifePerspectiveData.upskill.goal) * 100} className="h-2" />
-                                <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                                    <div className="p-2 bg-muted rounded-md"><p className="font-semibold">{lifePerspectiveData.upskill.completed.toFixed(0)}</p><p>Completed</p></div>
-                                    <div className="p-2 bg-muted rounded-md"><p className="font-semibold">{lifePerspectiveData.upskill.forecastPages.toFixed(0)}</p><p>Next Week</p></div>
-                                    <div className="p-2 bg-muted rounded-md"><p className="font-semibold">{lifePerspectiveData.upskill.goal}</p><p>Goal</p></div>
-                                </div>
-                                <p className="text-xs text-center text-muted-foreground italic">{lifePerspectiveData.upskill.suggestion}</p>
-                            </div>
-                        ) : <p className="text-sm text-center text-muted-foreground py-4">No active learning goal found in Upskill.</p>}
-                    </TabsContent>
-                </Tabs>
+            <CardContent className="space-y-4">
+                <p className="text-foreground leading-relaxed">
+                    {lifePerspectiveNarrative.healthNarrative}
+                </p>
+                {lifePerspectiveNarrative.deepWorkNarrative && (
+                    <p className="text-foreground leading-relaxed">
+                        {lifePerspectiveNarrative.deepWorkNarrative}
+                    </p>
+                )}
+                {lifePerspectiveNarrative.upskillNarrative && (
+                    <p className="text-foreground leading-relaxed">
+                        {lifePerspectiveNarrative.upskillNarrative}
+                    </p>
+                )}
+                <blockquote className="mt-6 border-l-2 pl-6 italic text-muted-foreground">
+                    {lifePerspectiveNarrative.affirmation}
+                </blockquote>
+                 <details className="text-xs text-muted-foreground pt-4">
+                    <summary className="cursor-pointer">What if I break my rhythm?</summary>
+                    <p className="mt-2 italic">
+                        {lifePerspectiveNarrative.healthAlternative}
+                    </p>
+                </details>
             </CardContent>
           </Card>
 
