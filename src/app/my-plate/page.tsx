@@ -129,7 +129,6 @@ function MyPlatePageContent() {
     dateOfBirth,
     allWorkoutLogs,
     allDeepWorkLogs,
-    allDeepWorkLogs
   } = useAuth();
   
   const [isLoading, setIsLoading] = useState(true);
@@ -405,32 +404,9 @@ function MyPlatePageContent() {
                 </CardContent>
             </Card>
 
-             <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-xl"><Heart className="h-6 w-6 text-primary"/> Health Insights</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div>
-                        <div className="flex justify-between items-start">
-                            <h3 className="font-semibold">Workout Consistency</h3>
-                            {renderTrend(workoutInsight.trend, `${weeklyStats.workouts.current} sessions`)}
-                        </div>
-                        <p className="mt-4 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: workoutInsight.message }}></p>
-                    </div>
-                    <Separator />
-                    <div>
-                        <div className="flex justify-between items-start">
-                            <h3 className="font-semibold">Weight Trend</h3>
-                            {renderTrend(weightInsight.trend, `${weeklyStats.weight.change.toFixed(1)} kg/lb`)}
-                        </div>
-                         <p className="mt-4 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: weightInsight.message }}></p>
-                    </div>
-                </CardContent>
-            </Card>
-
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-xl"><LineChart className="h-6 w-6 text-primary"/> Productivity Insights</CardTitle>
+                    <CardTitle className="flex items-center gap-2 text-xl"><ProductivityInsightsIcon /> Productivity Insights</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div>
@@ -451,6 +427,29 @@ function MyPlatePageContent() {
                         <div className="mt-2 text-2xl font-bold">{weeklyStats.upskill.current.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">hours</span></div>
                         <p className="text-xs text-muted-foreground">vs {weeklyStats.upskill.prev.toFixed(1)} hours last week</p>
                         <p className="mt-4 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: upskillInsight.message }}></p>
+                    </div>
+                </CardContent>
+            </Card>
+            
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-xl"><HealthInsightsIcon /> Health Insights</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div>
+                        <div className="flex justify-between items-start">
+                            <h3 className="font-semibold">Workout Consistency</h3>
+                            {renderTrend(workoutInsight.trend, `${weeklyStats.workouts.current} sessions`)}
+                        </div>
+                        <p className="mt-4 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: workoutInsight.message }}></p>
+                    </div>
+                    <Separator />
+                    <div>
+                        <div className="flex justify-between items-start">
+                            <h3 className="font-semibold">Weight Trend</h3>
+                            {renderTrend(weightInsight.trend, `${weeklyStats.weight.change.toFixed(1)} kg/lb`)}
+                        </div>
+                         <p className="mt-4 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: weightInsight.message }}></p>
                     </div>
                 </CardContent>
             </Card>
@@ -617,6 +616,23 @@ function MyPlatePageContent() {
   );
 }
 
+const ProductivityInsightsIcon = () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 16.5V13.5M12 16.5V7.5M6 16.5V10.5" stroke="hsl(var(--primary))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+);
+
+const HealthInsightsIcon = () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C14.6522 2 17.0988 3.05357 18.8284 4.78315M18.8284 4.78315L19 4.5M18.8284 4.78315L15 5.5" stroke="hsl(var(--primary))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M15.5503 16.55C15.5503 16.55 16.3503 15.166 17.4503 15.05C18.5503 14.934 19.3503 16.05 19.3503 16.05" stroke="hsl(var(--primary))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M8.5 16.55C8.5 16.55 7.7 15.166 6.6 15.05C5.5 14.934 4.7 16.05 4.7 16.05" stroke="hsl(var(--primary))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M16 11.5C16 12.3284 15.5523 13 15 13C14.4477 13 14 12.3284 14 11.5C14 10.6716 14.4477 10 15 10C15.5523 10 16 10.6716 16 11.5Z" fill="hsl(var(--primary))"/>
+        <path d="M10 11.5C10 12.3284 9.55228 13 9 13C8.44772 13 8 12.3284 8 11.5C8 10.6716 8.44772 10 9 10C9.55228 10 10 10.6716 10 11.5Z" fill="hsl(var(--primary))"/>
+    </svg>
+);
+
+
 export default function MyPlatePage() {
     return (
         <AuthGuard>
@@ -624,7 +640,5 @@ export default function MyPlatePage() {
         </AuthGuard>
     )
 }
-
-    
 
     
