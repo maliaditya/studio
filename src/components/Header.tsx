@@ -36,7 +36,6 @@ export function Header() {
     { href: '/productization', label: 'Productization' },
     { href: '/offerization', label: 'Offerization' },
     { href: '/matrix', label: 'Matrix' },
-    { href: '/motivation', label: 'Motivation' },
     { href: '/mind-map', label: 'Mind Map' },
     { href: '/canvas', label: 'Canvas' },
     { href: '/kanban', label: 'Kanban' },
