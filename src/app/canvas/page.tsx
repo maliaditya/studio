@@ -285,32 +285,37 @@ function CanvasPageContent() {
     if (!currentNode) return;
     
     const potentialParents = parentMap.get(nodeId) || [];
-    const parentsToLoad = potentialParents.filter(parentId => allDefinitions.has(parentId) && !nodePositions.has(parentId));
+    const newNodes: CanvasNode[] = [];
+    const newEdges: CanvasEdge[] = [];
+    const existingNodeIds = new Set(canvasLayout.nodes.map(n => n.id));
 
-    if (parentsToLoad.length > 0) {
-        const newNodes: CanvasNode[] = [];
-        const newEdges: CanvasEdge[] = [];
-
-        parentsToLoad.forEach((parentId, index) => {
-            newNodes.push({
-                id: parentId,
-                x: currentNode.x - 240, // Place to the left
-                y: currentNode.y + (index * 90) - ((parentsToLoad.length - 1) * 45),
-            });
+    potentialParents.forEach((parentId, index) => {
+        if (allDefinitions.has(parentId)) {
+            // Add the parent node if it's not already on the canvas
+            if (!existingNodeIds.has(parentId)) {
+                newNodes.push({
+                    id: parentId,
+                    x: currentNode.x - 240,
+                    y: currentNode.y + (index * 90) - ((potentialParents.length - 1) * 45),
+                });
+                existingNodeIds.add(parentId);
+            }
+            
+            // ALWAYS check if an edge needs to be added, regardless of whether the node was new
             const edgeId = `${parentId}-${nodeId}`;
-             if (!canvasLayout.edges.some(e => e.id === edgeId || e.id === `${nodeId}-${parentId}`)) {
+            if (!canvasLayout.edges.some(e => e.id === edgeId || e.id === `${nodeId}-${parentId}`)) {
                 newEdges.push({ id: edgeId, source: parentId, target: nodeId });
             }
-        });
-
-        if (newNodes.length > 0 || newEdges.length > 0) {
-            setCanvasLayout(prev => ({
-                nodes: [...prev.nodes, ...newNodes],
-                edges: [...prev.edges, ...newEdges],
-            }));
         }
+    });
+
+    if (newNodes.length > 0 || newEdges.length > 0) {
+        setCanvasLayout(prev => ({
+            nodes: [...prev.nodes, ...newNodes],
+            edges: [...prev.edges, ...newEdges],
+        }));
     }
-  }, [allDefinitions, canvasLayout, nodePositions, parentMap, setCanvasLayout]);
+  }, [allDefinitions, canvasLayout, parentMap, setCanvasLayout]);
   
   const handleExpandAll = useCallback((nodeId: string) => {
     setIsAutoExpanding(true);
