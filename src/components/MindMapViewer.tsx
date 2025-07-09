@@ -158,6 +158,46 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     }, [allDefinitions]);
 
     useEffect(() => {
+        // This effect automatically creates edges between any nodes that are on the canvas
+        // but are not yet connected.
+        const nodesOnCanvas = new Set(nodes.keys());
+        const edgesToAdd = new Set<string>();
+
+        nodes.forEach((pos, nodeId) => {
+            const definition = allDefinitions.get(nodeId);
+            if (!definition) return;
+
+            // Check for children
+            const childIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
+            childIds.forEach(childId => {
+                if (nodesOnCanvas.has(childId)) {
+                    const edgeId1 = `${nodeId}-${childId}`;
+                    const edgeId2 = `${childId}-${nodeId}`;
+                    if (!edges.has(edgeId1) && !edges.has(edgeId2)) {
+                        edgesToAdd.add(edgeId1);
+                    }
+                }
+            });
+
+            // Check for parents
+            const parentIds = parentMap.get(nodeId) || [];
+            parentIds.forEach(parentId => {
+                if (nodesOnCanvas.has(parentId)) {
+                    const edgeId1 = `${parentId}-${nodeId}`;
+                    const edgeId2 = `${nodeId}-${parentId}`;
+                    if (!edges.has(edgeId1) && !edges.has(edgeId2)) {
+                        edgesToAdd.add(edgeId1);
+                    }
+                }
+            });
+        });
+
+        if (edgesToAdd.size > 0) {
+            setEdges(prevEdges => new Set([...prevEdges, ...edgesToAdd]));
+        }
+    }, [nodes, edges, allDefinitions, parentMap]);
+
+    useEffect(() => {
         const linkedDeepWorkChildIds = new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || []));
         let currentId = rootId;
         let trueRootId = rootId;
