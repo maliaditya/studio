@@ -3,7 +3,7 @@
 "use client"
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle, Link as LinkIcon, Save, MinusCircle, Folder, ExternalLink, Lightbulb, Focus, Frame, Flashlight, Flag, Bolt } from 'lucide-react';
@@ -22,6 +22,7 @@ import { Checkbox } from './ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { DndContext, useDraggable, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
+import { Progress } from './ui/progress';
 
 // Component-specific icons
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -591,7 +592,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     );
 };
 
-const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealParents, canExpandChildren, canRevealParents, onExpandAll, isRootNode, status, nodeType, upskillDefinitions }: any) => {
+const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealParents, canExpandChildren, canRevealParents, onExpandAll, isRootNode, status, nodeType, upskillDefinitions, progress }: any) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: nodeId });
     const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
     
@@ -637,7 +638,6 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
                                 {definition.name}
                             </p>
                         </div>
-                        {nodeType && <Badge variant="outline" className="text-xs ml-2 shrink-0">{nodeType}</Badge>}
                     </div>
                      {status.text && (
                         <div className="mt-1.5 text-xs">
@@ -646,6 +646,17 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
                         </div>
                     )}
                 </div>
+                {progress.estimatedHours > 0 && (
+                  <CardFooter className="p-2 pt-0">
+                    <div className="w-full">
+                      <Progress value={(progress.loggedHours / progress.estimatedHours) * 100} className="h-1" />
+                      <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
+                        <span>{progress.loggedHours.toFixed(1)}h</span>
+                        <span>{progress.estimatedHours.toFixed(1)}h</span>
+                      </div>
+                    </div>
+                  </CardFooter>
+                )}
                 
                 <CardContent className="p-2 border-t flex justify-end gap-1">
                     {isRootNode && (
