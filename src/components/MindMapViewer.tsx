@@ -470,6 +470,46 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     
         return status;
     }, [schedule, allDeepWorkLogs, allUpskillLogs, brandingLogs]);
+
+    const getNodeProgress = useCallback((nodeId: string) => {
+        const getDescendantIds = (startNodeId: string, visited: Set<string>): string[] => {
+            if (visited.has(startNodeId)) return [];
+            visited.add(startNodeId);
+
+            const nodeDef = allDefinitions.get(startNodeId);
+            if (!nodeDef) return [];
+
+            const childIds = [
+                ...(nodeDef.linkedDeepWorkIds || []),
+                ...(nodeDef.linkedUpskillIds || []),
+            ];
+
+            let ids = [startNodeId];
+            for (const childId of childIds) {
+                ids = [...ids, ...getDescendantIds(childId, visited)];
+            }
+            return ids;
+        };
+        
+        const allNodeIds = getDescendantIds(nodeId, new Set());
+        let totalLoggedHours = 0;
+        let totalEstimatedHours = 0;
+
+        allNodeIds.forEach(id => {
+            const def = allDefinitions.get(id);
+            if (def) {
+                totalEstimatedHours += def.estimatedHours || 0;
+            }
+
+            const deepWorkLog = allDeepWorkLogs.flatMap(log => log.exercises).filter(ex => ex.definitionId === id);
+            totalLoggedHours += deepWorkLog.reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.weight || 0), 0), 0) / 60;
+            
+            const upskillLog = allUpskillLogs.flatMap(log => log.exercises).filter(ex => ex.definitionId === id);
+            totalLoggedHours += upskillLog.reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.reps || 0), 0), 0) / 60;
+        });
+
+        return { loggedHours: totalLoggedHours, estimatedHours: totalEstimatedHours };
+    }, [allDefinitions, allDeepWorkLogs, allUpskillLogs]);
     
     const getPath = (sourcePos: {x:number, y:number}, targetPos: {x:number, y:number}) => {
         const sourceIsLeft = sourcePos.x < targetPos.x;
@@ -582,6 +622,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                                     status={getNodeStatus(nodeId)}
                                     nodeType={nodeType}
                                     upskillDefinitions={upskillDefinitions}
+                                    progress={getNodeProgress(nodeId)}
                                 />
                             );
                         })}
@@ -646,7 +687,7 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
                         </div>
                     )}
                 </div>
-                {progress.estimatedHours > 0 && (
+                {progress && progress.estimatedHours > 0 && (
                   <CardFooter className="p-2 pt-0">
                     <div className="w-full">
                       <Progress value={(progress.loggedHours / progress.estimatedHours) * 100} className="h-1" />
