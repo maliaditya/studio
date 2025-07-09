@@ -272,7 +272,7 @@ function CanvasPageContent() {
             }));
         }
     }
-  }, [allDefinitions, canvasLayout.nodes, canvasLayout.edges, setCanvasLayout]);
+  }, [allDefinitions, canvasLayout, setCanvasLayout]);
   
   const handleRevealParents = useCallback((nodeId: string) => {
     const currentNode = canvasLayout.nodes.find(n => n.id === nodeId);
@@ -304,38 +304,88 @@ function CanvasPageContent() {
             }));
         }
     }
-  }, [allDefinitions, canvasLayout.nodes, canvasLayout.edges, nodePositions, parentMap, setCanvasLayout]);
+  }, [allDefinitions, canvasLayout, nodePositions, parentMap, setCanvasLayout]);
   
-    useEffect(() => {
-        if (!isAutoExpanding) return;
+  useEffect(() => {
+    if (!isAutoExpanding) return;
 
-        // First, try to find any node that needs its parents revealed.
-        const nodeToRevealParents = canvasLayout.nodes.find(node => {
+    let nodesToAdd: CanvasNode[] = [];
+    let edgesToAdd: CanvasEdge[] = [];
+    
+    // Phase 1: Reveal Parents
+    for (const node of canvasLayout.nodes) {
+        const canReveal = (parentMap.get(node.id) || []).some(parentId => allDefinitions.has(parentId) && !nodePositions.has(parentId));
+        if (canReveal) {
+            const currentNodePos = nodePositions.get(node.id);
+            if (!currentNodePos) continue;
+
             const potentialParents = parentMap.get(node.id) || [];
-            return potentialParents.some(parentId => allDefinitions.has(parentId) && !nodePositions.has(parentId));
-        });
-
-        if (nodeToRevealParents) {
-            handleRevealParents(nodeToRevealParents.id);
-            return; // Exit and let the next render handle more expansions.
+            const parentsToLoad = potentialParents.filter(parentId => allDefinitions.has(parentId) && !nodePositions.has(parentId));
+            
+            parentsToLoad.forEach((parentId, index) => {
+                if (!nodesToAdd.some(n => n.id === parentId) && !canvasLayout.nodes.some(n => n.id === parentId)) {
+                    nodesToAdd.push({
+                        id: parentId,
+                        x: currentNodePos.x - 240,
+                        y: currentNodePos.y + (index * 90) - ((parentsToLoad.length - 1) * 45),
+                    });
+                }
+                const edgeId = `${parentId}-${node.id}`;
+                if (!edgesToAdd.some(e => e.id === edgeId) && !canvasLayout.edges.some(e => e.id === edgeId || e.id === `${node.id}-${parentId}`)) {
+                   edgesToAdd.push({ id: edgeId, source: parentId, target: node.id });
+                }
+            });
         }
+    }
 
-        // If no parents need revealing, try to find any node that needs children expanded.
-        const nodeToExpandChildren = canvasLayout.nodes.find(node => {
-            const definition = allDefinitions.get(node.id);
-            if (!definition) return false;
-            const allChildIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
-            return allChildIds.some(childId => allDefinitions.has(childId) && !nodePositions.has(childId));
-        });
-        
-        if (nodeToExpandChildren) {
-            handleExpandChildren(nodeToExpandChildren.id);
-            return; // Exit and let the next render handle more.
+    if (nodesToAdd.length > 0 || edgesToAdd.length > 0) {
+        setCanvasLayout(prev => ({
+            nodes: [...prev.nodes, ...nodesToAdd],
+            edges: [...prev.edges, ...edgesToAdd],
+        }));
+        return;
+    }
+
+    // Phase 2: Expand Children
+    for (const node of canvasLayout.nodes) {
+        const definition = allDefinitions.get(node.id);
+        if (!definition) continue;
+        const allChildIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
+        const hasUnloadedChild = allChildIds.some(childId => allDefinitions.has(childId) && !nodePositions.has(childId));
+
+        if (hasUnloadedChild) {
+            const currentNodePos = nodePositions.get(node.id);
+            if (!currentNodePos) continue;
+
+            const childrenToLoad = allChildIds.filter(childId => allDefinitions.has(childId) && !nodePositions.has(childId));
+            
+            childrenToLoad.forEach((childId, index) => {
+                 if (!nodesToAdd.some(n => n.id === childId) && !canvasLayout.nodes.some(n => n.id === childId)) {
+                    nodesToAdd.push({
+                        id: childId,
+                        x: currentNodePos.x + 240,
+                        y: currentNodePos.y + (index * 90) - ((childrenToLoad.length - 1) * 45),
+                    });
+                }
+                const edgeId = `${node.id}-${childId}`;
+                if (!edgesToAdd.some(e => e.id === edgeId) && !canvasLayout.edges.some(e => e.id === edgeId || e.id === `${childId}-${node.id}`)) {
+                   edgesToAdd.push({ id: edgeId, source: node.id, target: childId });
+                }
+            });
         }
+    }
+    
+    if (nodesToAdd.length > 0 || edgesToAdd.length > 0) {
+        setCanvasLayout(prev => ({
+            nodes: [...prev.nodes, ...nodesToAdd],
+            edges: [...prev.edges, ...edgesToAdd],
+        }));
+        return;
+    }
 
-        // If we reach here, no nodes have anything to expand or reveal.
-        setIsAutoExpanding(false);
-    }, [isAutoExpanding, canvasLayout.nodes, allDefinitions, nodePositions, parentMap, handleRevealParents, handleExpandChildren]);
+    // If no changes were made in either phase, stop expanding.
+    setIsAutoExpanding(false);
+}, [isAutoExpanding, canvasLayout, allDefinitions, parentMap, nodePositions]);
 
   const getNodeStatus = useCallback((defId: string, category: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
