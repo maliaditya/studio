@@ -118,6 +118,7 @@ function CanvasPageContent() {
   const {
     deepWorkDefinitions,
     upskillDefinitions,
+    resources,
     canvasLayout,
     setCanvasLayout,
     schedule,
@@ -210,13 +211,13 @@ function CanvasPageContent() {
   };
 
   const allDefinitions = useMemo(() => new Map(
-      [...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])
-  ), [deepWorkDefinitions, upskillDefinitions]);
+      [...deepWorkDefinitions, ...upskillDefinitions, ...resources].map(def => [def.id, def])
+  ), [deepWorkDefinitions, upskillDefinitions, resources]);
 
   const parentMap = useMemo(() => {
     const map = new Map<string, string[]>();
     allDefinitions.forEach(def => {
-        const childIds = [...(def.linkedDeepWorkIds || []), ...(def.linkedUpskillIds || [])];
+        const childIds = [...(def.linkedDeepWorkIds || []), ...(def.linkedUpskillIds || []), ...(def.linkedResourceIds || [])];
         childIds.forEach(childId => {
             if (!map.has(childId)) map.set(childId, []);
             map.get(childId)!.push(def.id);
@@ -237,6 +238,7 @@ function CanvasPageContent() {
     const childIds = [
         ...(currentNodeDef.linkedDeepWorkIds || []),
         ...(currentNodeDef.linkedUpskillIds || []),
+        ...(currentNodeDef.linkedResourceIds || []),
     ];
     
     if (childIds.length > 0) {
@@ -274,7 +276,7 @@ function CanvasPageContent() {
     if (!currentNode) return;
     
     const potentialParents = parentMap.get(nodeId) || [];
-    const parentsToLoad = potentialParents.filter(parentId => !nodePositions.has(parentId));
+    const parentsToLoad = potentialParents.filter(parentId => allDefinitions.has(parentId) && !nodePositions.has(parentId));
 
     if (parentsToLoad.length > 0) {
         const newNodes: CanvasNode[] = [];
@@ -430,11 +432,16 @@ function CanvasPageContent() {
                     const definition = allDefinitions.get(node.id);
                     if (!definition) return null;
 
-                    const hasChildren = (definition.linkedDeepWorkIds?.length ?? 0) > 0 || (definition.linkedUpskillIds?.length ?? 0) > 0 || (definition.linkedResourceIds?.length ?? 0) > 0;
+                    const allChildIds = [
+                        ...(definition.linkedDeepWorkIds || []),
+                        ...(definition.linkedUpskillIds || []),
+                        ...(definition.linkedResourceIds || []),
+                    ];
+                    const hasUnloadedChild = allChildIds.some(childId => allDefinitions.has(childId) && !nodePositions.has(childId));
+                    const canExpandChildren = hasUnloadedChild;
+
                     const potentialParents = parentMap.get(node.id) || [];
-                    const hasUnloadedParent = potentialParents.some(parentId => !nodePositions.has(parentId));
-                    
-                    const canExpandChildren = hasChildren;
+                    const hasUnloadedParent = potentialParents.some(parentId => allDefinitions.has(parentId) && !nodePositions.has(parentId));
                     const canRevealParents = hasUnloadedParent;
 
                     return (
