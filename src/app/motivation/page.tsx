@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo } from 'react';
@@ -6,7 +5,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AlertCircle, ArrowDown, ArrowUp, BarChart3, TrendingUp, TrendingDown, CheckCircle2, PauseCircle } from 'lucide-react';
-import { differenceInDays, subDays, format, parseISO, addDays } from 'date-fns';
+import { differenceInDays, subDays, format, parseISO, addDays, differenceInYears } from 'date-fns';
 import type { DatedWorkout, WeightLog, TopicGoal } from '@/types/workout';
 
 const InsightCard = ({
@@ -59,7 +58,7 @@ const InsightCard = ({
       <CardContent className="flex flex-col flex-grow">
         <div className="text-2xl font-bold">{currentValue.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">{unit}</span></div>
         <p className="text-xs text-muted-foreground">vs {previousValue.toFixed(1)} {unit} last week</p>
-        <p className="mt-4 text-sm text-foreground flex-grow">{message}</p>
+        <p className="mt-4 text-sm text-foreground flex-grow" dangerouslySetInnerHTML={{ __html: message }}></p>
       </CardContent>
     </Card>
   );
@@ -68,62 +67,62 @@ const InsightCard = ({
 // --- Message Banks ---
 const messageTemplates = {
   burnout: [
-    "You're putting in incredible hours! This is amazing, but make sure you're taking time to rest and avoid burnout. Sustainable progress is key.",
-    "An absolutely massive week! Your dedication is off the charts. Remember, even the sharpest axe needs sharpening. Don't forget to schedule some downtime.",
+    "{{username}}, you're putting in incredible hours! This is amazing, but make sure you're taking time to rest and avoid burnout. Sustainable progress is key.",
+    "An absolutely massive week, {{username}}! Your dedication is off the charts. Remember, even the sharpest axe needs sharpening. Don't forget to schedule some downtime.",
     "Incredible intensity! You're crushing it. Just a friendly reminder to listen to your body and mind. Rest is as important as the work itself for long-term gains.",
   ],
   up: [
-    "Fantastic momentum! You've significantly increased your focus this week. Keep up the great work and build on this success.",
+    "Fantastic momentum, {{username}}! You've significantly increased your focus this week. Keep up the great work and build on this success.",
     "What a surge in productivity! Whatever you changed this week is clearly working. Let's keep that fire going.",
     "Great job stepping up the intensity. You're making serious progress. Channel this energy into next week.",
   ],
   down: [
-    "It looks like things slowed down a bit this week. That's completely normal. Was this intentional rest, or did something get in the way? Reflect and adjust for next week.",
+    "{{username}}, it looks like things slowed down a bit this week. That's completely normal. Was this intentional rest, or did something get in the way? Reflect and adjust for next week.",
     "A quieter week. A great opportunity to plan your comeback and set a clear, achievable goal for the upcoming days.",
     "Every system needs downtime. If this was a planned break, great. If not, what's one small step you can take tomorrow to get back on track?",
   ],
   stable: [
-    "Solid and steady! Consistency is the foundation of all progress. You're building strong habits. Keep it going!",
+    "Solid and steady, {{username}}! Consistency is the foundation of all progress. You're building strong habits. Keep it going!",
     "Another consistent week in the books. This is how long-term goals are achieved. Well done.",
     "You're in the groove. Maintaining this level of effort is a skill in itself. Keep executing.",
   ],
   new_week: [
-    "It's a fresh start. What's one small step you can take today to get the ball rolling?",
+    "It's a fresh start, {{username}}. What's one small step you can take today to get the ball rolling?",
     "A new week begins. What's your number one priority? Let's get after it.",
   ],
   goal_getting_closer: [
-      "Incredible work! You've cut down your estimated time to goal. Your consistent effort is paying off, and the finish line is getting closer.",
+      "Incredible work, {{username}}! You've cut down your estimated time to goal. Your consistent effort is paying off, and the finish line is getting closer.",
       "Your goal is approaching faster than ever! This week's progress has significantly shortened your timeline. Keep up this amazing pace!",
       "Momentum is on your side. You've made great strides and your projected completion date has moved up. This is what progress looks like!",
   ],
   goal_slipping: [
-      "Your projected goal date has slipped a bit. It's a good time to reassess. Was this a planned rest, or is it time to recommit to the original pace?",
+      "Your projected goal date has slipped a bit, {{username}}. It's a good time to reassess. Was this a planned rest, or is it time to recommit to the original pace?",
       "It looks like the timeline for your goal has extended. Let's analyze what happened this week and see how we can get back on the fast track.",
       "A small course correction might be needed. Your goal date has moved further out. Let's set a clear intention for this week to close the gap.",
   ],
   goal_stable: [
       "You're on a steady path to your goal. Your consistent effort is maintaining your projected completion date. Keep up the great work!",
-      "Steady as she goes! You're right on track with your projection. Consistency is your superpower right now.",
+      "Steady as she goes, {{username}}! You're right on track with your projection. Consistency is your superpower right now.",
       "Excellent. You're meeting the required pace to stay on schedule for your goal. Keep this rhythm going.",
   ],
   weight_loss_good: [
-      "Excellent! You're moving closer to your weight loss goal. Your hard work in diet and exercise is clearly paying off.",
+      "Excellent, {{username}}! You're moving closer to your weight loss goal. Your hard work in diet and exercise is clearly paying off.",
       "Great progress! You're successfully trending towards your target weight. Keep up the consistent effort.",
   ],
   weight_loss_bad: [
-      "A small bump in the road. This week's trend is moving away from your weight loss goal. Let's review the plan and get back on track.",
+      "A small bump in the road. This week's trend is moving away from your weight loss goal. Let's review the plan and get back on track, {{username}}.",
       "It looks like we're slightly off course from your weight loss target. A minor adjustment to your diet or activity could make all the difference this week.",
   ],
   weight_gain_good: [
       "Great! This is solid progress towards your weight gain goal. Stay consistent with your nutrition and training!",
-      "Nice work. You're successfully adding mass and moving towards your target. Keep fueling your body for growth.",
+      "Nice work, {{username}}. You're successfully adding mass and moving towards your target. Keep fueling your body for growth.",
   ],
   weight_gain_bad: [
       "This week's trend is moving away from your weight gain goal. Consider a small, consistent calorie surplus to get back on track.",
-      "A slight dip this week. Let's ensure you're getting enough fuel to support your muscle-building goals.",
+      "A slight dip this week. Let's ensure you're getting enough fuel to support your muscle-building goals, {{username}}.",
   ],
   weight_stable: [
-      "Your weight is stable, holding steady. This is great for maintenance. Keep your habits strong.",
+      "Your weight is stable, holding steady. This is great for maintenance, {{username}}. Keep your habits strong.",
       "Consistency is key, and you're maintaining your current weight perfectly. Well done.",
   ],
   weight_no_goal_up: [
@@ -135,19 +134,42 @@ const messageTemplates = {
   weight_no_data: [
       "Log your weight for two consecutive weeks to start seeing trends and get personalized feedback.",
       "Track your weight weekly to unlock insights and feedback on your progress.",
+  ],
+  age_related: [
+    "At age {{age}}, you're building habits that will compound for decades. Keep investing in yourself, {{username}}.",
+    "Think about where you want to be at age {{next_age}}. The work you're doing now is paving that path.",
+    "Every hour you invest in your skills at {{age}} is a massive leverage point for your future. Great work.",
   ]
 };
 
-// Helper to select a random message
-const getRandomMessage = (category: keyof typeof messageTemplates) => {
+// Helper to select a random message and personalize it
+const getRandomMessage = (
+    category: keyof typeof messageTemplates, 
+    context: { username?: string | null; age?: number | null } = {}
+) => {
   const messages = messageTemplates[category];
-  return messages[Math.floor(Math.random() * messages.length)];
+  let message = messages[Math.floor(Math.random() * messages.length)];
+  
+  if (context.username) {
+      message = message.replace(/{{username}}/g, `<b>${context.username}</b>`);
+  }
+  if (context.age) {
+      message = message.replace(/{{age}}/g, context.age.toString());
+      message = message.replace(/{{next_age}}/g, (context.age + 1).toString());
+  }
+
+  return message;
 };
 
 
 const MotivationPageContent = () => {
-  const { allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, weightLogs, goalWeight, topicGoals } = useAuth();
-
+  const { currentUser, dateOfBirth, allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, weightLogs, goalWeight, topicGoals } = useAuth();
+  
+  const userContext = useMemo(() => {
+    const age = dateOfBirth ? differenceInYears(new Date(), parseISO(dateOfBirth)) : null;
+    return { username: currentUser?.username, age };
+  }, [currentUser, dateOfBirth]);
+  
   const weeklyStats = useMemo(() => {
     const today = new Date();
     const oneWeekAgo = subDays(today, 7);
@@ -249,21 +271,21 @@ const MotivationPageContent = () => {
     burnoutThreshold: number
   ): { trend: 'up' | 'down' | 'stable' | 'burnout'; message: string } => {
     if (current > burnoutThreshold) {
-      return { trend: 'burnout', message: getRandomMessage('burnout') };
+      return { trend: 'burnout', message: getRandomMessage('burnout', userContext) };
     }
     if (current > prev * 1.2) { // More than 20% increase
-      return { trend: 'up', message: getRandomMessage('up') };
+      return { trend: 'up', message: getRandomMessage('up', userContext) };
     }
     if (current < prev * 0.8) { // More than 20% decrease
       if (prev > 0) {
-        return { trend: 'down', message: getRandomMessage('down') };
+        return { trend: 'down', message: getRandomMessage('down', userContext) };
       }
-      return { trend: 'down', message: getRandomMessage('new_week') };
+      return { trend: 'down', message: getRandomMessage('new_week', userContext) };
     }
     if (current > 0) {
-      return { trend: 'stable', message: getRandomMessage('stable') };
+      return { trend: 'stable', message: getRandomMessage('stable', userContext) };
     }
-    return { trend: 'stable', message: getRandomMessage('new_week') };
+    return { trend: 'stable', message: getRandomMessage('new_week', userContext) };
   };
 
   const getUpskillInsight = (
@@ -275,12 +297,12 @@ const MotivationPageContent = () => {
     // Check for goal projection changes first
     if (currentDays !== null && prevDays !== null) {
       if (currentDays < prevDays) {
-        return { trend: 'up' as const, message: getRandomMessage('goal_getting_closer') };
+        return { trend: 'up' as const, message: getRandomMessage('goal_getting_closer', userContext) };
       }
       if (currentDays > prevDays) {
-        return { trend: 'down' as const, message: getRandomMessage('goal_slipping') };
+        return { trend: 'down' as const, message: getRandomMessage('goal_slipping', userContext) };
       }
-      return { trend: 'stable' as const, message: getRandomMessage('goal_stable') };
+      return { trend: 'stable' as const, message: getRandomMessage('goal_stable', userContext) };
     }
 
     // Fallback to simple hour comparison if projections aren't available
@@ -293,7 +315,7 @@ const MotivationPageContent = () => {
     }
     const change = current - prev;
     if (Math.abs(change) < 0.2) {
-        return { trend: 'stable', message: getRandomMessage('weight_stable') };
+        return { trend: 'stable', message: getRandomMessage('weight_stable', userContext) };
     }
   
     const wentUp = change > 0;
@@ -305,12 +327,12 @@ const MotivationPageContent = () => {
       const goalIsHigher = goal > prev;
   
       if (goalIsLower) { // Goal is to lose weight
-        if (wentDown) return { trend: 'down', message: getRandomMessage('weight_loss_good') };
-        if (wentUp) return { trend: 'up', message: getRandomMessage('weight_loss_bad') };
+        if (wentDown) return { trend: 'down', message: getRandomMessage('weight_loss_good', userContext) };
+        if (wentUp) return { trend: 'up', message: getRandomMessage('weight_loss_bad', userContext) };
       }
       if (goalIsHigher) { // Goal is to gain weight
-        if (wentUp) return { trend: 'up', message: getRandomMessage('weight_gain_good') };
-        if (wentDown) return { trend: 'down', message: getRandomMessage('weight_gain_bad') };
+        if (wentUp) return { trend: 'up', message: getRandomMessage('weight_gain_good', userContext) };
+        if (wentDown) return { trend: 'down', message: getRandomMessage('weight_gain_bad', userContext) };
       }
     }
   
@@ -326,6 +348,7 @@ const MotivationPageContent = () => {
   const upskillInsight = getUpskillInsight(weeklyStats.upskill.current, weeklyStats.upskill.prev, weeklyStats.upskill.currentDaysToGoal, weeklyStats.upskill.prevDaysToGoal);
   const workoutInsight = getInsight(weeklyStats.workouts.current, weeklyStats.workouts.prev, 7);
   const weightInsight = getWeightInsight(weeklyStats.weight.current, weeklyStats.weight.prev, goalWeight);
+  const ageInsight = userContext.age ? { trend: 'stable' as const, message: getRandomMessage('age_related', userContext) } : null;
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -375,6 +398,17 @@ const MotivationPageContent = () => {
           unit="kg/lb"
           message={weightInsight.message}
         />
+        {ageInsight && (
+           <InsightCard
+                icon={<Calendar />}
+                title="Life Perspective"
+                trend={ageInsight.trend}
+                currentValue={userContext.age || 0}
+                previousValue={userContext.age || 0}
+                unit="years old"
+                message={ageInsight.message}
+            />
+        )}
       </div>
     </div>
   );
