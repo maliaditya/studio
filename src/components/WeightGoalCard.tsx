@@ -23,6 +23,8 @@ import Link from 'next/link';
 import { IntentionDetailModal } from './IntentionDetailModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { MindMapViewer } from './MindMapViewer';
+import { IntentionGoalCard } from './IntentionGoalCard';
+import { Carousel } from './ui/carousel';
 
 
 interface WeightGoalCardProps {
@@ -399,94 +401,31 @@ export function WeightGoalCard({
         setIsMindMapModalOpen(true);
     };
 
-    const renderTopicList = (topics: { name: string, count: number }[], type: 'deep-work' | 'upskill') => {
-        if (topics.length === 0) {
+    const renderProjectsContent = () => {
+        if (activeIntentions.length === 0) {
           return (
-            <div className="text-center text-sm text-muted-foreground py-4">
-              <p>No active {type === 'deep-work' ? 'projects' : 'learning topics'}.</p>
-              <Link href={`/${type}`} className="text-primary hover:underline">
-                Go to {type === 'deep-work' ? 'Deep Work' : 'Upskill'} to add some.
+            <div className="text-center text-sm text-muted-foreground py-4 flex flex-col items-center justify-center h-full">
+              <p>No active intentions found.</p>
+              <Link href="/deep-work" className="text-primary hover:underline mt-1">
+                Create an intention to see it here.
               </Link>
             </div>
           );
         }
         return (
-          <ul className="space-y-2">
-            {topics.map(topic => (
-              <li key={topic.name}>
-                <Link href={`/${type}`}>
-                  <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      {type === 'deep-work' ? <Briefcase className="h-4 w-4 text-primary" /> : <BookCopy className="h-4 w-4 text-primary" />}
-                      <span className="font-medium text-foreground">{topic.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">{topic.count} {topic.count === 1 ? 'item' : 'items'}</span>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
+            <Carousel
+                items={activeIntentions}
+                renderItem={(intention) => (
+                    <IntentionGoalCard
+                        key={intention.id}
+                        intention={intention}
+                        onMindMapClick={() => handleIntentionClick(intention)}
+                    />
+                )}
+            />
         );
       };
       
-    const renderIntentionsList = (intentions: ExerciseDefinition[]) => {
-        if (intentions.length === 0) {
-          return (
-            <div className="text-center text-sm text-muted-foreground py-4">
-              <p>No active intentions found.</p>
-              <Link href="/deep-work" className="text-primary hover:underline">
-                Create an intention by linking tasks in Deep Work.
-              </Link>
-            </div>
-          );
-        }
-        return (
-          <ul className="space-y-2">
-            {intentions.map(intention => (
-              <li key={intention.id}>
-                <button
-                    className="w-full text-left"
-                    onClick={() => handleIntentionClick(intention)}
-                >
-                  <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <Lightbulb className="h-4 w-4 text-primary flex-shrink-0" />
-                      <span className="font-medium text-foreground truncate" title={intention.name}>{intention.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-sm text-muted-foreground truncate" title={intention.category}>{intention.category}</span>
-                      <GitMerge className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
-        );
-      };
-
-    const renderProjectsContent = () => (
-        <Tabs defaultValue="deep-work" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="deep-work">Intentions</TabsTrigger>
-            <TabsTrigger value="upskill">Topics</TabsTrigger>
-          </TabsList>
-          <TabsContent value="deep-work" className="mt-4">
-            <ScrollArea className="h-48">
-              {renderIntentionsList(activeIntentions)}
-            </ScrollArea>
-          </TabsContent>
-          <TabsContent value="upskill" className="mt-4">
-            <ScrollArea className="h-48">
-              {renderTopicList(upskillTopics, 'upskill')}
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
-    );
-
     const renderWeightContent = () => {
         if (weightView === 'chart') {
             return (
