@@ -66,7 +66,7 @@ const InsightCard = ({
 };
 
 const MotivationPageContent = () => {
-  const { allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, weightLogs } = useAuth();
+  const { allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, weightLogs, goalWeight } = useAuth();
 
   const weeklyStats = useMemo(() => {
     const today = new Date();
@@ -141,24 +141,45 @@ const MotivationPageContent = () => {
     return { trend: 'stable', message: "It's a fresh start. What's one small step you can take today to get the ball rolling?" };
   };
 
-  const getWeightInsight = (current: number, prev: number): { trend: 'up' | 'down' | 'stable'; message: string } => {
-      if (current === 0 || prev === 0) {
-          return { trend: 'stable', message: "Log your weight for two consecutive weeks to start seeing trends and get personalized feedback." };
+  const getWeightInsight = (current: number, prev: number, goal: number | null): { trend: 'up' | 'down' | 'stable'; message: string } => {
+    if (current === 0 || prev === 0) {
+        return { trend: 'stable', message: "Log your weight for two consecutive weeks to start seeing trends and get personalized feedback." };
+    }
+    const change = current - prev;
+    if (Math.abs(change) < 0.2) {
+        return { trend: 'stable', message: `Your weight is stable, holding at ${current.toFixed(1)} kg/lb. Consistency is paying off. Keep your habits strong.` };
+    }
+  
+    const wentUp = change > 0;
+    const wentDown = change < 0;
+  
+    // With a goal set
+    if (goal) {
+      const goalIsLower = goal < prev;
+      const goalIsHigher = goal > prev;
+  
+      if (goalIsLower) { // Goal is to lose weight
+        if (wentDown) return { trend: 'down', message: `Excellent! You dropped from ${prev.toFixed(1)} to ${current.toFixed(1)} kg/lb, moving you closer to your goal. Keep up the great work!` };
+        if (wentUp) return { trend: 'up', message: `Your weight went up from ${prev.toFixed(1)} to ${current.toFixed(1)} kg/lb. This is a small step away from your weight loss goal. Let's refocus on the plan this week!` };
       }
-      const change = current - prev;
-      if (Math.abs(change) < 0.2) {
-          return { trend: 'stable', message: `Your weight is stable, holding at ${current} kg/lb. Consistency is paying off. Keep your habits strong.` };
+      if (goalIsHigher) { // Goal is to gain weight
+        if (wentUp) return { trend: 'up', message: `Great! You went from ${prev.toFixed(1)} to ${current.toFixed(1)} kg/lb. This is solid progress towards your weight gain goal. Stay consistent!` };
+        if (wentDown) return { trend: 'down', message: `Your weight dropped from ${prev.toFixed(1)} to ${current.toFixed(1)} kg/lb. This is moving away from your goal. Consider a small calorie surplus to get back on track.` };
       }
-      if (change > 0) {
-          return { trend: 'up', message: `Your weight went from ${prev} to ${current} kg/lb. Is this aligned with your current goals? Review your diet and activity.` };
-      }
-      return { trend: 'down', message: `Your weight dropped from ${prev} to ${current} kg/lb. Great progress if you're aiming for weight loss! If not, consider a small calorie surplus.` };
+    }
+  
+    // No goal set (generic feedback)
+    if (wentUp) {
+        return { trend: 'up', message: `Your weight went from ${prev.toFixed(1)} to ${current.toFixed(1)} kg/lb. Is this aligned with your current goals? Review your diet and activity.` };
+    }
+    // wentDown
+    return { trend: 'down', message: `Your weight dropped from ${prev.toFixed(1)} to ${current.toFixed(1)} kg/lb. Great progress if you're aiming for weight loss! If not, consider a small calorie surplus.` };
   };
 
   const deepWorkInsight = getInsight(weeklyStats.deepWork.current, weeklyStats.deepWork.prev, 35); // 5h/day burnout
   const upskillInsight = getInsight(weeklyStats.upskill.current, weeklyStats.upskill.prev, 28); // 4h/day burnout
   const workoutInsight = getInsight(weeklyStats.workouts.current, weeklyStats.workouts.prev, 7);
-  const weightInsight = getWeightInsight(weeklyStats.weight.current, weeklyStats.weight.prev);
+  const weightInsight = getWeightInsight(weeklyStats.weight.current, weeklyStats.weight.prev, goalWeight);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
