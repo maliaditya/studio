@@ -626,8 +626,8 @@ export function WeightGoalCard({
           content: renderDietContent()
         },
         projects: {
-          icon: <Briefcase />,
-          title: "Project Overview",
+          icon: <Workflow />,
+          title: "Vision",
           description: "A high-level view of your current work.",
           content: renderProjectsContent()
         }
