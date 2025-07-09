@@ -234,51 +234,67 @@ function MyPlatePageContent() {
     }
 
     const healthNarrative = `Your energy is steady. Your health score could climb from ${currentConsistency}% to ${scoreWithWorkouts}%. ${weightNarrative}`;
-    const healthAlternative = "You break the rhythm, the story ends. You wake up where you had started, free to believe whatever you want. But if you stay on this path, you stay in Wonderland, and I show you how deep the rabbit hole goes.";
 
     // Deep Work
     const linkedDeepWorkChildIds = new Set(deepWorkDefinitions.flatMap(def => def.linkedDeepWorkIds || []));
     const activeIntention = deepWorkDefinitions.find(def => ((def.linkedDeepWorkIds?.length ?? 0) > 0) && !linkedDeepWorkChildIds.has(def.id));
     let deepWorkNarrative = "";
-
+    
     if (activeIntention) {
-        const allDescendantIds = new Set<string>();
-        const queue: string[] = [activeIntention.id];
+        let allDescendantTasks: {id: string, name: string, remainingHours: number, type: 'objective' | 'action'}[] = [];
         const visited = new Set<string>();
+
+        const getLoggedHours = (defId: string) => {
+            let totalMinutes = 0;
+            allDeepWorkLogs.forEach(log => { log.exercises.forEach(ex => { if (ex.definitionId === defId) totalMinutes += ex.loggedSets.reduce((s, set) => s + set.weight, 0); }); });
+            allUpskillLogs.forEach(log => { log.exercises.forEach(ex => { if (ex.definitionId === defId) totalMinutes += ex.loggedSets.reduce((s, set) => s + set.reps, 0); }); });
+            return totalMinutes / 60;
+        };
+
+        const recurse = (nodeId: string) => {
+            if (visited.has(nodeId)) return;
+            visited.add(nodeId);
+            const node = deepWorkDefinitions.find(d => d.id === nodeId);
+            if (!node) return;
+
+            const isObjective = (node.linkedDeepWorkIds?.length ?? 0) > 0;
+            const remainingHours = (node.estimatedHours || 0) - getLoggedHours(node.id);
+
+            if (remainingHours > 0.1) { // Only consider tasks not yet completed
+                allDescendantTasks.push({ id: node.id, name: node.name, remainingHours, type: isObjective ? 'objective' : 'action' });
+            }
+            
+            (node.linkedDeepWorkIds || []).forEach(childId => recurse(childId));
+        };
         
-        while(queue.length > 0) {
-            const id = queue.shift()!;
-            if (visited.has(id)) continue;
-            visited.add(id);
-            allDescendantIds.add(id);
-            const def = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === id);
-            if(def) { 
-                (def.linkedDeepWorkIds || []).forEach(childId => queue.push(childId));
-                (def.linkedUpskillIds || []).forEach(childId => queue.push(childId));
+        // Start recursion from children of the main intention
+        (activeIntention.linkedDeepWorkIds || []).forEach(childId => recurse(childId));
+
+        const avgDailyProductiveHours = (weeklyStats.deepWork.current + weeklyStats.upskill.current) / 7;
+        let availableHours = avgDailyProductiveHours > 0 ? avgDailyProductiveHours * 7 : 7; // Assume at least 1 hr/day if no data
+        
+        let projectedCompletedObjectives: string[] = [];
+        let projectedCompletedActions: string[] = [];
+        
+        for (const task of allDescendantTasks) {
+            if (availableHours >= task.remainingHours) {
+                availableHours -= task.remainingHours;
+                if (task.type === 'objective') projectedCompletedObjectives.push(task.name);
+                else projectedCompletedActions.push(task.name);
+            } else {
+                break; // Stop when we can't complete the next full task
             }
         }
         
-        let totalLoggedHours = 0;
-        allDescendantIds.forEach(id => {
-            allDeepWorkLogs.forEach(log => {
-                log.exercises.forEach(ex => {
-                    if(ex.definitionId === id) {
-                        totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0) / 60;
-                    }
-                });
-            });
-            allUpskillLogs.forEach(log => {
-                log.exercises.forEach(ex => {
-                    if(ex.definitionId === id) {
-                        totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0) / 60;
-                    }
-                });
-            });
-        });
-        
-        const avgDailyProductiveHours = (weeklyStats.deepWork.current + weeklyStats.upskill.current) / 7;
-        const projectedHours = totalLoggedHours + (avgDailyProductiveHours * 7);
-        deepWorkNarrative = `Your intention, '${activeIntention.name}', is beginning to take shape. You now stand at ${projectedHours.toFixed(0)} hours—clarity is emerging.`;
+        let intentionNarrative = `Your intention, '${activeIntention.name}', is solidifying. This week, you are on track to complete`;
+        if (projectedCompletedObjectives.length > 0) {
+            intentionNarrative += ` the objective${projectedCompletedObjectives.length > 1 ? 's' : ''}: <b>${projectedCompletedObjectives.join(', ')}</b>.`;
+        } else if (projectedCompletedActions.length > 0) {
+             intentionNarrative += ` the action${projectedCompletedActions.length > 1 ? 's' : ''}: <b>${projectedCompletedActions.join(', ')}</b>.`;
+        } else {
+            intentionNarrative = `Your intention, '${activeIntention.name}', is a big one. Keep chipping away at it this week.`;
+        }
+        deepWorkNarrative = intentionNarrative;
     }
 
     // Upskill
@@ -293,7 +309,7 @@ function MyPlatePageContent() {
         const durationDays = differenceInDays(new Date(), firstDay) + 1;
         const avgRate = durationDays > 0 ? totalProgress / durationDays : 0;
         const projectedProgress = totalProgress + (avgRate * 7);
-        upskillNarrative = `On your desk, the ${topic} material lies open. You've crossed ${projectedProgress.toFixed(0)} ${goal.goalType}—each concept is less foreign, more intuitive.`;
+        upskillNarrative = `On your desk, the ${topic} material lies open. You're projected to cross ${projectedProgress.toFixed(0)} ${goal.goalType}—each concept is less foreign, more intuitive.`;
     }
 
     const affirmations = [
@@ -303,9 +319,12 @@ function MyPlatePageContent() {
     ];
     const affirmation = affirmations[Math.floor(Math.random() * affirmations.length)];
     
-    return { header, healthNarrative, deepWorkNarrative, upskillNarrative, healthAlternative, affirmation };
+    return { header, healthNarrative, deepWorkNarrative, upskillNarrative, affirmation };
 
   }, [allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, topicGoals, weeklyStats, weightLogs, dateOfBirth, currentUser]);
+  
+  const healthAlternative = `You break the rhythm, the story ends. You wake up where you had started, free to believe whatever you want. But if you stay on this path, you stay in Wonderland, and I show you how deep the rabbit hole goes.`
+
 
   const getInsight = (current: number, prev: number, burnoutThreshold: number): { trend: 'up' | 'down' | 'stable' | 'burnout'; message: string } => { if (current > burnoutThreshold) return { trend: 'burnout', message: getRandomMessage('burnout', userContext) }; if (current > prev * 1.2) return { trend: 'up', message: getRandomMessage('up', userContext) }; if (current < prev * 0.8) { if (prev > 0) return { trend: 'down', message: getRandomMessage('down', userContext) }; return { trend: 'down', message: getRandomMessage('new_week', userContext) }; } if (current > 0) return { trend: 'stable', message: getRandomMessage('stable', userContext) }; return { trend: 'stable', message: getRandomMessage('new_week', userContext) }; };
   const getUpskillInsight = (currentHours: number, prevHours: number, currentDays: number | null, prevDays: number | null) => { if (currentDays !== null && prevDays !== null) { if (currentDays < prevDays) return { trend: 'up' as const, message: getRandomMessage('goal_getting_closer', userContext) }; if (currentDays > prevDays) return { trend: 'down' as const, message: getRandomMessage('goal_slipping', userContext) }; return { trend: 'stable' as const, message: getRandomMessage('goal_stable', userContext) }; } return getInsight(currentHours, prevHours, 28); };
@@ -405,21 +424,17 @@ function MyPlatePageContent() {
             <CardContent className="space-y-4">
                 <p className="text-foreground leading-relaxed" dangerouslySetInnerHTML={{ __html: lifePerspectiveNarrative.healthNarrative}} />
                 {lifePerspectiveNarrative.deepWorkNarrative && (
-                    <p className="text-foreground leading-relaxed">
-                        {lifePerspectiveNarrative.deepWorkNarrative}
-                    </p>
+                    <p className="text-foreground leading-relaxed" dangerouslySetInnerHTML={{ __html: lifePerspectiveNarrative.deepWorkNarrative}} />
                 )}
                 {lifePerspectiveNarrative.upskillNarrative && (
-                    <p className="text-foreground leading-relaxed">
-                        {lifePerspectiveNarrative.upskillNarrative}
-                    </p>
+                    <p className="text-foreground leading-relaxed" dangerouslySetInnerHTML={{ __html: lifePerspectiveNarrative.upskillNarrative}} />
                 )}
                 <blockquote className="mt-6 border-l-2 pl-6 italic text-muted-foreground">
                     {lifePerspectiveNarrative.affirmation}
                 </blockquote>
                  <details className="text-xs text-muted-foreground pt-4">
                     <summary className="cursor-pointer">What if my rhythm breaks?</summary>
-                    <p className="mt-2 italic" dangerouslySetInnerHTML={{ __html: lifePerspectiveNarrative.healthAlternative }} />
+                    <p className="mt-2 italic">{healthAlternative}</p>
                 </details>
             </CardContent>
           </Card>
