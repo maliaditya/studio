@@ -66,7 +66,7 @@ function DraggableNode({ node, definition, status, onConnectClick, onRemoveClick
   return (
     <motion.div
       ref={setNodeRef}
-      style={{ ...style, position: 'absolute', left: node.x, top: node.y }}
+      style={{ ...style, position: 'absolute', left: node.x, top: node.y, willChange: 'transform' }}
       className="w-48 z-10"
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -162,10 +162,11 @@ function CanvasPageContent() {
   const handleDragEnd = (event: DragEndEvent) => {
     setIsDragging(false);
     const { active, delta } = event;
+    const scale = transformWrapperRef.current?.instance.transformState.scale || 1;
     setCanvasLayout(prev => ({
       ...prev,
       nodes: prev.nodes.map(node => 
-        node.id === active.id ? { ...node, x: node.x + delta.x, y: node.y + delta.y } : node
+        node.id === active.id ? { ...node, x: node.x + delta.x / scale, y: node.y + delta.y / scale } : node
       )
     }));
   };
