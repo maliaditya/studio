@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, addDays, subDays, isAfter, parseISO, differenceInDays } from 'date-fns';
 import type { DatedWorkout, ExerciseDefinition, TopicGoal, WeightLog } from '@/types/workout';
@@ -47,14 +47,15 @@ export function LifePerspectiveCard({
             else currentScore *= 0.95;
         }
         const scoreWithWorkouts = Math.round((currentScore + (1 - currentScore) * 0.3) * 100);
-        let weightNarrative = "";
-        if (weightLogs.length >= 2) {
-            const lastTwoLogs = [...weightLogs].sort((a,b) => a.date.localeCompare(b.date)).slice(-2);
-            const weeklyChange = lastTwoLogs[1].weight - lastTwoLogs[0].weight;
-            const nextWeekWeight = lastTwoLogs[1].weight + weeklyChange;
-            weightNarrative = `Your discipline is paying off; you are projected to be around <b>${nextWeekWeight.toFixed(1)} kg/lb</b>.`
+        
+        let weightNarrative = `Your energy is steady. Your health score could climb to ${scoreWithWorkouts}%.`;
+        if (weightLogs.length >= 2 && weeklyStats.weight.prev > 0) {
+            const weeklyChange = weeklyStats.weight.current - weeklyStats.weight.prev;
+            const nextWeekWeight = weeklyStats.weight.current + weeklyChange;
+            weightNarrative += ` After hitting <b>${weeklyStats.weight.prev.toFixed(1)} kg/lb</b> last week, you're now at <b>${weeklyStats.weight.current.toFixed(1)} kg/lb</b>. At this rate, you are projected to be around <b>${nextWeekWeight.toFixed(1)} kg/lb</b> next week.`
+        } else if (weightLogs.length >= 2) {
+             weightNarrative += ` You're currently at <b>${weeklyStats.weight.current.toFixed(1)} kg/lb</b>. Keep logging to see your projection.`
         }
-        const healthNarrative = `Your energy is steady. Your health score could climb to ${scoreWithWorkouts}%. ${weightNarrative}`;
 
         // Deep Work & Productivity
         const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
@@ -145,6 +146,11 @@ export function LifePerspectiveCard({
 
         // Upskill
         let upskillNarrative = "";
+        const prevUpskillHours = weeklyStats.upskill.prev;
+        const currentUpskillHours = weeklyStats.upskill.current;
+        if (currentUpskillHours > 0 || prevUpskillHours > 0) {
+             upskillNarrative += `You moved from <b>${prevUpskillHours.toFixed(1)} hours</b> of learning last week to a pace of <b>${currentUpskillHours.toFixed(1)} hours</b> this week.`
+        }
         if (Object.keys(topicGoals).length > 0) {
             const topic = Object.keys(topicGoals)[0];
             const goal = topicGoals[topic];
@@ -155,7 +161,10 @@ export function LifePerspectiveCard({
             const durationDays = differenceInDays(new Date(), firstDay) + 1;
             const avgRate = durationDays > 0 ? totalProgress / durationDays : 0;
             const projectedProgress = totalProgress + (avgRate * 7);
-            upskillNarrative = `On your desk, the ${topic} material lies open. You're projected to cross <b>${projectedProgress.toFixed(0)}</b> ${goal.goalType}—each concept is less foreign, more intuitive.`;
+            
+            if (avgRate > 0) {
+              upskillNarrative += ` On your desk, the ${topic} material lies open. You're projected to cross <b>${projectedProgress.toFixed(0)}</b> ${goal.goalType}—each concept is less foreign, more intuitive.`;
+            }
         }
 
         const affirmations = [
