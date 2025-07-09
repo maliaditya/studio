@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo } from 'react';
@@ -7,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { AlertCircle, ArrowDown, ArrowUp, BarChart3, TrendingUp, TrendingDown, CheckCircle2, PauseCircle, Calendar } from 'lucide-react';
 import { differenceInDays, subDays, format, parseISO, addDays, differenceInYears, addWeeks, getISOWeekYear, setISOWeek, startOfISOWeek } from 'date-fns';
 import type { DatedWorkout, WeightLog, TopicGoal, ExerciseDefinition } from '@/types/workout';
+import { Progress } from '@/components/ui/progress';
 
 const InsightCard = ({
   icon,
@@ -141,19 +143,13 @@ const messageTemplates = {
     "Every hour you invest in your skills at {{age}} is a massive leverage point for your future. Great work.",
   ],
   life_perspective_weight: [
-    "{{username}}, at your current pace, you could reach your weight goal of {{goalWeight}} kg/lb around age {{projectedAge}}. Imagine the shape you'll be in!",
     "Your dedication to fitness is clear. If you stay on this path, you're projected to hit your weight goal at age {{projectedAge}}. Future you will be grateful.",
-    "Keep up the great work, {{username}}. Reaching your fitness goal by age {{projectedAge}} is an incredible investment in your long-term health and vitality."
   ],
   life_perspective_intention: [
-    "Your vision for '{{intentionName}}' is taking shape. At this rate, you could complete it by age {{projectedAge}}. What will you build next?",
-    "{{username}}, you're on track to bring your intention '{{intentionName}}' to life around age {{projectedAge}}. That's a huge milestone to look forward to.",
-    "The work you're putting in now on '{{intentionName}}' will pay off. Your projected completion is at age {{projectedAge}}. Keep executing the vision."
+    "Your vision for '{{intentionName}}' is taking shape. At this rate, you could complete it by age {{projectedAge}}. That's a huge milestone to look forward to.",
   ],
   life_perspective_skill: [
     "Mastering '{{topicName}}' is a marathon, not a sprint. At this pace, you're set to reach your learning goal by age {{projectedAge}}, {{username}}.",
-    "Keep investing in your knowledge, {{username}}. You're projected to achieve your learning goal for '{{topicName}}' around age {{projectedAge}}.",
-    "Your commitment to learning '{{topicName}}' is impressive. Hitting your goal by age {{projectedAge}} will unlock incredible new opportunities."
   ],
 };
 
@@ -169,7 +165,7 @@ const getRandomMessage = (
   Object.keys(context).forEach(key => {
     const value = context[key];
     if (value !== null && value !== undefined) {
-      if (key === 'username' || category.startsWith('life_perspective')) {
+      if (key === 'username') {
         message = message.replace(new RegExp(`{{${key}}}`, 'g'), `<b>${value}</b>`);
       } else {
         message = message.replace(new RegExp(`{{${key}}}`, 'g'), value.toString());
@@ -295,9 +291,28 @@ const MotivationPageContent = () => {
   }, [allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, weightLogs, topicGoals]);
 
   const lifePerspectiveInsight = useMemo(() => {
-    if (!userContext.age || !dateOfBirth) return getRandomMessage('age_related', userContext);
+    if (!userContext.age || !dateOfBirth) return null;
+
+    let projectionData = null;
+    let messageKey: keyof typeof messageTemplates = 'age_related';
+    let context: Record<string, any> = userContext;
     
-    // 1. Weight Goal Projection
+    const calculateProjection = (totalRequired: number, logged: number, avgDailyRate: number, firstLogDate: Date) => {
+        const remaining = totalRequired - logged;
+        if (remaining <= 0) return null;
+        const daysToCompletion = Math.ceil(remaining / avgDailyRate);
+        const projectedDate = addDays(new Date(), daysToCompletion);
+        const projectedAge = differenceInYears(projectedDate, parseISO(dateOfBirth));
+        return {
+            logged,
+            totalRequired,
+            progressPercent: (logged / totalRequired) * 100,
+            projectedAge,
+            daysRemaining: daysToCompletion,
+            avgRate: avgDailyRate,
+        };
+    };
+
     if (goalWeight && weightLogs.length >= 2) {
       const sortedLogs = weightLogs.map(log => {
         const [year, weekNum] = log.date.split('-W');
@@ -317,12 +332,22 @@ const MotivationPageContent = () => {
           const weeksToGo = Math.ceil(Math.abs(weightToChange / rate));
           const projectedDate = addWeeks(lastLog.dateObj, weeksToGo);
           const projectedAge = differenceInYears(projectedDate, parseISO(dateOfBirth));
-          return getRandomMessage('life_perspective_weight', { ...userContext, goalWeight, projectedAge });
+          
+          projectionData = {
+              title: "Weight Goal",
+              current: lastLog.weight.toFixed(1),
+              goal: goalWeight,
+              unit: "kg/lb",
+              projectedAge: projectedAge,
+              avgRate: Math.abs(rate),
+              rateUnit: "kg/lb per week"
+          };
+          messageKey = 'life_perspective_weight';
+          context = { ...userContext, ...projectionData };
         }
       }
     }
     
-    // 2. Deep Work Intention Projection
     const linkedDeepWorkChildIds = new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || []));
     const intentions = deepWorkDefinitions.filter(def => {
         const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
@@ -330,8 +355,8 @@ const MotivationPageContent = () => {
         return isParent && !isChild;
     });
 
-    if (intentions.length > 0) {
-      const mainIntention = intentions[0]; // Simplistic: pick the first one
+    if (intentions.length > 0 && !projectionData) {
+      const mainIntention = intentions[0];
       let totalEstimatedHours = 0;
       let totalLoggedHours = 0;
       const descendentIds = new Set<string>();
@@ -362,29 +387,55 @@ const MotivationPageContent = () => {
           }));
       });
       
-      const remainingHours = totalEstimatedHours - totalLoggedHours;
       const avgDailyProductiveHours = (weeklyStats.deepWork.current + weeklyStats.upskill.current) / 7;
-      
-      if (remainingHours > 0 && avgDailyProductiveHours > 0) {
-          const daysToCompletion = Math.ceil(remainingHours / avgDailyProductiveHours);
-          const projectedDate = addDays(new Date(), daysToCompletion);
-          const projectedAge = differenceInYears(projectedDate, parseISO(dateOfBirth));
-          return getRandomMessage('life_perspective_intention', { ...userContext, intentionName: mainIntention.name, projectedAge });
+      if (totalEstimatedHours > 0 && avgDailyProductiveHours > 0) {
+        const proj = calculateProjection(totalEstimatedHours, totalLoggedHours, avgDailyProductiveHours, new Date());
+        if(proj) {
+            projectionData = {
+                title: mainIntention.name,
+                current: totalLoggedHours.toFixed(1),
+                goal: totalEstimatedHours,
+                unit: "hours",
+                ...proj
+            };
+            messageKey = 'life_perspective_intention';
+            context = { ...userContext, intentionName: mainIntention.name, projectedAge: proj.projectedAge };
+        }
+      }
+    }
+    
+    if (weeklyStats.upskill.currentDaysToGoal !== null && !projectionData) {
+      const topicName = Object.keys(topicGoals)[0];
+      if (topicName) {
+        const goal = topicGoals[topicName];
+        const logs = allUpskillLogs.filter(log => log.exercises.some(ex => ex.category === topicName));
+        const totalProgress = logs.reduce((sum, log) => sum + log.exercises.reduce((exSum, ex) => exSum + ex.loggedSets.reduce((sSum, s) => sSum + s.weight, 0), 0), 0);
+        
+        projectionData = {
+            title: topicName,
+            current: totalProgress.toFixed(0),
+            goal: goal.goalValue,
+            unit: goal.goalType,
+            projectedAge: differenceInYears(addDays(new Date(), weeklyStats.upskill.currentDaysToGoal), parseISO(dateOfBirth)),
+        };
+        messageKey = 'life_perspective_skill';
+        context = { ...userContext, topicName: topicName, projectedAge: projectionData.projectedAge };
       }
     }
 
-    // 3. Upskill Goal Projection
-    if (weeklyStats.upskill.currentDaysToGoal !== null) {
-      const topicName = Object.keys(topicGoals)[0]; // Pick first goal
-      const projectedDate = addDays(new Date(), weeklyStats.upskill.currentDaysToGoal);
-      const projectedAge = differenceInYears(projectedDate, parseISO(dateOfBirth));
-      return getRandomMessage('life_perspective_skill', { ...userContext, topicName, projectedAge });
+    if (!projectionData) {
+        return {
+            type: 'generic',
+            message: getRandomMessage('age_related', { ...userContext, next_age: userContext.age ? userContext.age + 1 : '' })
+        };
     }
-
-    // Fallback
-    return getRandomMessage('age_related', userContext);
+    
+    return {
+        type: 'specific',
+        data: projectionData,
+        message: getRandomMessage(messageKey, context)
+    };
   }, [userContext, dateOfBirth, goalWeight, weightLogs, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, topicGoals, weeklyStats]);
-
 
   const getInsight = (
     current: number,
@@ -518,16 +569,50 @@ const MotivationPageContent = () => {
           unit="kg/lb"
           message={weightInsight.message}
         />
-        {userContext.age && (
-           <InsightCard
-                icon={<Calendar />}
-                title="Life Perspective"
-                trend={'stable'}
-                currentValue={userContext.age || 0}
-                previousValue={userContext.age || 0}
-                unit="years old"
-                message={lifePerspectiveInsight}
-            />
+        {userContext.age && lifePerspectiveInsight && (
+           <Card className="flex flex-col md:col-span-2">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Calendar /> Life Perspective
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col flex-grow justify-between">
+              {lifePerspectiveInsight.type === 'specific' && lifePerspectiveInsight.data ? (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-lg" dangerouslySetInnerHTML={{ __html: lifePerspectiveInsight.message }}></p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <div className="p-3 rounded-md bg-muted/50">
+                      <div className="text-muted-foreground">Goal: <b>{lifePerspectiveInsight.data.title}</b></div>
+                      <div className="grid grid-cols-2 gap-x-2 mt-2">
+                          <div>Current:</div><div className="font-bold">{lifePerspectiveInsight.data.current} {lifePerspectiveInsight.data.unit}</div>
+                          <div>Goal:</div><div className="font-bold">{lifePerspectiveInsight.data.goal} {lifePerspectiveInsight.data.unit}</div>
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-md bg-muted/50">
+                      <div className="text-muted-foreground">Projection</div>
+                      <div className="grid grid-cols-2 gap-x-2 mt-2">
+                          <div>Current Age:</div><div className="font-bold">{userContext.age}</div>
+                          <div>Est. Age:</div><div className="font-bold">{lifePerspectiveInsight.data.projectedAge}</div>
+                      </div>
+                    </div>
+                  </div>
+                  {lifePerspectiveInsight.data.logged !== undefined && (
+                    <div>
+                      <Progress value={lifePerspectiveInsight.data.progressPercent} className="h-2" />
+                      <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                        <span>{lifePerspectiveInsight.data.logged.toFixed(1)}h logged</span>
+                        <span>{lifePerspectiveInsight.data.totalRequired.toFixed(1)}h est.</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-lg" dangerouslySetInnerHTML={{ __html: lifePerspectiveInsight.message }}></p>
+              )}
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
