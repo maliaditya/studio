@@ -6,8 +6,8 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AlertCircle, ArrowDown, ArrowUp, BarChart3, TrendingUp, TrendingDown, CheckCircle2, PauseCircle } from 'lucide-react';
-import { differenceInDays, subDays, format } from 'date-fns';
-import type { DatedWorkout, WeightLog } from '@/types/workout';
+import { differenceInDays, subDays, format, parseISO, addDays } from 'date-fns';
+import type { DatedWorkout, WeightLog, TopicGoal } from '@/types/workout';
 
 const InsightCard = ({
   icon,
@@ -66,14 +66,14 @@ const InsightCard = ({
 };
 
 const MotivationPageContent = () => {
-  const { allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, weightLogs, goalWeight } = useAuth();
+  const { allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, weightLogs, goalWeight, topicGoals } = useAuth();
 
   const weeklyStats = useMemo(() => {
     const today = new Date();
+    const oneWeekAgo = subDays(today, 7);
     const last7DaysStart = subDays(today, 6);
     const prev7DaysStart = subDays(today, 13);
-    const prev7DaysEnd = subDays(today, 7);
-
+    
     const calculateTotal = (logs: DatedWorkout[], startDate: Date, endDate: Date, field: 'reps' | 'weight') => {
       return logs.filter(log => {
         const logDate = new Date(log.date);
@@ -98,25 +98,70 @@ const MotivationPageContent = () => {
         return relevantLogs.sort((a,b) => a.date.localeCompare(b.date)).pop();
     };
 
+    const calculateProjection = (logs: DatedWorkout[], goals: Record<string, TopicGoal>, endDate: Date) => {
+      const dailyProgress: Record<string, { total: number; firstDate: Date }> = {};
+      
+      logs.forEach(log => {
+          if (parseISO(log.date) > endDate) return;
+          log.exercises.forEach(ex => {
+              if (goals[ex.category]) {
+                  const progress = ex.loggedSets.reduce((sum, set) => sum + set.weight, 0);
+                  if (progress > 0) {
+                      if (!dailyProgress[ex.category]) {
+                          dailyProgress[ex.category] = { total: 0, firstDate: parseISO(log.date) };
+                      }
+                      dailyProgress[ex.category].total += progress;
+                      if (parseISO(log.date) < dailyProgress[ex.category].firstDate) {
+                          dailyProgress[ex.category].firstDate = parseISO(log.date);
+                      }
+                  }
+              }
+          });
+      });
+
+      let overallDaysToCompletion: number | null = null;
+      Object.keys(dailyProgress).forEach(topic => {
+          const data = dailyProgress[topic];
+          const goal = goals[topic];
+          const duration = differenceInDays(endDate, data.firstDate) + 1;
+          const rate = data.total / duration;
+          if (rate > 0) {
+              const remaining = goal.goalValue - data.total;
+              if (remaining > 0) {
+                  const days = Math.ceil(remaining / rate);
+                  if (overallDaysToCompletion === null || days < overallDaysToCompletion) {
+                      overallDaysToCompletion = days;
+                  }
+              }
+          }
+      });
+      return overallDaysToCompletion;
+    };
+
+
     const currentDeepWork = calculateTotal(allDeepWorkLogs, last7DaysStart, today, 'weight') / 60;
-    const prevDeepWork = calculateTotal(allDeepWorkLogs, prev7DaysStart, prev7DaysEnd, 'weight') / 60;
+    const prevDeepWork = calculateTotal(allDeepWorkLogs, prev7DaysStart, oneWeekAgo, 'weight') / 60;
     
     const currentUpskill = calculateTotal(allUpskillLogs, last7DaysStart, today, 'reps') / 60;
-    const prevUpskill = calculateTotal(allUpskillLogs, prev7DaysStart, prev7DaysEnd, 'reps') / 60;
+    const prevUpskill = calculateTotal(allUpskillLogs, prev7DaysStart, oneWeekAgo, 'reps') / 60;
+    
+    const currentDaysToGoal = calculateProjection(allUpskillLogs, topicGoals, today);
+    const prevDaysToGoal = calculateProjection(allUpskillLogs, topicGoals, oneWeekAgo);
+
 
     const currentWorkouts = countWorkouts(allWorkoutLogs, last7DaysStart, today);
-    const prevWorkouts = countWorkouts(allWorkoutLogs, prev7DaysStart, prev7DaysEnd);
+    const prevWorkouts = countWorkouts(allWorkoutLogs, prev7DaysStart, oneWeekAgo);
     
     const latestWeight = getLatestWeight(weightLogs, today);
-    const prevWeightLog = getLatestWeight(weightLogs, prev7DaysEnd);
+    const prevWeightLog = getLatestWeight(weightLogs, oneWeekAgo);
 
     return {
       deepWork: { current: currentDeepWork, prev: prevDeepWork },
-      upskill: { current: currentUpskill, prev: prevUpskill },
+      upskill: { current: currentUpskill, prev: prevUpskill, currentDaysToGoal, prevDaysToGoal },
       workouts: { current: currentWorkouts, prev: prevWorkouts },
       weight: { current: latestWeight?.weight || 0, prev: prevWeightLog?.weight || 0 },
     };
-  }, [allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, weightLogs]);
+  }, [allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, weightLogs, topicGoals]);
 
   const getInsight = (
     current: number,
@@ -139,6 +184,29 @@ const MotivationPageContent = () => {
       return { trend: 'stable', message: "Solid and steady! Consistency is the foundation of all progress. You're building strong habits. Keep it going!" };
     }
     return { trend: 'stable', message: "It's a fresh start. What's one small step you can take today to get the ball rolling?" };
+  };
+
+  const getUpskillInsight = (
+    currentHours: number,
+    prevHours: number,
+    currentDays: number | null,
+    prevDays: number | null
+  ) => {
+    // Check for goal projection changes first
+    if (currentDays !== null && prevDays !== null) {
+      if (currentDays < prevDays) {
+        const daysReduced = prevDays - currentDays;
+        return { trend: 'up' as const, message: `Incredible work! You've cut your estimated time to goal by ${daysReduced} day${daysReduced > 1 ? 's' : ''}. Your goal is getting closer!` };
+      }
+      if (currentDays > prevDays) {
+        const daysIncreased = currentDays - prevDays;
+        return { trend: 'down' as const, message: `Your projected goal date has slipped by ${daysIncreased} day${daysIncreased > 1 ? 's' : ''}. Let's refocus this week to get back on track!` };
+      }
+      return { trend: 'stable' as const, message: `You're on a steady path to your goal. Your consistent effort is maintaining your projected completion date. Keep it up!` };
+    }
+
+    // Fallback to simple hour comparison if projections aren't available
+    return getInsight(currentHours, prevHours, 28);
   };
 
   const getWeightInsight = (current: number, prev: number, goal: number | null): { trend: 'up' | 'down' | 'stable'; message: string } => {
@@ -177,7 +245,7 @@ const MotivationPageContent = () => {
   };
 
   const deepWorkInsight = getInsight(weeklyStats.deepWork.current, weeklyStats.deepWork.prev, 35); // 5h/day burnout
-  const upskillInsight = getInsight(weeklyStats.upskill.current, weeklyStats.upskill.prev, 28); // 4h/day burnout
+  const upskillInsight = getUpskillInsight(weeklyStats.upskill.current, weeklyStats.upskill.prev, weeklyStats.upskill.currentDaysToGoal, weeklyStats.upskill.prevDaysToGoal);
   const workoutInsight = getInsight(weeklyStats.workouts.current, weeklyStats.workouts.prev, 7);
   const weightInsight = getWeightInsight(weeklyStats.weight.current, weeklyStats.weight.prev, goalWeight);
 
@@ -241,3 +309,4 @@ export default function MotivationPage() {
     </AuthGuard>
   );
 }
+
