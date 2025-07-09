@@ -1,10 +1,11 @@
+
 "use client";
 
 import React, { useMemo } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { AlertCircle, ArrowDown, ArrowUp, BarChart3, TrendingUp, TrendingDown, CheckCircle2, PauseCircle } from 'lucide-react';
+import { AlertCircle, ArrowDown, ArrowUp, BarChart3, TrendingUp, TrendingDown, CheckCircle2, PauseCircle, Calendar } from 'lucide-react';
 import { differenceInDays, subDays, format, parseISO, addDays, differenceInYears } from 'date-fns';
 import type { DatedWorkout, WeightLog, TopicGoal } from '@/types/workout';
 
@@ -421,4 +422,3 @@ export default function MotivationPage() {
     </AuthGuard>
   );
 }
-
