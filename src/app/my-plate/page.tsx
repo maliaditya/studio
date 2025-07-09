@@ -234,7 +234,7 @@ function MyPlatePageContent() {
     }
 
     const healthNarrative = `Your energy is steady. Your health score could climb from ${currentConsistency}% to ${scoreWithWorkouts}%. ${weightNarrative}`;
-    const healthAlternative = `You have been down that road, ${currentUser?.username}. You know exactly where it ends. And I know that's not where you want to be.`;
+    const healthAlternative = "You break the rhythm, the story ends. You wake up where you had started, free to believe whatever you want. But if you stay on this path, you stay in Wonderland, and I show you how deep the rabbit hole goes.";
 
     // Deep Work
     const linkedDeepWorkChildIds = new Set(deepWorkDefinitions.flatMap(def => def.linkedDeepWorkIds || []));
