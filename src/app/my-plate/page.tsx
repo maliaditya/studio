@@ -126,6 +126,7 @@ function MyPlatePageContent() {
     dateOfBirth,
     allWorkoutLogs,
     allDeepWorkLogs,
+    brandingLogs
   } = useAuth();
   
   const [isLoading, setIsLoading] = useState(true);
@@ -210,7 +211,7 @@ function MyPlatePageContent() {
   const lifePerspectiveNarrative = useMemo(() => {
     const nextWeek = addDays(new Date(), 7);
     const header = `🌱 A Glimpse Into Your Future – ${format(nextWeek, 'MMMM d, yyyy')}`;
-    
+
     // Health
     const workoutLogsForYear = allWorkoutLogs.filter(log => isAfter(parseISO(log.date), subDays(new Date(), 365)));
     const workoutDates = new Set(workoutLogsForYear.map(log => log.date));
@@ -222,9 +223,18 @@ function MyPlatePageContent() {
         else currentScore *= 0.95;
     }
     const currentConsistency = Math.round(currentScore * 100);
-    const scoreWithWorkouts = Math.round((currentScore + (1 - currentScore) * 0.3) * 100); // 3 workouts
+    const scoreWithWorkouts = Math.round((currentScore + (1 - currentScore) * 0.3) * 100);
     const scoreWithoutWorkouts = Math.round(currentScore * Math.pow(0.95, 7));
-    const healthNarrative = `Your energy is steady—a quiet reward for your work. Your health score has gently climbed from ${currentConsistency}% to ${scoreWithWorkouts}%.`;
+    
+    let weightNarrative = "";
+    if (weightLogs.length >= 2) {
+      const lastTwoLogs = [...weightLogs].sort((a,b) => a.date.localeCompare(b.date)).slice(-2);
+      const weeklyChange = lastTwoLogs[1].weight - lastTwoLogs[0].weight;
+      const nextWeekWeight = lastTwoLogs[1].weight + weeklyChange;
+      weightNarrative = `Your discipline is paying off; you are projected to be around <b>${nextWeekWeight.toFixed(1)} kg/lb</b> next week.`
+    }
+
+    const healthNarrative = `Your energy is steady. Your health score could climb from ${currentConsistency}% to ${scoreWithWorkouts}%. ${weightNarrative}`;
     const healthAlternative = `But if you skip this week's rhythm, the score may drift down to ${scoreWithoutWorkouts}%.`;
 
     // Deep Work
@@ -273,7 +283,7 @@ function MyPlatePageContent() {
     
     return { header, healthNarrative, deepWorkNarrative, upskillNarrative, healthAlternative, affirmation };
 
-  }, [allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, topicGoals, weeklyStats]);
+  }, [allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, topicGoals, weeklyStats, weightLogs]);
 
   const getInsight = (current: number, prev: number, burnoutThreshold: number): { trend: 'up' | 'down' | 'stable' | 'burnout'; message: string } => { if (current > burnoutThreshold) return { trend: 'burnout', message: getRandomMessage('burnout', userContext) }; if (current > prev * 1.2) return { trend: 'up', message: getRandomMessage('up', userContext) }; if (current < prev * 0.8) { if (prev > 0) return { trend: 'down', message: getRandomMessage('down', userContext) }; return { trend: 'down', message: getRandomMessage('new_week', userContext) }; } if (current > 0) return { trend: 'stable', message: getRandomMessage('stable', userContext) }; return { trend: 'stable', message: getRandomMessage('new_week', userContext) }; };
   const getUpskillInsight = (currentHours: number, prevHours: number, currentDays: number | null, prevDays: number | null) => { if (currentDays !== null && prevDays !== null) { if (currentDays < prevDays) return { trend: 'up' as const, message: getRandomMessage('goal_getting_closer', userContext) }; if (currentDays > prevDays) return { trend: 'down' as const, message: getRandomMessage('goal_slipping', userContext) }; return { trend: 'stable' as const, message: getRandomMessage('goal_stable', userContext) }; } return getInsight(currentHours, prevHours, 28); };
@@ -282,26 +292,7 @@ function MyPlatePageContent() {
   const upskillInsight = getUpskillInsight(weeklyStats.upskill.current, weeklyStats.upskill.prev, weeklyStats.upskill.currentDaysToGoal, weeklyStats.upskill.prevDaysToGoal);
   const workoutInsight = getInsight(weeklyStats.workouts.current, weeklyStats.workouts.prev, 7);
   const weightInsight = getWeightInsight(weeklyStats.weight.current, weeklyStats.weight.prev, goalWeight);
-   const renderTrend = (trend: 'up' | 'down' | 'stable' | 'burnout', changeText: string) => {
-    const getIcon = () => {
-      switch (trend) {
-        case 'up':
-          return <ArrowUp className="h-4 w-4 text-green-500" />;
-        case 'down':
-          return <ArrowDown className="h-4 w-4 text-red-500" />;
-        case 'burnout':
-          return <AlertCircle className="h-4 w-4 text-yellow-500" />;
-        default:
-          return <PauseCircle className="h-4 w-4 text-muted-foreground" />;
-      }
-    };
-    return (
-      <div className="flex items-center text-xs text-muted-foreground">
-        {getIcon()}
-        <span className="ml-1">{changeText}</span>
-      </div>
-    );
-  };
+  const renderTrend = (trend: 'up' | 'down' | 'stable' | 'burnout', changeText: string) => { const getIcon = () => { switch (trend) { case 'up': return <ArrowUp className="h-4 w-4 text-green-500" />; case 'down': return <ArrowDown className="h-4 w-4 text-red-500" />; case 'burnout': return <AlertCircle className="h-4 w-4 text-yellow-500" />; default: return <PauseCircle className="h-4 w-4 text-muted-foreground" />; } }; return ( <div className="flex items-center text-xs text-muted-foreground"> {getIcon()} <span className="ml-1">{changeText}</span> </div> ); };
   const getChangeText = (current: number, prev: number, trend: 'up'|'down'|'stable'|'burnout') => { const change = current - prev; const percentChange = prev !== 0 ? (change / prev) * 100 : current > 0 ? 100 : 0; if (trend === 'up') return `Up ${percentChange.toFixed(0)}% from last week`; if (trend === 'down') return `Down ${Math.abs(percentChange).toFixed(0)}% from last week`; if (trend === 'burnout') return 'Potential burnout risk'; return 'Consistent effort'; }
 
   useEffect(() => { if (currentUser?.username) setIsLoading(false); }, [currentUser]);
@@ -390,9 +381,7 @@ function MyPlatePageContent() {
                 <CardTitle>{lifePerspectiveNarrative.header}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-                <p className="text-foreground leading-relaxed">
-                    {lifePerspectiveNarrative.healthNarrative}
-                </p>
+                <p className="text-foreground leading-relaxed" dangerouslySetInnerHTML={{ __html: lifePerspectiveNarrative.healthNarrative}} />
                 {lifePerspectiveNarrative.deepWorkNarrative && (
                     <p className="text-foreground leading-relaxed">
                         {lifePerspectiveNarrative.deepWorkNarrative}
