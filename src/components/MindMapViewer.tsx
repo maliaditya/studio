@@ -637,6 +637,9 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: nodeId });
     const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
     
+    const { loggedHours = 0, estimatedHours = 0 } = progress || {};
+    const showProgress = estimatedHours > 0;
+
     const getIcon = () => {
         switch (nodeType) {
             // Deep Work
@@ -687,13 +690,13 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
                         </div>
                     )}
                 </div>
-                {progress && progress.estimatedHours > 0 && (
+                {showProgress && (
                   <CardFooter className="p-2 pt-0">
                     <div className="w-full">
-                      <Progress value={(progress.loggedHours / progress.estimatedHours) * 100} className="h-1" />
+                      <Progress value={(loggedHours / estimatedHours) * 100} className="h-1" />
                       <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-                        <span>{progress.loggedHours.toFixed(1)}h</span>
-                        <span>{progress.estimatedHours.toFixed(1)}h</span>
+                        <span>{loggedHours.toFixed(1)}h</span>
+                        <span>{estimatedHours.toFixed(1)}h</span>
                       </div>
                     </div>
                   </CardFooter>
