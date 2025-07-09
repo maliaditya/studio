@@ -242,26 +242,24 @@ function MyPlatePageContent() {
     
     if (activeIntention) {
         const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-        let allDescendantTasks: {id: string, name: string, remainingHours: number, type: 'Objective' | 'Action'}[] = [];
         const visited = new Set<string>();
+        const allDescendantTasks: {id: string, name: string, type: string, remainingHours: number}[] = [];
 
         const getLoggedHours = (defId: string): number => {
             let totalMinutes = 0;
             const upskillLog = allUpskillLogs.flatMap(log => log.exercises).filter(ex => ex.definitionId === defId);
             totalMinutes += upskillLog.reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + set.reps, 0), 0);
-
             const deepWorkLog = allDeepWorkLogs.flatMap(log => log.exercises).filter(ex => ex.definitionId === defId);
             totalMinutes += deepWorkLog.reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + set.weight, 0), 0);
-            
             return totalMinutes / 60;
         };
-        
+
         const recurse = (nodeId: string) => {
             if (visited.has(nodeId)) return;
             visited.add(nodeId);
             const node = allDefs.find(d => d.id === nodeId);
             if (!node) return;
-            
+
             const isObjective = (node.linkedDeepWorkIds?.length ?? 0) > 0;
             const remainingHours = (node.estimatedHours || 0) - getLoggedHours(node.id);
 
@@ -271,18 +269,17 @@ function MyPlatePageContent() {
 
             (node.linkedDeepWorkIds || []).forEach(childId => recurse(childId));
         };
-        
         recurse(activeIntention.id);
 
         const avgDailyProductiveHours = (weeklyStats.deepWork.current + weeklyStats.upskill.current) / 7;
-        let availableHours = avgDailyProductiveHours > 0 ? avgDailyProductiveHours * 7 : 7; // Default to 1 hr/day if no data
+        let workBudget = avgDailyProductiveHours > 0 ? avgDailyProductiveHours * 7 : 7;
         
-        let projectedCompletedObjectives: string[] = [];
-        let projectedCompletedActions: string[] = [];
+        const projectedCompletedObjectives: string[] = [];
+        const projectedCompletedActions: string[] = [];
         
         for (const task of allDescendantTasks) {
-            if (availableHours >= task.remainingHours) {
-                availableHours -= task.remainingHours;
+            if (workBudget >= task.remainingHours) {
+                workBudget -= task.remainingHours;
                 if (task.type === 'Objective') projectedCompletedObjectives.push(task.name);
                 else projectedCompletedActions.push(task.name);
             } else {
@@ -291,11 +288,15 @@ function MyPlatePageContent() {
         }
         
         let intentionNarrative = `Your intention, '${activeIntention.name}', is solidifying. This week, you are on track to complete`;
-        const completedItems = [...projectedCompletedObjectives, ...projectedCompletedActions];
+        if (projectedCompletedObjectives.length > 0) {
+            intentionNarrative += ` the objective${projectedCompletedObjectives.length > 1 ? 's' : ''}: <b>${projectedCompletedObjectives.join(', ')}</b>.`;
+        }
+        if (projectedCompletedActions.length > 0) {
+            if (projectedCompletedObjectives.length > 0) intentionNarrative += ' Additionally, you are set to complete';
+            intentionNarrative += ` the action${projectedCompletedActions.length > 1 ? 's' : ''}: <b>${projectedCompletedActions.join(', ')}</b>.`;
+        }
 
-        if (completedItems.length > 0) {
-            intentionNarrative += ` the task${completedItems.length > 1 ? 's' : ''}: <b>${completedItems.join(', ')}</b>.`;
-        } else {
+        if (projectedCompletedObjectives.length === 0 && projectedCompletedActions.length === 0) {
             intentionNarrative = `Your intention, '${activeIntention.name}', is a big one. Keep chipping away at it this week.`;
         }
         deepWorkNarrative = intentionNarrative;
@@ -327,7 +328,7 @@ function MyPlatePageContent() {
 
   }, [allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, topicGoals, weeklyStats, weightLogs, dateOfBirth, currentUser]);
   
-  const healthAlternative = `You break the rhythm, the story ends. You wake up where you had started, free to believe whatever you want. But if you stay on this path, you stay in Wonderland, and I show you how deep the rabbit hole goes.`;
+  const healthAlternative = `You break the rhythm, the story ends. You wake up where you had started, free to believe whatever you want to believe. But if you stay on this path, you stay in Wonderland, and I show you how deep the rabbit hole goes.`;
 
   const getInsight = (current: number, prev: number, burnoutThreshold: number): { trend: 'up' | 'down' | 'stable' | 'burnout'; message: string } => { if (current > burnoutThreshold) return { trend: 'burnout', message: getRandomMessage('burnout', userContext) }; if (current > prev * 1.2) return { trend: 'up', message: getRandomMessage('up', userContext) }; if (current < prev * 0.8) { if (prev > 0) return { trend: 'down', message: getRandomMessage('down', userContext) }; return { trend: 'down', message: getRandomMessage('new_week', userContext) }; } if (current > 0) return { trend: 'stable', message: getRandomMessage('stable', userContext) }; return { trend: 'stable', message: getRandomMessage('new_week', userContext) }; };
   const getUpskillInsight = (currentHours: number, prevHours: number, currentDays: number | null, prevDays: number | null) => { if (currentDays !== null && prevDays !== null) { if (currentDays < prevDays) return { trend: 'up' as const, message: getRandomMessage('goal_getting_closer', userContext) }; if (currentDays > prevDays) return { trend: 'down' as const, message: getRandomMessage('goal_slipping', userContext) }; return { trend: 'stable' as const, message: getRandomMessage('goal_stable', userContext) }; } return getInsight(currentHours, prevHours, 28); };
@@ -437,7 +438,7 @@ function MyPlatePageContent() {
                 </blockquote>
                  <details className="text-xs text-muted-foreground pt-4">
                     <summary className="cursor-pointer">What if my rhythm breaks?</summary>
-                    <p className="mt-2 italic">{healthAlternative}</p>
+                    <p className="mt-2 italic" dangerouslySetInnerHTML={{__html: healthAlternative}} />
                 </details>
             </CardContent>
           </Card>
@@ -569,5 +570,6 @@ export default function MyPlatePage() {
 }
 
     
+
 
 
