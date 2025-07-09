@@ -235,23 +235,32 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         const currentNodeDef = allDefinitions.get(nodeId);
         const currentNodePos = nodes.get(nodeId);
         if (!currentNodeDef || !currentNodePos) return;
-        
-        const childIds = [...(currentNodeDef.linkedDeepWorkIds || []), ...(currentNodeDef.linkedUpskillIds || []), ...(currentNodeDef.linkedResourceIds || [])];
-        const validChildIds = childIds.filter(id => allDefinitions.has(id) && !nodes.has(id));
 
-        if (validChildIds.length > 0) {
-            const newNodes = new Map(nodes);
-            const newEdges = new Set(edges);
-            
-            validChildIds.forEach((childId, index) => {
-                newNodes.set(childId, {
+        const childIds = [...(currentNodeDef.linkedDeepWorkIds || []), ...(currentNodeDef.linkedUpskillIds || []), ...(currentNodeDef.linkedResourceIds || [])];
+        const validChildIds = childIds.filter(id => allDefinitions.has(id));
+
+        const nodesToUpdate = new Map<string, { x: number; y: number }>();
+        const edgesToUpdate = new Set<string>();
+
+        validChildIds.forEach((childId, index) => {
+            if (!nodes.has(childId)) {
+                nodesToUpdate.set(childId, {
                     x: currentNodePos.x + 240, 
                     y: currentNodePos.y + (index * 90) - ((validChildIds.length - 1) * 45),
                 });
-                newEdges.add(`${nodeId}-${childId}`);
-            });
-            setNodes(newNodes);
-            setEdges(newEdges);
+            }
+            const edgeId1 = `${nodeId}-${childId}`;
+            const edgeId2 = `${childId}-${nodeId}`;
+            if (!edges.has(edgeId1) && !edges.has(edgeId2)) {
+                edgesToUpdate.add(edgeId1);
+            }
+        });
+
+        if (nodesToUpdate.size > 0) {
+            setNodes(prev => new Map([...prev, ...nodesToUpdate]));
+        }
+        if (edgesToUpdate.size > 0) {
+            setEdges(prev => new Set([...prev, ...edgesToUpdate]));
         }
     }, [nodes, edges, allDefinitions]);
   
@@ -260,21 +269,30 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         if (!currentNodePos) return;
 
         const potentialParents = parentMap.get(nodeId) || [];
-        const parentsToLoad = potentialParents.filter(parentId => allDefinitions.has(parentId) && !nodes.has(parentId));
+        const parentsToLoad = potentialParents.filter(parentId => allDefinitions.has(parentId));
 
-        if (parentsToLoad.length > 0) {
-            const newNodes = new Map(nodes);
-            const newEdges = new Set(edges);
-            
-            parentsToLoad.forEach((parentId, index) => {
-                newNodes.set(parentId, {
+        const nodesToUpdate = new Map<string, { x: number; y: number }>();
+        const edgesToUpdate = new Set<string>();
+
+        parentsToLoad.forEach((parentId, index) => {
+            if (!nodes.has(parentId)) {
+                nodesToUpdate.set(parentId, {
                     x: currentNodePos.x + 240,
                     y: currentNodePos.y + (index * 90) - ((parentsToLoad.length - 1) * 45),
                 });
-                newEdges.add(`${parentId}-${nodeId}`);
-            });
-            setNodes(newNodes);
-            setEdges(newEdges);
+            }
+            const edgeId1 = `${parentId}-${nodeId}`;
+            const edgeId2 = `${nodeId}-${parentId}`;
+            if (!edges.has(edgeId1) && !edges.has(edgeId2)) {
+                edgesToUpdate.add(edgeId1);
+            }
+        });
+
+        if (nodesToUpdate.size > 0) {
+            setNodes(prev => new Map([...prev, ...nodesToUpdate]));
+        }
+        if (edgesToUpdate.size > 0) {
+            setEdges(prev => new Set([...prev, ...edgesToUpdate]));
         }
     }, [nodes, edges, allDefinitions, parentMap]);
     
@@ -358,8 +376,15 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                         if (!definition) return null;
                         
                         const allChildIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
-                        const canExpandChildren = allChildIds.some(childId => allDefinitions.has(childId) && !nodes.has(childId));
-                        const canRevealParents = (parentMap.get(nodeId) || []).some(parentId => allDefinitions.has(parentId) && !nodes.has(parentId));
+                        const hasUnloadedChild = allChildIds.some(childId => allDefinitions.has(childId) && !nodes.has(childId));
+                        const hasUnlinkedChild = allChildIds.some(childId => allDefinitions.has(childId) && nodes.has(childId) && !Array.from(edges).some(edgeId => edgeId === `${nodeId}-${childId}` || edgeId === `${childId}-${nodeId}`));
+                        const canExpandChildren = hasUnloadedChild || hasUnlinkedChild;
+                        
+                        const potentialParents = parentMap.get(nodeId) || [];
+                        const hasUnloadedParent = potentialParents.some(parentId => allDefinitions.has(parentId) && !nodes.has(parentId));
+                        const hasUnlinkedParent = potentialParents.some(parentId => allDefinitions.has(parentId) && nodes.has(parentId) && !Array.from(edges).some(edgeId => edgeId === `${parentId}-${nodeId}` || edgeId === `${nodeId}-${parentId}`));
+                        const canRevealParents = hasUnloadedParent || hasUnlinkedParent;
+
                         const isRootNode = !(parentMap.get(nodeId) || []).some(parentId => nodes.has(parentId));
                         
                         return (
@@ -375,7 +400,6 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                                 canRevealParents={canRevealParents}
                                 isRootNode={isRootNode}
                                 status={getNodeStatus(nodeId)}
-                                upskillDefinitions={upskillDefinitions}
                             />
                         );
                     })}
@@ -385,8 +409,9 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     );
 };
 
-const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealParents, canExpandChildren, canRevealParents, onExpandAll, isRootNode, status, upskillDefinitions }: any) => {
+const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealParents, canExpandChildren, canRevealParents, onExpandAll, isRootNode, status }: any) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: nodeId });
+    const { upskillDefinitions } = useAuth();
     const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
     
     const getIcon = () => {
