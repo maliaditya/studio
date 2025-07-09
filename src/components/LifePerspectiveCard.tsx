@@ -34,29 +34,12 @@ export function LifePerspectiveCard({
 
     const lifePerspectiveNarrative = useMemo(() => {
         const nextWeek = addDays(new Date(), 7);
-        const header = `🌱 A Glimpse Into Your Future – ${format(nextWeek, 'MMMM d, yyyy')}`;
+        const header = `A Glimpse Into Your Future Self`;
+        const subheader = `A projection for ${format(nextWeek, 'MMMM d, yyyy')}`;
 
         // Health
-        const workoutLogsForYear = allWorkoutLogs.filter(log => isAfter(parseISO(log.date), subDays(new Date(), 365)));
-        const workoutDates = new Set(workoutLogsForYear.map(log => log.date));
-        let currentScore = 0.5;
-        for (let i = 0; i < 365; i++) {
-            const date = subDays(new Date(), 365 - i);
-            const dateKey = format(date, 'yyyy-MM-dd');
-            if (workoutDates.has(dateKey)) currentScore += (1 - currentScore) * 0.1;
-            else currentScore *= 0.95;
-        }
-        const scoreWithWorkouts = Math.round((currentScore + (1 - currentScore) * 0.3) * 100);
+        const healthNarrative = `Your energy is steady. Your discipline is paying off; you are projected to be around <b>${(weeklyStats.weight.current + weeklyStats.weight.change).toFixed(1)} kg/lb</b> next week.`;
         
-        let healthNarrative = `Your energy is steady. Your health score could climb to ${scoreWithWorkouts}%.`;
-        if (weightLogs.length >= 2 && weeklyStats.weight.prev > 0) {
-            const weeklyChange = weeklyStats.weight.current - weeklyStats.weight.prev;
-            const nextWeekWeight = weeklyStats.weight.current + weeklyChange;
-            healthNarrative += ` After hitting <b>${weeklyStats.weight.prev.toFixed(1)} kg/lb</b> last week, you're now at <b>${weeklyStats.weight.current.toFixed(1)} kg/lb</b>. At this rate, you are projected to be around <b>${nextWeekWeight.toFixed(1)} kg/lb</b> next week.`
-        } else if (weightLogs.length >= 2) {
-             healthNarrative += ` You're currently at <b>${weeklyStats.weight.current.toFixed(1)} kg/lb</b>. Keep logging to see your projection.`
-        }
-
         // Deep Work & Productivity
         const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
         const linkedDeepWorkChildIds = new Set(deepWorkDefinitions.flatMap(def => def.linkedDeepWorkIds || []));
@@ -78,8 +61,7 @@ export function LifePerspectiveCard({
         };
         
         const avgDailyProductiveHours = (weeklyStats.deepWork.current + weeklyStats.upskill.current) / 7;
-        let workBudget = avgDailyProductiveHours > 0 ? avgDailyProductiveHours * 7 : 7;
-        const productiveHoursNarrative = `Last week you invested <b>${(weeklyStats.deepWork.prev + weeklyStats.upskill.prev).toFixed(1)} hours</b>. Based on your current rhythm, you're on track to invest around <b>${(avgDailyProductiveHours * 7).toFixed(1)} hours</b> this week, averaging <b>${avgDailyProductiveHours.toFixed(1)} hours</b> each day.`
+        const productiveHoursNarrative = `You moved from <b>${(weeklyStats.deepWork.prev + weeklyStats.upskill.prev).toFixed(1)} hours</b> of focused work last week to a pace of <b>${(weeklyStats.deepWork.current + weeklyStats.upskill.current).toFixed(1)} hours</b> this week. With this rhythm, you're set to invest another <b>${(avgDailyProductiveHours * 7).toFixed(1)} hours</b> into your growth.`
         
         if (activeIntention) {
           const allTasks: { id: string; name: string; type: 'Objective' | 'Action'; remainingHours: number }[] = [];
@@ -116,6 +98,7 @@ export function LifePerspectiveCard({
           
           allTasks.sort((a, b) => a.remainingHours - b.remainingHours);
 
+          let workBudget = avgDailyProductiveHours > 0 ? avgDailyProductiveHours * 7 : 7;
           const projectedCompletedObjectives: string[] = [];
           const projectedCompletedActions: string[] = [];
           
@@ -136,9 +119,11 @@ export function LifePerspectiveCard({
               intentionNarrative += ` the action${projectedCompletedActions.length > 1 ? 's' : ''}: <b>${projectedCompletedActions.join(', ')}</b>.`;
           }
           if (projectedCompletedObjectives.length === 0 && projectedCompletedActions.length === 0) {
-              intentionNarrative = `Your intention, '${activeIntention.name}', is a significant undertaking. The momentum you build this week will be crucial.`;
+              intentionNarrative = `Your intention, '${activeIntention.name}', is a significant undertaking.`;
               if (topLevelObjectives.length > 0) {
                   intentionNarrative += ` The objective for this week is: <b>${topLevelObjectives[0]}</b>.`;
+              } else {
+                  intentionNarrative += " Keep chipping away at it this week."
               }
           }
           deepWorkNarrative = intentionNarrative;
@@ -148,9 +133,6 @@ export function LifePerspectiveCard({
         let upskillNarrative = "";
         const prevUpskillHours = weeklyStats.upskill.prev;
         const currentUpskillHours = weeklyStats.upskill.current;
-        if (currentUpskillHours > 0 || prevUpskillHours > 0) {
-             upskillNarrative += `You moved from <b>${prevUpskillHours.toFixed(1)} hours</b> of learning last week to a pace of <b>${currentUpskillHours.toFixed(1)} hours</b> this week.`
-        }
         if (Object.keys(topicGoals).length > 0) {
             const topic = Object.keys(topicGoals)[0];
             const goal = topicGoals[topic];
@@ -163,20 +145,22 @@ export function LifePerspectiveCard({
             const projectedProgress = totalProgress + (avgRate * 7);
             
             if (avgRate > 0) {
-              upskillNarrative += ` On your desk, the ${topic} material lies open. You're projected to cross <b>${projectedProgress.toFixed(0)}</b> ${goal.goalType}—each concept is less foreign, more intuitive.`;
+              upskillNarrative += `On your desk, the ${topic} material lies open. You're projected to cross <b>${projectedProgress.toFixed(0)}</b> ${goal.goalType}—each concept is less foreign, more intuitive.`;
             }
+        } else if (currentUpskillHours > 0 || prevUpskillHours > 0) {
+             upskillNarrative += `You're exploring new territories, moving from <b>${prevUpskillHours.toFixed(1)} hours</b> of learning last week to a pace of <b>${currentUpskillHours.toFixed(1)} hours</b> this week.`
         }
 
         const affirmations = [
-            "Consistency is not about pressure, it's about rhythm.",
+            "Consistency is not about pressure; it's about rhythm.",
             "One hour each day rewrites the next ten years of your life.",
             "You are not chasing progress—you are becoming it."
         ];
         const affirmation = affirmations[Math.floor(Math.random() * affirmations.length)];
         
-        const alternatePath = "You break the rhythm, the story ends. You wake up where you had started, free to believe whatever you want. But if you stay on this path, you stay in Wonderland, and I show you how deep the rabbit hole goes.";
+        const alternatePath = "Remember, if the rhythm breaks, the story pauses. You can always pick it back up. Stay on this path, stay in your personal Wonderland, and see how deep the rabbit hole goes.";
 
-        return { header, healthNarrative, productiveHoursNarrative, deepWorkNarrative, upskillNarrative, affirmation, alternatePath };
+        return { header, subheader, healthNarrative, productiveHoursNarrative, deepWorkNarrative, upskillNarrative, affirmation, alternatePath };
 
     }, [allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, topicGoals, weeklyStats, weightLogs, currentUser]);
 
@@ -184,6 +168,7 @@ export function LifePerspectiveCard({
         <Card>
             <CardHeader>
                 <CardTitle>{lifePerspectiveNarrative.header}</CardTitle>
+                <p className="text-sm text-muted-foreground">{lifePerspectiveNarrative.subheader}</p>
             </CardHeader>
             <CardContent className="space-y-4">
                 <p className="text-foreground leading-relaxed" dangerouslySetInnerHTML={{ __html: lifePerspectiveNarrative.healthNarrative}} />
@@ -198,7 +183,7 @@ export function LifePerspectiveCard({
                     {lifePerspectiveNarrative.affirmation}
                 </blockquote>
                  <details className="text-xs text-muted-foreground pt-4">
-                    <summary className="cursor-pointer">What if my rhythm breaks?</summary>
+                    <summary className="cursor-pointer">A closing thought...</summary>
                     <p className="mt-2 italic" dangerouslySetInnerHTML={{__html: lifePerspectiveNarrative.alternatePath}} />
                 </details>
             </CardContent>
