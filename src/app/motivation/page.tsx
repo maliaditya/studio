@@ -5,68 +5,12 @@ import React, { useMemo } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { AlertCircle, ArrowDown, ArrowUp, BarChart3, TrendingUp, TrendingDown, CheckCircle2, PauseCircle, Calendar } from 'lucide-react';
+import { AlertCircle, ArrowDown, ArrowUp, BarChart3, TrendingUp, TrendingDown, CheckCircle2, PauseCircle, Calendar, BookCopy, HeartPulse } from 'lucide-react';
 import { differenceInDays, subDays, format, parseISO, addDays, differenceInYears, addWeeks, getISOWeekYear, setISOWeek, startOfISOWeek } from 'date-fns';
 import type { DatedWorkout, WeightLog, TopicGoal, ExerciseDefinition } from '@/types/workout';
 import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
 
-const InsightCard = ({
-  icon,
-  title,
-  trend,
-  currentValue,
-  previousValue,
-  unit,
-  message,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  trend: 'up' | 'down' | 'stable' | 'burnout';
-  currentValue: number;
-  previousValue: number;
-  unit: string;
-  message: string;
-}) => {
-  const getTrendIcon = () => {
-    switch (trend) {
-      case 'up': return <ArrowUp className="h-4 w-4 text-green-500" />;
-      case 'down': return <ArrowDown className="h-4 w-4 text-red-500" />;
-      case 'burnout': return <AlertCircle className="h-4 w-4 text-yellow-500" />;
-      default: return <PauseCircle className="h-4 w-4 text-muted-foreground" />;
-    }
-  };
-
-  const trendText = () => {
-    const change = currentValue - previousValue;
-    const percentChange = previousValue !== 0 ? (change / previousValue) * 100 : currentValue > 0 ? 100 : 0;
-    
-    if (trend === 'up') return `Up ${percentChange.toFixed(0)}% from last week`;
-    if (trend === 'down') return `Down ${Math.abs(percentChange).toFixed(0)}% from last week`;
-    if (trend === 'burnout') return 'Potential burnout risk';
-    return 'Consistent effort';
-  };
-
-  return (
-    <Card className="flex flex-col">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-            {icon} {title}
-        </CardTitle>
-        <div className="flex items-center text-xs text-muted-foreground">
-            {getTrendIcon()}
-            <span className="ml-1">{trendText()}</span>
-        </div>
-      </CardHeader>
-      <CardContent className="flex flex-col flex-grow">
-        <div className="text-2xl font-bold">{currentValue.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">{unit}</span></div>
-        <p className="text-xs text-muted-foreground">vs {previousValue.toFixed(1)} {unit} last week</p>
-        <p className="mt-4 text-sm text-foreground flex-grow" dangerouslySetInnerHTML={{ __html: message }}></p>
-      </CardContent>
-    </Card>
-  );
-};
-
-// --- Message Banks ---
 const messageTemplates = {
   burnout: [
     "{{username}}, you're putting in incredible hours! This is amazing, but make sure you're taking time to rest and avoid burnout. Sustainable progress is key.",
@@ -112,7 +56,7 @@ const messageTemplates = {
       "Great progress! You're successfully trending towards your target weight. Keep up the consistent effort.",
   ],
   weight_loss_bad: [
-      "A small bump in the road. This week's trend is moving away from your weight loss goal. Let's review the plan and get back on track, {{username}}.",
+      "A small bump in the road, {{username}}. This week's trend is moving away from your weight loss goal. Let's review the plan and get back on track.",
       "It looks like we're slightly off course from your weight loss target. A minor adjustment to your diet or activity could make all the difference this week.",
   ],
   weight_gain_good: [
@@ -120,7 +64,7 @@ const messageTemplates = {
       "Nice work, {{username}}. You're successfully adding mass and moving towards your target. Keep fueling your body for growth.",
   ],
   weight_gain_bad: [
-      "This week's trend is moving away from your weight gain goal. Consider a small, consistent calorie surplus to get back on track.",
+      "This week's trend is moving away from your weight gain goal, {{username}}. Consider a small, consistent calorie surplus to get back on track.",
       "A slight dip this week. Let's ensure you're getting enough fuel to support your muscle-building goals, {{username}}.",
   ],
   weight_stable: [
@@ -521,6 +465,32 @@ const MotivationPageContent = () => {
   const workoutInsight = getInsight(weeklyStats.workouts.current, weeklyStats.workouts.prev, 7);
   const weightInsight = getWeightInsight(weeklyStats.weight.current, weeklyStats.weight.prev, goalWeight);
 
+  const renderTrend = (trend: 'up' | 'down' | 'stable' | 'burnout', changeText: string) => {
+    const getIcon = () => {
+        switch (trend) {
+        case 'up': return <ArrowUp className="h-4 w-4 text-green-500" />;
+        case 'down': return <ArrowDown className="h-4 w-4 text-red-500" />;
+        case 'burnout': return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+        default: return <PauseCircle className="h-4 w-4 text-muted-foreground" />;
+        }
+    };
+    return (
+        <div className="flex items-center text-xs text-muted-foreground">
+            {getIcon()}
+            <span className="ml-1">{changeText}</span>
+        </div>
+    )
+  };
+
+  const getChangeText = (current: number, prev: number, trend: 'up'|'down'|'stable'|'burnout') => {
+    const change = current - prev;
+    const percentChange = prev !== 0 ? (change / prev) * 100 : current > 0 ? 100 : 0;
+    if (trend === 'up') return `Up ${percentChange.toFixed(0)}% from last week`;
+    if (trend === 'down') return `Down ${Math.abs(percentChange).toFixed(0)}% from last week`;
+    if (trend === 'burnout') return 'Potential burnout risk';
+    return 'Consistent effort';
+  }
+
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
       <div className="text-center mb-8">
@@ -532,43 +502,75 @@ const MotivationPageContent = () => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-        <InsightCard
-          icon={<BarChart3 />}
-          title="Deep Work"
-          trend={deepWorkInsight.trend}
-          currentValue={weeklyStats.deepWork.current}
-          previousValue={weeklyStats.deepWork.prev}
-          unit="hours"
-          message={deepWorkInsight.message}
-        />
-        <InsightCard
-          icon={<TrendingUp />}
-          title="Upskill"
-          trend={upskillInsight.trend}
-          currentValue={weeklyStats.upskill.current}
-          previousValue={weeklyStats.upskill.prev}
-          unit="hours"
-          message={upskillInsight.message}
-        />
-        <InsightCard
-          icon={<CheckCircle2 />}
-          title="Workouts"
-          trend={workoutInsight.trend}
-          currentValue={weeklyStats.workouts.current}
-          previousValue={weeklyStats.workouts.prev}
-          unit="sessions"
-          message={workoutInsight.message}
-        />
-        <InsightCard
-          icon={<TrendingDown />}
-          title="Weight Trend"
-          trend={weightInsight.trend}
-          currentValue={weeklyStats.weight.current}
-          previousValue={weeklyStats.weight.prev}
-          unit="kg/lb"
-          message={weightInsight.message}
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+            <CardHeader>
+                <CardTitle>Productivity Insights</CardTitle>
+                <CardDescription>Your deep work and learning trends from the last week.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div>
+                    <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2">
+                            <BarChart3 className="h-5 w-5 text-primary"/>
+                            <h3 className="font-semibold">Deep Work</h3>
+                        </div>
+                        {renderTrend(deepWorkInsight.trend, getChangeText(weeklyStats.deepWork.current, weeklyStats.deepWork.prev, deepWorkInsight.trend))}
+                    </div>
+                    <div className="mt-2 text-2xl font-bold">{weeklyStats.deepWork.current.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">hours</span></div>
+                    <p className="text-xs text-muted-foreground">vs {weeklyStats.deepWork.prev.toFixed(1)} hours last week</p>
+                    <p className="mt-4 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: deepWorkInsight.message }}></p>
+                </div>
+                <Separator />
+                <div>
+                    <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2">
+                            <TrendingUp className="h-5 w-5 text-primary"/>
+                            <h3 className="font-semibold">Upskill</h3>
+                        </div>
+                        {renderTrend(upskillInsight.trend, getChangeText(weeklyStats.upskill.current, weeklyStats.upskill.prev, upskillInsight.trend))}
+                    </div>
+                    <div className="mt-2 text-2xl font-bold">{weeklyStats.upskill.current.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">hours</span></div>
+                    <p className="text-xs text-muted-foreground">vs {weeklyStats.upskill.prev.toFixed(1)} hours last week</p>
+                    <p className="mt-4 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: upskillInsight.message }}></p>
+                </div>
+            </CardContent>
+        </Card>
+
+        <Card>
+            <CardHeader>
+                <CardTitle>Health & Fitness Insights</CardTitle>
+                <CardDescription>Your workout consistency and weight tracking analysis.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div>
+                    <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2">
+                            <CheckCircle2 className="h-5 w-5 text-primary"/>
+                            <h3 className="font-semibold">Workouts</h3>
+                        </div>
+                        {renderTrend(workoutInsight.trend, getChangeText(weeklyStats.workouts.current, weeklyStats.workouts.prev, workoutInsight.trend))}
+                    </div>
+                    <div className="mt-2 text-2xl font-bold">{weeklyStats.workouts.current} <span className="text-sm font-normal text-muted-foreground">sessions</span></div>
+                    <p className="text-xs text-muted-foreground">vs {weeklyStats.workouts.prev} sessions last week</p>
+                    <p className="mt-4 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: workoutInsight.message }}></p>
+                </div>
+                <Separator />
+                <div>
+                    <div className="flex justify-between items-start">
+                         <div className="flex items-center gap-2">
+                            <HeartPulse className="h-5 w-5 text-primary"/>
+                            <h3 className="font-semibold">Weight Trend</h3>
+                        </div>
+                        {renderTrend(weightInsight.trend, `${weeklyStats.weight.current > weeklyStats.weight.prev ? 'Up' : 'Down'} ${Math.abs(weeklyStats.weight.current - weeklyStats.weight.prev).toFixed(1)} kg/lb`)}
+                    </div>
+                    <div className="mt-2 text-2xl font-bold">{weeklyStats.weight.current > 0 ? weeklyStats.weight.current.toFixed(1) : '-'} <span className="text-sm font-normal text-muted-foreground">kg/lb</span></div>
+                    <p className="text-xs text-muted-foreground">{weeklyStats.weight.prev > 0 ? `vs ${weeklyStats.weight.prev.toFixed(1)} kg/lb last week` : 'No data from last week'}</p>
+                    <p className="mt-4 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: weightInsight.message }}></p>
+                </div>
+            </CardContent>
+        </Card>
+
         {userContext.age && lifePerspectiveInsight && (
            <Card className="flex flex-col md:col-span-2">
             <CardHeader className="pb-4">
@@ -626,4 +628,5 @@ export default function MotivationPage() {
     </AuthGuard>
   );
 }
+
 
