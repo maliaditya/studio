@@ -288,7 +288,7 @@ function CanvasPageContent() {
         parentsToLoad.forEach((parentId, index) => {
             newNodes.push({
                 id: parentId,
-                x: currentNode.x + 240, // Place to the right
+                x: currentNode.x - 240, // Place to the left
                 y: currentNode.y + (index * 90) - ((parentsToLoad.length - 1) * 45),
             });
             const edgeId = `${parentId}-${nodeId}`;
@@ -308,40 +308,34 @@ function CanvasPageContent() {
   
     useEffect(() => {
         if (!isAutoExpanding) return;
-    
-        const expandableNode = canvasLayout.nodes.find(node => {
+
+        // First, try to find any node that needs its parents revealed.
+        const nodeToRevealParents = canvasLayout.nodes.find(node => {
+            const potentialParents = parentMap.get(node.id) || [];
+            return potentialParents.some(parentId => allDefinitions.has(parentId) && !nodePositions.has(parentId));
+        });
+
+        if (nodeToRevealParents) {
+            handleRevealParents(nodeToRevealParents.id);
+            return; // Exit and let the next render handle more expansions.
+        }
+
+        // If no parents need revealing, try to find any node that needs children expanded.
+        const nodeToExpandChildren = canvasLayout.nodes.find(node => {
             const definition = allDefinitions.get(node.id);
             if (!definition) return false;
-    
-            const allChildIds = [
-                ...(definition.linkedDeepWorkIds || []),
-                ...(definition.linkedUpskillIds || []),
-                ...(definition.linkedResourceIds || []),
-            ];
-            const hasUnloadedChild = allChildIds.some(childId => allDefinitions.has(childId) && !nodePositions.has(childId));
-            if (hasUnloadedChild) return true;
-    
-            const potentialParents = parentMap.get(node.id) || [];
-            const hasUnloadedParent = potentialParents.some(parentId => allDefinitions.has(parentId) && !nodePositions.has(parentId));
-            return hasUnloadedParent;
+            const allChildIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
+            return allChildIds.some(childId => allDefinitions.has(childId) && !nodePositions.has(childId));
         });
-    
-        if (expandableNode) {
-            // Preferentially reveal parents first, as this establishes the hierarchy upwards.
-            const definition = allDefinitions.get(expandableNode.id)!;
-            const potentialParents = parentMap.get(expandableNode.id) || [];
-            const hasUnloadedParent = potentialParents.some(parentId => allDefinitions.has(parentId) && !nodePositions.has(parentId));
-    
-            if (hasUnloadedParent) {
-                handleRevealParents(expandableNode.id);
-            } else {
-                handleExpandChildren(expandableNode.id);
-            }
-        } else {
-            // No more nodes to expand, stop the process.
-            setIsAutoExpanding(false);
+        
+        if (nodeToExpandChildren) {
+            handleExpandChildren(nodeToExpandChildren.id);
+            return; // Exit and let the next render handle more.
         }
-    }, [isAutoExpanding, canvasLayout.nodes, allDefinitions, nodePositions, parentMap, handleExpandChildren, handleRevealParents]);
+
+        // If we reach here, no nodes have anything to expand or reveal.
+        setIsAutoExpanding(false);
+    }, [isAutoExpanding, canvasLayout.nodes, allDefinitions, nodePositions, parentMap, handleRevealParents, handleExpandChildren]);
 
   const getNodeStatus = useCallback((defId: string, category: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
