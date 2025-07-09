@@ -133,13 +133,39 @@ interface MindMapViewerProps {
 const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     const { deepWorkDefinitions, upskillDefinitions, resources, schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs } = useAuth();
     const transformWrapperRef = useRef<ReactZoomPanPinchRef>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     const [nodes, setNodes] = useState<Map<string, { x: number; y: number }>>(new Map());
     const [edges, setEdges] = useState<Set<string>>(new Set());
     const [isDragging, setIsDragging] = useState(false);
     const [isAutoExpanding, setIsAutoExpanding] = useState(false);
+    const [isFullScreen, setIsFullScreen] = useState(false);
 
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+    const handleFullScreenChange = useCallback(() => {
+        setIsFullScreen(!!document.fullscreenElement);
+    }, []);
+
+    useEffect(() => {
+        document.addEventListener('fullscreenchange', handleFullScreenChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullScreenChange);
+        };
+    }, [handleFullScreenChange]);
+
+    const toggleFullScreen = useCallback(() => {
+        if (!containerRef.current) return;
+        if (!document.fullscreenElement) {
+            containerRef.current.requestFullscreen().catch(err => {
+                console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+            });
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+    }, []);
 
     const allDefinitions = useMemo(() => new Map(
         [...deepWorkDefinitions, ...upskillDefinitions, ...resources].map(def => [def.id, def])
@@ -158,16 +184,12 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     }, [allDefinitions]);
 
     useEffect(() => {
-        // This effect automatically creates edges between any nodes that are on the canvas
-        // but are not yet connected.
         const nodesOnCanvas = new Set(nodes.keys());
         const edgesToAdd = new Set<string>();
 
         nodes.forEach((pos, nodeId) => {
             const definition = allDefinitions.get(nodeId);
             if (!definition) return;
-
-            // Check for children
             const childIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
             childIds.forEach(childId => {
                 if (nodesOnCanvas.has(childId)) {
@@ -179,7 +201,6 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                 }
             });
 
-            // Check for parents
             const parentIds = parentMap.get(nodeId) || [];
             parentIds.forEach(parentId => {
                 if (nodesOnCanvas.has(parentId)) {
@@ -384,68 +405,73 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                 <Button size="icon" onClick={() => zoomIn()}><ZoomIn/></Button>
                 <Button size="icon" onClick={() => zoomOut()}><ZoomOut/></Button>
                 <Button size="icon" onClick={() => resetTransform()}><RefreshCw/></Button>
+                <Button size="icon" onClick={toggleFullScreen}>
+                    {isFullScreen ? <Shrink className="h-4 w-4" /> : <Expand className="h-4 w-4" />}
+                </Button>
             </div>
         );
     };
 
     return (
-        <DndContext sensors={sensors} onDragStart={() => setIsDragging(true)} onDragEnd={handleDragEnd}>
-            <TransformWrapper ref={transformWrapperRef} disabled={isDragging}>
-                <Controls />
-                <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '200vw', height: '200vh' }}>
-                    <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
-                        <defs>
-                            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
-                                <polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--border))" />
-                            </marker>
-                        </defs>
-                        {Array.from(edges).map(edgeId => {
-                            const [sourceId, targetId] = edgeId.split('-');
-                            const sourcePos = nodes.get(sourceId);
-                            const targetPos = nodes.get(targetId);
-                            if (!sourcePos || !targetPos) return null;
+        <div ref={containerRef} className="w-full h-full relative bg-background">
+            <DndContext sensors={sensors} onDragStart={() => setIsDragging(true)} onDragEnd={handleDragEnd}>
+                <TransformWrapper ref={transformWrapperRef} disabled={isDragging}>
+                    <Controls />
+                    <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '200vw', height: '200vh' }}>
+                        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
+                            <defs>
+                                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+                                    <polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--border))" />
+                                </marker>
+                            </defs>
+                            {Array.from(edges).map(edgeId => {
+                                const [sourceId, targetId] = edgeId.split('-');
+                                const sourcePos = nodes.get(sourceId);
+                                const targetPos = nodes.get(targetId);
+                                if (!sourcePos || !targetPos) return null;
+                                return (
+                                    <g key={edgeId}>
+                                        <path d={getPath(sourcePos, targetPos)} stroke="hsl(var(--border))" strokeWidth="2" fill="none" markerEnd="url(#arrowhead)" />
+                                    </g>
+                                );
+                            })}
+                        </svg>
+                        {Array.from(nodes.entries()).map(([nodeId, pos]) => {
+                            const definition = allDefinitions.get(nodeId);
+                            if (!definition) return null;
+                            
+                            const allChildIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
+                            const hasUnloadedChild = allChildIds.some(childId => allDefinitions.has(childId) && !nodes.has(childId));
+                            const hasUnlinkedChild = allChildIds.some(childId => allDefinitions.has(childId) && nodes.has(childId) && !Array.from(edges).some(edgeId => edgeId === `${nodeId}-${childId}` || edgeId === `${childId}-${nodeId}`));
+                            const canExpandChildren = hasUnloadedChild || hasUnlinkedChild;
+                            
+                            const potentialParents = parentMap.get(nodeId) || [];
+                            const hasUnloadedParent = potentialParents.some(parentId => allDefinitions.has(parentId) && !nodes.has(parentId));
+                            const hasUnlinkedParent = potentialParents.some(parentId => allDefinitions.has(parentId) && nodes.has(parentId) && !Array.from(edges).some(edgeId => edgeId === `${parentId}-${nodeId}` || edgeId === `${nodeId}-${parentId}`));
+                            const canRevealParents = hasUnloadedParent || hasUnlinkedParent;
+
+                            const isRootNode = !(parentMap.get(nodeId) || []).some(parentId => nodes.has(parentId));
+                            
                             return (
-                                <g key={edgeId}>
-                                    <path d={getPath(sourcePos, targetPos)} stroke="hsl(var(--border))" strokeWidth="2" fill="none" markerEnd="url(#arrowhead)" />
-                                </g>
+                                <PositionedNode
+                                    key={nodeId}
+                                    nodeId={nodeId}
+                                    pos={pos}
+                                    definition={definition}
+                                    onExpandChildren={() => handleExpandChildren(nodeId)}
+                                    onRevealParents={() => handleRevealParents(nodeId)}
+                                    onExpandAll={handleExpandAll}
+                                    canExpandChildren={canExpandChildren}
+                                    canRevealParents={canRevealParents}
+                                    isRootNode={isRootNode}
+                                    status={getNodeStatus(nodeId)}
+                                />
                             );
                         })}
-                    </svg>
-                    {Array.from(nodes.entries()).map(([nodeId, pos]) => {
-                        const definition = allDefinitions.get(nodeId);
-                        if (!definition) return null;
-                        
-                        const allChildIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
-                        const hasUnloadedChild = allChildIds.some(childId => allDefinitions.has(childId) && !nodes.has(childId));
-                        const hasUnlinkedChild = allChildIds.some(childId => allDefinitions.has(childId) && nodes.has(childId) && !Array.from(edges).some(edgeId => edgeId === `${nodeId}-${childId}` || edgeId === `${childId}-${nodeId}`));
-                        const canExpandChildren = hasUnloadedChild || hasUnlinkedChild;
-                        
-                        const potentialParents = parentMap.get(nodeId) || [];
-                        const hasUnloadedParent = potentialParents.some(parentId => allDefinitions.has(parentId) && !nodes.has(parentId));
-                        const hasUnlinkedParent = potentialParents.some(parentId => allDefinitions.has(parentId) && nodes.has(parentId) && !Array.from(edges).some(edgeId => edgeId === `${parentId}-${nodeId}` || edgeId === `${nodeId}-${parentId}`));
-                        const canRevealParents = hasUnloadedParent || hasUnlinkedParent;
-
-                        const isRootNode = !(parentMap.get(nodeId) || []).some(parentId => nodes.has(parentId));
-                        
-                        return (
-                            <PositionedNode
-                                key={nodeId}
-                                nodeId={nodeId}
-                                pos={pos}
-                                definition={definition}
-                                onExpandChildren={() => handleExpandChildren(nodeId)}
-                                onRevealParents={() => handleRevealParents(nodeId)}
-                                onExpandAll={handleExpandAll}
-                                canExpandChildren={canExpandChildren}
-                                canRevealParents={canRevealParents}
-                                isRootNode={isRootNode}
-                                status={getNodeStatus(nodeId)}
-                            />
-                        );
-                    })}
-                </TransformComponent>
-            </TransformWrapper>
-        </DndContext>
+                    </TransformComponent>
+                </TransformWrapper>
+            </DndContext>
+        </div>
     );
 };
 
