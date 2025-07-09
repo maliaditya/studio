@@ -52,9 +52,9 @@ export function LifePerspectiveCard({
             const lastTwoLogs = [...weightLogs].sort((a,b) => a.date.localeCompare(b.date)).slice(-2);
             const weeklyChange = lastTwoLogs[1].weight - lastTwoLogs[0].weight;
             const nextWeekWeight = lastTwoLogs[1].weight + weeklyChange;
-            weightNarrative = `Your discipline is paying off; you are projected to be around <b>${nextWeekWeight.toFixed(1)} kg/lb</b> next week.`
+            weightNarrative = `Your discipline is paying off; you are projected to be around <b>${nextWeekWeight.toFixed(1)} kg/lb</b>.`
         }
-        const healthNarrative = `Your energy is steady. Your health score could climb to ${scoreWithWorkouts}%. ${weightNarrative}`;
+        const healthNarrative = `Your energy is steady. With consistent effort this week, your health score could climb to ${scoreWithWorkouts}%. ${weightNarrative}`;
 
         // Deep Work
         const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
@@ -116,16 +116,16 @@ export function LifePerspectiveCard({
               } else break;
           }
           
-          let intentionNarrative = `Your intention, '${activeIntention.name}', is solidifying. This week, you are on track to complete`;
+          let intentionNarrative = `Within your grand intention, '${activeIntention.name}', the path is clearing. By this time next week, you are on track to have completed`;
           if (projectedCompletedObjectives.length > 0) {
               intentionNarrative += ` the objective${projectedCompletedObjectives.length > 1 ? 's' : ''}: <b>${projectedCompletedObjectives.join(', ')}</b>.`;
           }
           if (projectedCompletedActions.length > 0) {
-              if (projectedCompletedObjectives.length > 0) intentionNarrative += ' Additionally, you are set to complete';
+              if (projectedCompletedObjectives.length > 0) intentionNarrative += ' Further, you will have executed';
               intentionNarrative += ` the action${projectedCompletedActions.length > 1 ? 's' : ''}: <b>${projectedCompletedActions.join(', ')}</b>.`;
           }
           if (projectedCompletedObjectives.length === 0 && projectedCompletedActions.length === 0) {
-              intentionNarrative = `Your intention, '${activeIntention.name}', is a big one. Keep chipping away at it this week.`;
+              intentionNarrative = `Your intention, '${activeIntention.name}', is a significant undertaking. The momentum you build this week will be crucial.`;
           }
           deepWorkNarrative = intentionNarrative;
         }
