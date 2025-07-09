@@ -313,6 +313,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                                 canExpandChildren={canExpandChildren}
                                 canRevealParents={canRevealParents}
                                 status={getNodeStatus(nodeId)}
+                                upskillDefinitions={upskillDefinitions}
                             />
                         );
                     })}
@@ -322,12 +323,12 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     );
 };
 
-const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealParents, canExpandChildren, canRevealParents, status }: any) => {
+const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealParents, canExpandChildren, canRevealParents, status, upskillDefinitions }: any) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: nodeId });
     const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
     
     const getIcon = () => {
-        if (definition.category === 'Learning Task' || upskillDefinitions.some(d => d.id === definition.id)) {
+        if (definition.category === 'Learning Task' || (upskillDefinitions && upskillDefinitions.some((d: any) => d.id === definition.id))) {
           const isParent = (definition.linkedUpskillIds?.length ?? 0) > 0 || (definition.linkedResourceIds?.length ?? 0) > 0;
           if(isParent) return <Flashlight className="h-4 w-4 text-amber-500" />;
           return <Frame className="h-4 w-4 text-blue-500" />;
@@ -540,65 +541,160 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
 
   }, [selectedTopic, rootFocusAreaId, rootFolderId, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, totalTimePerFocusArea, resources, resourceFolders]);
 
-  // ... (rest of the component is the same) ...
-  useEffect(() => {
-    const timer = setTimeout(() => {
-        if (transformWrapperRef.current) {
-            transformWrapperRef.current.centerView();
-        }
-    }, 100); 
-    return () => clearTimeout(timer);
-  }, [mindMapData]);
-
   const scheduledTaskInfo = useMemo(() => {
-    // ... same as before
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs, deepWorkDefinitions]);
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const scheduled = new Set<string>();
+    const activities = Object.values(schedule[today] || {}).flat();
+    
+    activities.forEach(activity => {
+      let logsSource: DatedWorkout[] | undefined;
+      let defSource: ExerciseDefinition[] | undefined;
+      
+      if (activity.type === 'upskill') {
+        logsSource = allUpskillLogs;
+        defSource = upskillDefinitions;
+      } else if (activity.type === 'deepwork') {
+        logsSource = allDeepWorkLogs;
+        defSource = deepWorkDefinitions;
+      } else if (activity.type === 'branding') {
+        logsSource = brandingLogs;
+        defSource = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreaIds));
+      }
+
+      if (logsSource && defSource) {
+        const log = logsSource.find(l => l.date === today);
+        (activity.taskIds || []).forEach(taskId => {
+          const task = log?.exercises.find(t => t.id === taskId);
+          if (task) scheduled.add(task.definitionId);
+        });
+      }
+    });
+    return scheduled;
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs, upskillDefinitions, deepWorkDefinitions]);
 
   const loggedTaskInfo = useMemo(() => {
-    // ... same as before
-  }, [allUpskillLogs, allDeepWorkLogs, brandingLogs, deepWorkDefinitions]);
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const logged = new Set<string>();
+    
+    const processLogs = (logs: DatedWorkout[]) => {
+      const logToday = logs.find(log => log.date === today);
+      if (logToday) {
+        logToday.exercises.forEach(ex => {
+          if (ex.loggedSets.length > 0) logged.add(ex.definitionId);
+        });
+      }
+    };
+    
+    processLogs(allUpskillLogs);
+    processLogs(allDeepWorkLogs);
+    processLogs(brandingLogs);
+    return logged;
+  }, [allUpskillLogs, allDeepWorkLogs, brandingLogs]);
   
   const pendingTaskInfo = useMemo(() => {
-    // ... same as before
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs, deepWorkDefinitions]);
+      const pending = new Set<string>();
+      Object.keys(schedule).forEach(date => {
+          if (date < format(new Date(), 'yyyy-MM-dd')) {
+              Object.values(schedule[date]).flat().forEach(activity => {
+                  if (!activity.completed && activity.taskIds) {
+                      activity.taskIds.forEach(taskId => {
+                        let defId: string | undefined;
+                        if(activity.type === 'upskill') defId = allUpskillLogs.flatMap(l => l.exercises).find(t => t.id === taskId)?.definitionId;
+                        else if (activity.type === 'deepwork') defId = allDeepWorkLogs.flatMap(l => l.exercises).find(t => t.id === taskId)?.definitionId;
+                        else if (activity.type === 'branding') defId = brandingLogs.flatMap(l => l.exercises).find(t => t.id === taskId)?.definitionId;
+                        if(defId) pending.add(defId);
+                      });
+                  }
+              });
+          }
+      });
+      return pending;
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs]);
 
   const pastLoggedTaskInfo = useMemo(() => {
-    // ... same as before
-  }, [allUpskillLogs, allDeepWorkLogs, brandingLogs, deepWorkDefinitions]);
+    const pastLogged = new Set<string>();
+    const today = format(new Date(), 'yyyy-MM-dd');
+    
+    const processLogs = (logs: DatedWorkout[]) => {
+      logs.forEach(log => {
+        if (log.date < today) {
+          log.exercises.forEach(ex => {
+            if (ex.loggedSets.length > 0) pastLogged.add(ex.definitionId);
+          });
+        }
+      });
+    };
+
+    processLogs(allUpskillLogs);
+    processLogs(allDeepWorkLogs);
+    processLogs(brandingLogs);
+    return pastLogged;
+  }, [allUpskillLogs, allDeepWorkLogs, brandingLogs]);
   
   const handleSaveNewFeature = () => {
-    // ... same as before
+    if (inlineAddInfo) {
+      addFeatureToRelease(mindMapData!.children[0].children.find(r => r.id === inlineAddInfo.parentReleaseId)!, mindMapData!.topic!, inlineAddInfo.newFeatureName, mindMapData!.type!);
+      setInlineAddInfo(null);
+    }
   };
 
   const handleOpenLinkLearningPopover = (node: MindMapNode) => {
-    // ... same as before
+    setIsLinkLearningPopoverOpen(true);
+    setLinkingLearningToFocusArea(node);
+    setEditableLinkedUpskillIds(node.linkedUpskillIds || []);
   };
   
   const handleToggleUpskillLink = (upskillId: string) => {
-    // ... same as before
+    setEditableLinkedUpskillIds(prev =>
+      prev.includes(upskillId)
+        ? prev.filter(id => id !== upskillId)
+        : [...prev, upskillId]
+    );
   };
 
   const handleSaveLinkedLearning = () => {
-    // ... same as before
+    if (!linkingLearningToFocusArea || !setDeepWorkDefinitions) return;
+    
+    setDeepWorkDefinitions(prevDefs => 
+      prevDefs.map(def => 
+        def.id === linkingLearningToFocusArea.id 
+          ? { ...def, linkedUpskillIds: editableLinkedUpskillIds } 
+          : def
+      )
+    );
+    
+    toast({ title: "Links updated", description: "Learning tasks have been linked." });
+    setIsLinkLearningPopoverOpen(false);
+    setLinkingLearningToFocusArea(null);
   };
   
   const loggedUpskillDefinitions = useMemo(() => {
-    // ... same as before
+    const ids = new Set<string>();
+    allUpskillLogs.forEach(log => {
+        log.exercises.forEach(ex => {
+            if(ex.loggedSets.length > 0) ids.add(ex.definitionId);
+        });
+    });
+    return Array.from(ids).map(id => upskillDefinitions.find(d => d.id === id)).filter(Boolean);
   }, [allUpskillLogs, upskillDefinitions]);
 
   const getDescendantIds = useCallback((node: MindMapNode): string[] => {
-    // ... same as before
+    let ids = [node.id];
+    for (const child of node.children) {
+      ids = [...ids, ...getDescendantIds(child)];
+    }
+    return ids;
   }, []);
 
   const handleNodeMouseEnter = useCallback((node: MindMapNode) => {
-    // ... same as before
+    const descendantIds = new Set(getDescendantIds(node));
+    setHoveredNodeIds(descendantIds);
   }, [getDescendantIds]);
 
   const handleNodeMouseLeave = useCallback(() => {
-    // ... same as before
+    setHoveredNodeIds(new Set());
   }, []);
   
-  // The recursive rendering function.
   const renderNode = (node: MindMapNode, level: number, parentNode?: MindMapNode) => {
     // ... same as before
   };
@@ -607,12 +703,99 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     return <InteractiveFocusAreaMap rootId={rootFocusAreaId} />;
   }
   
-  // ... rest of the original component's return for non-interactive views
+  const Controls = () => {
+    const { zoomIn, zoomOut, resetTransform } = useControls();
+    return (
+        <div className="absolute top-2 right-2 z-20 flex gap-2">
+            <Button size="icon" onClick={() => transformWrapperRef.current?.zoomIn()}><ZoomIn/></Button>
+            <Button size="icon" onClick={() => transformWrapperRef.current?.zoomOut()}><ZoomOut/></Button>
+            <Button size="icon" onClick={() => transformWrapperRef.current?.resetTransform()}><RefreshCw/></Button>
+        </div>
+    );
+  };
+
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-full flex flex-col">
-          {/* ... existing non-interactive view logic ... */}
+        {showControls && (
+          <Card className="mb-6 flex-shrink-0">
+            <CardHeader>
+              <CardTitle>Mind Map Controls</CardTitle>
+              <CardDescription>Select a topic to generate its mind map. Use the controls to navigate.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col sm:flex-row gap-4">
+                  <Select value={selectedTopic} onValueChange={setSelectedTopic}>
+                    <SelectTrigger className="w-full sm:w-[280px]">
+                        <SelectValue placeholder="Select a Topic or View..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {allTopics.map(topic => (
+                            <SelectItem key={topic} value={topic}>{topic}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => transformWrapperRef.current?.zoomIn()}><ZoomIn className="mr-2 h-4 w-4"/>Zoom In</Button>
+                    <Button variant="outline" onClick={() => transformWrapperRef.current?.zoomOut()}><ZoomOut className="mr-2 h-4 w-4"/>Zoom Out</Button>
+                    <Button variant="outline" onClick={() => transformWrapperRef.current?.resetTransform()}><RefreshCw className="mr-2 h-4 w-4"/>Reset</Button>
+                  </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        <div className="flex-grow rounded-lg border bg-muted/30 relative overflow-hidden">
+          <TransformWrapper ref={transformWrapperRef} minScale={0.1} initialScale={0.8} wheel={{ step: 0.1 }}>
+            {({ zoomIn, zoomOut, resetTransform, ...rest }) => (
+              <>
+                {!showControls && <Controls />}
+                <TransformComponent wrapperStyle={{ width: "100%", height: "100%" }}>
+                  {mindMapData ? (
+                    <div className="flex justify-center items-center min-w-full min-h-full">
+                        {renderNode(mindMapData, 0)}
+                    </div>
+                  ) : selectedTopic ? (
+                     <div className="w-full h-full flex items-center justify-center">
+                        <p className="text-muted-foreground">No data for this topic. Add some releases or focus areas to get started.</p>
+                     </div>
+                  ) : (
+                    <ConceptualFlowDiagram />
+                  )}
+                </TransformComponent>
+              </>
+            )}
+          </TransformWrapper>
+        </div>
       </div>
+      <Dialog open={isLinkLearningPopoverOpen} onOpenChange={setIsLinkLearningPopoverOpen}>
+        <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Link Learning to "{linkingLearningToFocusArea?.name}"</DialogTitle>
+              <DialogDescription>Select the upskill tasks that directly support this focus area.</DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-96 my-4">
+              <div className="space-y-2 pr-4">
+                {loggedUpskillDefinitions.map(def => (
+                  <div key={def.id} className="flex items-center space-x-3">
+                    <Checkbox
+                      id={`link-upskill-${def.id}`}
+                      checked={editableLinkedUpskillIds.includes(def.id)}
+                      onCheckedChange={() => handleToggleUpskillLink(def.id)}
+                    />
+                    <Label htmlFor={`link-upskill-${def.id}`} className="font-normal w-full cursor-pointer">
+                      {def.name} <span className="text-muted-foreground text-xs">({def.category})</span>
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsLinkLearningPopoverOpen(false)}>Cancel</Button>
+                <Button onClick={handleSaveLinkedLearning}>Save Links</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
+
