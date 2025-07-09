@@ -627,7 +627,7 @@ export function WeightGoalCard({
         },
         projects: {
           icon: <Briefcase />,
-          title: "Active Projects",
+          title: "Project Overview",
           description: "A high-level view of your current work.",
           content: renderProjectsContent()
         }
