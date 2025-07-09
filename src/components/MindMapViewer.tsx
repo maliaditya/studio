@@ -1,11 +1,12 @@
 
+
 "use client"
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle, Link as LinkIcon, Save, MinusCircle, Folder, ExternalLink, Lightbulb, Focus, Frame, Flashlight } from 'lucide-react';
+import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle, Link as LinkIcon, Save, MinusCircle, Folder, ExternalLink, Lightbulb, Focus, Frame, Flashlight, Flag, Bolt } from 'lucide-react';
 import type { ExerciseDefinition, Release, DatedWorkout, ActivityType as ActivityTypeType, Resource, ResourceFolder as ResourceFolderType, DailySchedule } from '@/types/workout'; // Renaming imported ActivityType to avoid conflict with lucide-react
 import { TransformWrapper, TransformComponent, type ReactZoomPanPinchRef, useControls } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
@@ -497,6 +498,14 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         );
     };
 
+    const linkedDeepWorkChildIds = useMemo(() => {
+        return new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || []));
+    }, [deepWorkDefinitions]);
+    
+    const linkedUpskillChildIds = useMemo(() => {
+        return new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []));
+    }, [upskillDefinitions]);
+
     return (
         <div ref={containerRef} className="w-full h-full relative bg-background">
             <DndContext sensors={sensors} onDragStart={() => setIsDragging(true)} onDragEnd={handleDragEnd}>
@@ -536,6 +545,26 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                             const canRevealParents = hasUnloadedParent || hasUnlinkedParent;
 
                             const isRootNode = !(parentMap.get(nodeId) || []).some(parentId => nodes.has(parentId));
+
+                            // Determine node type
+                            let nodeType = '';
+                            const isUpskill = upskillDefinitions.some(d => d.id === definition.id);
+
+                            if (isUpskill) {
+                                const isParent = (definition.linkedUpskillIds?.length ?? 0) > 0 || (definition.linkedResourceIds?.length ?? 0) > 0;
+                                const isChild = linkedUpskillChildIds.has(definition.id);
+                                if (isParent && !isChild) nodeType = 'Curiosity';
+                                else if (isParent && isChild) nodeType = 'Objective';
+                                else if (!isParent && isChild) nodeType = 'Visualization';
+                                else nodeType = 'Standalone';
+                            } else { // Deep Work
+                                const isParent = (definition.linkedDeepWorkIds?.length ?? 0) > 0;
+                                const isChild = linkedDeepWorkChildIds.has(definition.id);
+                                if (isParent && !isChild) nodeType = 'Intention';
+                                else if (isParent && isChild) nodeType = 'Objective';
+                                else if (!isParent && isChild) nodeType = 'Action';
+                                else nodeType = 'Standalone';
+                            }
                             
                             return (
                                 <PositionedNode
@@ -550,6 +579,8 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                                     canRevealParents={canRevealParents}
                                     isRootNode={isRootNode}
                                     status={getNodeStatus(nodeId)}
+                                    nodeType={nodeType}
+                                    upskillDefinitions={upskillDefinitions}
                                 />
                             );
                         })}
@@ -560,20 +591,27 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     );
 };
 
-const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealParents, canExpandChildren, canRevealParents, onExpandAll, isRootNode, status }: any) => {
+const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealParents, canExpandChildren, canRevealParents, onExpandAll, isRootNode, status, nodeType, upskillDefinitions }: any) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: nodeId });
-    const { upskillDefinitions } = useAuth();
     const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
     
     const getIcon = () => {
-        if (definition.category === 'Learning Task' || upskillDefinitions.some((d: any) => d.id === definition.id)) {
-          const isParent = (definition.linkedUpskillIds?.length ?? 0) > 0 || (definition.linkedResourceIds?.length ?? 0) > 0;
-          if(isParent) return <Flashlight className="h-4 w-4 text-amber-500" />;
-          return <Frame className="h-4 w-4 text-blue-500" />;
+        switch (nodeType) {
+            // Deep Work
+            case 'Intention': return <Lightbulb className="h-4 w-4 text-amber-500" />;
+            case 'Objective':
+                const isUpskill = upskillDefinitions.some((d: any) => d.id === definition.id);
+                return isUpskill ? <Focus className="h-4 w-4 text-green-500" /> : <Flag className="h-4 w-4 text-green-500" />;
+            case 'Action': return <Bolt className="h-4 w-4 text-blue-500" />;
+            // Upskill
+            case 'Curiosity': return <Flashlight className="h-4 w-4 text-amber-500" />;
+            case 'Visualization': return <Frame className="h-4 w-4 text-blue-500" />;
+            // Other
+            case 'Standalone':
+                const isUpskillStandalone = upskillDefinitions.some((d: any) => d.id === definition.id);
+                return isUpskillStandalone ? <Lightbulb className="h-4 w-4 text-purple-500" /> : <Focus className="h-4 w-4 text-purple-500" />;
+            default: return <Briefcase className="h-4 w-4" />;
         }
-        const isParent = (definition.linkedDeepWorkIds?.length ?? 0) > 0;
-        if (isParent) return <Lightbulb className="h-4 w-4 text-amber-500" />;
-        return <Briefcase className="h-4 w-4 text-blue-500" />;
     };
 
     return (
@@ -592,11 +630,14 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
                 status.isPastLogged && "border-green-500 dark:border-green-400"
             )}>
                 <div className="p-2 cursor-grab" {...listeners} {...attributes}>
-                    <div className="flex items-center gap-2">
-                        {getIcon()}
-                        <p className="font-semibold text-xs text-foreground truncate" title={definition.name}>
-                            {definition.name}
-                        </p>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                            {getIcon()}
+                            <p className="font-semibold text-xs text-foreground truncate" title={definition.name}>
+                                {definition.name}
+                            </p>
+                        </div>
+                        {nodeType && <Badge variant="outline" className="text-xs ml-2 shrink-0">{nodeType}</Badge>}
                     </div>
                      {status.text && (
                         <div className="mt-1.5 text-xs">
