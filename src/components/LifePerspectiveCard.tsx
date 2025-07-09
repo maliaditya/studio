@@ -21,6 +21,7 @@ interface LifePerspectiveCardProps {
     topicGoals: Record<string, TopicGoal>;
     weeklyStats: any; // Simplified for brevity
     weightLogs: WeightLog[];
+    goalWeight: number | null;
 }
 
 export function LifePerspectiveCard({
@@ -53,8 +54,28 @@ export function LifePerspectiveCard({
 
     const getWeightInsight = (current: number, prev: number, goal: number | null) => {
         if (current === 0 || prev === 0) return { trend: 'stable' as const, message: `Log weekly to see trends` };
+        
         const change = current - prev;
-        if (Math.abs(change) < 0.2) return { trend: 'stable' as const, message: `Weight is stable` };
+
+        if (Math.abs(change) < 0.1) return { trend: 'stable' as const, message: `Weight is stable` };
+
+        // With a goal
+        if (goal !== null) {
+            const isLosing = goal < prev;
+            const isGaining = goal > prev;
+
+            if (isLosing) { // Goal is to lose weight
+                if (change < 0) return { trend: 'down' as const, message: `Closer to goal (${Math.abs(change).toFixed(1)} ↓)` };
+                if (change > 0) return { trend: 'up' as const, message: `Further from goal (${change.toFixed(1)} ↑)` };
+            }
+            
+            if (isGaining) { // Goal is to gain weight
+                if (change > 0) return { trend: 'up' as const, message: `Closer to goal (${change.toFixed(1)} ↑)` };
+                if (change < 0) return { trend: 'down' as const, message: `Further from goal (${Math.abs(change).toFixed(1)} ↓)` };
+            }
+        }
+        
+        // No goal set, just report the change
         const trend = change > 0 ? 'up' : 'down';
         const message = `${trend === 'up' ? 'Up' : 'Down'} ${Math.abs(change).toFixed(1)} from last week`;
         return { trend, message };
