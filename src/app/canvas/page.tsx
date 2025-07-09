@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { DndContext, useDraggable, type DragEndEvent, PointerSensor, useSensor, useSensors, DragStartEvent } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -134,6 +134,9 @@ function CanvasPageContent() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const transformWrapperRef = useRef<ReactZoomPanPinchRef>(null);
 
+  const [expansionQueue, setExpansionQueue] = useState<string[]>([]);
+  const prevNodesRef = useRef(canvasLayout.nodes);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -153,6 +156,7 @@ function CanvasPageContent() {
       y: canvasRect ? (canvasRect.height / 2) - 50 : 200,
     };
     setCanvasLayout(prev => ({ ...prev, nodes: [...prev.nodes, newNode] }));
+    setExpansionQueue([newNode.id]); // Kick off the auto-expansion
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -231,7 +235,7 @@ function CanvasPageContent() {
       canvasLayout.nodes.map(node => [node.id, { x: node.x, y: node.y }])
   ), [canvasLayout.nodes]);
   
-  const handleExpandChildren = (nodeId: string) => {
+  const handleExpandChildren = useCallback((nodeId: string) => {
     const currentNodeDef = allDefinitions.get(nodeId);
     const currentNode = canvasLayout.nodes.find(n => n.id === nodeId);
     if (!currentNodeDef || !currentNode) return;
@@ -270,9 +274,9 @@ function CanvasPageContent() {
             }));
         }
     }
-  };
+  }, [allDefinitions, canvasLayout.nodes, canvasLayout.edges, setCanvasLayout]);
   
-  const handleRevealParents = (nodeId: string) => {
+  const handleRevealParents = useCallback((nodeId: string) => {
     const currentNode = canvasLayout.nodes.find(n => n.id === nodeId);
     if (!currentNode) return;
     
@@ -302,7 +306,53 @@ function CanvasPageContent() {
             }));
         }
     }
-  };
+  }, [allDefinitions, canvasLayout.nodes, canvasLayout.edges, nodePositions, parentMap, setCanvasLayout]);
+
+    // NEW useEffect for triggering expansion
+    useEffect(() => {
+        if (expansionQueue.length === 0) return;
+
+        const nodeId = expansionQueue[0];
+        if (!canvasLayout.nodes.some(n => n.id === nodeId)) return; // Wait until node is rendered
+
+        const definition = allDefinitions.get(nodeId);
+        if (!definition) {
+            setExpansionQueue(q => q.slice(1));
+            return;
+        }
+
+        const potentialParents = parentMap.get(nodeId) || [];
+        const hasUnloadedParent = potentialParents.some(parentId => allDefinitions.has(parentId) && !nodePositions.has(parentId));
+
+        if (hasUnloadedParent) {
+            handleRevealParents(nodeId);
+            return;
+        }
+
+        const allChildIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
+        const hasUnloadedChild = allChildIds.some(childId => allDefinitions.has(childId) && !nodePositions.has(childId));
+
+        if (hasUnloadedChild) {
+            handleExpandChildren(nodeId);
+            return;
+        }
+        
+        // No more expansions for this node, move to the next in queue
+        setExpansionQueue(q => q.slice(1));
+
+    }, [expansionQueue, canvasLayout.nodes, allDefinitions, parentMap, nodePositions, handleExpandChildren, handleRevealParents]);
+
+    // NEW useEffect for updating queue after expansion
+    useEffect(() => {
+        const prevNodes = prevNodesRef.current;
+        if (canvasLayout.nodes.length > prevNodes.length && expansionQueue.length > 0) {
+            const newNodes = canvasLayout.nodes.filter(n => !prevNodes.some(pn => pn.id === n.id));
+            const newNodeIds = newNodes.map(n => n.id);
+            
+            setExpansionQueue(q => [...q.slice(1), ...newNodeIds]);
+        }
+        prevNodesRef.current = canvasLayout.nodes;
+    }, [canvasLayout.nodes, expansionQueue]);
 
   const getNodeStatus = useCallback((defId: string, category: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
