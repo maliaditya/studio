@@ -150,6 +150,64 @@ function CanvasPageContent() {
     })
   );
 
+  const allDefinitions = useMemo(() => new Map(
+      [...deepWorkDefinitions, ...upskillDefinitions, ...resources].map(def => [def.id, def])
+  ), [deepWorkDefinitions, upskillDefinitions, resources]);
+
+  const parentMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    allDefinitions.forEach(def => {
+        const childIds = [...(def.linkedDeepWorkIds || []), ...(def.linkedUpskillIds || []), ...(def.linkedResourceIds || [])];
+        childIds.forEach(childId => {
+            if (!map.has(childId)) map.set(childId, []);
+            map.get(childId)!.push(def.id);
+        });
+    });
+    return map;
+  }, [allDefinitions]);
+  
+  // Effect to automatically draw missing connections between visible nodes.
+  useEffect(() => {
+    const nodesOnCanvas = new Map(canvasLayout.nodes.map(n => [n.id, n]));
+    const existingEdges = new Set(canvasLayout.edges.map(e => [e.source, e.target].sort().join('-')));
+    const edgesToAdd: CanvasEdge[] = [];
+
+    canvasLayout.nodes.forEach(node => {
+      const definition = allDefinitions.get(node.id);
+      if (!definition) return;
+
+      const childIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
+      childIds.forEach(childId => {
+        if (nodesOnCanvas.has(childId)) {
+          const edgeKey = [node.id, childId].sort().join('-');
+          if (!existingEdges.has(edgeKey)) {
+            edgesToAdd.push({ id: `${node.id}-${childId}`, source: node.id, target: childId });
+            existingEdges.add(edgeKey);
+          }
+        }
+      });
+      
+      const parentIds = parentMap.get(node.id) || [];
+      parentIds.forEach(parentId => {
+        if (nodesOnCanvas.has(parentId)) {
+          const edgeKey = [node.id, parentId].sort().join('-');
+          if (!existingEdges.has(edgeKey)) {
+            edgesToAdd.push({ id: `${parentId}-${node.id}`, source: parentId, target: node.id });
+            existingEdges.add(edgeKey);
+          }
+        }
+      });
+    });
+
+    if (edgesToAdd.length > 0) {
+      setCanvasLayout(prev => ({
+        ...prev,
+        edges: [...prev.edges, ...edgesToAdd],
+      }));
+    }
+  }, [canvasLayout.nodes, canvasLayout.edges, allDefinitions, parentMap, setCanvasLayout]);
+
+
   const handleAddNode = (definition: ExerciseDefinition) => {
     if (canvasLayout.nodes.find(n => n.id === definition.id)) {
         return; // Already on canvas
@@ -219,22 +277,6 @@ function CanvasPageContent() {
     setCanvasLayout(prev => ({ ...prev, edges: prev.edges.filter(e => e.id !== edgeId)}));
   };
 
-  const allDefinitions = useMemo(() => new Map(
-      [...deepWorkDefinitions, ...upskillDefinitions, ...resources].map(def => [def.id, def])
-  ), [deepWorkDefinitions, upskillDefinitions, resources]);
-
-  const parentMap = useMemo(() => {
-    const map = new Map<string, string[]>();
-    allDefinitions.forEach(def => {
-        const childIds = [...(def.linkedDeepWorkIds || []), ...(def.linkedUpskillIds || []), ...(def.linkedResourceIds || [])];
-        childIds.forEach(childId => {
-            if (!map.has(childId)) map.set(childId, []);
-            map.get(childId)!.push(def.id);
-        });
-    });
-    return map;
-  }, [allDefinitions]);
-
   const nodePositions = useMemo(() => new Map(
       canvasLayout.nodes.map(node => [node.id, { x: node.x, y: node.y }])
   ), [canvasLayout.nodes]);
@@ -252,7 +294,6 @@ function CanvasPageContent() {
     
     if (childIds.length > 0) {
         const newNodes: CanvasNode[] = [];
-        const newEdges: CanvasEdge[] = [];
         const existingNodeIds = new Set(canvasLayout.nodes.map(n => n.id));
         const validChildIds = childIds.filter(id => allDefinitions.has(id));
 
@@ -265,16 +306,12 @@ function CanvasPageContent() {
                 });
                 existingNodeIds.add(childId);
             }
-            const edgeId = `${nodeId}-${childId}`;
-            if (!canvasLayout.edges.some(e => e.id === edgeId || e.id === `${childId}-${nodeId}`)) {
-                newEdges.push({ id: edgeId, source: nodeId, target: childId });
-            }
         });
 
-        if (newNodes.length > 0 || newEdges.length > 0) {
+        if (newNodes.length > 0) {
             setCanvasLayout(prev => ({
+                ...prev,
                 nodes: [...prev.nodes, ...newNodes],
-                edges: [...prev.edges, ...newEdges],
             }));
         }
     }
@@ -286,7 +323,6 @@ function CanvasPageContent() {
     
     const potentialParents = parentMap.get(nodeId) || [];
     const newNodes: CanvasNode[] = [];
-    const newEdges: CanvasEdge[] = [];
     const existingNodeIds = new Set(canvasLayout.nodes.map(n => n.id));
 
     potentialParents.forEach((parentId, index) => {
@@ -300,19 +336,13 @@ function CanvasPageContent() {
                 });
                 existingNodeIds.add(parentId);
             }
-            
-            // ALWAYS check if an edge needs to be added, regardless of whether the node was new
-            const edgeId = `${parentId}-${nodeId}`;
-            if (!canvasLayout.edges.some(e => e.id === edgeId || e.id === `${nodeId}-${parentId}`)) {
-                newEdges.push({ id: edgeId, source: parentId, target: nodeId });
-            }
         }
     });
 
-    if (newNodes.length > 0 || newEdges.length > 0) {
+    if (newNodes.length > 0) {
         setCanvasLayout(prev => ({
+            ...prev,
             nodes: [...prev.nodes, ...newNodes],
-            edges: [...prev.edges, ...newEdges],
         }));
     }
   }, [allDefinitions, canvasLayout, parentMap, setCanvasLayout]);
