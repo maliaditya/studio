@@ -224,7 +224,6 @@ function MyPlatePageContent() {
     }
     const currentConsistency = Math.round(currentScore * 100);
     const scoreWithWorkouts = Math.round((currentScore + (1 - currentScore) * 0.3) * 100);
-    const scoreWithoutWorkouts = Math.round(currentScore * Math.pow(0.95, 7));
     
     let weightNarrative = "";
     if (weightLogs.length >= 2) {
@@ -235,7 +234,7 @@ function MyPlatePageContent() {
     }
 
     const healthNarrative = `Your energy is steady. Your health score could climb from ${currentConsistency}% to ${scoreWithWorkouts}%. ${weightNarrative}`;
-    const healthAlternative = `But if you skip this week's rhythm, the score may drift down to ${scoreWithoutWorkouts}%.`;
+    const healthAlternative = `You have been down that road, ${currentUser?.username}. You know exactly where it ends. And I know that's not where you want to be.`;
 
     // Deep Work
     const linkedDeepWorkChildIds = new Set(deepWorkDefinitions.flatMap(def => def.linkedDeepWorkIds || []));
@@ -419,10 +418,8 @@ function MyPlatePageContent() {
                     {lifePerspectiveNarrative.affirmation}
                 </blockquote>
                  <details className="text-xs text-muted-foreground pt-4">
-                    <summary className="cursor-pointer">What if I break my rhythm?</summary>
-                    <p className="mt-2 italic">
-                        {lifePerspectiveNarrative.healthAlternative}
-                    </p>
+                    <summary className="cursor-pointer">What if my rhythm breaks?</summary>
+                    <p className="mt-2 italic" dangerouslySetInnerHTML={{ __html: lifePerspectiveNarrative.healthAlternative }} />
                 </details>
             </CardContent>
           </Card>
