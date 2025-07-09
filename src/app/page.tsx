@@ -968,35 +968,4 @@ function HomePageContent() {
           allWorkoutLogs={allWorkoutLogs}
           allUpskillLogs={allUpskillLogs}
           allDeepWorkLogs={allDeepWorkLogs}
-          weightLogs={weightLogs}
-          goalWeight={goalWeight}
-          consistencyData={consistencyData}
-          totalHoursData={productivityStats.totalHoursData}
-          todayHoursData={productivityStats.todayHoursData}
-        />
-      </div>
-
-      <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
-        <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
-            <DialogHeader className="sr-only">
-              <DialogTitle>Mind Map Overview</DialogTitle>
-            </DialogHeader>
-            <MindMapViewer defaultView="Strategic Overview" showControls={false} />
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={isKanbanModalOpen} onOpenChange={setIsKanbanModalOpen}>
-        <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
-            <DialogHeader className="sr-only">
-              <DialogTitle>Kanban Board</DialogTitle>
-            </DialogHeader>
-            <KanbanPageContent isModal={true} />
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
-
-export default function Page() {
-    return ( <AuthGuard> <HomePageContent /> </AuthGuard> );
-}
+        

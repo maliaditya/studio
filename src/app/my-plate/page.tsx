@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -26,9 +25,8 @@ function MyPlatePageContent() {
     goalWeight,
     weightLogs,
     leadGenDefinitions,
-    offerSystemDefinitions,
-    productizationPlans,
     offerizationPlans,
+    productizationPlans,
   } = useAuth();
   
   const [isLoading, setIsLoading] = useState(true);
@@ -83,8 +81,8 @@ function MyPlatePageContent() {
   }, [leadGenDefinitions]);
 
   const offerSystemPipeline = useMemo(() => {
-    return (offerSystemDefinitions || []).slice(0, 3);
-  }, [offerSystemDefinitions]);
+    return Object.values(offerizationPlans || {}).flatMap(plan => plan.offers || []).slice(0, 3);
+  }, [offerizationPlans]);
 
   const upcomingReleases = useMemo(() => {
     if (!productizationPlans && !offerizationPlans) return [];
@@ -282,7 +280,7 @@ function MyPlatePageContent() {
                         <h4 className="font-semibold mb-2 flex items-center gap-2 text-base"><Package className="h-5 w-5"/> Defined Offers</h4>
                         {offerSystemPipeline.length > 0 ? (
                              <ul className="space-y-2">
-                                {offerSystemPipeline.map(task => (
+                                {offerSystemPipeline.map((task: any) => (
                                     <li key={task.id} className="text-sm p-2 rounded-md bg-muted/50 flex justify-between items-center">
                                         <span>{task.name}</span>
                                     </li>
