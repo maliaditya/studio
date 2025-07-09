@@ -99,7 +99,7 @@ const getRandomMessage = (
     const value = context[key];
     if (value !== null && value !== undefined) {
       if (key === 'username') {
-        message = message.replace(new RegExp(`{{${key}}}`, 'g'), `&lt;b&gt;${value}&lt;/b&gt;`);
+        message = message.replace(new RegExp(`{{${key}}}`, 'g'), `<b>${value}</b>`);
       } else {
         message = message.replace(new RegExp(`{{${key}}}`, 'g'), value.toString());
       }
@@ -129,6 +129,7 @@ function MyPlatePageContent() {
     dateOfBirth,
     allWorkoutLogs,
     allDeepWorkLogs,
+    allDeepWorkLogs
   } = useAuth();
   
   const [isLoading, setIsLoading] = useState(true);
@@ -339,270 +340,291 @@ function MyPlatePageContent() {
   const upskillInsight = getUpskillInsight(weeklyStats.upskill.current, weeklyStats.upskill.prev, weeklyStats.upskill.currentDaysToGoal, weeklyStats.upskill.prevDaysToGoal);
   const workoutInsight = getInsight(weeklyStats.workouts.current, weeklyStats.workouts.prev, 7);
   const weightInsight = getWeightInsight(weeklyStats.weight.current, weeklyStats.weight.prev, goalWeight);
-  const renderTrend = (trend: 'up' | 'down' | 'stable' | 'burnout', changeText: string) => { const getIcon = () => { switch (trend) { case 'up': return &lt;ArrowUp className=&quot;h-4 w-4 text-green-500&quot; /&gt;; case 'down': return &lt;ArrowDown className=&quot;h-4 w-4 text-red-500&quot; /&gt;; case 'burnout': return &lt;AlertCircle className=&quot;h-4 w-4 text-yellow-500&quot; /&gt;; default: return &lt;PauseCircle className=&quot;h-4 w-4 text-muted-foreground&quot; /&gt;; } }; return ( &lt;div className=&quot;flex items-center text-xs text-muted-foreground&quot;&gt; {getIcon()} &lt;span className=&quot;ml-1&quot;&gt;{changeText}&lt;/span&gt; &lt;/div&gt; ) };
+   const renderTrend = (trend: 'up' | 'down' | 'stable' | 'burnout', changeText: string) => {
+    const getIcon = () => {
+      switch (trend) {
+        case 'up':
+          return <ArrowUp className="h-4 w-4 text-green-500" />;
+        case 'down':
+          return <ArrowDown className="h-4 w-4 text-red-500" />;
+        case 'burnout':
+          return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+        default:
+          return <PauseCircle className="h-4 w-4 text-muted-foreground" />;
+      }
+    };
+    return (
+      <div className="flex items-center text-xs text-muted-foreground">
+        {getIcon()}
+        <span className="ml-1">{changeText}</span>
+      </div>
+    );
+  };
   const getChangeText = (current: number, prev: number, trend: 'up'|'down'|'stable'|'burnout') => { const change = current - prev; const percentChange = prev !== 0 ? (change / prev) * 100 : current > 0 ? 100 : 0; if (trend === 'up') return `Up ${percentChange.toFixed(0)}% from last week`; if (trend === 'down') return `Down ${Math.abs(percentChange).toFixed(0)}% from last week`; if (trend === 'burnout') return 'Potential burnout risk'; return 'Consistent effort'; }
 
   useEffect(() => { if (currentUser?.username) setIsLoading(false); }, [currentUser]);
 
-  if (isLoading) return &lt;div className=&quot;flex justify-center items-center min-h-[calc(100vh-8rem)]&quot;&gt;&lt;p className=&quot;text-muted-foreground&quot;&gt;Loading your plate...&lt;/p&gt;&lt;/div&gt;;
+  if (isLoading) return <div className="flex justify-center items-center min-h-[calc(100vh-8rem)]"><p className="text-muted-foreground">Loading your plate...</p></div>;
 
   return (
-    &lt;div className=&quot;container mx-auto p-4 sm:p-6 lg:p-8 space-y-8&quot;&gt;
-      &lt;div className=&quot;text-center&quot;&gt;
-        &lt;h1 className=&quot;text-4xl font-bold tracking-tight text-primary flex items-center justify-center gap-4&quot;&gt;
-            &lt;BrainCircuit className=&quot;h-10 w-10&quot;/&gt;
+    <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold tracking-tight text-primary flex items-center justify-center gap-4">
+            <BrainCircuit className="h-10 w-10"/>
             My Plate
-        &lt;/h1&gt;
-        &lt;p className=&quot;mt-4 text-lg text-muted-foreground&quot;&gt;
+        </h1>
+        <p className="mt-4 text-lg text-muted-foreground">
           A top-down dashboard of your current life commitments, focus areas, and weekly insights.
-        &lt;/p&gt;
-      &lt;/div&gt;
+        </p>
+      </div>
 
-      &lt;div className=&quot;grid grid-cols-1 lg:grid-cols-3 gap-8&quot;&gt;
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        &lt;div className=&quot;lg:col-span-1 space-y-8&quot;&gt;
-            &lt;Card&gt;
-                &lt;CardHeader&gt;
-                    &lt;CardTitle&gt;Today's Agenda&lt;/CardTitle&gt;
-                    &lt;CardDescription&gt;{format(new Date(), 'EEEE, MMMM do')}&lt;/CardDescription&gt;
-                &lt;/CardHeader&gt;
-                &lt;CardContent&gt;
-                    {todaysActivities.length &gt; 0 ? (
-                        &lt;ul className=&quot;space-y-3&quot;&gt;
-                            {todaysActivities.map(activity =&gt; (
-                                &lt;li key={activity.id} className=&quot;flex items-center gap-3&quot;&gt;
-                                    {activity.completed ? &lt;CheckCircle2 className=&quot;h-5 w-5 text-green-500&quot; /&gt; : &lt;Circle className=&quot;h-5 w-5 text-muted-foreground&quot; /&gt;}
-                                    &lt;span className={`flex-grow truncate ${activity.completed ? 'line-through text-muted-foreground' : ''}`} title={activity.details}&gt;
+        <div className="lg:col-span-1 space-y-8">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Today's Agenda</CardTitle>
+                    <CardDescription>{format(new Date(), 'EEEE, MMMM do')}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {todaysActivities.length > 0 ? (
+                        <ul className="space-y-3">
+                            {todaysActivities.map(activity => (
+                                <li key={activity.id} className="flex items-center gap-3">
+                                    {activity.completed ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
+                                    <span className={`flex-grow truncate ${activity.completed ? 'line-through text-muted-foreground' : ''}`} title={activity.details}>
                                         {activity.details}
-                                    &lt;/span&gt;
-                                    &lt;Badge variant=&quot;outline&quot; className=&quot;capitalize&quot;&gt;{activity.type}&lt;/Badge&gt;
-                                &lt;/li&gt;
+                                    </span>
+                                    <Badge variant="outline" className="capitalize">{activity.type}</Badge>
+                                </li>
                             ))}
-                        &lt;/ul&gt;
+                        </ul>
                     ) : (
-                        &lt;p className=&quot;text-muted-foreground text-center py-4&quot;&gt;No activities scheduled for today.&lt;/p&gt;
+                        <p className="text-muted-foreground text-center py-4">No activities scheduled for today.</p>
                     )}
-                &lt;/CardContent&gt;
-            &lt;/Card&gt;
+                </CardContent>
+            </Card>
 
-             &lt;Card&gt;
-                &lt;CardHeader&gt;
-                    &lt;CardTitle className=&quot;flex items-center gap-2 text-xl&quot;&gt;&lt;Heart className=&quot;h-6 w-6 text-primary&quot;/&gt; Health Insights&lt;/CardTitle&gt;
-                &lt;/CardHeader&gt;
-                &lt;CardContent className=&quot;space-y-6&quot;&gt;
-                    &lt;div&gt;
-                        &lt;div className=&quot;flex justify-between items-start&quot;&gt;
-                            &lt;h3 className=&quot;font-semibold&quot;&gt;Workout Consistency&lt;/h3&gt;
+             <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-xl"><Heart className="h-6 w-6 text-primary"/> Health Insights</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div>
+                        <div className="flex justify-between items-start">
+                            <h3 className="font-semibold">Workout Consistency</h3>
                             {renderTrend(workoutInsight.trend, `${weeklyStats.workouts.current} sessions`)}
-                        &lt;/div&gt;
-                        &lt;p className=&quot;mt-4 text-sm text-foreground&quot; dangerouslySetInnerHTML={{ __html: workoutInsight.message }}&gt;&lt;/p&gt;
-                    &lt;/div&gt;
-                    &lt;Separator /&gt;
-                    &lt;div&gt;
-                        &lt;div className=&quot;flex justify-between items-start&quot;&gt;
-                            &lt;h3 className=&quot;font-semibold&quot;&gt;Weight Trend&lt;/h3&gt;
+                        </div>
+                        <p className="mt-4 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: workoutInsight.message }}></p>
+                    </div>
+                    <Separator />
+                    <div>
+                        <div className="flex justify-between items-start">
+                            <h3 className="font-semibold">Weight Trend</h3>
                             {renderTrend(weightInsight.trend, `${weeklyStats.weight.change.toFixed(1)} kg/lb`)}
-                        &lt;/div&gt;
-                         &lt;p className=&quot;mt-4 text-sm text-foreground&quot; dangerouslySetInnerHTML={{ __html: weightInsight.message }}&gt;&lt;/p&gt;
-                    &lt;/div&gt;
-                &lt;/CardContent&gt;
-            &lt;/Card&gt;
+                        </div>
+                         <p className="mt-4 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: weightInsight.message }}></p>
+                    </div>
+                </CardContent>
+            </Card>
 
-            &lt;Card&gt;
-                &lt;CardHeader&gt;
-                    &lt;CardTitle className=&quot;flex items-center gap-2 text-xl&quot;&gt;&lt;LineChart className=&quot;h-6 w-6 text-primary&quot;/&gt; Productivity Insights&lt;/CardTitle&gt;
-                &lt;/CardHeader&gt;
-                &lt;CardContent className=&quot;space-y-6&quot;&gt;
-                    &lt;div&gt;
-                        &lt;div className=&quot;flex justify-between items-start&quot;&gt;
-                            &lt;h3 className=&quot;font-semibold&quot;&gt;Deep Work&lt;/h3&gt;
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-xl"><LineChart className="h-6 w-6 text-primary"/> Productivity Insights</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div>
+                        <div className="flex justify-between items-start">
+                            <h3 className="font-semibold">Deep Work</h3>
                             {renderTrend(deepWorkInsight.trend, getChangeText(weeklyStats.deepWork.current, weeklyStats.deepWork.prev, deepWorkInsight.trend))}
-                        &lt;/div&gt;
-                        &lt;div className=&quot;mt-2 text-2xl font-bold&quot;&gt;{weeklyStats.deepWork.current.toFixed(1)} &lt;span className=&quot;text-sm font-normal text-muted-foreground&quot;&gt;hours&lt;/span&gt;&lt;/div&gt;
-                        &lt;p className=&quot;text-xs text-muted-foreground&quot;&gt;vs {weeklyStats.deepWork.prev.toFixed(1)} hours last week&lt;/p&gt;
-                        &lt;p className=&quot;mt-4 text-sm text-foreground&quot; dangerouslySetInnerHTML={{ __html: deepWorkInsight.message }}&gt;&lt;/p&gt;
-                    &lt;/div&gt;
-                    &lt;Separator /&gt;
-                    &lt;div&gt;
-                        &lt;div className=&quot;flex justify-between items-start&quot;&gt;
-                            &lt;h3 className=&quot;font-semibold&quot;&gt;Upskill&lt;/h3&gt;
+                        </div>
+                        <div className="mt-2 text-2xl font-bold">{weeklyStats.deepWork.current.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">hours</span></div>
+                        <p className="text-xs text-muted-foreground">vs {weeklyStats.deepWork.prev.toFixed(1)} hours last week</p>
+                        <p className="mt-4 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: deepWorkInsight.message }}></p>
+                    </div>
+                    <Separator />
+                    <div>
+                        <div className="flex justify-between items-start">
+                            <h3 className="font-semibold">Upskill</h3>
                             {renderTrend(upskillInsight.trend, getChangeText(weeklyStats.upskill.current, weeklyStats.upskill.prev, upskillInsight.trend))}
-                        &lt;/div&gt;
-                        &lt;div className=&quot;mt-2 text-2xl font-bold&quot;&gt;{weeklyStats.upskill.current.toFixed(1)} &lt;span className=&quot;text-sm font-normal text-muted-foreground&quot;&gt;hours&lt;/span&gt;&lt;/div&gt;
-                        &lt;p className=&quot;text-xs text-muted-foreground&quot;&gt;vs {weeklyStats.upskill.prev.toFixed(1)} hours last week&lt;/p&gt;
-                        &lt;p className=&quot;mt-4 text-sm text-foreground&quot; dangerouslySetInnerHTML={{ __html: upskillInsight.message }}&gt;&lt;/p&gt;
-                    &lt;/div&gt;
-                &lt;/CardContent&gt;
-            &lt;/Card&gt;
-        &lt;/div&gt;
+                        </div>
+                        <div className="mt-2 text-2xl font-bold">{weeklyStats.upskill.current.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">hours</span></div>
+                        <p className="text-xs text-muted-foreground">vs {weeklyStats.upskill.prev.toFixed(1)} hours last week</p>
+                        <p className="mt-4 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: upskillInsight.message }}></p>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
 
-        &lt;div className=&quot;lg:col-span-2 space-y-8&quot;&gt;
-          &lt;Card&gt;
-            &lt;CardHeader&gt;
-                &lt;CardTitle&gt;Vision &amp;amp; Trajectory&lt;/CardTitle&gt;
-                &lt;CardDescription&gt;A 1-week forecast based on your current momentum.&lt;/CardDescription&gt;
-            &lt;/CardHeader&gt;
-            &lt;CardContent&gt;
-                &lt;Tabs defaultValue=&quot;health&quot; className=&quot;w-full&quot;&gt;
-                    &lt;TabsList className=&quot;grid w-full grid-cols-3&quot;&gt;
-                        &lt;TabsTrigger value=&quot;health&quot;&gt;&lt;Heart className=&quot;h-4 w-4 mr-2&quot;/&gt;Health&lt;/TabsTrigger&gt;
-                        &lt;TabsTrigger value=&quot;intention&quot;&gt;&lt;Workflow className=&quot;h-4 w-4 mr-2&quot;/&gt;Intention&lt;/TabsTrigger&gt;
-                        &lt;TabsTrigger value=&quot;upskill&quot;&gt;&lt;BookCopy className=&quot;h-4 w-4 mr-2&quot;/&gt;Upskill&lt;/TabsTrigger&gt;
-                    &lt;/TabsList&gt;
-                    &lt;TabsContent value=&quot;health&quot; className=&quot;pt-4&quot;&gt;
-                        &lt;div className=&quot;grid grid-cols-2 gap-4 text-sm&quot;&gt;
-                            &lt;div className=&quot;p-3 bg-muted rounded-lg&quot;&gt;
-                                &lt;p className=&quot;font-semibold&quot;&gt;Current Consistency&lt;/p&gt;
-                                &lt;p className=&quot;text-2xl font-bold text-primary&quot;&gt;{lifePerspectiveData.health.currentConsistency}%&lt;/p&gt;
-                                &lt;p className=&quot;text-xs text-muted-foreground&quot;&gt;Keep it above 40%&lt;/p&gt;
-                            &lt;/div&gt;
-                            &lt;div className=&quot;p-3 bg-muted/80 rounded-lg&quot;&gt;
-                                &lt;p className=&quot;font-semibold&quot;&gt;Next Week's Forecast&lt;/p&gt;
-                                &lt;p className=&quot;text-lg font-bold text-green-500&quot;&gt;{lifePerspectiveData.health.nextWeekWithWorkouts}% &lt;span className=&quot;text-xs font-normal text-muted-foreground&quot;&gt;(with workouts)&lt;/span&gt;&lt;/p&gt;
-                                &lt;p className=&quot;text-lg font-bold text-red-500&quot;&gt;{lifePerspectiveData.health.nextWeekWithoutWorkouts}% &lt;span className=&quot;text-xs font-normal text-muted-foreground&quot;&gt;(without workouts)&lt;/span&gt;&lt;/p&gt;
-                            &lt;/div&gt;
-                        &lt;/div&gt;
-                         &lt;p className=&quot;text-xs text-center text-muted-foreground mt-3 italic&quot;&gt;{lifePerspectiveData.health.suggestion}&lt;/p&gt;
-                    &lt;/TabsContent&gt;
-                    &lt;TabsContent value=&quot;intention&quot; className=&quot;pt-4&quot;&gt;
+        <div className="lg:col-span-2 space-y-8">
+          <Card>
+            <CardHeader>
+                <CardTitle>Vision & Trajectory</CardTitle>
+                <CardDescription>A 1-week forecast based on your current momentum.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Tabs defaultValue="health" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="health"><Heart className="h-4 w-4 mr-2"/>Health</TabsTrigger>
+                        <TabsTrigger value="intention"><Workflow className="h-4 w-4 mr-2"/>Intention</TabsTrigger>
+                        <TabsTrigger value="upskill"><BookCopy className="h-4 w-4 mr-2"/>Upskill</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="health" className="pt-4">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="p-3 bg-muted rounded-lg">
+                                <p className="font-semibold">Current Consistency</p>
+                                <p className="text-2xl font-bold text-primary">{lifePerspectiveData.health.currentConsistency}%</p>
+                                <p className="text-xs text-muted-foreground">Keep it above 40%</p>
+                            </div>
+                            <div className="p-3 bg-muted/80 rounded-lg">
+                                <p className="font-semibold">Next Week's Forecast</p>
+                                <p className="text-lg font-bold text-green-500">{lifePerspectiveData.health.nextWeekWithWorkouts}% <span className="text-xs font-normal text-muted-foreground">(with workouts)</span></p>
+                                <p className="text-lg font-bold text-red-500">{lifePerspectiveData.health.nextWeekWithoutWorkouts}% <span className="text-xs font-normal text-muted-foreground">(without workouts)</span></p>
+                            </div>
+                        </div>
+                         <p className="text-xs text-center text-muted-foreground mt-3 italic">{lifePerspectiveData.health.suggestion}</p>
+                    </TabsContent>
+                    <TabsContent value="intention" className="pt-4">
                         {lifePerspectiveData.intention ? (
-                            &lt;div className=&quot;space-y-3&quot;&gt;
-                                &lt;p className=&quot;font-semibold text-center&quot;&gt;Project: &lt;Link href=&quot;/deep-work&quot; className=&quot;text-primary hover:underline&quot;&gt;{lifePerspectiveData.intention.name}&lt;/Link&gt;&lt;/p&gt;
-                                &lt;Progress value={(lifePerspectiveData.intention.completed / lifePerspectiveData.intention.totalEstimated) * 100} className=&quot;h-2&quot; /&gt;
-                                &lt;div className=&quot;grid grid-cols-3 gap-2 text-center text-xs&quot;&gt;
-                                    &lt;div className=&quot;p-2 bg-muted rounded-md&quot;&gt;&lt;p className=&quot;font-semibold&quot;&gt;{lifePerspectiveData.intention.completed.toFixed(1)}h&lt;/p&gt;&lt;p&gt;Completed&lt;/p&gt;&lt;/div&gt;
-                                    &lt;div className=&quot;p-2 bg-muted rounded-md&quot;&gt;&lt;p className=&quot;font-semibold&quot;&gt;{lifePerspectiveData.intention.forecastHours.toFixed(1)}h&lt;/p&gt;&lt;p&gt;Next Week&lt;/p&gt;&lt;/div&gt;
-                                    &lt;div className=&quot;p-2 bg-muted rounded-md&quot;&gt;&lt;p className=&quot;font-semibold&quot;&gt;{lifePerspectiveData.intention.totalEstimated}h&lt;/p&gt;&lt;p&gt;Total Est.&lt;/p&gt;&lt;/div&gt;
-                                &lt;/div&gt;
-                                &lt;p className=&quot;text-xs text-center text-muted-foreground italic&quot;&gt;Est. completion: {lifePerspectiveData.intention.estCompletionDate}&lt;/p&gt;
-                            &lt;/div&gt;
-                        ) : &lt;p className=&quot;text-sm text-center text-muted-foreground py-4&quot;&gt;No active intention with an estimate found in Deep Work.&lt;/p&gt;}
-                    &lt;/TabsContent&gt;
-                    &lt;TabsContent value=&quot;upskill&quot; className=&quot;pt-4&quot;&gt;
+                            <div className="space-y-3">
+                                <p className="font-semibold text-center">Project: <Link href="/deep-work" className="text-primary hover:underline">{lifePerspectiveData.intention.name}</Link></p>
+                                <Progress value={(lifePerspectiveData.intention.completed / lifePerspectiveData.intention.totalEstimated) * 100} className="h-2" />
+                                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                                    <div className="p-2 bg-muted rounded-md"><p className="font-semibold">{lifePerspectiveData.intention.completed.toFixed(1)}h</p><p>Completed</p></div>
+                                    <div className="p-2 bg-muted rounded-md"><p className="font-semibold">{lifePerspectiveData.intention.forecastHours.toFixed(1)}h</p><p>Next Week</p></div>
+                                    <div className="p-2 bg-muted rounded-md"><p className="font-semibold">{lifePerspectiveData.intention.totalEstimated}h</p><p>Total Est.</p></div>
+                                </div>
+                                <p className="text-xs text-center text-muted-foreground italic">Est. completion: {lifePerspectiveData.intention.estCompletionDate}</p>
+                            </div>
+                        ) : <p className="text-sm text-center text-muted-foreground py-4">No active intention with an estimate found in Deep Work.</p>}
+                    </TabsContent>
+                    <TabsContent value="upskill" className="pt-4">
                         {lifePerspectiveData.upskill ? (
-                             &lt;div className=&quot;space-y-3&quot;&gt;
-                                &lt;p className=&quot;font-semibold text-center&quot;&gt;Topic: &lt;Link href=&quot;/upskill&quot; className=&quot;text-primary hover:underline&quot;&gt;{lifePerspectiveData.upskill.topic}&lt;/Link&gt;&lt;/p&gt;
-                                &lt;Progress value={(lifePerspectiveData.upskill.completed / lifePerspectiveData.upskill.goal) * 100} className=&quot;h-2&quot; /&gt;
-                                &lt;div className=&quot;grid grid-cols-3 gap-2 text-center text-xs&quot;&gt;
-                                    &lt;div className=&quot;p-2 bg-muted rounded-md&quot;&gt;&lt;p className=&quot;font-semibold&quot;&gt;{lifePerspectiveData.upskill.completed.toFixed(0)}&lt;/p&gt;&lt;p&gt;Completed&lt;/p&gt;&lt;/div&gt;
-                                    &lt;div className=&quot;p-2 bg-muted rounded-md&quot;&gt;&lt;p className=&quot;font-semibold&quot;&gt;{lifePerspectiveData.upskill.forecastPages.toFixed(0)}&lt;/p&gt;&lt;p&gt;Next Week&lt;/p&gt;&lt;/div&gt;
-                                    &lt;div className=&quot;p-2 bg-muted rounded-md&quot;&gt;&lt;p className=&quot;font-semibold&quot;&gt;{lifePerspectiveData.upskill.goal}&lt;/p&gt;&lt;p&gt;Goal&lt;/p&gt;&lt;/div&gt;
-                                &lt;/div&gt;
-                                &lt;p className=&quot;text-xs text-center text-muted-foreground italic&quot;&gt;{lifePerspectiveData.upskill.suggestion}&lt;/p&gt;
-                            &lt;/div&gt;
-                        ) : &lt;p className=&quot;text-sm text-center text-muted-foreground py-4&quot;&gt;No active learning goal found in Upskill.&lt;/p&gt;}
-                    &lt;/TabsContent&gt;
-                &lt;/Tabs&gt;
-            &lt;/CardContent&gt;
-          &lt;/Card&gt;
+                             <div className="space-y-3">
+                                <p className="font-semibold text-center">Topic: <Link href="/upskill" className="text-primary hover:underline">{lifePerspectiveData.upskill.topic}</Link></p>
+                                <Progress value={(lifePerspectiveData.upskill.completed / lifePerspectiveData.upskill.goal) * 100} className="h-2" />
+                                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                                    <div className="p-2 bg-muted rounded-md"><p className="font-semibold">{lifePerspectiveData.upskill.completed.toFixed(0)}</p><p>Completed</p></div>
+                                    <div className="p-2 bg-muted rounded-md"><p className="font-semibold">{lifePerspectiveData.upskill.forecastPages.toFixed(0)}</p><p>Next Week</p></div>
+                                    <div className="p-2 bg-muted rounded-md"><p className="font-semibold">{lifePerspectiveData.upskill.goal}</p><p>Goal</p></div>
+                                </div>
+                                <p className="text-xs text-center text-muted-foreground italic">{lifePerspectiveData.upskill.suggestion}</p>
+                            </div>
+                        ) : <p className="text-sm text-center text-muted-foreground py-4">No active learning goal found in Upskill.</p>}
+                    </TabsContent>
+                </Tabs>
+            </CardContent>
+          </Card>
 
-            &lt;Card&gt;
-                &lt;CardHeader&gt;
-                    &lt;CardTitle className=&quot;flex items-center gap-3 text-xl&quot;&gt;&lt;DollarSign className=&quot;h-6 w-6 text-primary&quot;/&gt; Monetization Pipeline&lt;/CardTitle&gt;
-                    &lt;CardDescription&gt;Your content, lead generation, and offer creation flow.&lt;/CardDescription&gt;
-                &lt;/CardHeader&gt;
-                &lt;CardContent className=&quot;space-y-6&quot;&gt;
-                    &lt;div&gt;
-                        &lt;h4 className=&quot;font-semibold mb-2 flex items-center gap-2 text-base&quot;&gt;&lt;Share2 className=&quot;h-5 w-5&quot;/&gt; Branding Pipeline&lt;/h4&gt;
-                        {brandingPipeline.length &gt; 0 ? (
-                             &lt;ul className=&quot;space-y-2&quot;&gt;
-                                {brandingPipeline.map(task =&gt; (
-                                    &lt;li key={task.id} className=&quot;text-sm p-2 rounded-md bg-muted/50 flex justify-between items-center&quot;&gt;
-                                        &lt;span&gt;{task.name}&lt;/span&gt;
-                                        &lt;Badge variant=&quot;secondary&quot;&gt;Active&lt;/Badge&gt;
-                                    &lt;/li&gt;
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-3 text-xl"><DollarSign className="h-6 w-6 text-primary"/> Monetization Pipeline</CardTitle>
+                    <CardDescription>Your content, lead generation, and offer creation flow.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div>
+                        <h4 className="font-semibold mb-2 flex items-center gap-2 text-base"><Share2 className="h-5 w-5"/> Branding Pipeline</h4>
+                        {brandingPipeline.length > 0 ? (
+                             <ul className="space-y-2">
+                                {brandingPipeline.map(task => (
+                                    <li key={task.id} className="text-sm p-2 rounded-md bg-muted/50 flex justify-between items-center">
+                                        <span>{task.name}</span>
+                                        <Badge variant="secondary">Active</Badge>
+                                    </li>
                                 ))}
-                            &lt;/ul&gt;
+                            </ul>
                         ) : (
-                            &lt;p className=&quot;text-muted-foreground text-sm&quot;&gt;Branding pipeline is clear. Go to Deep Work to mark items as ready!&lt;/p&gt;
+                            <p className="text-muted-foreground text-sm">Branding pipeline is clear. Go to Deep Work to mark items as ready!</p>
                         )}
-                    &lt;/div&gt;
-                    &lt;div className=&quot;pt-4 border-t&quot;&gt;
-                        &lt;h4 className=&quot;font-semibold mb-2 flex items-center gap-2 text-base&quot;&gt;&lt;Magnet className=&quot;h-5 w-5&quot;/&gt; Lead Generation Tasks&lt;/h4&gt;
-                        {leadGenPipeline.length &gt; 0 ? (
-                             &lt;ul className=&quot;space-y-2&quot;&gt;
-                                {leadGenPipeline.map(task =&gt; (
-                                    &lt;li key={task.id} className=&quot;text-sm p-2 rounded-md bg-muted/50 flex justify-between items-center&quot;&gt;
-                                        &lt;span&gt;{task.name}&lt;/span&gt;
-                                    &lt;/li&gt;
+                    </div>
+                    <div className="pt-4 border-t">
+                        <h4 className="font-semibold mb-2 flex items-center gap-2 text-base"><Magnet className="h-5 w-5"/> Lead Generation Tasks</h4>
+                        {leadGenPipeline.length > 0 ? (
+                             <ul className="space-y-2">
+                                {leadGenPipeline.map(task => (
+                                    <li key={task.id} className="text-sm p-2 rounded-md bg-muted/50 flex justify-between items-center">
+                                        <span>{task.name}</span>
+                                    </li>
                                 ))}
-                            &lt;/ul&gt;
+                            </ul>
                         ) : (
-                            &lt;p className=&quot;text-muted-foreground text-sm&quot;&gt;No lead generation tasks defined.&lt;/p&gt;
+                            <p className="text-muted-foreground text-sm">No lead generation tasks defined.</p>
                         )}
-                    &lt;/div&gt;
-                    &lt;div className=&quot;pt-4 border-t&quot;&gt;
-                        &lt;h4 className=&quot;font-semibold mb-2 flex items-center gap-2 text-base&quot;&gt;&lt;Package className=&quot;h-5 w-5&quot;/&gt; Defined Offers&lt;/h4&gt;
-                        {offerSystemPipeline.length &gt; 0 ? (
-                             &lt;ul className=&quot;space-y-2&quot;&gt;
-                                {offerSystemPipeline.map((task: any) =&gt; (
-                                    &lt;li key={task.id} className=&quot;text-sm p-2 rounded-md bg-muted/50 flex justify-between items-center&quot;&gt;
-                                        &lt;span&gt;{task.name}&lt;/span&gt;
-                                    &lt;/li&gt;
+                    </div>
+                    <div className="pt-4 border-t">
+                        <h4 className="font-semibold mb-2 flex items-center gap-2 text-base"><Package className="h-5 w-5"/> Defined Offers</h4>
+                        {offerSystemPipeline.length > 0 ? (
+                             <ul className="space-y-2">
+                                {offerSystemPipeline.map((task: any) => (
+                                    <li key={task.id} className="text-sm p-2 rounded-md bg-muted/50 flex justify-between items-center">
+                                        <span>{task.name}</span>
+                                    </li>
                                 ))}
-                            &lt;/ul&gt;
+                            </ul>
                         ) : (
-                            &lt;p className=&quot;text-muted-foreground text-sm&quot;&gt;No offers have been defined yet.&lt;/p&gt;
+                            <p className="text-muted-foreground text-sm">No offers have been defined yet.</p>
                         )}
-                    &lt;/div&gt;
-                &lt;/CardContent&gt;
-            &lt;/Card&gt;
+                    </div>
+                </CardContent>
+            </Card>
 
-            &lt;Card&gt;
-                &lt;CardHeader&gt;
-                    &lt;CardTitle className=&quot;flex items-center gap-3 text-xl&quot;&gt;&lt;Rocket className=&quot;h-6 w-6 text-primary&quot;/&gt; Upcoming Roadmap&lt;/CardTitle&gt;
-                    &lt;CardDescription&gt;Your upcoming product and service releases.&lt;/CardDescription&gt;
-                &lt;/CardHeader&gt;
-                &lt;CardContent&gt;
-                    {upcomingReleases.length &gt; 0 ? (
-                         &lt;ul className=&quot;space-y-3&quot;&gt;
-                            {upcomingReleases.map(({ topic, release, type }) =&gt; (
-                                &lt;li key={release.id} className=&quot;text-sm p-3 rounded-md bg-muted/50 flex justify-between items-center&quot;&gt;
-                                    &lt;div&gt;
-                                        &lt;span className=&quot;font-semibold&quot;&gt;{release.name}&lt;/span&gt;
-                                        &lt;span className=&quot;text-muted-foreground ml-2&quot;&gt;({topic})&lt;/span&gt;
-                                    &lt;/div&gt;
-                                     &lt;div className=&quot;flex items-center gap-2&quot;&gt;
-                                        &lt;Badge variant=&quot;outline&quot; className=&quot;capitalize&quot;&gt;{type}&lt;/Badge&gt;
-                                        &lt;Badge variant=&quot;secondary&quot;&gt;{format(parseISO(release.launchDate), 'MMM dd, yyyy')}&lt;/Badge&gt;
-                                    &lt;/div&gt;
-                                &lt;/li&gt;
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-3 text-xl"><Rocket className="h-6 w-6 text-primary"/> Upcoming Roadmap</CardTitle>
+                    <CardDescription>Your upcoming product and service releases.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {upcomingReleases.length > 0 ? (
+                         <ul className="space-y-3">
+                            {upcomingReleases.map(({ topic, release, type }) => (
+                                <li key={release.id} className="text-sm p-3 rounded-md bg-muted/50 flex justify-between items-center">
+                                    <div>
+                                        <span className="font-semibold">{release.name}</span>
+                                        <span className="text-muted-foreground ml-2">({topic})</span>
+                                    </div>
+                                     <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className="capitalize">{type}</Badge>
+                                        <Badge variant="secondary">{format(parseISO(release.launchDate), 'MMM dd, yyyy')}</Badge>
+                                    </div>
+                                </li>
                             ))}
-                        &lt;/ul&gt;
+                        </ul>
                     ) : (
-                        &lt;p className=&quot;text-muted-foreground text-sm&quot;&gt;No upcoming releases planned.&lt;/p&gt;
+                        <p className="text-muted-foreground text-sm">No upcoming releases planned.</p>
                     )}
-                &lt;/CardContent&gt;
-            &lt;/Card&gt;
+                </CardContent>
+            </Card>
             
-             &lt;Card&gt;
-                &lt;CardHeader&gt;
-                    &lt;CardTitle className=&quot;flex items-center gap-3 text-xl&quot;&gt;
-                        &lt;MessageSquareQuote className=&quot;h-6 w-6 text-primary&quot;/&gt;
+             <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-3 text-xl">
+                        <MessageSquareQuote className="h-6 w-6 text-primary"/>
                         Weekly Reflection
-                    &lt;/CardTitle&gt;
-                    &lt;CardDescription&gt;Take a moment to reflect and adjust your focus.&lt;/CardDescription&gt;
-                &lt;/CardHeader&gt;
-                &lt;CardContent&gt;
-                    &lt;ul className=&quot;space-y-4 text-muted-foreground list-disc pl-5&quot;&gt;
-                      &lt;li&gt;Which of these are moving you forward the most?&lt;/li&gt;
-                      &lt;li&gt;Which one have you neglected and why?&lt;/li&gt;
-                      &lt;li&gt;What do you want to add/remove from your plate this week?&lt;/li&gt;
-                    &lt;/ul&gt;
-                &lt;/CardContent&gt;
-            &lt;/Card&gt;
-        &lt;/div&gt;
-      &lt;/div&gt;
-    &lt;/div&gt;
+                    </CardTitle>
+                    <CardDescription>Take a moment to reflect and adjust your focus.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <ul className="space-y-4 text-muted-foreground list-disc pl-5">
+                      <li>Which of these are moving you forward the most?</li>
+                      <li>Which one have you neglected and why?</li>
+                      <li>What do you want to add/remove from your plate this week?</li>
+                    </ul>
+                </CardContent>
+            </Card>
+        </div>
+      </div>
+    </div>
   );
 }
 
 export default function MyPlatePage() {
     return (
-        &lt;AuthGuard&gt;
-            &lt;MyPlatePageContent /&gt;
-        &lt;/AuthGuard&gt;
+        <AuthGuard>
+            <MyPlatePageContent />
+        </AuthGuard>
     )
 }
+
+    
 
     
