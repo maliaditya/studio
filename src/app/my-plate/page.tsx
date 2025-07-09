@@ -260,7 +260,7 @@ function MyPlatePageContent() {
             const isObjective = (node.linkedDeepWorkIds?.length ?? 0) > 0;
             const remainingHours = (node.estimatedHours || 0) - getLoggedHours(node.id);
 
-            if (remainingHours > 0.1) { // Only consider tasks not yet completed
+            if (remainingHours > 0.1) {
                 allDescendantTasks.push({ id: node.id, name: node.name, remainingHours, type: isObjective ? 'objective' : 'action' });
             }
             
@@ -271,7 +271,7 @@ function MyPlatePageContent() {
         (activeIntention.linkedDeepWorkIds || []).forEach(childId => recurse(childId));
 
         const avgDailyProductiveHours = (weeklyStats.deepWork.current + weeklyStats.upskill.current) / 7;
-        let availableHours = avgDailyProductiveHours > 0 ? avgDailyProductiveHours * 7 : 7; // Assume at least 1 hr/day if no data
+        let availableHours = avgDailyProductiveHours > 0 ? avgDailyProductiveHours * 7 : 7;
         
         let projectedCompletedObjectives: string[] = [];
         let projectedCompletedActions: string[] = [];
@@ -282,7 +282,7 @@ function MyPlatePageContent() {
                 if (task.type === 'objective') projectedCompletedObjectives.push(task.name);
                 else projectedCompletedActions.push(task.name);
             } else {
-                break; // Stop when we can't complete the next full task
+                break;
             }
         }
         
@@ -566,3 +566,4 @@ export default function MyPlatePage() {
 }
 
     
+
