@@ -114,8 +114,8 @@ function MyPlatePageContent() {
   const { 
     currentUser, 
     schedule,
-    allUpskillLogs,
     upskillDefinitions,
+    allUpskillLogs,
     topicGoals, 
     deepWorkDefinitions, 
     goalWeight,
@@ -234,44 +234,48 @@ function MyPlatePageContent() {
     }
 
     const healthNarrative = `Your energy is steady. Your health score could climb from ${currentConsistency}% to ${scoreWithWorkouts}%. ${weightNarrative}`;
-
+    
     // Deep Work
     const linkedDeepWorkChildIds = new Set(deepWorkDefinitions.flatMap(def => def.linkedDeepWorkIds || []));
     const activeIntention = deepWorkDefinitions.find(def => ((def.linkedDeepWorkIds?.length ?? 0) > 0) && !linkedDeepWorkChildIds.has(def.id));
     let deepWorkNarrative = "";
     
     if (activeIntention) {
-        let allDescendantTasks: {id: string, name: string, remainingHours: number, type: 'objective' | 'action'}[] = [];
+        const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+        let allDescendantTasks: {id: string, name: string, remainingHours: number, type: 'Objective' | 'Action'}[] = [];
         const visited = new Set<string>();
 
-        const getLoggedHours = (defId: string) => {
+        const getLoggedHours = (defId: string): number => {
             let totalMinutes = 0;
-            allDeepWorkLogs.forEach(log => { log.exercises.forEach(ex => { if (ex.definitionId === defId) totalMinutes += ex.loggedSets.reduce((s, set) => s + set.weight, 0); }); });
-            allUpskillLogs.forEach(log => { log.exercises.forEach(ex => { if (ex.definitionId === defId) totalMinutes += ex.loggedSets.reduce((s, set) => s + set.reps, 0); }); });
+            const upskillLog = allUpskillLogs.flatMap(log => log.exercises).filter(ex => ex.definitionId === defId);
+            totalMinutes += upskillLog.reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + set.reps, 0), 0);
+
+            const deepWorkLog = allDeepWorkLogs.flatMap(log => log.exercises).filter(ex => ex.definitionId === defId);
+            totalMinutes += deepWorkLog.reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + set.weight, 0), 0);
+            
             return totalMinutes / 60;
         };
-
+        
         const recurse = (nodeId: string) => {
             if (visited.has(nodeId)) return;
             visited.add(nodeId);
-            const node = deepWorkDefinitions.find(d => d.id === nodeId);
+            const node = allDefs.find(d => d.id === nodeId);
             if (!node) return;
-
+            
             const isObjective = (node.linkedDeepWorkIds?.length ?? 0) > 0;
             const remainingHours = (node.estimatedHours || 0) - getLoggedHours(node.id);
 
-            if (remainingHours > 0.1) {
-                allDescendantTasks.push({ id: node.id, name: node.name, remainingHours, type: isObjective ? 'objective' : 'action' });
+            if (remainingHours > 0.01) {
+                allDescendantTasks.push({ id: node.id, name: node.name, remainingHours, type: isObjective ? 'Objective' : 'Action' });
             }
-            
+
             (node.linkedDeepWorkIds || []).forEach(childId => recurse(childId));
         };
         
-        // Start recursion from children of the main intention
-        (activeIntention.linkedDeepWorkIds || []).forEach(childId => recurse(childId));
+        recurse(activeIntention.id);
 
         const avgDailyProductiveHours = (weeklyStats.deepWork.current + weeklyStats.upskill.current) / 7;
-        let availableHours = avgDailyProductiveHours > 0 ? avgDailyProductiveHours * 7 : 7;
+        let availableHours = avgDailyProductiveHours > 0 ? avgDailyProductiveHours * 7 : 7; // Default to 1 hr/day if no data
         
         let projectedCompletedObjectives: string[] = [];
         let projectedCompletedActions: string[] = [];
@@ -279,7 +283,7 @@ function MyPlatePageContent() {
         for (const task of allDescendantTasks) {
             if (availableHours >= task.remainingHours) {
                 availableHours -= task.remainingHours;
-                if (task.type === 'objective') projectedCompletedObjectives.push(task.name);
+                if (task.type === 'Objective') projectedCompletedObjectives.push(task.name);
                 else projectedCompletedActions.push(task.name);
             } else {
                 break;
@@ -287,10 +291,10 @@ function MyPlatePageContent() {
         }
         
         let intentionNarrative = `Your intention, '${activeIntention.name}', is solidifying. This week, you are on track to complete`;
-        if (projectedCompletedObjectives.length > 0) {
-            intentionNarrative += ` the objective${projectedCompletedObjectives.length > 1 ? 's' : ''}: <b>${projectedCompletedObjectives.join(', ')}</b>.`;
-        } else if (projectedCompletedActions.length > 0) {
-             intentionNarrative += ` the action${projectedCompletedActions.length > 1 ? 's' : ''}: <b>${projectedCompletedActions.join(', ')}</b>.`;
+        const completedItems = [...projectedCompletedObjectives, ...projectedCompletedActions];
+
+        if (completedItems.length > 0) {
+            intentionNarrative += ` the task${completedItems.length > 1 ? 's' : ''}: <b>${completedItems.join(', ')}</b>.`;
         } else {
             intentionNarrative = `Your intention, '${activeIntention.name}', is a big one. Keep chipping away at it this week.`;
         }
@@ -323,8 +327,7 @@ function MyPlatePageContent() {
 
   }, [allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, topicGoals, weeklyStats, weightLogs, dateOfBirth, currentUser]);
   
-  const healthAlternative = `You break the rhythm, the story ends. You wake up where you had started, free to believe whatever you want. But if you stay on this path, you stay in Wonderland, and I show you how deep the rabbit hole goes.`
-
+  const healthAlternative = `You break the rhythm, the story ends. You wake up where you had started, free to believe whatever you want. But if you stay on this path, you stay in Wonderland, and I show you how deep the rabbit hole goes.`;
 
   const getInsight = (current: number, prev: number, burnoutThreshold: number): { trend: 'up' | 'down' | 'stable' | 'burnout'; message: string } => { if (current > burnoutThreshold) return { trend: 'burnout', message: getRandomMessage('burnout', userContext) }; if (current > prev * 1.2) return { trend: 'up', message: getRandomMessage('up', userContext) }; if (current < prev * 0.8) { if (prev > 0) return { trend: 'down', message: getRandomMessage('down', userContext) }; return { trend: 'down', message: getRandomMessage('new_week', userContext) }; } if (current > 0) return { trend: 'stable', message: getRandomMessage('stable', userContext) }; return { trend: 'stable', message: getRandomMessage('new_week', userContext) }; };
   const getUpskillInsight = (currentHours: number, prevHours: number, currentDays: number | null, prevDays: number | null) => { if (currentDays !== null && prevDays !== null) { if (currentDays < prevDays) return { trend: 'up' as const, message: getRandomMessage('goal_getting_closer', userContext) }; if (currentDays > prevDays) return { trend: 'down' as const, message: getRandomMessage('goal_slipping', userContext) }; return { trend: 'stable' as const, message: getRandomMessage('goal_stable', userContext) }; } return getInsight(currentHours, prevHours, 28); };
@@ -566,4 +569,5 @@ export default function MyPlatePage() {
 }
 
     
+
 
