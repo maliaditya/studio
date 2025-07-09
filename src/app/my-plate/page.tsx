@@ -5,8 +5,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, getDay, parseISO, differenceInDays, subDays, isAfter, startOfToday, isBefore, differenceInYears, addDays, addWeeks, setISOWeek, startOfISOWeek } from 'date-fns';
-import { DollarSign, Share2, Heart, Trophy, MessageSquareQuote, CheckCircle2, Circle, Target, TrendingUp, Magnet, Package, Rocket, AlertCircle, ArrowDown, ArrowUp, BarChart3, CheckCircle2 as CheckCircleIcon, PauseCircle, Calendar } from 'lucide-react';
+import { format, getDay, parseISO, differenceInDays, subDays, isAfter, startOfToday, isBefore, differenceInYears, addDays, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear } from 'date-fns';
+import { DollarSign, Share2, Heart, Trophy, MessageSquareQuote, CheckCircle2, Circle, Target, TrendingUp, Magnet, Package, Rocket, AlertCircle, ArrowDown, ArrowUp, BarChart3, CheckCircle2 as CheckCircleIcon, PauseCircle, Calendar, LineChart, BrainCircuit } from 'lucide-react';
 import type { Activity, Release, DatedWorkout, WeightLog, TopicGoal, ExerciseDefinition } from '@/types/workout';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -73,15 +73,15 @@ const messageTemplates = {
         "Your weight is stable, holding steady. This is great for maintenance, {{username}}. Keep your habits strong.",
         "Consistency is key, and you're maintaining your current weight perfectly. Well done.",
     ],
+    weight_no_data: [
+        "Log your weight for two consecutive weeks to start seeing trends and get personalized feedback.",
+        "Track your weight weekly to unlock insights and feedback on your progress.",
+    ],
     weight_no_goal_up: [
         "Your weight trended up this week. Is this aligned with your current, unstated goals? A good time to reflect.",
     ],
     weight_no_goal_down: [
         "Your weight trended down this week. Great progress if you're aiming for weight loss! If not, now is a good time to assess.",
-    ],
-    weight_no_data: [
-        "Log your weight for two consecutive weeks to start seeing trends and get personalized feedback.",
-        "Track your weight weekly to unlock insights and feedback on your progress.",
     ],
     age_related: [
       "At age {{age}}, you're building habits that will compound for decades. Keep investing in yourself, {{username}}.",
@@ -255,21 +255,28 @@ function MyPlatePageContent() {
     const prevWorkouts = countWorkouts(allWorkoutLogs, prev7DaysStart, oneWeekAgo);
     const latestWeight = getLatestWeight(weightLogs, today);
     const prevWeightLog = getLatestWeight(weightLogs, oneWeekAgo);
-    return { deepWork: { current: currentDeepWork, prev: prevDeepWork }, upskill: { current: currentUpskill, prev: prevUpskill, currentDaysToGoal, prevDaysToGoal }, workouts: { current: currentWorkouts, prev: prevWorkouts }, weight: { current: latestWeight?.weight || 0, prev: prevWeightLog?.weight || 0 }};
+    return { deepWork: { current: currentDeepWork, prev: prevDeepWork }, upskill: { current: currentUpskill, prev: prevUpskill, currentDaysToGoal, prevDaysToGoal }, workouts: { current: currentWorkouts, prev: prevWorkouts }, weight: { current: latestWeight?.weight || 0, prev: prevWeightLog?.weight || 0, change: (latestWeight?.weight || 0) - (prevWeightLog?.weight || 0) }};
   }, [allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, weightLogs, topicGoals]);
 
   const lifePerspectiveInsight = useMemo(() => {
     if (!userContext.age || !dateOfBirth) return null;
     let projectionData = null; let messageKey: keyof typeof messageTemplates = 'age_related'; let context: Record<string, any> = userContext;
     const calculateProjection = (totalRequired: number, logged: number, avgDailyRate: number, firstLogDate: Date) => { const remaining = totalRequired - logged; if (remaining <= 0) return null; const daysToCompletion = Math.ceil(remaining / avgDailyRate); const projectedDate = addDays(new Date(), daysToCompletion); const projectedAge = differenceInYears(projectedDate, parseISO(dateOfBirth)); return { logged, totalRequired, progressPercent: (logged / totalRequired) * 100, projectedAge, daysRemaining: daysToCompletion, avgRate: avgDailyRate, }; };
-    if (goalWeight && weightLogs.length >= 2) { const sortedLogs = weightLogs.map(log => { const [year, weekNum] = log.date.split('-W'); return { ...log, dateObj: startOfISOWeek(setISOWeek(new Date(parseInt(year), 0, 4), parseInt(weekNum))) }; }).sort((a,b) => a.dateObj.getTime() - b.dateObj.getTime()); const lastLog = sortedLogs[sortedLogs.length - 1]; const weightToChange = goalWeight - lastLog.weight; if (Math.abs(weightToChange) > 0.1) { const changes = sortedLogs.map((log, i) => i > 0 ? log.weight - sortedLogs[i-1].weight : null).filter((c): c is number => c !== null); let rate = changes.length > 0 ? changes.reduce((a, b) => a + b, 0) / changes.length : 0; if (weightToChange < 0 && rate >= 0) rate = -0.5; if (weightToChange > 0 && rate <= 0) rate = 0.25; if (Math.abs(rate) > 0.01) { const weeksToGo = Math.ceil(Math.abs(weightToChange / rate)); const projectedDate = addWeeks(lastLog.dateObj, weeksToGo); const projectedAge = differenceInYears(projectedDate, parseISO(dateOfBirth)); projectionData = { title: "Weight Goal", current: lastLog.weight.toFixed(1), goal: goalWeight, unit: "kg/lb", projectedAge: projectedAge, avgRate: Math.abs(rate), rateUnit: "kg/lb per week" }; messageKey = 'life_perspective_weight'; context = { ...userContext, ...projectionData }; } } }
+    
+    // Weight Projection
+    if (goalWeight && weightLogs.length >= 2) { const sortedLogs = weightLogs.map(log => { const [year, weekNum] = log.date.split('-W'); return { ...log, dateObj: startOfISOWeek(setISOWeek(new Date(parseInt(year), 0, 4), parseInt(weekNum))) }; }).sort((a,b) => a.dateObj.getTime() - b.dateObj.getTime()); const lastLog = sortedLogs[sortedLogs.length - 1]; const weightToChange = goalWeight - lastLog.weight; if (Math.abs(weightToChange) > 0.1) { const changes = sortedLogs.map((log, i) => i > 0 ? log.weight - sortedLogs[i-1].weight : null).filter((c): c is number => c !== null); let rate = changes.length > 0 ? changes.reduce((a, b) => a + b, 0) / changes.length : 0; if (weightToChange < 0 && rate >= 0) rate = -0.5; if (weightToChange > 0 && rate <= 0) rate = 0.25; if (Math.abs(rate) > 0.01) { const weeksToGo = Math.ceil(Math.abs(weightToChange / rate)); const projectedDate = addWeeks(lastLog.dateObj, weeksToGo); const projectedAge = differenceInYears(projectedDate, parseISO(dateOfBirth)); const nextWeekWeight = lastLog.weight + rate; projectionData = { title: "Weight Goal", current: lastLog.weight.toFixed(1), goal: goalWeight, unit: "kg/lb", projectedAge: projectedAge, avgRate: Math.abs(rate), rateUnit: "kg/lb per week", nextWeekProjection: nextWeekWeight.toFixed(1) }; messageKey = 'life_perspective_weight'; context = { ...userContext, ...projectionData }; } } }
+    
+    // Intention Projection
     const linkedDeepWorkChildIds = new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || []));
     const intentions = deepWorkDefinitions.filter(def => { const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0; const isChild = linkedDeepWorkChildIds.has(def.id); return isParent && !isChild; });
-    if (intentions.length > 0 && !projectionData) { const mainIntention = intentions[0]; let totalEstimatedHours = 0; let totalLoggedHours = 0; const descendentIds = new Set<string>(); const queue = [mainIntention.id]; const visited = new Set<string>(); while(queue.length > 0) { const id = queue.shift()!; if(visited.has(id)) continue; visited.add(id); descendentIds.add(id); const def = [...deepWorkDefinitions, ...allUpskillLogs].find(d => d.id === id); if (def) { (def.linkedDeepWorkIds || []).forEach(childId => queue.push(childId)); (def.linkedUpskillIds || []).forEach(childId => queue.push(childId)); } } descendentIds.forEach(id => { const def = [...deepWorkDefinitions, ...allUpskillLogs].find(d => d.id === id); if(def) totalEstimatedHours += def.estimatedHours || 0; allDeepWorkLogs.forEach(log => log.exercises.forEach(ex => { if (ex.definitionId === id) totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0) / 60; })); allUpskillLogs.forEach(log => log.exercises.forEach(ex => { if (ex.definitionId === id) totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0) / 60; })); }); const avgDailyProductiveHours = (weeklyStats.deepWork.current + weeklyStats.upskill.current) / 7; if (totalEstimatedHours > 0 && avgDailyProductiveHours > 0) { const proj = calculateProjection(totalEstimatedHours, totalLoggedHours, avgDailyProductiveHours, new Date()); if(proj) { projectionData = { title: mainIntention.name, current: totalLoggedHours.toFixed(1), goal: totalEstimatedHours, unit: "hours", ...proj }; messageKey = 'life_perspective_intention'; context = { ...userContext, intentionName: mainIntention.name, projectedAge: proj.projectedAge }; } } }
-    if (weeklyStats.upskill.currentDaysToGoal !== null && !projectionData) { const topicName = Object.keys(topicGoals)[0]; if (topicName) { const goal = topicGoals[topicName]; const logs = allUpskillLogs.filter(log => log.exercises.some(ex => ex.category === topicName)); const totalProgress = logs.reduce((sum, log) => sum + log.exercises.reduce((exSum, ex) => exSum + ex.loggedSets.reduce((sSum, s) => sSum + s.weight, 0), 0), 0); projectionData = { title: topicName, current: totalProgress.toFixed(0), goal: goal.goalValue, unit: goal.goalType, projectedAge: differenceInYears(addDays(new Date(), weeklyStats.upskill.currentDaysToGoal), parseISO(dateOfBirth)), }; messageKey = 'life_perspective_skill'; context = { ...userContext, topicName: topicName, projectedAge: projectionData.projectedAge }; } }
+    if (intentions.length > 0 && !projectionData) { const mainIntention = intentions[0]; let totalEstimatedHours = 0; let totalLoggedHours = 0; const descendentIds = new Set<string>(); const queue = [mainIntention.id]; const visited = new Set<string>(); while(queue.length > 0) { const id = queue.shift()!; if(visited.has(id)) continue; visited.add(id); descendentIds.add(id); const def = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === id); if (def) { (def.linkedDeepWorkIds || []).forEach(childId => queue.push(childId)); (def.linkedUpskillIds || []).forEach(childId => queue.push(childId)); } } descendentIds.forEach(id => { const def = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === id); if(def) totalEstimatedHours += def.estimatedHours || 0; allDeepWorkLogs.forEach(log => log.exercises.forEach(ex => { if (ex.definitionId === id) totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0) / 60; })); allUpskillLogs.forEach(log => log.exercises.forEach(ex => { if (ex.definitionId === id) totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0) / 60; })); }); const avgDailyProductiveHours = (weeklyStats.deepWork.current + weeklyStats.upskill.current) / 7; if (totalEstimatedHours > 0 && avgDailyProductiveHours > 0) { const proj = calculateProjection(totalEstimatedHours, totalLoggedHours, avgDailyProductiveHours, new Date()); if(proj) { const nextWeekHours = totalLoggedHours + (weeklyStats.deepWork.current * 7 / 60) + (weeklyStats.upskill.current * 7 / 60); projectionData = { title: mainIntention.name, current: totalLoggedHours.toFixed(1), goal: totalEstimatedHours, unit: "hours", nextWeekProjection: nextWeekHours.toFixed(1), ...proj }; messageKey = 'life_perspective_intention'; context = { ...userContext, intentionName: mainIntention.name, projectedAge: proj.projectedAge }; } } }
+    
+    // Upskill Projection
+    if (weeklyStats.upskill.currentDaysToGoal !== null && !projectionData) { const topicName = Object.keys(topicGoals)[0]; if (topicName) { const goal = topicGoals[topicName]; const logs = allUpskillLogs.filter(log => log.exercises.some(ex => ex.category === topicName)); const totalProgress = logs.reduce((sum, log) => sum + log.exercises.reduce((exSum, ex) => exSum + ex.loggedSets.reduce((sSum, s) => sSum + s.weight, 0), 0), 0); const weeklyRate = weeklyStats.upskill.current * 60 / 7; const nextWeekProgress = totalProgress + (weeklyRate * 7); projectionData = { title: topicName, current: totalProgress.toFixed(0), goal: goal.goalValue, unit: goal.goalType, projectedAge: differenceInYears(addDays(new Date(), weeklyStats.upskill.currentDaysToGoal), parseISO(dateOfBirth)), nextWeekProjection: nextWeekProgress.toFixed(0) }; messageKey = 'life_perspective_skill'; context = { ...userContext, topicName: topicName, projectedAge: projectionData.projectedAge }; } }
+
     if (!projectionData) return { type: 'generic', message: getRandomMessage('age_related', { ...userContext, next_age: userContext.age ? userContext.age + 1 : '' })};
     return { type: 'specific', data: projectionData, message: getRandomMessage(messageKey, context) };
-  }, [userContext, dateOfBirth, goalWeight, weightLogs, deepWorkDefinitions, allUpskillLogs, topicGoals, weeklyStats, allDeepWorkLogs]);
+  }, [userContext, dateOfBirth, goalWeight, weightLogs, deepWorkDefinitions, allUpskillLogs, topicGoals, weeklyStats, allDeepWorkLogs, upskillDefinitions]);
 
   const getInsight = (current: number, prev: number, burnoutThreshold: number): { trend: 'up' | 'down' | 'stable' | 'burnout'; message: string } => { if (current > burnoutThreshold) return { trend: 'burnout', message: getRandomMessage('burnout', userContext) }; if (current > prev * 1.2) return { trend: 'up', message: getRandomMessage('up', userContext) }; if (current < prev * 0.8) { if (prev > 0) return { trend: 'down', message: getRandomMessage('down', userContext) }; return { trend: 'down', message: getRandomMessage('new_week', userContext) }; } if (current > 0) return { trend: 'stable', message: getRandomMessage('stable', userContext) }; return { trend: 'stable', message: getRandomMessage('new_week', userContext) }; };
   const getUpskillInsight = (currentHours: number, prevHours: number, currentDays: number | null, prevDays: number | null) => { if (currentDays !== null && prevDays !== null) { if (currentDays < prevDays) return { trend: 'up' as const, message: getRandomMessage('goal_getting_closer', userContext) }; if (currentDays > prevDays) return { trend: 'down' as const, message: getRandomMessage('goal_slipping', userContext) }; return { trend: 'stable' as const, message: getRandomMessage('goal_stable', userContext) }; } return getInsight(currentHours, prevHours, 28); };
@@ -291,7 +298,7 @@ function MyPlatePageContent() {
       {/* Header */}
       <div className="text-center">
         <h1 className="text-4xl font-bold tracking-tight text-primary flex items-center justify-center gap-4">
-            <Trophy className="h-10 w-10"/>
+            <BrainCircuit className="h-10 w-10"/>
             My Plate
         </h1>
         <p className="mt-4 text-lg text-muted-foreground">
@@ -328,39 +335,37 @@ function MyPlatePageContent() {
                 </CardContent>
             </Card>
 
-            <Card>
+             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-xl"><Heart className="h-6 w-6 text-primary"/> Health</CardTitle>
+                    <CardTitle className="flex items-center gap-2 text-xl"><Heart className="h-6 w-6 text-primary"/> Health Insights</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-6">
                     <div>
-                        <h4 className="font-semibold text-sm mb-1">Today's Workout</h4>
-                        <p className="text-muted-foreground text-sm">{todaysMuscleGroups.length > 0 ? todaysMuscleGroups.join(' & ') : 'Rest Day'}</p>
+                        <div className="flex justify-between items-start">
+                            <h3 className="font-semibold">Workout Consistency</h3>
+                            {renderTrend(workoutInsight.trend, `${weeklyStats.workouts.current} sessions`)}
+                        </div>
+                        <p className="mt-4 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: workoutInsight.message }}></p>
                     </div>
-                     <div>
-                        <h4 className="font-semibold text-sm mb-1">Weight Tracking</h4>
-                         {latestWeightLog && (
-                             <p className="text-muted-foreground text-sm">
-                                 Latest: {latestWeightLog.weight} kg/lb on week {latestWeightLog.date.split('-W')[1]}
-                            </p>
-                         )}
-                         {goalWeight && (
-                            <p className="text-muted-foreground text-sm">Goal: {goalWeight} kg/lb</p>
-                         )}
-                         {!latestWeightLog && !goalWeight && <p className="text-muted-foreground text-sm">No weight data logged.</p>}
+                    <Separator />
+                    <div>
+                        <div className="flex justify-between items-start">
+                            <h3 className="font-semibold">Weight Trend</h3>
+                            {renderTrend(weightInsight.trend, `${weeklyStats.weight.change.toFixed(1)} kg/lb`)}
+                        </div>
+                         <p className="mt-4 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: weightInsight.message }}></p>
                     </div>
                 </CardContent>
             </Card>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Weekly Insights</CardTitle>
-                    <CardDescription>Your AI coach analyzing last week's performance.</CardDescription>
+                    <CardTitle className="flex items-center gap-2 text-xl"><LineChart className="h-6 w-6 text-primary"/> Productivity Insights</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div>
                         <div className="flex justify-between items-start">
-                            <div className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary"/><h3 className="font-semibold">Deep Work</h3></div>
+                            <h3 className="font-semibold">Deep Work</h3>
                             {renderTrend(deepWorkInsight.trend, getChangeText(weeklyStats.deepWork.current, weeklyStats.deepWork.prev, deepWorkInsight.trend))}
                         </div>
                         <div className="mt-2 text-2xl font-bold">{weeklyStats.deepWork.current.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">hours</span></div>
@@ -370,7 +375,7 @@ function MyPlatePageContent() {
                     <Separator />
                     <div>
                         <div className="flex justify-between items-start">
-                            <div className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary"/><h3 className="font-semibold">Upskill</h3></div>
+                            <h3 className="font-semibold">Upskill</h3>
                             {renderTrend(upskillInsight.trend, getChangeText(weeklyStats.upskill.current, weeklyStats.upskill.prev, upskillInsight.trend))}
                         </div>
                         <div className="mt-2 text-2xl font-bold">{weeklyStats.upskill.current.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">hours</span></div>
@@ -391,32 +396,37 @@ function MyPlatePageContent() {
                     <CardContent className="flex flex-col flex-grow justify-between">
                     {lifePerspectiveInsight.type === 'specific' && lifePerspectiveInsight.data ? (
                         <div className="space-y-4">
-                        <div><p className="text-lg" dangerouslySetInnerHTML={{ __html: lifePerspectiveInsight.message }}></p></div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                            <div className="p-3 rounded-md bg-muted/50">
-                                <div className="text-muted-foreground">Goal: <b>{lifePerspectiveInsight.data.title}</b></div>
-                                <div className="grid grid-cols-2 gap-x-2 mt-2">
-                                    <div>Current:</div><div className="font-bold">{lifePerspectiveInsight.data.current} {lifePerspectiveInsight.data.unit}</div>
-                                    <div>Goal:</div><div className="font-bold">{lifePerspectiveInsight.data.goal} {lifePerspectiveInsight.data.unit}</div>
+                            <div><p className="text-lg" dangerouslySetInnerHTML={{ __html: lifePerspectiveInsight.message }}></p></div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                                <div className="p-3 rounded-md bg-muted/50">
+                                    <div className="text-muted-foreground">Goal: <b>{lifePerspectiveInsight.data.title}</b></div>
+                                    <div className="grid grid-cols-2 gap-x-2 mt-2">
+                                        <div>Current:</div><div className="font-bold">{lifePerspectiveInsight.data.current} {lifePerspectiveInsight.data.unit}</div>
+                                        <div>Goal:</div><div className="font-bold">{lifePerspectiveInsight.data.goal} {lifePerspectiveInsight.data.unit}</div>
+                                        {lifePerspectiveInsight.data.nextWeekProjection && (
+                                            <>
+                                                <div>Next Week:</div><div className="font-bold">{lifePerspectiveInsight.data.nextWeekProjection} {lifePerspectiveInsight.data.unit}</div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="p-3 rounded-md bg-muted/50">
+                                    <div className="text-muted-foreground">Projection</div>
+                                    <div className="grid grid-cols-2 gap-x-2 mt-2">
+                                        <div>Current Age:</div><div className="font-bold">{userContext.age}</div>
+                                        <div>Est. Age:</div><div className="font-bold">{lifePerspectiveInsight.data.projectedAge}</div>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="p-3 rounded-md bg-muted/50">
-                                <div className="text-muted-foreground">Projection</div>
-                                <div className="grid grid-cols-2 gap-x-2 mt-2">
-                                    <div>Current Age:</div><div className="font-bold">{userContext.age}</div>
-                                    <div>Est. Age:</div><div className="font-bold">{lifePerspectiveInsight.data.projectedAge}</div>
+                            {lifePerspectiveInsight.data.logged !== undefined && (
+                                <div>
+                                    <Progress value={lifePerspectiveInsight.data.progressPercent} className="h-2" />
+                                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                        <span>{lifePerspectiveInsight.data.logged.toFixed(1)}h logged</span>
+                                        <span>{lifePerspectiveInsight.data.totalRequired.toFixed(1)}h est.</span>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                        {lifePerspectiveInsight.data.logged !== undefined && (
-                            <div>
-                                <Progress value={lifePerspectiveInsight.data.progressPercent} className="h-2" />
-                                <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                                    <span>{lifePerspectiveInsight.data.logged.toFixed(1)}h logged</span>
-                                    <span>{lifePerspectiveInsight.data.totalRequired.toFixed(1)}h est.</span>
-                                </div>
-                            </div>
-                        )}
+                            )}
                         </div>
                     ) : (
                         <p className="text-lg" dangerouslySetInnerHTML={{ __html: lifePerspectiveInsight.message }}></p>
