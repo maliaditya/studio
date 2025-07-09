@@ -13,7 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Link, X, Lightbulb, Focus, Frame, Flashlight, Briefcase, GitMerge, GitBranch, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react';
+import { Link, X, Lightbulb, Focus, Frame, Flashlight, Briefcase, GitMerge, GitBranch, RefreshCw, ZoomIn, ZoomOut, Expand } from 'lucide-react';
 import type { ExerciseDefinition, CanvasNode, ActivityType, CanvasEdge } from '@/types/workout';
 import { format } from 'date-fns';
 import { TransformWrapper, TransformComponent, useControls, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
@@ -30,7 +30,7 @@ const Controls = () => {
 };
 
 // Draggable Node Component
-function DraggableNode({ node, definition, status, onConnectClick, onRemoveClick, onExpandChildren, onRevealParents, onClickForConnection, isConnecting, isHovered, canExpandChildren, canRevealParents }: {
+function DraggableNode({ node, definition, status, onConnectClick, onRemoveClick, onExpandChildren, onRevealParents, onClickForConnection, isConnecting, isHovered, canExpandChildren, canRevealParents, onExpandAll, isRootNode }: {
   node: CanvasNode;
   definition: ExerciseDefinition;
   status: any;
@@ -43,6 +43,8 @@ function DraggableNode({ node, definition, status, onConnectClick, onRemoveClick
   isHovered: boolean;
   canExpandChildren: boolean;
   canRevealParents: boolean;
+  onExpandAll: (nodeId: string) => void;
+  isRootNode: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: node.id,
@@ -91,6 +93,11 @@ function DraggableNode({ node, definition, status, onConnectClick, onRemoveClick
           </div>
         </div>
         <CardContent className="p-2 border-t flex justify-end gap-1">
+          {isRootNode && (
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onExpandAll(node.id)}>
+                <Expand className="h-4 w-4 text-purple-500" />
+            </Button>
+          )}
           {canExpandChildren && (
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onExpandChildren(node.id)}>
                 <GitBranch className="h-4 w-4 text-green-500" />
@@ -154,7 +161,6 @@ function CanvasPageContent() {
       y: canvasRect ? (canvasRect.height / 2) - 50 : 200,
     };
     setCanvasLayout(prev => ({ ...prev, nodes: [...prev.nodes, newNode] }));
-    setIsAutoExpanding(true);
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -306,86 +312,68 @@ function CanvasPageContent() {
     }
   }, [allDefinitions, canvasLayout, nodePositions, parentMap, setCanvasLayout]);
   
+  const handleExpandAll = useCallback((nodeId: string) => {
+    setIsAutoExpanding(true);
+  }, []);
+
   useEffect(() => {
     if (!isAutoExpanding) return;
 
-    let nodesToAdd: CanvasNode[] = [];
-    let edgesToAdd: CanvasEdge[] = [];
-    
-    // Phase 1: Reveal Parents
-    for (const node of canvasLayout.nodes) {
-        const canReveal = (parentMap.get(node.id) || []).some(parentId => allDefinitions.has(parentId) && !nodePositions.has(parentId));
-        if (canReveal) {
-            const currentNodePos = nodePositions.get(node.id);
-            if (!currentNodePos) continue;
+    let madeChanges = false;
+    const allNewNodes: CanvasNode[] = [];
+    const allNewEdges: CanvasEdge[] = [];
+    const nodesOnCanvas = new Set(canvasLayout.nodes.map(n => n.id));
 
-            const potentialParents = parentMap.get(node.id) || [];
-            const parentsToLoad = potentialParents.filter(parentId => allDefinitions.has(parentId) && !nodePositions.has(parentId));
-            
-            parentsToLoad.forEach((parentId, index) => {
-                if (!nodesToAdd.some(n => n.id === parentId) && !canvasLayout.nodes.some(n => n.id === parentId)) {
-                    nodesToAdd.push({
-                        id: parentId,
-                        x: currentNodePos.x - 240,
-                        y: currentNodePos.y + (index * 90) - ((parentsToLoad.length - 1) * 45),
-                    });
-                }
-                const edgeId = `${parentId}-${node.id}`;
-                if (!edgesToAdd.some(e => e.id === edgeId) && !canvasLayout.edges.some(e => e.id === edgeId || e.id === `${node.id}-${parentId}`)) {
-                   edgesToAdd.push({ id: edgeId, source: parentId, target: node.id });
-                }
-            });
-        }
-    }
+    // Create a stable copy of nodes to iterate over
+    const nodesToScan = [...canvasLayout.nodes];
 
-    if (nodesToAdd.length > 0 || edgesToAdd.length > 0) {
-        setCanvasLayout(prev => ({
-            nodes: [...prev.nodes, ...nodesToAdd],
-            edges: [...prev.edges, ...edgesToAdd],
-        }));
-        return;
-    }
-
-    // Phase 2: Expand Children
-    for (const node of canvasLayout.nodes) {
+    nodesToScan.forEach(node => {
         const definition = allDefinitions.get(node.id);
-        if (!definition) continue;
-        const allChildIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
-        const hasUnloadedChild = allChildIds.some(childId => allDefinitions.has(childId) && !nodePositions.has(childId));
+        if (!definition) return;
 
-        if (hasUnloadedChild) {
-            const currentNodePos = nodePositions.get(node.id);
-            if (!currentNodePos) continue;
-
-            const childrenToLoad = allChildIds.filter(childId => allDefinitions.has(childId) && !nodePositions.has(childId));
-            
+        // Expand children
+        const childIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
+        const childrenToLoad = childIds.filter(childId => allDefinitions.has(childId) && !nodesOnCanvas.has(childId) && !allNewNodes.some(n => n.id === childId));
+        
+        if (childrenToLoad.length > 0) {
+            madeChanges = true;
             childrenToLoad.forEach((childId, index) => {
-                 if (!nodesToAdd.some(n => n.id === childId) && !canvasLayout.nodes.some(n => n.id === childId)) {
-                    nodesToAdd.push({
-                        id: childId,
-                        x: currentNodePos.x + 240,
-                        y: currentNodePos.y + (index * 90) - ((childrenToLoad.length - 1) * 45),
-                    });
-                }
-                const edgeId = `${node.id}-${childId}`;
-                if (!edgesToAdd.some(e => e.id === edgeId) && !canvasLayout.edges.some(e => e.id === edgeId || e.id === `${childId}-${node.id}`)) {
-                   edgesToAdd.push({ id: edgeId, source: node.id, target: childId });
-                }
+                allNewNodes.push({
+                    id: childId,
+                    x: node.x + 240,
+                    y: node.y + (index * 90) - ((childrenToLoad.length - 1) * 45),
+                });
+                allNewEdges.push({ id: `${node.id}-${childId}`, source: node.id, target: childId });
             });
         }
-    }
-    
-    if (nodesToAdd.length > 0 || edgesToAdd.length > 0) {
-        setCanvasLayout(prev => ({
-            nodes: [...prev.nodes, ...nodesToAdd],
-            edges: [...prev.edges, ...edgesToAdd],
-        }));
-        return;
-    }
 
-    // If no changes were made in either phase, stop expanding.
-    setIsAutoExpanding(false);
-}, [isAutoExpanding, canvasLayout, allDefinitions, parentMap, nodePositions]);
+        // Reveal parents
+        const parentIds = parentMap.get(node.id) || [];
+        const parentsToLoad = parentIds.filter(parentId => allDefinitions.has(parentId) && !nodesOnCanvas.has(parentId) && !allNewNodes.some(n => n.id === parentId));
+        
+        if (parentsToLoad.length > 0) {
+            madeChanges = true;
+            parentsToLoad.forEach((parentId, index) => {
+                allNewNodes.push({
+                    id: parentId,
+                    x: node.x - 240,
+                    y: node.y + (index * 90) - ((parentsToLoad.length - 1) * 45),
+                });
+                allNewEdges.push({ id: `${parentId}-${node.id}`, source: parentId, target: node.id });
+            });
+        }
+    });
+
+    if (madeChanges) {
+        setCanvasLayout(prev => ({
+            nodes: [...prev.nodes, ...allNewNodes],
+            edges: [...prev.edges, ...allNewEdges],
+        }));
+    } else {
+        setIsAutoExpanding(false); // Stop when a full pass results in no new nodes
+    }
+  }, [isAutoExpanding, canvasLayout, allDefinitions, parentMap, setCanvasLayout]);
+
 
   const getNodeStatus = useCallback((defId: string, category: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -527,6 +515,9 @@ function CanvasPageContent() {
                     const potentialParents = parentMap.get(node.id) || [];
                     const hasUnloadedParent = potentialParents.some(parentId => allDefinitions.has(parentId) && !nodePositions.has(parentId));
                     const canRevealParents = hasUnloadedParent;
+                    
+                    const isRootNode = !(parentMap.get(node.id) || []).some(parentId => nodePositions.has(parentId));
+
 
                     return (
                       <DraggableNode
@@ -543,6 +534,8 @@ function CanvasPageContent() {
                         isHovered={connectingFrom === node.id}
                         canExpandChildren={canExpandChildren}
                         canRevealParents={canRevealParents}
+                        onExpandAll={handleExpandAll}
+                        isRootNode={isRootNode}
                       />
                     );
                   })}
