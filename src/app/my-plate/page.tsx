@@ -130,6 +130,7 @@ function MyPlatePageContent() {
     allUpskillLogs,
     topicGoals, 
     deepWorkDefinitions, 
+    upskillDefinitions,
     workoutMode, 
     workoutPlans, 
     exerciseDefinitions,
@@ -567,3 +568,5 @@ export default function MyPlatePage() {
         </AuthGuard>
     )
 }
+
+    
