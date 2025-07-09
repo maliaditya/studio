@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo } from 'react';
@@ -6,8 +5,8 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AlertCircle, ArrowDown, ArrowUp, BarChart3, TrendingUp, TrendingDown, CheckCircle2, PauseCircle, Calendar } from 'lucide-react';
-import { differenceInDays, subDays, format, parseISO, addDays, differenceInYears } from 'date-fns';
-import type { DatedWorkout, WeightLog, TopicGoal } from '@/types/workout';
+import { differenceInDays, subDays, format, parseISO, addDays, differenceInYears, addWeeks, getISOWeekYear, setISOWeek, startOfISOWeek } from 'date-fns';
+import type { DatedWorkout, WeightLog, TopicGoal, ExerciseDefinition } from '@/types/workout';
 
 const InsightCard = ({
   icon,
@@ -140,31 +139,61 @@ const messageTemplates = {
     "At age {{age}}, you're building habits that will compound for decades. Keep investing in yourself, {{username}}.",
     "Think about where you want to be at age {{next_age}}. The work you're doing now is paving that path.",
     "Every hour you invest in your skills at {{age}} is a massive leverage point for your future. Great work.",
-  ]
+  ],
+  life_perspective_weight: [
+    "{{username}}, at your current pace, you could reach your weight goal of {{goalWeight}} kg/lb around age {{projectedAge}}. Imagine the shape you'll be in!",
+    "Your dedication to fitness is clear. If you stay on this path, you're projected to hit your weight goal at age {{projectedAge}}. Future you will be grateful.",
+    "Keep up the great work, {{username}}. Reaching your fitness goal by age {{projectedAge}} is an incredible investment in your long-term health and vitality."
+  ],
+  life_perspective_intention: [
+    "Your vision for '{{intentionName}}' is taking shape. At this rate, you could complete it by age {{projectedAge}}. What will you build next?",
+    "{{username}}, you're on track to bring your intention '{{intentionName}}' to life around age {{projectedAge}}. That's a huge milestone to look forward to.",
+    "The work you're putting in now on '{{intentionName}}' will pay off. Your projected completion is at age {{projectedAge}}. Keep executing the vision."
+  ],
+  life_perspective_skill: [
+    "Mastering '{{topicName}}' is a marathon, not a sprint. At this pace, you're set to reach your learning goal by age {{projectedAge}}, {{username}}.",
+    "Keep investing in your knowledge, {{username}}. You're projected to achieve your learning goal for '{{topicName}}' around age {{projectedAge}}.",
+    "Your commitment to learning '{{topicName}}' is impressive. Hitting your goal by age {{projectedAge}} will unlock incredible new opportunities."
+  ],
 };
 
 // Helper to select a random message and personalize it
 const getRandomMessage = (
     category: keyof typeof messageTemplates, 
-    context: { username?: string | null; age?: number | null } = {}
+    context: Record<string, any> = {}
 ) => {
   const messages = messageTemplates[category];
+  if (!messages) return '';
   let message = messages[Math.floor(Math.random() * messages.length)];
   
-  if (context.username) {
-      message = message.replace(/{{username}}/g, `<b>${context.username}</b>`);
-  }
-  if (context.age) {
-      message = message.replace(/{{age}}/g, context.age.toString());
-      message = message.replace(/{{next_age}}/g, (context.age + 1).toString());
-  }
+  Object.keys(context).forEach(key => {
+    const value = context[key];
+    if (value !== null && value !== undefined) {
+      if (key === 'username' || category.startsWith('life_perspective')) {
+        message = message.replace(new RegExp(`{{${key}}}`, 'g'), `<b>${value}</b>`);
+      } else {
+        message = message.replace(new RegExp(`{{${key}}}`, 'g'), value.toString());
+      }
+    }
+  });
 
   return message;
 };
 
 
 const MotivationPageContent = () => {
-  const { currentUser, dateOfBirth, allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, weightLogs, goalWeight, topicGoals } = useAuth();
+  const { 
+    currentUser, 
+    dateOfBirth, 
+    allDeepWorkLogs, 
+    allUpskillLogs, 
+    allWorkoutLogs, 
+    weightLogs, 
+    goalWeight, 
+    topicGoals,
+    deepWorkDefinitions,
+    upskillDefinitions
+  } = useAuth();
   
   const userContext = useMemo(() => {
     const age = dateOfBirth ? differenceInYears(new Date(), parseISO(dateOfBirth)) : null;
@@ -194,8 +223,7 @@ const MotivationPageContent = () => {
     const getLatestWeight = (logs: WeightLog[], endDate: Date) => {
         const relevantLogs = logs.filter(log => {
             const [year, weekNum] = log.date.split('-W');
-            const logDate = new Date(`${year}-01-01`);
-            logDate.setDate(logDate.getDate() + (parseInt(weekNum) - 1) * 7);
+            const logDate = startOfISOWeek(setISOWeek(new Date(parseInt(year), 0, 4), parseInt(weekNum)));
             return logDate <= endDate;
         });
         return relevantLogs.sort((a,b) => a.date.localeCompare(b.date)).pop();
@@ -265,6 +293,98 @@ const MotivationPageContent = () => {
       weight: { current: latestWeight?.weight || 0, prev: prevWeightLog?.weight || 0 },
     };
   }, [allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, weightLogs, topicGoals]);
+
+  const lifePerspectiveInsight = useMemo(() => {
+    if (!userContext.age || !dateOfBirth) return getRandomMessage('age_related', userContext);
+    
+    // 1. Weight Goal Projection
+    if (goalWeight && weightLogs.length >= 2) {
+      const sortedLogs = weightLogs.map(log => {
+        const [year, weekNum] = log.date.split('-W');
+        return { ...log, dateObj: startOfISOWeek(setISOWeek(new Date(parseInt(year), 0, 4), parseInt(weekNum))) };
+      }).sort((a,b) => a.dateObj.getTime() - b.dateObj.getTime());
+      
+      const lastLog = sortedLogs[sortedLogs.length - 1];
+      const weightToChange = goalWeight - lastLog.weight;
+
+      if (Math.abs(weightToChange) > 0.1) {
+        const changes = sortedLogs.map((log, i) => i > 0 ? log.weight - sortedLogs[i-1].weight : null).filter((c): c is number => c !== null);
+        let rate = changes.length > 0 ? changes.reduce((a, b) => a + b, 0) / changes.length : 0;
+        if (weightToChange < 0 && rate >= 0) rate = -0.5;
+        if (weightToChange > 0 && rate <= 0) rate = 0.25;
+
+        if (Math.abs(rate) > 0.01) {
+          const weeksToGo = Math.ceil(Math.abs(weightToChange / rate));
+          const projectedDate = addWeeks(lastLog.dateObj, weeksToGo);
+          const projectedAge = differenceInYears(projectedDate, parseISO(dateOfBirth));
+          return getRandomMessage('life_perspective_weight', { ...userContext, goalWeight, projectedAge });
+        }
+      }
+    }
+    
+    // 2. Deep Work Intention Projection
+    const linkedDeepWorkChildIds = new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || []));
+    const intentions = deepWorkDefinitions.filter(def => {
+        const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
+        const isChild = linkedDeepWorkChildIds.has(def.id);
+        return isParent && !isChild;
+    });
+
+    if (intentions.length > 0) {
+      const mainIntention = intentions[0]; // Simplistic: pick the first one
+      let totalEstimatedHours = 0;
+      let totalLoggedHours = 0;
+      const descendentIds = new Set<string>();
+      const queue = [mainIntention.id];
+      const visited = new Set<string>();
+      
+      while(queue.length > 0) {
+          const id = queue.shift()!;
+          if(visited.has(id)) continue;
+          visited.add(id);
+          descendentIds.add(id);
+          const def = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === id);
+          if (def) {
+              (def.linkedDeepWorkIds || []).forEach(childId => queue.push(childId));
+              (def.linkedUpskillIds || []).forEach(childId => queue.push(childId));
+          }
+      }
+
+      descendentIds.forEach(id => {
+          const def = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === id);
+          if(def) totalEstimatedHours += def.estimatedHours || 0;
+
+          allDeepWorkLogs.forEach(log => log.exercises.forEach(ex => {
+              if (ex.definitionId === id) totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0) / 60;
+          }));
+          allUpskillLogs.forEach(log => log.exercises.forEach(ex => {
+              if (ex.definitionId === id) totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0) / 60;
+          }));
+      });
+      
+      const remainingHours = totalEstimatedHours - totalLoggedHours;
+      const avgDailyProductiveHours = (weeklyStats.deepWork.current + weeklyStats.upskill.current) / 7;
+      
+      if (remainingHours > 0 && avgDailyProductiveHours > 0) {
+          const daysToCompletion = Math.ceil(remainingHours / avgDailyProductiveHours);
+          const projectedDate = addDays(new Date(), daysToCompletion);
+          const projectedAge = differenceInYears(projectedDate, parseISO(dateOfBirth));
+          return getRandomMessage('life_perspective_intention', { ...userContext, intentionName: mainIntention.name, projectedAge });
+      }
+    }
+
+    // 3. Upskill Goal Projection
+    if (weeklyStats.upskill.currentDaysToGoal !== null) {
+      const topicName = Object.keys(topicGoals)[0]; // Pick first goal
+      const projectedDate = addDays(new Date(), weeklyStats.upskill.currentDaysToGoal);
+      const projectedAge = differenceInYears(projectedDate, parseISO(dateOfBirth));
+      return getRandomMessage('life_perspective_skill', { ...userContext, topicName, projectedAge });
+    }
+
+    // Fallback
+    return getRandomMessage('age_related', userContext);
+  }, [userContext, dateOfBirth, goalWeight, weightLogs, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, topicGoals, weeklyStats]);
+
 
   const getInsight = (
     current: number,
@@ -349,7 +469,6 @@ const MotivationPageContent = () => {
   const upskillInsight = getUpskillInsight(weeklyStats.upskill.current, weeklyStats.upskill.prev, weeklyStats.upskill.currentDaysToGoal, weeklyStats.upskill.prevDaysToGoal);
   const workoutInsight = getInsight(weeklyStats.workouts.current, weeklyStats.workouts.prev, 7);
   const weightInsight = getWeightInsight(weeklyStats.weight.current, weeklyStats.weight.prev, goalWeight);
-  const ageInsight = userContext.age ? { trend: 'stable' as const, message: getRandomMessage('age_related', userContext) } : null;
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -399,15 +518,15 @@ const MotivationPageContent = () => {
           unit="kg/lb"
           message={weightInsight.message}
         />
-        {ageInsight && (
+        {userContext.age && (
            <InsightCard
                 icon={<Calendar />}
                 title="Life Perspective"
-                trend={ageInsight.trend}
+                trend={'stable'}
                 currentValue={userContext.age || 0}
                 previousValue={userContext.age || 0}
                 unit="years old"
-                message={ageInsight.message}
+                message={lifePerspectiveInsight}
             />
         )}
       </div>
@@ -422,3 +541,4 @@ export default function MotivationPage() {
     </AuthGuard>
   );
 }
+
