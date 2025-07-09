@@ -133,9 +133,7 @@ function CanvasPageContent() {
   const [isDragging, setIsDragging] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const transformWrapperRef = useRef<ReactZoomPanPinchRef>(null);
-
-  const [expansionQueue, setExpansionQueue] = useState<string[]>([]);
-  const prevNodesRef = useRef<CanvasNode[]>([]);
+  const [isAutoExpanding, setIsAutoExpanding] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -156,7 +154,7 @@ function CanvasPageContent() {
       y: canvasRect ? (canvasRect.height / 2) - 50 : 200,
     };
     setCanvasLayout(prev => ({ ...prev, nodes: [...prev.nodes, newNode] }));
-    setExpansionQueue([newNode.id]); // Kick off the auto-expansion
+    setIsAutoExpanding(true);
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -307,52 +305,43 @@ function CanvasPageContent() {
         }
     }
   }, [allDefinitions, canvasLayout.nodes, canvasLayout.edges, nodePositions, parentMap, setCanvasLayout]);
-
-    // This effect processes one node from the queue at a time.
+  
     useEffect(() => {
-        if (expansionQueue.length === 0) return;
-
-        const nodeId = expansionQueue[0];
-        if (!canvasLayout.nodes.some(n => n.id === nodeId)) return;
-
-        const definition = allDefinitions.get(nodeId);
-        if (!definition) {
-            setExpansionQueue(q => q.slice(1));
-            return;
-        }
-
-        const potentialParents = parentMap.get(nodeId) || [];
-        const hasUnloadedParent = potentialParents.some(parentId => allDefinitions.has(parentId) && !nodePositions.has(parentId));
-        if (hasUnloadedParent) {
-            handleRevealParents(nodeId);
-            return; // Exit and wait for re-render, this effect will run again for the same node.
-        }
-
-        const allChildIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
-        const hasUnloadedChild = allChildIds.some(childId => allDefinitions.has(childId) && !nodePositions.has(childId));
-        if (hasUnloadedChild) {
-            handleExpandChildren(nodeId);
-            return; // Exit and wait for re-render.
-        }
-        
-        // If there's nothing left to expand for this node, remove it from the queue and process the next one.
-        setExpansionQueue(q => q.slice(1));
-
-    }, [expansionQueue, canvasLayout.nodes, allDefinitions, parentMap, nodePositions, handleExpandChildren, handleRevealParents]);
-
-    // This effect adds newly created nodes to the end of the queue.
-    useEffect(() => {
-        const prevNodeIds = new Set(prevNodesRef.current.map(n => n.id));
-        if (canvasLayout.nodes.length > prevNodesRef.current.length) {
-            const newNodes = canvasLayout.nodes.filter(n => !prevNodeIds.has(n.id));
-            const newNodeIds = newNodes.map(n => n.id);
-            
-            if (newNodeIds.length > 0) {
-              setExpansionQueue(q => [...q, ...newNodeIds]);
+        if (!isAutoExpanding) return;
+    
+        const expandableNode = canvasLayout.nodes.find(node => {
+            const definition = allDefinitions.get(node.id);
+            if (!definition) return false;
+    
+            const allChildIds = [
+                ...(definition.linkedDeepWorkIds || []),
+                ...(definition.linkedUpskillIds || []),
+                ...(definition.linkedResourceIds || []),
+            ];
+            const hasUnloadedChild = allChildIds.some(childId => allDefinitions.has(childId) && !nodePositions.has(childId));
+            if (hasUnloadedChild) return true;
+    
+            const potentialParents = parentMap.get(node.id) || [];
+            const hasUnloadedParent = potentialParents.some(parentId => allDefinitions.has(parentId) && !nodePositions.has(parentId));
+            return hasUnloadedParent;
+        });
+    
+        if (expandableNode) {
+            // Preferentially reveal parents first, as this establishes the hierarchy upwards.
+            const definition = allDefinitions.get(expandableNode.id)!;
+            const potentialParents = parentMap.get(expandableNode.id) || [];
+            const hasUnloadedParent = potentialParents.some(parentId => allDefinitions.has(parentId) && !nodePositions.has(parentId));
+    
+            if (hasUnloadedParent) {
+                handleRevealParents(expandableNode.id);
+            } else {
+                handleExpandChildren(expandableNode.id);
             }
+        } else {
+            // No more nodes to expand, stop the process.
+            setIsAutoExpanding(false);
         }
-        prevNodesRef.current = canvasLayout.nodes;
-    }, [canvasLayout.nodes]);
+    }, [isAutoExpanding, canvasLayout.nodes, allDefinitions, nodePositions, parentMap, handleExpandChildren, handleRevealParents]);
 
   const getNodeStatus = useCallback((defId: string, category: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -455,7 +444,7 @@ function CanvasPageContent() {
             <TransformWrapper 
                 ref={transformWrapperRef} 
                 disabled={isDragging} 
-                wheel={{ step: 0.1, ctrlToPan: true }}
+                wheel={{ step: 0.1, activationKeys: ['Control'] }}
                 panning={{ allowLeftClick: false, allowRightClick: false, allowMiddleClick: false }}
             >
                 <Controls/>
