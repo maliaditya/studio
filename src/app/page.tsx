@@ -8,7 +8,7 @@ import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subYea
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { MindMapViewer } from '@/components/MindMapViewer';
 
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
@@ -457,7 +457,7 @@ function HomePageContent() {
                       break;
                   }
               }
-              let requiredDailyRate = (milestoneStats?.progressNeeded || remainingProgress) / (milestoneStats?.daysRemaining || completionStats?.daysRemaining || 1);
+              let requiredDailyRate = (milestoneStats?.progressNeeded || remainingProgress) / (milestoneStats?.daysRemaining || 1);
               const remainingForToday = Math.max(0, requiredDailyRate - todaysProgress);
               topicStats[topic] = {
                   topic, speed, unit: `${goal.goalType}/hr`, totalProgress: Math.round(totalProgress), remainingProgress: Math.round(remainingProgress),
