@@ -136,7 +136,7 @@ export function LifePerspectiveCard({
           if (projectedCompletedObjectives.length === 0 && projectedCompletedActions.length === 0) {
               intentionNarrative = `Your intention, '${activeIntention.name}', is a significant undertaking. The momentum you build this week will be crucial.`;
               if (topLevelObjectives.length > 0) {
-                  intentionNarrative += ` The objectives you can complete this week are: <b>${topLevelObjectives.slice(0, 3).join(', ')}</b>.`;
+                  intentionNarrative += ` The objective for this week is: <b>${topLevelObjectives[0]}</b>.`;
               }
           }
           deepWorkNarrative = intentionNarrative;
