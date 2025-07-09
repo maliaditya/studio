@@ -48,13 +48,13 @@ export function LifePerspectiveCard({
         }
         const scoreWithWorkouts = Math.round((currentScore + (1 - currentScore) * 0.3) * 100);
         
-        let weightNarrative = `Your energy is steady. Your health score could climb to ${scoreWithWorkouts}%.`;
+        let healthNarrative = `Your energy is steady. Your health score could climb to ${scoreWithWorkouts}%.`;
         if (weightLogs.length >= 2 && weeklyStats.weight.prev > 0) {
             const weeklyChange = weeklyStats.weight.current - weeklyStats.weight.prev;
             const nextWeekWeight = weeklyStats.weight.current + weeklyChange;
-            weightNarrative += ` After hitting <b>${weeklyStats.weight.prev.toFixed(1)} kg/lb</b> last week, you're now at <b>${weeklyStats.weight.current.toFixed(1)} kg/lb</b>. At this rate, you are projected to be around <b>${nextWeekWeight.toFixed(1)} kg/lb</b> next week.`
+            healthNarrative += ` After hitting <b>${weeklyStats.weight.prev.toFixed(1)} kg/lb</b> last week, you're now at <b>${weeklyStats.weight.current.toFixed(1)} kg/lb</b>. At this rate, you are projected to be around <b>${nextWeekWeight.toFixed(1)} kg/lb</b> next week.`
         } else if (weightLogs.length >= 2) {
-             weightNarrative += ` You're currently at <b>${weeklyStats.weight.current.toFixed(1)} kg/lb</b>. Keep logging to see your projection.`
+             healthNarrative += ` You're currently at <b>${weeklyStats.weight.current.toFixed(1)} kg/lb</b>. Keep logging to see your projection.`
         }
 
         // Deep Work & Productivity
