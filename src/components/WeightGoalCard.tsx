@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight, Workflow, Lightbulb } from 'lucide-react';
+import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight, Workflow, Lightbulb, GitMerge } from 'lucide-react';
 import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition } from '@/types/workout';
 import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +21,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
 import Link from 'next/link';
 import { IntentionDetailModal } from './IntentionDetailModal';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { MindMapViewer } from './MindMapViewer';
+
 
 interface WeightGoalCardProps {
   weightLogs: WeightLog[];
@@ -83,6 +86,8 @@ export function WeightGoalCard({
     const [weightView, setWeightView] = useState<'chart' | 'details'>('details');
     const [mainView, setMainView] = useState<'weight' | 'diet' | 'projects'>('weight');
     const [selectedIntention, setSelectedIntention] = useState<ExerciseDefinition | null>(null);
+    const [mindMapRootId, setMindMapRootId] = useState<string | null>(null);
+    const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
 
     const [heightInput, setHeightInput] = useState('');
     const [dobInput, setDobInput] = useState<Date | undefined>();
@@ -389,6 +394,11 @@ export function WeightGoalCard({
         toast({ title: "Details Saved", description: "Your profile has been updated." });
     };
 
+    const handleIntentionClick = (intention: ExerciseDefinition) => {
+        setMindMapRootId(intention.id);
+        setIsMindMapModalOpen(true);
+    };
+
     const renderTopicList = (topics: { name: string, count: number }[], type: 'deep-work' | 'upskill') => {
         if (topics.length === 0) {
           return (
@@ -439,7 +449,7 @@ export function WeightGoalCard({
               <li key={intention.id}>
                 <button
                     className="w-full text-left"
-                    onClick={() => setSelectedIntention(intention)}
+                    onClick={() => handleIntentionClick(intention)}
                 >
                   <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors">
                     <div className="flex items-center gap-3 min-w-0">
@@ -448,7 +458,7 @@ export function WeightGoalCard({
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <span className="text-sm text-muted-foreground truncate" title={intention.category}>{intention.category}</span>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                      <GitMerge className="h-4 w-4 text-muted-foreground" />
                     </div>
                   </div>
                 </button>
@@ -779,6 +789,14 @@ export function WeightGoalCard({
                 onOpenChange={() => setSelectedIntention(null)}
                 intention={selectedIntention}
             />
+            <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
+                <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+                    <DialogHeader className="sr-only">
+                        <DialogTitle>Intention Mind Map</DialogTitle>
+                    </DialogHeader>
+                    <MindMapViewer rootFocusAreaId={mindMapRootId} showControls={false} />
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
