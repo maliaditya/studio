@@ -54,7 +54,7 @@ export function LifePerspectiveCard({
             const nextWeekWeight = lastTwoLogs[1].weight + weeklyChange;
             weightNarrative = `Your discipline is paying off; you are projected to be around <b>${nextWeekWeight.toFixed(1)} kg/lb</b>.`
         }
-        const healthNarrative = `Your energy is steady. With consistent effort this week, your health score could climb to ${scoreWithWorkouts}%. ${weightNarrative}`;
+        const healthNarrative = `Your energy is steady. Your health score could climb to ${scoreWithWorkouts}%. ${weightNarrative}`;
 
         // Deep Work & Productivity
         const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
@@ -78,7 +78,7 @@ export function LifePerspectiveCard({
         
         const avgDailyProductiveHours = (weeklyStats.deepWork.current + weeklyStats.upskill.current) / 7;
         let workBudget = avgDailyProductiveHours > 0 ? avgDailyProductiveHours * 7 : 7;
-        const productiveHoursNarrative = `Based on your current rhythm, you're on track to invest around <b>${(avgDailyProductiveHours * 7).toFixed(1)} hours</b> this week, averaging <b>${avgDailyProductiveHours.toFixed(1)} hours</b> each day.`
+        const productiveHoursNarrative = `Last week you invested <b>${(weeklyStats.deepWork.prev + weeklyStats.upskill.prev).toFixed(1)} hours</b>. Based on your current rhythm, you're on track to invest around <b>${(avgDailyProductiveHours * 7).toFixed(1)} hours</b> this week, averaging <b>${avgDailyProductiveHours.toFixed(1)} hours</b> each day.`
         
         if (activeIntention) {
           const allTasks: { id: string; name: string; type: 'Objective' | 'Action'; remainingHours: number }[] = [];
@@ -165,7 +165,7 @@ export function LifePerspectiveCard({
         ];
         const affirmation = affirmations[Math.floor(Math.random() * affirmations.length)];
         
-        const alternatePath = `You break the rhythm, the story ends. You wake up where you had started, free to believe whatever you want. But if you stay on this path, you stay in Wonderland, and I show you how deep the rabbit hole goes.`;
+        const alternatePath = "You break the rhythm, the story ends. You wake up where you had started, free to believe whatever you want. But if you stay on this path, you stay in Wonderland, and I show you how deep the rabbit hole goes.";
 
         return { header, healthNarrative, productiveHoursNarrative, deepWorkNarrative, upskillNarrative, affirmation, alternatePath };
 
