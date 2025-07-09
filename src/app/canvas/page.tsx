@@ -135,7 +135,7 @@ function CanvasPageContent() {
   const transformWrapperRef = useRef<ReactZoomPanPinchRef>(null);
 
   const [expansionQueue, setExpansionQueue] = useState<string[]>([]);
-  const prevNodesRef = useRef(canvasLayout.nodes);
+  const prevNodesRef = useRef<CanvasNode[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -308,12 +308,12 @@ function CanvasPageContent() {
     }
   }, [allDefinitions, canvasLayout.nodes, canvasLayout.edges, nodePositions, parentMap, setCanvasLayout]);
 
-    // NEW useEffect for triggering expansion
+    // This effect processes one node from the queue at a time.
     useEffect(() => {
         if (expansionQueue.length === 0) return;
 
         const nodeId = expansionQueue[0];
-        if (!canvasLayout.nodes.some(n => n.id === nodeId)) return; // Wait until node is rendered
+        if (!canvasLayout.nodes.some(n => n.id === nodeId)) return;
 
         const definition = allDefinitions.get(nodeId);
         if (!definition) {
@@ -323,36 +323,36 @@ function CanvasPageContent() {
 
         const potentialParents = parentMap.get(nodeId) || [];
         const hasUnloadedParent = potentialParents.some(parentId => allDefinitions.has(parentId) && !nodePositions.has(parentId));
-
         if (hasUnloadedParent) {
             handleRevealParents(nodeId);
-            return;
+            return; // Exit and wait for re-render, this effect will run again for the same node.
         }
 
         const allChildIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
         const hasUnloadedChild = allChildIds.some(childId => allDefinitions.has(childId) && !nodePositions.has(childId));
-
         if (hasUnloadedChild) {
             handleExpandChildren(nodeId);
-            return;
+            return; // Exit and wait for re-render.
         }
         
-        // No more expansions for this node, move to the next in queue
+        // If there's nothing left to expand for this node, remove it from the queue and process the next one.
         setExpansionQueue(q => q.slice(1));
 
     }, [expansionQueue, canvasLayout.nodes, allDefinitions, parentMap, nodePositions, handleExpandChildren, handleRevealParents]);
 
-    // NEW useEffect for updating queue after expansion
+    // This effect adds newly created nodes to the end of the queue.
     useEffect(() => {
-        const prevNodes = prevNodesRef.current;
-        if (canvasLayout.nodes.length > prevNodes.length && expansionQueue.length > 0) {
-            const newNodes = canvasLayout.nodes.filter(n => !prevNodes.some(pn => pn.id === n.id));
+        const prevNodeIds = new Set(prevNodesRef.current.map(n => n.id));
+        if (canvasLayout.nodes.length > prevNodesRef.current.length) {
+            const newNodes = canvasLayout.nodes.filter(n => !prevNodeIds.has(n.id));
             const newNodeIds = newNodes.map(n => n.id);
             
-            setExpansionQueue(q => [...q.slice(1), ...newNodeIds]);
+            if (newNodeIds.length > 0) {
+              setExpansionQueue(q => [...q, ...newNodeIds]);
+            }
         }
         prevNodesRef.current = canvasLayout.nodes;
-    }, [canvasLayout.nodes, expansionQueue]);
+    }, [canvasLayout.nodes]);
 
   const getNodeStatus = useCallback((defId: string, category: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
