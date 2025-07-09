@@ -65,6 +65,86 @@ const InsightCard = ({
   );
 };
 
+// --- Message Banks ---
+const messageTemplates = {
+  burnout: [
+    "You're putting in incredible hours! This is amazing, but make sure you're taking time to rest and avoid burnout. Sustainable progress is key.",
+    "An absolutely massive week! Your dedication is off the charts. Remember, even the sharpest axe needs sharpening. Don't forget to schedule some downtime.",
+    "Incredible intensity! You're crushing it. Just a friendly reminder to listen to your body and mind. Rest is as important as the work itself for long-term gains.",
+  ],
+  up: [
+    "Fantastic momentum! You've significantly increased your focus this week. Keep up the great work and build on this success.",
+    "What a surge in productivity! Whatever you changed this week is clearly working. Let's keep that fire going.",
+    "Great job stepping up the intensity. You're making serious progress. Channel this energy into next week.",
+  ],
+  down: [
+    "It looks like things slowed down a bit this week. That's completely normal. Was this intentional rest, or did something get in the way? Reflect and adjust for next week.",
+    "A quieter week. A great opportunity to plan your comeback and set a clear, achievable goal for the upcoming days.",
+    "Every system needs downtime. If this was a planned break, great. If not, what's one small step you can take tomorrow to get back on track?",
+  ],
+  stable: [
+    "Solid and steady! Consistency is the foundation of all progress. You're building strong habits. Keep it going!",
+    "Another consistent week in the books. This is how long-term goals are achieved. Well done.",
+    "You're in the groove. Maintaining this level of effort is a skill in itself. Keep executing.",
+  ],
+  new_week: [
+    "It's a fresh start. What's one small step you can take today to get the ball rolling?",
+    "A new week begins. What's your number one priority? Let's get after it.",
+  ],
+  goal_getting_closer: [
+      "Incredible work! You've cut down your estimated time to goal. Your consistent effort is paying off, and the finish line is getting closer.",
+      "Your goal is approaching faster than ever! This week's progress has significantly shortened your timeline. Keep up this amazing pace!",
+      "Momentum is on your side. You've made great strides and your projected completion date has moved up. This is what progress looks like!",
+  ],
+  goal_slipping: [
+      "Your projected goal date has slipped a bit. It's a good time to reassess. Was this a planned rest, or is it time to recommit to the original pace?",
+      "It looks like the timeline for your goal has extended. Let's analyze what happened this week and see how we can get back on the fast track.",
+      "A small course correction might be needed. Your goal date has moved further out. Let's set a clear intention for this week to close the gap.",
+  ],
+  goal_stable: [
+      "You're on a steady path to your goal. Your consistent effort is maintaining your projected completion date. Keep up the great work!",
+      "Steady as she goes! You're right on track with your projection. Consistency is your superpower right now.",
+      "Excellent. You're meeting the required pace to stay on schedule for your goal. Keep this rhythm going.",
+  ],
+  weight_loss_good: [
+      "Excellent! You're moving closer to your weight loss goal. Your hard work in diet and exercise is clearly paying off.",
+      "Great progress! You're successfully trending towards your target weight. Keep up the consistent effort.",
+  ],
+  weight_loss_bad: [
+      "A small bump in the road. This week's trend is moving away from your weight loss goal. Let's review the plan and get back on track.",
+      "It looks like we're slightly off course from your weight loss target. A minor adjustment to your diet or activity could make all the difference this week.",
+  ],
+  weight_gain_good: [
+      "Great! This is solid progress towards your weight gain goal. Stay consistent with your nutrition and training!",
+      "Nice work. You're successfully adding mass and moving towards your target. Keep fueling your body for growth.",
+  ],
+  weight_gain_bad: [
+      "This week's trend is moving away from your weight gain goal. Consider a small, consistent calorie surplus to get back on track.",
+      "A slight dip this week. Let's ensure you're getting enough fuel to support your muscle-building goals.",
+  ],
+  weight_stable: [
+      "Your weight is stable, holding steady. This is great for maintenance. Keep your habits strong.",
+      "Consistency is key, and you're maintaining your current weight perfectly. Well done.",
+  ],
+  weight_no_goal_up: [
+      "Your weight trended up this week. Is this aligned with your current, unstated goals? A good time to reflect.",
+  ],
+  weight_no_goal_down: [
+      "Your weight trended down this week. Great progress if you're aiming for weight loss! If not, now is a good time to assess.",
+  ],
+  weight_no_data: [
+      "Log your weight for two consecutive weeks to start seeing trends and get personalized feedback.",
+      "Track your weight weekly to unlock insights and feedback on your progress.",
+  ]
+};
+
+// Helper to select a random message
+const getRandomMessage = (category: keyof typeof messageTemplates) => {
+  const messages = messageTemplates[category];
+  return messages[Math.floor(Math.random() * messages.length)];
+};
+
+
 const MotivationPageContent = () => {
   const { allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, weightLogs, goalWeight, topicGoals } = useAuth();
 
@@ -169,21 +249,21 @@ const MotivationPageContent = () => {
     burnoutThreshold: number
   ): { trend: 'up' | 'down' | 'stable' | 'burnout'; message: string } => {
     if (current > burnoutThreshold) {
-      return { trend: 'burnout', message: "You're putting in incredible hours! This is amazing, but make sure you're taking time to rest and avoid burnout. Sustainable progress is key." };
+      return { trend: 'burnout', message: getRandomMessage('burnout') };
     }
     if (current > prev * 1.2) { // More than 20% increase
-      return { trend: 'up', message: "Fantastic momentum! You've significantly increased your focus this week. Keep up the great work and build on this success." };
+      return { trend: 'up', message: getRandomMessage('up') };
     }
     if (current < prev * 0.8) { // More than 20% decrease
       if (prev > 0) {
-        return { trend: 'down', message: "It looks like things slowed down a bit this week. That's completely normal. Was this intentional rest, or did something get in the way? Reflect and adjust for next week." };
+        return { trend: 'down', message: getRandomMessage('down') };
       }
-      return { trend: 'down', message: "A quieter week. A great opportunity to plan your comeback and set clear goals for the upcoming days." };
+      return { trend: 'down', message: getRandomMessage('new_week') };
     }
     if (current > 0) {
-      return { trend: 'stable', message: "Solid and steady! Consistency is the foundation of all progress. You're building strong habits. Keep it going!" };
+      return { trend: 'stable', message: getRandomMessage('stable') };
     }
-    return { trend: 'stable', message: "It's a fresh start. What's one small step you can take today to get the ball rolling?" };
+    return { trend: 'stable', message: getRandomMessage('new_week') };
   };
 
   const getUpskillInsight = (
@@ -195,14 +275,12 @@ const MotivationPageContent = () => {
     // Check for goal projection changes first
     if (currentDays !== null && prevDays !== null) {
       if (currentDays < prevDays) {
-        const daysReduced = prevDays - currentDays;
-        return { trend: 'up' as const, message: `Incredible work! You've cut your estimated time to goal by ${daysReduced} day${daysReduced > 1 ? 's' : ''}. Your goal is getting closer!` };
+        return { trend: 'up' as const, message: getRandomMessage('goal_getting_closer') };
       }
       if (currentDays > prevDays) {
-        const daysIncreased = currentDays - prevDays;
-        return { trend: 'down' as const, message: `Your projected goal date has slipped by ${daysIncreased} day${daysIncreased > 1 ? 's' : ''}. Let's refocus this week to get back on track!` };
+        return { trend: 'down' as const, message: getRandomMessage('goal_slipping') };
       }
-      return { trend: 'stable' as const, message: `You're on a steady path to your goal. Your consistent effort is maintaining your projected completion date. Keep it up!` };
+      return { trend: 'stable' as const, message: getRandomMessage('goal_stable') };
     }
 
     // Fallback to simple hour comparison if projections aren't available
@@ -211,11 +289,11 @@ const MotivationPageContent = () => {
 
   const getWeightInsight = (current: number, prev: number, goal: number | null): { trend: 'up' | 'down' | 'stable'; message: string } => {
     if (current === 0 || prev === 0) {
-        return { trend: 'stable', message: "Log your weight for two consecutive weeks to start seeing trends and get personalized feedback." };
+        return { trend: 'stable', message: getRandomMessage('weight_no_data') };
     }
     const change = current - prev;
     if (Math.abs(change) < 0.2) {
-        return { trend: 'stable', message: `Your weight is stable, holding at ${current.toFixed(1)} kg/lb. Consistency is paying off. Keep your habits strong.` };
+        return { trend: 'stable', message: getRandomMessage('weight_stable') };
     }
   
     const wentUp = change > 0;
@@ -227,21 +305,21 @@ const MotivationPageContent = () => {
       const goalIsHigher = goal > prev;
   
       if (goalIsLower) { // Goal is to lose weight
-        if (wentDown) return { trend: 'down', message: `Excellent! You dropped from ${prev.toFixed(1)} to ${current.toFixed(1)} kg/lb, moving you closer to your goal. Keep up the great work!` };
-        if (wentUp) return { trend: 'up', message: `Your weight went up from ${prev.toFixed(1)} to ${current.toFixed(1)} kg/lb. This is a small step away from your weight loss goal. Let's refocus on the plan this week!` };
+        if (wentDown) return { trend: 'down', message: getRandomMessage('weight_loss_good') };
+        if (wentUp) return { trend: 'up', message: getRandomMessage('weight_loss_bad') };
       }
       if (goalIsHigher) { // Goal is to gain weight
-        if (wentUp) return { trend: 'up', message: `Great! You went from ${prev.toFixed(1)} to ${current.toFixed(1)} kg/lb. This is solid progress towards your weight gain goal. Stay consistent!` };
-        if (wentDown) return { trend: 'down', message: `Your weight dropped from ${prev.toFixed(1)} to ${current.toFixed(1)} kg/lb. This is moving away from your goal. Consider a small calorie surplus to get back on track.` };
+        if (wentUp) return { trend: 'up', message: getRandomMessage('weight_gain_good') };
+        if (wentDown) return { trend: 'down', message: getRandomMessage('weight_gain_bad') };
       }
     }
   
     // No goal set (generic feedback)
     if (wentUp) {
-        return { trend: 'up', message: `Your weight went from ${prev.toFixed(1)} to ${current.toFixed(1)} kg/lb. Is this aligned with your current goals? Review your diet and activity.` };
+        return { trend: 'up', message: getRandomMessage('weight_no_goal_up') };
     }
     // wentDown
-    return { trend: 'down', message: `Your weight dropped from ${prev.toFixed(1)} to ${current.toFixed(1)} kg/lb. Great progress if you're aiming for weight loss! If not, consider a small calorie surplus.` };
+    return { trend: 'down', message: getRandomMessage('weight_no_goal_down') };
   };
 
   const deepWorkInsight = getInsight(weeklyStats.deepWork.current, weeklyStats.deepWork.prev, 35); // 5h/day burnout
