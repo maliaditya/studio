@@ -182,4 +182,3 @@ export function LifePerspectiveCard({
         </Card>
     );
 }
-
