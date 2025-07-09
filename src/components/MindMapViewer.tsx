@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -136,6 +137,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     const [nodes, setNodes] = useState<Map<string, { x: number; y: number }>>(new Map());
     const [edges, setEdges] = useState<Set<string>>(new Set());
     const [isDragging, setIsDragging] = useState(false);
+    const [isAutoExpanding, setIsAutoExpanding] = useState(false);
 
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -171,6 +173,63 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         setNodes(new Map([[trueRootId, { x: 100, y: 300 }]]));
         setEdges(new Set());
     }, [rootId, deepWorkDefinitions]);
+
+    const handleExpandAll = useCallback(() => {
+        setIsAutoExpanding(true);
+    }, []);
+
+    useEffect(() => {
+        if (!isAutoExpanding) return;
+    
+        let madeChanges = false;
+        const newNodesMap = new Map<string, { x: number; y: number }>();
+        const newEdgesSet = new Set<string>();
+        const nodesOnCanvas = new Set(nodes.keys());
+    
+        const nodesToScan = Array.from(nodes.entries());
+    
+        nodesToScan.forEach(([nodeId, pos]) => {
+            const definition = allDefinitions.get(nodeId);
+            if (!definition) return;
+    
+            // Expand children
+            const childIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
+            const childrenToLoad = childIds.filter(childId => allDefinitions.has(childId) && !nodesOnCanvas.has(childId) && !newNodesMap.has(childId));
+            
+            if (childrenToLoad.length > 0) {
+                madeChanges = true;
+                childrenToLoad.forEach((childId, index) => {
+                    newNodesMap.set(childId, {
+                        x: pos.x + 240, 
+                        y: pos.y + (index * 90) - ((childrenToLoad.length - 1) * 45),
+                    });
+                    newEdgesSet.add(`${nodeId}-${childId}`);
+                });
+            }
+    
+            // Reveal parents
+            const parentIds = parentMap.get(nodeId) || [];
+            const parentsToLoad = parentIds.filter(parentId => allDefinitions.has(parentId) && !nodesOnCanvas.has(parentId) && !newNodesMap.has(parentId));
+            
+            if (parentsToLoad.length > 0) {
+                madeChanges = true;
+                parentsToLoad.forEach((parentId, index) => {
+                    newNodesMap.set(parentId, {
+                        x: pos.x - 240,
+                        y: pos.y + (index * 90) - ((parentsToLoad.length - 1) * 45),
+                    });
+                    newEdgesSet.add(`${parentId}-${nodeId}`);
+                });
+            }
+        });
+    
+        if (madeChanges) {
+            setNodes(prev => new Map([...prev, ...newNodesMap]));
+            setEdges(prev => new Set([...prev, ...newEdgesSet]));
+        } else {
+            setIsAutoExpanding(false);
+        }
+    }, [isAutoExpanding, nodes, edges, allDefinitions, parentMap]);
 
     const handleExpandChildren = useCallback((nodeId: string) => {
         const currentNodeDef = allDefinitions.get(nodeId);
@@ -209,7 +268,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
             
             parentsToLoad.forEach((parentId, index) => {
                 newNodes.set(parentId, {
-                    x: currentNodePos.x + 240,
+                    x: currentNodePos.x - 240,
                     y: currentNodePos.y + (index * 90) - ((parentsToLoad.length - 1) * 45),
                 });
                 newEdges.add(`${parentId}-${nodeId}`);
@@ -301,6 +360,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                         const allChildIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
                         const canExpandChildren = allChildIds.some(childId => allDefinitions.has(childId) && !nodes.has(childId));
                         const canRevealParents = (parentMap.get(nodeId) || []).some(parentId => allDefinitions.has(parentId) && !nodes.has(parentId));
+                        const isRootNode = !(parentMap.get(nodeId) || []).some(parentId => nodes.has(parentId));
                         
                         return (
                             <PositionedNode
@@ -310,8 +370,10 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                                 definition={definition}
                                 onExpandChildren={() => handleExpandChildren(nodeId)}
                                 onRevealParents={() => handleRevealParents(nodeId)}
+                                onExpandAll={handleExpandAll}
                                 canExpandChildren={canExpandChildren}
                                 canRevealParents={canRevealParents}
+                                isRootNode={isRootNode}
                                 status={getNodeStatus(nodeId)}
                                 upskillDefinitions={upskillDefinitions}
                             />
@@ -323,12 +385,12 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     );
 };
 
-const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealParents, canExpandChildren, canRevealParents, status, upskillDefinitions }: any) => {
+const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealParents, canExpandChildren, canRevealParents, onExpandAll, isRootNode, status, upskillDefinitions }: any) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: nodeId });
     const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
     
     const getIcon = () => {
-        if (definition.category === 'Learning Task' || (upskillDefinitions && upskillDefinitions.some((d: any) => d.id === definition.id))) {
+        if (definition.category === 'Learning Task' || upskillDefinitions.some((d: any) => d.id === definition.id)) {
           const isParent = (definition.linkedUpskillIds?.length ?? 0) > 0 || (definition.linkedResourceIds?.length ?? 0) > 0;
           if(isParent) return <Flashlight className="h-4 w-4 text-amber-500" />;
           return <Frame className="h-4 w-4 text-blue-500" />;
@@ -356,6 +418,11 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
                     </div>
                 </div>
                 <CardContent className="p-2 border-t flex justify-end gap-1">
+                    {isRootNode && (
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onExpandAll}>
+                            <Expand className="h-4 w-4 text-purple-500" />
+                        </Button>
+                    )}
                     {canExpandChildren && (
                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onExpandChildren}>
                             <GitBranch className="h-4 w-4 text-green-500" />
@@ -798,4 +865,3 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     </>
   );
 }
-
