@@ -215,7 +215,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                 madeChanges = true;
                 parentsToLoad.forEach((parentId, index) => {
                     newNodesMap.set(parentId, {
-                        x: pos.x - 240,
+                        x: pos.x + 240,
                         y: pos.y + (index * 90) - ((parentsToLoad.length - 1) * 45),
                     });
                     newEdgesSet.add(`${parentId}-${nodeId}`);
@@ -268,7 +268,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
             
             parentsToLoad.forEach((parentId, index) => {
                 newNodes.set(parentId, {
-                    x: currentNodePos.x - 240,
+                    x: currentNodePos.x + 240,
                     y: currentNodePos.y + (index * 90) - ((parentsToLoad.length - 1) * 45),
                 });
                 newEdges.add(`${parentId}-${nodeId}`);
@@ -497,7 +497,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
 
   const allTopics = useMemo(() => {
     const productAndServiceTopics = Object.keys(deepWorkTopicMetadata).sort();
-    const hasBundles = deepWorkDefinitions.some(def => Array.isArray(def.focusAreaIds));
+    const hasBundles = deepWorkDefinitions.some(def => def.focusAreaIds && def.focusAreaIds.length > 0);
     const hasResources = resourceFolders.length > 0;
     
     const availableTopics = [];
@@ -763,7 +763,81 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
   }, []);
   
   const renderNode = (node: MindMapNode, level: number, parentNode?: MindMapNode) => {
-    // ... same as before
+    const isNodeCollapsed = collapsedNodes.has(node.id);
+    const isHighlighted = hoveredNodeIds.has(node.id);
+
+    const getIcon = () => {
+        if (node.category === 'Learning Task') return <BookCopy className="h-4 w-4" />;
+        if (node.category === 'Release') return <Calendar className="h-4 w-4" />;
+        if (node.category === 'product' || node.category === 'service') return <Package className="h-4 w-4" />;
+        if (node.category === 'System') return <GitMerge className="h-4 w-4" />;
+        if (node.category === 'System Branch') return <Rocket className="h-4 w-4" />;
+        if (node.category === 'Social') {
+            if (node.name === 'X/Twitter') return <TwitterIcon className="h-4 w-4" />;
+            if (node.name === 'LinkedIn') return <Linkedin className="h-4 w-4" />;
+            if (node.name === 'Dev.to') return <DevToIcon className="h-4 w-4" />;
+        }
+        if (node.category === 'Content Bundle') return <Share2 className="h-4 w-4" />;
+        if (node.category === 'Branding') return <Share2 className="h-4 w-4" />;
+        if (node.category === 'Resource') return <Globe className="h-4 w-4" />;
+        if (node.category === 'Folder') return <Folder className="h-4 w-4" />;
+        if (node.category === 'FocusArea') {
+            const isIntention = (node.linkedDeepWorkIds?.length ?? 0) > 0 || (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+            return isIntention ? <Workflow className="h-4 w-4" /> : <Briefcase className="h-4 w-4" />;
+        }
+        return <Briefcase className="h-4 w-4" />;
+    };
+    
+    const nodeStatus = {
+        isScheduled: scheduledTaskInfo.has(node.definitionId),
+        isLogged: loggedTaskInfo.has(node.definitionId),
+        isPending: pendingTaskInfo.has(node.definitionId),
+        isPastLogged: pastLoggedTaskInfo.has(node.definitionId),
+    };
+    const nodeClass = cn(
+        "p-2 rounded-md shadow-md transition-all duration-300 relative border-l-4",
+        isHighlighted ? 'bg-primary/10' : 'bg-card',
+        nodeStatus.isLogged ? "border-green-500" :
+        nodeStatus.isScheduled ? "border-yellow-500" :
+        nodeStatus.isPending ? "border-orange-500" :
+        "border-transparent"
+    );
+
+    const isExpandable = node.children.length > 0;
+
+    return (
+        <div key={node.id} className="flex items-center" onMouseEnter={() => handleNodeMouseEnter(node)} onMouseLeave={handleNodeMouseLeave}>
+            <div className="flex flex-col items-center">
+                <div className={nodeClass}>
+                    <div className="flex items-center gap-2">
+                        {isExpandable && (
+                            <button onClick={() => toggleNode(node.id)} className="p-1 rounded-full hover:bg-muted -ml-1">
+                                {isNodeCollapsed ? <PlusCircle className="h-4 w-4" /> : <MinusCircle className="h-4 w-4" />}
+                            </button>
+                        )}
+                        <span className="text-primary">{getIcon()}</span>
+                        <div className='flex flex-col text-left'>
+                            <span className="font-semibold text-sm text-foreground truncate">{node.name}</span>
+                            <span className="text-xs text-muted-foreground">{node.category}</span>
+                        </div>
+                    </div>
+                </div>
+                {!isNodeCollapsed && node.children.length > 0 && <div className="h-4 w-px bg-border" />}
+            </div>
+            {!isNodeCollapsed && node.children.length > 0 && (
+                <div className="pl-6 flex flex-col justify-center">
+                    {node.children.map((child, index) => (
+                        <div key={child.id} className="flex items-center relative">
+                            <div className="w-6 h-px bg-border absolute left-0" />
+                            {index > 0 && <div className="h-full w-px bg-border absolute left-0 -top-1/2" />}
+                            {index < node.children.length - 1 && <div className="h-full w-px bg-border absolute left-0 top-1/2" />}
+                            <div className="pl-6">{renderNode(child, level + 1, node)}</div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
   };
   
   if (rootFocusAreaId) {
