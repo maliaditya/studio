@@ -79,8 +79,9 @@ export function LifePerspectiveCard({
         if (activeIntention) {
           const allTasks: { id: string; name: string; type: 'Objective' | 'Action'; remainingHours: number }[] = [];
           const visited = new Set<string>();
+          const topLevelObjectives: string[] = [];
 
-          const recurse = (nodeId: string) => {
+          const recurse = (nodeId: string, isTopLevel: boolean) => {
               if (visited.has(nodeId)) return;
               visited.add(nodeId);
 
@@ -91,16 +92,24 @@ export function LifePerspectiveCard({
               const remainingHours = (node.estimatedHours || 0) - getLoggedHours(node.id, 'deepwork');
               
               if (remainingHours > 0.01) {
+                const taskType = isParent ? 'Objective' : 'Action';
                 allTasks.push({
                     id: node.id,
                     name: node.name,
-                    type: isParent ? 'Objective' : 'Action',
+                    type: taskType,
                     remainingHours,
                 });
+                if (isTopLevel && taskType === 'Objective') {
+                    topLevelObjectives.push(node.name);
+                }
               }
-              if (isParent) (node.linkedDeepWorkIds || []).forEach(childId => recurse(childId));
+
+              if (isParent) (node.linkedDeepWorkIds || []).forEach(childId => recurse(childId, false));
           };
-          recurse(activeIntention.id);
+          
+          (activeIntention.linkedDeepWorkIds || []).forEach(id => recurse(id, true));
+          
+          allTasks.sort((a, b) => a.remainingHours - b.remainingHours); // Prioritize smaller tasks
 
           const avgDailyProductiveHours = (weeklyStats.deepWork.current + weeklyStats.upskill.current) / 7;
           let workBudget = avgDailyProductiveHours > 0 ? avgDailyProductiveHours * 7 : 7;
@@ -126,6 +135,9 @@ export function LifePerspectiveCard({
           }
           if (projectedCompletedObjectives.length === 0 && projectedCompletedActions.length === 0) {
               intentionNarrative = `Your intention, '${activeIntention.name}', is a significant undertaking. The momentum you build this week will be crucial.`;
+              if (topLevelObjectives.length > 0) {
+                  intentionNarrative += ` The objectives you can complete this week are: <b>${topLevelObjectives.slice(0, 3).join(', ')}</b>.`;
+              }
           }
           deepWorkNarrative = intentionNarrative;
         }
