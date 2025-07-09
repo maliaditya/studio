@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -7,11 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle, Link as LinkIcon, Save, MinusCircle, Folder, ExternalLink, Lightbulb, Focus, Frame, Flashlight } from 'lucide-react';
-import type { ExerciseDefinition, Release, DatedWorkout, ActivityType as ActivityTypeType, Resource, ResourceFolder as ResourceFolderType } from '@/types/workout'; // Renaming imported ActivityType to avoid conflict with lucide-react
+import type { ExerciseDefinition, Release, DatedWorkout, ActivityType as ActivityTypeType, Resource, ResourceFolder as ResourceFolderType, DailySchedule } from '@/types/workout'; // Renaming imported ActivityType to avoid conflict with lucide-react
 import { TransformWrapper, TransformComponent, type ReactZoomPanPinchRef, useControls } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { format, parseISO, differenceInDays } from 'date-fns';
+import { format, parseISO, differenceInDays, isBefore, startOfToday, isAfter } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
@@ -131,7 +130,15 @@ interface MindMapViewerProps {
 
 // Sub-component for the new interactive map
 const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
-    const { deepWorkDefinitions, upskillDefinitions, resources, schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs } = useAuth();
+    const { 
+        deepWorkDefinitions, 
+        upskillDefinitions, 
+        resources, 
+        schedule, 
+        allUpskillLogs, 
+        allDeepWorkLogs, 
+        brandingLogs 
+    } = useAuth();
     const transformWrapperRef = useRef<ReactZoomPanPinchRef>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -372,16 +379,94 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     };
 
     const getNodeStatus = useCallback((defId: string) => {
-        const todayKey = format(new Date(), 'yyyy-MM-dd');
-        const scheduledInfo = schedule[todayKey] ? Object.values(schedule[todayKey]).flat().find(act => act.taskIds?.some(tid => tid.startsWith(defId))) : undefined;
+        const today = startOfToday();
+        const todayKey = format(today, 'yyyy-MM-dd');
+        let status: any = { 
+            isLoggedToday: false, 
+            isScheduledToday: false, 
+            isPending: false, 
+            isPastLogged: false,
+            text: null,
+            subtext: null
+        };
+        const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
+    
+        // 1. Check for today's logs (Green Fill)
+        const deepWorkLogToday = allDeepWorkLogs.find(log => log.date === todayKey)?.exercises.find(ex => ex.definitionId === defId);
+        const upskillLogToday = allUpskillLogs.find(log => log.date === todayKey)?.exercises.find(ex => ex.definitionId === defId);
+        const brandingLogToday = brandingLogs.find(log => log.date === todayKey)?.exercises.find(ex => ex.definitionId === defId);
+        const isLoggedToday = (deepWorkLogToday?.loggedSets.length ?? 0) > 0 || (upskillLogToday?.loggedSets.length ?? 0) > 0 || (brandingLogToday?.loggedSets.length ?? 0) > 0;
+    
+        if (isLoggedToday) {
+            const deepWorkTime = deepWorkLogToday?.loggedSets.reduce((sum, set) => sum + set.weight, 0) || 0;
+            const upskillTime = upskillLogToday?.loggedSets.reduce((sum, set) => sum + set.reps, 0) || 0;
+            const totalTimeToday = deepWorkTime + upskillTime;
+            status.isLoggedToday = true;
+            status.text = 'Completed';
+            status.subtext = totalTimeToday > 0 ? `${totalTimeToday} min today` : `Today`;
+            return status;
+        }
+    
+        // 2. Check if scheduled for today (Yellow Fill)
+        if (schedule[todayKey]) {
+            for (const slotName of slotOrder) {
+                const activity = (schedule[todayKey][slotName] || []).find(act => !act.completed && act.taskIds?.some(tid => tid.startsWith(defId)));
+                if (activity) {
+                    status.isScheduledToday = true;
+                    status.text = 'Scheduled Today';
+                    status.subtext = `in ${slotName}`;
+                    return status;
+                }
+            }
+        }
         
-        const deepWorkLog = allDeepWorkLogs.find(log => log.date === todayKey)?.exercises.find(ex => ex.definitionId === defId);
-        const upskillLog = allUpskillLogs.find(log => log.date === todayKey)?.exercises.find(ex => ex.definitionId === defId);
-        const brandingLog = brandingLogs.find(log => log.date === todayKey)?.exercises.find(ex => ex.definitionId === defId);
-
-        const isLoggedToday = (deepWorkLog?.loggedSets.length ?? 0) > 0 || (upskillLog?.loggedSets.length ?? 0) > 0 || (brandingLog?.loggedSets.length ?? 0) > 0;
-        
-        return { isLoggedToday, isScheduledToday: !!scheduledInfo, isPending: false };
+        // 3. Check for pending from past (Orange Fill)
+        let mostRecentPendingDate: Date | null = null;
+        for (const dateKey in schedule) {
+            if (isBefore(parseISO(dateKey), today)) {
+                const isPendingInDay = Object.values(schedule[dateKey]).flat().some(activity => 
+                    !activity.completed && activity.taskIds?.some(tid => tid.startsWith(defId))
+                );
+                if (isPendingInDay) {
+                    const scheduleDate = parseISO(dateKey);
+                    if (!mostRecentPendingDate || isAfter(scheduleDate, mostRecentPendingDate)) {
+                        mostRecentPendingDate = scheduleDate;
+                    }
+                }
+            }
+        }
+    
+        if (mostRecentPendingDate) {
+            const daysAgo = differenceInDays(today, mostRecentPendingDate);
+            status.isPending = true;
+            status.text = 'Pending';
+            status.subtext = `${daysAgo} day${daysAgo > 1 ? 's' : ''} ago`;
+            return status;
+        }
+    
+        // 4. Check for past completions (Green Border)
+        let mostRecentCompletionDate: Date | null = null;
+        const allLogs = [...allDeepWorkLogs, ...allUpskillLogs, ...brandingLogs];
+        for (const log of allLogs) {
+            if (log.date < todayKey) {
+                const hasCompleted = log.exercises.some(ex => ex.definitionId === defId && ex.loggedSets.length > 0);
+                if (hasCompleted) {
+                    const completionDate = parseISO(log.date);
+                     if (!mostRecentCompletionDate || isAfter(completionDate, mostRecentCompletionDate)) {
+                        mostRecentCompletionDate = completionDate;
+                    }
+                }
+            }
+        }
+    
+        if (mostRecentCompletionDate) {
+            status.isPastLogged = true;
+            status.text = 'Completed';
+            status.subtext = format(mostRecentCompletionDate, 'MMM d, yyyy');
+            return status;
+        }
+    
+        return status;
     }, [schedule, allDeepWorkLogs, allUpskillLogs, brandingLogs]);
     
     const getPath = (sourcePos: {x:number, y:number}, targetPos: {x:number, y:number}) => {
@@ -499,7 +584,13 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
         >
-            <Card className={cn("shadow-lg hover:shadow-xl transition-shadow border-2", status.isLoggedToday && "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700", status.isScheduledToday && !status.isLoggedToday && "bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700")}>
+            <Card className={cn(
+                "shadow-lg hover:shadow-xl transition-shadow border-2",
+                status.isLoggedToday && "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700",
+                status.isScheduledToday && "bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700",
+                status.isPending && "bg-orange-100 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700",
+                status.isPastLogged && "border-green-500 dark:border-green-400"
+            )}>
                 <div className="p-2 cursor-grab" {...listeners} {...attributes}>
                     <div className="flex items-center gap-2">
                         {getIcon()}
@@ -507,7 +598,14 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
                             {definition.name}
                         </p>
                     </div>
+                     {status.text && (
+                        <div className="mt-1.5 text-xs">
+                            <p className="font-semibold text-foreground">{status.text}</p>
+                            <p className="text-muted-foreground">{status.subtext}</p>
+                        </div>
+                    )}
                 </div>
+                
                 <CardContent className="p-2 border-t flex justify-end gap-1">
                     {isRootNode && (
                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onExpandAll}>
@@ -751,9 +849,11 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
   
   const pendingTaskInfo = useMemo(() => {
       const pending = new Set<string>();
-      Object.keys(schedule).forEach(date => {
-          if (date < format(new Date(), 'yyyy-MM-dd')) {
-              Object.values(schedule[date]).flat().forEach(activity => {
+      const today = startOfToday();
+      Object.keys(schedule).forEach(dateKey => {
+          const scheduleDate = parseISO(dateKey);
+          if (isBefore(scheduleDate, today)) {
+              Object.values(schedule[dateKey]).flat().forEach(activity => {
                   if (!activity.completed && activity.taskIds) {
                       activity.taskIds.forEach(taskId => {
                         let defId: string | undefined;
