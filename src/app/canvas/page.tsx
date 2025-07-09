@@ -399,7 +399,12 @@ function CanvasPageContent() {
 
       <main ref={canvasRef} className="flex-grow relative bg-muted/30 overflow-hidden">
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <TransformWrapper ref={transformWrapperRef} disabled={isDragging} wheel={{ step: 0.1 }} >
+            <TransformWrapper 
+                ref={transformWrapperRef} 
+                disabled={isDragging} 
+                wheel={{ step: 0.1 }}
+                panning={{ allowLeftClick: false, allowRightClick: false, allowMiddleClick: false }}
+            >
                 <Controls/>
                 <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '200vw', height: '200vh' }}>
                   <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
