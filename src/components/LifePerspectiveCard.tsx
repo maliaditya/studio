@@ -56,7 +56,7 @@ export function LifePerspectiveCard({
         }
         const healthNarrative = `Your energy is steady. With consistent effort this week, your health score could climb to ${scoreWithWorkouts}%. ${weightNarrative}`;
 
-        // Deep Work
+        // Deep Work & Productivity
         const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
         const linkedDeepWorkChildIds = new Set(deepWorkDefinitions.flatMap(def => def.linkedDeepWorkIds || []));
         const activeIntention = deepWorkDefinitions.find(def => ((def.linkedDeepWorkIds?.length ?? 0) > 0) && !linkedDeepWorkChildIds.has(def.id));
@@ -75,6 +75,10 @@ export function LifePerspectiveCard({
           });
           return totalMinutes / 60;
         };
+        
+        const avgDailyProductiveHours = (weeklyStats.deepWork.current + weeklyStats.upskill.current) / 7;
+        let workBudget = avgDailyProductiveHours > 0 ? avgDailyProductiveHours * 7 : 7;
+        const productiveHoursNarrative = `Based on your current rhythm, you're on track to invest around <b>${(avgDailyProductiveHours * 7).toFixed(1)} hours</b> this week, averaging <b>${avgDailyProductiveHours.toFixed(1)} hours</b> each day.`
         
         if (activeIntention) {
           const allTasks: { id: string; name: string; type: 'Objective' | 'Action'; remainingHours: number }[] = [];
@@ -109,11 +113,8 @@ export function LifePerspectiveCard({
           
           (activeIntention.linkedDeepWorkIds || []).forEach(id => recurse(id, true));
           
-          allTasks.sort((a, b) => a.remainingHours - b.remainingHours); // Prioritize smaller tasks
+          allTasks.sort((a, b) => a.remainingHours - b.remainingHours);
 
-          const avgDailyProductiveHours = (weeklyStats.deepWork.current + weeklyStats.upskill.current) / 7;
-          let workBudget = avgDailyProductiveHours > 0 ? avgDailyProductiveHours * 7 : 7;
-          
           const projectedCompletedObjectives: string[] = [];
           const projectedCompletedActions: string[] = [];
           
@@ -166,7 +167,7 @@ export function LifePerspectiveCard({
         
         const alternatePath = `You break the rhythm, the story ends. You wake up where you had started, free to believe whatever you want. But if you stay on this path, you stay in Wonderland, and I show you how deep the rabbit hole goes.`;
 
-        return { header, healthNarrative, deepWorkNarrative, upskillNarrative, affirmation, alternatePath };
+        return { header, healthNarrative, productiveHoursNarrative, deepWorkNarrative, upskillNarrative, affirmation, alternatePath };
 
     }, [allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, topicGoals, weeklyStats, weightLogs, currentUser]);
 
@@ -177,6 +178,7 @@ export function LifePerspectiveCard({
             </CardHeader>
             <CardContent className="space-y-4">
                 <p className="text-foreground leading-relaxed" dangerouslySetInnerHTML={{ __html: lifePerspectiveNarrative.healthNarrative}} />
+                <p className="text-foreground leading-relaxed" dangerouslySetInnerHTML={{ __html: lifePerspectiveNarrative.productiveHoursNarrative}} />
                 {lifePerspectiveNarrative.deepWorkNarrative && (
                     <p className="text-foreground leading-relaxed" dangerouslySetInnerHTML={{ __html: lifePerspectiveNarrative.deepWorkNarrative}} />
                 )}
