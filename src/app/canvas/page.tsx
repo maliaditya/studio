@@ -405,7 +405,7 @@ function CanvasPageContent() {
             <TransformWrapper 
                 ref={transformWrapperRef} 
                 disabled={isDragging} 
-                wheel={{ step: 0.1 }}
+                wheel={{ step: 0.1, ctrlToPan: true }}
                 panning={{ allowLeftClick: false, allowRightClick: false, allowMiddleClick: false }}
             >
                 <Controls/>
