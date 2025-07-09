@@ -238,22 +238,45 @@ function MyPlatePageContent() {
     const healthAlternative = `But if you skip this week's rhythm, the score may drift down to ${scoreWithoutWorkouts}%.`;
 
     // Deep Work
-    const linkedChildIds = new Set(deepWorkDefinitions.flatMap(def => def.linkedDeepWorkIds || []));
-    const activeIntention = deepWorkDefinitions.find(def => ((def.linkedDeepWorkIds?.length ?? 0) > 0) && !linkedChildIds.has(def.id));
+    const linkedDeepWorkChildIds = new Set(deepWorkDefinitions.flatMap(def => def.linkedDeepWorkIds || []));
+    const activeIntention = deepWorkDefinitions.find(def => ((def.linkedDeepWorkIds?.length ?? 0) > 0) && !linkedDeepWorkChildIds.has(def.id));
     let deepWorkNarrative = "";
+
     if (activeIntention) {
-        let totalLoggedHours = 0;
-        const descendantIds = new Set<string>();
+        const allDescendantIds = new Set<string>();
         const queue: string[] = [activeIntention.id];
+        const visited = new Set<string>();
+        
         while(queue.length > 0) {
             const id = queue.shift()!;
-            if (descendantIds.has(id)) continue;
-            descendantIds.add(id);
+            if (visited.has(id)) continue;
+            visited.add(id);
+            allDescendantIds.add(id);
             const def = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === id);
-            if(def) { (def.linkedDeepWorkIds || []).forEach(childId => queue.push(childId)); (def.linkedUpskillIds || []).forEach(childId => queue.push(childId)); }
+            if(def) { 
+                (def.linkedDeepWorkIds || []).forEach(childId => queue.push(childId));
+                (def.linkedUpskillIds || []).forEach(childId => queue.push(childId));
+            }
         }
-        allDeepWorkLogs.forEach(log => {log.exercises.forEach(ex => {if(descendantIds.has(ex.definitionId)) totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0) / 60})});
-        allUpskillLogs.forEach(log => {log.exercises.forEach(ex => {if(descendantIds.has(ex.definitionId)) totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0) / 60})});
+        
+        let totalLoggedHours = 0;
+        allDescendantIds.forEach(id => {
+            allDeepWorkLogs.forEach(log => {
+                log.exercises.forEach(ex => {
+                    if(ex.definitionId === id) {
+                        totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0) / 60;
+                    }
+                });
+            });
+            allUpskillLogs.forEach(log => {
+                log.exercises.forEach(ex => {
+                    if(ex.definitionId === id) {
+                        totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0) / 60;
+                    }
+                });
+            });
+        });
+        
         const avgDailyProductiveHours = (weeklyStats.deepWork.current + weeklyStats.upskill.current) / 7;
         const projectedHours = totalLoggedHours + (avgDailyProductiveHours * 7);
         deepWorkNarrative = `Your intention, '${activeIntention.name}', is beginning to take shape. You now stand at ${projectedHours.toFixed(0)} hours—clarity is emerging.`;
@@ -283,7 +306,7 @@ function MyPlatePageContent() {
     
     return { header, healthNarrative, deepWorkNarrative, upskillNarrative, healthAlternative, affirmation };
 
-  }, [allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, topicGoals, weeklyStats, weightLogs]);
+  }, [allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, topicGoals, weeklyStats, weightLogs, dateOfBirth, currentUser]);
 
   const getInsight = (current: number, prev: number, burnoutThreshold: number): { trend: 'up' | 'down' | 'stable' | 'burnout'; message: string } => { if (current > burnoutThreshold) return { trend: 'burnout', message: getRandomMessage('burnout', userContext) }; if (current > prev * 1.2) return { trend: 'up', message: getRandomMessage('up', userContext) }; if (current < prev * 0.8) { if (prev > 0) return { trend: 'down', message: getRandomMessage('down', userContext) }; return { trend: 'down', message: getRandomMessage('new_week', userContext) }; } if (current > 0) return { trend: 'stable', message: getRandomMessage('stable', userContext) }; return { trend: 'stable', message: getRandomMessage('new_week', userContext) }; };
   const getUpskillInsight = (currentHours: number, prevHours: number, currentDays: number | null, prevDays: number | null) => { if (currentDays !== null && prevDays !== null) { if (currentDays < prevDays) return { trend: 'up' as const, message: getRandomMessage('goal_getting_closer', userContext) }; if (currentDays > prevDays) return { trend: 'down' as const, message: getRandomMessage('goal_slipping', userContext) }; return { trend: 'stable' as const, message: getRandomMessage('goal_stable', userContext) }; } return getInsight(currentHours, prevHours, 28); };
