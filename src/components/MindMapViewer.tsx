@@ -256,33 +256,18 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                     const [idA, posA] = nodeArray[i];
                     const [idB, posB] = nodeArray[j];
     
-                    const dx = posA.x - posB.x;
-                    const dy = posA.y - posB.y;
-                    
-                    const overlapX = (CARD_WIDTH + 20) - Math.abs(dx);
-                    const overlapY = (CARD_HEIGHT + VERTICAL_SPACING) - Math.abs(dy);
+                    const overlapX = (CARD_WIDTH + 20) - Math.abs(posA.x - posB.x);
+                    const overlapY = (CARD_HEIGHT + VERTICAL_SPACING) - Math.abs(posA.y - posB.y);
     
                     if (overlapX > 0 && overlapY > 0) {
                         changed = true;
-                        
-                        if (overlapX < overlapY) { // Push horizontally
-                            const pushX = overlapX / 2;
-                            if (posA.x < posB.x) {
-                                posA.x -= pushX;
-                                posB.x += pushX;
-                            } else {
-                                posA.x += pushX;
-                                posB.x -= pushX;
-                            }
-                        } else { // Push vertically
-                             const pushY = overlapY / 2;
-                             if (posA.y < posB.y) {
-                                posA.y -= pushY;
-                                posB.y += pushY;
-                            } else {
-                                posA.y += pushY;
-                                posB.y -= pushY;
-                            }
+                        const pushY = overlapY / 2;
+                        if (posA.y < posB.y) {
+                            posA.y -= pushY;
+                            posB.y += pushY;
+                        } else {
+                            posA.y += pushY;
+                            posB.y -= pushY;
                         }
                     }
                 }
@@ -766,19 +751,12 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
 
     const getIcon = () => {
         switch (nodeType) {
-            // Deep Work
             case 'Intention': return <Lightbulb className="h-4 w-4 text-amber-500" />;
-            case 'Objective':
-                const isUpskill = upskillDefinitions.some((d: any) => d.id === definition.id);
-                return isUpskill ? <Focus className="h-4 w-4 text-green-500" /> : <Flag className="h-4 w-4 text-green-500" />;
             case 'Action': return <Bolt className="h-4 w-4 text-blue-500" />;
-            // Upskill
             case 'Curiosity': return <Flashlight className="h-4 w-4 text-amber-500" />;
             case 'Visualization': return <Frame className="h-4 w-4 text-blue-500" />;
-            // Other
-            case 'Standalone':
-                const isUpskillStandalone = upskillDefinitions.some((d: any) => d.id === definition.id);
-                return isUpskillStandalone ? <Lightbulb className="h-4 w-4 text-purple-500" /> : <Focus className="h-4 w-4 text-purple-500" />;
+            case 'Objective': return <Flag className="h-4 w-4 text-green-500" />;
+            case 'Standalone': return <Focus className="h-4 w-4 text-purple-500" />;
             default: return <Briefcase className="h-4 w-4" />;
         }
     };
@@ -793,10 +771,10 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
         >
             <Card className={cn(
                 "shadow-lg hover:shadow-xl transition-shadow border-2",
-                status.isLoggedToday && "bg-green-100 border-green-300 dark:bg-transparent dark:border-green-700",
-                status.isScheduledToday && "dark:bg-transparent border-yellow-300 dark:border-yellow-700",
-                status.isPending && "dark:bg-transparent border-orange-300 dark:border-orange-700",
-                status.isPastLogged && "border-green-500 dark:border-green-400"
+                status.isLoggedToday && "bg-green-100 dark:bg-transparent border-green-500 dark:border-green-400",
+                status.isScheduledToday && "bg-yellow-100 dark:bg-transparent border-yellow-500 dark:border-yellow-400",
+                status.isPending && "bg-orange-100 dark:bg-transparent border-orange-400 dark:border-orange-500",
+                status.isPastLogged && !status.isLoggedToday && "border-green-500 dark:border-green-400"
             )}>
                 <div className="p-2 cursor-grab" {...listeners} {...attributes}>
                     <div className="flex items-center justify-between">
@@ -1180,9 +1158,17 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     const isNodeCollapsed = collapsedNodes.has(node.id);
     const isHighlighted = hoveredNodeIds.has(node.id);
     const linkedDeepWorkChildIds = new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || []));
+    const linkedUpskillChildIds = new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []));
 
     const getIcon = () => {
-        if (node.category === 'Learning Task') return <BookCopy className="h-4 w-4" />;
+        if (node.category === 'Learning Task') {
+            const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+            const isChild = linkedUpskillChildIds.has(node.id);
+            if (isParent && !isChild) return <Flashlight className="h-4 w-4 text-amber-500" />; // Curiosity
+            if (isParent && isChild) return <Flag className="h-4 w-4 text-green-500" />; // Objective
+            if (!isParent && isChild) return <Frame className="h-4 w-4 text-blue-500" />; // Visualization
+            return <Focus className="h-4 w-4 text-purple-500" />; // Standalone
+        }
         if (node.category === 'Release') return <Calendar className="h-4 w-4" />;
         if (node.category === 'product' || node.category === 'service') return <Package className="h-4 w-4" />;
         if (node.category === 'System') return <GitMerge className="h-4 w-4" />;
@@ -1199,8 +1185,10 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         if (node.category === 'FocusArea') {
             const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0 || (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
             const isChild = linkedDeepWorkChildIds.has(node.id);
-            const isIntention = isParent && !isChild;
-            return isIntention ? <Workflow className="h-4 w-4" /> : <Briefcase className="h-4 w-4" />;
+            if (isParent && !isChild) return <Lightbulb className="h-4 w-4 text-amber-500" />; // Intention
+            if (isParent && isChild) return <Flag className="h-4 w-4 text-green-500" />; // Objective
+            if (!isParent && isChild) return <Bolt className="h-4 w-4 text-blue-500" />; // Action
+            return <Focus className="h-4 w-4 text-purple-500" />; // Standalone
         }
         return <Briefcase className="h-4 w-4" />;
     };
@@ -1214,9 +1202,9 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     const nodeClass = cn(
         "p-2 rounded-md shadow-md transition-all duration-300 relative border-l-4",
         isHighlighted ? 'bg-primary/10' : 'bg-card',
-        nodeStatus.isLogged ? "border-green-500" :
-        nodeStatus.isScheduled ? "bg-yellow-100/50 dark:bg-transparent border-yellow-300 dark:border-yellow-500" :
-        nodeStatus.isPending ? "bg-orange-100/50 dark:bg-transparent border-orange-300 dark:border-orange-500" :
+        nodeStatus.isLogged ? "bg-green-100 dark:bg-transparent border-green-500 dark:border-green-400" :
+        nodeStatus.isScheduled ? "bg-yellow-100 dark:bg-transparent border-yellow-500 dark:border-yellow-400" :
+        nodeStatus.isPending ? "bg-orange-100 dark:bg-transparent border-orange-400 dark:border-orange-500" :
         nodeStatus.isPastLogged ? "border-green-400" :
         "border-transparent"
     );

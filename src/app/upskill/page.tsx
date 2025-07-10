@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, GitMerge, Clock, Unlink, Flashlight, Focus, Frame, Lightbulb, PictureInPicture, GripVertical } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, GitMerge, Clock, Unlink, Flashlight, Focus, Frame, Lightbulb, PictureInPicture, GripVertical, Flag, Bolt } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -430,7 +430,15 @@ function UpskillPageContent() {
   }, [selectedSubtopic, calculateTotalEstimate]);
 
   useEffect(() => {
-    if (editingSubtopic) setEditedSubtopicData(editingSubtopic);
+    if (editingSubtopic) {
+        const hours = Math.floor((editingSubtopic.estimatedDuration || 0) / 60);
+        const minutes = (editingSubtopic.estimatedDuration || 0) % 60;
+        setEditedSubtopicData({
+            ...editingSubtopic,
+            estHours: hours > 0 ? String(hours) : '',
+            estMinutes: minutes > 0 ? String(minutes) : ''
+        });
+    }
   }, [editingSubtopic]);
 
   useEffect(() => {
@@ -866,9 +874,9 @@ function UpskillPageContent() {
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><FilterIcon className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                             <DropdownMenuCheckboxItem checked={visibilityFilters.has('curiosity')} onCheckedChange={() => handleVisibilityFilterChange('curiosity')}><Flashlight className="mr-2 h-4 w-4 text-amber-500" /><span>Curiosities</span></DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('objective')} onCheckedChange={() => handleVisibilityFilterChange('objective')}><Focus className="mr-2 h-4 w-4 text-green-500" /><span>Objectives</span></DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('objective')} onCheckedChange={() => handleVisibilityFilterChange('objective')}><Flag className="mr-2 h-4 w-4 text-green-500" /><span>Objectives</span></DropdownMenuCheckboxItem>
                             <DropdownMenuCheckboxItem checked={visibilityFilters.has('visualization')} onCheckedChange={() => handleVisibilityFilterChange('visualization')}><Frame className="mr-2 h-4 w-4 text-blue-500" /><span>Visualizations</span></DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('standalone')} onCheckedChange={() => handleVisibilityFilterChange('standalone')}><Lightbulb className="mr-2 h-4 w-4 text-purple-500" /><span>Standalone</span></DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('standalone')} onCheckedChange={() => handleVisibilityFilterChange('standalone')}><Focus className="mr-2 h-4 w-4 text-purple-500" /><span>Standalone</span></DropdownMenuCheckboxItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -935,9 +943,9 @@ function UpskillPageContent() {
                                 <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted" onContextMenu={(e) => handleSubtopicContextMenu(e, def)}>
                                     <div className="flex items-center gap-2 flex-grow min-w-0">
                                       {isCuriosity ? <Flashlight className="h-4 w-4 flex-shrink-0 text-amber-500" />
-                                       : isObjective ? <Focus className="h-4 w-4 flex-shrink-0 text-green-500" />
+                                       : isObjective ? <Flag className="h-4 w-4 flex-shrink-0 text-green-500" />
                                        : isVisualization ? <Frame className="h-4 w-4 flex-shrink-0 text-blue-500" />
-                                       : <Lightbulb className="h-4 w-4 flex-shrink-0 text-purple-500" />}
+                                       : <Focus className="h-4 w-4 flex-shrink-0 text-purple-500" />}
                                       <span className="truncate cursor-pointer" onClick={() => { setSelectedSubtopic(def); setViewMode('library'); }}>{def.name}</span>
                                       {estDuration && estDuration > 0 && <Badge variant="secondary" className="text-xs ml-auto">{formatMinutes(estDuration)}</Badge>}
                                     </div>

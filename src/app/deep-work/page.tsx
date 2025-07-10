@@ -125,7 +125,8 @@ const DraggableSubtaskItem: React.FC<{
     parentId: string;
     childName: string;
     isLogged: boolean;
-  }> = ({ childId, parentId, childName, isLogged }) => {
+    type: 'deepwork' | 'upskill';
+  }> = ({ childId, parentId, childName, isLogged, type }) => {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: `subtask-${childId}-from-${parentId}`,
     });
@@ -302,7 +303,7 @@ function LinkedUpskillCard({
                                   if (!childDef) return null;
                                   const isChildComplete = isUpskillObjectiveComplete(childId);
                                   return (
-                                    <DraggableSubtaskItem key={childId} childId={childId} parentId={upskillDef.id} childName={childDef.name} isLogged={isChildComplete} />
+                                    <DraggableSubtaskItem key={childId} childId={childId} parentId={upskillDef.id} childName={childDef.name} isLogged={isChildComplete} type="upskill" />
                                   );
                                 })}
                               </div>
@@ -338,7 +339,8 @@ function LinkedDeepWorkCard({
     handleViewProgress,
     deepWorkDefinitions,
     formatDuration,
-    calculatedEstimate
+    calculatedEstimate,
+    upskillDefinitions
 } : {
     id: string;
     deepworkDef: ExerciseDefinition;
@@ -355,6 +357,7 @@ function LinkedDeepWorkCard({
     deepWorkDefinitions: ExerciseDefinition[];
     formatDuration: (minutes: number) => string;
     calculatedEstimate: number;
+    upskillDefinitions: ExerciseDefinition[];
 }) {
     const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
@@ -370,6 +373,7 @@ function LinkedDeepWorkCard({
     const nodeType = isObjective ? 'Objective' : 'Action';
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
     const estDuration = isObjective ? calculatedEstimate : deepworkDef.estimatedDuration;
+    const hasLinkedLearning = (deepworkDef.linkedUpskillIds?.length ?? 0) > 0;
 
     const isComplete = useMemo(() => {
         if (!isObjective) return permanentlyLoggedActionIds.has(deepworkDef.id);
@@ -450,13 +454,22 @@ function LinkedDeepWorkCard({
                               if (!childDef) return null;
                               const isChildPermanentlyLogged = permanentlyLoggedActionIds.has(childDef.id);
                               return (
-                                  <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={isChildPermanentlyLogged} />
+                                  <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={isChildPermanentlyLogged} type="deepwork" />
                               );
                           })}
                       </div>
                   ) : (
                       <p className="text-sm text-muted-foreground line-clamp-2">This objective has no sub-tasks yet. Link items to it.</p>
                   )
+              ) : hasLinkedLearning ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                    {(deepworkDef.linkedUpskillIds || []).map(childId => {
+                        const childDef = upskillDefinitions.find(d => d.id === childId);
+                        if (!childDef) return null;
+                        // For display purposes, we assume linked learning is not "completable" in the same way.
+                        return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="upskill"/>;
+                    })}
+                </div>
               ) : (
                   <p className="text-sm text-muted-foreground line-clamp-2">This is a final action. You can add it to a session to log time.</p>
               )}
@@ -1400,9 +1413,14 @@ function DeepWorkPageContent() {
           return false;
         }
         
-        return true;
+        // This is the new logic to allow standalone tasks to be linked
+        const isChild = linkedDeepWorkChildIds.has(def.id);
+        const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
+        const isStandalone = !isParent && !isChild;
+
+        return isStandalone || isParent;
     });
-}, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkUpskillTopic, linkDeepWorkTopic]);
+}, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkUpskillTopic, linkDeepWorkTopic, linkedDeepWorkChildIds]);
 
 
   const handleStartEditUpskill = (def: ExerciseDefinition) => {
@@ -1988,6 +2006,7 @@ function DeepWorkPageContent() {
                                             deepWorkDefinitions={deepWorkDefinitions}
                                             formatDuration={formatDuration}
                                             calculatedEstimate={calculateTotalEstimate(deepworkDef)}
+                                            upskillDefinitions={upskillDefinitions}
                                         />
                                       );
                                     })}
