@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DndContext, useDraggable, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
 import { Progress } from './ui/progress';
+import { IntentionDetailModal } from './IntentionDetailModal';
 
 // Component-specific icons
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -786,6 +787,8 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
   const [isLinkLearningPopoverOpen, setIsLinkLearningPopoverOpen] = useState(false);
   const [linkingLearningToFocusArea, setLinkingLearningToFocusArea] = useState<MindMapNode | null>(null);
   const [editableLinkedUpskillIds, setEditableLinkedUpskillIds] = useState<string[]>([]);
+  const [selectedIntention, setSelectedIntention] = useState<ExerciseDefinition | null>(null);
+
 
   // State for inline adding
   const [inlineAddInfo, setInlineAddInfo] = useState<{ parentReleaseId: string; newFeatureName: string } | null>(null);
@@ -1096,6 +1099,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
   const renderNode = (node: MindMapNode, level: number, parentNode?: MindMapNode) => {
     const isNodeCollapsed = collapsedNodes.has(node.id);
     const isHighlighted = hoveredNodeIds.has(node.id);
+    const linkedDeepWorkChildIds = new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || []));
 
     const getIcon = () => {
         if (node.category === 'Learning Task') return <BookCopy className="h-4 w-4" />;
@@ -1113,7 +1117,9 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         if (node.category === 'Resource') return <Globe className="h-4 w-4" />;
         if (node.category === 'Folder') return <Folder className="h-4 w-4" />;
         if (node.category === 'FocusArea') {
-            const isIntention = (node.linkedDeepWorkIds?.length ?? 0) > 0 || (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+            const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0 || (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+            const isChild = linkedDeepWorkChildIds.has(node.id);
+            const isIntention = isParent && !isChild;
             return isIntention ? <Workflow className="h-4 w-4" /> : <Briefcase className="h-4 w-4" />;
         }
         return <Briefcase className="h-4 w-4" />;
@@ -1131,18 +1137,30 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         nodeStatus.isLogged ? "border-green-500" :
         nodeStatus.isScheduled ? "border-yellow-500" :
         nodeStatus.isPending ? "border-orange-500" :
+        nodeStatus.isPastLogged ? "border-green-400" :
         "border-transparent"
     );
 
     const isExpandable = node.children.length > 0;
+    
+    const handleNodeClick = () => {
+        if (node.category === 'FocusArea') {
+            const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0 || (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+            const isChild = linkedDeepWorkChildIds.has(node.id);
+            if (isParent && !isChild) {
+                const def = deepWorkDefinitions.find(d => d.id === node.id);
+                if (def) setSelectedIntention(def);
+            }
+        }
+    }
 
     return (
         <div key={node.id} className="flex items-center" onMouseEnter={() => handleNodeMouseEnter(node)} onMouseLeave={handleNodeMouseLeave}>
             <div className="flex flex-col items-center">
-                <div className={nodeClass}>
+                <div className={nodeClass} onClick={handleNodeClick}>
                     <div className="flex items-center gap-2">
                         {isExpandable && (
-                            <button onClick={() => toggleNode(node.id)} className="p-1 rounded-full hover:bg-muted -ml-1">
+                            <button onClick={(e) => { e.stopPropagation(); toggleNode(node.id); }} className="p-1 rounded-full hover:bg-muted -ml-1">
                                 {isNodeCollapsed ? <PlusCircle className="h-4 w-4" /> : <MinusCircle className="h-4 w-4" />}
                             </button>
                         )}
@@ -1271,6 +1289,11 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
             </DialogFooter>
         </DialogContent>
       </Dialog>
+      <IntentionDetailModal 
+        isOpen={!!selectedIntention} 
+        onOpenChange={() => setSelectedIntention(null)} 
+        intention={selectedIntention} 
+      />
     </>
   );
 }
