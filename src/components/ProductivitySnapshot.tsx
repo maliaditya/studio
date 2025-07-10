@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, GitMerge, LayoutDashboard } from 'lucide-react';
+import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ChartContainer } from '@/components/ui/chart';
@@ -34,11 +34,10 @@ interface ProductivitySnapshotProps {
   stats: any;
   timeAllocationData: { name: string; time: number; fill: string; }[];
   onOpenStatsModal: () => void;
-  onOpenMindMapModal: () => void;
   onOpenKanbanModal: () => void;
 }
 
-export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsModal, onOpenMindMapModal, onOpenKanbanModal }: ProductivitySnapshotProps) {
+export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsModal, onOpenKanbanModal }: ProductivitySnapshotProps) {
   const router = useRouter();
   const [isAddFeatureModalOpen, setIsAddFeatureModalOpen] = useState(false);
   const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service' } | null>(null);
@@ -68,10 +67,6 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             <Button variant="outline" size="icon" onClick={onOpenKanbanModal}>
               <LayoutDashboard className="h-4 w-4" />
               <span className="sr-only">Open Kanban Board</span>
-            </Button>
-            <Button variant="outline" size="icon" onClick={onOpenMindMapModal}>
-              <GitMerge className="h-4 w-4" />
-              <span className="sr-only">Open Strategic Mind Map</span>
             </Button>
             <Button variant="outline" size="icon" onClick={onOpenStatsModal}>
               <BarChart3 className="h-4 w-4" />

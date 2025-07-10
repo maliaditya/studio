@@ -383,35 +383,40 @@ function HomePageContent() {
       };
 
       const calculateTotalLoggedMinutesForFocusArea = (focusAreaDef: ExerciseDefinition | undefined) => {
-        let totalMinutes = 0;
         if (!focusAreaDef) return 0;
-    
-        const allDeepWorkDefIdsToSum = new Set<string>([focusAreaDef.id, ...(focusAreaDef.linkedDeepWorkIds || [])]);
-        const allUpskillDefIdsToSum = new Set<string>(focusAreaDef.linkedUpskillIds || []);
-    
-        if (allDeepWorkLogs) {
-            allDeepWorkLogs.forEach(log => {
-                log.exercises.forEach(ex => {
-                    if (allDeepWorkDefIdsToSum.has(ex.definitionId)) {
-                        ex.loggedSets.forEach(set => {
-                            totalMinutes += set.weight;
-                        });
-                    }
+        
+        let totalMinutes = 0;
+        const visited = new Set<string>();
+
+        function recurse(def: ExerciseDefinition) {
+            if (visited.has(def.id)) return;
+            visited.add(def.id);
+
+            const isDeepWorkLeaf = (def.linkedDeepWorkIds?.length ?? 0) === 0;
+            const isUpskillLeaf = (def.linkedUpskillIds?.length ?? 0) === 0;
+            const isBrandingLeaf = (def.focusAreaIds?.length ?? 0) === 0;
+
+            const isLeaf = isDeepWorkLeaf && isUpskillLeaf && isBrandingLeaf;
+            
+            if (isLeaf) {
+                const deepWorkLogs = allDeepWorkLogs.flatMap(log => log.exercises).filter(ex => ex.definitionId === def.id);
+                const upskillLogs = allUpskillLogs.flatMap(log => log.exercises).filter(ex => ex.definitionId === def.id);
+                
+                totalMinutes += deepWorkLogs.reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + set.weight, 0), 0);
+                totalMinutes += upskillLogs.reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + set.reps, 0), 0);
+            } else {
+                (def.linkedDeepWorkIds || []).forEach(childId => {
+                    const childDef = deepWorkDefinitions.find(d => d.id === childId);
+                    if (childDef) recurse(childDef);
                 });
-            });
-        }
-    
-        if (allUpskillLogs) {
-            allUpskillLogs.forEach(log => {
-                log.exercises.forEach(ex => {
-                    if (allUpskillDefIdsToSum.has(ex.definitionId)) {
-                        ex.loggedSets.forEach(set => {
-                            totalMinutes += set.reps;
-                        });
-                    }
+                (def.linkedUpskillIds || []).forEach(childId => {
+                    const childDef = upskillDefinitions.find(d => d.id === childId);
+                    if (childDef) recurse(childDef);
                 });
-            });
+            }
         }
+
+        recurse(focusAreaDef);
         return totalMinutes;
       };
 
@@ -861,7 +866,6 @@ function HomePageContent() {
                   stats={productivityStats} 
                   timeAllocationData={timeAllocationData} 
                   onOpenStatsModal={() => setIsStatsModalOpen(true)} 
-                  onOpenMindMapModal={() => setIsMindMapModalOpen(true)}
                   onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
                 />
               </div>

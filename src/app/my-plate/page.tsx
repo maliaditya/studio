@@ -386,13 +386,13 @@ function HomePageContent() {
         let totalMinutes = 0;
         if (!focusAreaDef) return 0;
     
-        const allDeepWorkDefIdsToSum = new Set<string>([focusAreaDef.id, ...(focusAreaDef.linkedDeepWorkIds || [])]);
-        const allUpskillDefIdsToSum = new Set<string>(focusAreaDef.linkedUpskillIds || []);
+        const allDeepWorkDefIds = new Set<string>([focusAreaDef.id, ...(focusAreaDef.linkedDeepWorkIds || [])]);
+        const allUpskillDefIds = new Set<string>(focusAreaDef.linkedUpskillIds || []);
     
         if (allDeepWorkLogs) {
             allDeepWorkLogs.forEach(log => {
                 log.exercises.forEach(ex => {
-                    if (allDeepWorkDefIdsToSum.has(ex.definitionId)) {
+                    if (allDeepWorkDefIds.has(ex.definitionId)) {
                         ex.loggedSets.forEach(set => {
                             totalMinutes += set.weight;
                         });
@@ -404,7 +404,7 @@ function HomePageContent() {
         if (allUpskillLogs) {
             allUpskillLogs.forEach(log => {
                 log.exercises.forEach(ex => {
-                    if (allUpskillDefIdsToSum.has(ex.definitionId)) {
+                    if (allUpskillDefIds.has(ex.definitionId)) {
                         ex.loggedSets.forEach(set => {
                             totalMinutes += set.reps;
                         });
@@ -861,7 +861,6 @@ function HomePageContent() {
                   stats={productivityStats} 
                   timeAllocationData={timeAllocationData} 
                   onOpenStatsModal={() => setIsStatsModalOpen(true)} 
-                  onOpenMindMapModal={() => setIsMindMapModalOpen(true)}
                   onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
                 />
               </div>
