@@ -465,21 +465,6 @@ function ResourcesPageContent() {
                                             variant="ghost"
                                             size="icon"
                                             className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                const iframe = document.getElementById(`video-${res.id}`) as HTMLIFrameElement;
-                                                if (document.pictureInPictureEnabled && iframe) {
-                                                    iframe.requestPictureInPicture().catch(console.error);
-                                                }
-                                            }}
-                                            aria-label="Picture in Picture"
-                                        >
-                                            <PictureInPicture className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"
                                             onClick={(e) => { e.stopPropagation(); setEmbedUrl(youtubeEmbedUrl); }}
                                             aria-label="View in App"
                                         >
