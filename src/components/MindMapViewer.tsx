@@ -55,6 +55,49 @@ const FeatureList = ({ features }: { features: string[] }) => (
 );
 
 const ConceptualFlowDiagram = () => {
+  return (
+    <div className="w-full h-full flex items-center justify-center bg-muted/30 p-8">
+      <div className="relative w-[800px] h-[400px]">
+        {/* Nodes */}
+        <div className="absolute bottom-0 left-0 text-center">
+          <div className="font-semibold text-lg">Current state</div>
+        </div>
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 text-center">
+          <div className="font-semibold text-lg">Solution</div>
+          <div className="text-sm text-muted-foreground">Go to Gym + Walks + diet + plan + consistency</div>
+        </div>
+        <div className="absolute bottom-0 right-0 text-center">
+          <div className="font-semibold text-lg">Outcome</div>
+          <div className="text-sm text-muted-foreground">Lost 12 KGS in 6 months</div>
+        </div>
+
+        {/* Lines and Arrows */}
+        <svg className="absolute top-0 left-0 w-full h-full overflow-visible">
+          <defs>
+            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto" markerUnits="strokeWidth">
+              <polygon points="0 0, 10 3.5, 0 7" fill="currentColor" />
+            </marker>
+          </defs>
+          {/* Base Line */}
+          <line x1="100" y1="380" x2="700" y2="380" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead)" />
+          {/* Left Line */}
+          <line x1="80" y1="360" x2="390" y2="60" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead)" />
+          {/* Right Line */}
+          <line x1="410" y1="60" x2="720" y2="360" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead)" />
+        </svg>
+
+        {/* Labels on lines */}
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-center">
+          <div className="text-sm text-muted-foreground">I want to lose 20kg weight in 6 months</div>
+          <div className="font-semibold mt-1">Intention</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+const StrategicOverviewDiagram = () => {
     return (
         <div className="flex items-start justify-center p-8 overflow-x-auto">
             {/* Main container changed to flex-row */}
@@ -790,7 +833,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     if (hasResources) availableTopics.push("Resources");
     availableTopics.push(...productAndServiceTopics);
     
-    return ["Strategic Overview", ...availableTopics.sort()];
+    return ["Strategic Overview", "Conceptual Flow", ...availableTopics.sort()];
   }, [deepWorkTopicMetadata, deepWorkDefinitions, resourceFolders]);
   
   const mindMapData = useMemo((): MindMapNode | null => {
@@ -831,6 +874,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     };
     
     if (!selectedTopic) return null;
+    if (selectedTopic === 'Conceptual Flow') return null; // Handled separately
 
     if (selectedTopic === 'Resources') {
         const buildFolderTree = (parentId: string | null): MindMapNode[] => {
@@ -1178,16 +1222,20 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
               <>
                 {!showControls && <Controls />}
                 <TransformComponent wrapperStyle={{ width: "100%", height: "100%" }}>
-                  {mindMapData ? (
+                  {selectedTopic === 'Conceptual Flow' ? (
+                    <ConceptualFlowDiagram />
+                  ) : mindMapData ? (
                     <div className="flex justify-center items-center min-w-full min-h-full">
                         {renderNode(mindMapData, 0)}
                     </div>
+                  ) : selectedTopic === 'Strategic Overview' ? (
+                     <StrategicOverviewDiagram />
                   ) : selectedTopic ? (
                      <div className="w-full h-full flex items-center justify-center">
                         <p className="text-muted-foreground">No data for this topic. Add some releases or focus areas to get started.</p>
                      </div>
                   ) : (
-                    <ConceptualFlowDiagram />
+                    <StrategicOverviewDiagram />
                   )}
                 </TransformComponent>
               </>
