@@ -77,24 +77,23 @@ export function FloatingVideoPlayer() {
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.9 }}
         >
-          <Card className="shadow-2xl overflow-hidden bg-black">
+          <Card className="shadow-2xl overflow-hidden bg-black/80 rounded-xl">
             <div
-              className="flex items-center p-1.5 bg-background/80 backdrop-blur-sm cursor-grab active:cursor-grabbing"
+              className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-black/60 to-transparent p-1.5 flex items-start justify-between cursor-grab active:cursor-grabbing"
               onMouseDown={handleMouseDown}
             >
-              <GripVertical className="h-5 w-5 text-muted-foreground" />
-              <div className="flex-grow"></div>
+              <GripVertical className="h-5 w-5 text-white/50" />
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
+                className="h-7 w-7 text-white/80 hover:bg-white/20 hover:text-white"
                 onClick={() => setFloatingVideoUrl(null)}
               >
                 <X className="h-4 w-4" />
                 <span className="sr-only">Close Player</span>
               </Button>
             </div>
-            <CardContent className="p-0 aspect-video">
+            <CardContent className="p-0 aspect-video bg-black">
               <ReactPlayer
                 url={floatingVideoUrl}
                 width="100%"
