@@ -16,6 +16,7 @@ import { Badge } from './ui/badge';
 import { BookCopy, Link as LinkIcon, Briefcase, ExternalLink, Globe, Workflow } from 'lucide-react';
 import type { ExerciseDefinition, Resource, DatedWorkout } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
+import { format, subDays } from 'date-fns';
 
 interface IntentionDetailModalProps {
   isOpen: boolean;
@@ -66,20 +67,27 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
   }, [intention, upskillDefinitions, deepWorkDefinitions]);
   
   const productivityStats = useMemo(() => {
-    const calculateAverageDuration = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
+    const calculateWeeklyAverage = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
       if (!logs) return 0;
-      const dailyDurations: Record<string, number> = {};
-      logs.forEach(log => {
-          const duration = log.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
-          if (duration > 0) { dailyDurations[log.date] = (dailyDurations[log.date] || 0) + duration; }
-      });
-      const daysWithActivity = Object.keys(dailyDurations).length;
-      if (daysWithActivity === 0) return 0;
-      const totalDuration = Object.values(dailyDurations).reduce((sum, d) => sum + d, 0);
-      return totalDuration / daysWithActivity;
+      
+      const today = new Date();
+      let totalMinutes = 0;
+      
+      for (let i = 0; i < 7; i++) {
+        const day = subDays(today, i);
+        const dateKey = format(day, 'yyyy-MM-dd');
+        const dayLog = logs.find(log => log.date === dateKey);
+        if (dayLog) {
+          totalMinutes += dayLog.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
+        }
+      }
+      return totalMinutes / 7; // Average daily minutes over the last 7 days
     };
     
-    const totalProductiveMinutes = calculateAverageDuration(allUpskillLogs, 'reps') + calculateAverageDuration(allDeepWorkLogs, 'weight');
+    const avgUpskillMinutes = calculateWeeklyAverage(allUpskillLogs, 'reps');
+    const avgDeepWorkMinutes = calculateWeeklyAverage(allDeepWorkLogs, 'weight');
+
+    const totalProductiveMinutes = avgUpskillMinutes + avgDeepWorkMinutes;
     const avgProductiveHours = totalProductiveMinutes / 60;
     const currentLevel = productivityLevels.find(l => totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max) || null;
 
