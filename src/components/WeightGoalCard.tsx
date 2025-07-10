@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight, Workflow, Lightbulb, GitMerge } from 'lucide-react';
+import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight, Workflow, Lightbulb } from 'lucide-react';
 import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition } from '@/types/workout';
 import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
