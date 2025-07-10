@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -163,6 +163,7 @@ function LinkedUpskillCard({
     isUpskillObjectiveComplete,
     getUpskillLoggedMinutesRecursive,
     setEmbedUrl,
+    setFloatingVideoUrl,
     handleViewProgress,
     handleStartEditUpskill,
     handleUnlinkItem,
@@ -174,6 +175,7 @@ function LinkedUpskillCard({
     isUpskillObjectiveComplete: (id: string) => boolean;
     getUpskillLoggedMinutesRecursive: (def: ExerciseDefinition) => number;
     setEmbedUrl: (url: string | null) => void;
+    setFloatingVideoUrl: (url: string | null) => void;
     handleViewProgress: (def: ExerciseDefinition, type: 'deepwork' | 'upskill') => void;
     handleStartEditUpskill: (def: ExerciseDefinition) => void;
     handleUnlinkItem: (type: 'upskill' | 'deepwork' | 'resource', id: string) => void;
@@ -207,6 +209,9 @@ function LinkedUpskillCard({
                 {youtubeEmbedUrl ? (
                     <>
                         <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(upskillDef.link)} onMouseDown={(e) => e.stopPropagation()}>
+                                <PictureInPicture className="h-4 w-4" />
+                            </Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
                                 <Expand className="h-4 w-4" />
                             </Button>
@@ -457,6 +462,7 @@ function DeepWorkPageContent() {
     resources, setResources,
     resourceFolders,
     topicGoals,
+    setFloatingVideoUrl,
   } = useAuth();
 
   const [newTopicName, setNewTopicName] = useState('');
@@ -1890,6 +1896,7 @@ function DeepWorkPageContent() {
                                             getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
                                             isUpskillObjectiveComplete={isUpskillObjectiveComplete}
                                             setEmbedUrl={setEmbedUrl}
+                                            setFloatingVideoUrl={setFloatingVideoUrl}
                                             handleViewProgress={handleViewProgress}
                                             handleStartEditUpskill={handleStartEditUpskill}
                                             handleUnlinkItem={handleUnlinkItem}
@@ -1959,6 +1966,9 @@ function DeepWorkPageContent() {
                                               {youtubeEmbedUrl ? (
                                                   <>
                                                       <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(resource.link)} onMouseDown={(e) => e.stopPropagation()}>
+                                                              <PictureInPicture className="h-4 w-4" />
+                                                          </Button>
                                                           <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
                                                               <Expand className="h-4 w-4" />
                                                           </Button>
@@ -2387,6 +2397,7 @@ function DeepWorkPageContent() {
                         className="w-full h-full border-0 rounded-md"
                         title="Embedded Resource"
                         sandbox="allow-scripts allow-same-origin allow-forms"
+                        allow="picture-in-picture"
                     ></iframe>
                 )}
             </div>
