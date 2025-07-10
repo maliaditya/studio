@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -489,7 +490,7 @@ function DeepWorkPageContent() {
   const [editingTopic, setEditingTopic] = useState<string | null>(null);
   const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
   const [newTopicNameForEdit, setNewTopicNameForEdit] = useState('');
-  const [newTopicClassificationForEdit, setNewTopicClassificationForEdit] = <'product' | 'service'>('product');
+  const [newTopicClassificationForEdit, setNewTopicClassificationForEdit] = useState<'product' | 'service'>('product');
 
   // State for adding a focus area with a modal
   const [isNewFocusAreaModalOpen, setIsNewFocusAreaModalOpen] = useState(false);
