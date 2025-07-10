@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -203,7 +202,7 @@ function LinkedUpskillCard({
 
     return (
         <div ref={setCombinedRefs} style={style} className={cn(isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-2xl", isDragging && "opacity-80 shadow-2xl")}>
-            <Card className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]">
+            <Card className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isComplete && "opacity-70 bg-muted/30")}>
                 <button ref={setActivatorNodeRef} {...listeners} {...attributes} className="absolute bottom-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
                   <GripVertical className="h-5 w-5 text-muted-foreground" />
                 </button>
@@ -239,7 +238,7 @@ function LinkedUpskillCard({
                             <div className="flex-grow min-w-0">
                                 <div className="flex items-center gap-2">
                                     <Youtube className="h-5 w-5 flex-shrink-0 text-red-500" />
-                                    <p className="text-base font-bold truncate" title={upskillDef.name}>{upskillDef.name}</p>
+                                    <p className={cn("text-base font-bold truncate", isComplete && "line-through text-muted-foreground")} title={upskillDef.name}>{upskillDef.name}</p>
                                 </div>
                                 <CardDescription className="text-xs">{upskillDef.category}</CardDescription>
                             </div>
@@ -284,7 +283,7 @@ function LinkedUpskillCard({
                         <CardHeader className="pb-3">
                           <CardTitle className="text-base flex items-center gap-2">
                             <Flashlight className="h-5 w-5 text-amber-500 flex-shrink-0" />
-                            <span className="truncate" title={upskillDef.name}>{upskillDef.name}</span>
+                            <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={upskillDef.name}>{upskillDef.name}</span>
                           </CardTitle>
                           <CardDescription>{upskillDef.category}</CardDescription>
                         </CardHeader>
@@ -361,11 +360,24 @@ function LinkedDeepWorkCard({
     const isObjective = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0;
     const nodeType = isObjective ? 'Objective' : 'Action';
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
-    const isPermanentlyLogged = permanentlyLoggedActionIds.has(deepworkDef.id);
+
+    const isComplete = useMemo(() => {
+        if (!isObjective) return permanentlyLoggedActionIds.has(deepworkDef.id);
+        
+        const childActionIds = (deepworkDef.linkedDeepWorkIds || []).filter(childId => {
+            const childDef = deepWorkDefinitions.find(d => d.id === childId);
+            // Include only final actions (no children of their own)
+            return childDef && (childDef.linkedDeepWorkIds?.length ?? 0) === 0;
+        });
+
+        if (childActionIds.length === 0) return false;
+        
+        return childActionIds.every(id => permanentlyLoggedActionIds.has(id));
+    }, [deepworkDef, isObjective, permanentlyLoggedActionIds, deepWorkDefinitions]);
 
     return (
         <div ref={setCombinedRefs} style={style} className={cn(isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-2xl", isDragging && "opacity-80 shadow-2xl")}>
-         <Card className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isPermanentlyLogged && !isObjective && "opacity-70 bg-muted/30")}>
+         <Card className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isComplete && "opacity-70 bg-muted/30")}>
             <button ref={setActivatorNodeRef} {...listeners} {...attributes} className="absolute bottom-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
                 <GripVertical className="h-5 w-5 text-muted-foreground" />
             </button>
@@ -412,7 +424,7 @@ function LinkedDeepWorkCard({
                   ) : (
                     <Bolt className="h-5 w-5 text-blue-500 flex-shrink-0" />
                   )}
-                <span className={cn("truncate", isPermanentlyLogged && !isObjective && "line-through text-muted-foreground")} title={deepworkDef.name}>{deepworkDef.name}</span>
+                <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={deepworkDef.name}>{deepworkDef.name}</span>
                 <Badge variant="outline" className="text-xs">{nodeType}</Badge>
               </CardTitle>
               <CardDescription>{deepworkDef.category}</CardDescription>
@@ -477,7 +489,7 @@ function DeepWorkPageContent() {
   const [editingTopic, setEditingTopic] = useState<string | null>(null);
   const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
   const [newTopicNameForEdit, setNewTopicNameForEdit] = useState('');
-  const [newTopicClassificationForEdit, setNewTopicClassificationForEdit] = useState<'product' | 'service'>('product');
+  const [newTopicClassificationForEdit, setNewTopicClassificationForEdit] = <'product' | 'service'>('product');
 
   // State for adding a focus area with a modal
   const [isNewFocusAreaModalOpen, setIsNewFocusAreaModalOpen] = useState(false);
@@ -2499,7 +2511,7 @@ function DeepWorkPageContent() {
                     <Label htmlFor="dw-name">Name</Label>
                     <Input id="dw-name" value={editingDefinitionName} onChange={e => setEditingDefinitionName(e.target.value)} />
                 </div>
-                <div className="space-y-1">
+                 <div className="space-y-1">
                     <Label>Estimated Duration</Label>
                     <div className="flex gap-2">
                         <Input id="dw-hours" type="number" value={editingDefinitionHours} onChange={e => setEditingDefinitionHours(e.target.value)} placeholder="Hours" />

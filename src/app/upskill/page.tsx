@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -7,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, GitMerge, Clock, Unlink, Flashlight, Focus, Frame, Lightbulb } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, GitMerge, Clock, Unlink, Flashlight, Focus, Frame, Lightbulb, PictureInPicture } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +83,7 @@ function UpskillPageContent() {
     upskillDefinitions, setUpskillDefinitions,
     topicGoals, setTopicGoals,
     resources, setResources, resourceFolders,
+    setFloatingVideoUrl
   } = useAuth();
 
   const [newTopicName, setNewTopicName] = useState('');
@@ -91,7 +91,7 @@ function UpskillPageContent() {
   const [newTopicGoalValue, setNewTopicGoalValue] = useState('');
   
   const [editingSubtopic, setEditingSubtopic] = useState<ExerciseDefinition | null>(null);
-  const [editedSubtopicData, setEditedSubtopicData] = useState<Partial<ExerciseDefinition>>({});
+  const [editedSubtopicData, setEditedSubtopicData] = useState<Partial<ExerciseDefinition> & { estHours?: string; estMinutes?: string }>({});
   
   const [editingTopicGoal, setEditingTopicGoal] = useState<string | null>(null);
   const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
@@ -124,6 +124,7 @@ function UpskillPageContent() {
   const [newLinkedItemDescription, setNewLinkedItemDescription] = useState('');
   const [newLinkedItemLink, setNewLinkedItemLink] = useState('');
   const [newLinkedItemHours, setNewLinkedItemHours] = useState('');
+  const [newLinkedItemMinutes, setNewLinkedItemMinutes] = useState('');
   const [newLinkedItemFolderId, setNewLinkedItemFolderId] = useState('');
   const [linkSearchTerm, setLinkSearchTerm] = useState('');
   const [tempLinkedIds, setTempLinkedIds] = useState<string[]>([]);
@@ -133,7 +134,7 @@ function UpskillPageContent() {
 
   const [isNewSubtopicModalOpen, setIsNewSubtopicModalOpen] = useState(false);
   const [newSubtopicParentTopic, setNewSubtopicParentTopic] = useState<string | null>(null);
-  const [newSubtopicData, setNewSubtopicData] = useState({ name: '', description: '', link: '', hours: '' });
+  const [newSubtopicData, setNewSubtopicData] = useState({ name: '', description: '', link: '', hours: '', minutes: '' });
 
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
 
@@ -175,7 +176,7 @@ function UpskillPageContent() {
   
   const isUpskillObjectiveComplete = useCallback((objectiveId: string): boolean => {
     const visited = new Set<string>();
-    const visualizations = new Set<string>();
+    const visualizationIds = new Set<string>();
     const queue: string[] = [objectiveId];
 
     while (queue.length > 0) {
@@ -386,6 +387,10 @@ function UpskillPageContent() {
         return;
     }
 
+    const hours = parseInt(newSubtopicData.hours, 10) || 0;
+    const minutes = parseInt(newSubtopicData.minutes, 10) || 0;
+    const totalMinutes = hours * 60 + minutes;
+
     const newDef: ExerciseDefinition = { 
         id: `def_${Date.now()}_${Math.random()}`, 
         name: newSubtopicData.name.trim(), 
@@ -393,13 +398,13 @@ function UpskillPageContent() {
         description: newSubtopicData.description.trim(),
         link: newSubtopicData.link.trim(),
         iconUrl: getFaviconUrl(newSubtopicData.link.trim()),
-        estimatedHours: parseInt(newSubtopicData.hours, 10) || undefined,
+        estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
     };
     
     setUpskillDefinitions(prev => [...prev.filter(d => d.name !== 'placeholder'), newDef]);
     
     setIsNewSubtopicModalOpen(false);
-    setNewSubtopicData({ name: '', description: '', link: '', hours: '' });
+    setNewSubtopicData({ name: '', description: '', link: '', hours: '', minutes: '' });
     
     toast({ title: "Success", description: `Subtopic "${newDef.name}" created.` });
 
@@ -432,13 +437,27 @@ function UpskillPageContent() {
 
   const handleStartEditSubtopic = (def: ExerciseDefinition) => {
     setEditingSubtopic(def);
-    setEditedSubtopicData(def);
+    const hours = Math.floor((def.estimatedDuration || 0) / 60);
+    const minutes = (def.estimatedDuration || 0) % 60;
+    setEditedSubtopicData({
+      ...def,
+      estHours: hours > 0 ? String(hours) : '',
+      estMinutes: minutes > 0 ? String(minutes) : ''
+    });
   };
 
   const handleSaveSubtopicEdit = () => {
     if (!editingSubtopic || !editedSubtopicData.name?.trim()) { toast({ title: "Error", description: "Subtopic name cannot be empty.", variant: "destructive" }); return; }
     
-    let finalData = { ...editedSubtopicData };
+    const hours = parseInt(editedSubtopicData.estHours || '0', 10);
+    const minutes = parseInt(editedSubtopicData.estMinutes || '0', 10);
+    const totalMinutes = hours * 60 + minutes;
+
+    let finalData: Partial<ExerciseDefinition> = { 
+      ...editedSubtopicData,
+      estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined
+    };
+
     if (finalData.link !== editingSubtopic.link) finalData.iconUrl = getFaviconUrl(finalData.link || '');
     
     setUpskillDefinitions(prev => prev.map(def => def.id === editingSubtopic.id ? { ...def, ...finalData } as ExerciseDefinition : def));
@@ -577,11 +596,16 @@ function UpskillPageContent() {
     if (!newLinkedItemName.trim() || !newLinkedItemTopic.trim()) {
         toast({ title: "Error", description: "Name and topic are required.", variant: "destructive" }); return;
     }
+
+    const hours = parseInt(newLinkedItemHours, 10) || 0;
+    const minutes = parseInt(newLinkedItemMinutes, 10) || 0;
+    const totalMinutes = hours * 60 + minutes;
+    
     const link = newLinkedItemLink.trim();
     const newUpskillDef: ExerciseDefinition = {
         id: `def_${Date.now()}_upskill_${Math.random()}`, name: newLinkedItemName.trim(), category: newLinkedItemTopic.trim() as ExerciseCategory,
         description: newLinkedItemDescription.trim(), link: link, iconUrl: getFaviconUrl(link),
-        estimatedHours: parseInt(newLinkedItemHours, 10) || undefined,
+        estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
     };
     setUpskillDefinitions(prev => [...prev, newUpskillDef]);
     updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newUpskillDef.id] };
@@ -615,33 +639,13 @@ function UpskillPageContent() {
     
     let definitionsSource = linkUpskillTopic ? upskillDefinitions.filter(d => d.category === linkUpskillTopic) : upskillDefinitions;
 
-    const isParentParent = (parent.linkedUpskillIds?.length ?? 0) > 0 || (parent.linkedResourceIds?.length ?? 0) > 0;
-    const isParentChild = linkedUpskillChildIds.has(parent.id);
-    const isParentAVisualization = !isParentParent && isParentChild;
-
     return definitionsSource.filter(def => {
         if (!def.name || def.name === 'placeholder' || def.id === parent.id || !def.name.toLowerCase().includes(linkSearchTerm.toLowerCase())) {
             return false;
         }
-
-        const isDefParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-        const isDefChild = linkedUpskillChildIds.has(def.id);
-        const isDefAVisualization = !isDefParent && isDefChild;
-
-        if (isParentAVisualization) {
-            return isDefAVisualization;
-        }
-        
-        const isParentACuriosity = isParentParent && !isParentChild;
-        const isParentAnObjective = isParentParent && isParentChild;
-        const isDefAnObjective = isDefParent && isDefChild;
-        
-        if (isParentACuriosity) return isDefAnObjective;
-        if (isParentAnObjective) return isDefAnObjective || isDefAVisualization;
-        
         return true;
     });
-}, [manageLinksConfig, upskillDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkUpskillTopic, linkedUpskillChildIds]);
+}, [manageLinksConfig, upskillDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkUpskillTopic]);
 
   const handleUnlinkItem = (type: 'upskill' | 'resource', idToUnlink: string) => {
     if (!selectedSubtopic) return;
@@ -663,17 +667,17 @@ function UpskillPageContent() {
     return options;
   }, [resourceFolders]);
 
-  const totalEstimatedHours = useMemo(() => {
+  const totalEstimatedDuration = useMemo(() => {
     if (!selectedSubtopic) return 0;
-    let totalHours = 0;
+    let totalMinutes = 0;
     (selectedSubtopic.linkedUpskillIds || []).forEach(id => {
       const def = upskillDefinitions.find(d => d.id === id);
-      if (def?.estimatedHours) totalHours += def.estimatedHours;
+      if (def?.estimatedDuration) totalMinutes += def.estimatedDuration;
     });
-    return totalHours;
+    return totalMinutes;
   }, [selectedSubtopic, upskillDefinitions]);
 
-  const totalScopeHours = (selectedSubtopic?.estimatedHours || 0) + totalEstimatedHours;
+  const totalScopeDuration = (selectedSubtopic?.estimatedDuration || 0) + totalEstimatedDuration;
 
   if (isLoadingPage) {
     return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your upskill data...</p></div>;
@@ -764,7 +768,7 @@ function UpskillPageContent() {
                                        : isVisualization ? <Frame className="h-4 w-4 flex-shrink-0 text-blue-500" />
                                        : <Lightbulb className="h-4 w-4 flex-shrink-0 text-purple-500" />}
                                       <span className="truncate cursor-pointer" onClick={() => { setSelectedSubtopic(def); setViewMode('library'); }}>{def.name}</span>
-                                      {def.estimatedHours && <Badge variant="secondary" className="text-xs ml-auto">{def.estimatedHours}h</Badge>}
+                                      {def.estimatedDuration && <Badge variant="secondary" className="text-xs ml-auto">{formatMinutes(def.estimatedDuration)}</Badge>}
                                     </div>
                                     <div className='hidden items-center flex-shrink-0 group-hover:flex'>
                                         <TooltipProvider>
@@ -789,16 +793,16 @@ function UpskillPageContent() {
                     <CardContent className="space-y-4 pt-4">
                         <div className="space-y-2">
                             <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Logged Time</span><span className="font-medium">{formatMinutes(totalLoggedTime)}</span></div>
-                            {selectedSubtopic.estimatedHours && (<div className="flex justify-between text-sm"><span className="text-muted-foreground">This Task's Est.</span><span className="font-medium">{selectedSubtopic.estimatedHours}h</span></div>)}
-                            {totalEstimatedHours > 0 && (<div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Linked Est.</span><span className="font-medium">{totalEstimatedHours.toFixed(1)}h</span></div>)}
+                            {selectedSubtopic.estimatedDuration && (<div className="flex justify-between text-sm"><span className="text-muted-foreground">This Task's Est.</span><span className="font-medium">{formatMinutes(selectedSubtopic.estimatedDuration)}</span></div>)}
+                            {totalEstimatedDuration > 0 && (<div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Linked Est.</span><span className="font-medium">{formatMinutes(totalEstimatedDuration)}</span></div>)}
                         </div>
-                        {totalScopeHours > 0 && (
+                        {totalScopeDuration > 0 && (
                             <div>
-                                <Progress value={Math.min(100, (totalLoggedTime / (totalScopeHours * 60)) * 100)} className="h-2" />
-                                <div className="flex justify-between text-xs text-muted-foreground mt-1"><span>0%</span><span>{((totalLoggedTime / (totalScopeHours * 60)) * 100).toFixed(0)}%</span></div>
+                                <Progress value={Math.min(100, (totalLoggedTime / totalScopeDuration) * 100)} className="h-2" />
+                                <div className="flex justify-between text-xs text-muted-foreground mt-1"><span>0%</span><span>{((totalLoggedTime / totalScopeDuration) * 100).toFixed(0)}%</span></div>
                             </div>
                         )}
-                        {totalScopeHours > 0 && totalLoggedTime > totalScopeHours * 60 && (<Badge variant="destructive" className="w-full justify-center">Overspent by {formatMinutes(totalLoggedTime - totalScopeHours * 60)}</Badge>)}
+                        {totalScopeDuration > 0 && totalLoggedTime > totalScopeDuration && (<Badge variant="destructive" className="w-full justify-center">Overspent by {formatMinutes(totalLoggedTime - totalScopeDuration)}</Badge>)}
                     </CardContent>
                 </Card>
             )}
@@ -854,18 +858,15 @@ function UpskillPageContent() {
                                     const isStandalone = !isParent && !isChild;
 
                                     const loggedMinutes = getUpskillLoggedMinutes(upskillDef.id);
-                                    const loggedHours = loggedMinutes / 60;
-                                    
+                                    const isComplete = isUpskillObjectiveComplete(id);
+
                                     return (
-                                      <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[150px]">
+                                      <Card key={id} className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[150px]", isComplete && "opacity-70 bg-muted/30")}>
                                         <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <TooltipProvider>
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
-                                                    <span tabIndex={isVisualization ? 0 : -1}><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); isVisualization && handleAddTaskToSession(upskillDef); }} disabled={!isVisualization}><PlusCircle className="h-4 w-4" /></Button></span>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>{isVisualization ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent>
-                                                </Tooltip>
+                                                    <span tabIndex={isVisualization ? 0 : -1}><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); isVisualization && handleAddTaskToSession(upskillDef); }} disabled={!isVisualization}><PlusCircle className="h-4 w-4" /></Button></span></TooltipTrigger><TooltipContent>{isVisualization ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent></Tooltip>
                                             </TooltipProvider>
                                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setSelectedSubtopic(upskillDef); setViewMode('library'); }}><ArrowRight className="h-4 w-4" /></Button>
                                             <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => handleViewProgress(upskillDef)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => handleStartEditSubtopic(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem><DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteSubtopic(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
@@ -876,7 +877,7 @@ function UpskillPageContent() {
                                                 : isObjective ? <Focus className="h-5 w-5 text-green-500 flex-shrink-0" />
                                                 : isVisualization ? <Frame className="h-5 w-5 text-blue-500 flex-shrink-0" />
                                                 : <Lightbulb className="h-5 w-5 text-purple-500 flex-shrink-0" />}
-                                            <span className="truncate" title={upskillDef.name}>{upskillDef.name}</span>
+                                            <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={upskillDef.name}>{upskillDef.name}</span>
                                           </CardTitle>
                                           <CardDescription>{upskillDef.category}</CardDescription>
                                         </CardHeader>
@@ -912,7 +913,7 @@ function UpskillPageContent() {
                                                 <p className="text-sm text-muted-foreground line-clamp-2">{upskillDef.description || "No description provided."}</p>
                                             )}
                                         </CardContent>
-                                        <CardFooter className="pt-3 flex items-center justify-end"><div className="flex items-center gap-1 flex-shrink-0">{upskillDef.estimatedHours && <Badge variant="outline" className="flex-shrink-0">{upskillDef.estimatedHours}h est.</Badge>}{loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}</div></CardFooter>
+                                        <CardFooter className="pt-3 flex items-center justify-end"><div className="flex items-center gap-1 flex-shrink-0">{upskillDef.estimatedDuration && <Badge variant="outline" className="flex-shrink-0">{formatMinutes(upskillDef.estimatedDuration)} est.</Badge>}{loggedMinutes > 0 && <Badge variant="secondary">{formatMinutes(loggedMinutes)} logged</Badge>}</div></CardFooter>
                                       </Card>
                                     )
                                   })}
@@ -932,15 +933,44 @@ function UpskillPageContent() {
                                     const resource = resources.find(r => r.id === id);
                                     if (!resource) return null;
                                     const embedLinkForModal = getYouTubeEmbedUrl(resource.link) || ((isNotionUrl(resource.link) || isObsidianUrl(resource.link)) ? resource.link : null);
+                                    const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
+
                                     return (
-                                      <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[150px]">
-                                        <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            {embedLinkForModal ? (<Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setEmbedUrl(embedLinkForModal); }}><Expand className="h-4 w-4" /></Button>) : (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><a href={resource.link} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}><ExternalLink className="h-4 w-4" /></a></Button>)}
-                                            <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => handleUnlinkItem('resource', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                                        </div>
-                                        <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2">{resource.iconUrl ? <Image src={resource.iconUrl} alt="" width={20} height={20} className="h-5 w-5 rounded-sm flex-shrink-0" unoptimized /> : <Globe className="h-5 w-5 text-muted-foreground flex-shrink-0" />}<span className="truncate" title={resource.name}>{resource.name}</span></CardTitle><CardDescription>{resourceFolders.find(f => f.id === resource.folderId)?.name || 'Uncategorized'}</CardDescription></CardHeader>
-                                        <CardContent className="flex-grow"><p className="text-sm text-muted-foreground line-clamp-2">{resource.description || "No description provided."}</p></CardContent>
-                                      </Card>
+                                        <Card key={id} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[150px]">
+                                            {youtubeEmbedUrl ? (
+                                                <>
+                                                     <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(resource.link)} onMouseDown={(e) => e.stopPropagation()}>
+                                                            <PictureInPicture className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
+                                                            <Expand className="h-4 w-4" />
+                                                        </Button>
+                                                        <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onMouseDown={(e) => e.stopPropagation()}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => handleUnlinkItem('resource', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                                                     </div>
+                                                     <div className="aspect-video w-full bg-black overflow-hidden rounded-t-2xl">
+                                                          <iframe src={youtubeEmbedUrl} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
+                                                      </div>
+                                                      <div className="p-4 flex-grow">
+                                                         <div className="flex items-start justify-between gap-2">
+                                                            <div className="flex-grow min-w-0">
+                                                                <div className="flex items-center gap-2"><Youtube className="h-5 w-5 flex-shrink-0 text-red-500" /><p className="text-base font-bold truncate" title={resource.name}>{resource.name}</p></div>
+                                                                <CardDescription className="text-xs">{resourceFolders.find(f => f.id === resource.folderId)?.name || 'Uncategorized'}</CardDescription>
+                                                            </div>
+                                                        </div>
+                                                      </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        {embedLinkForModal ? (<Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setEmbedUrl(embedLinkForModal); }}><Expand className="h-4 w-4" /></Button>) : (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><a href={resource.link} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}><ExternalLink className="h-4 w-4" /></a></Button>)}
+                                                        <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => handleUnlinkItem('resource', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                                                    </div>
+                                                    <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2">{resource.iconUrl ? <Image src={resource.iconUrl} alt="" width={20} height={20} className="h-5 w-5 rounded-sm flex-shrink-0" unoptimized /> : <Globe className="h-5 w-5 text-muted-foreground flex-shrink-0" />}<span className="truncate" title={resource.name}>{resource.name}</span></CardTitle><CardDescription>{resourceFolders.find(f => f.id === resource.folderId)?.name || 'Uncategorized'}</CardDescription></CardHeader>
+                                                    <CardContent className="flex-grow"><p className="text-sm text-muted-foreground line-clamp-2">{resource.description || "No description provided."}</p></CardContent>
+                                                </>
+                                            )}
+                                        </Card>
                                     )
                                   })}
                                   <Card 
@@ -972,7 +1002,7 @@ function UpskillPageContent() {
               variant="ghost" className="w-full h-9 justify-start px-2"
               onClick={() => { 
                 setNewSubtopicParentTopic(contextMenu.item);
-                setNewSubtopicData({ name: '', description: '', link: '', hours: '' });
+                setNewSubtopicData({ name: '', description: '', link: '', hours: '', minutes: '' });
                 setIsNewSubtopicModalOpen(true);
                 setContextMenu(null);
               }}>
@@ -1013,7 +1043,7 @@ function UpskillPageContent() {
         <DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>Manage Links for "{manageLinksConfig?.parent.name}"</DialogTitle><DialogDescription>Create a new item and link it, or link existing items from your library.</DialogDescription></DialogHeader>
             <Tabs defaultValue="create-new" className="w-full"><TabsList className="grid w-full grid-cols-2"><TabsTrigger value="create-new">Create New</TabsTrigger><TabsTrigger value="link-existing">Link from Library</TabsTrigger></TabsList>
                 <TabsContent value="create-new">
-                    <div className="space-y-4 py-4">{manageLinksConfig?.type === 'resource' ? (<><div className="space-y-1"><Label htmlFor="new-linked-folder">Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger id="new-linked-folder"><SelectValue placeholder="Select a folder..." /></SelectTrigger><SelectContent>{renderFolderOptions(null, 0)}</SelectContent></Select></div><div className="space-y-1"><Label htmlFor="new-linked-link">Link</Label><Input id="new-linked-link" value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} placeholder="https://..." /></div></>) : (<><div className="space-y-1"><Label htmlFor="new-linked-topic">Topic</Label><Select value={newLinkedItemTopic} onValueChange={setNewLinkedItemTopic}><SelectTrigger id="new-linked-topic"><SelectValue placeholder="Select a topic..." /></SelectTrigger><SelectContent>{allKnownTopics.map(topic => (<SelectItem key={topic} value={topic}>{topic}</SelectItem>))}</SelectContent></Select></div><div className="space-y-1"><Label htmlFor="new-linked-name">Name</Label><Input id="new-linked-name" value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} placeholder={'e.g., CUDA Fundamentals Course'} /></div><div className="space-y-1"><Label htmlFor="new-linked-hours">Estimated Hours</Label><Input id="new-linked-hours" type="number" value={newLinkedItemHours} onChange={e => setNewLinkedItemHours(e.target.value)} placeholder="e.g., 20" /></div><> <div className="space-y-1"><Label htmlFor="new-linked-desc">Description</Label><Textarea id="new-linked-desc" value={newLinkedItemDescription} onChange={e => setNewLinkedItemDescription(e.target.value)} placeholder="Key points, summary..." /></div><div className="space-y-1"><Label htmlFor="new-linked-link">Link</Label><Input id="new-linked-link" value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} placeholder="https://..." /></div></></>)}</div>
+                    <div className="space-y-4 py-4">{manageLinksConfig?.type === 'resource' ? (<><div className="space-y-1"><Label htmlFor="new-linked-folder">Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger id="new-linked-folder"><SelectValue placeholder="Select a folder..." /></SelectTrigger><SelectContent>{renderFolderOptions(null, 0)}</SelectContent></Select></div><div className="space-y-1"><Label htmlFor="new-linked-link">Link</Label><Input id="new-linked-link" value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} placeholder="https://..." /></div></>) : (<><div className="space-y-1"><Label htmlFor="new-linked-topic">Topic</Label><Select value={newLinkedItemTopic} onValueChange={setNewLinkedItemTopic}><SelectTrigger id="new-linked-topic"><SelectValue placeholder="Select a topic..." /></SelectTrigger><SelectContent>{allKnownTopics.map(topic => (<SelectItem key={topic} value={topic}>{topic}</SelectItem>))}</SelectContent></Select></div><div className="space-y-1"><Label htmlFor="new-linked-name">Name</Label><Input id="new-linked-name" value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} placeholder={'e.g., CUDA Fundamentals Course'} /></div><div className="space-y-1"><Label>Estimated Duration</Label><div className="flex gap-2"><Input id="new-linked-hours" type="number" value={newLinkedItemHours} onChange={e => setNewLinkedItemHours(e.target.value)} placeholder="Hours" /><Input id="new-linked-minutes" type="number" value={newLinkedItemMinutes} onChange={e => setNewLinkedItemMinutes(e.target.value)} placeholder="Minutes" /></div></div><> <div className="space-y-1"><Label htmlFor="new-linked-desc">Description</Label><Textarea id="new-linked-desc" value={newLinkedItemDescription} onChange={e => setNewLinkedItemDescription(e.target.value)} placeholder="Key points, summary..." /></div><div className="space-y-1"><Label htmlFor="new-linked-link">Link</Label><Input id="new-linked-link" value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} placeholder="https://..." /></div></></>)}</div>
                     <DialogFooter><Button variant="outline" onClick={() => setIsManageLinksModalOpen(false)}>Cancel</Button><Button onClick={handleCreateAndLinkItem} disabled={isCreatingLink}>{isCreatingLink ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}{isCreatingLink ? 'Fetching...' : 'Create & Link'}</Button></DialogFooter>
                 </TabsContent>
                 <TabsContent value="link-existing">
@@ -1028,7 +1058,7 @@ function UpskillPageContent() {
         </DialogContent>
       </Dialog>
       <Dialog open={!!editingTopicGoal} onOpenChange={() => setEditingTopicGoal(null)}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Edit Goal for "{editingTopicGoal}"</DialogTitle><DialogDescription>Update the target goal for this topic.</DialogDescription></DialogHeader><div className="grid gap-4 py-4"><RadioGroup value={currentGoal.goalType} onValueChange={(v) => setCurrentGoal(prev => ({...prev, goalType: v as 'pages' | 'hours'}))} className="flex gap-4"><div className="flex items-center space-x-2"><RadioGroupItem value="pages" id="type-pages" /><Label htmlFor="type-pages" className="font-normal">Pages</Label></div><div className="flex items-center space-x-2"><RadioGroupItem value="hours" id="type-hours" /><Label htmlFor="type-hours" className="font-normal">Hours</Label></div></RadioGroup><Input type="number" placeholder="Total" value={currentGoal.goalValue} onChange={(e) => setCurrentGoal(prev => ({...prev, goalValue: parseInt(e.target.value, 10) || 0}))} aria-label="Goal value" /></div><DialogFooter><Button variant="outline" onClick={() => setEditingTopicGoal(null)}>Cancel</Button><Button onClick={handleSaveGoal}>Save Goal</Button></DialogFooter></DialogContent></Dialog>
-      <Dialog open={!!editingSubtopic} onOpenChange={() => setEditingSubtopic(null)}><DialogContent><DialogHeader><DialogTitle>Edit Learning Task</DialogTitle><DialogDescription>Update the details of this learning task.</DialogDescription></DialogHeader><div className="space-y-4 py-4"><div className="space-y-1"><Label htmlFor="subtopic-name">Name</Label><Input id="subtopic-name" value={editedSubtopicData.name || ''} onChange={e => setEditedSubtopicData(d => ({ ...d, name: e.target.value }))} /></div><div className="space-y-1"><Label htmlFor="subtopic-desc">Description</Label><Textarea id="subtopic-desc" value={editedSubtopicData.description || ''} onChange={e => setEditedSubtopicData(d => ({ ...d, description: e.target.value }))} /></div><div className="space-y-1"><Label htmlFor="subtopic-link">Link</Label><Input id="subtopic-link" value={editedSubtopicData.link || ''} onChange={e => setEditedSubtopicData(d => ({ ...d, link: e.target.value }))} /></div><div className="space-y-1"><Label htmlFor="subtopic-hours">Est. Hours</Label><Input id="subtopic-hours" type="number" value={editedSubtopicData.estimatedHours || ''} onChange={e => setEditedSubtopicData(d => ({ ...d, estimatedHours: e.target.value ? parseInt(e.target.value, 10) : undefined }))} /></div></div><DialogFooter><Button variant="outline" onClick={() => setEditingSubtopic(null)}>Cancel</Button><Button onClick={handleSaveSubtopicEdit}>Save Changes</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={!!editingSubtopic} onOpenChange={() => setEditingSubtopic(null)}><DialogContent><DialogHeader><DialogTitle>Edit Learning Task</DialogTitle><DialogDescription>Update the details of this learning task.</DialogDescription></DialogHeader><div className="space-y-4 py-4"><div className="space-y-1"><Label htmlFor="subtopic-name">Name</Label><Input id="subtopic-name" value={editedSubtopicData.name || ''} onChange={e => setEditedSubtopicData(d => ({ ...d, name: e.target.value }))} /></div><div className="space-y-1"><Label htmlFor="subtopic-desc">Description</Label><Textarea id="subtopic-desc" value={editedSubtopicData.description || ''} onChange={e => setEditedSubtopicData(d => ({ ...d, description: e.target.value }))} /></div><div className="space-y-1"><Label htmlFor="subtopic-link">Link</Label><Input id="subtopic-link" value={editedSubtopicData.link || ''} onChange={e => setEditedSubtopicData(d => ({ ...d, link: e.target.value }))} /></div><div className="space-y-1"><Label>Estimated Duration</Label><div className="flex gap-2"><Input type="number" placeholder="Hours" value={editedSubtopicData.estHours || ''} onChange={e => setEditedSubtopicData(d => ({ ...d, estHours: e.target.value }))} /><Input type="number" placeholder="Minutes" value={editedSubtopicData.estMinutes || ''} onChange={e => setEditedSubtopicData(d => ({ ...d, estMinutes: e.target.value }))} /></div></div></div><DialogFooter><Button variant="outline" onClick={() => setEditingSubtopic(null)}>Cancel</Button><Button onClick={handleSaveSubtopicEdit}>Save Changes</Button></DialogFooter></DialogContent></Dialog>
       <Dialog open={!!embedUrl} onOpenChange={(isOpen) => !isOpen && setEmbedUrl(null)}><DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2"><div className="flex-grow min-h-0">{embedUrl && (<iframe src={embedUrl} className="w-full h-full border-0 rounded-md" title="Embedded Resource" sandbox="allow-scripts allow-same-origin allow-forms" allow="picture-in-picture" allowFullScreen></iframe>)}</div></DialogContent></Dialog>
       <Dialog open={isNewSubtopicModalOpen} onOpenChange={setIsNewSubtopicModalOpen}>
         <DialogContent>
@@ -1052,8 +1082,11 @@ function UpskillPageContent() {
                     <Input id="new-subtopic-link" value={newSubtopicData.link} onChange={e => setNewSubtopicData(d => ({ ...d, link: e.target.value }))} placeholder="https://..." />
                 </div>
                 <div className="space-y-1">
-                    <Label htmlFor="new-subtopic-hours">Estimated Hours (Optional)</Label>
-                    <Input id="new-subtopic-hours" type="number" value={newSubtopicData.hours} onChange={e => setNewSubtopicData(d => ({ ...d, hours: e.target.value }))} placeholder="e.g., 10" />
+                    <Label>Estimated Duration (Optional)</Label>
+                    <div className="flex gap-2">
+                      <Input type="number" placeholder="Hours" value={newSubtopicData.hours} onChange={e => setNewSubtopicData(d => ({ ...d, hours: e.target.value }))} />
+                      <Input type="number" placeholder="Minutes" value={newSubtopicData.minutes} onChange={e => setNewSubtopicData(d => ({ ...d, minutes: e.target.value }))} />
+                    </div>
                 </div>
             </div>
             <DialogFooter>
