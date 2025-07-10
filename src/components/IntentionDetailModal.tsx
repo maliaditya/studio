@@ -14,7 +14,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from './ui/card';
 import { Badge } from './ui/badge';
 import { BookCopy, Link as LinkIcon, Briefcase, ExternalLink, Globe, Workflow } from 'lucide-react';
-import type { ExerciseDefinition, Resource } from '@/types/workout';
+import type { ExerciseDefinition, Resource, DatedWorkout } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface IntentionDetailModalProps {
@@ -23,19 +23,31 @@ interface IntentionDetailModalProps {
   intention: ExerciseDefinition | null;
 }
 
-const getYouTubeThumbnailUrl = (url: string): string | null => {
-    try {
-        const urlObj = new URL(url);
-        let videoId: string | null = null;
-        if (urlObj.hostname.includes('youtube.com')) videoId = urlObj.searchParams.get('v');
-        else if (urlObj.hostname.includes('youtu.be')) videoId = urlObj.pathname.slice(1);
-        if (videoId) return `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
-    } catch (e) {}
-    return null;
-};
+const productivityLevels = [
+    { level: 'L1', min: 15, max: 30, description: 'Just showing up', zone: '⚪️ Entry Zone' },
+    { level: 'L2', min: 30, max: 45, description: 'Light touch / spark', zone: '⚪️ Entry Zone' },
+    { level: 'L3', min: 45, max: 60, description: 'Single Pomodoro session', zone: '⚪️ Entry Zone' },
+    { level: 'L4', min: 60, max: 90, description: 'Basic learner habit', zone: '🟢 Stable Zone' },
+    { level: 'L5', min: 90, max: 120, description: 'Focused beginner phase', zone: '🟢 Stable Zone' },
+    { level: 'L6', min: 120, max: 150, description: 'Mini deep work commitment', zone: '🟢 Stable Zone' },
+    { level: 'L7', min: 150, max: 180, description: 'Structured discipline zone', zone: '🟢 Stable Zone' },
+    { level: 'L8', min: 180, max: 210, description: 'Daily scholar mode', zone: '🟡 Progress Zone' },
+    { level: 'L9', min: 210, max: 240, description: 'Solid effort / Part-time student', zone: '🟡 Progress Zone' },
+    { level: 'L10', min: 240, max: 300, description: 'Full-time learner level', zone: '🟡 Progress Zone' },
+    { level: 'L11', min: 300, max: 360, description: 'Deep learner zone', zone: '🟡 Progress Zone' },
+    { level: 'L12', min: 360, max: 420, description: 'Advanced practice / Bootcamp ready', zone: '🟠 High Intensity' },
+    { level: 'L13', min: 420, max: 480, description: 'Peak state zone', zone: '🟠 High Intensity' },
+    { level: 'L14', min: 480, max: 540, description: 'Monastic discipline', zone: '🔴 Extreme Zone' },
+    { level: 'L15', min: 540, max: 600, description: 'Total immersion day', zone: '🔴 Extreme Zone' },
+    { level: 'L16', min: 600, max: 660, description: 'Elite performer stretch', zone: '🔴 Extreme Zone' },
+    { level: 'L17', min: 660, max: 720, description: 'Near-max capacity', zone: '🔴 Extreme Zone' },
+    { level: 'L18', min: 720, max: 780, description: 'Obsessive learner', zone: '🔴 Extreme Zone' },
+    { level: 'L19', min: 780, max: 900, description: 'Burning fuel — not sustainable daily', zone: '🔥 Overdrive Zone' },
+    { level: 'L20', min: 900, max: Infinity, description: 'Legendary grind day (Rare / Purpose-driven only)', zone: '⚠️ Apex Zone' },
+];
 
 export function IntentionDetailModal({ isOpen, onOpenChange, intention }: IntentionDetailModalProps) {
-  const { upskillDefinitions, deepWorkDefinitions } = useAuth();
+  const { upskillDefinitions, deepWorkDefinitions, allUpskillLogs, allDeepWorkLogs } = useAuth();
 
   const { linkedLearningTasks, linkedWorkTasks, totalEstimatedHours } = useMemo(() => {
     if (!intention) return { linkedLearningTasks: [], linkedWorkTasks: [], totalEstimatedHours: 0 };
@@ -52,6 +64,30 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
 
     return { linkedLearningTasks: learningTasks, linkedWorkTasks: workTasks, totalEstimatedHours: totalHours };
   }, [intention, upskillDefinitions, deepWorkDefinitions]);
+  
+  const productivityStats = useMemo(() => {
+    const calculateAverageDuration = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
+      if (!logs) return 0;
+      const dailyDurations: Record<string, number> = {};
+      logs.forEach(log => {
+          const duration = log.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
+          if (duration > 0) { dailyDurations[log.date] = (dailyDurations[log.date] || 0) + duration; }
+      });
+      const daysWithActivity = Object.keys(dailyDurations).length;
+      if (daysWithActivity === 0) return 0;
+      const totalDuration = Object.values(dailyDurations).reduce((sum, d) => sum + d, 0);
+      return totalDuration / daysWithActivity;
+    };
+    
+    const totalProductiveMinutes = calculateAverageDuration(allUpskillLogs, 'reps') + calculateAverageDuration(allDeepWorkLogs, 'weight');
+    const avgProductiveHours = totalProductiveMinutes / 60;
+    const currentLevel = productivityLevels.find(l => totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max) || null;
+
+    return {
+      avgProductiveHours: avgProductiveHours.toFixed(1),
+      currentLevel: currentLevel?.level || 'N/A'
+    };
+  }, [allUpskillLogs, allDeepWorkLogs]);
 
   if (!intention) return null;
 
@@ -82,8 +118,12 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                 </svg>
 
                 {/* Text labels */}
-                <div className="absolute left-[5%] bottom-[10%] -translate-x-1/2 translate-y-[150%] text-center">
+                 <div className="absolute left-[5%] bottom-[10%] -translate-x-1/2 translate-y-[150%] text-center">
                     <p className="font-semibold text-foreground">Current state</p>
+                    <div className="text-xs text-muted-foreground mt-1">
+                        <p>Avg. Productive: {productivityStats.avgProductiveHours}h/day</p>
+                        <p>Productivity Level: {productivityStats.currentLevel}</p>
+                    </div>
                 </div>
                 
                 <div className="absolute left-1/2 top-[10%] -translate-x-1/2 -translate-y-full text-center w-full px-4">
