@@ -11,12 +11,13 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { ScrollArea } from './ui/scroll-area';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from './ui/card';
 import { Badge } from './ui/badge';
 import { BookCopy, Link as LinkIcon, Briefcase, ExternalLink, Globe, Workflow } from 'lucide-react';
 import type { ExerciseDefinition, Resource, DatedWorkout } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, subDays } from 'date-fns';
+import { Progress } from './ui/progress';
 
 interface IntentionDetailModalProps {
   isOpen: boolean;
@@ -50,29 +51,69 @@ const productivityLevels = [
 export function IntentionDetailModal({ isOpen, onOpenChange, intention }: IntentionDetailModalProps) {
   const { upskillDefinitions, deepWorkDefinitions, allUpskillLogs, allDeepWorkLogs } = useAuth();
 
-  const { linkedLearningTasks, linkedWorkTasks, totalEstimatedHours } = useMemo(() => {
-    if (!intention) return { linkedLearningTasks: [], linkedWorkTasks: [], totalEstimatedHours: 0 };
+  const {
+    linkedLearningTasks,
+    linkedWorkTasks,
+    totalEstimatedHours,
+    intentionEstimatedHours,
+    totalLinkedEstimatedHours,
+    totalLoggedHours,
+    progressPercent,
+  } = useMemo(() => {
+    if (!intention) return {
+        linkedLearningTasks: [],
+        linkedWorkTasks: [],
+        totalEstimatedHours: 0,
+        intentionEstimatedHours: 0,
+        totalLinkedEstimatedHours: 0,
+        totalLoggedHours: 0,
+        progressPercent: 0,
+    };
     
     const learningTasks = (intention.linkedUpskillIds || []).map(id => upskillDefinitions.find(d => d.id === id)).filter(Boolean) as ExerciseDefinition[];
     const workTasks = (intention.linkedDeepWorkIds || []).map(id => deepWorkDefinitions.find(d => d.id === id)).filter(Boolean) as ExerciseDefinition[];
 
+    const intentionMinutes = intention.estimatedDuration || 0;
     const totalLearningMinutes = learningTasks.reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
     const totalWorkMinutes = workTasks.reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
-    const intentionMinutes = intention.estimatedDuration || 0;
+    const totalLinkedMinutes = totalLearningMinutes + totalWorkMinutes;
+    const totalMinutes = intentionMinutes + totalLinkedMinutes;
     
-    const totalMinutes = intentionMinutes + totalLearningMinutes + totalWorkMinutes;
-    const totalHours = totalMinutes / 60;
+    const getLoggedMinutes = (defs: ExerciseDefinition[], logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
+        const defIds = new Set(defs.map(d => d.id));
+        let minutes = 0;
+        logs.forEach(log => {
+            log.exercises.forEach(ex => {
+                if(defIds.has(ex.definitionId)) {
+                    minutes += ex.loggedSets.reduce((sum, set) => sum + set[durationField], 0);
+                }
+            });
+        });
+        return minutes;
+    };
+    
+    const loggedLearningMinutes = getLoggedMinutes(learningTasks, allUpskillLogs, 'reps');
+    const loggedWorkMinutes = getLoggedMinutes(workTasks, allDeepWorkLogs, 'weight');
+    const loggedIntentionMinutes = getLoggedMinutes([intention], allDeepWorkLogs, 'weight');
+    
+    const totalLoggedMinutes = loggedIntentionMinutes + loggedLearningMinutes + loggedWorkMinutes;
 
-    return { linkedLearningTasks: learningTasks, linkedWorkTasks: workTasks, totalEstimatedHours: totalHours };
-  }, [intention, upskillDefinitions, deepWorkDefinitions]);
+    return {
+        linkedLearningTasks: learningTasks,
+        linkedWorkTasks: workTasks,
+        totalEstimatedHours: totalMinutes / 60,
+        intentionEstimatedHours: intentionMinutes / 60,
+        totalLinkedEstimatedHours: totalLinkedMinutes / 60,
+        totalLoggedHours: totalLoggedMinutes / 60,
+        progressPercent: totalMinutes > 0 ? (totalLoggedMinutes / totalMinutes) * 100 : 0,
+    };
+  }, [intention, upskillDefinitions, deepWorkDefinitions, allUpskillLogs, allDeepWorkLogs]);
   
   const productivityStats = useMemo(() => {
     const calculateWeeklyAverage = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
       if (!logs) return 0;
-      
       const today = new Date();
       let totalMinutes = 0;
-      
       for (let i = 0; i < 7; i++) {
         const day = subDays(today, i);
         const dateKey = format(day, 'yyyy-MM-dd');
@@ -81,12 +122,11 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
           totalMinutes += dayLog.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
         }
       }
-      return totalMinutes / 7; // Average daily minutes over the last 7 days
+      return totalMinutes / 7;
     };
     
     const avgUpskillMinutes = calculateWeeklyAverage(allUpskillLogs, 'reps');
     const avgDeepWorkMinutes = calculateWeeklyAverage(allDeepWorkLogs, 'weight');
-
     const totalProductiveMinutes = avgUpskillMinutes + avgDeepWorkMinutes;
     const avgProductiveHours = totalProductiveMinutes / 60;
     const currentLevel = productivityLevels.find(l => totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max) || null;
@@ -108,17 +148,20 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
             This diagram illustrates the strategic path from your current state to your desired outcome.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex-grow min-h-0 flex items-center justify-center p-8">
+        <div className="flex-grow min-h-0 flex flex-col items-center justify-center p-8">
             <div className="relative w-full h-full max-w-3xl">
-                {/* SVG for lines */}
+                {/* SVG for lines and progress bar */}
                 <svg className="absolute top-0 left-0 w-full h-full overflow-visible" preserveAspectRatio="none">
                     <defs>
                         <marker id="arrowhead" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                             <path d="M 0 0 L 10 5 L 0 10 z" fill="hsl(var(--muted-foreground))" />
                         </marker>
                     </defs>
-                    {/* Base line */}
-                    <line x1="5%" y1="90%" x2="95%" y2="90%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
+                    {/* Progress Bar as Base */}
+                    <foreignObject x="5%" y="87%" width="90%" height="24px">
+                        <Progress value={progressPercent} className="h-2" />
+                    </foreignObject>
+                    
                     {/* Left line */}
                     <line x1="5%" y1="90%" x2="50%" y2="10%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
                     {/* Right line */}
@@ -136,8 +179,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                 
                 <div className="absolute left-1/2 top-[10%] -translate-x-1/2 -translate-y-full text-center w-full px-4">
                     <p className="font-semibold text-foreground text-lg">Solution</p>
-                    <div className="text-sm text-muted-foreground w-full max-w-sm mx-auto p-2 border rounded-md bg-background/50 backdrop-blur-sm mt-2">
-                        <p className="font-bold text-primary mb-2">Total Est: {totalEstimatedHours.toFixed(1)}h</p>
+                     <div className="text-sm text-muted-foreground w-full max-w-sm mx-auto p-2 border rounded-md bg-background/50 backdrop-blur-sm mt-2">
                         <ScrollArea className="max-h-32">
                           <ul className="text-xs list-disc list-inside space-y-1 text-left">
                               {[...linkedWorkTasks, ...linkedLearningTasks].map(task => (
@@ -161,7 +203,25 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                      <p className="text-sm text-muted-foreground truncate" title={intention.name}>
                         {intention.name}
                      </p>
+                     <p className="text-xs font-mono text-primary mt-1">
+                        Total Est: {totalEstimatedHours.toFixed(1)}h
+                     </p>
                 </div>
+            </div>
+            
+        </div>
+        <div className="flex-shrink-0 border-t pt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+            <div>
+                <CardTitle>{totalLoggedHours.toFixed(1)}h</CardTitle>
+                <CardDescription>Total Logged Time</CardDescription>
+            </div>
+            <div>
+                <CardTitle>{intentionEstimatedHours.toFixed(1)}h</CardTitle>
+                <CardDescription>This Focus Area's Est.</CardDescription>
+            </div>
+            <div>
+                <CardTitle>{totalLinkedEstimatedHours.toFixed(1)}h</CardTitle>
+                <CardDescription>Total Linked Est.</CardDescription>
             </div>
         </div>
       </DialogContent>
