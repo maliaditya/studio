@@ -264,10 +264,9 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     
                     if (overlapX > 0 && overlapY > 0) {
                         changed = true;
-                        const pushX = overlapX / 2;
-                        const pushY = overlapY / 2;
-
+                        
                         if (Math.abs(dx) < Math.abs(dy)) { // Push vertically
+                             const pushY = overlapY / 2;
                              if (posA.y < posB.y) {
                                 posA.y -= pushY;
                                 posB.y += pushY;
@@ -276,6 +275,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                                 posB.y -= pushY;
                             }
                         } else { // Push horizontally
+                            const pushX = overlapX / 2;
                             if (posA.x < posB.x) {
                                 posA.x -= pushX;
                                 posB.x += pushX;
@@ -793,9 +793,9 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
         >
             <Card className={cn(
                 "shadow-lg hover:shadow-xl transition-shadow border-2",
-                status.isLoggedToday && "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700",
-                status.isScheduledToday && "bg-yellow-100 dark:bg-yellow-900/30 dark:border-yellow-700",
-                status.isPending && "bg-orange-100 dark:bg-orange-900/30 dark:border-orange-700",
+                status.isLoggedToday && "bg-green-100 dark:bg-transparent dark:border-green-700 border-green-300",
+                status.isScheduledToday && "bg-yellow-100 dark:bg-transparent dark:border-yellow-700 border-yellow-300",
+                status.isPending && "bg-orange-100 dark:bg-transparent dark:border-orange-700 border-orange-300",
                 status.isPastLogged && "border-green-500 dark:border-green-400"
             )}>
                 <div className="p-2 cursor-grab" {...listeners} {...attributes}>
@@ -1215,8 +1215,8 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         "p-2 rounded-md shadow-md transition-all duration-300 relative border-l-4",
         isHighlighted ? 'bg-primary/10' : 'bg-card',
         nodeStatus.isLogged ? "border-green-500" :
-        nodeStatus.isScheduled ? "dark:border-yellow-500 border-transparent bg-yellow-100/50 dark:bg-yellow-900/30" :
-        nodeStatus.isPending ? "dark:border-orange-500 border-transparent bg-orange-100/50 dark:bg-orange-900/30" :
+        nodeStatus.isScheduled ? "bg-yellow-100/50 dark:bg-transparent dark:border-yellow-500 border-yellow-300" :
+        nodeStatus.isPending ? "bg-orange-100/50 dark:bg-transparent dark:border-orange-500 border-orange-300" :
         nodeStatus.isPastLogged ? "border-green-400" :
         "border-transparent"
     );
