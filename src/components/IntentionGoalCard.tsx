@@ -118,30 +118,12 @@ export function IntentionGoalCard({ intention, onMindMapClick, onDiagramClick }:
             }
         });
         
-        // This is the actual logged time, used only for projection, not for the progress bar.
-        let actualLoggedHours = 0;
-        allDeepWorkLogs.forEach(log => {
-            log.exercises.forEach(ex => {
-                if (intention.linkedDeepWorkIds?.includes(ex.definitionId)) {
-                    actualLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0) / 60;
-                }
-            });
-        });
-         allUpskillLogs.forEach(log => {
-            log.exercises.forEach(ex => {
-                if (intention.linkedUpskillIds?.includes(ex.definitionId)) {
-                    actualLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0) / 60;
-                }
-            });
-        });
-
-
-        const remainingHours = Math.max(0, totalEstimatedHours - actualLoggedHours);
+        const remainingHours = Math.max(0, totalEstimatedHours - completedHours);
         const daysRemaining = avgDailyProductiveHours > 0 ? Math.ceil(remainingHours / avgDailyProductiveHours) : null;
         const projectedDate = daysRemaining !== null ? format(addDays(new Date(), daysRemaining), 'MMM d, yyyy') : null;
 
         return {
-            loggedHours: completedHours, // Use completed hours for progress display
+            loggedHours: completedHours,
             estimatedHours: totalEstimatedHours,
             progressPercent: totalEstimatedHours > 0 ? (completedHours / totalEstimatedHours) * 100 : 0,
             daysRemaining,
