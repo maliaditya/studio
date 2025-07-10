@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -465,6 +465,22 @@ function ResourcesPageContent() {
                                             variant="ghost"
                                             size="icon"
                                             className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                const video = document.getElementById(`video-${res.id}`) as HTMLIFrameElement;
+                                                const videoElement = video?.contentWindow?.document.querySelector('video');
+                                                if (videoElement && document.pictureInPictureEnabled) {
+                                                    videoElement.requestPictureInPicture().catch(console.error);
+                                                }
+                                            }}
+                                            aria-label="Picture in Picture"
+                                        >
+                                            <PictureInPicture className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"
                                             onClick={(e) => { e.stopPropagation(); setEmbedUrl(youtubeEmbedUrl); }}
                                             aria-label="View in App"
                                         >
@@ -484,6 +500,7 @@ function ResourcesPageContent() {
                                     </div>
                                     <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl">
                                         <iframe
+                                            id={`video-${res.id}`}
                                             width="100%"
                                             height="100%"
                                             src={youtubeEmbedUrl}
@@ -659,6 +676,7 @@ function ResourcesPageContent() {
                         className="w-full h-full border-0 rounded-md"
                         title="Embedded Resource"
                         sandbox="allow-scripts allow-same-origin allow-forms"
+                        allow="picture-in-picture"
                     ></iframe>
                 )}
             </div>
@@ -679,3 +697,5 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
+    
