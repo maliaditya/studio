@@ -162,6 +162,8 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
     const loggedIntentionMinutes = getLoggedMinutes([intention], allDeepWorkLogs, 'weight');
     
     const totalLoggedMinutes = loggedIntentionMinutes + loggedLearningMinutes + loggedWorkMinutes;
+    
+    const linkedLoggedMinutes = loggedLearningMinutes + loggedWorkMinutes;
 
     return {
         linkedLearningTasks: learningTasks,
@@ -170,7 +172,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
         intentionEstimatedHours: intentionMinutes / 60,
         totalLinkedEstimatedHours: totalLinkedMinutes / 60,
         totalLoggedHours: totalLoggedMinutes / 60,
-        progressPercent: totalMinutes > 0 ? (totalLoggedMinutes / totalMinutes) * 100 : 0,
+        progressPercent: totalLinkedMinutes > 0 ? (linkedLoggedMinutes / totalLinkedMinutes) * 100 : 0,
     };
   }, [intention, upskillDefinitions, deepWorkDefinitions, allUpskillLogs, allDeepWorkLogs, isUpskillObjectiveComplete, isDeepWorkObjectiveComplete]);
   
