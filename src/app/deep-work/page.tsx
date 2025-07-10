@@ -819,9 +819,10 @@ function DeepWorkPageContent() {
       if (visited.has(d.id)) return;
       visited.add(d.id);
   
-      const hasChildren = (d.linkedDeepWorkIds?.length ?? 0) > 0 || (d.linkedUpskillIds?.length ?? 0) > 0;
+      const hasDeepWorkChildren = (d.linkedDeepWorkIds?.length ?? 0) > 0;
+      const hasUpskillChildren = (d.linkedUpskillIds?.length ?? 0) > 0;
   
-      if (hasChildren) {
+      if (hasDeepWorkChildren || hasUpskillChildren) {
         (d.linkedDeepWorkIds || []).forEach(childId => {
           const childDef = deepWorkDefinitions.find(c => c.id === childId);
           if (childDef) recurse(childDef);
@@ -1503,33 +1504,33 @@ function DeepWorkPageContent() {
   
   const isUpskillObjectiveComplete = useCallback((objectiveId: string): boolean => {
     const visited = new Set<string>();
-    const visualizations = new Set<string>();
-    const queue: string[] = [objectiveId];
+    const visualizations: ExerciseDefinition[] = [];
 
-    while (queue.length > 0) {
-        const currentId = queue.shift()!;
-        if (visited.has(currentId)) continue;
-        visited.add(currentId);
+    function recurse(nodeId: string) {
+        if (visited.has(nodeId)) return;
+        visited.add(nodeId);
 
-        const node = upskillDefinitions.find(d => d.id === currentId);
-        if (!node) continue;
+        const node = upskillDefinitions.find(d => d.id === nodeId);
+        if (!node) return;
 
         const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
-
+        
         if (!isParent) { // It's a Visualization
-            visualizations.add(node.id);
+            visualizations.push(node);
         } else { // It's an Objective or Curiosity, so recurse
             (node.linkedUpskillIds || []).forEach(childId => {
                 if (!visited.has(childId)) {
-                    queue.push(childId);
+                    recurse(childId);
                 }
             });
         }
     }
     
-    if (visualizations.size === 0) return false;
+    recurse(objectiveId);
+    
+    if (visualizations.length === 0) return false;
 
-    return Array.from(visualizations).every(vizId => permanentlyLoggedVisualizationIds.has(vizId));
+    return visualizations.every(viz => permanentlyLoggedVisualizationIds.has(viz.id));
   }, [upskillDefinitions, permanentlyLoggedVisualizationIds]);
 
   const handleDragEnd = (event: DragEndEvent) => {
