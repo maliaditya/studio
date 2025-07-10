@@ -45,8 +45,10 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
 
     const totalLearningMinutes = learningTasks.reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
     const totalWorkMinutes = workTasks.reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
+    const intentionMinutes = intention.estimatedDuration || 0;
     
-    const totalHours = (totalLearningMinutes + totalWorkMinutes) / 60;
+    const totalMinutes = intentionMinutes + totalLearningMinutes + totalWorkMinutes;
+    const totalHours = totalMinutes / 60;
 
     return { linkedLearningTasks: learningTasks, linkedWorkTasks: workTasks, totalEstimatedHours: totalHours };
   }, [intention, upskillDefinitions, deepWorkDefinitions]);
@@ -88,14 +90,16 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                     <p className="font-semibold text-foreground text-lg">Solution</p>
                     <div className="text-sm text-muted-foreground w-full max-w-sm mx-auto p-2 border rounded-md bg-background/50 backdrop-blur-sm mt-2">
                         <p className="font-bold text-primary mb-2">Total Est: {totalEstimatedHours.toFixed(1)}h</p>
-                        <ul className="text-xs list-disc list-inside space-y-1 text-left max-h-32 overflow-y-auto">
-                            {[...linkedWorkTasks, ...linkedLearningTasks].map(task => (
-                                <li key={task.id} className="truncate" title={task.name}>
-                                    {task.name}
-                                    {task.estimatedDuration && <span className="font-mono text-muted-foreground/80"> - {(task.estimatedDuration / 60).toFixed(1)}h</span>}
-                                </li>
-                            ))}
-                        </ul>
+                        <ScrollArea className="max-h-32">
+                          <ul className="text-xs list-disc list-inside space-y-1 text-left">
+                              {[...linkedWorkTasks, ...linkedLearningTasks].map(task => (
+                                  <li key={task.id} className="truncate" title={task.name}>
+                                      {task.name}
+                                      {task.estimatedDuration && <span className="font-mono text-muted-foreground/80"> - {(task.estimatedDuration / 60).toFixed(1)}h</span>}
+                                  </li>
+                              ))}
+                          </ul>
+                        </ScrollArea>
                     </div>
                 </div>
 
