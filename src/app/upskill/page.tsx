@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -294,6 +295,35 @@ function UpskillPageContent() {
     const m = minutes % 60;
     return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim();
   }
+
+  const calculateTotalEstimate = useCallback((def: ExerciseDefinition) => {
+    let total = 0;
+    const visited = new Set<string>();
+  
+    function recurse(d: ExerciseDefinition) {
+      if (visited.has(d.id)) return;
+      visited.add(d.id);
+  
+      const hasChildren = (d.linkedUpskillIds?.length ?? 0) > 0;
+  
+      if (hasChildren) {
+        (d.linkedUpskillIds || []).forEach(childId => {
+          const childDef = upskillDefinitions.find(c => c.id === childId);
+          if (childDef) recurse(childDef);
+        });
+      } else {
+        total += d.estimatedDuration || 0;
+      }
+    }
+  
+    recurse(def);
+    return total;
+  }, [upskillDefinitions]);
+
+  const totalEstimatedDuration = useMemo(() => {
+    if (!selectedSubtopic) return 0;
+    return calculateTotalEstimate(selectedSubtopic);
+  }, [selectedSubtopic, calculateTotalEstimate]);
 
   useEffect(() => {
     if (editingSubtopic) setEditedSubtopicData(editingSubtopic);
@@ -667,18 +697,6 @@ function UpskillPageContent() {
     return options;
   }, [resourceFolders]);
 
-  const totalEstimatedDuration = useMemo(() => {
-    if (!selectedSubtopic) return 0;
-    let totalMinutes = 0;
-    (selectedSubtopic.linkedUpskillIds || []).forEach(id => {
-      const def = upskillDefinitions.find(d => d.id === id);
-      if (def?.estimatedDuration) totalMinutes += def.estimatedDuration;
-    });
-    return totalMinutes;
-  }, [selectedSubtopic, upskillDefinitions]);
-
-  const totalScopeDuration = (selectedSubtopic?.estimatedDuration || 0) + totalEstimatedDuration;
-
   if (isLoadingPage) {
     return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your upskill data...</p></div>;
   }
@@ -760,6 +778,8 @@ function UpskillPageContent() {
                               const isVisualization = !isParent && isChild;
                               const isStandalone = !isParent && !isChild;
                               
+                              const estDuration = isParent ? calculateTotalEstimate(def) : def.estimatedDuration;
+                              
                               return (
                                 <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted" onContextMenu={(e) => handleSubtopicContextMenu(e, def)}>
                                     <div className="flex items-center gap-2 flex-grow min-w-0">
@@ -768,7 +788,7 @@ function UpskillPageContent() {
                                        : isVisualization ? <Frame className="h-4 w-4 flex-shrink-0 text-blue-500" />
                                        : <Lightbulb className="h-4 w-4 flex-shrink-0 text-purple-500" />}
                                       <span className="truncate cursor-pointer" onClick={() => { setSelectedSubtopic(def); setViewMode('library'); }}>{def.name}</span>
-                                      {def.estimatedDuration && <Badge variant="secondary" className="text-xs ml-auto">{formatMinutes(def.estimatedDuration)}</Badge>}
+                                      {estDuration && estDuration > 0 && <Badge variant="secondary" className="text-xs ml-auto">{formatMinutes(estDuration)}</Badge>}
                                     </div>
                                     <div className='hidden items-center flex-shrink-0 group-hover:flex'>
                                         <TooltipProvider>
@@ -793,16 +813,15 @@ function UpskillPageContent() {
                     <CardContent className="space-y-4 pt-4">
                         <div className="space-y-2">
                             <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Logged Time</span><span className="font-medium">{formatMinutes(totalLoggedTime)}</span></div>
-                            {selectedSubtopic.estimatedDuration && (<div className="flex justify-between text-sm"><span className="text-muted-foreground">This Task's Est.</span><span className="font-medium">{formatMinutes(selectedSubtopic.estimatedDuration)}</span></div>)}
-                            {totalEstimatedDuration > 0 && (<div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Linked Est.</span><span className="font-medium">{formatMinutes(totalEstimatedDuration)}</span></div>)}
+                            {totalEstimatedDuration > 0 && (<div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Estimated Time</span><span className="font-medium">{formatMinutes(totalEstimatedDuration)}</span></div>)}
                         </div>
-                        {totalScopeDuration > 0 && (
+                        {totalEstimatedDuration > 0 && (
                             <div>
-                                <Progress value={Math.min(100, (totalLoggedTime / totalScopeDuration) * 100)} className="h-2" />
-                                <div className="flex justify-between text-xs text-muted-foreground mt-1"><span>0%</span><span>{((totalLoggedTime / totalScopeDuration) * 100).toFixed(0)}%</span></div>
+                                <Progress value={Math.min(100, (totalLoggedTime / totalEstimatedDuration) * 100)} className="h-2" />
+                                <div className="flex justify-between text-xs text-muted-foreground mt-1"><span>0%</span><span>{((totalLoggedTime / totalEstimatedDuration) * 100).toFixed(0)}%</span></div>
                             </div>
                         )}
-                        {totalScopeDuration > 0 && totalLoggedTime > totalScopeDuration && (<Badge variant="destructive" className="w-full justify-center">Overspent by {formatMinutes(totalLoggedTime - totalScopeDuration)}</Badge>)}
+                        {totalEstimatedDuration > 0 && totalLoggedTime > totalEstimatedDuration && (<Badge variant="destructive" className="w-full justify-center">Overspent by {formatMinutes(totalLoggedTime - totalEstimatedDuration)}</Badge>)}
                     </CardContent>
                 </Card>
             )}
@@ -859,6 +878,7 @@ function UpskillPageContent() {
 
                                     const loggedMinutes = getUpskillLoggedMinutes(upskillDef.id);
                                     const isComplete = isUpskillObjectiveComplete(id);
+                                    const estDuration = isParent ? calculateTotalEstimate(upskillDef) : upskillDef.estimatedDuration;
 
                                     return (
                                       <Card key={id} className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[150px]", isComplete && "opacity-70 bg-muted/30")}>
@@ -913,7 +933,7 @@ function UpskillPageContent() {
                                                 <p className="text-sm text-muted-foreground line-clamp-2">{upskillDef.description || "No description provided."}</p>
                                             )}
                                         </CardContent>
-                                        <CardFooter className="pt-3 flex items-center justify-end"><div className="flex items-center gap-1 flex-shrink-0">{upskillDef.estimatedDuration && <Badge variant="outline" className="flex-shrink-0">{formatMinutes(upskillDef.estimatedDuration)} est.</Badge>}{loggedMinutes > 0 && <Badge variant="secondary">{formatMinutes(loggedMinutes)} logged</Badge>}</div></CardFooter>
+                                        <CardFooter className="pt-3 flex items-center justify-end"><div className="flex items-center gap-1 flex-shrink-0">{estDuration && estDuration > 0 && <Badge variant="outline" className="flex-shrink-0">{formatMinutes(estDuration)} est.</Badge>}{loggedMinutes > 0 && <Badge variant="secondary">{formatMinutes(loggedMinutes)} logged</Badge>}</div></CardFooter>
                                       </Card>
                                     )
                                   })}

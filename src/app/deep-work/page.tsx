@@ -169,7 +169,8 @@ function LinkedUpskillCard({
     handleUnlinkItem,
     handleDeleteUpskillDefinition,
     upskillDefinitions,
-    formatDuration
+    formatDuration,
+    calculatedEstimate
 } : {
     id: string;
     upskillDef: ExerciseDefinition;
@@ -183,6 +184,7 @@ function LinkedUpskillCard({
     handleDeleteUpskillDefinition: (id: string) => void;
     upskillDefinitions: ExerciseDefinition[];
     formatDuration: (minutes: number) => string;
+    calculatedEstimate: number;
 }) {
     const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
@@ -200,6 +202,8 @@ function LinkedUpskillCard({
 
     const loggedMinutes = getUpskillLoggedMinutesRecursive(upskillDef);
     const isComplete = isUpskillObjectiveComplete(upskillDef.id);
+    const isParent = (upskillDef.linkedUpskillIds?.length ?? 0) > 0 || (upskillDef.linkedResourceIds?.length ?? 0) > 0;
+    const estDuration = isParent ? calculatedEstimate : upskillDef.estimatedDuration;
 
     return (
         <div ref={setCombinedRefs} style={style} className={cn(isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-2xl", isDragging && "opacity-80 shadow-2xl")}>
@@ -246,7 +250,7 @@ function LinkedUpskillCard({
                           </div>
                           <div className="mt-auto pt-2 flex items-center justify-end">
                             <div className="flex items-center gap-1 flex-shrink-0">
-                                {upskillDef.estimatedDuration && <Badge variant="outline">{formatDuration(upskillDef.estimatedDuration)} est.</Badge>}
+                                {estDuration && <Badge variant="outline">{formatDuration(estDuration)} est.</Badge>}
                                 {loggedMinutes > 0 && <Badge variant="secondary">{formatDuration(loggedMinutes)} logged</Badge>}
                             </div>
                           </div>
@@ -260,11 +264,13 @@ function LinkedUpskillCard({
                                     <Expand className="h-4 w-4" />
                                 </Button>
                             ) : (
-                                <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
-                                    <a href={upskillDef.link} target="_blank" rel="noopener noreferrer" onMouseDown={(e) => e.stopPropagation()}>
-                                        <ExternalLink className="h-4 w-4" />
-                                    </a>
-                                </Button>
+                                upskillDef.link ? (
+                                    <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
+                                        <a href={upskillDef.link} target="_blank" rel="noopener noreferrer" onMouseDown={(e) => e.stopPropagation()}>
+                                            <ExternalLink className="h-4 w-4" />
+                                        </a>
+                                    </Button>
+                                ) : null
                             )}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -306,7 +312,7 @@ function LinkedUpskillCard({
                         </CardContent>
                         <CardFooter className="pt-3 flex items-center justify-end">
                           <div className="flex items-center gap-1 flex-shrink-0">
-                            {upskillDef.estimatedDuration && <Badge variant="outline" className="flex-shrink-0">{formatDuration(upskillDef.estimatedDuration)} est.</Badge>}
+                            {estDuration && <Badge variant="outline" className="flex-shrink-0">{formatDuration(estDuration)} est.</Badge>}
                             {loggedMinutes > 0 && <Badge variant="secondary">{formatDuration(loggedMinutes)} logged</Badge>}
                           </div>
                         </CardFooter>
@@ -331,7 +337,8 @@ function LinkedDeepWorkCard({
     handleDeleteExerciseDefinition,
     handleViewProgress,
     deepWorkDefinitions,
-    formatDuration
+    formatDuration,
+    calculatedEstimate
 } : {
     id: string;
     deepworkDef: ExerciseDefinition;
@@ -347,6 +354,7 @@ function LinkedDeepWorkCard({
     handleViewProgress: (def: ExerciseDefinition, type: 'deepwork' | 'upskill') => void;
     deepWorkDefinitions: ExerciseDefinition[];
     formatDuration: (minutes: number) => string;
+    calculatedEstimate: number;
 }) {
     const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
@@ -361,6 +369,7 @@ function LinkedDeepWorkCard({
     const isObjective = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0;
     const nodeType = isObjective ? 'Objective' : 'Action';
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
+    const estDuration = isObjective ? calculatedEstimate : deepworkDef.estimatedDuration;
 
     const isComplete = useMemo(() => {
         if (!isObjective) return permanentlyLoggedActionIds.has(deepworkDef.id);
@@ -454,7 +463,7 @@ function LinkedDeepWorkCard({
             </CardContent>
            <CardFooter className="pt-3 flex items-center justify-end">
               <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                  {deepworkDef.estimatedDuration && <Badge variant="outline">{formatDuration(deepworkDef.estimatedDuration)} est.</Badge>}
+                  {estDuration && <Badge variant="outline">{formatDuration(estDuration)} est.</Badge>}
                   {loggedMinutes > 0 && <Badge variant="secondary">{formatDuration(loggedMinutes)} logged</Badge>}
               </div>
             </CardFooter>
@@ -802,23 +811,38 @@ function DeepWorkPageContent() {
     return getDeepWorkLoggedMinutes(selectedFocusArea);
   }, [selectedFocusArea, getDeepWorkLoggedMinutes]);
 
+  const calculateTotalEstimate = useCallback((def: ExerciseDefinition) => {
+    let total = 0;
+    const visited = new Set<string>();
+  
+    function recurse(d: ExerciseDefinition) {
+      if (visited.has(d.id)) return;
+      visited.add(d.id);
+  
+      const hasChildren = (d.linkedDeepWorkIds?.length ?? 0) > 0 || (d.linkedUpskillIds?.length ?? 0) > 0;
+  
+      if (hasChildren) {
+        (d.linkedDeepWorkIds || []).forEach(childId => {
+          const childDef = deepWorkDefinitions.find(c => c.id === childId);
+          if (childDef) recurse(childDef);
+        });
+        (d.linkedUpskillIds || []).forEach(childId => {
+          const childDef = upskillDefinitions.find(c => c.id === childId);
+          if (childDef) recurse(childDef);
+        });
+      } else {
+        total += d.estimatedDuration || 0;
+      }
+    }
+  
+    recurse(def);
+    return total;
+  }, [deepWorkDefinitions, upskillDefinitions]);
+
   const totalEstimatedDuration = useMemo(() => {
     if (!selectedFocusArea) return 0;
-    let totalMinutes = 0;
-    const processIds = (ids: string[], defs: ExerciseDefinition[]) => {
-      (ids || []).forEach(id => {
-        const def = defs.find(d => d.id === id);
-        if (def?.estimatedDuration) {
-          totalMinutes += def.estimatedDuration;
-        }
-      });
-    };
-    processIds(selectedFocusArea.linkedDeepWorkIds, deepWorkDefinitions);
-    processIds(selectedFocusArea.linkedUpskillIds, upskillDefinitions);
-    return totalMinutes;
-  }, [selectedFocusArea, deepWorkDefinitions, upskillDefinitions]);
-
-  const totalScopeDuration = (selectedFocusArea?.estimatedDuration || 0) + totalEstimatedDuration;
+    return calculateTotalEstimate(selectedFocusArea);
+  }, [selectedFocusArea, calculateTotalEstimate]);
 
   const timesheetData = useMemo(() => {
     if (!selectedFocusArea) return [];
@@ -1739,6 +1763,9 @@ function DeepWorkPageContent() {
                               const isStandalone = !isParent && !isLinkedAsChild;
                               const isAction = !isParent && isLinkedAsChild;
 
+                              const calculatedEst = calculateTotalEstimate(def);
+                              const estDuration = isParent ? calculatedEst : def.estimatedDuration;
+
                               return (
                                 <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted" onContextMenu={(e) => handleFocusAreaContextMenu(e, def)}>
                                     <>
@@ -1754,7 +1781,7 @@ function DeepWorkPageContent() {
                                         )}
                                         <span className="truncate cursor-pointer" onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} title={`View details for ${def.name}`}>{def.name}</span>
                                         {def.isReadyForBranding && <Share2 className="h-3 w-3 text-primary flex-shrink-0" title="Ready for Branding" />}
-                                        {def.estimatedDuration && <Badge variant="secondary" className="text-xs ml-auto">{formatDuration(def.estimatedDuration)}</Badge>}
+                                        {estDuration && estDuration > 0 && <Badge variant="secondary" className="text-xs ml-auto">{formatDuration(estDuration)}</Badge>}
                                       </div>
                                       <div className='hidden items-center flex-shrink-0 group-hover:flex'>
                                         <TooltipProvider>
@@ -1810,36 +1837,30 @@ function DeepWorkPageContent() {
                                 <span className="text-muted-foreground">Total Logged Time</span>
                                 <span className="font-medium">{formatDuration(totalLoggedTime)}</span>
                             </div>
-                            {selectedFocusArea.estimatedDuration && (
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">This Focus Area's Est.</span>
-                                    <span className="font-medium">{formatDuration(selectedFocusArea.estimatedDuration)}</span>
-                                </div>
-                            )}
                             {totalEstimatedDuration > 0 && (
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Total Linked Est.</span>
+                                    <span className="text-muted-foreground">Total Estimated Time</span>
                                     <span className="font-medium">{formatDuration(totalEstimatedDuration)}</span>
                                 </div>
                             )}
                         </div>
                         
-                        {totalScopeDuration > 0 && (
+                        {totalEstimatedDuration > 0 && (
                             <div>
                                 <Progress 
-                                    value={Math.min(100, (totalLoggedTime / totalScopeDuration) * 100)} 
+                                    value={Math.min(100, (totalLoggedTime / totalEstimatedDuration) * 100)} 
                                     className="h-2" 
                                 />
                                 <div className="flex justify-between text-xs text-muted-foreground mt-1">
                                     <span>0%</span>
-                                    <span>{((totalLoggedTime / totalScopeDuration) * 100).toFixed(0)}%</span>
+                                    <span>{((totalLoggedTime / totalEstimatedDuration) * 100).toFixed(0)}%</span>
                                 </div>
                             </div>
                         )}
                         
-                        {totalScopeDuration > 0 && totalLoggedTime > totalScopeDuration && (
+                        {totalEstimatedDuration > 0 && totalLoggedTime > totalEstimatedDuration && (
                             <Badge variant="destructive" className="w-full justify-center">
-                                Overspent by {formatDuration(totalLoggedTime - totalScopeDuration)}
+                                Overspent by {formatDuration(totalLoggedTime - totalEstimatedDuration)}
                             </Badge>
                         )}
                     </CardContent>
@@ -1938,6 +1959,7 @@ function DeepWorkPageContent() {
                                             handleDeleteUpskillDefinition={handleDeleteUpskillDefinition}
                                             upskillDefinitions={upskillDefinitions}
                                             formatDuration={formatDuration}
+                                            calculatedEstimate={calculateTotalEstimate(upskillDef)}
                                         />
                                       )
                                     })}
@@ -1974,6 +1996,7 @@ function DeepWorkPageContent() {
                                             handleViewProgress={handleViewProgress}
                                             deepWorkDefinitions={deepWorkDefinitions}
                                             formatDuration={formatDuration}
+                                            calculatedEstimate={calculateTotalEstimate(deepworkDef)}
                                         />
                                       );
                                     })}
