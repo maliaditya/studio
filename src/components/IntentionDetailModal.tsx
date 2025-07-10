@@ -16,7 +16,7 @@ import { Badge } from './ui/badge';
 import { BookCopy, Link as LinkIcon, Briefcase, ExternalLink, Globe, Workflow } from 'lucide-react';
 import type { ExerciseDefinition, Resource, DatedWorkout } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, subDays, parseISO } from 'date-fns';
+import { format, subDays, parseISO, addDays } from 'date-fns';
 import { Progress } from './ui/progress';
 import { cn } from '@/lib/utils';
 import { BrainCircuit, ArrowUp, ArrowDown, PauseCircle, AlertCircle } from 'lucide-react';
@@ -53,6 +53,38 @@ const productivityLevels = [
 
 export function IntentionDetailModal({ isOpen, onOpenChange, intention }: IntentionDetailModalProps) {
   const { upskillDefinitions, deepWorkDefinitions, allUpskillLogs, allDeepWorkLogs } = useAuth();
+  
+  const productivityStats = useMemo(() => {
+    const getDailyDuration = (logs: DatedWorkout[], dateStr: string, durationField: 'reps' | 'weight') => {
+        if (!logs) return 0;
+        const logForDay = logs.find(log => log.date === dateStr);
+        if (!logForDay) return 0;
+        return logForDay.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
+    };
+
+    const calculateWeeklyAverage = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
+      if (!logs) return 0;
+      const today = new Date();
+      let totalMinutes = 0;
+      for (let i = 0; i < 7; i++) {
+        const day = subDays(today, i);
+        const dateKey = format(day, 'yyyy-MM-dd');
+        totalMinutes += getDailyDuration(logs, dateKey, durationField);
+      }
+      return totalMinutes / 7;
+    };
+    
+    const avgUpskillMinutes = calculateWeeklyAverage(allUpskillLogs, 'reps');
+    const avgDeepWorkMinutes = calculateWeeklyAverage(allDeepWorkLogs, 'weight');
+    const totalProductiveMinutes = avgUpskillMinutes + avgDeepWorkMinutes;
+    const avgProductiveHours = totalProductiveMinutes / 60;
+    const currentLevel = productivityLevels.find(l => totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max) || null;
+
+    return {
+      avgProductiveHours: avgProductiveHours,
+      currentLevel: currentLevel?.level || 'N/A'
+    };
+  }, [allUpskillLogs, allDeepWorkLogs]);
   
   const permanentlyLoggedActionIds = useMemo(() => {
     const loggedIds = new Set<string>();
@@ -111,19 +143,19 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
     linkedLearningTasks,
     linkedWorkTasks,
     totalEstimatedHours,
-    intentionEstimatedHours,
-    totalLinkedEstimatedHours,
     totalLoggedHours,
     progressPercent,
+    projectedDate,
+    daysRemaining,
   } = useMemo(() => {
     if (!intention) return {
         linkedLearningTasks: [],
         linkedWorkTasks: [],
         totalEstimatedHours: 0,
-        intentionEstimatedHours: 0,
-        totalLinkedEstimatedHours: 0,
         totalLoggedHours: 0,
         progressPercent: 0,
+        projectedDate: null,
+        daysRemaining: null,
     };
     
     const learningTasks = (intention.linkedUpskillIds || []).map(id => {
@@ -135,58 +167,40 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
       const def = deepWorkDefinitions.find(d => d.id === id);
       return def ? { ...def, isCompleted: isDeepWorkObjectiveComplete(def) } : null;
     }).filter(Boolean) as (ExerciseDefinition & { isCompleted: boolean })[];
-
-    const intentionMinutes = intention.estimatedDuration || 0;
     
-    const totalLinkedMinutes = [...learningTasks, ...workTasks]
-      .reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
+    let loggedMinutesFromCompletedTasks = 0;
+    const allLinkedTasks = [...learningTasks, ...workTasks];
 
+    allLinkedTasks.forEach(task => {
+        if (task.isCompleted) {
+            loggedMinutesFromCompletedTasks += (task.estimatedDuration || 0);
+        }
+    });
+    
+    const intentionMinutes = intention.estimatedDuration || 0;
+    const totalLinkedMinutes = allLinkedTasks.reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
     const totalMinutes = intentionMinutes + totalLinkedMinutes;
     
-    // Progress is based on the sum of estimated hours of COMPLETED tasks.
-    const loggedMinutesFromCompletedTasks = [...learningTasks, ...workTasks]
-      .filter(task => task.isCompleted)
-      .reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
+    const progress = totalLinkedMinutes > 0 ? (loggedMinutesFromCompletedTasks / totalLinkedMinutes) * 100 : 0;
+    
+    // Projection calculation
+    const remainingHours = (totalMinutes - loggedMinutesFromCompletedTasks) / 60;
+    const daysLeft = (productivityStats.avgProductiveHours > 0 && remainingHours > 0)
+        ? Math.ceil(remainingHours / productivityStats.avgProductiveHours)
+        : null;
+    const estDate = daysLeft !== null ? format(addDays(new Date(), daysLeft), 'MMM d, yyyy') : null;
 
     return {
         linkedLearningTasks: learningTasks,
         linkedWorkTasks: workTasks,
         totalEstimatedHours: totalMinutes / 60,
-        intentionEstimatedHours: intentionMinutes / 60,
-        totalLinkedEstimatedHours: totalLinkedMinutes / 60,
         totalLoggedHours: loggedMinutesFromCompletedTasks / 60,
-        progressPercent: totalLinkedMinutes > 0 ? (loggedMinutesFromCompletedTasks / totalLinkedMinutes) * 100 : 0,
+        progressPercent: progress,
+        projectedDate: estDate,
+        daysRemaining: daysLeft,
     };
-  }, [intention, upskillDefinitions, deepWorkDefinitions, isUpskillObjectiveComplete, isDeepWorkObjectiveComplete]);
+  }, [intention, upskillDefinitions, deepWorkDefinitions, isUpskillObjectiveComplete, isDeepWorkObjectiveComplete, productivityStats.avgProductiveHours]);
   
-  const productivityStats = useMemo(() => {
-    const calculateWeeklyAverage = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
-      if (!logs) return 0;
-      const today = new Date();
-      let totalMinutes = 0;
-      for (let i = 0; i < 7; i++) {
-        const day = subDays(today, i);
-        const dateKey = format(day, 'yyyy-MM-dd');
-        const dayLog = logs.find(log => log.date === dateKey);
-        if (dayLog) {
-          totalMinutes += dayLog.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
-        }
-      }
-      return totalMinutes / 7;
-    };
-    
-    const avgUpskillMinutes = calculateWeeklyAverage(allUpskillLogs, 'reps');
-    const avgDeepWorkMinutes = calculateWeeklyAverage(allDeepWorkLogs, 'weight');
-    const totalProductiveMinutes = avgUpskillMinutes + avgDeepWorkMinutes;
-    const avgProductiveHours = totalProductiveMinutes / 60;
-    const currentLevel = productivityLevels.find(l => totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max) || null;
-
-    return {
-      avgProductiveHours: avgProductiveHours.toFixed(1),
-      currentLevel: currentLevel?.level || 'N/A'
-    };
-  }, [allUpskillLogs, allDeepWorkLogs]);
-
   if (!intention) return null;
 
   return (
@@ -217,7 +231,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                  <div className="absolute left-[5%] bottom-[10%] -translate-x-1/2 translate-y-[150%] text-center">
                     <p className="font-semibold text-foreground">Current state</p>
                     <div className="text-xs text-muted-foreground mt-1">
-                        <p>Avg. Productive: {productivityStats.avgProductiveHours}h/day</p>
+                        <p>Avg. Productive: {productivityStats.avgProductiveHours.toFixed(1)}h/day</p>
                         <p>Productivity Level: {productivityStats.currentLevel}</p>
                     </div>
                 </div>
@@ -230,20 +244,25 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                               {[...linkedWorkTasks, ...linkedLearningTasks].sort((a,b) => a.name.localeCompare(b.name)).map(task => (
                                   <li key={task.id} className={cn("truncate", task.isCompleted && "line-through text-muted-foreground/60")} title={task.name}>
                                       {task.name}
-                                      {task.estimatedDuration && <span className="font-mono text-muted-foreground/80"> - {(task.estimatedDuration / 60).toFixed(1)}h</span>}
                                   </li>
                               ))}
                           </ul>
                         </ScrollArea>
-                        <div className="text-xs font-semibold text-right mt-2 pt-2 border-t">
-                            Total Linked Est: {totalLinkedEstimatedHours.toFixed(1)}h
-                        </div>
                     </div>
                 </div>
 
                 <div className="absolute right-[5%] bottom-[10%] translate-x-1/2 translate-y-[150%] text-center">
                      <p className="font-semibold text-foreground">Outcome</p>
-                     <p className="text-sm text-muted-foreground">To be defined</p>
+                     <div className="text-xs text-muted-foreground mt-1">
+                        {projectedDate ? (
+                            <>
+                                <p>{projectedDate}</p>
+                                <p>({daysRemaining} days remaining)</p>
+                            </>
+                        ) : (
+                            <p>To be defined</p>
+                        )}
+                     </div>
                 </div>
 
                 <div className="absolute left-1/2 bottom-[10%] -translate-x-1/2 translate-y-[120%] text-center w-full px-4">
