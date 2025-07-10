@@ -147,6 +147,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
     progressPercent,
     projectedDate,
     daysRemaining,
+    totalLinkedEstimatedHours,
   } = useMemo(() => {
     if (!intention) return {
         linkedLearningTasks: [],
@@ -156,6 +157,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
         progressPercent: 0,
         projectedDate: null,
         daysRemaining: null,
+        totalLinkedEstimatedHours: 0,
     };
     
     const learningTasks = (intention.linkedUpskillIds || []).map(id => {
@@ -168,23 +170,22 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
       return def ? { ...def, isCompleted: isDeepWorkObjectiveComplete(def) } : null;
     }).filter(Boolean) as (ExerciseDefinition & { isCompleted: boolean })[];
     
-    let loggedMinutesFromCompletedTasks = 0;
-    const allLinkedTasks = [...learningTasks, ...workTasks];
+    const completedLearningTasks = learningTasks.filter(task => task.isCompleted);
+    const completedWorkTasks = workTasks.filter(task => task.isCompleted);
 
-    allLinkedTasks.forEach(task => {
-        if (task.isCompleted) {
-            loggedMinutesFromCompletedTasks += (task.estimatedDuration || 0);
-        }
-    });
-    
+    const loggedMinutesFromCompletedTasks = 
+        [...completedLearningTasks, ...completedWorkTasks]
+        .reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
+        
     const intentionMinutes = intention.estimatedDuration || 0;
-    const totalLinkedMinutes = allLinkedTasks.reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
-    const totalMinutes = intentionMinutes + totalLinkedMinutes;
+    const linkedMinutes = [...learningTasks, ...workTasks]
+        .reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
     
-    const progress = totalLinkedMinutes > 0 ? (loggedMinutesFromCompletedTasks / totalLinkedMinutes) * 100 : 0;
+    const totalMinutes = intentionMinutes + linkedMinutes;
     
-    // Projection calculation
-    const remainingHours = (totalMinutes - loggedMinutesFromCompletedTasks) / 60;
+    const progress = linkedMinutes > 0 ? (loggedMinutesFromCompletedTasks / linkedMinutes) * 100 : 0;
+    
+    const remainingHours = (linkedMinutes - loggedMinutesFromCompletedTasks) / 60;
     const daysLeft = (productivityStats.avgProductiveHours > 0 && remainingHours > 0)
         ? Math.ceil(remainingHours / productivityStats.avgProductiveHours)
         : null;
@@ -195,6 +196,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
         linkedWorkTasks: workTasks,
         totalEstimatedHours: totalMinutes / 60,
         totalLoggedHours: loggedMinutesFromCompletedTasks / 60,
+        totalLinkedEstimatedHours: linkedMinutes / 60,
         progressPercent: progress,
         projectedDate: estDate,
         daysRemaining: daysLeft,
