@@ -53,7 +53,7 @@ export interface ExerciseDefinition {
   description?: string;
   link?: string;
   iconUrl?: string;
-  estimatedHours?: number;
+  estimatedDuration?: number; // Total minutes
   decompositionData?: DecompositionRow[];
   focusAreaIds?: string[];
   sourceUpskillId?: string;

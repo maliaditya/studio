@@ -168,7 +168,8 @@ function LinkedUpskillCard({
     handleStartEditUpskill,
     handleUnlinkItem,
     handleDeleteUpskillDefinition,
-    upskillDefinitions
+    upskillDefinitions,
+    formatDuration
 } : {
     id: string;
     upskillDef: ExerciseDefinition;
@@ -181,6 +182,7 @@ function LinkedUpskillCard({
     handleUnlinkItem: (type: 'upskill' | 'deepwork' | 'resource', id: string) => void;
     handleDeleteUpskillDefinition: (id: string) => void;
     upskillDefinitions: ExerciseDefinition[];
+    formatDuration: (minutes: number) => string;
 }) {
     const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
@@ -197,7 +199,6 @@ function LinkedUpskillCard({
     const embedLinkForModal = youtubeEmbedUrl || (isNotionObsidianEmbed ? upskillDef.link : null);
 
     const loggedMinutes = getUpskillLoggedMinutesRecursive(upskillDef);
-    const loggedHours = loggedMinutes / 60;
     const isComplete = isUpskillObjectiveComplete(upskillDef.id);
 
     return (
@@ -245,8 +246,8 @@ function LinkedUpskillCard({
                           </div>
                           <div className="mt-auto pt-2 flex items-center justify-end">
                             <div className="flex items-center gap-1 flex-shrink-0">
-                                {upskillDef.estimatedHours && <Badge variant="outline">{upskillDef.estimatedHours}h est.</Badge>}
-                                {loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}
+                                {upskillDef.estimatedDuration && <Badge variant="outline">{formatDuration(upskillDef.estimatedDuration)} est.</Badge>}
+                                {loggedMinutes > 0 && <Badge variant="secondary">{formatDuration(loggedMinutes)} logged</Badge>}
                             </div>
                           </div>
                         </div>
@@ -305,8 +306,8 @@ function LinkedUpskillCard({
                         </CardContent>
                         <CardFooter className="pt-3 flex items-center justify-end">
                           <div className="flex items-center gap-1 flex-shrink-0">
-                            {upskillDef.estimatedHours && <Badge variant="outline" className="flex-shrink-0">{upskillDef.estimatedHours}h est.</Badge>}
-                            {loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}
+                            {upskillDef.estimatedDuration && <Badge variant="outline" className="flex-shrink-0">{formatDuration(upskillDef.estimatedDuration)} est.</Badge>}
+                            {loggedMinutes > 0 && <Badge variant="secondary">{formatDuration(loggedMinutes)} logged</Badge>}
                           </div>
                         </CardFooter>
                     </>
@@ -329,7 +330,8 @@ function LinkedDeepWorkCard({
     handleUnlinkItem,
     handleDeleteExerciseDefinition,
     handleViewProgress,
-    deepWorkDefinitions
+    deepWorkDefinitions,
+    formatDuration
 } : {
     id: string;
     deepworkDef: ExerciseDefinition;
@@ -344,6 +346,7 @@ function LinkedDeepWorkCard({
     handleDeleteExerciseDefinition: (id: string) => void;
     handleViewProgress: (def: ExerciseDefinition, type: 'deepwork' | 'upskill') => void;
     deepWorkDefinitions: ExerciseDefinition[];
+    formatDuration: (minutes: number) => string;
 }) {
     const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
@@ -358,7 +361,6 @@ function LinkedDeepWorkCard({
     const isObjective = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0;
     const nodeType = isObjective ? 'Objective' : 'Action';
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
-    const loggedHours = loggedMinutes / 60;
     const isPermanentlyLogged = permanentlyLoggedActionIds.has(deepworkDef.id);
 
     return (
@@ -439,8 +441,8 @@ function LinkedDeepWorkCard({
             </CardContent>
            <CardFooter className="pt-3 flex items-center justify-end">
               <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                  {deepworkDef.estimatedHours && <Badge variant="outline">{deepworkDef.estimatedHours}h est.</Badge>}
-                  {loggedHours > 0 && <Badge variant="secondary">{loggedHours.toFixed(1)}h logged</Badge>}
+                  {deepworkDef.estimatedDuration && <Badge variant="outline">{formatDuration(deepworkDef.estimatedDuration)} est.</Badge>}
+                  {loggedMinutes > 0 && <Badge variant="secondary">{formatDuration(loggedMinutes)} logged</Badge>}
               </div>
             </CardFooter>
          </Card>
@@ -470,6 +472,7 @@ function DeepWorkPageContent() {
   const [editingDefinition, setEditingDefinition] = useState<ExerciseDefinition | null>(null);
   const [editingDefinitionName, setEditingDefinitionName] = useState('');
   const [editingDefinitionHours, setEditingDefinitionHours] = useState('');
+  const [editingDefinitionMinutes, setEditingDefinitionMinutes] = useState('');
   
   const [editingTopic, setEditingTopic] = useState<string | null>(null);
   const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
@@ -480,12 +483,13 @@ function DeepWorkPageContent() {
   const [addingFocusToTopic, setAddingFocusToTopic] = useState<string | null>(null);
   const [newFocusAreaName, setNewFocusAreaName] = useState('');
   const [newFocusAreaHours, setNewFocusAreaHours] = useState('');
+  const [newFocusAreaMinutes, setNewFocusAreaMinutes] = useState('');
 
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
 
   // Edit states for linked items
   const [editingUpskill, setEditingUpskill] = useState<ExerciseDefinition | null>(null);
-  const [editedUpskillData, setEditedUpskillData] = useState<Partial<ExerciseDefinition>>({});
+  const [editedUpskillData, setEditedUpskillData] = useState<Partial<ExerciseDefinition> & { estHours?: string; estMinutes?: string }>({});
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   const [editedResourceData, setEditedResourceData] = useState<Partial<Resource>>({});
 
@@ -566,7 +570,15 @@ function DeepWorkPageContent() {
   }, [editingTopic, deepWorkTopicMetadata]);
 
   useEffect(() => {
-    if (editingUpskill) setEditedUpskillData(editingUpskill);
+    if (editingUpskill) {
+      const hours = Math.floor((editingUpskill.estimatedDuration || 0) / 60);
+      const minutes = (editingUpskill.estimatedDuration || 0) % 60;
+      setEditedUpskillData({
+        ...editingUpskill,
+        estHours: hours > 0 ? String(hours) : '',
+        estMinutes: minutes > 0 ? String(minutes) : ''
+      });
+    }
   }, [editingUpskill]);
 
   useEffect(() => {
@@ -599,6 +611,7 @@ function DeepWorkPageContent() {
   const [newLinkedItemDescription, setNewLinkedItemDescription] = useState('');
   const [newLinkedItemLink, setNewLinkedItemLink] = useState('');
   const [newLinkedItemHours, setNewLinkedItemHours] = useState('');
+  const [newLinkedItemMinutes, setNewLinkedItemMinutes] = useState('');
   const [newLinkedItemFolderId, setNewLinkedItemFolderId] = useState('');
   const [linkSearchTerm, setLinkSearchTerm] = useState('');
   const [tempLinkedIds, setTempLinkedIds] = useState<string[]>([]);
@@ -672,7 +685,7 @@ function DeepWorkPageContent() {
   }, [allKnownTopics, deepWorkDefinitions, linkedDeepWorkChildIds, visibilityFilters]);
 
 
-  const formatMinutes = (minutes: number) => {
+  const formatDuration = (minutes: number) => {
     if (minutes === 0) return "0m";
     const h = Math.floor(minutes / 60);
     const m = Math.round(minutes % 60);
@@ -777,25 +790,23 @@ function DeepWorkPageContent() {
     return getDeepWorkLoggedMinutes(selectedFocusArea);
   }, [selectedFocusArea, getDeepWorkLoggedMinutes]);
 
-  const totalEstimatedHours = useMemo(() => {
+  const totalEstimatedDuration = useMemo(() => {
     if (!selectedFocusArea) return 0;
-    let totalHours = 0;
-    (selectedFocusArea.linkedDeepWorkIds || []).forEach(id => {
-      const def = deepWorkDefinitions.find(d => d.id === id);
-      if (def?.estimatedHours) {
-        totalHours += def.estimatedHours;
-      }
-    });
-    (selectedFocusArea.linkedUpskillIds || []).forEach(id => {
-      const def = upskillDefinitions.find(d => d.id === id);
-      if (def?.estimatedHours) {
-        totalHours += def.estimatedHours;
-      }
-    });
-    return totalHours;
+    let totalMinutes = 0;
+    const processIds = (ids: string[], defs: ExerciseDefinition[]) => {
+      (ids || []).forEach(id => {
+        const def = defs.find(d => d.id === id);
+        if (def?.estimatedDuration) {
+          totalMinutes += def.estimatedDuration;
+        }
+      });
+    };
+    processIds(selectedFocusArea.linkedDeepWorkIds, deepWorkDefinitions);
+    processIds(selectedFocusArea.linkedUpskillIds, upskillDefinitions);
+    return totalMinutes;
   }, [selectedFocusArea, deepWorkDefinitions, upskillDefinitions]);
 
-  const totalScopeHours = (selectedFocusArea?.estimatedHours || 0) + totalEstimatedHours;
+  const totalScopeDuration = (selectedFocusArea?.estimatedDuration || 0) + totalEstimatedDuration;
 
   const timesheetData = useMemo(() => {
     if (!selectedFocusArea) return [];
@@ -964,17 +975,22 @@ function DeepWorkPageContent() {
         return;
     }
 
+    const hours = parseInt(newFocusAreaHours, 10) || 0;
+    const minutes = parseInt(newFocusAreaMinutes, 10) || 0;
+    const totalMinutes = hours * 60 + minutes;
+
     const newDef: ExerciseDefinition = { 
         id: `def_${Date.now()}_${Math.random()}`, 
         name: newFocusAreaName.trim(),
         category: topic as ExerciseCategory,
         isReadyForBranding: false,
         sharingStatus: { twitter: false, linkedin: false, devto: false },
-        estimatedHours: parseInt(newFocusAreaHours, 10) || undefined,
+        estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
     };
     setDeepWorkDefinitions(prev => [...prev, newDef]);
     setNewFocusAreaName('');
     setNewFocusAreaHours('');
+    setNewFocusAreaMinutes('');
     setAddingFocusToTopic(null);
     toast({ title: "Success", description: `Focus Area "${newDef.name}" added to ${topic}.` });
   };
@@ -995,7 +1011,10 @@ function DeepWorkPageContent() {
   const handleStartEditDefinition = (def: ExerciseDefinition) => {
     setEditingDefinition(def);
     setEditingDefinitionName(def.name);
-    setEditingDefinitionHours(def.estimatedHours?.toString() || '');
+    const hours = Math.floor((def.estimatedDuration || 0) / 60);
+    const minutes = (def.estimatedDuration || 0) % 60;
+    setEditingDefinitionHours(hours > 0 ? String(hours) : '');
+    setEditingDefinitionMinutes(minutes > 0 ? String(minutes) : '');
   };
 
   const handleSaveEditDefinition = () => {
@@ -1003,7 +1022,11 @@ function DeepWorkPageContent() {
       toast({ title: "Error", description: "Focus Area name cannot be empty.", variant: "destructive" });
       return;
     }
-    const updatedDef = { ...editingDefinition, name: editingDefinitionName.trim(), estimatedHours: parseInt(editingDefinitionHours, 10) || undefined };
+    const hours = parseInt(editingDefinitionHours, 10) || 0;
+    const minutes = parseInt(editingDefinitionMinutes, 10) || 0;
+    const totalMinutes = hours * 60 + minutes;
+
+    const updatedDef = { ...editingDefinition, name: editingDefinitionName.trim(), estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined };
     setDeepWorkDefinitions(prev => prev.map(def => def.id === editingDefinition.id ? updatedDef : def));
     setAllDeepWorkLogs(prevLogs => prevLogs.map(log => ({...log, exercises: log.exercises.map(ex => ex.definitionId === editingDefinition.id ? { ...ex, name: updatedDef.name } : ex)})));
     if(selectedFocusArea?.id === editingDefinition.id) {
@@ -1159,6 +1182,7 @@ function DeepWorkPageContent() {
     setNewLinkedItemDescription('');
     setNewLinkedItemLink('');
     setNewLinkedItemHours('');
+    setNewLinkedItemMinutes('');
     setNewLinkedItemFolderId('');
     setLinkSearchTerm('');
     setLinkResourceFolderId('');
@@ -1236,6 +1260,10 @@ function DeepWorkPageContent() {
         return;
     }
 
+    const hours = parseInt(newLinkedItemHours, 10) || 0;
+    const minutes = parseInt(newLinkedItemMinutes, 10) || 0;
+    const totalMinutes = hours * 60 + minutes;
+
     if (type === 'upskill') {
         if (!newLinkedItemTopic.trim()) {
             toast({ title: "Error", description: "Topic is required.", variant: "destructive" });
@@ -1249,7 +1277,7 @@ function DeepWorkPageContent() {
             description: newLinkedItemDescription.trim(),
             link: link,
             iconUrl: getFaviconUrl(link),
-            estimatedHours: parseInt(newLinkedItemHours, 10) || undefined,
+            estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
         };
         setUpskillDefinitions(prev => [...prev, newUpskillDef]);
         updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newUpskillDef.id] };
@@ -1262,7 +1290,7 @@ function DeepWorkPageContent() {
             id: `def_${Date.now()}_deepwork_${Math.random()}`,
             name: newLinkedItemName.trim(),
             category: newLinkedItemTopic.trim() as ExerciseCategory,
-            estimatedHours: parseInt(newLinkedItemHours, 10) || undefined,
+            estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
         };
         setDeepWorkDefinitions(prev => [...prev, newDeepWorkDef]);
         updatedParent = { ...parent, linkedDeepWorkIds: [...(parent.linkedDeepWorkIds || []), newDeepWorkDef.id] };
@@ -1338,13 +1366,15 @@ function DeepWorkPageContent() {
   
   const handleSaveUpskillEdit = () => {
     if (!editedUpskillData || !editingUpskill) return;
+
+    const hours = parseInt(editedUpskillData.estHours || '0', 10);
+    const minutes = parseInt(editedUpskillData.estMinutes || '0', 10);
+    const totalMinutes = hours * 60 + minutes;
+
     const finalUpskillData: Partial<ExerciseDefinition> = { 
         ...editedUpskillData,
-        estimatedHours: editedUpskillData.estimatedHours ? parseInt(String(editedUpskillData.estimatedHours)) : undefined
+        estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined
     };
-    if (isNaN(finalUpskillData.estimatedHours!)) {
-        finalUpskillData.estimatedHours = undefined;
-    }
 
     if (finalUpskillData.link !== editingUpskill.link) {
         finalUpskillData.iconUrl = getFaviconUrl(finalUpskillData.link || '');
@@ -1694,7 +1724,7 @@ function DeepWorkPageContent() {
                                         )}
                                         <span className="truncate cursor-pointer" onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} title={`View details for ${def.name}`}>{def.name}</span>
                                         {def.isReadyForBranding && <Share2 className="h-3 w-3 text-primary flex-shrink-0" title="Ready for Branding" />}
-                                        {def.estimatedHours && <Badge variant="secondary" className="text-xs ml-auto">{def.estimatedHours}h</Badge>}
+                                        {def.estimatedDuration && <Badge variant="secondary" className="text-xs ml-auto">{formatDuration(def.estimatedDuration)}</Badge>}
                                       </div>
                                       <div className='hidden items-center flex-shrink-0 group-hover:flex'>
                                         <TooltipProvider>
@@ -1732,13 +1762,22 @@ function DeepWorkPageContent() {
                                           placeholder="New Focus Area Name"
                                           onKeyDown={e => e.key === 'Escape' && setAddingFocusToTopic(null)}
                                       />
-                                      <Input 
-                                          value={newFocusAreaHours}
-                                          onChange={(e) => setNewFocusAreaHours(e.target.value)}
-                                          type="number"
-                                          className="h-8"
-                                          placeholder="Est. Hours (optional)"
-                                      />
+                                      <div className="flex gap-2">
+                                        <Input 
+                                            value={newFocusAreaHours}
+                                            onChange={(e) => setNewFocusAreaHours(e.target.value)}
+                                            type="number"
+                                            className="h-8"
+                                            placeholder="Hours"
+                                        />
+                                        <Input 
+                                            value={newFocusAreaMinutes}
+                                            onChange={(e) => setNewFocusAreaMinutes(e.target.value)}
+                                            type="number"
+                                            className="h-8"
+                                            placeholder="Mins"
+                                        />
+                                      </div>
                                       <div className="flex justify-end gap-2">
                                         <Button size="icon" className="h-8 w-8" type="submit"><Save className="h-4 w-4"/></Button>
                                         <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAddingFocusToTopic(null)}><X className="h-4 w-4"/></Button>
@@ -1773,38 +1812,38 @@ function DeepWorkPageContent() {
                         <div className="space-y-2">
                             <div className="flex justify-between text-sm">
                                 <span className="text-muted-foreground">Total Logged Time</span>
-                                <span className="font-medium">{formatMinutes(totalLoggedTime)}</span>
+                                <span className="font-medium">{formatDuration(totalLoggedTime)}</span>
                             </div>
-                            {selectedFocusArea.estimatedHours && (
+                            {selectedFocusArea.estimatedDuration && (
                                 <div className="flex justify-between text-sm">
                                     <span className="text-muted-foreground">This Focus Area's Est.</span>
-                                    <span className="font-medium">{selectedFocusArea.estimatedHours}h</span>
+                                    <span className="font-medium">{formatDuration(selectedFocusArea.estimatedDuration)}</span>
                                 </div>
                             )}
-                            {totalEstimatedHours > 0 && (
+                            {totalEstimatedDuration > 0 && (
                                 <div className="flex justify-between text-sm">
                                     <span className="text-muted-foreground">Total Linked Est.</span>
-                                    <span className="font-medium">{totalEstimatedHours.toFixed(1)}h</span>
+                                    <span className="font-medium">{formatDuration(totalEstimatedDuration)}</span>
                                 </div>
                             )}
                         </div>
                         
-                        {totalScopeHours > 0 && (
+                        {totalScopeDuration > 0 && (
                             <div>
                                 <Progress 
-                                    value={Math.min(100, (totalLoggedTime / (totalScopeHours * 60)) * 100)} 
+                                    value={Math.min(100, (totalLoggedTime / totalScopeDuration) * 100)} 
                                     className="h-2" 
                                 />
                                 <div className="flex justify-between text-xs text-muted-foreground mt-1">
                                     <span>0%</span>
-                                    <span>{((totalLoggedTime / (totalScopeHours * 60)) * 100).toFixed(0)}%</span>
+                                    <span>{((totalLoggedTime / totalScopeDuration) * 100).toFixed(0)}%</span>
                                 </div>
                             </div>
                         )}
                         
-                        {totalScopeHours > 0 && totalLoggedTime > totalScopeHours * 60 && (
+                        {totalScopeDuration > 0 && totalLoggedTime > totalScopeDuration && (
                             <Badge variant="destructive" className="w-full justify-center">
-                                Overspent by {formatMinutes(totalLoggedTime - totalScopeHours * 60)}
+                                Overspent by {formatDuration(totalLoggedTime - totalScopeDuration)}
                             </Badge>
                         )}
                     </CardContent>
@@ -1902,6 +1941,7 @@ function DeepWorkPageContent() {
                                             handleUnlinkItem={handleUnlinkItem}
                                             handleDeleteUpskillDefinition={handleDeleteUpskillDefinition}
                                             upskillDefinitions={upskillDefinitions}
+                                            formatDuration={formatDuration}
                                         />
                                       )
                                     })}
@@ -1937,6 +1977,7 @@ function DeepWorkPageContent() {
                                             handleDeleteExerciseDefinition={handleDeleteExerciseDefinition}
                                             handleViewProgress={handleViewProgress}
                                             deepWorkDefinitions={deepWorkDefinitions}
+                                            formatDuration={formatDuration}
                                         />
                                       );
                                     })}
@@ -2225,8 +2266,11 @@ function DeepWorkPageContent() {
                                 <Input id="new-linked-name" value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} placeholder={manageLinksConfig?.type === 'upskill' ? 'e.g., CUDA Fundamentals Course' : 'e.g., Implement Ray Tracing'} />
                                 </div>
                                 <div className="space-y-1">
-                                    <Label htmlFor="new-linked-hours">Estimated Hours</Label>
-                                    <Input id="new-linked-hours" type="number" value={newLinkedItemHours} onChange={e => setNewLinkedItemHours(e.target.value)} placeholder="e.g., 20" />
+                                    <Label>Estimated Duration</Label>
+                                    <div className="flex gap-2">
+                                        <Input id="new-linked-hours" type="number" value={newLinkedItemHours} onChange={e => setNewLinkedItemHours(e.target.value)} placeholder="Hours" />
+                                        <Input id="new-linked-minutes" type="number" value={newLinkedItemMinutes} onChange={e => setNewLinkedItemMinutes(e.target.value)} placeholder="Minutes" />
+                                    </div>
                                 </div>
                                 {manageLinksConfig?.type === 'upskill' && (
                                 <>
@@ -2414,7 +2458,13 @@ function DeepWorkPageContent() {
                 <div className="space-y-1"><Label htmlFor="upskill-name">Name</Label><Input id="upskill-name" value={editedUpskillData.name || ''} onChange={e => setEditedUpskillData(d => ({ ...d, name: e.target.value }))} /></div>
                 <div className="space-y-1"><Label htmlFor="upskill-desc">Description</Label><Textarea id="upskill-desc" value={editedUpskillData.description || ''} onChange={e => setEditedUpskillData(d => ({ ...d, description: e.target.value }))} /></div>
                 <div className="space-y-1"><Label htmlFor="upskill-link">Link</Label><Input id="upskill-link" value={editedUpskillData.link || ''} onChange={e => setEditedUpskillData(d => ({ ...d, link: e.target.value }))} /></div>
-                <div className="space-y-1"><Label htmlFor="upskill-hours">Est. Hours</Label><Input id="upskill-hours" type="number" value={editedUpskillData.estimatedHours || ''} onChange={e => setEditedUpskillData(d => ({ ...d, estimatedHours: e.target.value ? parseInt(e.target.value, 10) : undefined }))} /></div>
+                <div className="space-y-1">
+                    <Label>Estimated Duration</Label>
+                    <div className="flex gap-2">
+                      <Input type="number" placeholder="Hours" value={editedUpskillData.estHours || ''} onChange={e => setEditedUpskillData(d => ({ ...d, estHours: e.target.value }))} />
+                      <Input type="number" placeholder="Minutes" value={editedUpskillData.estMinutes || ''} onChange={e => setEditedUpskillData(d => ({ ...d, estMinutes: e.target.value }))} />
+                    </div>
+                </div>
             </div>
             <DialogFooter>
                 <Button variant="outline" onClick={() => setEditingUpskill(null)}>Cancel</Button>
@@ -2468,8 +2518,11 @@ function DeepWorkPageContent() {
                     <Input id="dw-name" value={editingDefinitionName} onChange={e => setEditingDefinitionName(e.target.value)} />
                 </div>
                 <div className="space-y-1">
-                    <Label htmlFor="dw-hours">Estimated Hours</Label>
-                    <Input id="dw-hours" type="number" value={editingDefinitionHours} onChange={e => setEditingDefinitionHours(e.target.value)} placeholder="e.g., 40" />
+                    <Label>Estimated Duration</Label>
+                    <div className="flex gap-2">
+                        <Input id="dw-hours" type="number" value={editingDefinitionHours} onChange={e => setEditingDefinitionHours(e.target.value)} placeholder="Hours" />
+                        <Input id="dw-minutes" type="number" value={editingDefinitionMinutes} onChange={e => setEditingDefinitionMinutes(e.target.value)} placeholder="Minutes" />
+                    </div>
                 </div>
             </div>
             <DialogFooter>
@@ -2494,7 +2547,7 @@ function DeepWorkPageContent() {
                             <CardHeader className="p-3 flex flex-row justify-between items-center">
                                 <div>
                                     <CardTitle className="text-base">{format(parseISO(day.date), 'PPP')}</CardTitle>
-                                    <CardDescription className="text-xs">Total: {formatMinutes(day.totalDuration)}</CardDescription>
+                                    <CardDescription className="text-xs">Total: {formatDuration(day.totalDuration)}</CardDescription>
                                 </div>
                             </CardHeader>
                             <CardContent className="p-3 pt-0">
@@ -2509,7 +2562,7 @@ function DeepWorkPageContent() {
                                         {day.tasks.map((task, index) => (
                                             <TableRow key={index}>
                                                 <TableCell className="font-medium">{task.taskName}</TableCell>
-                                                <TableCell className="text-right">{formatMinutes(task.duration)}</TableCell>
+                                                <TableCell className="text-right">{formatDuration(task.duration)}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
