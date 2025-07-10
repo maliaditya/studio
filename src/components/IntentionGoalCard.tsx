@@ -45,51 +45,34 @@ export function IntentionGoalCard({ intention, onMindMapClick, onDiagramClick }:
     [allUpskillLogs, allDeepWorkLogs]);
 
     const projectStats = useMemo(() => {
-        const descendantIds = new Set<string>();
-        const queue = [intention.id];
-        const visited = new Set<string>();
-
-        while (queue.length > 0) {
-            const currentId = queue.shift()!;
-            if (visited.has(currentId)) continue;
-            visited.add(currentId);
-            descendantIds.add(currentId);
-
-            const def = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === currentId);
-            if (def) {
-                (def.linkedDeepWorkIds || []).forEach(id => queue.push(id));
-                (def.linkedUpskillIds || []).forEach(id => queue.push(id));
-            }
-        }
+        const linkedDeepWork = (intention.linkedDeepWorkIds || []).map(id => deepWorkDefinitions.find(d => d.id === id)).filter(Boolean) as ExerciseDefinition[];
+        const linkedUpskill = (intention.linkedUpskillIds || []).map(id => upskillDefinitions.find(d => d.id === id)).filter(Boolean) as ExerciseDefinition[];
+        const allLinkedTasks = [...linkedDeepWork, ...linkedUpskill];
 
         let totalLoggedHours = 0;
         let totalEstimatedHours = 0;
 
-        descendantIds.forEach(id => {
-            const def = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === id);
-            if (def?.estimatedDuration) {
-                totalEstimatedHours += def.estimatedDuration;
+        allLinkedTasks.forEach(task => {
+            totalEstimatedHours += (task.estimatedDuration || 0) / 60;
+
+            if (deepWorkDefinitions.some(d => d.id === task.id)) {
+                allDeepWorkLogs.forEach(log => {
+                    log.exercises.forEach(ex => {
+                        if (ex.definitionId === task.id) {
+                            totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0) / 60;
+                        }
+                    });
+                });
+            } else if (upskillDefinitions.some(d => d.id === task.id)) {
+                allUpskillLogs.forEach(log => {
+                    log.exercises.forEach(ex => {
+                        if (ex.definitionId === task.id) {
+                            totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0) / 60;
+                        }
+                    });
+                });
             }
-
-            allDeepWorkLogs.forEach(log => {
-                log.exercises.forEach(ex => {
-                    if (ex.definitionId === id) {
-                        totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0);
-                    }
-                });
-            });
-
-            allUpskillLogs.forEach(log => {
-                log.exercises.forEach(ex => {
-                    if (ex.definitionId === id) {
-                        totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0);
-                    }
-                });
-            });
         });
-        
-        totalLoggedHours = totalLoggedHours / 60;
-        totalEstimatedHours = totalEstimatedHours / 60;
 
         const remainingHours = Math.max(0, totalEstimatedHours - totalLoggedHours);
         const daysRemaining = avgDailyProductiveHours > 0 ? Math.ceil(remainingHours / avgDailyProductiveHours) : null;
