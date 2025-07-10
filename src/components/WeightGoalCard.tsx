@@ -401,6 +401,10 @@ export function WeightGoalCard({
         setIsMindMapModalOpen(true);
     };
 
+    const handleDiagramClick = (intention: ExerciseDefinition) => {
+        setSelectedIntention(intention);
+    };
+
     const renderProjectsContent = () => {
         if (activeIntentions.length === 0) {
           return (
@@ -420,6 +424,7 @@ export function WeightGoalCard({
                         key={intention.id}
                         intention={intention}
                         onMindMapClick={() => handleIntentionClick(intention)}
+                        onDiagramClick={() => handleDiagramClick(intention)}
                     />
                 )}
             />

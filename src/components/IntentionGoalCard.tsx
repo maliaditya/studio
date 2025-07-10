@@ -5,7 +5,7 @@ import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Progress } from './ui/progress';
 import { Button } from './ui/button';
-import { Workflow, GitMerge, TrendingUp, Calendar, Clock } from 'lucide-react';
+import { Workflow, GitMerge, TrendingUp, Calendar, Clock, Lightbulb } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, addDays } from 'date-fns';
 import type { ExerciseDefinition, DatedWorkout } from '@/types/workout';
@@ -13,6 +13,7 @@ import type { ExerciseDefinition, DatedWorkout } from '@/types/workout';
 interface IntentionGoalCardProps {
     intention: ExerciseDefinition;
     onMindMapClick: () => void;
+    onDiagramClick: () => void;
 }
 
 const calculateProductiveHours = (allUpskillLogs: DatedWorkout[], allDeepWorkLogs: DatedWorkout[]) => {
@@ -36,7 +37,7 @@ const calculateProductiveHours = (allUpskillLogs: DatedWorkout[], allDeepWorkLog
     return avgMinutesPerDay > 0 ? avgMinutesPerDay / 60 : 1;
 };
 
-export function IntentionGoalCard({ intention, onMindMapClick }: IntentionGoalCardProps) {
+export function IntentionGoalCard({ intention, onMindMapClick, onDiagramClick }: IntentionGoalCardProps) {
     const { deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs } = useAuth();
     
     const avgDailyProductiveHours = useMemo(() => 
@@ -66,14 +67,14 @@ export function IntentionGoalCard({ intention, onMindMapClick }: IntentionGoalCa
 
         descendantIds.forEach(id => {
             const def = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === id);
-            if (def?.estimatedHours) {
-                totalEstimatedHours += def.estimatedHours;
+            if (def?.estimatedDuration) {
+                totalEstimatedHours += def.estimatedDuration;
             }
 
             allDeepWorkLogs.forEach(log => {
                 log.exercises.forEach(ex => {
                     if (ex.definitionId === id) {
-                        totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0) / 60;
+                        totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0);
                     }
                 });
             });
@@ -81,11 +82,14 @@ export function IntentionGoalCard({ intention, onMindMapClick }: IntentionGoalCa
             allUpskillLogs.forEach(log => {
                 log.exercises.forEach(ex => {
                     if (ex.definitionId === id) {
-                        totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0) / 60;
+                        totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0);
                     }
                 });
             });
         });
+        
+        totalLoggedHours = totalLoggedHours / 60;
+        totalEstimatedHours = totalEstimatedHours / 60;
 
         const remainingHours = Math.max(0, totalEstimatedHours - totalLoggedHours);
         const daysRemaining = avgDailyProductiveHours > 0 ? Math.ceil(remainingHours / avgDailyProductiveHours) : null;
@@ -106,14 +110,19 @@ export function IntentionGoalCard({ intention, onMindMapClick }: IntentionGoalCa
                 <div className="flex justify-between items-start">
                     <div className="min-w-0">
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <Workflow className="h-5 w-5 text-primary flex-shrink-0" />
+                            <Lightbulb className="h-5 w-5 text-primary flex-shrink-0" />
                             <span className="truncate" title={intention.name}>{intention.name}</span>
                         </CardTitle>
                         <CardDescription className="text-xs">{intention.category}</CardDescription>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 flex-shrink-0" onClick={onMindMapClick}>
-                        <GitMerge className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 flex-shrink-0" onClick={onDiagramClick}>
+                            <Workflow className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 flex-shrink-0" onClick={onMindMapClick}>
+                            <GitMerge className="h-4 w-4" />
+                        </Button>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent className="flex-grow space-y-3">
@@ -123,7 +132,7 @@ export function IntentionGoalCard({ intention, onMindMapClick }: IntentionGoalCa
                             <Progress value={projectStats.progressPercent} className="h-2" />
                             <div className="flex justify-between text-xs text-muted-foreground mt-1">
                                 <span>{projectStats.loggedHours.toFixed(1)}h logged</span>
-                                <span>{projectStats.estimatedHours}h est.</span>
+                                <span>{projectStats.estimatedHours.toFixed(1)}h est.</span>
                             </div>
                         </div>
                         <div className="text-xs text-muted-foreground space-y-1">
