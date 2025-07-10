@@ -265,16 +265,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                     if (overlapX > 0 && overlapY > 0) {
                         changed = true;
                         
-                        if (Math.abs(dx) < Math.abs(dy)) { // Push vertically
-                             const pushY = overlapY / 2;
-                             if (posA.y < posB.y) {
-                                posA.y -= pushY;
-                                posB.y += pushY;
-                            } else {
-                                posA.y += pushY;
-                                posB.y -= pushY;
-                            }
-                        } else { // Push horizontally
+                        if (overlapX < overlapY) { // Push horizontally
                             const pushX = overlapX / 2;
                             if (posA.x < posB.x) {
                                 posA.x -= pushX;
@@ -283,16 +274,25 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                                 posA.x += pushX;
                                 posB.x -= pushX;
                             }
+                        } else { // Push vertically
+                             const pushY = overlapY / 2;
+                             if (posA.y < posB.y) {
+                                posA.y -= pushY;
+                                posB.y += pushY;
+                            } else {
+                                posA.y += pushY;
+                                posB.y -= pushY;
+                            }
                         }
                     }
                 }
             }
         }
         
-        if (iterations > 0) {
+        if (changed) {
             setNodes(updatedNodes);
         }
-        return iterations > 0;
+        return changed;
     }, []);
 
 
@@ -344,10 +344,9 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
             } else { break; }
         }
         
-        // Center the root node in the view
         const container = containerRef.current;
-        const centerX = container ? container.clientWidth / 2 - (CARD_WIDTH / 2) : 300;
-        const centerY = container ? container.clientHeight / 2 - (CARD_HEIGHT / 2) : 300;
+        const centerX = container ? container.offsetWidth / 2 : 500;
+        const centerY = container ? container.offsetHeight / 2 : 500;
 
         setNodes(new Map([[trueRootId, { x: centerX, y: centerY }]]));
         setEdges(new Set());
@@ -406,10 +405,11 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
             const finalNodes = new Map([...nodes, ...newNodesMap]);
             setNodes(finalNodes);
             setEdges(prev => new Set([...prev, ...newEdgesSet]));
-            // Run collision detection after expanding
+            
             let iterations = 0;
             const runLayout = () => {
-                if (iterations < 5 && runCollisionDetection(finalNodes)) {
+                const changed = runCollisionDetection(finalNodes);
+                if (iterations < 5 && changed) {
                     iterations++;
                     requestAnimationFrame(runLayout);
                 }
@@ -793,9 +793,9 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
         >
             <Card className={cn(
                 "shadow-lg hover:shadow-xl transition-shadow border-2",
-                status.isLoggedToday && "bg-green-100 dark:bg-transparent dark:border-green-700 border-green-300",
-                status.isScheduledToday && "bg-yellow-100 dark:bg-transparent dark:border-yellow-700 border-yellow-300",
-                status.isPending && "bg-orange-100 dark:bg-transparent dark:border-orange-700 border-orange-300",
+                status.isLoggedToday && "bg-green-100 border-green-300 dark:bg-transparent dark:border-green-700",
+                status.isScheduledToday && "dark:bg-transparent border-yellow-300 dark:border-yellow-700",
+                status.isPending && "dark:bg-transparent border-orange-300 dark:border-orange-700",
                 status.isPastLogged && "border-green-500 dark:border-green-400"
             )}>
                 <div className="p-2 cursor-grab" {...listeners} {...attributes}>
@@ -1215,8 +1215,8 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         "p-2 rounded-md shadow-md transition-all duration-300 relative border-l-4",
         isHighlighted ? 'bg-primary/10' : 'bg-card',
         nodeStatus.isLogged ? "border-green-500" :
-        nodeStatus.isScheduled ? "bg-yellow-100/50 dark:bg-transparent dark:border-yellow-500 border-yellow-300" :
-        nodeStatus.isPending ? "bg-orange-100/50 dark:bg-transparent dark:border-orange-500 border-orange-300" :
+        nodeStatus.isScheduled ? "bg-yellow-100/50 dark:bg-transparent border-yellow-300 dark:border-yellow-500" :
+        nodeStatus.isPending ? "bg-orange-100/50 dark:bg-transparent border-orange-300 dark:border-orange-500" :
         nodeStatus.isPastLogged ? "border-green-400" :
         "border-transparent"
     );
