@@ -775,8 +775,8 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
             <Card className={cn(
                 "shadow-lg hover:shadow-xl transition-shadow border-2",
                 status.isLoggedToday && "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700",
-                status.isScheduledToday && "bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700",
-                status.isPending && "bg-orange-100 border-orange-300 dark:bg-orange-900/30 dark:border-orange-700",
+                status.isScheduledToday && "bg-yellow-100 dark:bg-yellow-900/30 dark:border-yellow-700",
+                status.isPending && "bg-orange-100 dark:bg-orange-900/30 dark:border-orange-700",
                 status.isPastLogged && "border-green-500 dark:border-green-400"
             )}>
                 <div className="p-2 cursor-grab" {...listeners} {...attributes}>
@@ -1196,8 +1196,8 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         "p-2 rounded-md shadow-md transition-all duration-300 relative border-l-4",
         isHighlighted ? 'bg-primary/10' : 'bg-card',
         nodeStatus.isLogged ? "border-green-500" :
-        nodeStatus.isScheduled ? "border-yellow-500" :
-        nodeStatus.isPending ? "border-orange-500" :
+        nodeStatus.isScheduled ? "dark:border-yellow-500 border-transparent" :
+        nodeStatus.isPending ? "dark:border-orange-500 border-transparent" :
         nodeStatus.isPastLogged ? "border-green-400" :
         "border-transparent"
     );
