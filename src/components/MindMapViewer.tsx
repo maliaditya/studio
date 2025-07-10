@@ -261,13 +261,14 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     
                     if (overlapX > 0 && overlapY > 0) {
                         changed = true;
-                        const pushY = overlapY / 2;
+                        // Determine push direction based on position. Push vertically.
+                        const pushAmount = overlapY / 2;
                         if (posA.y < posB.y) {
-                            posA.y -= pushY;
-                            posB.y += pushY;
+                            posA.y -= pushAmount;
+                            posB.y += pushAmount;
                         } else {
-                            posA.y += pushY;
-                            posB.y -= pushY;
+                            posA.y += pushAmount;
+                            posB.y -= pushAmount;
                         }
                     }
                 }
@@ -330,8 +331,8 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         }
         
         const container = containerRef.current;
-        const centerX = container ? container.offsetWidth / 2 : 500;
-        const centerY = container ? container.offsetHeight / 2 : 500;
+        const centerX = container ? container.offsetWidth / 2 - (CARD_WIDTH / 2) : 500;
+        const centerY = container ? container.offsetHeight / 2 - (CARD_HEIGHT / 2) : 500;
 
         setNodes(new Map([[trueRootId, { x: centerX, y: centerY }]]));
         setEdges(new Set());
@@ -378,7 +379,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                 madeChanges = true;
                 parentsToLoad.forEach((parentId, index) => {
                     newNodesMap.set(parentId, {
-                        x: pos.x - HORIZONTAL_SPACING,
+                        x: pos.x + HORIZONTAL_SPACING, // Changed to expand to the right
                         y: pos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
                     });
                     newEdgesSet.add(`${parentId}-${nodeId}`);
@@ -453,7 +454,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         parentsToLoad.forEach((parentId, index) => {
             if (!nodes.has(parentId)) {
                 nodesToUpdate.set(parentId, {
-                    x: currentNodePos.x - HORIZONTAL_SPACING,
+                    x: currentNodePos.x + HORIZONTAL_SPACING, // Changed to expand to the right
                     y: currentNodePos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
                 });
             }
@@ -771,7 +772,7 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
         >
             <Card className={cn(
                 "shadow-lg hover:shadow-xl transition-shadow border-2",
-                status.isLoggedToday && "bg-green-100 dark:bg-transparent border-green-500 dark:border-green-400",
+                status.isLoggedToday && "bg-green-100 dark:bg-green-900/30 border-green-500 dark:border-green-400",
                 status.isScheduledToday && "bg-yellow-100 dark:bg-transparent border-yellow-500 dark:border-yellow-400",
                 status.isPending && "bg-orange-100 dark:bg-transparent border-orange-400 dark:border-orange-500",
                 status.isPastLogged && !status.isLoggedToday && "border-green-500 dark:border-green-400"
@@ -1203,8 +1204,8 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         "p-2 rounded-md shadow-md transition-all duration-300 relative border-l-4",
         isHighlighted ? 'bg-primary/10' : 'bg-card',
         nodeStatus.isLogged ? "bg-green-100 dark:bg-transparent border-green-500 dark:border-green-400" :
-        nodeStatus.isScheduled ? "bg-yellow-100 dark:bg-transparent border-yellow-500 dark:border-yellow-400" :
-        nodeStatus.isPending ? "bg-orange-100 dark:bg-transparent border-orange-400 dark:border-orange-500" :
+        nodeStatus.isScheduled ? "dark:bg-transparent border-yellow-500 dark:border-yellow-400" :
+        nodeStatus.isPending ? "dark:bg-transparent border-orange-400 dark:border-orange-500" :
         nodeStatus.isPastLogged ? "border-green-400" :
         "border-transparent"
     );
