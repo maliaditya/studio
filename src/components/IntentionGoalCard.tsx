@@ -44,48 +44,110 @@ export function IntentionGoalCard({ intention, onMindMapClick, onDiagramClick }:
         calculateProductiveHours(allUpskillLogs, allDeepWorkLogs), 
     [allUpskillLogs, allDeepWorkLogs]);
 
+    const permanentlyLoggedActionIds = useMemo(() => {
+        const loggedIds = new Set<string>();
+        allDeepWorkLogs.forEach(log => {
+          log.exercises.forEach(ex => {
+            if (ex.loggedSets.length > 0) loggedIds.add(ex.definitionId);
+          });
+        });
+        return loggedIds;
+    }, [allDeepWorkLogs]);
+
+    const permanentlyLoggedVisualizationIds = useMemo(() => {
+        const loggedIds = new Set<string>();
+        allUpskillLogs.forEach(log => {
+          log.exercises.forEach(ex => {
+            if (ex.loggedSets.length > 0) loggedIds.add(ex.definitionId);
+          });
+        });
+        return loggedIds;
+    }, [allUpskillLogs]);
+
     const projectStats = useMemo(() => {
+        const isDeepWorkObjectiveComplete = (objective: ExerciseDefinition): boolean => {
+            const childActionIds = (objective.linkedDeepWorkIds || []).filter(childId => {
+                const childDef = deepWorkDefinitions.find(d => d.id === childId);
+                return childDef && (childDef.linkedDeepWorkIds?.length ?? 0) === 0;
+            });
+            if (childActionIds.length === 0) return false;
+            return childActionIds.every(id => permanentlyLoggedActionIds.has(id));
+        };
+        
+        const isUpskillObjectiveComplete = (objective: ExerciseDefinition): boolean => {
+            const visited = new Set<string>();
+            const visualizationIds = new Set<string>();
+            const queue: string[] = [objective.id];
+      
+            while (queue.length > 0) {
+                const currentId = queue.shift()!;
+                if (visited.has(currentId)) continue;
+                visited.add(currentId);
+                const node = upskillDefinitions.find(d => d.id === currentId);
+                if (!node) continue;
+                const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+                if (!isParent) {
+                    visualizationIds.add(node.id);
+                } else {
+                    (node.linkedUpskillIds || []).forEach(childId => {
+                        if (!visited.has(childId)) queue.push(childId);
+                    });
+                }
+            }
+            if (visualizationIds.size === 0) return false;
+            return Array.from(visualizationIds).every(vizId => permanentlyLoggedVisualizationIds.has(vizId));
+        };
+        
         const linkedDeepWork = (intention.linkedDeepWorkIds || []).map(id => deepWorkDefinitions.find(d => d.id === id)).filter(Boolean) as ExerciseDefinition[];
         const linkedUpskill = (intention.linkedUpskillIds || []).map(id => upskillDefinitions.find(d => d.id === id)).filter(Boolean) as ExerciseDefinition[];
+        
         const allLinkedTasks = [...linkedDeepWork, ...linkedUpskill];
 
-        let totalLoggedHours = 0;
+        let completedHours = 0;
         let totalEstimatedHours = 0;
 
         allLinkedTasks.forEach(task => {
             totalEstimatedHours += (task.estimatedDuration || 0) / 60;
 
-            if (deepWorkDefinitions.some(d => d.id === task.id)) {
-                allDeepWorkLogs.forEach(log => {
-                    log.exercises.forEach(ex => {
-                        if (ex.definitionId === task.id) {
-                            totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0) / 60;
-                        }
-                    });
-                });
-            } else if (upskillDefinitions.some(d => d.id === task.id)) {
-                allUpskillLogs.forEach(log => {
-                    log.exercises.forEach(ex => {
-                        if (ex.definitionId === task.id) {
-                            totalLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0) / 60;
-                        }
-                    });
-                });
+            const isCompleted = deepWorkDefinitions.some(d => d.id === task.id) 
+                ? isDeepWorkObjectiveComplete(task)
+                : isUpskillObjectiveComplete(task);
+            
+            if (isCompleted) {
+                completedHours += (task.estimatedDuration || 0) / 60;
             }
         });
+        
+        // This is the actual logged time, used only for projection, not for the progress bar.
+        let actualLoggedHours = 0;
+        allDeepWorkLogs.forEach(log => {
+            log.exercises.forEach(ex => {
+                if (intention.linkedDeepWorkIds?.includes(ex.definitionId)) {
+                    actualLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0) / 60;
+                }
+            });
+        });
+         allUpskillLogs.forEach(log => {
+            log.exercises.forEach(ex => {
+                if (intention.linkedUpskillIds?.includes(ex.definitionId)) {
+                    actualLoggedHours += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0) / 60;
+                }
+            });
+        });
 
-        const remainingHours = Math.max(0, totalEstimatedHours - totalLoggedHours);
+
+        const remainingHours = Math.max(0, totalEstimatedHours - actualLoggedHours);
         const daysRemaining = avgDailyProductiveHours > 0 ? Math.ceil(remainingHours / avgDailyProductiveHours) : null;
         const projectedDate = daysRemaining !== null ? format(addDays(new Date(), daysRemaining), 'MMM d, yyyy') : null;
 
         return {
-            loggedHours: totalLoggedHours,
+            loggedHours: completedHours, // Use completed hours for progress display
             estimatedHours: totalEstimatedHours,
-            progressPercent: totalEstimatedHours > 0 ? (totalLoggedHours / totalEstimatedHours) * 100 : 0,
+            progressPercent: totalEstimatedHours > 0 ? (completedHours / totalEstimatedHours) * 100 : 0,
             daysRemaining,
             projectedDate,
         };
-    }, [intention, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, avgDailyProductiveHours]);
+    }, [intention, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, avgDailyProductiveHours, permanentlyLoggedActionIds, permanentlyLoggedVisualizationIds]);
 
     return (
         <Card className="h-full flex flex-col">
@@ -146,3 +208,4 @@ export function IntentionGoalCard({ intention, onMindMapClick, onDiagramClick }:
         </Card>
     );
 }
+
