@@ -73,7 +73,7 @@ const isObsidianUrl = (url: string): boolean => {
 };
 
 function ResourcesPageContent() {
-  const { toast } = useToast();
+  const { toast } = useAuth();
   const { 
     resources, setResources, 
     resourceFolders, setResourceFolders,
@@ -467,10 +467,9 @@ function ResourcesPageContent() {
                                             className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                const video = document.getElementById(`video-${res.id}`) as HTMLIFrameElement;
-                                                const videoElement = video?.contentWindow?.document.querySelector('video');
-                                                if (videoElement && document.pictureInPictureEnabled) {
-                                                    videoElement.requestPictureInPicture().catch(console.error);
+                                                const iframe = document.getElementById(`video-${res.id}`) as HTMLIFrameElement;
+                                                if (document.pictureInPictureEnabled && iframe) {
+                                                    iframe.requestPictureInPicture().catch(console.error);
                                                 }
                                             }}
                                             aria-label="Picture in Picture"
