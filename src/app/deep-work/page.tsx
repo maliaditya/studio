@@ -479,11 +479,10 @@ function DeepWorkPageContent() {
   const [newTopicNameForEdit, setNewTopicNameForEdit] = useState('');
   const [newTopicClassificationForEdit, setNewTopicClassificationForEdit] = useState<'product' | 'service'>('product');
 
-  // State for adding a focus area inline
-  const [addingFocusToTopic, setAddingFocusToTopic] = useState<string | null>(null);
-  const [newFocusAreaName, setNewFocusAreaName] = useState('');
-  const [newFocusAreaHours, setNewFocusAreaHours] = useState('');
-  const [newFocusAreaMinutes, setNewFocusAreaMinutes] = useState('');
+  // State for adding a focus area with a modal
+  const [isNewFocusAreaModalOpen, setIsNewFocusAreaModalOpen] = useState(false);
+  const [newFocusAreaParentTopic, setNewFocusAreaParentTopic] = useState<string | null>(null);
+  const [newFocusAreaData, setNewFocusAreaData] = useState({ name: '', hours: '', minutes: '' });
 
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
 
@@ -963,36 +962,54 @@ function DeepWorkPageContent() {
     setNewTopicName('');
     toast({ title: "Topic Created", description: `"${topic}" has been added to your library.` });
   }
+  
+  const handleOpenNewFocusAreaModal = (topic: string) => {
+    setNewFocusAreaParentTopic(topic);
+    setIsNewFocusAreaModalOpen(true);
+  };
 
-  const handleAddFocusArea = (topic: string) => {
-    if (!newFocusAreaName.trim()) {
-        setAddingFocusToTopic(null); // Cancel if empty
-        return;
+  const handleCreateFocusArea = () => {
+    if (!newFocusAreaParentTopic || !newFocusAreaData.name.trim()) {
+      toast({ title: "Error", description: "Focus area name cannot be empty.", variant: "destructive" });
+      return;
     }
 
-    if (deepWorkDefinitions.some(def => def.name.toLowerCase() === newFocusAreaName.trim().toLowerCase() && def.category.toLowerCase() === topic.toLowerCase())) {
+    if (deepWorkDefinitions.some(def => def.name.toLowerCase() === newFocusAreaData.name.trim().toLowerCase() && def.category.toLowerCase() === newFocusAreaParentTopic.toLowerCase())) {
         toast({ title: "Error", description: "This focus area already exists for this topic.", variant: "destructive" });
         return;
     }
 
-    const hours = parseInt(newFocusAreaHours, 10) || 0;
-    const minutes = parseInt(newFocusAreaMinutes, 10) || 0;
+    const hours = parseInt(newFocusAreaData.hours, 10) || 0;
+    const minutes = parseInt(newFocusAreaData.minutes, 10) || 0;
     const totalMinutes = hours * 60 + minutes;
 
     const newDef: ExerciseDefinition = { 
         id: `def_${Date.now()}_${Math.random()}`, 
-        name: newFocusAreaName.trim(),
-        category: topic as ExerciseCategory,
+        name: newFocusAreaData.name.trim(),
+        category: newFocusAreaParentTopic as ExerciseCategory,
         isReadyForBranding: false,
         sharingStatus: { twitter: false, linkedin: false, devto: false },
         estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
     };
+
     setDeepWorkDefinitions(prev => [...prev, newDef]);
-    setNewFocusAreaName('');
-    setNewFocusAreaHours('');
-    setNewFocusAreaMinutes('');
-    setAddingFocusToTopic(null);
-    toast({ title: "Success", description: `Focus Area "${newDef.name}" added to ${topic}.` });
+    
+    // Expand the topic to show the new area
+    setExpandedTopics(prev => {
+        const newSet = new Set(prev);
+        newSet.add(newFocusAreaParentTopic);
+        return newSet;
+    });
+
+    // Select the new focus area
+    setSelectedFocusArea(newDef);
+    setViewMode('library');
+
+    // Reset and close modal
+    setNewFocusAreaData({ name: '', hours: '', minutes: '' });
+    setIsNewFocusAreaModalOpen(false);
+    setNewFocusAreaParentTopic(null);
+    toast({ title: "Success", description: `Focus Area "${newDef.name}" added to ${newFocusAreaParentTopic}.` });
   };
 
 
@@ -1751,41 +1768,7 @@ function DeepWorkPageContent() {
                                     </>
                                 </li>
                               )})}
-                             {addingFocusToTopic === topic && (
-                                <li className="p-1.5">
-                                  <form onSubmit={(e) => { e.preventDefault(); handleAddFocusArea(topic); }} className="space-y-2">
-                                      <Input 
-                                          value={newFocusAreaName}
-                                          onChange={(e) => setNewFocusAreaName(e.target.value)}
-                                          className="h-8"
-                                          autoFocus
-                                          placeholder="New Focus Area Name"
-                                          onKeyDown={e => e.key === 'Escape' && setAddingFocusToTopic(null)}
-                                      />
-                                      <div className="flex gap-2">
-                                        <Input 
-                                            value={newFocusAreaHours}
-                                            onChange={(e) => setNewFocusAreaHours(e.target.value)}
-                                            type="number"
-                                            className="h-8"
-                                            placeholder="Hours"
-                                        />
-                                        <Input 
-                                            value={newFocusAreaMinutes}
-                                            onChange={(e) => setNewFocusAreaMinutes(e.target.value)}
-                                            type="number"
-                                            className="h-8"
-                                            placeholder="Mins"
-                                        />
-                                      </div>
-                                      <div className="flex justify-end gap-2">
-                                        <Button size="icon" className="h-8 w-8" type="submit"><Save className="h-4 w-4"/></Button>
-                                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAddingFocusToTopic(null)}><X className="h-4 w-4"/></Button>
-                                      </div>
-                                  </form>
-                                </li>
-                            )}
-                          </ul>
+                        </ul>
                       )}
                     </div>
                   )})}
@@ -2155,8 +2138,7 @@ function DeepWorkPageContent() {
         >
           <Button variant="ghost" className="w-full justify-start h-9 px-2" onClick={(e) => {
               e.stopPropagation();
-              toggleTopicExpansion(contextMenu.item);
-              setAddingFocusToTopic(contextMenu.item);
+              handleOpenNewFocusAreaModal(contextMenu.item);
               setContextMenu(null);
           }}>
             <PlusCircle className="mr-2 h-4 w-4" /> New Focus Area
@@ -2574,6 +2556,32 @@ function DeepWorkPageContent() {
                     )}
                 </div>
             </ScrollArea>
+        </DialogContent>
+    </Dialog>
+
+     <Dialog open={isNewFocusAreaModalOpen} onOpenChange={setIsNewFocusAreaModalOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>New Focus Area for "{newFocusAreaParentTopic}"</DialogTitle>
+                <DialogDescription>Create a new task to focus on. You can link other items to it later.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-1">
+                    <Label htmlFor="new-focus-name">Name</Label>
+                    <Input id="new-focus-name" autoFocus value={newFocusAreaData.name} onChange={(e) => setNewFocusAreaData(prev => ({ ...prev, name: e.target.value }))} />
+                </div>
+                 <div className="space-y-1">
+                    <Label>Estimated Duration (Optional)</Label>
+                    <div className="flex gap-2">
+                        <Input type="number" placeholder="Hours" value={newFocusAreaData.hours} onChange={(e) => setNewFocusAreaData(prev => ({ ...prev, hours: e.target.value }))} />
+                        <Input type="number" placeholder="Minutes" value={newFocusAreaData.minutes} onChange={(e) => setNewFocusAreaData(prev => ({ ...prev, minutes: e.target.value }))} />
+                    </div>
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsNewFocusAreaModalOpen(false)}>Cancel</Button>
+                <Button onClick={handleCreateFocusArea}>Create Focus Area</Button>
+            </DialogFooter>
         </DialogContent>
     </Dialog>
     </>
