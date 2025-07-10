@@ -77,7 +77,7 @@ const isObsidianUrl = (url: string): boolean => {
     } catch (e) { return false; }
 };
 
-function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleStartEditSubtopic, handleUnlinkItem, handleDeleteSubtopic, handleViewProgress, isComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions }: {
+function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleStartEditSubtopic, handleUnlinkItem, handleDeleteSubtopic, handleViewProgress, isComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions, calculatedEstimate }: {
   upskillDef: ExerciseDefinition;
   handleAddTaskToSession: (def: ExerciseDefinition) => void;
   setSelectedSubtopic: (def: ExerciseDefinition | null) => void;
@@ -89,6 +89,7 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
   isComplete: boolean;
   getUpskillLoggedMinutesRecursive: (def: ExerciseDefinition) => number;
   upskillDefinitions: ExerciseDefinition[];
+  calculatedEstimate: number;
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id: upskillDef.id });
   const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: upskillDef.id });
@@ -103,28 +104,8 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
   const isParent = (upskillDef.linkedUpskillIds?.length ?? 0) > 0 || (upskillDef.linkedResourceIds?.length ?? 0) > 0;
   const isVisualization = !isParent;
 
-  const calculateTotalEstimate = useCallback((def: ExerciseDefinition) => {
-    let total = 0;
-    const visited = new Set<string>();
-    function recurse(d: ExerciseDefinition) {
-      if (visited.has(d.id)) return;
-      visited.add(d.id);
-      const hasChildren = (d.linkedUpskillIds?.length ?? 0) > 0;
-      if (hasChildren) {
-        (d.linkedUpskillIds || []).forEach(childId => {
-          const childDef = upskillDefinitions.find(c => c.id === childId);
-          if (childDef) recurse(childDef);
-        });
-      } else {
-        total += d.estimatedDuration || 0;
-      }
-    }
-    recurse(def);
-    return total;
-  }, [upskillDefinitions]);
-
   const loggedMinutes = getUpskillLoggedMinutesRecursive(upskillDef);
-  const estDuration = isParent ? calculateTotalEstimate(upskillDef) : upskillDef.estimatedDuration;
+  const estDuration = isParent ? calculatedEstimate : upskillDef.estimatedDuration;
   
   const formatMinutes = (minutes: number) => {
     if (minutes === 0) return "0m";
@@ -341,6 +322,31 @@ function UpskillPageContent() {
   }, [upskillDefinitions, permanentlyLoggedVisualizationIds]);
 
 
+  const calculateTotalEstimate = useCallback((def: ExerciseDefinition) => {
+    let total = 0;
+    const visited = new Set<string>();
+  
+    function recurse(d: ExerciseDefinition) {
+      if (visited.has(d.id)) return;
+      visited.add(d.id);
+  
+      const hasChildren = (d.linkedUpskillIds?.length ?? 0) > 0;
+  
+      if (hasChildren) {
+        (d.linkedUpskillIds || []).forEach(childId => {
+          const childDef = upskillDefinitions.find(c => c.id === childId);
+          if (childDef) recurse(childDef);
+        });
+      } else {
+        total += d.estimatedDuration || 0;
+      }
+    }
+  
+    recurse(def);
+    return total;
+  }, [upskillDefinitions]);
+
+
   const topicsWithSubtopics = useMemo(() => {
     const effectiveFilters = visibilityFilters.size === 0 ? new Set<never>() : visibilityFilters;
     const visibleDefinitions = upskillDefinitions.filter(def => {
@@ -416,30 +422,6 @@ function UpskillPageContent() {
     const m = minutes % 60;
     return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim();
   }
-
-  const calculateTotalEstimate = useCallback((def: ExerciseDefinition) => {
-    let total = 0;
-    const visited = new Set<string>();
-  
-    function recurse(d: ExerciseDefinition) {
-      if (visited.has(d.id)) return;
-      visited.add(d.id);
-  
-      const hasChildren = (d.linkedUpskillIds?.length ?? 0) > 0;
-  
-      if (hasChildren) {
-        (d.linkedUpskillIds || []).forEach(childId => {
-          const childDef = upskillDefinitions.find(c => c.id === childId);
-          if (childDef) recurse(childDef);
-        });
-      } else {
-        total += d.estimatedDuration || 0;
-      }
-    }
-  
-    recurse(def);
-    return total;
-  }, [upskillDefinitions]);
 
   const totalEstimatedDuration = useMemo(() => {
     if (!selectedSubtopic) return 0;
@@ -707,7 +689,7 @@ function UpskillPageContent() {
     setManageLinksConfig({ type, parent });
     setTempLinkedIds(type === 'upskill' ? (parent.linkedUpskillIds || []) : (parent.linkedResourceIds || []));
     setNewLinkedItemTopic(parent.category);
-    setNewLinkedItemName(''); setNewLinkedItemDescription(''); setNewLinkedItemLink(''); setNewLinkedItemHours(''); setNewLinkedItemFolderId('');
+    setNewLinkedItemName(''); setNewLinkedItemDescription(''); setNewLinkedItemLink(''); setNewLinkedItemHours(''); setNewLinkedItemMinutes(''); setNewLinkedItemFolderId('');
     setLinkSearchTerm(''); setLinkResourceFolderId(''); setLinkUpskillTopic('');
     setIsManageLinksModalOpen(true);
   };
@@ -1050,6 +1032,7 @@ function UpskillPageContent() {
                                             isComplete={isUpskillObjectiveComplete(id)}
                                             getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
                                             upskillDefinitions={upskillDefinitions}
+                                            calculatedEstimate={calculateTotalEstimate(upskillDef)}
                                         />
                                     )
                                   })}
