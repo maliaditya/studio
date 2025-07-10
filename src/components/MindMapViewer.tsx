@@ -325,7 +325,12 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
             } else { break; }
         }
         
-        setNodes(new Map([[trueRootId, { x: 100, y: 300 }]]));
+        // Center the root node in the view
+        const container = containerRef.current;
+        const centerX = container ? container.clientWidth / 2 - (CARD_WIDTH / 2) : 300;
+        const centerY = container ? container.clientHeight / 2 - (CARD_HEIGHT / 2) : 300;
+
+        setNodes(new Map([[trueRootId, { x: centerX, y: centerY }]]));
         setEdges(new Set());
     }, [rootId, deepWorkDefinitions]);
 
@@ -650,7 +655,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     return (
         <div ref={containerRef} className="w-full h-full relative bg-background">
             <DndContext sensors={sensors} onDragStart={() => setIsDragging(true)} onDragEnd={handleDragEnd}>
-                <TransformWrapper ref={transformWrapperRef} disabled={isDragging}>
+                <TransformWrapper ref={transformWrapperRef} disabled={isDragging} initialScale={0.7}>
                     <Controls />
                     <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '200vw', height: '200vh' }}>
                         <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
