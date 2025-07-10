@@ -325,7 +325,7 @@ function UpskillPageContent() {
         const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
         
         if (!isParent) { // It's a Visualization
-            visualizations.add(node.id);
+            visualizationIds.add(node.id);
         } else { // It's an Objective or Curiosity, so recurse
             (node.linkedUpskillIds || []).forEach(childId => {
                 if (!visited.has(childId)) {
@@ -335,9 +335,9 @@ function UpskillPageContent() {
         }
     }
     
-    if (visualizations.size === 0) return false;
+    if (visualizationIds.size === 0) return false;
 
-    return Array.from(visualizations).every(vizId => permanentlyLoggedVisualizationIds.has(vizId));
+    return Array.from(visualizationIds).every(vizId => permanentlyLoggedVisualizationIds.has(vizId));
   }, [upskillDefinitions, permanentlyLoggedVisualizationIds]);
 
 
