@@ -139,31 +139,14 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
     const intentionMinutes = intention.estimatedDuration || 0;
     
     const totalLinkedMinutes = [...learningTasks, ...workTasks]
-      .filter(task => !task.isCompleted) // Only count hours for incomplete tasks
       .reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
 
     const totalMinutes = intentionMinutes + totalLinkedMinutes;
     
-    const getLoggedMinutes = (defs: ExerciseDefinition[], logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
-        const defIds = new Set(defs.map(d => d.id));
-        let minutes = 0;
-        logs.forEach(log => {
-            log.exercises.forEach(ex => {
-                if(defIds.has(ex.definitionId)) {
-                    minutes += ex.loggedSets.reduce((sum, set) => sum + set[durationField], 0);
-                }
-            });
-        });
-        return minutes;
-    };
-    
-    const loggedLearningMinutes = getLoggedMinutes(learningTasks, allUpskillLogs, 'reps');
-    const loggedWorkMinutes = getLoggedMinutes(workTasks, allDeepWorkLogs, 'weight');
-    const loggedIntentionMinutes = getLoggedMinutes([intention], allDeepWorkLogs, 'weight');
-    
-    const totalLoggedMinutes = loggedIntentionMinutes + loggedLearningMinutes + loggedWorkMinutes;
-    
-    const linkedLoggedMinutes = loggedLearningMinutes + loggedWorkMinutes;
+    // Progress is based on the sum of estimated hours of COMPLETED tasks.
+    const loggedMinutesFromCompletedTasks = [...learningTasks, ...workTasks]
+      .filter(task => task.isCompleted)
+      .reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
 
     return {
         linkedLearningTasks: learningTasks,
@@ -171,10 +154,10 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
         totalEstimatedHours: totalMinutes / 60,
         intentionEstimatedHours: intentionMinutes / 60,
         totalLinkedEstimatedHours: totalLinkedMinutes / 60,
-        totalLoggedHours: totalLoggedMinutes / 60,
-        progressPercent: totalLinkedMinutes > 0 ? (linkedLoggedMinutes / totalLinkedMinutes) * 100 : 0,
+        totalLoggedHours: loggedMinutesFromCompletedTasks / 60,
+        progressPercent: totalLinkedMinutes > 0 ? (loggedMinutesFromCompletedTasks / totalLinkedMinutes) * 100 : 0,
     };
-  }, [intention, upskillDefinitions, deepWorkDefinitions, allUpskillLogs, allDeepWorkLogs, isUpskillObjectiveComplete, isDeepWorkObjectiveComplete]);
+  }, [intention, upskillDefinitions, deepWorkDefinitions, isUpskillObjectiveComplete, isDeepWorkObjectiveComplete]);
   
   const productivityStats = useMemo(() => {
     const calculateWeeklyAverage = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
@@ -268,11 +251,6 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                      <p className="text-sm text-muted-foreground truncate" title={intention.name}>
                         {intention.name}
                      </p>
-                      {intentionEstimatedHours > 0 && (
-                        <p className="text-xs font-mono text-primary mt-1">
-                            This Est: {intentionEstimatedHours.toFixed(1)}h
-                        </p>
-                      )}
                       <p className="text-xs font-mono text-primary/80">
                         Total Est: {totalEstimatedHours.toFixed(1)}h
                       </p>
