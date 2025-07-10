@@ -41,105 +41,63 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
 
   const linkedLearningTasks = (intention.linkedUpskillIds || []).map(id => upskillDefinitions.find(d => d.id === id)).filter(Boolean) as ExerciseDefinition[];
   const linkedWorkTasks = (intention.linkedDeepWorkIds || []).map(id => deepWorkDefinitions.find(d => d.id === id)).filter(Boolean) as ExerciseDefinition[];
-  const linkedResources = (intention.linkedResourceIds || []).map(id => resources.find(r => r.id === id)).filter(Boolean) as Resource[];
   const isIntentionCheck = (def: ExerciseDefinition) => (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+
+  const solutionText = [
+    ...linkedWorkTasks.map(t => t.name),
+    ...linkedLearningTasks.map(t => t.name)
+  ].join(' + ');
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-4xl h-[70vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Intention Details: {intention.name}</DialogTitle>
+          <DialogTitle>Conceptual Flow: {intention.name}</DialogTitle>
           <DialogDescription>
-            A complete overview of all tasks and resources linked to this intention.
+            This diagram illustrates the strategic path from your current state to your desired outcome.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex-grow min-h-0">
-          <ScrollArea className="h-full pr-6">
-            <div className="space-y-6">
-              {/* Linked Learning */}
-              {linkedLearningTasks.length > 0 && (
-                <div>
-                  <h3 className="font-semibold flex items-center gap-2 mb-3"><BookCopy className="h-5 w-5 text-primary" /> Linked Learning</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {linkedLearningTasks.map(task => {
-                        const thumbnailUrl = task.link ? getYouTubeThumbnailUrl(task.link) : null;
-                        return (
-                            <Card key={task.id} className="rounded-lg flex flex-col group overflow-hidden">
-                                {thumbnailUrl ? (
-                                    <a href={task.link} target="_blank" rel="noopener noreferrer" className="block">
-                                        <Image src={thumbnailUrl} alt={task.name} width={320} height={180} className="w-full h-auto object-cover" />
-                                    </a>
-                                ) : null}
-                                <div className="p-4 flex-grow flex flex-col">
-                                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                      <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                      <a href={task.link} target="_blank" rel="noopener noreferrer" className="truncate hover:underline" title={task.name}>{task.name}</a>
-                                  </CardTitle>
-                                  <CardDescription className="text-xs mt-1">{task.category}</CardDescription>
-                                  <CardContent className="p-0 pt-2 flex-grow">
-                                      <p className="text-xs text-muted-foreground line-clamp-2">{task.description || "No description."}</p>
-                                  </CardContent>
-                                  {task.estimatedHours && <CardFooter className="p-0 pt-2"><Badge variant="outline" className="text-xs">{task.estimatedHours}h est.</Badge></CardFooter>}
-                                </div>
-                            </Card>
-                        )
-                    })}
-                  </div>
-                </div>
-              )}
+        <div className="flex-grow min-h-0 flex items-center justify-center p-8">
+            <div className="relative w-full h-full max-w-3xl">
+                {/* SVG for lines */}
+                <svg className="absolute top-0 left-0 w-full h-full overflow-visible" preserveAspectRatio="none">
+                    <defs>
+                        <marker id="arrowhead" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="hsl(var(--muted-foreground))" />
+                        </marker>
+                    </defs>
+                    {/* Base line */}
+                    <line x1="5%" y1="90%" x2="95%" y2="90%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
+                    {/* Left line */}
+                    <line x1="5%" y1="90%" x2="50%" y2="10%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
+                    {/* Right line */}
+                    <line x1="50%" y1="10%" x2="95%" y2="90%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
+                </svg>
 
-              {/* Linked Work */}
-              {linkedWorkTasks.length > 0 && (
-                <div>
-                  <h3 className="font-semibold flex items-center gap-2 mb-3"><Briefcase className="h-5 w-5 text-primary" /> Linked Work</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {linkedWorkTasks.map(task => (
-                        <Card key={task.id} className="rounded-lg flex flex-col">
-                           <div className="p-4 flex-grow flex flex-col">
-                              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                {isIntentionCheck(task) ? (
-                                    <Workflow className="h-4 w-4 text-primary flex-shrink-0" />
-                                ) : (
-                                    <Briefcase className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                )}
-                                <span className="truncate" title={task.name}>{task.name}</span>
-                              </CardTitle>
-                              <CardDescription className="text-xs mt-1">{task.category}</CardDescription>
-                              <CardContent className="p-0 pt-2 flex-grow">
-                                <p className="text-xs text-muted-foreground line-clamp-2">{task.description || "No description."}</p>
-                              </CardContent>
-                           </div>
-                           {task.estimatedHours && <CardFooter className="p-4 pt-0"><Badge variant="outline" className="text-xs">{task.estimatedHours}h est.</Badge></CardFooter>}
-                        </Card>
-                    ))}
-                  </div>
+                {/* Text labels */}
+                <div className="absolute left-[5%] bottom-[10%] -translate-x-1/2 translate-y-[150%] text-center">
+                    <p className="font-semibold text-foreground">Current state</p>
                 </div>
-              )}
+                
+                <div className="absolute left-1/2 top-[10%] -translate-x-1/2 -translate-y-[150%] text-center w-full px-4">
+                    <p className="font-semibold text-foreground text-lg">Solution</p>
+                    <p className="text-sm text-muted-foreground truncate" title={solutionText || 'Define linked tasks'}>
+                        {solutionText || 'Define linked tasks'}
+                    </p>
+                </div>
 
-              {/* Linked Resources */}
-              {linkedResources.length > 0 && (
-                <div>
-                  <h3 className="font-semibold flex items-center gap-2 mb-3"><LinkIcon className="h-5 w-5 text-primary" /> Linked Resources</h3>
-                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {linkedResources.map(resource => (
-                        <Card key={resource.id} className="rounded-lg flex flex-col">
-                            <div className="p-4 flex-grow flex flex-col">
-                                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                  <a href={resource.link} target="_blank" rel="noopener noreferrer" className="truncate hover:underline">{resource.name}</a>
-                                  <ExternalLink className="h-3 w-3 text-muted-foreground"/>
-                                </CardTitle>
-                                <CardDescription className="text-xs mt-1">{resourceFolders.find(f => f.id === resource.folderId)?.name || 'Uncategorized'}</CardDescription>
-                                <CardContent className="p-0 pt-2 flex-grow">
-                                  <p className="text-xs text-muted-foreground line-clamp-2">{resource.description || 'No description'}</p>
-                                </CardContent>
-                            </div>
-                        </Card>
-                    ))}
-                  </div>
+                <div className="absolute right-[5%] bottom-[10%] translate-x-1/2 translate-y-[150%] text-center">
+                     <p className="font-semibold text-foreground">Outcome</p>
+                     <p className="text-sm text-muted-foreground">To be defined</p>
                 </div>
-              )}
+
+                <div className="absolute left-1/2 bottom-[10%] -translate-x-1/2 translate-y-[120%] text-center w-full px-4">
+                     <p className="font-semibold text-foreground text-lg">Intention</p>
+                     <p className="text-sm text-muted-foreground truncate" title={intention.name}>
+                        {intention.name}
+                     </p>
+                </div>
             </div>
-          </ScrollArea>
         </div>
       </DialogContent>
     </Dialog>
