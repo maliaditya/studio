@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import Image from 'next/image';
 import {
   Dialog,
@@ -35,18 +35,23 @@ const getYouTubeThumbnailUrl = (url: string): string | null => {
 };
 
 export function IntentionDetailModal({ isOpen, onOpenChange, intention }: IntentionDetailModalProps) {
-  const { upskillDefinitions, deepWorkDefinitions, resources, resourceFolders } = useAuth();
+  const { upskillDefinitions, deepWorkDefinitions } = useAuth();
+
+  const { linkedLearningTasks, linkedWorkTasks, totalEstimatedHours } = useMemo(() => {
+    if (!intention) return { linkedLearningTasks: [], linkedWorkTasks: [], totalEstimatedHours: 0 };
+    
+    const learningTasks = (intention.linkedUpskillIds || []).map(id => upskillDefinitions.find(d => d.id === id)).filter(Boolean) as ExerciseDefinition[];
+    const workTasks = (intention.linkedDeepWorkIds || []).map(id => deepWorkDefinitions.find(d => d.id === id)).filter(Boolean) as ExerciseDefinition[];
+
+    const totalLearningMinutes = learningTasks.reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
+    const totalWorkMinutes = workTasks.reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
+    
+    const totalHours = (totalLearningMinutes + totalWorkMinutes) / 60;
+
+    return { linkedLearningTasks: learningTasks, linkedWorkTasks: workTasks, totalEstimatedHours: totalHours };
+  }, [intention, upskillDefinitions, deepWorkDefinitions]);
 
   if (!intention) return null;
-
-  const linkedLearningTasks = (intention.linkedUpskillIds || []).map(id => upskillDefinitions.find(d => d.id === id)).filter(Boolean) as ExerciseDefinition[];
-  const linkedWorkTasks = (intention.linkedDeepWorkIds || []).map(id => deepWorkDefinitions.find(d => d.id === id)).filter(Boolean) as ExerciseDefinition[];
-  const isIntentionCheck = (def: ExerciseDefinition) => (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-
-  const solutionText = [
-    ...linkedWorkTasks.map(t => t.name),
-    ...linkedLearningTasks.map(t => t.name)
-  ].join(' + ');
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -79,11 +84,19 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                     <p className="font-semibold text-foreground">Current state</p>
                 </div>
                 
-                <div className="absolute left-1/2 top-[10%] -translate-x-1/2 -translate-y-[150%] text-center w-full px-4">
+                <div className="absolute left-1/2 top-[10%] -translate-x-1/2 -translate-y-full text-center w-full px-4">
                     <p className="font-semibold text-foreground text-lg">Solution</p>
-                    <p className="text-sm text-muted-foreground truncate" title={solutionText || 'Define linked tasks'}>
-                        {solutionText || 'Define linked tasks'}
-                    </p>
+                    <div className="text-sm text-muted-foreground w-full max-w-sm mx-auto p-2 border rounded-md bg-background/50 backdrop-blur-sm mt-2">
+                        <p className="font-bold text-primary mb-2">Total Est: {totalEstimatedHours.toFixed(1)}h</p>
+                        <ul className="text-xs list-disc list-inside space-y-1 text-left max-h-32 overflow-y-auto">
+                            {[...linkedWorkTasks, ...linkedLearningTasks].map(task => (
+                                <li key={task.id} className="truncate" title={task.name}>
+                                    {task.name}
+                                    {task.estimatedDuration && <span className="font-mono text-muted-foreground/80"> - {(task.estimatedDuration / 60).toFixed(1)}h</span>}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
                 </div>
 
                 <div className="absolute right-[5%] bottom-[10%] translate-x-1/2 translate-y-[150%] text-center">
