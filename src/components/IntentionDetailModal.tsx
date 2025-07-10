@@ -208,21 +208,6 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                      </p>
                 </div>
             </div>
-            
-        </div>
-        <div className="flex-shrink-0 border-t pt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-            <div>
-                <CardTitle>{totalLoggedHours.toFixed(1)}h</CardTitle>
-                <CardDescription>Total Logged Time</CardDescription>
-            </div>
-            <div>
-                <CardTitle>{intentionEstimatedHours.toFixed(1)}h</CardTitle>
-                <CardDescription>This Focus Area's Est.</CardDescription>
-            </div>
-            <div>
-                <CardTitle>{totalLinkedEstimatedHours.toFixed(1)}h</CardTitle>
-                <CardDescription>Total Linked Est.</CardDescription>
-            </div>
         </div>
       </DialogContent>
     </Dialog>
