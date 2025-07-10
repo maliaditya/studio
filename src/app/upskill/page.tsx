@@ -670,7 +670,7 @@ function UpskillPageContent() {
     let definitionsSource = linkUpskillTopic ? upskillDefinitions.filter(d => d.category === linkUpskillTopic) : upskillDefinitions;
 
     return definitionsSource.filter(def => {
-        if (!def.name || def.name === 'placeholder' || def.id === parent.id || !def.name.toLowerCase().includes(linkSearchTerm.toLowerCase())) {
+        if (!def.name || def.name === 'placeholder' || def.id === parent.id || (linkSearchTerm && !def.name.toLowerCase().includes(linkSearchTerm.toLowerCase()))) {
             return false;
         }
         return true;

@@ -1398,20 +1398,10 @@ function DeepWorkPageContent() {
         if (!def.name || def.name === 'placeholder' || def.id === parent.id || (linkSearchTerm && !def.name.toLowerCase().includes(linkSearchTerm.toLowerCase()))) {
           return false;
         }
-
-        if (type === 'upskill') {
-          // When parent is an Intention, it must link to a top-level Curiosity
-          const isParentAnIntention = (parent.linkedDeepWorkIds?.length ?? 0) > 0 && !linkedDeepWorkChildIds.has(parent.id);
-          if (isParentAnIntention) {
-            const isCuriosity = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-            const isLinkedAsUpskillChild = linkedUpskillChildIds.has(def.id);
-            return isCuriosity && !isLinkedAsUpskillChild;
-          }
-        }
         
         return true;
     });
-}, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkedDeepWorkChildIds, linkUpskillTopic, linkDeepWorkTopic]);
+}, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkUpskillTopic, linkDeepWorkTopic]);
 
 
   const handleStartEditUpskill = (def: ExerciseDefinition) => {
