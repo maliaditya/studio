@@ -31,6 +31,8 @@ interface AuthContextType {
   pushDemoDataWithToken: (token: string) => Promise<void>;
   theme: string;
   setTheme: React.Dispatch<React.SetStateAction<string>>;
+  floatingVideoUrl: string | null;
+  setFloatingVideoUrl: React.Dispatch<React.SetStateAction<string | null>>;
   
   // Shared health state
   weightLogs: WeightLog[];
@@ -134,6 +136,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [isDemoTokenModalOpen, setIsDemoTokenModalOpen] = useState(false);
   const [theme, setTheme] = useState('default');
+  const [floatingVideoUrl, setFloatingVideoUrl] = useState<string | null>(null);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -1251,6 +1254,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pushDataToCloud, pullDataFromCloud, exportData, importData,
     isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken,
     theme, setTheme,
+    floatingVideoUrl, setFloatingVideoUrl,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule, setSchedule, isAgendaDocked, setIsAgendaDocked, activityDurations, setActivityDurations,
     handleToggleComplete, handleLogLearning, carryForwardTask, scheduleTaskFromMindMap,
