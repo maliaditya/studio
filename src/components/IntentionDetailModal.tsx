@@ -106,16 +106,35 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
     return loggedIds;
   }, [allUpskillLogs]);
 
-  const isDeepWorkObjectiveComplete = (objective: ExerciseDefinition): boolean => {
+  const {
+    linkedLearningTasks,
+    linkedWorkTasks,
+    totalEstimatedHours,
+    totalLoggedHours,
+    progressPercent,
+    projectedDate,
+    daysRemaining,
+  } = useMemo(() => {
+    if (!intention) return {
+        linkedLearningTasks: [],
+        linkedWorkTasks: [],
+        totalEstimatedHours: 0,
+        totalLoggedHours: 0,
+        progressPercent: 0,
+        projectedDate: null,
+        daysRemaining: null,
+    };
+
+    const isDeepWorkObjectiveComplete = (objective: ExerciseDefinition): boolean => {
       const childActionIds = (objective.linkedDeepWorkIds || []).filter(childId => {
           const childDef = deepWorkDefinitions.find(d => d.id === childId);
           return childDef && (childDef.linkedDeepWorkIds?.length ?? 0) === 0;
       });
       if (childActionIds.length === 0) return false;
       return childActionIds.every(id => permanentlyLoggedActionIds.has(id));
-  };
+    };
   
-  const isUpskillObjectiveComplete = (objective: ExerciseDefinition): boolean => {
+    const isUpskillObjectiveComplete = (objective: ExerciseDefinition): boolean => {
       const visited = new Set<string>();
       const visualizationIds = new Set<string>();
       const queue: string[] = [objective.id];
@@ -137,27 +156,6 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
       }
       if (visualizationIds.size === 0) return false;
       return Array.from(visualizationIds).every(vizId => permanentlyLoggedVisualizationIds.has(vizId));
-  };
-
-  const {
-    linkedLearningTasks,
-    linkedWorkTasks,
-    totalEstimatedHours,
-    totalLoggedHours,
-    progressPercent,
-    projectedDate,
-    daysRemaining,
-    totalLinkedEstimatedHours,
-  } = useMemo(() => {
-    if (!intention) return {
-        linkedLearningTasks: [],
-        linkedWorkTasks: [],
-        totalEstimatedHours: 0,
-        totalLoggedHours: 0,
-        progressPercent: 0,
-        projectedDate: null,
-        daysRemaining: null,
-        totalLinkedEstimatedHours: 0,
     };
     
     const learningTasks = (intention.linkedUpskillIds || []).map(id => {
@@ -169,23 +167,21 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
       const def = deepWorkDefinitions.find(d => d.id === id);
       return def ? { ...def, isCompleted: isDeepWorkObjectiveComplete(def) } : null;
     }).filter(Boolean) as (ExerciseDefinition & { isCompleted: boolean })[];
-    
-    const completedLearningTasks = learningTasks.filter(task => task.isCompleted);
-    const completedWorkTasks = workTasks.filter(task => task.isCompleted);
 
-    const loggedMinutesFromCompletedTasks = 
-        [...completedLearningTasks, ...completedWorkTasks]
-        .reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
-        
-    const intentionMinutes = intention.estimatedDuration || 0;
-    const linkedMinutes = [...learningTasks, ...workTasks]
-        .reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
+    const allLinkedTasks = [...learningTasks, ...workTasks];
+    const totalLinkedEstimatedMinutes = allLinkedTasks.reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
+    const totalLinkedEstimatedHours = totalLinkedEstimatedMinutes / 60;
     
-    const totalMinutes = intentionMinutes + linkedMinutes;
+    // --- New Progress Calculation ---
+    // Sum the estimated duration of *completed* sub-tasks.
+    // This represents the "value" of the work completed.
+    const completedObjectiveHours = allLinkedTasks
+      .filter(task => task.isCompleted)
+      .reduce((sum, task) => sum + (task.estimatedDuration || 0), 0) / 60;
+
+    const progress = totalLinkedEstimatedHours > 0 ? (completedObjectiveHours / totalLinkedEstimatedHours) * 100 : 0;
     
-    const progress = linkedMinutes > 0 ? (loggedMinutesFromCompletedTasks / linkedMinutes) * 100 : 0;
-    
-    const remainingHours = (linkedMinutes - loggedMinutesFromCompletedTasks) / 60;
+    const remainingHours = Math.max(0, totalLinkedEstimatedHours - completedObjectiveHours);
     const daysLeft = (productivityStats.avgProductiveHours > 0 && remainingHours > 0)
         ? Math.ceil(remainingHours / productivityStats.avgProductiveHours)
         : null;
@@ -194,15 +190,14 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
     return {
         linkedLearningTasks: learningTasks,
         linkedWorkTasks: workTasks,
-        totalEstimatedHours: totalMinutes / 60,
-        totalLoggedHours: loggedMinutesFromCompletedTasks / 60,
-        totalLinkedEstimatedHours: linkedMinutes / 60,
+        totalEstimatedHours: (intention.estimatedDuration || 0) / 60,
+        totalLoggedHours: completedObjectiveHours,
         progressPercent: progress,
         projectedDate: estDate,
         daysRemaining: daysLeft,
     };
-  }, [intention, upskillDefinitions, deepWorkDefinitions, isUpskillObjectiveComplete, isDeepWorkObjectiveComplete, productivityStats.avgProductiveHours]);
-  
+  }, [intention, upskillDefinitions, deepWorkDefinitions, allUpskillLogs, allDeepWorkLogs, productivityStats.avgProductiveHours, permanentlyLoggedActionIds, permanentlyLoggedVisualizationIds]);
+
   if (!intention) return null;
 
   return (
@@ -272,7 +267,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                      <p className="text-sm text-muted-foreground truncate" title={intention.name}>
                         {intention.name}
                      </p>
-                      <p className="text-xs font-mono text-primary/80">
+                     <p className="text-xs font-mono text-primary/80">
                         Total Est: {totalEstimatedHours.toFixed(1)}h
                       </p>
                 </div>
