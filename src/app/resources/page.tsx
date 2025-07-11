@@ -63,7 +63,7 @@ const isObsidianUrl = (url: string | undefined): boolean => {
     if (!url) return false;
     try {
         const urlObj = new URL(url);
-        return urlObj.hostname.endsWith('obsidian.md') || urlObj.hostname.endsWith('publish.obsidian.md');
+        return urlObj.hostname.includes('obsidian.md') || urlObj.hostname.includes('publish.obsidian.md');
     } catch (e) { return false; }
 };
 
