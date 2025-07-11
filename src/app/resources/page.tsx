@@ -159,7 +159,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl }: { r
                                 <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={() => handleDeletePoint(point.id)}>
                                     <Trash2 className="h-3 w-3"/>
                                 </Button>
-                                {point.type === 'youtube' && (
+                                {(point.type === 'youtube' || point.type === 'obsidian') && (
                                     <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground opacity-0 group-hover/item:opacity-100" onClick={() => setFloatingVideoUrl(point.text)}>
                                         <PictureInPicture className="h-3 w-3"/>
                                     </Button>
@@ -721,6 +721,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
