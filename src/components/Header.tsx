@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { BrainCircuit, Heart, Settings } from 'lucide-react';
 import { UserProfile } from './UserProfile';
@@ -25,6 +25,12 @@ export function Header() {
   const pathname = usePathname();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
 
   const navLinks = [
     { href: '/', label: 'Dashboard' },
@@ -58,7 +64,7 @@ export function Header() {
                   href={link.href}
                   className={cn(
                     "text-sm font-medium transition-colors hover:text-primary",
-                    pathname === link.href ? "text-primary" : "text-muted-foreground"
+                    isClient && pathname === link.href ? "text-primary" : "text-muted-foreground"
                   )}
                 >
                   {link.label}
