@@ -20,7 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { format, subDays, parseISO, addDays, isBefore, startOfToday, isAfter } from 'date-fns';
 import { Progress } from './ui/progress';
 import { cn } from '@/lib/utils';
-import { BrainCircuit, ArrowUp, ArrowDown, PauseCircle, AlertCircle } from 'lucide-react';
+import { BrainCircuit, ArrowUp, ArrowDown, PauseCircle, AlertTriangle } from 'lucide-react';
 import { Separator } from './ui/separator';
 
 interface IntentionDetailModalProps {
@@ -50,8 +50,8 @@ const getProductivitySuggestion = (hours: number): { title: string; description:
         };
     }
     return {
-        title: "Entry Zone: Focus on showing up",
-        description: "Your main goal is to build the habit. Focus on completing one or two small tasks daily to build momentum. Consistency is more important than volume at this stage."
+        title: "The Truth of the Moment",
+        description: "Fulfillment doesn't come from chasing feelings or perfection. It comes from taking justified action, aligned with the truth of your current moment."
     };
 };
 
