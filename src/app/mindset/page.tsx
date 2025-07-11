@@ -218,8 +218,8 @@ const ConceptualFlowDiagram = ({ intention, avgDailyProductiveHours }: { intenti
                                 <path d="M 0 0 L 10 5 L 0 10 z" fill="hsl(var(--muted-foreground))" />
                             </marker>
                         </defs>
-                        <line x1="5%" y1="90%" x2="50%" y2="10%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
-                        <line x1="50%" y1="10%" x2="95%" y2="90%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
+                        <line x1="5%" y1="90%" x2="50%" y2="20%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
+                        <line x1="50%" y1="20%" x2="95%" y2="90%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
                     </svg>
 
                      <div className="absolute left-[5%] top-[90%] -translate-x-1/2 translate-y-4 text-center">
@@ -227,7 +227,7 @@ const ConceptualFlowDiagram = ({ intention, avgDailyProductiveHours }: { intenti
                         <p className="text-xs text-muted-foreground">Productivity: <strong>{avgDailyProductiveHours.toFixed(1)}h/day</strong></p>
                     </div>
                     
-                    <div className="absolute left-1/2 top-[10%] -translate-x-1/2 -translate-y-full text-center w-full px-4">
+                    <div className="absolute left-1/2 top-[20%] -translate-x-1/2 -translate-y-[120%] text-center w-full px-4">
                         <p className="font-semibold text-foreground text-lg">Solution</p>
                          <div className="text-sm text-muted-foreground w-full max-w-sm mx-auto p-2 border rounded-md bg-background/50 backdrop-blur-sm mt-2">
                             <ScrollArea className="h-32">
