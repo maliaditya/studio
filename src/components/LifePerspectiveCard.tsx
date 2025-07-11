@@ -13,15 +13,7 @@ import { cn } from '@/lib/utils';
 
 interface LifePerspectiveCardProps {
     currentUser: LocalUser | null;
-    allWorkoutLogs: DatedWorkout[];
-    deepWorkDefinitions: ExerciseDefinition[];
-    allDeepWorkLogs: DatedWorkout[];
-    upskillDefinitions: ExerciseDefinition[];
-    allUpskillLogs: DatedWorkout[];
-    topicGoals: Record<string, TopicGoal>;
-    weeklyStats: any; // Simplified for brevity
-    weightLogs: WeightLog[];
-    goalWeight: number | null;
+    weeklyStats: any;
 }
 
 export function LifePerspectiveCard({

@@ -27,6 +27,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from '@/lib/utils';
 import { CalendarIcon } from 'lucide-react';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
+import { LifePerspectiveCard } from '@/components/LifePerspectiveCard';
 
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release } from '@/types/workout';
@@ -354,6 +355,62 @@ function HomePageContent() {
     }
     return data;
   }, [allWorkoutLogs, oneYearAgo, today]);
+  
+    const weeklyStats = useMemo(() => {
+        const getWeeklyHours = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
+            if (!logs) return { current: 0, prev: 0 };
+            const today = new Date();
+            let currentWeekMinutes = 0;
+            let prevWeekMinutes = 0;
+
+            for (let i = 0; i < 7; i++) {
+                const currentDay = subDays(today, i);
+                const prevWeekDay = subDays(today, i + 7);
+                const currentDayKey = format(currentDay, 'yyyy-MM-dd');
+                const prevWeekDayKey = format(prevWeekDay, 'yyyy-MM-dd');
+
+                currentWeekMinutes += logs.find(log => log.date === currentDayKey)?.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0) || 0;
+                prevWeekMinutes += logs.find(log => log.date === prevWeekDayKey)?.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0) || 0;
+            }
+            return { current: currentWeekMinutes / 60, prev: prevWeekMinutes / 60 };
+        };
+        
+        const getWeeklyWorkouts = (logs: DatedWorkout[]) => {
+            if (!logs) return { current: 0, prev: 0 };
+            const today = new Date();
+            let currentWeekCount = 0;
+            let prevWeekCount = 0;
+
+            for (let i = 0; i < 7; i++) {
+                const currentDayKey = format(subDays(today, i), 'yyyy-MM-dd');
+                const prevWeekDayKey = format(subDays(today, i + 7), 'yyyy-MM-dd');
+                if (logs.some(log => log.date === currentDayKey && log.exercises.some(ex => ex.loggedSets.length > 0))) {
+                    currentWeekCount++;
+                }
+                if (logs.some(log => log.date === prevWeekDayKey && log.exercises.some(ex => ex.loggedSets.length > 0))) {
+                    prevWeekCount++;
+                }
+            }
+            return { current: currentWeekCount, prev: prevWeekCount };
+        }
+
+        const getWeeklyWeight = (logs: WeightLog[]) => {
+            if (!logs || logs.length === 0) return { current: 0, prev: 0 };
+            const sortedLogs = logs.sort((a,b) => a.date.localeCompare(b.date));
+            const current = sortedLogs[sortedLogs.length - 1]?.weight || 0;
+            const prev = sortedLogs[sortedLogs.length - 2]?.weight || 0;
+            return { current, prev };
+        };
+
+        return {
+            deepWork: getWeeklyHours(allDeepWorkLogs, 'weight'),
+            upskill: getWeeklyHours(allUpskillLogs, 'reps'),
+            workouts: getWeeklyWorkouts(allWorkoutLogs),
+            weight: getWeeklyWeight(weightLogs),
+            goalWeight,
+        };
+    }, [allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, weightLogs, goalWeight]);
+
 
   const productivityStats = useMemo(() => {
       const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -861,12 +918,16 @@ function HomePageContent() {
           <CardContent>
             <DashboardStats stats={productivityStats} />
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
-              <div className="lg:col-span-3">
-                <ProductivitySnapshot 
+              <div className="lg:col-span-3 space-y-6">
+                 <ProductivitySnapshot 
                   stats={productivityStats} 
                   timeAllocationData={timeAllocationData} 
                   onOpenStatsModal={() => setIsStatsModalOpen(true)} 
                   onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
+                />
+                <LifePerspectiveCard 
+                    currentUser={currentUser} 
+                    weeklyStats={weeklyStats} 
                 />
               </div>
               <div className="lg:col-span-2 space-y-6">
