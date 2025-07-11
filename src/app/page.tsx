@@ -27,7 +27,6 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from '@/lib/utils';
 import { CalendarIcon } from 'lucide-react';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
-import { LifePerspectiveCard } from '@/components/LifePerspectiveCard';
 
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release } from '@/types/workout';
@@ -918,16 +917,12 @@ function HomePageContent() {
           <CardContent>
             <DashboardStats stats={productivityStats} />
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
-              <div className="lg:col-span-3 space-y-6">
-                 <ProductivitySnapshot 
+              <div className="lg:col-span-3">
+                <ProductivitySnapshot 
                   stats={productivityStats} 
                   timeAllocationData={timeAllocationData} 
                   onOpenStatsModal={() => setIsStatsModalOpen(true)} 
                   onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
-                />
-                <LifePerspectiveCard 
-                    currentUser={currentUser} 
-                    weeklyStats={weeklyStats} 
                 />
               </div>
               <div className="lg:col-span-2 space-y-6">
