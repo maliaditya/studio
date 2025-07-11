@@ -13,7 +13,7 @@ import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLi
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
-import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogFooter as DialogFooterComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -558,6 +558,9 @@ function ResourcesPageContent() {
                   // Link type rendering
                   const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                   const isSpecialEmbed = isNotionUrl(res.link) || isObsidianUrl(res.link);
+                  
+                  const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? res.link : null);
+
                   const isLongContent = res.name.length > 20 && (res.description?.length ?? 0) > 30;
 
                   return (
@@ -592,7 +595,9 @@ function ResourcesPageContent() {
                                   <p className="text-sm text-muted-foreground mt-3 line-clamp-3 flex-grow min-h-[60px]">{res.description || 'No description available.'}</p>
                                   <div className="mt-auto pt-4 flex items-center gap-2">
                                       <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
-                                      <Button variant="outline" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(res.link)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
+                                      {res.link && (
+                                        <Button variant="outline" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
+                                      )}
                                   </div>
                               </div>
                           )}
@@ -657,10 +662,10 @@ function ResourcesPageContent() {
                     </Select>
                 </div>
             </div>
-            <DialogFooterComponent>
+            <DialogFooter>
                 <Button variant="outline" onClick={() => setEditingResource(null)}>Cancel</Button>
                 <Button onClick={handleSaveResourceEdit}>Save Changes</Button>
-            </DialogFooterComponent>
+            </DialogFooter>
         </DialogContent>
     </Dialog>
 
@@ -719,4 +724,5 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
