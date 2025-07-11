@@ -762,9 +762,9 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
         }
     };
 
-    const hasFooterActions = isRootNode || canExpandChildren || canRevealParents;
     const isUpskillNode = upskillDefinitions.some((d: any) => d.id === definition.id);
-
+    const hasFooterActions = isRootNode || canExpandChildren || canRevealParents;
+    
     return (
         <motion.div
             ref={setNodeRef}
@@ -789,7 +789,7 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
                                     {definition.name}
                                 </p>
                                 <p className="text-xs text-muted-foreground capitalize">
-                                    {isUpskillNode ? 'Upskill' : 'Focus Area'}
+                                    {isUpskillNode ? 'Learning' : 'Deep Work'}
                                 </p>
                             </div>
                         </div>
@@ -1233,7 +1233,8 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         }
     }
     const isUpskillNode = upskillDefinitions.some(d => d.id === node.definitionId);
-    const hasFooterActions = node.category !== 'Social' && node.category !== 'Resource';
+    const hasFooterActions = node.category !== 'Social' && node.category !== 'Resource' && node.category !== 'Folder' && !getIcon().props.className.includes('lucide');
+
     
     return (
         <div key={node.id} className="flex items-center" onMouseEnter={() => handleNodeMouseEnter(node)} onMouseLeave={handleNodeMouseLeave}>
@@ -1248,7 +1249,9 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
                         <span className="text-primary">{getIcon()}</span>
                         <div className='flex flex-col text-left'>
                             <span className="font-semibold text-sm text-foreground truncate">{node.name}</span>
-                            <span className="text-xs text-muted-foreground capitalize">{isUpskillNode ? "Upskill" : "Focus Area"}</span>
+                             {node.category !== 'product' && node.category !== 'service' && node.category !== 'System' && node.category !== 'System Branch' && node.category !== 'Release' && node.category !== 'Content Bundle' && node.category !== 'Social' && node.category !== 'Folder' && (
+                                <span className="text-xs text-muted-foreground capitalize">{isUpskillNode ? "Learning" : "Deep Work"}</span>
+                            )}
                         </div>
                     </div>
                 </div>
