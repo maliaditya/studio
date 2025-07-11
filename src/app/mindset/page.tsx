@@ -209,7 +209,7 @@ const ConceptualFlowDiagram = ({ intention, avgDailyProductiveHours }: { intenti
                 </CardTitle>
             </CardHeader>
             <CardContent className="flex-grow flex flex-col items-center justify-between p-4">
-                <div className="relative w-full h-[350px] max-w-2xl">
+                <div className="relative w-full h-[300px] max-w-2xl">
                     <svg className="absolute top-0 left-0 w-full h-full overflow-visible" preserveAspectRatio="none">
                         <defs>
                             <marker id="arrowhead" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -296,37 +296,50 @@ const InteractiveTutorial = () => {
     const [cardIndex, setCardIndex] = useState(0);
     const [pointIndex, setPointIndex] = useState(0);
     const [isAnimating, setIsAnimating] = useState(false);
+    
+    const TOTAL_DURATION_MINUTES = 7;
+    const TOTAL_DURATION_MS = TOTAL_DURATION_MINUTES * 60 * 1000;
+    const ANIMATION_DURATION_MS = (4.5 * 6 * 1000) + (16 * 4 * 1000) + (5 * 5 * 1000); // from BreathingAnimation
+    
+    const totalPoints = TUTORIAL_CONTENT.reduce((sum, card) => sum + card.points.length, 0) - 1; // -1 for animation point
+    const DURATION_PER_POINT_MS = (TOTAL_DURATION_MS - ANIMATION_DURATION_MS) / totalPoints;
 
     const currentCard = TUTORIAL_CONTENT[cardIndex];
     const currentPoint = currentCard.points[pointIndex];
-    const isLastPoint = pointIndex === currentCard.points.length - 1;
-    const isLastCard = cardIndex === TUTORIAL_CONTENT.length - 1;
+    
+    useEffect(() => {
+        setIsAnimating(true);
+        setIsAudioPlaying(true);
+    }, [setIsAudioPlaying]);
 
-    const handleNext = () => {
-        if (!isLastPoint) {
-            setPointIndex(prev => prev + 1);
-        } else if (!isLastCard) {
-            setCardIndex(prev => prev + 1);
-            setPointIndex(0);
-        } else {
-            // End of tutorial
+    const handleNext = useCallback(() => {
+        setCardIndex(prevCardIndex => {
+            const currentCard = TUTORIAL_CONTENT[prevCardIndex];
+            if (pointIndex < currentCard.points.length - 1) {
+                setPointIndex(prevPointIndex => prevPointIndex + 1);
+                return prevCardIndex;
+            } else if (prevCardIndex < TUTORIAL_CONTENT.length - 1) {
+                setPointIndex(0);
+                return prevCardIndex + 1;
+            }
+            return prevCardIndex; // End of tutorial
+        });
+    }, [pointIndex]);
+
+    useEffect(() => {
+        if (!isAnimating) {
+            const timer = setTimeout(handleNext, DURATION_PER_POINT_MS);
+            return () => clearTimeout(timer);
         }
-    };
-
+    }, [isAnimating, handleNext, DURATION_PER_POINT_MS]);
+    
     const handleBreathingComplete = useCallback(() => {
         setIsAnimating(false);
         setIsAudioPlaying(false);
-        setPointIndex(1); // Move to the next point after animation
-    }, [setIsAudioPlaying]);
+        // Start the timer for the next point immediately
+        handleNext();
+    }, [setIsAudioPlaying, handleNext]);
 
-    useEffect(() => {
-        // Start animation only on the first point of the first card
-        if(cardIndex === 0 && pointIndex === 0) {
-            setIsAnimating(true);
-            setIsAudioPlaying(true);
-        }
-    }, [cardIndex, pointIndex, setIsAudioPlaying]);
-    
     return (
         <Card className="h-full flex flex-col">
             <CardHeader>
@@ -383,22 +396,19 @@ const InteractiveTutorial = () => {
                     </motion.div>
                 </AnimatePresence>
             </CardContent>
-            <CardFooter className="justify-between items-center">
-                <div className="flex gap-2">
-                    {TUTORIAL_CONTENT.map((_, index) => (
-                        <div key={index} className="w-1/3 h-2 rounded-full bg-muted overflow-hidden">
+            <CardFooter>
+                <div className="w-full flex gap-2">
+                    {TUTORIAL_CONTENT.map((card, index) => (
+                        <div key={index} className="w-full h-2 rounded-full bg-muted overflow-hidden">
                             <div 
                                 className="h-full bg-primary transition-all duration-500"
                                 style={{
-                                    width: index < cardIndex ? '100%' : index === cardIndex ? `${((pointIndex + 1) / currentCard.points.length) * 100}%` : '0%'
+                                    width: index < cardIndex ? '100%' : index === cardIndex ? `${((pointIndex + 1) / card.points.length) * 100}%` : '0%'
                                 }}
                             />
                         </div>
                     ))}
                 </div>
-                <Button onClick={handleNext} disabled={(isLastCard && isLastPoint) || isAnimating}>
-                    {isAnimating ? "Breathing..." : "Next"} {!isAnimating && <ArrowRight className="ml-2 h-4 w-4" />}
-                </Button>
             </CardFooter>
         </Card>
     );
@@ -471,3 +481,4 @@ export default function MindsetPage() {
         </AuthGuard>
     );
 }
+
