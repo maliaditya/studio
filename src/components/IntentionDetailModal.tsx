@@ -52,7 +52,7 @@ const productivityLevels = [
 ];
 
 export function IntentionDetailModal({ isOpen, onOpenChange, intention }: IntentionDetailModalProps) {
-  const { deepWorkDefinitions, allDeepWorkLogs, allUpskillLogs, schedule } = useAuth();
+  const { deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, schedule } = useAuth();
   
   const productivityStats = useMemo(() => {
     const getDailyDuration = (logs: DatedWorkout[], dateStr: string, durationField: 'reps' | 'weight') => {
@@ -91,25 +91,24 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
 
     const today = startOfToday();
     const todayKey = format(today, 'yyyy-MM-dd');
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
 
-    // 1. Get all descendant definitions of the intention
     const allDescendantIds = new Set<string>();
     const queue = [intention.id];
     const visited = new Set<string>();
-    while(queue.length > 0) {
-      const currentId = queue.shift()!;
-      if (visited.has(currentId)) continue;
-      visited.add(currentId);
-      allDescendantIds.add(currentId);
-      const def = deepWorkDefinitions.find(d => d.id === currentId);
-      if(def) {
-        (def.linkedDeepWorkIds || []).forEach(childId => queue.push(childId));
-        (def.linkedUpskillIds || []).forEach(childId => queue.push(childId)); // Assuming upskill can be part of it
-      }
+    while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        if (visited.has(currentId)) continue;
+        visited.add(currentId);
+        allDescendantIds.add(currentId);
+        const def = allDefs.find(d => d.id === currentId);
+        if (def) {
+            (def.linkedDeepWorkIds || []).forEach(childId => queue.push(childId));
+            (def.linkedUpskillIds || []).forEach(childId => queue.push(childId));
+        }
     }
-    
-    // 2. Find which actions are scheduled or pending
-    const scheduledOrPendingActionIds = new Set<string>();
+
+    const scheduledOrPendingDefIds = new Set<string>();
     for (const dateKey in schedule) {
         const scheduleDate = parseISO(dateKey);
         const dailySchedule = schedule[dateKey] as DailySchedule;
@@ -120,37 +119,42 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
             Object.values(dailySchedule).flat().forEach(activity => {
                 if (activity && !activity.completed && (isToday || isPast)) {
                     (activity.taskIds || []).forEach(taskId => {
-                        const taskDefId = allDeepWorkLogs.flatMap(l => l.exercises).find(t => t.id === taskId)?.definitionId;
-                        if (taskDefId && allDescendantIds.has(taskDefId)) {
-                            scheduledOrPendingActionIds.add(taskDefId);
+                        let defId: string | undefined;
+                        if (activity.type === 'deepwork') {
+                           defId = allDeepWorkLogs.flatMap(l => l.exercises).find(t => t.id === taskId)?.definitionId;
+                        } else if (activity.type === 'upskill') {
+                           defId = allUpskillLogs.flatMap(l => l.exercises).find(t => t.id === taskId)?.definitionId;
+                        }
+                        if (defId && allDescendantIds.has(defId)) {
+                            scheduledOrPendingDefIds.add(defId);
                         }
                     });
                 }
             });
         }
     }
-    
-    // 3. Filter for final actions
-    const solutionActions = deepWorkDefinitions.filter(def => 
-        scheduledOrPendingActionIds.has(def.id) &&
-        (def.linkedDeepWorkIds?.length ?? 0) === 0 // It's a final action
-    );
 
-    // 4. Find parent objectives for these actions
+    const solutionActions = allDefs.filter(def => {
+        if (!scheduledOrPendingDefIds.has(def.id)) return false;
+        const isDeepWorkLeaf = (def.linkedDeepWorkIds?.length ?? 0) === 0;
+        const isUpskillLeaf = (def.linkedUpskillIds?.length ?? 0) === 0 && (def.linkedResourceIds?.length ?? 0) === 0;
+        return isDeepWorkLeaf && isUpskillLeaf;
+    });
+
     const parentObjectiveIds = new Set<string>();
     solutionActions.forEach(action => {
-        deepWorkDefinitions.forEach(potentialParent => {
-            if ((potentialParent.linkedDeepWorkIds || []).includes(action.id)) {
+        allDefs.forEach(potentialParent => {
+            if ((potentialParent.linkedDeepWorkIds || []).includes(action.id) || (potentialParent.linkedUpskillIds || []).includes(action.id)) {
                 parentObjectiveIds.add(potentialParent.id);
             }
         });
     });
 
-    const outcomeObjectives = deepWorkDefinitions.filter(def => parentObjectiveIds.has(def.id));
+    const outcomeObjectives = allDefs.filter(def => parentObjectiveIds.has(def.id));
 
     return { solutionActions, outcomeObjectives };
+  }, [intention, schedule, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs]);
 
-  }, [intention, schedule, deepWorkDefinitions, allDeepWorkLogs]);
 
   if (!intention) return null;
 
