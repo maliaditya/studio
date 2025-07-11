@@ -167,6 +167,7 @@ function ResourcesPageContent() {
   const { 
     resources, setResources, 
     resourceFolders, setResourceFolders,
+    setFloatingVideoUrl
   } = useAuth();
   const { toast } = useToast();
   
@@ -533,55 +534,56 @@ function ResourcesPageContent() {
               </h2>
               
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                {selectedFolderId ? (
-                  <>
-                    {filteredResources.map(res => {
-                      if (res.type === 'card') {
-                        return <ResourceCard key={res.id} resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} />;
-                      }
+                {filteredResources.map(res => {
+                  if (res.type === 'card') {
+                    return <ResourceCard key={res.id} resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} />;
+                  }
 
-                      // Link type rendering
-                      const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
-                      const isSpecialEmbed = isNotionUrl(res.link) || isObsidianUrl(res.link);
-                      const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? res.link : null);
-                      const isLongContent = res.name.length > 20 && (res.description?.length ?? 0) > 30;
+                  // Link type rendering
+                  const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
+                  const isSpecialEmbed = isNotionUrl(res.link) || isObsidianUrl(res.link);
+                  const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? res.link : null);
+                  const isLongContent = res.name.length > 20 && (res.description?.length ?? 0) > 30;
 
-                      return (
-                          <Card key={res.id} className={cn(
-                              "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5",
-                              isLongContent ? "bg-gradient-to-br from-card to-muted/20" : "bg-card"
-                          )}>
-                              {youtubeEmbedUrl ? (
-                                  <>
-                                      <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setEmbedUrl(youtubeEmbedUrl); }} aria-label="View in App"><Expand className="h-4 w-4" /></Button>
-                                          <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                                      </div>
-                                      <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl"><iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe></div>
-                                      <div className="p-4 flex-grow"><div className="flex items-start justify-between gap-2"><div className="flex-grow min-w-0"><div className="flex items-center gap-2"><Youtube className="h-5 w-5 flex-shrink-0 text-red-500" /><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div></div></div></div>
-                                  </>
-                              ) : (
-                                  <div className="p-5 flex flex-col flex-grow">
-                                      <div className="flex items-start justify-between gap-2">
-                                          <div className="flex-grow min-w-0">
-                                              <div className="flex items-center gap-2">
-                                                  {isSpecialEmbed ? <Globe className="h-4 w-4 flex-shrink-0 text-primary" /> : res.iconUrl ? <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm flex-shrink-0" /> : <LinkIcon className="h-4 w-4 flex-shrink-0" />}
-                                                  <p className="text-base font-bold" title={res.name}>{res.name}</p>
-                                              </div>
-                                          </div>
-                                           <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 -mr-2 -mt-1"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                                      </div>
-                                      <a href={res.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline mt-1">{res.link}</a>
-                                      <p className="text-sm text-muted-foreground mt-3 line-clamp-3 flex-grow min-h-[60px]">{res.description || 'No description available.'}</p>
-                                      <div className="mt-auto pt-4">
-                                          {isSpecialEmbed ? (<Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(res.link)}>View in App</Button>) : (<Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>)}
-                                      </div>
+                  return (
+                      <Card key={res.id} className={cn(
+                          "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5",
+                          isLongContent ? "bg-gradient-to-br from-card to-muted/20" : "bg-card"
+                      )}>
+                          {youtubeEmbedUrl && res.link ? (
+                              <>
+                                  <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(res.link!)} onMouseDown={(e) => e.stopPropagation()}>
+                                        <PictureInPicture className="h-4 w-4" />
+                                      </Button>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setEmbedUrl(youtubeEmbedUrl); }} aria-label="View in App"><Expand className="h-4 w-4" /></Button>
+                                      <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                                   </div>
-                              )}
-                          </Card>
-                      )
-                    })}
-                    {isAdding ? (
+                                  <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl"><iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe></div>
+                                  <div className="p-4 flex-grow"><div className="flex items-start justify-between gap-2"><div className="flex-grow min-w-0"><div className="flex items-center gap-2"><Youtube className="h-5 w-5 flex-shrink-0 text-red-500" /><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div></div></div></div>
+                              </>
+                          ) : (
+                              <div className="p-5 flex flex-col flex-grow">
+                                  <div className="flex items-start justify-between gap-2">
+                                      <div className="flex-grow min-w-0">
+                                          <div className="flex items-center gap-2">
+                                              {isSpecialEmbed ? <Globe className="h-4 w-4 flex-shrink-0 text-primary" /> : res.iconUrl ? <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm flex-shrink-0" /> : <LinkIcon className="h-4 w-4 flex-shrink-0" />}
+                                              <p className="text-base font-bold" title={res.name}>{res.name}</p>
+                                          </div>
+                                      </div>
+                                       <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 -mr-2 -mt-1"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                                  </div>
+                                  <a href={res.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline mt-1">{res.link}</a>
+                                  <p className="text-sm text-muted-foreground mt-3 line-clamp-3 flex-grow min-h-[60px]">{res.description || 'No description available.'}</p>
+                                  <div className="mt-auto pt-4">
+                                      {isSpecialEmbed ? (<Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(res.link)}>View in App</Button>) : (<Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>)}
+                                  </div>
+                              </div>
+                          )}
+                      </Card>
+                  )
+                })}
+                 {selectedFolderId && (isAdding ? (
                       <Card className="rounded-3xl flex flex-col border-primary ring-2 ring-primary shadow-xl">
                         <div className="p-5 flex flex-col flex-grow justify-between">
                           <div>
@@ -628,14 +630,7 @@ function ResourcesPageContent() {
                           <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
                           <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add New Resource</p>
                       </Card>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-center py-12 border-2 border-dashed rounded-lg col-span-full">
-                    <Library className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground">Select a folder to view or add resources.</p>
-                  </div>
-                )}
+                    ))}
               </div>
             </div>
           </main>
@@ -710,4 +705,5 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
