@@ -75,14 +75,14 @@ const BasicBreath = () => (
       <motion.div
         className="absolute left-1/2 -translate-x-1/2 w-4 h-4 bg-white rounded-full shadow-lg"
         animate={{ y: ["4rem", "10rem", "4rem"] }}
-        transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
       />
       <AnimatePresence>
         <motion.div
           key="inhale"
           initial={{ opacity: 0 }}
           animate={{ opacity: [0, 1, 0] }}
-          transition={{ duration: 2.25, repeat: Infinity, repeatDelay: 2.25 }}
+          transition={{ duration: 4, repeat: Infinity, repeatDelay: 4 }}
           className="absolute top-0 left-0 right-0 text-center text-white/80 font-medium"
         >
           Inhale
@@ -91,7 +91,7 @@ const BasicBreath = () => (
           key="exhale"
           initial={{ opacity: 0 }}
           animate={{ opacity: [0, 0, 1, 0] }}
-          transition={{ duration: 4.5, repeat: Infinity }}
+          transition={{ duration: 8, repeat: Infinity }}
           className="absolute bottom-0 left-0 right-0 text-center text-white/80 font-medium"
         >
           Exhale
@@ -128,20 +128,20 @@ const HummingBreath = () => (
         <motion.div
           className="absolute left-1/2 -translate-x-1/2 w-4 h-4 bg-white rounded-full shadow-lg"
           animate={{ y: ["4rem", "10rem", "4rem"] }}
-          transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
         />
         {/* Ripples */}
          <motion.div
           className="absolute left-1/2 top-1/2 w-1 h-1 rounded-full border-2 border-white/50"
           style={{ x: '-50%', y: '3.5rem' }}
           animate={{ scale: [1, 20], opacity: [1, 0, 0] }}
-          transition={{ duration: 2.5, repeat: Infinity, ease: "easeOut", delay: 2.5, repeatDelay: 2.5 }}
+          transition={{ duration: 5, repeat: Infinity, ease: "easeOut", delay: 5, repeatDelay: 5 }}
         />
          <motion.div
           className="absolute left-1/2 top-1/2 w-1 h-1 rounded-full border border-white/30"
           style={{ x: '-50%', y: '3.5rem' }}
           animate={{ scale: [1, 20], opacity: [1, 0, 0] }}
-          transition={{ duration: 2.5, repeat: Infinity, ease: "easeOut", delay: 3, repeatDelay: 2.5 }}
+          transition={{ duration: 5, repeat: Infinity, ease: "easeOut", delay: 5.5, repeatDelay: 5 }}
         />
 
         <AnimatePresence>
@@ -149,7 +149,7 @@ const HummingBreath = () => (
             key="inhale-hum"
             initial={{ opacity: 0 }}
             animate={{ opacity: [0, 1, 0] }}
-            transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 2.5 }}
+            transition={{ duration: 5, repeat: Infinity, repeatDelay: 5 }}
             className="absolute top-0 left-0 right-0 text-center text-white/80 font-medium"
           >
             Inhale
@@ -158,7 +158,7 @@ const HummingBreath = () => (
             key="exhale-hum"
             initial={{ opacity: 0 }}
             animate={{ opacity: [0, 0, 1, 0] }}
-            transition={{ duration: 5, repeat: Infinity }}
+            transition={{ duration: 10, repeat: Infinity }}
             className="absolute bottom-0 left-0 right-0 text-center text-white/80 font-medium"
           >
             Exhale (Hum...)
@@ -167,4 +167,3 @@ const HummingBreath = () => (
       </div>
     </div>
   )
-
