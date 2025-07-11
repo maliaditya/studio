@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight, Workflow, Lightbulb } from 'lucide-react';
+import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight, Workflow, Lightbulb, Brain } from 'lucide-react';
 import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition } from '@/types/workout';
 import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +22,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
 import Link from 'next/link';
 import { IntentionDetailModal } from './IntentionDetailModal';
+import { useRouter } from 'next/navigation';
 
 interface WeightGoalCardProps {
   weightLogs: WeightLog[];
@@ -80,6 +81,7 @@ export function WeightGoalCard({
     avgDailyProductiveHours
 }: WeightGoalCardProps) {
     const { toast } = useToast();
+    const router = useRouter();
     const [newWeight, setNewWeight] = useState('');
     const [weightDate, setWeightDate] = useState<Date | undefined>(new Date());
     const [showLogForm, setShowLogForm] = useState(false);
@@ -399,17 +401,16 @@ export function WeightGoalCard({
         <ScrollArea className="h-[250px] pr-3">
           <ul className="space-y-2">
             {activeIntentions.map((intention) => (
-              <li key={intention.id}>
-                <button 
-                  onClick={() => handleDiagramClick(intention)}
-                  className="w-full text-left p-2 rounded-md hover:bg-accent flex items-center gap-3 transition-colors"
-                >
-                  <Workflow className="h-5 w-5 text-primary flex-shrink-0" />
-                  <div className="flex-grow min-w-0">
-                    <p className="font-medium text-sm truncate">{intention.name}</p>
-                    <p className="text-xs text-muted-foreground">{intention.category}</p>
-                  </div>
-                </button>
+              <li key={intention.id} className="flex items-center justify-between p-2 rounded-md hover:bg-accent transition-colors">
+                <p className="font-medium text-sm truncate flex-grow" title={intention.name}>{intention.name}</p>
+                <div className="flex items-center flex-shrink-0">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDiagramClick(intention)}>
+                        <Workflow className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => router.push(`/mindset?intentionId=${intention.id}`)}>
+                        <Brain className="h-4 w-4" />
+                    </Button>
+                </div>
               </li>
             ))}
           </ul>
