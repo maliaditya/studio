@@ -763,6 +763,7 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
     };
 
     const hasFooterActions = isRootNode || canExpandChildren || canRevealParents;
+    const isUpskillNode = upskillDefinitions.some((d: any) => d.id === definition.id);
 
     return (
         <motion.div
@@ -780,12 +781,17 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
                 status.isPastLogged && !status.isLoggedToday && "border-green-500 dark:border-green-400"
             )}>
                 <div className="p-2 cursor-grab" {...listeners} {...attributes}>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2 min-w-0">
                             {getIcon()}
-                            <p className="font-semibold text-xs text-foreground truncate" title={definition.name}>
-                                {definition.name}
-                            </p>
+                             <div className="flex-grow min-w-0">
+                                <p className="font-semibold text-xs text-foreground truncate" title={definition.name}>
+                                    {definition.name}
+                                </p>
+                                <p className="text-xs text-muted-foreground capitalize">
+                                    {isUpskillNode ? 'Upskill' : 'Focus Area'}
+                                </p>
+                            </div>
                         </div>
                     </div>
                      {status.text && (
@@ -1226,7 +1232,9 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
             }
         }
     }
-
+    const isUpskillNode = upskillDefinitions.some(d => d.id === node.definitionId);
+    const hasFooterActions = node.category !== 'Social' && node.category !== 'Resource';
+    
     return (
         <div key={node.id} className="flex items-center" onMouseEnter={() => handleNodeMouseEnter(node)} onMouseLeave={handleNodeMouseLeave}>
             <div className="flex flex-col items-center">
@@ -1240,7 +1248,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
                         <span className="text-primary">{getIcon()}</span>
                         <div className='flex flex-col text-left'>
                             <span className="font-semibold text-sm text-foreground truncate">{node.name}</span>
-                            <span className="text-xs text-muted-foreground">{node.category}</span>
+                            <span className="text-xs text-muted-foreground capitalize">{isUpskillNode ? "Upskill" : "Focus Area"}</span>
                         </div>
                     </div>
                 </div>
