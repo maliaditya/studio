@@ -63,7 +63,7 @@ const isObsidianUrl = (url: string | undefined): boolean => {
     if (!url) return false;
     try {
         const urlObj = new URL(url);
-        return urlObj.hostname === 'share.note.sx';
+        return urlObj.hostname.endsWith('obsidian.md') || urlObj.hostname.endsWith('publish.obsidian.md');
     } catch (e) { return false; }
 };
 
@@ -76,11 +76,14 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl }: { r
     };
 
     const handleUpdatePoint = (pointId: string, newText: string) => {
-        const embedUrl = getYouTubeEmbedUrl(newText);
+        const youtubeEmbedUrl = getYouTubeEmbedUrl(newText);
+        const obsidianEmbedUrl = isObsidianUrl(newText) ? newText : null;
         let updatedPointData: Partial<ResourcePoint>;
     
-        if (embedUrl) {
-            updatedPointData = { text: newText, type: 'youtube', url: embedUrl };
+        if (youtubeEmbedUrl) {
+            updatedPointData = { text: newText, type: 'youtube', url: youtubeEmbedUrl };
+        } else if (obsidianEmbedUrl) {
+            updatedPointData = { text: newText, type: 'obsidian', url: obsidianEmbedUrl };
         } else {
             updatedPointData = { text: newText, type: 'text', url: undefined };
         }
@@ -143,6 +146,10 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl }: { r
                                 ) : point.type === 'youtube' && point.url ? (
                                     <div className="w-full aspect-video rounded-md overflow-hidden border">
                                         <iframe src={point.url} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
+                                    </div>
+                                ) : point.type === 'obsidian' && point.url ? (
+                                    <div className="w-full aspect-[4/3] rounded-md overflow-hidden border">
+                                        <iframe src={point.url} title={resource.name} frameBorder="0" allowFullScreen className="w-full h-full"></iframe>
                                     </div>
                                 ) : (
                                     <span onClick={() => setEditingPointId(point.id)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/<br>/g, '') }} />
@@ -576,7 +583,7 @@ function ResourcesPageContent() {
                                   <div className="flex items-start justify-between gap-2">
                                       <div className="flex-grow min-w-0">
                                           <div className="flex items-center gap-2">
-                                              {isSpecialEmbed ? <Globe className="h-4 w-4 flex-shrink-0 text-primary" /> : res.iconUrl ? <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm flex-shrink-0" /> : <LinkIcon className="h-4 w-4 flex-shrink-0" />}
+                                              {isSpecialEmbed ? <Globe className="h-4 w-4 flex-shrink-0 text-primary" /> : res.iconUrl ? <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm flex-shrink-0" unoptimized/> : <LinkIcon className="h-4 w-4 flex-shrink-0" />}
                                               <p className="text-base font-bold" title={res.name}>{res.name}</p>
                                           </div>
                                       </div>
@@ -714,6 +721,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 

@@ -209,7 +209,7 @@ export interface GapAnalysis {
 export interface ResourcePoint {
   id: string;
   text: string;
-  type?: 'text' | 'youtube';
+  type?: 'text' | 'youtube' | 'obsidian';
   url?: string;
 }
 export interface Resource {
@@ -263,5 +263,6 @@ export interface MindsetCard {
   icon: string;
   points: MindsetPoint[];
 }
+
 
 
