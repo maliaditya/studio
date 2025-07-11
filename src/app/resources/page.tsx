@@ -557,7 +557,8 @@ function ResourcesPageContent() {
 
                   // Link type rendering
                   const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
-                  const isSpecialEmbed = isNotionUrl(res.link) || isObsidianUrl(res.link);
+                  const isObsidianEmbed = isObsidianUrl(res.link);
+                  const isSpecialEmbed = isNotionUrl(res.link) || isObsidianEmbed;
                   
                   const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? res.link : null);
 
@@ -571,21 +572,38 @@ function ResourcesPageContent() {
                           {youtubeEmbedUrl && res.link ? (
                               <>
                                   <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(res.link!)} onMouseDown={(e) => e.stopPropagation()}>
-                                        <PictureInPicture className="h-4 w-4" />
-                                      </Button>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="h-4 w-4" /></Button>
                                       <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setEmbedUrl(youtubeEmbedUrl); }} aria-label="View in App"><Expand className="h-4 w-4" /></Button>
                                       <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                                   </div>
                                   <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl"><iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe></div>
                                   <div className="p-4 flex-grow"><div className="flex items-start justify-between gap-2"><div className="flex-grow min-w-0"><div className="flex items-center gap-2"><Youtube className="h-5 w-5 flex-shrink-0 text-red-500" /><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div></div></div></div>
                               </>
+                          ) : isObsidianEmbed && res.link ? (
+                              <div className="flex flex-col h-full">
+                                  <div className="p-3 border-b flex items-start justify-between">
+                                      <div className="flex-grow min-w-0">
+                                          <div className="flex items-center gap-2">
+                                            {res.iconUrl ? <Image src={res.iconUrl} alt="" width={16} height={16} className="rounded-sm flex-shrink-0" unoptimized/> : <Globe className="h-4 w-4 flex-shrink-0" />}
+                                            <p className="text-sm font-bold truncate" title={res.name}>{res.name}</p>
+                                          </div>
+                                      </div>
+                                      <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 -mr-2 -mt-1"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                                  </div>
+                                  <div className="flex-grow min-h-0 aspect-[4/3]">
+                                    <iframe src={res.link} title={res.name} frameBorder="0" className="w-full h-full" />
+                                  </div>
+                                  <div className="p-2 border-t flex items-center gap-2">
+                                     <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
+                                     <Button variant="outline" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
+                                  </div>
+                              </div>
                           ) : (
                               <div className="p-5 flex flex-col flex-grow">
                                   <div className="flex items-start justify-between gap-2">
                                       <div className="flex-grow min-w-0">
                                           <div className="flex items-center gap-2">
-                                              {isSpecialEmbed ? <Globe className="h-4 w-4 flex-shrink-0 text-primary" /> : res.iconUrl ? <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm flex-shrink-0" unoptimized/> : <LinkIcon className="h-4 w-4 flex-shrink-0" />}
+                                              {res.iconUrl ? <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm flex-shrink-0" unoptimized/> : <LinkIcon className="h-4 w-4 flex-shrink-0" />}
                                               <p className="text-base font-bold truncate" title={res.name}>{res.name}</p>
                                           </div>
                                       </div>
@@ -724,5 +742,6 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
