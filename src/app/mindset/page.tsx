@@ -226,17 +226,15 @@ function MindsetPageContent() {
     
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-[calc(100vh-4rem)]">
-            <div className="h-full">
-                <div className="h-full flex flex-col">
-                    <div className="flex justify-end mb-4">
-                        <Button variant="outline" onClick={() => setMode(prev => prev === 'normal' ? 'play' : 'normal')}>
-                            {mode === 'normal' ? <Play className="mr-2 h-4 w-4" /> : <BookText className="mr-2 h-4 w-4" />}
-                            {mode === 'normal' ? 'Start Play Mode' : 'Switch to Normal Mode'}
-                        </Button>
-                    </div>
-                    <div className="flex-grow min-h-0">
-                      {mode === 'play' ? <InteractiveTutorial /> : <NormalModeTutorial />}
-                    </div>
+            <div className="h-full flex flex-col">
+                <div className="flex justify-end mb-4">
+                    <Button variant="outline" onClick={() => setMode(prev => prev === 'normal' ? 'play' : 'normal')}>
+                        {mode === 'normal' ? <Play className="mr-2 h-4 w-4" /> : <BookText className="mr-2 h-4 w-4" />}
+                        {mode === 'normal' ? 'Start Play Mode' : 'Switch to Normal Mode'}
+                    </Button>
+                </div>
+                <div className="flex-grow min-h-0">
+                    {mode === 'play' ? <InteractiveTutorial /> : <NormalModeTutorial />}
                 </div>
             </div>
         </div>
@@ -252,3 +250,6 @@ export default function MindsetPage() {
         </AuthGuard>
     );
 }
+
+
+    
