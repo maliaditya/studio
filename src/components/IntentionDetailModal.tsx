@@ -55,49 +55,6 @@ const getProductivitySuggestion = (hours: number): { title: string; description:
     };
 };
 
-const TUTORIAL_CONTENT = [
-    {
-      title: "Visualization to Action",
-      icon: <BrainCircuit className="h-5 w-5" />,
-      points: [
-        "Breathe in, out — 5 times",
-        "Activate PFC",
-        "Visualize task: no judgment, no labels",
-        "Say: “See clearly, not judge quickly”",
-        "Visualize effort, form, breath",
-        "Ask: “Can I do 1 rep, 1 line with control?”",
-        "Act: Full focus, match visualization",
-        "You’re the observer, not the doer",
-        "Start"
-      ]
-    },
-    {
-      title: "Mental Checkpoint",
-      icon: <CheckSquare className="h-5 w-5" />,
-      points: [
-        "Spot it: “What image just flashed before action?”",
-        "Label it: [[Judgmental]]? [[Mastery]]? [[Shame]]? [[Ego]]? Wish or reality?",
-        "Question it: “Is this true?” “Is it helping?” “Am I rushing?” “Will this keep tomorrow intact — and bring fulfillment now?”",
-        "Replace it: Visualize from grounded self",
-        "Detach: You are not your body",
-        "Don’t chase completion. Chase comprehension. *Finishing isn’t winning if nothing sticks.*"
-      ]
-    },
-    {
-      title: "Devotion Mode",
-      icon: <Zap className="h-5 w-5" />,
-      points: [
-        "Every sub-action is deliberate",
-        "No time wasted",
-        "Fully in the task — not above, not beside",
-        "No judgment, no past/future",
-        "Just you — merged with the motion",
-        "No gap between intent and action",
-        "No ego, no inner audience"
-      ]
-    }
-];
-
 export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDailyProductiveHours = 1 }: IntentionDetailModalProps) {
   const { deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, schedule } = useAuth();
   
@@ -297,26 +254,6 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
                 </div>
 
                 <div className="w-full text-center mt-auto">
-                    <Separator className="my-12" />
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {TUTORIAL_CONTENT.map((card, index) => (
-                            <Card key={index} className="text-left bg-muted/30">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-base">
-                                        {card.icon}
-                                        {card.title}
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <ul className="space-y-2 text-sm text-muted-foreground">
-                                        {card.points.map((point, pointIndex) => (
-                                            <li key={pointIndex} dangerouslySetInnerHTML={{ __html: point.replace(/<br>/g, '') }} />
-                                        ))}
-                                    </ul>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
                     <Separator className="my-8" />
                     <h4 className="font-semibold text-sm">{suggestion.title}</h4>
                     <p className="text-xs text-muted-foreground max-w-xl mx-auto">{suggestion.description}</p>
