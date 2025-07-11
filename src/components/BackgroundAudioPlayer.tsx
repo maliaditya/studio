@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
@@ -5,10 +6,11 @@ import { Button } from './ui/button';
 import { Play, Pause, Volume1, Volume2, VolumeX } from 'lucide-react';
 import { Slider } from './ui/slider';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function BackgroundAudioPlayer() {
+  const { isAudioPlaying, setIsAudioPlaying } = useAuth();
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.05); // Start at 5% volume
 
   // Effect to sync audio element's playing state with component state
@@ -16,7 +18,7 @@ export function BackgroundAudioPlayer() {
     const audio = audioRef.current;
     if (!audio) return;
 
-    if (isPlaying) {
+    if (isAudioPlaying) {
       // Attempt to play the audio. This returns a promise.
       const playPromise = audio.play();
       if (playPromise !== undefined) {
@@ -25,13 +27,13 @@ export function BackgroundAudioPlayer() {
           // We'll set isPlaying to false so the UI reflects the actual state.
           // The user can then click the play button to start it manually.
           console.log("Audio playback failed. User interaction is required.", error);
-          setIsPlaying(false);
+          setIsAudioPlaying(false);
         });
       }
     } else {
       audio.pause();
     }
-  }, [isPlaying]); // This effect runs whenever isPlaying state changes.
+  }, [isAudioPlaying, setIsAudioPlaying]);
 
   // Effect to sync audio element's volume with component state
   useEffect(() => {
@@ -53,10 +55,10 @@ export function BackgroundAudioPlayer() {
             audio.src = '';
         }
     };
-  }, []); // Empty dependency array means this runs once on mount and cleans up on unmount.
+  }, []);
 
   const togglePlayPause = () => {
-    setIsPlaying(prev => !prev);
+    setIsAudioPlaying(prev => !prev);
   };
 
   const handleVolumeChange = (newVolume: number[]) => {
@@ -74,9 +76,9 @@ export function BackgroundAudioPlayer() {
       <audio ref={audioRef} src="/40 Hz Study Music.mp3" loop />
       <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full border bg-background/80 p-2 shadow-lg backdrop-blur-sm">
         <Button onClick={togglePlayPause} variant="ghost" size="icon" className="h-10 w-10 rounded-full">
-          {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+          {isAudioPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
         </Button>
-        {isPlaying && (
+        {isAudioPlaying && (
           <div className="flex h-5 w-5 items-end justify-between gap-0.5">
             <div className="h-full w-1 origin-bottom animate-audio-wave-1 rounded-full bg-primary"></div>
             <div className="h-full w-1 origin-bottom animate-audio-wave-2 rounded-full bg-primary"></div>

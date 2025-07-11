@@ -292,6 +292,7 @@ const ConceptualFlowDiagram = ({ intention, avgDailyProductiveHours }: { intenti
 };
 
 const InteractiveTutorial = () => {
+    const { setIsAudioPlaying } = useAuth();
     const [cardIndex, setCardIndex] = useState(0);
     const [pointIndex, setPointIndex] = useState(0);
     const [isAnimating, setIsAnimating] = useState(false);
@@ -314,15 +315,17 @@ const InteractiveTutorial = () => {
 
     const handleBreathingComplete = useCallback(() => {
         setIsAnimating(false);
+        setIsAudioPlaying(false);
         setPointIndex(1); // Move to the next point after animation
-    }, []);
+    }, [setIsAudioPlaying]);
 
     useEffect(() => {
         // Start animation only on the first point of the first card
         if(cardIndex === 0 && pointIndex === 0) {
             setIsAnimating(true);
+            setIsAudioPlaying(true);
         }
-    }, [cardIndex, pointIndex]);
+    }, [cardIndex, pointIndex, setIsAudioPlaying]);
     
     return (
         <Card className="h-full flex flex-col">
