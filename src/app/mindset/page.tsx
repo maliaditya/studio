@@ -1,75 +1,38 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
-import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Brain, ArrowRight, Play, BookText, BrainCircuit, CheckSquare, Zap, Expand, Shrink } from 'lucide-react';
+import { Brain, ArrowRight, Play, BookText, BrainCircuit, CheckSquare, Zap, Expand, Shrink, PlusCircle, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BreathingAnimation } from '@/components/BreathingAnimation';
 import { cn } from '@/lib/utils';
+import { MindsetCard, MindsetPoint } from '@/types/workout';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
-const TUTORIAL_CONTENT = [
-    {
-      title: "Visualization to Action",
-      icon: <BrainCircuit className="h-5 w-5" />,
-      points: [
-        "Breathe in, out — 5 times",
-        "Activate PFC",
-        "Visualize task: no judgment, no labels",
-        "Say: “See clearly, not judge quickly”",
-        "Visualize effort, form, breath",
-        "Ask: “Can I do 1 rep, 1 line with control?”",
-        "Act: Full focus, match visualization",
-        "You’re the observer, not the doer",
-        "Start"
-      ]
-    },
-    {
-      title: "Mental Checkpoint",
-      icon: <CheckSquare className="h-5 w-5" />,
-      points: [
-        "Spot it: “What image just flashed before action?”",
-        "Label it: [[Judgmental]]? [[Mastery]]? [[Shame]]? [[Ego]]? Wish or reality?",
-        "Question it: “Is this true?” “Is it helping?” “Am I rushing?” “Will this keep tomorrow intact — and bring fulfillment now?”",
-        "Replace it: Visualize from grounded self",
-        "Detach: You are not your body",
-        "Don’t chase completion. Chase comprehension. *Finishing isn’t winning if nothing sticks.*"
-      ]
-    },
-    {
-      title: "Devotion Mode",
-      icon: <Zap className="h-5 w-5" />,
-      points: [
-        "Every sub-action is deliberate",
-        "No time wasted",
-        "Fully in the task — not above, not beside",
-        "No judgment, no past/future",
-        "Just you — merged with the motion",
-        "No gap between intent and action",
-        "No ego, no inner audience"
-      ]
-    }
-];
+interface InteractiveTutorialProps {
+  cards: MindsetCard[];
+}
 
-const InteractiveTutorial = () => {
+const InteractiveTutorial = ({ cards }: InteractiveTutorialProps) => {
     const { isAudioPlaying, setIsAudioPlaying } = useAuth();
     const [cardIndex, setCardIndex] = useState(0);
     const [pointIndex, setPointIndex] = useState(0);
-    const [isAnimating, setIsAnimating] = useState(false);
+    const [isAnimating, setIsAnimating] = useState(true); // Start with animation
     
     const TOTAL_DURATION_MINUTES = 7;
     const TOTAL_DURATION_MS = TOTAL_DURATION_MINUTES * 60 * 1000;
     const ANIMATION_DURATION_MS = (4.5 * 6 * 1000) + (16 * 4 * 1000) + (5 * 5 * 1000);
     
-    const totalPoints = TUTORIAL_CONTENT.reduce((sum, card) => sum + card.points.length, 0) - 1;
-    const DURATION_PER_POINT_MS = (TOTAL_DURATION_MS - ANIMATION_DURATION_MS) / totalPoints;
+    const totalPoints = cards.reduce((sum, card) => sum + card.points.length, 0) - 1;
+    const DURATION_PER_POINT_MS = totalPoints > 0 ? (TOTAL_DURATION_MS - ANIMATION_DURATION_MS) / totalPoints : 0;
 
-    const currentCard = TUTORIAL_CONTENT[cardIndex];
+    const currentCard = cards[cardIndex];
     const currentPoint = currentCard.points[pointIndex];
     
     useEffect(() => {
@@ -79,24 +42,26 @@ const InteractiveTutorial = () => {
 
     const handleNext = useCallback(() => {
         setCardIndex(prevCardIndex => {
-            const currentCard = TUTORIAL_CONTENT[prevCardIndex];
-            if (pointIndex < currentCard.points.length - 1) {
+            const currentCardData = cards[prevCardIndex];
+            if (pointIndex < currentCardData.points.length - 1) {
                 setPointIndex(prevPointIndex => prevPointIndex + 1);
                 return prevCardIndex;
-            } else if (prevCardIndex < TUTORIAL_CONTENT.length - 1) {
+            } else if (prevCardIndex < cards.length - 1) {
                 setPointIndex(0);
                 return prevCardIndex + 1;
             }
+            // End of tutorial
+            setIsAudioPlaying(false);
             return prevCardIndex;
         });
-    }, [pointIndex]);
+    }, [pointIndex, cards, setIsAudioPlaying]);
 
     useEffect(() => {
-        if (!isAnimating) {
+        if (!isAnimating && totalPoints > 0) {
             const timer = setTimeout(handleNext, DURATION_PER_POINT_MS);
             return () => clearTimeout(timer);
         }
-    }, [isAnimating, handleNext, DURATION_PER_POINT_MS]);
+    }, [isAnimating, handleNext, DURATION_PER_POINT_MS, totalPoints]);
     
     const handleBreathingComplete = useCallback(() => {
         setIsAnimating(false);
@@ -142,7 +107,7 @@ const InteractiveTutorial = () => {
                                     exit={{ opacity: 0, y: -10 }}
                                     transition={{ duration: 0.2 }}
                                     className="text-2xl text-center font-medium"
-                                    dangerouslySetInnerHTML={{ __html: currentPoint }}
+                                    dangerouslySetInnerHTML={{ __html: currentPoint.text }}
                                 />
                             </CardContent>
                         </Card>
@@ -151,7 +116,7 @@ const InteractiveTutorial = () => {
             </CardContent>
             <CardFooter>
                 <div className="w-full flex gap-2 max-w-lg mx-auto">
-                    {TUTORIAL_CONTENT.map((card, index) => (
+                    {cards.map((card, index) => (
                         <div key={index} className="w-full h-2 rounded-full bg-muted overflow-hidden">
                             <div 
                                 className="h-full bg-primary transition-all duration-500"
@@ -165,34 +130,105 @@ const InteractiveTutorial = () => {
             </CardFooter>
         </Card>
     );
-}
+};
 
-const NormalModeTutorial = () => (
-    <div className="space-y-4">
-        {TUTORIAL_CONTENT.map((card, cardIndex) => (
-            <Card key={cardIndex} className="bg-gradient-to-br from-card to-muted/20 hover:shadow-lg transition-shadow">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-3 text-lg">
-                        <span className="text-primary">{card.icon}</span>
-                        {card.title}
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <ul className="space-y-3">
-                        {card.points.map((point, pointIndex) => (
-                            <li key={pointIndex} className="flex items-start gap-3 text-sm text-muted-foreground">
-                                <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
-                                <span dangerouslySetInnerHTML={{ __html: point.replace(/<br>/g, '') }} />
-                            </li>
-                        ))}
-                    </ul>
-                </CardContent>
-            </Card>
-        ))}
-    </div>
-);
+const getIcon = (iconName: string) => {
+  switch (iconName) {
+    case 'BrainCircuit': return <BrainCircuit className="h-5 w-5" />;
+    case 'CheckSquare': return <CheckSquare className="h-5 w-5" />;
+    case 'Zap': return <Zap className="h-5 w-5" />;
+    default: return <Brain className="h-5 w-5" />;
+  }
+};
+
+const NormalModeTutorial = () => {
+    const { mindsetCards, setMindsetCards } = useAuth();
+    const [editingCardId, setEditingCardId] = useState<string | null>(null);
+    const [editingPointId, setEditingPointId] = useState<string | null>(null);
+
+    const handleUpdateCard = (cardId: string, newTitle: string) => {
+        setMindsetCards(prev => prev.map(c => c.id === cardId ? { ...c, title: newTitle } : c));
+    };
+
+    const handleUpdatePoint = (cardId: string, pointId: string, newText: string) => {
+        setMindsetCards(prev => prev.map(c => {
+            if (c.id === cardId) {
+                return { ...c, points: c.points.map(p => p.id === pointId ? { ...p, text: newText } : p) };
+            }
+            return c;
+        }));
+    };
+    
+    const handleAddPoint = (cardId: string) => {
+        const newPoint: MindsetPoint = { id: `point_${Date.now()}`, text: 'New step' };
+        setMindsetCards(prev => prev.map(c => c.id === cardId ? { ...c, points: [...c.points, newPoint] } : c));
+        setEditingPointId(newPoint.id);
+    };
+
+    const handleDeletePoint = (cardId: string, pointId: string) => {
+        setMindsetCards(prev => prev.map(c => c.id === cardId ? { ...c, points: c.points.filter(p => p.id !== pointId) } : c));
+    };
+
+    const handleAddCard = () => {
+        const newCard: MindsetCard = { id: `card_${Date.now()}`, title: 'New Card', icon: 'Brain', points: [] };
+        setMindsetCards(prev => [...prev, newCard]);
+        setEditingCardId(newCard.id);
+    };
+
+    const handleDeleteCard = (cardId: string) => {
+        setMindsetCards(prev => prev.filter(c => c.id !== cardId));
+    };
+
+    return (
+        <div className="space-y-4">
+            {mindsetCards.map((card) => (
+                <Card key={card.id} className="bg-gradient-to-br from-card to-muted/20 hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                        <div className="flex justify-between items-start">
+                           {editingCardId === card.id ? (
+                                <Input value={card.title} onChange={(e) => handleUpdateCard(card.id, e.target.value)} onBlur={() => setEditingCardId(null)} autoFocus className="text-lg font-semibold" />
+                           ) : (
+                                <CardTitle className="flex items-center gap-3 text-lg cursor-pointer" onClick={() => setEditingCardId(card.id)}>
+                                    <span className="text-primary">{getIcon(card.icon)}</span>
+                                    {card.title}
+                                </CardTitle>
+                           )}
+                           <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteCard(card.id)}>
+                                <Trash2 className="h-4 w-4" />
+                           </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <ul className="space-y-3">
+                            {card.points.map((point) => (
+                                <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground group">
+                                    <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
+                                    {editingPointId === point.id ? (
+                                        <Textarea value={point.text} onChange={e => handleUpdatePoint(card.id, point.id, e.target.value)} onBlur={() => setEditingPointId(null)} autoFocus className="text-sm" rows={2}/>
+                                    ) : (
+                                        <span onClick={() => setEditingPointId(point.id)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/<br>/g, '') }} />
+                                    )}
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100" onClick={() => handleDeletePoint(card.id, point.id)}>
+                                        <Trash2 className="h-3 w-3"/>
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
+                         <Button variant="outline" size="sm" className="mt-4" onClick={() => handleAddPoint(card.id)}>
+                            <PlusCircle className="mr-2 h-4 w-4" /> Add Step
+                        </Button>
+                    </CardContent>
+                </Card>
+            ))}
+             <Button variant="secondary" className="w-full" onClick={handleAddCard}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New Card
+            </Button>
+        </div>
+    );
+};
 
 function MindsetPageContent() {
+    const { mindsetCards } = useAuth();
     const [mode, setMode] = useState<'normal' | 'play'>('normal');
     const containerRef = useRef<HTMLDivElement>(null);
     const [isFullScreen, setIsFullScreen] = useState(false);
@@ -233,14 +269,14 @@ function MindsetPageContent() {
                 <div className={cn("flex justify-end mb-4", isFullScreen && "hidden")}>
                     <Button variant="outline" onClick={togglePlayMode}>
                         {mode === 'normal' ? <Play className="mr-2 h-4 w-4" /> : <BookText className="mr-2 h-4 w-4" />}
-                        {mode === 'normal' ? 'Start Play Mode' : 'Exit Play Mode'}
+                        {mode === 'normal' ? 'Start Guided Session' : 'View as Text'}
                         {isFullScreen 
                             ? <Shrink className="ml-2 h-4 w-4" /> 
                             : <Expand className="ml-2 h-4 w-4" />}
                     </Button>
                 </div>
                 <div className="flex-grow min-h-0">
-                    {mode === 'play' ? <InteractiveTutorial /> : <NormalModeTutorial />}
+                    {mode === 'play' ? <InteractiveTutorial cards={mindsetCards} /> : <NormalModeTutorial />}
                 </div>
             </div>
         </div>

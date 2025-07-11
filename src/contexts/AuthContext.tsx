@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -12,7 +12,7 @@ import {
   getCurrentLocalUser,
 } from '@/lib/localAuth';
 import { format, addDays, parseISO, subDays } from 'date-fns';
-import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS } from '@/lib/constants';
+import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS } from '@/lib/constants';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
 
@@ -120,6 +120,10 @@ interface AuthContextType {
   // Canvas
   canvasLayout: CanvasLayout;
   setCanvasLayout: React.Dispatch<React.SetStateAction<CanvasLayout>>;
+
+  // Mindset
+  mindsetCards: MindsetCard[];
+  setMindsetCards: React.Dispatch<React.SetStateAction<MindsetCard[]>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -181,6 +185,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Canvas State
   const [canvasLayout, setCanvasLayout] = useState<CanvasLayout>({ nodes: [], edges: [] });
+
+  // Mindset State
+  const [mindsetCards, setMindsetCards] = useState<MindsetCard[]>(DEFAULT_MINDSET_CARDS);
 
 
   useEffect(() => {
@@ -279,6 +286,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Canvas Data
       try { const d = localStorage.getItem(`canvas_layout_${username}`); setCanvasLayout(d ? JSON.parse(d) : { nodes: [], edges: [] }); } catch (e) { setCanvasLayout({ nodes: [], edges: [] }); }
 
+      // Mindset Data
+      try { const d = localStorage.getItem(`mindset_cards_${username}`); setMindsetCards(d ? JSON.parse(d) : DEFAULT_MINDSET_CARDS); } catch (e) { setMindsetCards(DEFAULT_MINDSET_CARDS); }
+
 
     } else {
       // Clear all data on logout
@@ -293,6 +303,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setOfferizationPlans({});
       setResources([]); setResourceFolders([]);
       setCanvasLayout({ nodes: [], edges: [] });
+      setMindsetCards(DEFAULT_MINDSET_CARDS);
     }
   }, [currentUser]);
 
@@ -335,6 +346,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Canvas
       localStorage.setItem(`canvas_layout_${username}`, JSON.stringify(canvasLayout));
 
+      // Mindset
+      localStorage.setItem(`mindset_cards_${username}`, JSON.stringify(mindsetCards));
+
+
       // Clean up old resource keys after migration
       localStorage.removeItem(`resourceCategories_${username}`);
       localStorage.removeItem(`resourceSubcategories_${username}`);
@@ -346,6 +361,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     productizationPlans, offerizationPlans,
     resources, resourceFolders,
     canvasLayout,
+    mindsetCards,
     currentUser, loading
   ]);
 
@@ -520,6 +536,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setResources(resourcesData);
 
     setCanvasLayout(data.canvasLayout || { nodes: [], edges: [] });
+    setMindsetCards(data.mindsetCards || DEFAULT_MINDSET_CARDS);
   };
   
   const register = async (username: string, password: string) => {
@@ -575,6 +592,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       dietPlan, weightLogs, goalWeight, height, dateOfBirth, gender,
       resources, resourceFolders,
       canvasLayout,
+      mindsetCards,
     };
   }
 
@@ -1278,6 +1296,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,
+    mindsetCards, setMindsetCards,
   };
 
   return (

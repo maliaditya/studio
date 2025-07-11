@@ -238,3 +238,16 @@ export interface CanvasLayout {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
 }
+
+// Mindset Types
+export interface MindsetPoint {
+  id: string;
+  text: string;
+}
+
+export interface MindsetCard {
+  id: string;
+  title: string;
+  icon: string;
+  points: MindsetPoint[];
+}
