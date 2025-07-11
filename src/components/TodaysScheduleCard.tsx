@@ -25,7 +25,6 @@ interface AgendaWidgetItemProps {
   onStartWorkoutLog: (activity: Activity) => void;
   onToggleComplete: (slotName: string, activityId: string) => void;
   onStartLeadGenLog: (activity: Activity) => void;
-  onStartOfferSystemLog: (activity: Activity) => void;
 }
 
 const parseDurationToHours = (durationStr: string | undefined): number => {
@@ -50,7 +49,7 @@ const parseDurationToHours = (durationStr: string | undefined): number => {
   return totalHours;
 };
 
-function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog, onToggleComplete, onStartLeadGenLog, onStartOfferSystemLog }: AgendaWidgetItemProps) {
+function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog, onToggleComplete, onStartLeadGenLog }: AgendaWidgetItemProps) {
   const [openPopover, setOpenPopover] = useState(false);
   const [progressInput, setProgressInput] = useState('');
   const [durationInput, setDurationInput] = useState('');
@@ -64,8 +63,6 @@ function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog
         onStartWorkoutLog(activity);
     } else if (activity.type === 'lead-generation') {
         onStartLeadGenLog(activity);
-    } else if (activity.type === 'offer-system') {
-        onStartOfferSystemLog(activity);
     } else if (canLogProgress) {
       setOpenPopover(true);
     } else {
@@ -165,7 +162,6 @@ interface TodaysScheduleCardProps {
   onLogLearning: (activity: Activity, progress: number, duration: number) => void;
   onStartWorkoutLog: (activity: Activity) => void;
   onStartLeadGenLog: (activity: Activity) => void;
-  onStartOfferSystemLog: (activity: Activity) => void;
   onToggleComplete: (slotName: string, activityId: string) => void;
 }
 
@@ -178,7 +174,6 @@ export function TodaysScheduleCard({
   onLogLearning,
   onStartWorkoutLog,
   onStartLeadGenLog,
-  onStartOfferSystemLog,
   onToggleComplete,
 }: TodaysScheduleCardProps) {
   const { carryForwardTask } = useAuth();
@@ -364,7 +359,6 @@ export function TodaysScheduleCard({
                 onStartWorkoutLog={onStartWorkoutLog}
                 onToggleComplete={onToggleComplete}
                 onStartLeadGenLog={onStartLeadGenLog}
-                onStartOfferSystemLog={onStartOfferSystemLog}
               />
             ))}
           </ul>

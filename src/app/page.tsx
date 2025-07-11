@@ -702,35 +702,68 @@ function HomePageContent() {
     const durations: Record<string, string> = {};
     const daySchedule = schedule[selectedDateKey];
     if (!daySchedule) return durations;
-
+  
+    const allDefs = new Map([...upskillDefinitions, ...deepWorkDefinitions].map(d => [d.id, d]));
+  
     for (const slotName in daySchedule) {
-        const activitiesInSlot = daySchedule[slotName] || [];
-        const totalActivitiesInSlot = activitiesInSlot.length;
-
-        for (const activity of activitiesInSlot) {
-            switch (activity.type) {
-                case 'workout':
-                    durations[activity.id] = '1h 30m';
-                    break;
-                case 'planning':
-                case 'tracking':
-                    durations[activity.id] = '30m';
-                    break;
-                case 'deepwork':
-                case 'branding':
-                    durations[activity.id] = totalActivitiesInSlot === 1 ? '4h' : '2h';
-                    break;
-                case 'lead-generation':
-                    durations[activity.id] = '45m';
-                    break;
-                case 'upskill':
-                    durations[activity.id] = '30m';
-                    break;
-            }
+      const activitiesInSlot = daySchedule[slotName] || [];
+  
+      for (const activity of activitiesInSlot) {
+        let totalMinutes = 0;
+  
+        if (activity.completed) {
+          const logSource = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
+          const logForDay = logSource.find(log => log.date === selectedDateKey);
+          if (logForDay) {
+            const relevantExercises = logForDay.exercises.filter(ex => activity.taskIds?.includes(ex.id));
+            const durationField = activity.type === 'upskill' ? 'reps' : 'weight';
+            totalMinutes = relevantExercises.reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + set[durationField], 0), 0);
+          }
+        } else {
+          switch (activity.type) {
+            case 'workout':
+              totalMinutes = 90; // 1h 30m
+              break;
+            case 'planning':
+            case 'tracking':
+              totalMinutes = 30;
+              break;
+            case 'lead-generation':
+              totalMinutes = 45;
+              break;
+            case 'upskill':
+            case 'deepwork':
+            case 'branding':
+              if (activity.taskIds && activity.taskIds.length > 0) {
+                const firstTaskId = activity.taskIds[0];
+                const logSource = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
+                const log = logSource.find(l => l.date === selectedDateKey);
+                const exerciseInstance = log?.exercises.find(ex => ex.id === firstTaskId);
+                const definition = allDefs.get(exerciseInstance?.definitionId || '');
+                totalMinutes = definition?.estimatedDuration || (activitiesInSlot.length === 1 ? 240 : 120);
+              } else {
+                 totalMinutes = activitiesInSlot.length === 1 ? 240 : 120;
+              }
+              break;
+            default:
+              totalMinutes = 30;
+          }
         }
+        
+        if (totalMinutes > 0) {
+          const hours = Math.floor(totalMinutes / 60);
+          const minutes = totalMinutes % 60;
+          let durationStr = '';
+          if (hours > 0) durationStr += `${hours}h `;
+          if (minutes > 0) durationStr += `${minutes}m`;
+          durations[activity.id] = durationStr.trim();
+        } else {
+          durations[activity.id] = '';
+        }
+      }
     }
     return durations;
-}, [schedule, selectedDateKey]);
+  }, [schedule, selectedDateKey, allUpskillLogs, allDeepWorkLogs, upskillDefinitions, deepWorkDefinitions]);
 
   // Push calculated durations to the global context
   useEffect(() => {
