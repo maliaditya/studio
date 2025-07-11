@@ -157,13 +157,13 @@ const parseDurationToHours = (durationStr: string | undefined): number => {
       totalHours += parseFloat(minMatch[1]) / 60;
     }
     
-    // Handle case where it's just a number in minutes e.g., "30"
-    if (!hourMatch && !minMatch && /^\d+$/.test(durationStr)) {
+    // Handle case where it's just minutes as a number, e.g. "30"
+    if (!hourMatch && !minMatch && /^\d+(\.\d+)?$/.test(durationStr)) {
         totalHours += parseFloat(durationStr) / 60;
     }
   
     return totalHours;
-  };
+};
 
 export function TodaysScheduleCard({ 
   schedule, 

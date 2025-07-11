@@ -702,30 +702,56 @@ function HomePageContent() {
     const durations: Record<string, string> = {};
     const daySchedule = schedule[selectedDateKey];
     if (!daySchedule) return durations;
-  
+
     const allDefs = new Map([...upskillDefinitions, ...deepWorkDefinitions].map(d => [d.id, d]));
-  
+    const allLogsByDefId = new Map<string, number>();
+
+    const upskillLogsForDay = allUpskillLogs.find(log => log.date === selectedDateKey);
+    upskillLogsForDay?.exercises.forEach(ex => {
+        const totalDuration = ex.loggedSets.reduce((sum, set) => sum + set.reps, 0);
+        if (totalDuration > 0) {
+            allLogsByDefId.set(ex.definitionId, (allLogsByDefId.get(ex.definitionId) || 0) + totalDuration);
+        }
+    });
+
+    const deepWorkLogsForDay = allDeepWorkLogs.find(log => log.date === selectedDateKey);
+    deepWorkLogsForDay?.exercises.forEach(ex => {
+        const totalDuration = ex.loggedSets.reduce((sum, set) => sum + set.weight, 0);
+        if (totalDuration > 0) {
+            allLogsByDefId.set(ex.definitionId, (allLogsByDefId.get(ex.definitionId) || 0) + totalDuration);
+        }
+    });
+
     for (const slotName in daySchedule) {
       const activitiesInSlot = daySchedule[slotName] || [];
-  
+
       for (const activity of activitiesInSlot) {
         let totalMinutes = 0;
-  
-        // Calculate total estimated duration for linked tasks if any, otherwise use fallback
+        let isEstimated = true;
+
         if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.taskIds && activity.taskIds.length > 0) {
           const logSource = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
           const logForDay = logSource.find(log => log.date === selectedDateKey);
+          
           if (logForDay) {
             const relevantExercises = logForDay.exercises.filter(ex => activity.taskIds!.includes(ex.id));
-            totalMinutes = relevantExercises.reduce((sum, ex) => {
-              const def = allDefs.get(ex.definitionId);
-              return sum + (def?.estimatedDuration || 0);
+            
+            const loggedMinutes = relevantExercises.reduce((sum, ex) => {
+              const durationField = activity.type === 'upskill' ? 'reps' : 'weight';
+              return sum + ex.loggedSets.reduce((setSum, set) => setSum + set[durationField], 0);
             }, 0);
+
+            if (loggedMinutes > 0) {
+              totalMinutes = loggedMinutes;
+              isEstimated = false;
+            } else {
+               const taskDefs = relevantExercises.map(ex => allDefs.get(ex.definitionId)).filter(Boolean) as ExerciseDefinition[];
+               totalMinutes = taskDefs.reduce((sum, def) => sum + (def.estimatedDuration || 0), 0);
+            }
           }
         }
         
-        // Use fallback if no specific tasks are linked or it's another activity type
-        if (totalMinutes === 0) {
+        if (isEstimated && totalMinutes === 0) {
             switch (activity.type) {
                 case 'workout': totalMinutes = 90; break;
                 case 'planning': case 'tracking': totalMinutes = 30; break;
@@ -748,7 +774,7 @@ function HomePageContent() {
       }
     }
     return durations;
-  }, [schedule, selectedDateKey, allUpskillLogs, allDeepWorkLogs, upskillDefinitions, deepWorkDefinitions]);
+}, [schedule, selectedDateKey, allUpskillLogs, allDeepWorkLogs, upskillDefinitions, deepWorkDefinitions]);
 
   // Push calculated durations to the global context
   useEffect(() => {
