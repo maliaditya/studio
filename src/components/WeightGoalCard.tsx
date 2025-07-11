@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -21,11 +22,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
 import Link from 'next/link';
 import { IntentionDetailModal } from './IntentionDetailModal';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
-import { MindMapViewer } from './MindMapViewer';
-import { IntentionGoalCard } from './IntentionGoalCard';
-import { Carousel } from './ui/carousel';
-
 
 interface WeightGoalCardProps {
   weightLogs: WeightLog[];
@@ -42,6 +38,7 @@ interface WeightGoalCardProps {
   onEditDietClick: () => void;
   deepWorkDefinitions: ExerciseDefinition[];
   upskillDefinitions: ExerciseDefinition[];
+  avgDailyProductiveHours: number;
 }
 
 const weightChartConfig = {
@@ -79,7 +76,8 @@ export function WeightGoalCard({
     dietPlan,
     onEditDietClick,
     deepWorkDefinitions,
-    upskillDefinitions
+    upskillDefinitions,
+    avgDailyProductiveHours
 }: WeightGoalCardProps) {
     const { toast } = useToast();
     const [newWeight, setNewWeight] = useState('');
@@ -88,8 +86,6 @@ export function WeightGoalCard({
     const [weightView, setWeightView] = useState<'chart' | 'details'>('details');
     const [mainView, setMainView] = useState<'weight' | 'diet' | 'projects'>('weight');
     const [selectedIntention, setSelectedIntention] = useState<ExerciseDefinition | null>(null);
-    const [mindMapRootId, setMindMapRootId] = useState<string | null>(null);
-    const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
 
     const [heightInput, setHeightInput] = useState('');
     const [dobInput, setDobInput] = useState<Date | undefined>();
@@ -121,18 +117,6 @@ export function WeightGoalCard({
             })
             .sort((a, b) => a.name.localeCompare(b.name));
     }, [deepWorkDefinitions, linkedDeepWorkChildIds]);
-
-    const upskillTopics = useMemo(() => {
-        const topics = new Map<string, number>();
-        (upskillDefinitions || []).forEach(def => {
-          if (def.name !== 'placeholder') {
-            topics.set(def.category, (topics.get(def.category) || 0) + 1);
-          }
-        });
-        return Array.from(topics.entries())
-          .map(([topic, count]) => ({ name: topic, count }))
-          .sort((a, b) => a.name.localeCompare(b.name));
-    }, [upskillDefinitions]);
 
     useEffect(() => {
         if (!areDetailsSet) {
@@ -394,11 +378,6 @@ export function WeightGoalCard({
         }
 
         toast({ title: "Details Saved", description: "Your profile has been updated." });
-    };
-
-    const handleIntentionClick = (intention: ExerciseDefinition) => {
-        setMindMapRootId(intention.id);
-        setIsMindMapModalOpen(true);
     };
 
     const handleDiagramClick = (intention: ExerciseDefinition) => {
@@ -739,15 +718,8 @@ export function WeightGoalCard({
                 isOpen={!!selectedIntention}
                 onOpenChange={() => setSelectedIntention(null)}
                 intention={selectedIntention}
+                avgDailyProductiveHours={avgDailyProductiveHours}
             />
-            <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
-                <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
-                    <DialogHeader className="sr-only">
-                        <DialogTitle>Intention Mind Map</DialogTitle>
-                    </DialogHeader>
-                    <MindMapViewer rootFocusAreaId={mindMapRootId} showControls={false} />
-                </DialogContent>
-            </Dialog>
         </>
     );
 }

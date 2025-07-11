@@ -20,81 +20,26 @@ import { useAuth } from '@/contexts/AuthContext';
 import { format, subDays, parseISO, addDays, isBefore, startOfToday } from 'date-fns';
 import { Progress } from './ui/progress';
 import { cn } from '@/lib/utils';
-import { BrainCircuit, ArrowUp, ArrowDown, PauseCircle, AlertCircle } from 'lucide-react';
+import { BrainCircuit, ArrowUp, ArrowDown, PauseCircle, AlertCircle, Clock } from 'lucide-react';
 import { Separator } from './ui/separator';
 
 interface IntentionDetailModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   intention: ExerciseDefinition | null;
+  avgDailyProductiveHours?: number;
 }
 
-const productivityLevels = [
-    { level: 'L1', min: 15, max: 30, description: 'Just showing up', zone: '⚪️ Entry Zone' },
-    { level: 'L2', min: 30, max: 45, description: 'Light touch / spark', zone: '⚪️ Entry Zone' },
-    { level: 'L3', min: 45, max: 60, description: 'Single Pomodoro session', zone: '⚪️ Entry Zone' },
-    { level: 'L4', min: 60, max: 90, description: 'Basic learner habit', zone: '🟢 Stable Zone' },
-    { level: 'L5', min: 90, max: 120, description: 'Focused beginner phase', zone: '🟢 Stable Zone' },
-    { level: 'L6', min: 120, max: 150, description: 'Mini deep work commitment', zone: '🟢 Stable Zone' },
-    { level: 'L7', min: 150, max: 180, description: 'Structured discipline zone', zone: '🟢 Stable Zone' },
-    { level: 'L8', min: 180, max: 210, description: 'Daily scholar mode', zone: '🟡 Progress Zone' },
-    { level: 'L9', min: 210, max: 240, description: 'Solid effort / Part-time student', zone: '🟡 Progress Zone' },
-    { level: 'L10', min: 240, max: 300, description: 'Full-time learner level', zone: '🟡 Progress Zone' },
-    { level: 'L11', min: 300, max: 360, description: 'Deep learner zone', zone: '🟡 Progress Zone' },
-    { level: 'L12', min: 360, max: 420, description: 'Advanced practice / Bootcamp ready', zone: '🟠 High Intensity' },
-    { level: 'L13', min: 420, max: 480, description: 'Peak state zone', zone: '🟠 High Intensity' },
-    { level: 'L14', min: 480, max: 540, description: 'Monastic discipline', zone: '🔴 Extreme Zone' },
-    { level: 'L15', min: 540, max: 600, description: 'Total immersion day', zone: '🔴 Extreme Zone' },
-    { level: 'L16', min: 600, max: 660, description: 'Elite performer stretch', zone: '🔴 Extreme Zone' },
-    { level: 'L17', min: 660, max: 720, description: 'Near-max capacity', zone: '🔴 Extreme Zone' },
-    { level: 'L18', min: 720, max: 780, description: 'Obsessive learner', zone: '🔴 Extreme Zone' },
-    { level: 'L19', min: 780, max: 900, description: 'Burning fuel — not sustainable daily', zone: '🔥 Overdrive Zone' },
-    { level: 'L20', min: 900, max: Infinity, description: 'Legendary grind day (Rare / Purpose-driven only)', zone: '⚠️ Apex Zone' },
-];
-
-export function IntentionDetailModal({ isOpen, onOpenChange, intention }: IntentionDetailModalProps) {
+export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDailyProductiveHours = 1 }: IntentionDetailModalProps) {
   const { deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, schedule } = useAuth();
   
-  const productivityStats = useMemo(() => {
-    const getDailyDuration = (logs: DatedWorkout[], dateStr: string, durationField: 'reps' | 'weight') => {
-        if (!logs) return 0;
-        const logForDay = logs.find(log => log.date === dateStr);
-        if (!logForDay) return 0;
-        return logForDay.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
-    };
-
-    const calculateWeeklyAverage = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
-      if (!logs) return 0;
-      const today = new Date();
-      let totalMinutes = 0;
-      for (let i = 0; i < 7; i++) {
-        const day = subDays(today, i);
-        const dateKey = format(day, 'yyyy-MM-dd');
-        totalMinutes += getDailyDuration(logs, dateKey, durationField);
-      }
-      return totalMinutes / 7;
-    };
-    
-    const avgUpskillMinutes = calculateWeeklyAverage(allUpskillLogs, 'reps');
-    const avgDeepWorkMinutes = calculateWeeklyAverage(allDeepWorkLogs, 'weight');
-    const totalProductiveMinutes = avgUpskillMinutes + avgDeepWorkMinutes;
-    const avgProductiveHours = totalProductiveMinutes / 60;
-    const currentLevel = productivityLevels.find(l => totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max) || null;
-
-    return {
-      avgProductiveHours: avgProductiveHours,
-      currentLevel: currentLevel?.level || 'N/A'
-    };
-  }, [allUpskillLogs, allDeepWorkLogs]);
-  
-  const { solutionTasks, outcomeObjectives } = useMemo(() => {
-    if (!intention) return { solutionTasks: [], outcomeObjectives: [] };
+  const { solutionTasks, outcomeObjectives, totalEstimatedMinutes } = useMemo(() => {
+    if (!intention) return { solutionTasks: [], outcomeObjectives: [], totalEstimatedMinutes: 0 };
 
     const today = startOfToday();
     const todayKey = format(today, 'yyyy-MM-dd');
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
 
-    // Find all descendants of the current intention
     const allDescendantIds = new Set<string>();
     const queue = [intention.id];
     const visited = new Set<string>();
@@ -110,7 +55,6 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
         }
     }
     
-    // Find all descendant definition IDs that are scheduled or pending
     const scheduledOrPendingDefIds = new Set<string>();
     for (const dateKey in schedule) {
         const scheduleDate = parseISO(dateKey);
@@ -139,10 +83,10 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
 
     const solutionTasks: { action: ExerciseDefinition, linkedVisualizations: ExerciseDefinition[] }[] = [];
     const outcomeObjectiveIds = new Set<string>();
+    let estimatedMinutes = 0;
 
     const allScheduledOrPendingDefs = allDefs.filter(def => scheduledOrPendingDefIds.has(def.id));
     
-    // Find leaf "Actions" (Deep Work) and "Visualizations" (Upskill)
     const solutionLeafs = allScheduledOrPendingDefs.filter(def => {
         const isDWAction = deepWorkDefinitions.some(d => d.id === def.id) && (def.linkedDeepWorkIds?.length ?? 0) === 0;
         const isUpskillViz = upskillDefinitions.some(d => d.id === def.id) && (def.linkedUpskillIds?.length ?? 0) === 0;
@@ -150,7 +94,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
     });
 
     solutionLeafs.forEach(leaf => {
-        // If it's a visualization, find which action it's linked to.
+        estimatedMinutes += leaf.estimatedDuration || 0;
         if (upskillDefinitions.some(d => d.id === leaf.id)) {
             const parentAction = deepWorkDefinitions.find(action => (action.linkedUpskillIds || []).includes(leaf.id));
             if (parentAction && scheduledOrPendingDefIds.has(parentAction.id)) {
@@ -161,14 +105,13 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                 }
                 solutionTask.linkedVisualizations.push(leaf);
             }
-        } else { // It's a deep work action
+        } else {
             if (!solutionTasks.some(st => st.action.id === leaf.id)) {
                 solutionTasks.push({ action: leaf, linkedVisualizations: [] });
             }
         }
     });
 
-    // Find parent objectives of all collected solution tasks
     solutionTasks.forEach(({ action }) => {
         deepWorkDefinitions.forEach(parent => {
             if ((parent.linkedDeepWorkIds || []).includes(action.id)) {
@@ -179,8 +122,30 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
 
     const outcomeObjectives = deepWorkDefinitions.filter(def => outcomeObjectiveIds.has(def.id));
 
-    return { solutionTasks, outcomeObjectives };
+    return { solutionTasks, outcomeObjectives, totalEstimatedMinutes: estimatedMinutes };
   }, [intention, schedule, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs]);
+
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+
+    if (days > 0) return `${days}d ${remainingHours}h ${mins}m`;
+    if (hours > 0) return `${hours}h ${mins}m`;
+    return `${mins}m`;
+  };
+  
+  const projectedCompletion = useMemo(() => {
+    if (avgDailyProductiveHours <= 0 || totalEstimatedMinutes <= 0) return null;
+    const totalHours = totalEstimatedMinutes / 60;
+    const days = totalHours / avgDailyProductiveHours;
+
+    if (days < 1) {
+        return `${(days * avgDailyProductiveHours).toFixed(1)} hours`;
+    }
+    return `${Math.ceil(days)} days`;
+  }, [totalEstimatedMinutes, avgDailyProductiveHours]);
 
 
   if (!intention) return null;
@@ -192,7 +157,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
           <DialogTitle>Conceptual Flow: {intention.name}</DialogTitle>
         </DialogHeader>
         <div className="flex-grow min-h-0 flex flex-col items-center justify-center p-8">
-            <div className="relative w-full h-full max-w-3xl">
+            <div className="relative w-full h-full max-w-2xl">
                 <svg className="absolute top-0 left-0 w-full h-full overflow-visible" preserveAspectRatio="none">
                     <defs>
                         <marker id="arrowhead" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -200,20 +165,15 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                         </marker>
                     </defs>
                     
-                    {/* Adjusted lines for a smaller triangle */}
                     <line x1="5%" y1="80%" x2="50%" y2="20%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
                     <line x1="50%" y1="20%" x2="95%" y2="80%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
                 </svg>
 
                  <div className="absolute left-[5%] top-[80%] -translate-x-1/2 translate-y-4 text-center">
                     <p className="font-semibold text-foreground">Current state</p>
-                    <div className="text-xs text-muted-foreground mt-1">
-                        <p>Avg. Productive: {productivityStats.avgProductiveHours.toFixed(1)}h/day</p>
-                        <p>Productivity Level: {productivityStats.currentLevel}</p>
-                    </div>
                 </div>
                 
-                <div className="absolute left-1/2 top-[20%] -translate-x-1/2 -translate-y-[110%] text-center w-full px-4">
+                <div className="absolute left-1/2 top-[20%] -translate-x-1/2 -translate-y-[120%] text-center w-full px-4">
                     <p className="font-semibold text-foreground text-lg">Solution</p>
                      <div className="text-sm text-muted-foreground w-full max-w-sm mx-auto p-2 border rounded-md bg-background/50 backdrop-blur-sm mt-2">
                         <ScrollArea className="max-h-32">
@@ -248,6 +208,11 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                           'No objectives targeted.'
                         )}
                      </div>
+                      {totalEstimatedMinutes > 0 && (
+                        <div className="mt-2 pt-2 border-t font-semibold">
+                            <p className="text-xs flex items-center gap-1 justify-center"><Clock className="h-3 w-3" /> {formatDuration(totalEstimatedMinutes)}</p>
+                        </div>
+                      )}
                 </div>
 
                 <div className="absolute left-1/2 top-[80%] -translate-x-1/2 translate-y-4 text-center w-full px-4">
@@ -255,6 +220,11 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                      <p className="text-sm text-muted-foreground truncate" title={intention.name}>
                         {intention.name}
                      </p>
+                     {projectedCompletion && (
+                        <div className="mt-2 pt-2 border-t font-semibold">
+                            <p className="text-xs flex items-center gap-1 justify-center"><Clock className="h-3 w-3" /> Est. {projectedCompletion}</p>
+                        </div>
+                     )}
                 </div>
             </div>
         </div>
