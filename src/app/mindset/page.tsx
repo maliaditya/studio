@@ -1,19 +1,17 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Brain, ArrowRight, Clock, Workflow, Play, BookText, BrainCircuit, CheckSquare, Zap } from 'lucide-react';
-import type { ExerciseDefinition, DailySchedule, DatedWorkout } from '@/types/workout';
-import { format, parseISO, isBefore, startOfToday, addDays, differenceInDays } from 'date-fns';
+import { Brain, ArrowRight, Play, BookText, BrainCircuit, CheckSquare, Zap, Expand, Shrink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BreathingAnimation } from '@/components/BreathingAnimation';
+import { cn } from '@/lib/utils';
 
 const TUTORIAL_CONTENT = [
     {
@@ -66,9 +64,9 @@ const InteractiveTutorial = () => {
     
     const TOTAL_DURATION_MINUTES = 7;
     const TOTAL_DURATION_MS = TOTAL_DURATION_MINUTES * 60 * 1000;
-    const ANIMATION_DURATION_MS = (4.5 * 6 * 1000) + (16 * 4 * 1000) + (5 * 5 * 1000); // from BreathingAnimation
+    const ANIMATION_DURATION_MS = (4.5 * 6 * 1000) + (16 * 4 * 1000) + (5 * 5 * 1000);
     
-    const totalPoints = TUTORIAL_CONTENT.reduce((sum, card) => sum + card.points.length, 0) - 1; // -1 for animation point
+    const totalPoints = TUTORIAL_CONTENT.reduce((sum, card) => sum + card.points.length, 0) - 1;
     const DURATION_PER_POINT_MS = (TOTAL_DURATION_MS - ANIMATION_DURATION_MS) / totalPoints;
 
     const currentCard = TUTORIAL_CONTENT[cardIndex];
@@ -89,7 +87,7 @@ const InteractiveTutorial = () => {
                 setPointIndex(0);
                 return prevCardIndex + 1;
             }
-            return prevCardIndex; // End of tutorial
+            return prevCardIndex;
         });
     }, [pointIndex]);
 
@@ -103,15 +101,14 @@ const InteractiveTutorial = () => {
     const handleBreathingComplete = useCallback(() => {
         setIsAnimating(false);
         setIsAudioPlaying(false);
-        // Start the timer for the next point immediately
         handleNext();
     }, [setIsAudioPlaying, handleNext]);
 
     return (
-        <Card className="h-full flex flex-col">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Brain className="h-6 w-6 text-primary"/>
+        <Card className="h-full flex flex-col border-0 shadow-none bg-transparent">
+            <CardHeader className="text-center">
+                <CardTitle className="flex items-center justify-center gap-2 text-2xl">
+                    <Brain className="h-8 w-8 text-primary"/>
                     Mindset Tutorial
                 </CardTitle>
                 <CardDescription>
@@ -126,9 +123,9 @@ const InteractiveTutorial = () => {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
                         transition={{ duration: 0.3 }}
-                        className="w-full"
+                        className="w-full max-w-lg"
                     >
-                        <Card className="bg-muted/50">
+                        <Card className="bg-card/50">
                             <CardHeader>
                                 <CardTitle>{currentCard.title}</CardTitle>
                                 <CardDescription>Step {pointIndex + 1} of {currentCard.points.length}</CardDescription>
@@ -153,7 +150,7 @@ const InteractiveTutorial = () => {
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, y: -10 }}
                                             transition={{ duration: 0.2 }}
-                                            className="text-lg text-center font-medium"
+                                            className="text-2xl text-center font-medium"
                                             dangerouslySetInnerHTML={{ __html: currentPoint }}
                                         />
                                     )}
@@ -164,7 +161,7 @@ const InteractiveTutorial = () => {
                 </AnimatePresence>
             </CardContent>
             <CardFooter>
-                <div className="w-full flex gap-2">
+                <div className="w-full flex gap-2 max-w-lg mx-auto">
                     {TUTORIAL_CONTENT.map((card, index) => (
                         <div key={index} className="w-full h-2 rounded-full bg-muted overflow-hidden">
                             <div 
@@ -207,30 +204,49 @@ const NormalModeTutorial = () => (
 );
 
 function MindsetPageContent() {
-    const searchParams = useSearchParams();
-    const { deepWorkDefinitions } = useAuth();
-    const intentionId = searchParams.get('intentionId');
     const [mode, setMode] = useState<'normal' | 'play'>('normal');
-    
-    const intention = useMemo(() => {
-        return deepWorkDefinitions.find(def => def.id === intentionId) || null;
-    }, [intentionId, deepWorkDefinitions]);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isFullScreen, setIsFullScreen] = useState(false);
 
-    if (!intentionId || !intention) {
-        return (
-            <div className="flex items-center justify-center h-full">
-                <p className="text-muted-foreground">Intention not found. Please select one from the dashboard.</p>
-            </div>
-        );
-    }
+    const handleFullScreenChange = useCallback(() => {
+        setIsFullScreen(!!document.fullscreenElement);
+        if (!document.fullscreenElement) {
+            setMode('normal'); // Exit play mode when exiting fullscreen
+        }
+    }, []);
+
+    useEffect(() => {
+        document.addEventListener('fullscreenchange', handleFullScreenChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullScreenChange);
+        };
+    }, [handleFullScreenChange]);
+
+    const togglePlayMode = () => {
+        if (mode === 'normal') {
+            setMode('play');
+            containerRef.current?.requestFullscreen().catch(err => {
+                console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                setMode('normal'); // Revert if fullscreen fails
+            });
+        } else {
+            setMode('normal');
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            }
+        }
+    };
     
     return (
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-[calc(100vh-4rem)]">
-            <div className="h-full flex flex-col">
+        <div ref={containerRef} className={cn("bg-background", isFullScreen && "h-screen w-screen")}>
+            <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-full flex flex-col">
                 <div className="flex justify-end mb-4">
-                    <Button variant="outline" onClick={() => setMode(prev => prev === 'normal' ? 'play' : 'normal')}>
+                    <Button variant="outline" onClick={togglePlayMode}>
                         {mode === 'normal' ? <Play className="mr-2 h-4 w-4" /> : <BookText className="mr-2 h-4 w-4" />}
-                        {mode === 'normal' ? 'Start Play Mode' : 'Switch to Normal Mode'}
+                        {mode === 'normal' ? 'Start Play Mode' : 'Exit Play Mode'}
+                        {isFullScreen 
+                            ? <Shrink className="ml-2 h-4 w-4" /> 
+                            : <Expand className="ml-2 h-4 w-4" />}
                     </Button>
                 </div>
                 <div className="flex-grow min-h-0">
@@ -250,6 +266,3 @@ export default function MindsetPage() {
         </AuthGuard>
     );
 }
-
-
-    
