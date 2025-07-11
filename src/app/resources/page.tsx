@@ -67,7 +67,7 @@ const isObsidianUrl = (url: string | undefined): boolean => {
     } catch (e) { return false; }
 };
 
-const ResourceCard = ({ resource, onUpdate, onDelete }: { resource: Resource; onUpdate: (resource: Resource) => void; onDelete: (resourceId: string) => void; }) => {
+const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl }: { resource: Resource; onUpdate: (resource: Resource) => void; onDelete: (resourceId: string) => void; setFloatingVideoUrl: (url: string | null) => void; }) => {
     const [editingTitle, setEditingTitle] = useState(false);
     const [editingPointId, setEditingPointId] = useState<string | null>(null);
 
@@ -137,18 +137,27 @@ const ResourceCard = ({ resource, onUpdate, onDelete }: { resource: Resource; on
                     {(resource.points || []).map((point) => (
                         <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
                             <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
-                            {editingPointId === point.id ? (
-                                <Textarea value={point.text} onChange={e => handleUpdatePoint(point.id, e.target.value)} onBlur={() => setEditingPointId(null)} autoFocus className="text-sm" rows={2}/>
-                            ) : point.type === 'youtube' && point.url ? (
-                                <div className="w-full aspect-video rounded-md overflow-hidden border">
-                                    <iframe src={point.url} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
-                                </div>
-                            ) : (
-                                <span onClick={() => setEditingPointId(point.id)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/<br>/g, '') }} />
-                            )}
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={() => handleDeletePoint(point.id)}>
-                                <Trash2 className="h-3 w-3"/>
-                            </Button>
+                            <div className="flex-grow">
+                                {editingPointId === point.id ? (
+                                    <Textarea value={point.text} onChange={e => handleUpdatePoint(point.id, e.target.value)} onBlur={() => setEditingPointId(null)} autoFocus className="text-sm" rows={2}/>
+                                ) : point.type === 'youtube' && point.url ? (
+                                    <div className="w-full aspect-video rounded-md overflow-hidden border">
+                                        <iframe src={point.url} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
+                                    </div>
+                                ) : (
+                                    <span onClick={() => setEditingPointId(point.id)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/<br>/g, '') }} />
+                                )}
+                            </div>
+                            <div className="flex flex-col items-center flex-shrink-0">
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={() => handleDeletePoint(point.id)}>
+                                    <Trash2 className="h-3 w-3"/>
+                                </Button>
+                                {point.type === 'youtube' && (
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground opacity-0 group-hover/item:opacity-100" onClick={() => setFloatingVideoUrl(point.text)}>
+                                        <PictureInPicture className="h-3 w-3"/>
+                                    </Button>
+                                )}
+                            </div>
                         </li>
                     ))}
                 </ul>
@@ -536,7 +545,7 @@ function ResourcesPageContent() {
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                 {filteredResources.map(res => {
                   if (res.type === 'card') {
-                    return <ResourceCard key={res.id} resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} />;
+                    return <ResourceCard key={res.id} resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} />;
                   }
 
                   // Link type rendering
@@ -705,5 +714,6 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
