@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -19,7 +20,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MindMapViewer } from '@/components/MindMapViewer';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AuthGuard } from '@/components/AuthGuard';
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -517,6 +517,52 @@ function ResourcesPageContent() {
               
               {selectedFolderId ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {filteredResources.map(res => {
+                    if (res.type === 'card') {
+                      return <ResourceCard key={res.id} resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} />;
+                    }
+
+                    // Link type rendering
+                    const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
+                    const isSpecialEmbed = isNotionUrl(res.link) || isObsidianUrl(res.link);
+                    const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? res.link : null);
+                    const isLongContent = res.name.length > 20 && (res.description?.length ?? 0) > 30;
+
+                    return (
+                        <Card key={res.id} className={cn(
+                            "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5",
+                            isLongContent ? "bg-gradient-to-br from-card to-muted/20" : "bg-card"
+                        )}>
+                            {youtubeEmbedUrl ? (
+                                <>
+                                    <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setEmbedUrl(youtubeEmbedUrl); }} aria-label="View in App"><Expand className="h-4 w-4" /></Button>
+                                        <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                                    </div>
+                                    <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl"><iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe></div>
+                                    <div className="p-4 flex-grow"><div className="flex items-start justify-between gap-2"><div className="flex-grow min-w-0"><div className="flex items-center gap-2"><Youtube className="h-5 w-5 flex-shrink-0 text-red-500" /><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div></div></div></div>
+                                </>
+                            ) : (
+                                <div className="p-5 flex flex-col flex-grow">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="flex-grow min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                {isSpecialEmbed ? <Globe className="h-4 w-4 flex-shrink-0 text-primary" /> : res.iconUrl ? <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm flex-shrink-0" /> : <LinkIcon className="h-4 w-4 flex-shrink-0" />}
+                                                <p className="text-base font-bold" title={res.name}>{res.name}</p>
+                                            </div>
+                                        </div>
+                                         <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 -mr-2 -mt-1"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                                    </div>
+                                    <a href={res.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline mt-1">{res.link}</a>
+                                    <p className="text-sm text-muted-foreground mt-3 line-clamp-3 flex-grow min-h-[60px]">{res.description || 'No description available.'}</p>
+                                    <div className="mt-auto pt-4">
+                                        {isSpecialEmbed ? (<Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(res.link)}>View in App</Button>) : (<Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>)}
+                                    </div>
+                                </div>
+                            )}
+                        </Card>
+                    )
+                  })}
                   {isAdding ? (
                     <Card className="rounded-3xl flex flex-col border-primary ring-2 ring-primary shadow-xl">
                       <div className="p-5 flex flex-col flex-grow justify-between">
@@ -565,53 +611,6 @@ function ResourcesPageContent() {
                         <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add New Resource</p>
                     </Card>
                   )}
-
-                  {filteredResources.map(res => {
-                    if (res.type === 'card') {
-                      return <ResourceCard key={res.id} resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} />;
-                    }
-
-                    // Link type rendering
-                    const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
-                    const isSpecialEmbed = isNotionUrl(res.link) || isObsidianUrl(res.link);
-                    const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? res.link : null);
-                    const isLongContent = res.name.length > 20 && (res.description?.length ?? 0) > 30;
-
-                    return (
-                        <Card key={res.id} className={cn(
-                            "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5",
-                            isLongContent ? "bg-gradient-to-br from-card to-muted/20" : "bg-card"
-                        )}>
-                            {youtubeEmbedUrl ? (
-                                <>
-                                    <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setEmbedUrl(youtubeEmbedUrl); }} aria-label="View in App"><Expand className="h-4 w-4" /></Button>
-                                        <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                                    </div>
-                                    <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl"><iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe></div>
-                                    <div className="p-4 flex-grow"><div className="flex items-start justify-between gap-2"><div className="flex-grow min-w-0"><div className="flex items-center gap-2"><Youtube className="h-5 w-5 flex-shrink-0 text-red-500" /><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div></div></div></div>
-                                </>
-                            ) : (
-                                <div className="p-5 flex flex-col flex-grow">
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="flex-grow min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                {isSpecialEmbed ? <Globe className="h-4 w-4 flex-shrink-0 text-primary" /> : res.iconUrl ? <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm flex-shrink-0" /> : <LinkIcon className="h-4 w-4 flex-shrink-0" />}
-                                                <p className="text-base font-bold" title={res.name}>{res.name}</p>
-                                            </div>
-                                        </div>
-                                         <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 -mr-2 -mt-1"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                                    </div>
-                                    <a href={res.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline mt-1">{res.link}</a>
-                                    <p className="text-sm text-muted-foreground mt-3 line-clamp-3 flex-grow min-h-[60px]">{res.description || 'No description available.'}</p>
-                                    <div className="mt-auto pt-4">
-                                        {isSpecialEmbed ? (<Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(res.link)}>View in App</Button>) : (<Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>)}
-                                    </div>
-                                </div>
-                            )}
-                        </Card>
-                    )
-                  })}
                 </div>
               ) : (
                 <div className="text-center py-12 border-2 border-dashed rounded-lg">
@@ -692,3 +691,4 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
