@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useMemo } from 'react';
@@ -93,6 +94,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
     const todayKey = format(today, 'yyyy-MM-dd');
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
 
+    // Find all descendants of the current intention
     const allDescendantIds = new Set<string>();
     const queue = [intention.id];
     const visited = new Set<string>();
@@ -107,7 +109,8 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
             (def.linkedUpskillIds || []).forEach(childId => queue.push(childId));
         }
     }
-
+    
+    // Find all descendant definition IDs that are scheduled or pending
     const scheduledOrPendingDefIds = new Set<string>();
     for (const dateKey in schedule) {
         const scheduleDate = parseISO(dateKey);
@@ -133,30 +136,48 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
             });
         }
     }
+
+    const solutionTasks: { action: ExerciseDefinition, linkedVisualizations: ExerciseDefinition[] }[] = [];
+    const outcomeObjectiveIds = new Set<string>();
+
+    const allScheduledOrPendingDefs = allDefs.filter(def => scheduledOrPendingDefIds.has(def.id));
     
-    // Find leaf "Actions" from the pending list
-    const solutionActions = deepWorkDefinitions.filter(def => {
-        return scheduledOrPendingDefIds.has(def.id) && (def.linkedDeepWorkIds?.length ?? 0) === 0;
+    // Find leaf "Actions" (Deep Work) and "Visualizations" (Upskill)
+    const solutionLeafs = allScheduledOrPendingDefs.filter(def => {
+        const isDWAction = deepWorkDefinitions.some(d => d.id === def.id) && (def.linkedDeepWorkIds?.length ?? 0) === 0;
+        const isUpskillViz = upskillDefinitions.some(d => d.id === def.id) && (def.linkedUpskillIds?.length ?? 0) === 0;
+        return isDWAction || isUpskillViz;
     });
 
-    const solutionTasks = solutionActions.map(action => {
-      // Find linked visualizations for each action
-      const linkedVisualizations = (action.linkedUpskillIds || [])
-        .map(id => upskillDefinitions.find(d => d.id === id))
-        .filter((viz): viz is ExerciseDefinition => !!viz && (viz.linkedUpskillIds?.length ?? 0) === 0);
-      return { action, linkedVisualizations };
-    });
-
-    // Find parent objectives of the solution tasks
-    const objectiveIds = new Set<string>();
-    solutionActions.forEach(action => {
-      deepWorkDefinitions.forEach(parent => {
-        if ((parent.linkedDeepWorkIds || []).includes(action.id)) {
-          objectiveIds.add(parent.id);
+    solutionLeafs.forEach(leaf => {
+        // If it's a visualization, find which action it's linked to.
+        if (upskillDefinitions.some(d => d.id === leaf.id)) {
+            const parentAction = deepWorkDefinitions.find(action => (action.linkedUpskillIds || []).includes(leaf.id));
+            if (parentAction && scheduledOrPendingDefIds.has(parentAction.id)) {
+                let solutionTask = solutionTasks.find(st => st.action.id === parentAction.id);
+                if (!solutionTask) {
+                    solutionTask = { action: parentAction, linkedVisualizations: [] };
+                    solutionTasks.push(solutionTask);
+                }
+                solutionTask.linkedVisualizations.push(leaf);
+            }
+        } else { // It's a deep work action
+            if (!solutionTasks.some(st => st.action.id === leaf.id)) {
+                solutionTasks.push({ action: leaf, linkedVisualizations: [] });
+            }
         }
-      });
     });
-    const outcomeObjectives = deepWorkDefinitions.filter(def => objectiveIds.has(def.id));
+
+    // Find parent objectives of all collected solution tasks
+    solutionTasks.forEach(({ action }) => {
+        deepWorkDefinitions.forEach(parent => {
+            if ((parent.linkedDeepWorkIds || []).includes(action.id)) {
+                outcomeObjectiveIds.add(parent.id);
+            }
+        });
+    });
+
+    const outcomeObjectives = deepWorkDefinitions.filter(def => outcomeObjectiveIds.has(def.id));
 
     return { solutionTasks, outcomeObjectives };
   }, [intention, schedule, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs]);
@@ -179,11 +200,12 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                         </marker>
                     </defs>
                     
-                    <line x1="5%" y1="90%" x2="50%" y2="10%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
-                    <line x1="50%" y1="10%" x2="95%" y2="90%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
+                    {/* Adjusted lines for a smaller triangle */}
+                    <line x1="5%" y1="80%" x2="50%" y2="20%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
+                    <line x1="50%" y1="20%" x2="95%" y2="80%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
                 </svg>
 
-                 <div className="absolute left-[5%] bottom-[10%] -translate-x-1/2 translate-y-[150%] text-center">
+                 <div className="absolute left-[5%] top-[80%] -translate-x-1/2 translate-y-4 text-center">
                     <p className="font-semibold text-foreground">Current state</p>
                     <div className="text-xs text-muted-foreground mt-1">
                         <p>Avg. Productive: {productivityStats.avgProductiveHours.toFixed(1)}h/day</p>
@@ -191,7 +213,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                     </div>
                 </div>
                 
-                <div className="absolute left-1/2 top-[10%] -translate-x-1/2 -translate-y-[110%] text-center w-full px-4">
+                <div className="absolute left-1/2 top-[20%] -translate-x-1/2 -translate-y-[110%] text-center w-full px-4">
                     <p className="font-semibold text-foreground text-lg">Solution</p>
                      <div className="text-sm text-muted-foreground w-full max-w-sm mx-auto p-2 border rounded-md bg-background/50 backdrop-blur-sm mt-2">
                         <ScrollArea className="max-h-32">
@@ -217,7 +239,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                     </div>
                 </div>
 
-                <div className="absolute right-[5%] bottom-[10%] translate-x-1/2 translate-y-[150%] text-center">
+                <div className="absolute right-[5%] top-[80%] translate-x-1/2 translate-y-4 text-center">
                      <p className="font-semibold text-foreground">Outcome</p>
                      <div className="text-xs text-muted-foreground mt-1 max-w-[150px]">
                         {outcomeObjectives.length > 0 ? (
@@ -228,7 +250,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                      </div>
                 </div>
 
-                <div className="absolute left-1/2 bottom-[10%] -translate-x-1/2 translate-y-[120%] text-center w-full px-4">
+                <div className="absolute left-1/2 top-[80%] -translate-x-1/2 translate-y-4 text-center w-full px-4">
                      <p className="font-semibold text-foreground text-lg">Intention</p>
                      <p className="text-sm text-muted-foreground truncate" title={intention.name}>
                         {intention.name}
