@@ -104,6 +104,10 @@ const InteractiveTutorial = () => {
         handleNext();
     }, [setIsAudioPlaying, handleNext]);
 
+    if (isAnimating) {
+        return <BreathingAnimation onComplete={handleBreathingComplete} />;
+    }
+
     return (
         <Card className="h-full flex flex-col border-0 shadow-none bg-transparent">
             <CardHeader className="text-center">
@@ -131,30 +135,15 @@ const InteractiveTutorial = () => {
                                 <CardDescription>Step {pointIndex + 1} of {currentCard.points.length}</CardDescription>
                             </CardHeader>
                             <CardContent className="min-h-[250px] flex items-center justify-center">
-                                <AnimatePresence mode="wait">
-                                    {isAnimating ? (
-                                        <motion.div
-                                            key="animation"
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            exit={{ opacity: 0 }}
-                                            transition={{ duration: 0.5 }}
-                                            className="w-full"
-                                        >
-                                            <BreathingAnimation onComplete={handleBreathingComplete} />
-                                        </motion.div>
-                                    ) : (
-                                        <motion.p
-                                            key={`${cardIndex}-${pointIndex}`}
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: -10 }}
-                                            transition={{ duration: 0.2 }}
-                                            className="text-2xl text-center font-medium"
-                                            dangerouslySetInnerHTML={{ __html: currentPoint }}
-                                        />
-                                    )}
-                                </AnimatePresence>
+                                <motion.p
+                                    key={`${cardIndex}-${pointIndex}`}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="text-2xl text-center font-medium"
+                                    dangerouslySetInnerHTML={{ __html: currentPoint }}
+                                />
                             </CardContent>
                         </Card>
                     </motion.div>
@@ -209,8 +198,9 @@ function MindsetPageContent() {
     const [isFullScreen, setIsFullScreen] = useState(false);
 
     const handleFullScreenChange = useCallback(() => {
-        setIsFullScreen(!!document.fullscreenElement);
-        if (!document.fullscreenElement) {
+        const isCurrentlyFullScreen = !!document.fullscreenElement;
+        setIsFullScreen(isCurrentlyFullScreen);
+        if (!isCurrentlyFullScreen) {
             setMode('normal'); // Exit play mode when exiting fullscreen
         }
     }, []);
@@ -238,9 +228,9 @@ function MindsetPageContent() {
     };
     
     return (
-        <div ref={containerRef} className={cn("bg-background", isFullScreen && "h-screen w-screen")}>
-            <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-full flex flex-col">
-                <div className="flex justify-end mb-4">
+        <div ref={containerRef} className={cn("bg-background transition-all", isFullScreen ? "h-screen w-screen" : "h-full")}>
+            <div className={cn("container mx-auto h-full flex flex-col transition-all", isFullScreen ? "p-0" : "p-4 sm:p-6 lg:p-8")}>
+                <div className={cn("flex justify-end mb-4", isFullScreen && "hidden")}>
                     <Button variant="outline" onClick={togglePlayMode}>
                         {mode === 'normal' ? <Play className="mr-2 h-4 w-4" /> : <BookText className="mr-2 h-4 w-4" />}
                         {mode === 'normal' ? 'Start Play Mode' : 'Exit Play Mode'}
