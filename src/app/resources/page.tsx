@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MindMapViewer } from '@/components/MindMapViewer';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AuthGuard } from '@/components/AuthGuard';
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -691,4 +692,3 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
-
