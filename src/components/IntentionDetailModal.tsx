@@ -252,7 +252,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
                 </div>
             </div>
             <div className="w-full text-center mt-auto">
-                <Separator className="my-4" />
+                <Separator className="my-6" />
                 <h4 className="font-semibold text-sm">{suggestion.title}</h4>
                 <p className="text-xs text-muted-foreground max-w-xl mx-auto">{suggestion.description}</p>
             </div>
