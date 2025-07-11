@@ -6,7 +6,7 @@ import ReactPlayer from 'react-player/youtube';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
-import { X, GripVertical } from 'lucide-react';
+import { X, GripVertical, ExternalLink } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -42,7 +42,7 @@ export function FloatingVideoPlayer() {
   }, [floatingVideoUrl]);
 
   const handleDragMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('button')) return;
+    if ((e.target as HTMLElement).closest('button, a')) return;
     setIsDragging(true);
     setDragStartOffset({
       x: e.clientX - position.x,
@@ -161,31 +161,47 @@ export function FloatingVideoPlayer() {
             )}>
             <div
               className={cn(
-                  "absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-black/60 to-transparent p-1.5 flex items-start justify-between cursor-grab active:cursor-grabbing",
-                  isYoutubeUrl(floatingVideoUrl) ? "text-white/50" : "text-muted-foreground"
+                  "absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-black/60 to-transparent p-1.5 flex items-start justify-between z-10",
+                   !isYoutubeUrl(floatingVideoUrl) && "cursor-grab active:cursor-grabbing"
                 )}
               onMouseDown={handleDragMouseDown}
             >
-              <GripVertical className="h-5 w-5" />
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn(
-                    "h-7 w-7",
-                    isYoutubeUrl(floatingVideoUrl) ? "text-white/80 hover:bg-white/20 hover:text-white" : "hover:bg-accent"
-                )}
-                onClick={() => setFloatingVideoUrl(null)}
-              >
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close Player</span>
-              </Button>
+              <GripVertical className="h-5 w-5 text-white/50" />
+              <div className="flex items-center gap-1">
+                 <Button
+                    asChild
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                        "h-7 w-7",
+                        isYoutubeUrl(floatingVideoUrl) ? "text-white/80 hover:bg-white/20 hover:text-white" : "hover:bg-accent"
+                    )}
+                >
+                    <a href={floatingVideoUrl} target="_blank" rel="noopener noreferrer" title="Open in new tab">
+                        <ExternalLink className="h-4 w-4" />
+                        <span className="sr-only">Open in new tab</span>
+                    </a>
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                        "h-7 w-7",
+                        isYoutubeUrl(floatingVideoUrl) ? "text-white/80 hover:bg-white/20 hover:text-white" : "hover:bg-accent"
+                    )}
+                    onClick={() => setFloatingVideoUrl(null)}
+                >
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">Close Player</span>
+                </Button>
+              </div>
             </div>
-            <CardContent className={cn("p-0 w-full h-full", isYoutubeUrl(floatingVideoUrl) ? "bg-black" : "bg-background pt-8")}>
+            <CardContent className={cn("p-0 w-full h-full", isYoutubeUrl(floatingVideoUrl) ? "bg-black" : "bg-background")}>
               {renderContent()}
             </CardContent>
              <div
                 onMouseDown={handleResizeMouseDown}
-                className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize"
+                className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize z-10"
                 style={{
                     borderBottom: `8px solid hsl(var(${isYoutubeUrl(floatingVideoUrl) ? "--border" : "--accent"}) / 0.5)`,
                     borderLeft: '8px solid transparent',
