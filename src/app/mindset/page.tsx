@@ -7,13 +7,13 @@ import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Brain, ArrowRight, Lightbulb, Clock, Workflow } from 'lucide-react';
-import type { ExerciseDefinition, Activity, DailySchedule, DatedWorkout } from '@/types/workout';
+import { Brain, ArrowRight, Clock, Workflow } from 'lucide-react';
+import type { ExerciseDefinition, DailySchedule, DatedWorkout } from '@/types/workout';
 import { format, parseISO, isBefore, startOfToday, addDays, differenceInDays } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
+import { BreathingAnimation } from '@/components/BreathingAnimation';
 
 const TUTORIAL_CONTENT = [
     {
@@ -38,7 +38,7 @@ const TUTORIAL_CONTENT = [
         "Question it: “Is this true?” “Is it helping?” “Am I rushing?” “Will this keep tomorrow intact — and bring fulfillment now?”",
         "Replace it: Visualize from grounded self",
         "Detach: You are not your body",
-        "Don’t chase completion. Chase comprehension. Finishing isn’t winning if nothing sticks."
+        "Don’t chase completion. Chase comprehension. *Finishing isn’t winning if nothing sticks.*"
       ]
     },
     {
@@ -150,6 +150,7 @@ const ConceptualFlowDiagram = ({ intention, avgDailyProductiveHours }: { intenti
                     if (!solutionTask) {
                         solutionTask = { action: parentAction, linkedVisualizations: [] };
                         solutionTasks.push(solutionTask);
+                        estimatedMinutes += parentAction.estimatedDuration || 0;
                     }
                     solutionTask.linkedVisualizations.push(leaf);
                 }
@@ -206,12 +207,9 @@ const ConceptualFlowDiagram = ({ intention, avgDailyProductiveHours }: { intenti
                     <Workflow className="h-6 w-6 text-primary"/>
                     Conceptual Flow
                 </CardTitle>
-                <CardDescription>
-                    Your strategic path from current state to desired outcome.
-                </CardDescription>
             </CardHeader>
             <CardContent className="flex-grow flex flex-col items-center justify-between p-4">
-                <div className="relative w-full h-[450px] max-w-2xl">
+                <div className="relative w-full h-[350px] max-w-2xl">
                     <svg className="absolute top-0 left-0 w-full h-full overflow-visible" preserveAspectRatio="none">
                         <defs>
                             <marker id="arrowhead" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -284,7 +282,7 @@ const ConceptualFlowDiagram = ({ intention, avgDailyProductiveHours }: { intenti
             </CardContent>
              <CardFooter className="text-center">
                 <div className="w-full">
-                    <Separator className="my-6" />
+                    <Separator className="my-8" />
                     <h4 className="font-semibold text-sm">{suggestion.title}</h4>
                     <p className="text-xs text-muted-foreground max-w-xl mx-auto">{suggestion.description}</p>
                 </div>
@@ -296,6 +294,7 @@ const ConceptualFlowDiagram = ({ intention, avgDailyProductiveHours }: { intenti
 const InteractiveTutorial = () => {
     const [cardIndex, setCardIndex] = useState(0);
     const [pointIndex, setPointIndex] = useState(0);
+    const [isAnimating, setIsAnimating] = useState(false);
 
     const currentCard = TUTORIAL_CONTENT[cardIndex];
     const currentPoint = currentCard.points[pointIndex];
@@ -312,6 +311,18 @@ const InteractiveTutorial = () => {
             // End of tutorial
         }
     };
+
+    const handleBreathingComplete = useCallback(() => {
+        setIsAnimating(false);
+        setPointIndex(1); // Move to the next point after animation
+    }, []);
+
+    useEffect(() => {
+        // Start animation only on the first point of the first card
+        if(cardIndex === 0 && pointIndex === 0) {
+            setIsAnimating(true);
+        }
+    }, [cardIndex, pointIndex]);
     
     return (
         <Card className="h-full flex flex-col">
@@ -339,17 +350,30 @@ const InteractiveTutorial = () => {
                                 <CardTitle>{currentCard.title}</CardTitle>
                                 <CardDescription>Step {pointIndex + 1} of {currentCard.points.length}</CardDescription>
                             </CardHeader>
-                            <CardContent className="min-h-[120px] flex items-center justify-center">
+                            <CardContent className="min-h-[250px] flex items-center justify-center">
                                 <AnimatePresence mode="wait">
-                                    <motion.p
-                                        key={`${cardIndex}-${pointIndex}`}
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -10 }}
-                                        transition={{ duration: 0.2 }}
-                                        className="text-lg text-center font-medium"
-                                        dangerouslySetInnerHTML={{ __html: currentPoint }}
-                                    />
+                                    {isAnimating ? (
+                                        <motion.div
+                                            key="animation"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            transition={{ duration: 0.5 }}
+                                            className="w-full"
+                                        >
+                                            <BreathingAnimation onComplete={handleBreathingComplete} />
+                                        </motion.div>
+                                    ) : (
+                                        <motion.p
+                                            key={`${cardIndex}-${pointIndex}`}
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -10 }}
+                                            transition={{ duration: 0.2 }}
+                                            className="text-lg text-center font-medium"
+                                            dangerouslySetInnerHTML={{ __html: currentPoint }}
+                                        />
+                                    )}
                                 </AnimatePresence>
                             </CardContent>
                         </Card>
@@ -369,8 +393,8 @@ const InteractiveTutorial = () => {
                         </div>
                     ))}
                 </div>
-                <Button onClick={handleNext} disabled={isLastCard && isLastPoint}>
-                    Next <ArrowRight className="ml-2 h-4 w-4" />
+                <Button onClick={handleNext} disabled={(isLastCard && isLastPoint) || isAnimating}>
+                    {isAnimating ? "Breathing..." : "Next"} {!isAnimating && <ArrowRight className="ml-2 h-4 w-4" />}
                 </Button>
             </CardFooter>
         </Card>
