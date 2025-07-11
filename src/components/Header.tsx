@@ -23,9 +23,10 @@ export function Header() {
   } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [isClient, setIsClient] = useState(false);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [isClient, setIsClient] = useState(false);
+
 
   useEffect(() => {
     setIsClient(true);
