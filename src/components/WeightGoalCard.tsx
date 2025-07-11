@@ -406,30 +406,37 @@ export function WeightGoalCard({
     };
 
     const renderProjectsContent = () => {
-        if (activeIntentions.length === 0) {
-          return (
-            <div className="text-center text-sm text-muted-foreground py-4 flex flex-col items-center justify-center h-full">
-              <p>No active intentions found.</p>
-              <Link href="/deep-work" className="text-primary hover:underline mt-1">
-                Create an intention to see it here.
-              </Link>
-            </div>
-          );
-        }
+      if (activeIntentions.length === 0) {
         return (
-            <Carousel
-                items={activeIntentions}
-                renderItem={(intention) => (
-                    <IntentionGoalCard
-                        key={intention.id}
-                        intention={intention}
-                        onMindMapClick={() => handleIntentionClick(intention)}
-                        onDiagramClick={() => handleDiagramClick(intention)}
-                    />
-                )}
-            />
+          <div className="text-center text-sm text-muted-foreground py-4 flex flex-col items-center justify-center h-full">
+            <p>No active intentions found.</p>
+            <Link href="/deep-work" className="text-primary hover:underline mt-1">
+              Create an intention to see it here.
+            </Link>
+          </div>
         );
-      };
+      }
+      return (
+        <ScrollArea className="h-[250px] pr-3">
+          <ul className="space-y-2">
+            {activeIntentions.map((intention) => (
+              <li key={intention.id}>
+                <button 
+                  onClick={() => handleDiagramClick(intention)}
+                  className="w-full text-left p-2 rounded-md hover:bg-accent flex items-center gap-3 transition-colors"
+                >
+                  <Workflow className="h-5 w-5 text-primary flex-shrink-0" />
+                  <div className="flex-grow min-w-0">
+                    <p className="font-medium text-sm truncate">{intention.name}</p>
+                    <p className="text-xs text-muted-foreground">{intention.category}</p>
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </ScrollArea>
+      );
+    };
       
     const renderWeightContent = () => {
         if (weightView === 'chart') {
