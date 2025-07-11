@@ -14,9 +14,9 @@ import { ScrollArea } from './ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from './ui/card';
 import { Badge } from './ui/badge';
 import { BookCopy, Link as LinkIcon, Briefcase, ExternalLink, Globe, Workflow } from 'lucide-react';
-import type { ExerciseDefinition, Resource, DatedWorkout } from '@/types/workout';
+import type { ExerciseDefinition, Resource, DatedWorkout, DailySchedule } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, subDays, parseISO, addDays } from 'date-fns';
+import { format, subDays, parseISO, addDays, isBefore, startOfToday } from 'date-fns';
 import { Progress } from './ui/progress';
 import { cn } from '@/lib/utils';
 import { BrainCircuit, ArrowUp, ArrowDown, PauseCircle, AlertCircle } from 'lucide-react';
@@ -52,7 +52,7 @@ const productivityLevels = [
 ];
 
 export function IntentionDetailModal({ isOpen, onOpenChange, intention }: IntentionDetailModalProps) {
-  const { upskillDefinitions, deepWorkDefinitions, allUpskillLogs, allDeepWorkLogs } = useAuth();
+  const { deepWorkDefinitions, allDeepWorkLogs, allUpskillLogs, schedule } = useAuth();
   
   const productivityStats = useMemo(() => {
     const getDailyDuration = (logs: DatedWorkout[], dateStr: string, durationField: 'reps' | 'weight') => {
@@ -86,117 +86,71 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
     };
   }, [allUpskillLogs, allDeepWorkLogs]);
   
-  const permanentlyLoggedActionIds = useMemo(() => {
-    const loggedIds = new Set<string>();
-    allDeepWorkLogs.forEach(log => {
-      log.exercises.forEach(ex => {
-        if (ex.loggedSets.length > 0) loggedIds.add(ex.definitionId);
-      });
-    });
-    return loggedIds;
-  }, [allDeepWorkLogs]);
+  const { solutionActions, outcomeObjectives } = useMemo(() => {
+    if (!intention) return { solutionActions: [], outcomeObjectives: [] };
 
-  const permanentlyLoggedVisualizationIds = useMemo(() => {
-    const loggedIds = new Set<string>();
-    allUpskillLogs.forEach(log => {
-      log.exercises.forEach(ex => {
-        if (ex.loggedSets.length > 0) loggedIds.add(ex.definitionId);
-      });
-    });
-    return loggedIds;
-  }, [allUpskillLogs]);
+    const today = startOfToday();
+    const todayKey = format(today, 'yyyy-MM-dd');
 
-  const {
-    linkedLearningTasks,
-    linkedWorkTasks,
-    totalEstimatedHours,
-    totalLoggedHours,
-    progressPercent,
-    projectedDate,
-    daysRemaining,
-  } = useMemo(() => {
-    if (!intention) return {
-        linkedLearningTasks: [],
-        linkedWorkTasks: [],
-        totalEstimatedHours: 0,
-        totalLoggedHours: 0,
-        progressPercent: 0,
-        projectedDate: null,
-        daysRemaining: null,
-    };
-
-    const isDeepWorkObjectiveComplete = (objective: ExerciseDefinition): boolean => {
-      const childActionIds = (objective.linkedDeepWorkIds || []).filter(childId => {
-          const childDef = deepWorkDefinitions.find(d => d.id === childId);
-          return childDef && (childDef.linkedDeepWorkIds?.length ?? 0) === 0;
-      });
-      if (childActionIds.length === 0) return false;
-      return childActionIds.every(id => permanentlyLoggedActionIds.has(id));
-    };
-  
-    const isUpskillObjectiveComplete = (objective: ExerciseDefinition): boolean => {
-      const visited = new Set<string>();
-      const visualizationIds = new Set<string>();
-      const queue: string[] = [objective.id];
-
-      while (queue.length > 0) {
-          const currentId = queue.shift()!;
-          if (visited.has(currentId)) continue;
-          visited.add(currentId);
-          const node = upskillDefinitions.find(d => d.id === currentId);
-          if (!node) continue;
-          const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
-          if (!isParent) {
-              visualizationIds.add(node.id);
-          } else {
-              (node.linkedUpskillIds || []).forEach(childId => {
-                  if (!visited.has(childId)) queue.push(childId);
-              });
-          }
+    // 1. Get all descendant definitions of the intention
+    const allDescendantIds = new Set<string>();
+    const queue = [intention.id];
+    const visited = new Set<string>();
+    while(queue.length > 0) {
+      const currentId = queue.shift()!;
+      if (visited.has(currentId)) continue;
+      visited.add(currentId);
+      allDescendantIds.add(currentId);
+      const def = deepWorkDefinitions.find(d => d.id === currentId);
+      if(def) {
+        (def.linkedDeepWorkIds || []).forEach(childId => queue.push(childId));
+        (def.linkedUpskillIds || []).forEach(childId => queue.push(childId)); // Assuming upskill can be part of it
       }
-      if (visualizationIds.size === 0) return false;
-      return Array.from(visualizationIds).every(vizId => permanentlyLoggedVisualizationIds.has(vizId));
-    };
+    }
     
-    const learningTasks = (intention.linkedUpskillIds || []).map(id => {
-      const def = upskillDefinitions.find(d => d.id === id);
-      return def ? { ...def, isCompleted: isUpskillObjectiveComplete(def) } : null;
-    }).filter(Boolean) as (ExerciseDefinition & { isCompleted: boolean })[];
+    // 2. Find which actions are scheduled or pending
+    const scheduledOrPendingActionIds = new Set<string>();
+    for (const dateKey in schedule) {
+        const scheduleDate = parseISO(dateKey);
+        const dailySchedule = schedule[dateKey] as DailySchedule;
+        if (dailySchedule) {
+            const isToday = dateKey === todayKey;
+            const isPast = isBefore(scheduleDate, today);
 
-    const workTasks = (intention.linkedDeepWorkIds || []).map(id => {
-      const def = deepWorkDefinitions.find(d => d.id === id);
-      return def ? { ...def, isCompleted: isDeepWorkObjectiveComplete(def) } : null;
-    }).filter(Boolean) as (ExerciseDefinition & { isCompleted: boolean })[];
-
-    const allLinkedTasks = [...learningTasks, ...workTasks];
-    const totalLinkedEstimatedMinutes = allLinkedTasks.reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
-    const totalLinkedEstimatedHours = totalLinkedEstimatedMinutes / 60;
+            Object.values(dailySchedule).flat().forEach(activity => {
+                if (activity && !activity.completed && (isToday || isPast)) {
+                    (activity.taskIds || []).forEach(taskId => {
+                        const taskDefId = allDeepWorkLogs.flatMap(l => l.exercises).find(t => t.id === taskId)?.definitionId;
+                        if (taskDefId && allDescendantIds.has(taskDefId)) {
+                            scheduledOrPendingActionIds.add(taskDefId);
+                        }
+                    });
+                }
+            });
+        }
+    }
     
-    // --- New Progress Calculation ---
-    // Sum the estimated duration of *completed* sub-tasks.
-    // This represents the "value" of the work completed.
-    const completedObjectiveHours = allLinkedTasks
-      .filter(task => task.isCompleted)
-      .reduce((sum, task) => sum + (task.estimatedDuration || 0), 0) / 60;
+    // 3. Filter for final actions
+    const solutionActions = deepWorkDefinitions.filter(def => 
+        scheduledOrPendingActionIds.has(def.id) &&
+        (def.linkedDeepWorkIds?.length ?? 0) === 0 // It's a final action
+    );
 
-    const progress = totalLinkedEstimatedHours > 0 ? (completedObjectiveHours / totalLinkedEstimatedHours) * 100 : 0;
-    
-    const remainingHours = Math.max(0, totalLinkedEstimatedHours - completedObjectiveHours);
-    const daysLeft = (productivityStats.avgProductiveHours > 0 && remainingHours > 0)
-        ? Math.ceil(remainingHours / productivityStats.avgProductiveHours)
-        : null;
-    const estDate = daysLeft !== null ? format(addDays(new Date(), daysLeft), 'MMM d, yyyy') : null;
+    // 4. Find parent objectives for these actions
+    const parentObjectiveIds = new Set<string>();
+    solutionActions.forEach(action => {
+        deepWorkDefinitions.forEach(potentialParent => {
+            if ((potentialParent.linkedDeepWorkIds || []).includes(action.id)) {
+                parentObjectiveIds.add(potentialParent.id);
+            }
+        });
+    });
 
-    return {
-        linkedLearningTasks: learningTasks,
-        linkedWorkTasks: workTasks,
-        totalEstimatedHours: (intention.estimatedDuration || 0) / 60,
-        totalLoggedHours: completedObjectiveHours,
-        progressPercent: progress,
-        projectedDate: estDate,
-        daysRemaining: daysLeft,
-    };
-  }, [intention, upskillDefinitions, deepWorkDefinitions, allUpskillLogs, allDeepWorkLogs, productivityStats.avgProductiveHours, permanentlyLoggedActionIds, permanentlyLoggedVisualizationIds]);
+    const outcomeObjectives = deepWorkDefinitions.filter(def => parentObjectiveIds.has(def.id));
+
+    return { solutionActions, outcomeObjectives };
+
+  }, [intention, schedule, deepWorkDefinitions, allDeepWorkLogs]);
 
   if (!intention) return null;
 
@@ -217,9 +171,6 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                             <path d="M 0 0 L 10 5 L 0 10 z" fill="hsl(var(--muted-foreground))" />
                         </marker>
                     </defs>
-                    <foreignObject x="5%" y="87%" width="90%" height="24px">
-                        <Progress value={progressPercent} className="h-2" />
-                    </foreignObject>
                     
                     <line x1="5%" y1="90%" x2="50%" y2="10%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
                     <line x1="50%" y1="10%" x2="95%" y2="90%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
@@ -233,16 +184,20 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                     </div>
                 </div>
                 
-                <div className="absolute left-1/2 top-[10%] -translate-x-1/2 -translate-y-full text-center w-full px-4">
+                <div className="absolute left-1/2 top-[10%] -translate-x-1/2 -translate-y-[110%] text-center w-full px-4">
                     <p className="font-semibold text-foreground text-lg">Solution</p>
                      <div className="text-sm text-muted-foreground w-full max-w-sm mx-auto p-2 border rounded-md bg-background/50 backdrop-blur-sm mt-2">
                         <ScrollArea className="max-h-32">
                           <ul className="text-xs list-disc list-inside space-y-1 text-left">
-                              {[...linkedWorkTasks, ...linkedLearningTasks].sort((a,b) => a.name.localeCompare(b.name)).map(task => (
-                                  <li key={task.id} className={cn("truncate", task.isCompleted && "line-through text-muted-foreground/60")} title={task.name}>
-                                      {task.name}
-                                  </li>
-                              ))}
+                              {solutionActions.length > 0 ? (
+                                solutionActions.map(task => (
+                                    <li key={task.id} className="truncate" title={task.name}>
+                                        {task.name}
+                                    </li>
+                                ))
+                              ) : (
+                                <li>No actions scheduled or pending.</li>
+                              )}
                           </ul>
                         </ScrollArea>
                     </div>
@@ -250,14 +205,11 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
 
                 <div className="absolute right-[5%] bottom-[10%] translate-x-1/2 translate-y-[150%] text-center">
                      <p className="font-semibold text-foreground">Outcome</p>
-                     <div className="text-xs text-muted-foreground mt-1">
-                        {projectedDate ? (
-                            <>
-                                <p>{projectedDate}</p>
-                                <p>({daysRemaining} days remaining)</p>
-                            </>
+                     <div className="text-xs text-muted-foreground mt-1 max-w-[150px]">
+                        {outcomeObjectives.length > 0 ? (
+                          outcomeObjectives.map(obj => obj.name).join(', ')
                         ) : (
-                            <p>To be defined</p>
+                          'No objectives targeted.'
                         )}
                      </div>
                 </div>
@@ -267,9 +219,6 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                      <p className="text-sm text-muted-foreground truncate" title={intention.name}>
                         {intention.name}
                      </p>
-                     <p className="text-xs font-mono text-primary/80">
-                        Total Est: {totalEstimatedHours.toFixed(1)}h
-                      </p>
                 </div>
             </div>
         </div>
