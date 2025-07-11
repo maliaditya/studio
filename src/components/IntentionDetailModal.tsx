@@ -86,8 +86,8 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
     };
   }, [allUpskillLogs, allDeepWorkLogs]);
   
-  const { solutionActions, outcomeObjectives } = useMemo(() => {
-    if (!intention) return { solutionActions: [], outcomeObjectives: [] };
+  const { solutionTasks, outcomeObjectives } = useMemo(() => {
+    if (!intention) return { solutionTasks: [], outcomeObjectives: [] };
 
     const today = startOfToday();
     const todayKey = format(today, 'yyyy-MM-dd');
@@ -133,26 +133,32 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
             });
         }
     }
-
-    const solutionActions = allDefs.filter(def => {
-        if (!scheduledOrPendingDefIds.has(def.id)) return false;
-        const isDeepWorkLeaf = (def.linkedDeepWorkIds?.length ?? 0) === 0;
-        const isUpskillLeaf = (def.linkedUpskillIds?.length ?? 0) === 0 && (def.linkedResourceIds?.length ?? 0) === 0;
-        return isDeepWorkLeaf && isUpskillLeaf;
+    
+    // Find leaf "Actions" from the pending list
+    const solutionActions = deepWorkDefinitions.filter(def => {
+        return scheduledOrPendingDefIds.has(def.id) && (def.linkedDeepWorkIds?.length ?? 0) === 0;
     });
 
-    const parentObjectiveIds = new Set<string>();
+    const solutionTasks = solutionActions.map(action => {
+      // Find linked visualizations for each action
+      const linkedVisualizations = (action.linkedUpskillIds || [])
+        .map(id => upskillDefinitions.find(d => d.id === id))
+        .filter((viz): viz is ExerciseDefinition => !!viz && (viz.linkedUpskillIds?.length ?? 0) === 0);
+      return { action, linkedVisualizations };
+    });
+
+    // Find parent objectives of the solution tasks
+    const objectiveIds = new Set<string>();
     solutionActions.forEach(action => {
-        allDefs.forEach(potentialParent => {
-            if ((potentialParent.linkedDeepWorkIds || []).includes(action.id) || (potentialParent.linkedUpskillIds || []).includes(action.id)) {
-                parentObjectiveIds.add(potentialParent.id);
-            }
-        });
+      deepWorkDefinitions.forEach(parent => {
+        if ((parent.linkedDeepWorkIds || []).includes(action.id)) {
+          objectiveIds.add(parent.id);
+        }
+      });
     });
+    const outcomeObjectives = deepWorkDefinitions.filter(def => objectiveIds.has(def.id));
 
-    const outcomeObjectives = allDefs.filter(def => parentObjectiveIds.has(def.id));
-
-    return { solutionActions, outcomeObjectives };
+    return { solutionTasks, outcomeObjectives };
   }, [intention, schedule, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs]);
 
 
@@ -164,7 +170,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
         <DialogHeader>
           <DialogTitle>Conceptual Flow: {intention.name}</DialogTitle>
           <DialogDescription>
-            This diagram illustrates the strategic path from your current state to your desired outcome.
+            This diagram illustrates the strategic path from your current state to your desired outcome based on pending tasks.
           </DialogDescription>
         </DialogHeader>
         <div className="flex-grow min-h-0 flex flex-col items-center justify-center p-8">
@@ -192,12 +198,19 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                     <p className="font-semibold text-foreground text-lg">Solution</p>
                      <div className="text-sm text-muted-foreground w-full max-w-sm mx-auto p-2 border rounded-md bg-background/50 backdrop-blur-sm mt-2">
                         <ScrollArea className="max-h-32">
-                          <ul className="text-xs list-disc list-inside space-y-1 text-left">
-                              {solutionActions.length > 0 ? (
-                                solutionActions.map(task => (
-                                    <li key={task.id} className="truncate" title={task.name}>
-                                        {task.name}
-                                    </li>
+                          <ul className="text-xs list-disc list-inside space-y-2 text-left">
+                              {solutionTasks.length > 0 ? (
+                                solutionTasks.map(({ action, linkedVisualizations }) => (
+                                  <li key={action.id} className="font-semibold text-foreground" title={action.name}>
+                                    {action.name}
+                                    {linkedVisualizations.length > 0 && (
+                                      <ul className="pl-4 list-['▹'] list-inside text-muted-foreground font-normal">
+                                        {linkedVisualizations.map(viz => (
+                                          <li key={viz.id} className="truncate" title={viz.name}>{viz.name}</li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </li>
                                 ))
                               ) : (
                                 <li>No actions scheduled or pending.</li>
@@ -230,3 +243,4 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
     </Dialog>
   );
 }
+
