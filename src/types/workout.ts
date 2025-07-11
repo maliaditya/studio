@@ -1,4 +1,5 @@
 
+
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -205,13 +206,22 @@ export interface GapAnalysis {
 }
 
 // Resource Library Types
+export interface ResourcePoint {
+  id: string;
+  text: string;
+}
 export interface Resource {
   id: string;
   name: string;
-  link: string;
-  description: string;
   folderId: string;
+  type: 'link' | 'card';
+  // For 'link' type
+  link?: string;
+  description?: string;
   iconUrl?: string;
+  // For 'card' type
+  points?: ResourcePoint[];
+  icon?: string;
 }
 
 export interface ResourceFolder {
@@ -251,3 +261,4 @@ export interface MindsetCard {
   icon: string;
   points: MindsetPoint[];
 }
+

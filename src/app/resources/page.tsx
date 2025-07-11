@@ -1,24 +1,24 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture } from 'lucide-react';
-import { AuthGuard } from '@/components/AuthGuard';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
-import type { Resource, ResourceFolder } from '@/types/workout';
+import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogFooter as DialogFooterComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MindMapViewer } from '@/components/MindMapViewer';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -34,43 +34,116 @@ const getFaviconUrl = (link: string): string | undefined => {
   }
 };
 
-const getYouTubeEmbedUrl = (url: string): string | null => {
+const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
+    if (!url) return null;
     try {
         const urlObj = new URL(url);
         let videoId: string | null = null;
-
         if (urlObj.hostname.includes('youtube.com')) {
             videoId = urlObj.searchParams.get('v');
         } else if (urlObj.hostname.includes('youtu.be')) {
             videoId = urlObj.pathname.slice(1);
         }
-
-        if (videoId) {
-            return `https://www.youtube.com/embed/${videoId}`;
-        }
-    } catch (e) {
-        // Silently fail for invalid URLs
-    }
+        if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+    } catch (e) {}
     return null;
 };
 
-const isNotionUrl = (url: string): boolean => {
+const isNotionUrl = (url: string | undefined): boolean => {
+    if (!url) return false;
     try {
         const urlObj = new URL(url);
         return urlObj.hostname.endsWith('notion.so');
-    } catch (e) {
-        return false;
-    }
+    } catch (e) { return false; }
 };
 
-const isObsidianUrl = (url: string): boolean => {
+const isObsidianUrl = (url: string | undefined): boolean => {
+    if (!url) return false;
     try {
         const urlObj = new URL(url);
         return urlObj.hostname === 'share.note.sx';
-    } catch (e) {
-        return false;
-    }
+    } catch (e) { return false; }
 };
+
+const ResourceCard = ({ resource, onUpdate, onDelete }: { resource: Resource; onUpdate: (resource: Resource) => void; onDelete: (resourceId: string) => void; }) => {
+    const { toast } = useAuth();
+    const [editingTitle, setEditingTitle] = useState(false);
+    const [editingPointId, setEditingPointId] = useState<string | null>(null);
+
+    const handleUpdateTitle = (newTitle: string) => {
+        onUpdate({ ...resource, name: newTitle });
+    };
+
+    const handleUpdatePoint = (pointId: string, newText: string) => {
+        const updatedPoints = (resource.points || []).map(p => p.id === pointId ? { ...p, text: newText } : p);
+        onUpdate({ ...resource, points: updatedPoints });
+    };
+
+    const handleAddPoint = () => {
+        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: 'New step' };
+        const updatedPoints = [...(resource.points || []), newPoint];
+        onUpdate({ ...resource, points: updatedPoints });
+        setEditingPointId(newPoint.id);
+    };
+
+    const handleDeletePoint = (pointId: string) => {
+        const updatedPoints = (resource.points || []).filter(p => p.id !== pointId);
+        onUpdate({ ...resource, points: updatedPoints });
+    };
+    
+    return (
+        <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl">
+            <CardHeader>
+                <div className="flex justify-between items-start gap-2">
+                   <div className="flex items-center gap-2 flex-grow min-w-0">
+                        {editingTitle ? (
+                            <Input value={resource.name} onChange={(e) => handleUpdateTitle(e.target.value)} onBlur={() => setEditingTitle(false)} autoFocus className="text-lg font-semibold h-9" />
+                        ) : (
+                            <CardTitle className="flex items-center gap-3 text-lg cursor-pointer" onClick={() => setEditingTitle(true)}>
+                                <span className="text-primary"><Library className="h-5 w-5" /></span>
+                                <span className="truncate">{resource.name}</span>
+                            </CardTitle>
+                        )}
+                   </div>
+                   <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 -mr-2 -mt-1">
+                                <MoreVertical className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={() => setEditingTitle(true)}>Edit Title</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => onDelete(resource.id)} className="text-destructive">Delete Card</DropdownMenuItem>
+                        </DropdownMenuContent>
+                   </DropdownMenu>
+                </div>
+            </CardHeader>
+            <CardContent className="flex-grow">
+                <ul className="space-y-3">
+                    {(resource.points || []).map((point) => (
+                        <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
+                            <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
+                            {editingPointId === point.id ? (
+                                <Textarea value={point.text} onChange={e => handleUpdatePoint(point.id, e.target.value)} onBlur={() => setEditingPointId(null)} autoFocus className="text-sm" rows={2}/>
+                            ) : (
+                                <span onClick={() => setEditingPointId(point.id)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/<br>/g, '') }} />
+                            )}
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={() => handleDeletePoint(point.id)}>
+                                <Trash2 className="h-3 w-3"/>
+                            </Button>
+                        </li>
+                    ))}
+                </ul>
+            </CardContent>
+            <CardContent className="pt-0">
+                 <Button variant="outline" size="sm" className="w-full" onClick={handleAddPoint}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Step
+                </Button>
+            </CardContent>
+        </Card>
+    );
+};
+
 
 function ResourcesPageContent() {
   const { toast } = useAuth();
@@ -80,7 +153,8 @@ function ResourcesPageContent() {
   } = useAuth();
   
   const [newFolderName, setNewFolderName] = useState('');
-  const [newResource, setNewResource] = useState({ name: '', link: '', description: '' });
+  const [newResourceName, setNewResourceName] = useState('');
+  const [newResourceLink, setNewResourceLink] = useState('');
 
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [editingFolder, setEditingFolder] = useState<ResourceFolder | null>(null);
@@ -104,6 +178,8 @@ function ResourcesPageContent() {
   
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [mindMapRootFolderId, setMindMapRootFolderId] = useState<string | null>(null);
+  
+  const [addResourceType, setAddResourceType] = useState<'link' | 'card'>('link');
 
   useEffect(() => {
     if (editingResource) {
@@ -231,18 +307,38 @@ function ResourcesPageContent() {
       toast({ title: "Error", description: "Please select a folder first.", variant: "destructive" });
       return;
     }
-    if (!newResource.link.trim()) {
-      toast({ title: "Error", description: "Resource link is required.", variant: "destructive" });
+    if (addResourceType === 'link' && !newResourceLink.trim()) {
+      toast({ title: "Error", description: "Resource link is required for a link type.", variant: "destructive" });
+      return;
+    }
+    if (addResourceType === 'card' && !newResourceName.trim()) {
+      toast({ title: "Error", description: "Name is required for a card type.", variant: "destructive" });
       return;
     }
 
-    let fullLink = newResource.link.trim();
+    if (addResourceType === 'card') {
+        const newRes: Resource = {
+            id: `res_${Date.now()}`,
+            name: newResourceName.trim(),
+            folderId: selectedFolderId,
+            type: 'card',
+            points: [],
+            icon: 'Library'
+        };
+        setResources(prev => [...prev, newRes]);
+        setNewResourceName('');
+        setIsAdding(false);
+        toast({ title: "Resource Card Added", description: `"${newRes.name}" has been saved.`});
+        return;
+    }
+
+    // Handle 'link' type
+    let fullLink = newResourceLink.trim();
     if (!fullLink.startsWith('http://') && !fullLink.startsWith('https://')) {
         fullLink = 'https://' + fullLink;
     }
 
     setIsFetchingMeta(true);
-
     try {
       const response = await fetch('/api/get-link-metadata', {
         method: 'POST',
@@ -262,12 +358,12 @@ function ResourcesPageContent() {
           description: result.description || '',
           folderId: selectedFolderId,
           iconUrl: getFaviconUrl(fullLink),
+          type: 'link'
       };
       setResources(prev => [...prev, newRes]);
-      setNewResource({ name: '', link: '', description: '' });
+      setNewResourceLink('');
       setIsAdding(false);
       toast({ title: "Resource Added", description: `"${newRes.name}" has been saved.`});
-
     } catch (error) {
         toast({
             title: "Error adding resource",
@@ -287,24 +383,29 @@ function ResourcesPageContent() {
       setEditedResourceData(prev => ({...prev, folderId: value}));
   };
 
+  const handleUpdateResource = (updatedResource: Resource) => {
+    setResources(prev =>
+      prev.map(res => res.id === updatedResource.id ? updatedResource : res)
+    );
+  };
+
   const handleSaveResourceEdit = () => {
-    if (!editingResource || !editedResourceData.name?.trim() || !editedResourceData.link?.trim() || !editedResourceData.folderId) {
-        toast({ title: "Error", description: "Name, link, and folder are required.", variant: "destructive"});
+    if (!editingResource || !editedResourceData.name?.trim() || !editedResourceData.folderId) {
+        toast({ title: "Error", description: "Name and folder are required.", variant: "destructive"});
         return;
     }
     
     let finalData = { ...editedResourceData };
-    if (finalData.link && finalData.link !== editingResource?.link) {
+    if (finalData.type === 'link' && finalData.link && finalData.link !== editingResource?.link) {
         finalData.iconUrl = getFaviconUrl(finalData.link);
     }
-
-    setResources(prev =>
-        prev.map(res =>
-            res.id === editingResource.id ? { ...res, ...finalData } as Resource : res
-        )
-    );
+    onUpdateResource(finalData as Resource);
     setEditingResource(null);
     toast({ title: "Resource Updated", description: `"${editedResourceData.name}" has been updated.` });
+  };
+
+  const onUpdateResource = (updatedResource: Resource) => {
+    setResources(prev => prev.map(res => res.id === updatedResource.id ? updatedResource : res));
   };
   
   const renderFolderOptions = useCallback((parentId: string | null, level: number): JSX.Element[] => {
@@ -420,18 +521,34 @@ function ResourcesPageContent() {
                       <div className="p-5 flex flex-col flex-grow justify-between">
                         <div>
                           <p className="text-base font-semibold">Add New Resource</p>
-                          <p className="text-sm text-muted-foreground mb-4">Enter a URL to fetch its details.</p>
-                          <Input
-                            className="h-10 text-base"
-                            autoFocus
-                            placeholder="https://example.com"
-                            value={newResource.link}
-                            onChange={(e) => setNewResource({ name: '', link: e.target.value, description: '' })}
-                            onKeyDown={(e) => { if (e.key === 'Enter') handleAddResource(); }}
-                          />
+                          <Tabs value={addResourceType} onValueChange={(v) => setAddResourceType(v as 'link' | 'card')} className="w-full mt-2 mb-4">
+                            <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="link">Link</TabsTrigger>
+                                <TabsTrigger value="card">Card</TabsTrigger>
+                            </TabsList>
+                          </Tabs>
+                          {addResourceType === 'link' ? (
+                            <Input
+                                className="h-10 text-base"
+                                autoFocus
+                                placeholder="https://example.com"
+                                value={newResourceLink}
+                                onChange={(e) => setNewResourceLink(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleAddResource(); }}
+                              />
+                          ) : (
+                             <Input
+                                className="h-10 text-base"
+                                autoFocus
+                                placeholder="New card name..."
+                                value={newResourceName}
+                                onChange={(e) => setNewResourceName(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleAddResource(); }}
+                              />
+                          )}
                         </div>
                         <div className="flex justify-end gap-2 mt-4">
-                          <Button variant="ghost" size="sm" onClick={() => { setIsAdding(false); setNewResource({ name: '', link: '', description: '' }); }}>Cancel</Button>
+                          <Button variant="ghost" size="sm" onClick={() => { setIsAdding(false); setNewResourceLink(''); setNewResourceName('') }}>Cancel</Button>
                           <Button size="sm" onClick={handleAddResource} disabled={isFetchingMeta}>
                             {isFetchingMeta ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
                           </Button>
@@ -449,9 +566,15 @@ function ResourcesPageContent() {
                   )}
 
                   {filteredResources.map(res => {
+                    if (res.type === 'card') {
+                      return <ResourceCard key={res.id} resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} />;
+                    }
+
+                    // Link type rendering
                     const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                     const isSpecialEmbed = isNotionUrl(res.link) || isObsidianUrl(res.link);
-                    const isLongContent = res.name.length > 20 && res.description.length > 30;
+                    const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? res.link : null);
+                    const isLongContent = res.name.length > 20 && (res.description?.length ?? 0) > 30;
 
                     return (
                         <Card key={res.id} className={cn(
@@ -461,93 +584,27 @@ function ResourcesPageContent() {
                             {youtubeEmbedUrl ? (
                                 <>
                                     <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"
-                                            onClick={(e) => { e.stopPropagation(); setEmbedUrl(youtubeEmbedUrl); }}
-                                            aria-label="View in App"
-                                        >
-                                            <Expand className="h-4 w-4" />
-                                        </Button>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white">
-                                                    <MoreVertical className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                                                <DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
-                                                <DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setEmbedUrl(youtubeEmbedUrl); }} aria-label="View in App"><Expand className="h-4 w-4" /></Button>
+                                        <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                                     </div>
-                                    <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl">
-                                        <iframe
-                                            id={`video-${res.id}`}
-                                            width="100%"
-                                            height="100%"
-                                            src={youtubeEmbedUrl}
-                                            title={res.name}
-                                            frameBorder="0"
-                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                            allowFullScreen
-                                        ></iframe>
-                                    </div>
-                                    <div className="p-4 flex-grow">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <div className="flex-grow min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <Youtube className="h-5 w-5 flex-shrink-0 text-red-500" />
-                                                    <p className="text-base font-bold truncate" title={res.name}>{res.name}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl"><iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe></div>
+                                    <div className="p-4 flex-grow"><div className="flex items-start justify-between gap-2"><div className="flex-grow min-w-0"><div className="flex items-center gap-2"><Youtube className="h-5 w-5 flex-shrink-0 text-red-500" /><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div></div></div></div>
                                 </>
                             ) : (
                                 <div className="p-5 flex flex-col flex-grow">
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="flex-grow min-w-0">
                                             <div className="flex items-center gap-2">
-                                                {isSpecialEmbed ? (
-                                                    <Globe className="h-4 w-4 flex-shrink-0 text-primary" />
-                                                ) : res.iconUrl ? (
-                                                    <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm flex-shrink-0" />
-                                                ) : (
-                                                    <LinkIcon className="h-4 w-4 flex-shrink-0" />
-                                                )}
+                                                {isSpecialEmbed ? <Globe className="h-4 w-4 flex-shrink-0 text-primary" /> : res.iconUrl ? <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm flex-shrink-0" /> : <LinkIcon className="h-4 w-4 flex-shrink-0" />}
                                                 <p className="text-base font-bold" title={res.name}>{res.name}</p>
                                             </div>
                                         </div>
-                                         <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 -mr-2 -mt-1">
-                                                    <MoreVertical className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
-                                                <DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                         <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 -mr-2 -mt-1"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                                     </div>
                                     <a href={res.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline mt-1">{res.link}</a>
-                                    <p className="text-sm text-muted-foreground mt-3 line-clamp-3 flex-grow min-h-[60px]">
-                                        {res.description || 'No description available.'}
-                                    </p>
+                                    <p className="text-sm text-muted-foreground mt-3 line-clamp-3 flex-grow min-h-[60px]">{res.description || 'No description available.'}</p>
                                     <div className="mt-auto pt-4">
-                                        {isSpecialEmbed ? (
-                                          <Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(res.link)}>
-                                              View in App
-                                          </Button>
-                                        ) : (
-                                          <Button asChild variant="secondary" size="sm" className="w-full">
-                                              <a href={res.link} target="_blank" rel="noopener noreferrer">
-                                                  Visit Site <ExternalLink className="ml-2 h-3 w-3" />
-                                              </a>
-                                          </Button>
-                                        )}
+                                        {isSpecialEmbed ? (<Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(res.link)}>View in App</Button>) : (<Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>)}
                                     </div>
                                 </div>
                             )}
@@ -567,50 +624,15 @@ function ResourcesPageContent() {
     </div>
     
     {contextMenu && (
-        <div
-            ref={contextMenuRef}
-            style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }}
-            className="fixed z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
-            onClick={(e) => e.stopPropagation()}
-        >
-            <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleAddNewNestedFolder(contextMenu.item); setContextMenu(null); }}>
-                New Folder
-            </Button>
-            <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => {
-                setEditingFolder(contextMenu.item);
-                setContextMenu(null);
-            }}>
-                Rename
-            </Button>
-            <Button variant="ghost" className="w-full h-9 justify-start px-2 text-destructive hover:text-destructive" onClick={() => {
-                setDeleteConfirmation({ item: contextMenu.item });
-                setContextMenu(null);
-            }}>
-                Delete
-            </Button>
+        <div ref={contextMenuRef} style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }} className="fixed z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => e.stopPropagation()}>
+            <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleAddNewNestedFolder(contextMenu.item); setContextMenu(null); }}>New Folder</Button>
+            <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { setEditingFolder(contextMenu.item); setContextMenu(null); }}>Rename</Button>
+            <Button variant="ghost" className="w-full h-9 justify-start px-2 text-destructive hover:text-destructive" onClick={() => { setDeleteConfirmation({ item: contextMenu.item }); setContextMenu(null); }}>Delete</Button>
         </div>
     )}
     
     {deleteConfirmation && (
-        <AlertDialog open={!!deleteConfirmation} onOpenChange={() => setDeleteConfirmation(null)}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        This will permanently delete "{deleteConfirmation.item.name}" and all its contents. This action cannot be undone.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel onClick={() => setDeleteConfirmation(null)}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => {
-                        handleDeleteFolder(deleteConfirmation.item.id);
-                        setDeleteConfirmation(null);
-                    }}>
-                        Delete
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+        <AlertDialog open={!!deleteConfirmation} onOpenChange={() => setDeleteConfirmation(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete "{deleteConfirmation.item.name}" and all its contents. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setDeleteConfirmation(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { handleDeleteFolder(deleteConfirmation.item.id); setDeleteConfirmation(null); }}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     )}
 
     <Dialog open={!!editingResource} onOpenChange={(isOpen) => !isOpen && setEditingResource(null)}>
@@ -624,23 +646,23 @@ function ResourcesPageContent() {
                     <Label htmlFor="res-name" className="text-right">Name</Label>
                     <Input id="res-name" value={editedResourceData.name || ''} onChange={(e) => setEditedResourceData(prev => ({...prev, name: e.target.value}))} className="col-span-3"/>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="res-link" className="text-right">Link</Label>
-                    <Input id="res-link" value={editedResourceData.link || ''} onChange={(e) => setEditedResourceData(prev => ({...prev, link: e.target.value}))} className="col-span-3"/>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="res-desc" className="text-right">Description</Label>
-                    <Textarea id="res-desc" value={editedResourceData.description || ''} onChange={(e) => setEditedResourceData(prev => ({...prev, description: e.target.value}))} className="col-span-3"/>
-                </div>
+                {editingResource?.type === 'link' && (
+                  <>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="res-link" className="text-right">Link</Label>
+                        <Input id="res-link" value={editedResourceData.link || ''} onChange={(e) => setEditedResourceData(prev => ({...prev, link: e.target.value}))} className="col-span-3"/>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="res-desc" className="text-right">Description</Label>
+                        <Textarea id="res-desc" value={editedResourceData.description || ''} onChange={(e) => setEditedResourceData(prev => ({...prev, description: e.target.value}))} className="col-span-3"/>
+                    </div>
+                  </>
+                )}
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="res-folder" className="text-right">Folder</Label>
                     <Select value={editedResourceData.folderId || ''} onValueChange={handleResourceFolderChange}>
-                        <SelectTrigger id="res-folder" className="col-span-3">
-                            <SelectValue placeholder="Select a folder" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {renderFolderOptions(null, 0)}
-                        </SelectContent>
+                        <SelectTrigger id="res-folder" className="col-span-3"><SelectValue placeholder="Select a folder" /></SelectTrigger>
+                        <SelectContent>{renderFolderOptions(null, 0)}</SelectContent>
                     </Select>
                 </div>
             </div>
@@ -653,24 +675,12 @@ function ResourcesPageContent() {
 
     <Dialog open={!!embedUrl} onOpenChange={(isOpen) => !isOpen && setEmbedUrl(null)}>
         <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
-            <div className="flex-grow min-h-0">
-                {embedUrl && (
-                    <iframe
-                        src={embedUrl}
-                        className="w-full h-full border-0 rounded-md"
-                        title="Embedded Resource"
-                        sandbox="allow-scripts allow-same-origin allow-forms"
-                        allow="picture-in-picture"
-                    ></iframe>
-                )}
-            </div>
+            <div className="flex-grow min-h-0">{embedUrl && (<iframe src={embedUrl} className="w-full h-full border-0 rounded-md" title="Embedded Resource" sandbox="allow-scripts allow-same-origin allow-forms" allow="picture-in-picture"></iframe>)}</div>
         </DialogContent>
     </Dialog>
     <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
         <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
-            <DialogHeader className="sr-only">
-              <DialogTitle>Resource Mind Map</DialogTitle>
-            </DialogHeader>
+            <DialogHeader className="sr-only"><DialogTitle>Resource Mind Map</DialogTitle></DialogHeader>
             <MindMapViewer defaultView="Resources" rootFolderId={mindMapRootFolderId} showControls={false} />
         </DialogContent>
     </Dialog>
@@ -682,4 +692,3 @@ export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
 
-    
