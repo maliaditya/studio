@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Brain, ArrowRight, Clock, Workflow } from 'lucide-react';
+import { Brain, ArrowRight, Clock, Workflow, Play, BookText } from 'lucide-react';
 import type { ExerciseDefinition, DailySchedule, DatedWorkout } from '@/types/workout';
 import { format, parseISO, isBefore, startOfToday, addDays, differenceInDays } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -414,10 +414,30 @@ const InteractiveTutorial = () => {
     );
 }
 
+const NormalModeTutorial = () => (
+    <div className="space-y-4">
+        {TUTORIAL_CONTENT.map((card, cardIndex) => (
+            <Card key={cardIndex}>
+                <CardHeader>
+                    <CardTitle>{card.title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <ul className="space-y-2">
+                        {card.points.map((point, pointIndex) => (
+                            <li key={pointIndex} className="text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: point.replace(/<br>/g, '') }} />
+                        ))}
+                    </ul>
+                </CardContent>
+            </Card>
+        ))}
+    </div>
+);
+
 function MindsetPageContent() {
     const searchParams = useSearchParams();
     const { deepWorkDefinitions } = useAuth();
     const intentionId = searchParams.get('intentionId');
+    const [mode, setMode] = useState<'normal' | 'play'>('normal');
     
     const calculateProductiveHours = useCallback((allUpskillLogs: DatedWorkout[], allDeepWorkLogs: DatedWorkout[]) => {
         const dailyDurations: Record<string, number> = {};
@@ -464,8 +484,16 @@ function MindsetPageContent() {
                 <div className="lg:col-span-1 h-full">
                     <ConceptualFlowDiagram intention={intention} avgDailyProductiveHours={avgDailyProductiveHours} />
                 </div>
-                <div className="lg:col-span-1 h-full">
-                    <InteractiveTutorial />
+                <div className="lg:col-span-1 h-full flex flex-col">
+                    <div className="flex justify-end mb-4">
+                        <Button variant="outline" onClick={() => setMode(prev => prev === 'normal' ? 'play' : 'normal')}>
+                            {mode === 'normal' ? <Play className="mr-2 h-4 w-4" /> : <BookText className="mr-2 h-4 w-4" />}
+                            {mode === 'normal' ? 'Start Play Mode' : 'Switch to Normal Mode'}
+                        </Button>
+                    </div>
+                    <div className="flex-grow min-h-0">
+                      {mode === 'play' ? <InteractiveTutorial /> : <NormalModeTutorial />}
+                    </div>
                 </div>
             </div>
         </div>
@@ -481,4 +509,3 @@ export default function MindsetPage() {
         </AuthGuard>
     );
 }
-
