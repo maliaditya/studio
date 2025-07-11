@@ -10,9 +10,9 @@ interface BreathingAnimationProps {
 }
 
 const segmentDurations = {
-  basic: 4.5 * 6 * 1000, // 6 cycles of 4.5s
+  basic: 8 * 6 * 1000, // 6 cycles of 8s
   box: 16 * 4 * 1000,    // 4 cycles of 16s
-  humming: 5 * 5 * 1000, // 5 cycles of 5s
+  humming: 10 * 5 * 1000, // 5 cycles of 10s
 }
 
 export function BreathingAnimation({ onComplete }: BreathingAnimationProps) {
@@ -52,7 +52,7 @@ export function BreathingAnimation({ onComplete }: BreathingAnimationProps) {
   }
 
   return (
-    <div className="relative w-full h-[250px] flex items-center justify-center overflow-hidden rounded-lg">
+    <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
       <AnimatePresence mode="wait">
         <motion.div
           key={segment}
