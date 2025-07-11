@@ -14,13 +14,13 @@ import {
 import { ScrollArea } from './ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from './ui/card';
 import { Badge } from './ui/badge';
-import { BookCopy, Link as LinkIcon, Briefcase, ExternalLink, Globe, Workflow } from 'lucide-react';
+import { BookCopy, Link as LinkIcon, Briefcase, ExternalLink, Globe, Workflow, Clock, Lightbulb, TrendingUp } from 'lucide-react';
 import type { ExerciseDefinition, Resource, DatedWorkout, DailySchedule } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, subDays, parseISO, addDays, isBefore, startOfToday } from 'date-fns';
+import { format, subDays, parseISO, addDays, isBefore, startOfToday, isAfter } from 'date-fns';
 import { Progress } from './ui/progress';
 import { cn } from '@/lib/utils';
-import { BrainCircuit, ArrowUp, ArrowDown, PauseCircle, AlertCircle, Clock } from 'lucide-react';
+import { BrainCircuit, ArrowUp, ArrowDown, PauseCircle, AlertCircle } from 'lucide-react';
 import { Separator } from './ui/separator';
 
 interface IntentionDetailModalProps {
@@ -30,6 +30,31 @@ interface IntentionDetailModalProps {
   avgDailyProductiveHours?: number;
 }
 
+const getProductivitySuggestion = (hours: number): { title: string; description: string } => {
+    if (hours >= 8) {
+        return {
+            title: "Apex Zone: Monitor for Burnout",
+            description: "Your output is exceptional. Ensure this pace is sustainable. Prioritize rest and recovery to maintain this high level of performance without compromising your well-being."
+        };
+    }
+    if (hours >= 4) {
+        return {
+            title: "High-Intensity Zone: Optimize & Sustain",
+            description: "You're in a highly productive zone. Focus on maintaining this momentum with structured breaks. Your current pace is ideal for making significant progress on key objectives."
+        };
+    }
+    if (hours >= 2) {
+        return {
+            title: "Stable Zone: Build Consistency",
+            description: "You have a solid, consistent work habit. Focus on maintaining this routine daily. This is the foundation from which you can build towards more intensive work sprints when needed."
+        };
+    }
+    return {
+        title: "Entry Zone: Focus on showing up",
+        description: "Your main goal is to build the habit. Focus on completing one or two small tasks daily to build momentum. Consistency is more important than volume at this stage."
+    };
+};
+
 export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDailyProductiveHours = 1 }: IntentionDetailModalProps) {
   const { deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, schedule } = useAuth();
   
@@ -37,7 +62,6 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
     if (!intention) return { solutionTasks: [], outcomeObjectives: [], totalEstimatedMinutes: 0 };
 
     const today = startOfToday();
-    const todayKey = format(today, 'yyyy-MM-dd');
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
 
     const allDescendantIds = new Set<string>();
@@ -60,11 +84,10 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
         const scheduleDate = parseISO(dateKey);
         const dailySchedule = schedule[dateKey] as DailySchedule;
         if (dailySchedule) {
-            const isToday = dateKey === todayKey;
-            const isPast = isBefore(scheduleDate, today);
+            const isTodayOrPast = isBefore(scheduleDate, addDays(today, 1));
 
             Object.values(dailySchedule).flat().forEach(activity => {
-                if (activity && !activity.completed && (isToday || isPast)) {
+                if (activity && !activity.completed && isTodayOrPast) {
                     (activity.taskIds || []).forEach(taskId => {
                         let defId: string | undefined;
                         if (activity.type === 'deepwork') {
@@ -81,12 +104,12 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
         }
     }
 
+    const allScheduledOrPendingDefs = allDefs.filter(def => scheduledOrPendingDefIds.has(def.id));
+    
     const solutionTasks: { action: ExerciseDefinition, linkedVisualizations: ExerciseDefinition[] }[] = [];
     const outcomeObjectiveIds = new Set<string>();
     let estimatedMinutes = 0;
 
-    const allScheduledOrPendingDefs = allDefs.filter(def => scheduledOrPendingDefIds.has(def.id));
-    
     const solutionLeafs = allScheduledOrPendingDefs.filter(def => {
         const isDWAction = deepWorkDefinitions.some(d => d.id === def.id) && (def.linkedDeepWorkIds?.length ?? 0) === 0;
         const isUpskillViz = upskillDefinitions.some(d => d.id === def.id) && (def.linkedUpskillIds?.length ?? 0) === 0;
@@ -149,6 +172,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
 
 
   if (!intention) return null;
+  const suggestion = getProductivitySuggestion(avgDailyProductiveHours);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -156,21 +180,21 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
         <DialogHeader>
           <DialogTitle>Conceptual Flow: {intention.name}</DialogTitle>
         </DialogHeader>
-        <div className="flex-grow min-h-0 flex flex-col items-center justify-center p-8">
-            <div className="relative w-full h-full max-w-2xl">
+        <div className="flex-grow min-h-0 flex flex-col items-center justify-between p-8">
+            <div className="relative w-full h-full max-w-3xl">
                 <svg className="absolute top-0 left-0 w-full h-full overflow-visible" preserveAspectRatio="none">
                     <defs>
                         <marker id="arrowhead" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                             <path d="M 0 0 L 10 5 L 0 10 z" fill="hsl(var(--muted-foreground))" />
                         </marker>
                     </defs>
-                    
-                    <line x1="5%" y1="80%" x2="50%" y2="20%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
-                    <line x1="50%" y1="20%" x2="95%" y2="80%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
+                    <line x1="5%" y1="90%" x2="50%" y2="20%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
+                    <line x1="50%" y1="20%" x2="95%" y2="90%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
                 </svg>
 
-                 <div className="absolute left-[5%] top-[80%] -translate-x-1/2 translate-y-4 text-center">
+                 <div className="absolute left-[5%] top-[90%] -translate-x-1/2 translate-y-4 text-center">
                     <p className="font-semibold text-foreground">Current state</p>
+                    <p className="text-xs text-muted-foreground">Productivity: <strong>{avgDailyProductiveHours.toFixed(1)}h/day</strong></p>
                 </div>
                 
                 <div className="absolute left-1/2 top-[20%] -translate-x-1/2 -translate-y-[120%] text-center w-full px-4">
@@ -199,7 +223,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
                     </div>
                 </div>
 
-                <div className="absolute right-[5%] top-[80%] translate-x-1/2 translate-y-4 text-center">
+                <div className="absolute right-[5%] top-[90%] translate-x-1/2 translate-y-4 text-center">
                      <p className="font-semibold text-foreground">Outcome</p>
                      <div className="text-xs text-muted-foreground mt-1 max-w-[150px]">
                         {outcomeObjectives.length > 0 ? (
@@ -215,7 +239,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
                       )}
                 </div>
 
-                <div className="absolute left-1/2 top-[80%] -translate-x-1/2 translate-y-4 text-center w-full px-4">
+                <div className="absolute left-1/2 top-[90%] -translate-x-1/2 translate-y-4 text-center w-full px-4">
                      <p className="font-semibold text-foreground text-lg">Intention</p>
                      <p className="text-sm text-muted-foreground truncate" title={intention.name}>
                         {intention.name}
@@ -226,6 +250,11 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
                         </div>
                      )}
                 </div>
+            </div>
+            <div className="w-full text-center mt-auto">
+                <Separator className="my-4" />
+                <h4 className="font-semibold text-sm">{suggestion.title}</h4>
+                <p className="text-xs text-muted-foreground max-w-xl mx-auto">{suggestion.description}</p>
             </div>
         </div>
       </DialogContent>
