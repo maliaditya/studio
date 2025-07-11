@@ -181,84 +181,88 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
           <DialogTitle>Conceptual Flow: {intention.name}</DialogTitle>
         </DialogHeader>
         <ScrollArea className="h-full">
-            <div className="flex-grow min-h-0 flex flex-col items-center justify-between p-6">
-                <div className="relative w-full h-[300px] max-w-3xl mb-12">
-                    <svg className="absolute top-0 left-0 w-full h-full overflow-visible" preserveAspectRatio="none">
-                        <defs>
-                            <marker id="arrowhead" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                                <path d="M 0 0 L 10 5 L 0 10 z" fill="hsl(var(--muted-foreground))" />
-                            </marker>
-                        </defs>
-                        <line x1="5%" y1="90%" x2="50%" y2="20%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
-                        <line x1="50%" y1="20%" x2="95%" y2="90%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
-                    </svg>
+            <Card className="h-full flex flex-col border-0 shadow-none">
+                <CardContent className="flex-grow min-h-0 flex flex-col items-center justify-between p-6">
+                    <div className="relative w-full h-[300px] max-w-3xl mb-12">
+                        <svg className="absolute top-0 left-0 w-full h-full overflow-visible" preserveAspectRatio="none">
+                            <defs>
+                                <marker id="arrowhead" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                    <path d="M 0 0 L 10 5 L 0 10 z" fill="hsl(var(--muted-foreground))" />
+                                </marker>
+                            </defs>
+                            <line x1="5%" y1="90%" x2="50%" y2="20%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
+                            <line x1="50%" y1="20%" x2="95%" y2="90%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
+                        </svg>
 
-                     <div className="absolute left-[5%] top-[90%] -translate-x-1/2 translate-y-4 text-center">
-                        <p className="font-semibold text-foreground">Current state</p>
-                        <p className="text-xs text-muted-foreground">Productivity: <strong>{avgDailyProductiveHours.toFixed(1)}h/day</strong></p>
-                    </div>
-                    
-                    <div className="absolute left-1/2 top-[20%] -translate-x-1/2 -translate-y-full text-center w-full px-4">
-                        <p className="font-semibold text-foreground text-lg">Solution</p>
-                        <div className="text-sm text-muted-foreground w-full max-w-sm mx-auto p-2 border rounded-md bg-background/50 backdrop-blur-sm mt-2">
-                            <ScrollArea className="h-32">
-                              <ul className="text-xs list-disc list-inside space-y-2 text-left">
-                                  {solutionTasks.length > 0 ? (
-                                    solutionTasks.map(({ action, linkedVisualizations }) => (
-                                      <li key={action.id} className="font-semibold text-foreground" title={action.name}>
-                                        {action.name}
-                                        {linkedVisualizations.length > 0 && (
-                                          <ul className="pl-4 list-['▹'] list-inside text-muted-foreground font-normal">
-                                            {linkedVisualizations.map(viz => (
-                                              <li key={viz.id} className="truncate" title={viz.name}>{viz.name}</li>
-                                            ))}
-                                          </ul>
-                                        )}
-                                      </li>
-                                    ))
-                                  ) : (
-                                    <li>No actions scheduled or pending.</li>
-                                  )}
-                              </ul>
-                            </ScrollArea>
+                         <div className="absolute left-[5%] top-[90%] -translate-x-1/2 translate-y-4 text-center">
+                            <p className="font-semibold text-foreground">Current state</p>
+                            <p className="text-xs text-muted-foreground">Productivity: <strong>{avgDailyProductiveHours.toFixed(1)}h/day</strong></p>
+                        </div>
+                        
+                        <div className="absolute left-1/2 top-[20%] -translate-x-1/2 -translate-y-full text-center w-full px-4">
+                            <p className="font-semibold text-foreground text-lg">Solution</p>
+                             <div className="text-sm text-muted-foreground w-full max-w-sm mx-auto p-2 border rounded-md bg-background/50 backdrop-blur-sm mt-2">
+                                <ScrollArea className="h-32">
+                                  <ul className="text-xs list-disc list-inside space-y-2 text-left">
+                                      {solutionTasks.length > 0 ? (
+                                        solutionTasks.map(({ action, linkedVisualizations }) => (
+                                          <li key={action.id} className="font-semibold text-foreground" title={action.name}>
+                                            {action.name}
+                                            {linkedVisualizations.length > 0 && (
+                                              <ul className="pl-4 list-['▹'] list-inside text-muted-foreground font-normal">
+                                                {linkedVisualizations.map(viz => (
+                                                  <li key={viz.id} className="truncate" title={viz.name}>{viz.name}</li>
+                                                ))}
+                                              </ul>
+                                            )}
+                                          </li>
+                                        ))
+                                      ) : (
+                                        <li>No actions scheduled or pending.</li>
+                                      )}
+                                  </ul>
+                                </ScrollArea>
+                            </div>
+                        </div>
+
+                        <div className="absolute right-[5%] top-[90%] translate-x-1/2 translate-y-4 text-center">
+                             <p className="font-semibold text-foreground">Outcome</p>
+                             <div className="text-xs text-muted-foreground mt-1 max-w-[150px]">
+                                {outcomeObjectives.length > 0 ? (
+                                  outcomeObjectives.map(obj => obj.name).join(', ')
+                                ) : (
+                                  'No objectives targeted.'
+                                )}
+                             </div>
+                              {totalEstimatedMinutes > 0 && (
+                                <div className="mt-2 pt-2 border-t font-semibold">
+                                    <p className="text-xs flex items-center gap-1 justify-center"><Clock className="h-3 w-3" /> {formatDuration(totalEstimatedMinutes)}</p>
+                                </div>
+                              )}
+                        </div>
+
+                        <div className="absolute left-1/2 top-[90%] -translate-x-1/2 translate-y-4 text-center w-full px-4">
+                             <p className="font-semibold text-foreground text-lg">Intention</p>
+                             <p className="text-sm text-muted-foreground truncate" title={intention.name}>
+                                {intention.name}
+                             </p>
+                             {projectedCompletion && (
+                                <div className="mt-2 pt-2 border-t font-semibold">
+                                    <p className="text-xs flex items-center gap-1 justify-center"><Clock className="h-3 w-3" /> Est. {projectedCompletion}</p>
+                                </div>
+                             )}
                         </div>
                     </div>
 
-                    <div className="absolute right-[5%] top-[90%] translate-x-1/2 translate-y-4 text-center">
-                         <p className="font-semibold text-foreground">Outcome</p>
-                         <div className="text-xs text-muted-foreground mt-1 max-w-[150px]">
-                            {outcomeObjectives.length > 0 ? (
-                              outcomeObjectives.map(obj => obj.name).join(', ')
-                            ) : (
-                              'No objectives targeted.'
-                            )}
-                         </div>
-                          {totalEstimatedMinutes > 0 && (
-                            <div className="mt-2 pt-2 border-t font-semibold">
-                                <p className="text-xs flex items-center gap-1 justify-center"><Clock className="h-3 w-3" /> {formatDuration(totalEstimatedMinutes)}</p>
-                            </div>
-                          )}
+                </CardContent>
+                 <CardFooter className="text-center">
+                    <div className="w-full">
+                        <Separator className="my-20" />
+                        <h4 className="font-semibold text-sm">{suggestion.title}</h4>
+                        <p className="text-xs text-muted-foreground max-w-xl mx-auto">{suggestion.description}</p>
                     </div>
-
-                    <div className="absolute left-1/2 top-[90%] -translate-x-1/2 translate-y-4 text-center w-full px-4">
-                         <p className="font-semibold text-foreground text-lg">Intention</p>
-                         <p className="text-sm text-muted-foreground truncate" title={intention.name}>
-                            {intention.name}
-                         </p>
-                         {projectedCompletion && (
-                            <div className="mt-2 pt-2 border-t font-semibold">
-                                <p className="text-xs flex items-center gap-1 justify-center"><Clock className="h-3 w-3" /> Est. {projectedCompletion}</p>
-                            </div>
-                         )}
-                    </div>
-                </div>
-
-                <div className="w-full text-center mt-auto">
-                    <Separator className="my-8" />
-                    <h4 className="font-semibold text-sm">{suggestion.title}</h4>
-                    <p className="text-xs text-muted-foreground max-w-xl mx-auto">{suggestion.description}</p>
-                </div>
-            </div>
+                </CardFooter>
+            </Card>
         </ScrollArea>
       </DialogContent>
     </Dialog>
