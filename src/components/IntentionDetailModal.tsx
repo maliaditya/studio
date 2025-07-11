@@ -169,9 +169,6 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
       <DialogContent className="sm:max-w-4xl h-[70vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Conceptual Flow: {intention.name}</DialogTitle>
-          <DialogDescription>
-            This diagram illustrates the strategic path from your current state to your desired outcome based on pending tasks.
-          </DialogDescription>
         </DialogHeader>
         <div className="flex-grow min-h-0 flex flex-col items-center justify-center p-8">
             <div className="relative w-full h-full max-w-3xl">
@@ -243,4 +240,3 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
     </Dialog>
   );
 }
-
