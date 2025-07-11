@@ -762,6 +762,8 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
         }
     };
 
+    const hasFooterActions = isRootNode || canExpandChildren || canRevealParents;
+
     return (
         <motion.div
             ref={setNodeRef}
@@ -805,23 +807,25 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
                   </CardFooter>
                 )}
                 
-                <CardContent className="p-2 border-t flex justify-end gap-1">
-                    {isRootNode && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onExpandAll}>
-                            <Expand className="h-4 w-4 text-purple-500" />
-                        </Button>
-                    )}
-                    {canExpandChildren && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onExpandChildren}>
-                            <GitBranch className="h-4 w-4 text-green-500" />
-                        </Button>
-                    )}
-                    {canRevealParents && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onRevealParents}>
-                            <GitMerge className="h-4 w-4 text-amber-500" />
-                        </Button>
-                    )}
-                </CardContent>
+                {hasFooterActions && (
+                    <CardContent className="p-2 border-t flex justify-end gap-1">
+                        {isRootNode && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onExpandAll}>
+                                <Expand className="h-4 w-4 text-purple-500" />
+                            </Button>
+                        )}
+                        {canExpandChildren && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onExpandChildren}>
+                                <GitBranch className="h-4 w-4 text-green-500" />
+                            </Button>
+                        )}
+                        {canRevealParents && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onRevealParents}>
+                                <GitMerge className="h-4 w-4 text-amber-500" />
+                            </Button>
+                        )}
+                    </CardContent>
+                )}
             </Card>
         </motion.div>
     );
