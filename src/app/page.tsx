@@ -711,43 +711,28 @@ function HomePageContent() {
       for (const activity of activitiesInSlot) {
         let totalMinutes = 0;
   
-        if (activity.completed) {
+        // Calculate total estimated duration for linked tasks if any, otherwise use fallback
+        if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.taskIds && activity.taskIds.length > 0) {
           const logSource = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
           const logForDay = logSource.find(log => log.date === selectedDateKey);
           if (logForDay) {
-            const relevantExercises = logForDay.exercises.filter(ex => activity.taskIds?.includes(ex.id));
-            const durationField = activity.type === 'upskill' ? 'reps' : 'weight';
-            totalMinutes = relevantExercises.reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + set[durationField], 0), 0);
+            const relevantExercises = logForDay.exercises.filter(ex => activity.taskIds!.includes(ex.id));
+            totalMinutes = relevantExercises.reduce((sum, ex) => {
+              const def = allDefs.get(ex.definitionId);
+              return sum + (def?.estimatedDuration || 0);
+            }, 0);
           }
-        } else {
-          switch (activity.type) {
-            case 'workout':
-              totalMinutes = 90; // 1h 30m
-              break;
-            case 'planning':
-            case 'tracking':
-              totalMinutes = 30;
-              break;
-            case 'lead-generation':
-              totalMinutes = 45;
-              break;
-            case 'upskill':
-            case 'deepwork':
-            case 'branding':
-              if (activity.taskIds && activity.taskIds.length > 0) {
-                const firstTaskId = activity.taskIds[0];
-                const logSource = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
-                const log = logSource.find(l => l.date === selectedDateKey);
-                const exerciseInstance = log?.exercises.find(ex => ex.id === firstTaskId);
-                const definition = allDefs.get(exerciseInstance?.definitionId || '');
-                totalMinutes = definition?.estimatedDuration || (activitiesInSlot.length === 1 ? 240 : 120);
-              } else {
-                 totalMinutes = activitiesInSlot.length === 1 ? 240 : 120;
-              }
-              break;
-            default:
-              totalMinutes = 30;
-          }
+        }
+        
+        // Use fallback if no specific tasks are linked or it's another activity type
+        if (totalMinutes === 0) {
+            switch (activity.type) {
+                case 'workout': totalMinutes = 90; break;
+                case 'planning': case 'tracking': totalMinutes = 30; break;
+                case 'lead-generation': totalMinutes = 45; break;
+                case 'upskill': case 'deepwork': case 'branding': totalMinutes = activitiesInSlot.length === 1 ? 240 : 120; break;
+                default: totalMinutes = 30;
+            }
         }
         
         if (totalMinutes > 0) {

@@ -27,28 +27,6 @@ interface AgendaWidgetItemProps {
   onStartLeadGenLog: (activity: Activity) => void;
 }
 
-const parseDurationToHours = (durationStr: string | undefined): number => {
-  if (!durationStr) return 0;
-  let totalHours = 0;
-  
-  const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
-  if (hourMatch) {
-    totalHours += parseFloat(hourMatch[1]);
-  }
-
-  const minMatch = durationStr.match(/(\d+)\s*m/);
-  if (minMatch) {
-    totalHours += parseFloat(minMatch[1]) / 60;
-  }
-  
-  // Handle case where it's just a number in minutes e.g., "30" from upskill
-  if (!hourMatch && !minMatch && /^\d+$/.test(durationStr)) {
-      totalHours += parseFloat(durationStr) / 60;
-  }
-
-  return totalHours;
-};
-
 function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog, onToggleComplete, onStartLeadGenLog }: AgendaWidgetItemProps) {
   const [openPopover, setOpenPopover] = useState(false);
   const [progressInput, setProgressInput] = useState('');
@@ -164,6 +142,28 @@ interface TodaysScheduleCardProps {
   onStartLeadGenLog: (activity: Activity) => void;
   onToggleComplete: (slotName: string, activityId: string) => void;
 }
+
+const parseDurationToHours = (durationStr: string | undefined): number => {
+    if (!durationStr) return 0;
+    let totalHours = 0;
+    
+    const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
+    if (hourMatch) {
+      totalHours += parseFloat(hourMatch[1]);
+    }
+  
+    const minMatch = durationStr.match(/(\d+)\s*m/);
+    if (minMatch) {
+      totalHours += parseFloat(minMatch[1]) / 60;
+    }
+    
+    // Handle case where it's just a number in minutes e.g., "30"
+    if (!hourMatch && !minMatch && /^\d+$/.test(durationStr)) {
+        totalHours += parseFloat(durationStr) / 60;
+    }
+  
+    return totalHours;
+  };
 
 export function TodaysScheduleCard({ 
   schedule, 
