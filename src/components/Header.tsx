@@ -33,7 +33,7 @@ export function Header() {
 
 
   const navLinks = [
-    { href: '/', label: 'Dashboard' },
+    { href: '/my-plate', label: 'My Plate' },
     { href: '/workout-tracker', label: 'Workout Tracker' },
     { href: '/upskill', label: 'Upskill' },
     { href: '/deep-work', label: 'Deep Work' },
