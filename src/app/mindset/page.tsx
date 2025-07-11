@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Brain, ArrowRight, Clock, Workflow, Play, BookText } from 'lucide-react';
+import { Brain, ArrowRight, Clock, Workflow, Play, BookText, BrainCircuit, CheckSquare, Zap } from 'lucide-react';
 import type { ExerciseDefinition, DailySchedule, DatedWorkout } from '@/types/workout';
 import { format, parseISO, isBefore, startOfToday, addDays, differenceInDays } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -18,6 +18,7 @@ import { BreathingAnimation } from '@/components/BreathingAnimation';
 const TUTORIAL_CONTENT = [
     {
       title: "Visualization to Action",
+      icon: <BrainCircuit className="h-5 w-5" />,
       points: [
         "Breathe in, out — 5 times",
         "Activate PFC",
@@ -32,6 +33,7 @@ const TUTORIAL_CONTENT = [
     },
     {
       title: "Mental Checkpoint",
+      icon: <CheckSquare className="h-5 w-5" />,
       points: [
         "Spot it: “What image just flashed before action?”",
         "Label it: [[Judgmental]]? [[Mastery]]? [[Shame]]? [[Ego]]? Wish or reality?",
@@ -43,6 +45,7 @@ const TUTORIAL_CONTENT = [
     },
     {
       title: "Devotion Mode",
+      icon: <Zap className="h-5 w-5" />,
       points: [
         "Every sub-action is deliberate",
         "No time wasted",
@@ -417,14 +420,20 @@ const InteractiveTutorial = () => {
 const NormalModeTutorial = () => (
     <div className="space-y-4">
         {TUTORIAL_CONTENT.map((card, cardIndex) => (
-            <Card key={cardIndex}>
+            <Card key={cardIndex} className="bg-gradient-to-br from-card to-muted/20 hover:shadow-lg transition-shadow">
                 <CardHeader>
-                    <CardTitle>{card.title}</CardTitle>
+                    <CardTitle className="flex items-center gap-3 text-lg">
+                        <span className="text-primary">{card.icon}</span>
+                        {card.title}
+                    </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <ul className="space-y-2">
+                    <ul className="space-y-3">
                         {card.points.map((point, pointIndex) => (
-                            <li key={pointIndex} className="text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: point.replace(/<br>/g, '') }} />
+                            <li key={pointIndex} className="flex items-start gap-3 text-sm text-muted-foreground">
+                                <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
+                                <span dangerouslySetInnerHTML={{ __html: point.replace(/<br>/g, '') }} />
+                            </li>
                         ))}
                     </ul>
                 </CardContent>
