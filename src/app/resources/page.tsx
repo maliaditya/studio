@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
@@ -67,7 +68,6 @@ const isObsidianUrl = (url: string | undefined): boolean => {
 };
 
 const ResourceCard = ({ resource, onUpdate, onDelete }: { resource: Resource; onUpdate: (resource: Resource) => void; onDelete: (resourceId: string) => void; }) => {
-    const { toast } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
     const [editingPointId, setEditingPointId] = useState<string | null>(null);
 
@@ -147,7 +147,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete }: { resource: Resource; on
 
 
 function ResourcesPageContent() {
-  const { toast } = useAuth();
+  const { toast } = useToast();
   const { 
     resources, setResources, 
     resourceFolders, setResourceFolders,
@@ -691,4 +691,3 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
-
