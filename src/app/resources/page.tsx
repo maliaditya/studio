@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -67,7 +67,7 @@ const isObsidianUrl = (url: string | undefined): boolean => {
     } catch (e) { return false; }
 };
 
-const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl }: { resource: Resource; onUpdate: (resource: Resource) => void; onDelete: (resourceId: string) => void; setFloatingVideoUrl: (url: string | null) => void; }) => {
+const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEmbedUrl }: { resource: Resource; onUpdate: (resource: Resource) => void; onDelete: (resourceId: string) => void; setFloatingVideoUrl: (url: string | null) => void; setEmbedUrl: (url: string | null) => void; }) => {
     const [editingTitle, setEditingTitle] = useState(false);
     const [editingPointId, setEditingPointId] = useState<string | null>(null);
 
@@ -77,7 +77,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl }: { r
 
     const handleUpdatePoint = (pointId: string, newText: string) => {
         const youtubeEmbedUrl = getYouTubeEmbedUrl(newText);
-        const obsidianEmbedUrl = isObsidianUrl(newText) ? newText : null;
+        const obsidianEmbedUrl = (isObsidianUrl(newText) || isNotionUrl(newText)) ? newText : null;
         let updatedPointData: Partial<ResourcePoint>;
     
         if (youtubeEmbedUrl) {
@@ -552,13 +552,12 @@ function ResourcesPageContent() {
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                 {filteredResources.map(res => {
                   if (res.type === 'card') {
-                    return <ResourceCard key={res.id} resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} />;
+                    return <ResourceCard key={res.id} resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} setEmbedUrl={setEmbedUrl} />;
                   }
 
                   // Link type rendering
                   const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                   const isSpecialEmbed = isNotionUrl(res.link) || isObsidianUrl(res.link);
-                  const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? res.link : null);
                   const isLongContent = res.name.length > 20 && (res.description?.length ?? 0) > 30;
 
                   return (
@@ -591,54 +590,16 @@ function ResourcesPageContent() {
                                   </div>
                                   <a href={res.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline mt-1">{res.link}</a>
                                   <p className="text-sm text-muted-foreground mt-3 line-clamp-3 flex-grow min-h-[60px]">{res.description || 'No description available.'}</p>
-                                  <div className="mt-auto pt-4">
-                                      {isSpecialEmbed ? (<Button variant="secondary" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(res.link)}>View in App</Button>) : (<Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>)}
+                                  <div className="mt-auto pt-4 flex items-center gap-2">
+                                      <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
+                                      <Button variant="outline" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(res.link)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
                                   </div>
                               </div>
                           )}
                       </Card>
                   )
                 })}
-                 {selectedFolderId && (isAdding ? (
-                      <Card className="rounded-3xl flex flex-col border-primary ring-2 ring-primary shadow-xl">
-                        <div className="p-5 flex flex-col flex-grow justify-between">
-                          <div>
-                            <p className="text-base font-semibold">Add New Resource</p>
-                            <Tabs value={addResourceType} onValueChange={(v) => setAddResourceType(v as 'link' | 'card')} className="w-full mt-2 mb-4">
-                              <TabsList className="grid w-full grid-cols-2">
-                                  <TabsTrigger value="link">Link</TabsTrigger>
-                                  <TabsTrigger value="card">Card</TabsTrigger>
-                              </TabsList>
-                            </Tabs>
-                            {addResourceType === 'link' ? (
-                              <Input
-                                  className="h-10 text-base"
-                                  autoFocus
-                                  placeholder="https://example.com"
-                                  value={newResourceLink}
-                                  onChange={(e) => setNewResourceLink(e.target.value)}
-                                  onKeyDown={(e) => { if (e.key === 'Enter') handleAddResource(); }}
-                                />
-                            ) : (
-                               <Input
-                                  className="h-10 text-base"
-                                  autoFocus
-                                  placeholder="New card name..."
-                                  value={newResourceName}
-                                  onChange={(e) => setNewResourceName(e.target.value)}
-                                  onKeyDown={(e) => { if (e.key === 'Enter') handleAddResource(); }}
-                                />
-                            )}
-                          </div>
-                          <div className="flex justify-end gap-2 mt-4">
-                            <Button variant="ghost" size="sm" onClick={() => { setIsAdding(false); setNewResourceLink(''); setNewResourceName('') }}>Cancel</Button>
-                            <Button size="sm" onClick={handleAddResource} disabled={isFetchingMeta}>
-                              {isFetchingMeta ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-                            </Button>
-                          </div>
-                        </div>
-                      </Card>
-                    ) : (
+                 {selectedFolderId && (
                       <Card 
                         onClick={() => setIsAdding(true)}
                         className="rounded-3xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[220px] hover:shadow-xl hover:-translate-y-1"
@@ -646,7 +607,7 @@ function ResourcesPageContent() {
                           <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
                           <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add New Resource</p>
                       </Card>
-                    ))}
+                    )}
               </div>
             </div>
           </main>
@@ -714,6 +675,43 @@ function ResourcesPageContent() {
             <MindMapViewer defaultView="Resources" rootFolderId={mindMapRootFolderId} showControls={false} />
         </DialogContent>
     </Dialog>
+    <Dialog open={isAdding} onOpenChange={setIsAdding}>
+        <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Resource</DialogTitle>
+            </DialogHeader>
+            <Tabs value={addResourceType} onValueChange={(v) => setAddResourceType(v as 'link' | 'card')} className="w-full mt-2 mb-4">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="link">Link</TabsTrigger>
+                    <TabsTrigger value="card">Card</TabsTrigger>
+                </TabsList>
+                <TabsContent value="link" className="pt-4">
+                    <Input
+                        autoFocus
+                        placeholder="https://example.com"
+                        value={newResourceLink}
+                        onChange={(e) => setNewResourceLink(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddResource(); }}
+                    />
+                </TabsContent>
+                <TabsContent value="card" className="pt-4">
+                    <Input
+                        autoFocus
+                        placeholder="New card name..."
+                        value={newResourceName}
+                        onChange={(e) => setNewResourceName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddResource(); }}
+                    />
+                </TabsContent>
+            </Tabs>
+            <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsAdding(false)}>Cancel</Button>
+                <Button onClick={handleAddResource} disabled={isFetchingMeta}>
+                    {isFetchingMeta ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
     </>
   );
 }
@@ -721,3 +719,4 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
