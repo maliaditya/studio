@@ -27,7 +27,7 @@ export function Header() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   const navLinks = [
-    { href: '/my-plate', label: 'My Plate' },
+    { href: '/', label: 'Dashboard' },
     { href: '/workout-tracker', label: 'Workout Tracker' },
     { href: '/upskill', label: 'Upskill' },
     { href: '/deep-work', label: 'Deep Work' },
