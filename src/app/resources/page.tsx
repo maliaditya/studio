@@ -6,7 +6,7 @@ import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } f
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical as DragHandle, X } from 'lucide-react';
@@ -110,12 +110,8 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onClose }: ResourcePopupP
     if (!resource) return null;
 
     return (
-        <motion.div 
+        <div 
             ref={setNodeRef} style={style} {...attributes} className="z-[60]"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.1 }}
         >
             <Card className="w-80 shadow-2xl border-2 border-primary/50 bg-background">
                 <CardHeader className="p-3 relative cursor-grab" {...listeners}>
@@ -123,9 +119,6 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onClose }: ResourcePopupP
                         <Library className="h-4 w-4" />
                         <span className="truncate">{resource.name}</span>
                     </CardTitle>
-                    <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7" onClick={(e) => { e.stopPropagation(); onClose(resource.id); }}>
-                        <X className="h-4 w-4" />
-                    </Button>
                 </CardHeader>
                 <CardContent className="p-3 pt-0 max-h-[60vh] overflow-y-auto">
                     <ul className="space-y-2 text-sm text-muted-foreground">
@@ -146,8 +139,13 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onClose }: ResourcePopupP
                         ))}
                     </ul>
                 </CardContent>
+                <CardFooter className="p-2 flex justify-end">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onClose(resource.id); }}>
+                        <X className="h-4 w-4" />
+                    </Button>
+                </CardFooter>
             </Card>
-        </motion.div>
+        </div>
     );
 };
 
@@ -819,28 +817,27 @@ function ResourcesPageContent() {
 
   const handleClosePopup = (resourceId: string) => {
     setOpenPopups(prev => {
-        const newPopups = new Map(prev);
-        const popupsToDelete = new Set<string>();
-
-        // Recursive function to find all children of a popup
-        const findChildren = (parentId: string) => {
-            popupsToDelete.add(parentId);
-            newPopups.forEach((popup, id) => {
-                if (popup.parentId === parentId) {
-                    findChildren(id);
-                }
-            });
-        };
-
-        findChildren(resourceId);
-        
-        popupsToDelete.forEach(id => {
-            newPopups.delete(id);
-        });
-
-        return newPopups;
+      const newPopups = new Map(prev);
+      const popupsToDelete = new Set<string>();
+  
+      function findChildren(parentId: string) {
+        popupsToDelete.add(parentId);
+        for (const [id, popup] of newPopups.entries()) {
+          if (popup.parentId === parentId) {
+            findChildren(id);
+          }
+        }
+      }
+  
+      findChildren(resourceId);
+  
+      for (const id of popupsToDelete) {
+        newPopups.delete(id);
+      }
+  
+      return newPopups;
     });
-};
+  };
 
 
   const sensors = useSensors(useSensor(PointerSensor));
@@ -886,7 +883,7 @@ function ResourcesPageContent() {
         onDragEnd={handleDragEndMain}
     >
         {openPopups.size > 0 && (
-          <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm" aria-hidden="true" />
+          <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm" aria-hidden="true" onClick={() => setOpenPopups(new Map())}/>
         )}
         <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
@@ -1159,3 +1156,4 @@ export default function ResourcesPage() {
 }
 
     
+
