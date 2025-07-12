@@ -21,6 +21,7 @@ import { MindMapViewer } from '@/components/MindMapViewer';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AuthGuard } from '@/components/AuthGuard';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -67,9 +68,41 @@ const isObsidianUrl = (url: string | undefined): boolean => {
     } catch (e) { return false; }
 };
 
+const ResourceCardPreview = ({ resource }: { resource: Resource }) => {
+    return (
+        <Card className="w-64 bg-background shadow-lg">
+            <CardHeader className="p-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                    <Library className="h-4 w-4" />
+                    {resource.name}
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                    {(resource.points || []).slice(0, 5).map(point => (
+                        <li key={point.id} className="flex items-start gap-2">
+                            <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
+                            <span className="truncate" title={point.text}>{point.text}</span>
+                        </li>
+                    ))}
+                    {(resource.points?.length ?? 0) > 5 && (
+                        <li className="text-xs text-center text-muted-foreground">...and more</li>
+                    )}
+                </ul>
+            </CardContent>
+        </Card>
+    );
+};
+
+
 const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEmbedUrl }: { resource: Resource; onUpdate: (resource: Resource) => void; onDelete: (resourceId: string) => void; setFloatingVideoUrl: (url: string | null) => void; setEmbedUrl: (url: string | null) => void; }) => {
+    const { resources } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
     const [editingPointId, setEditingPointId] = useState<string | null>(null);
+
+    const [addStepPopoverOpen, setAddStepPopoverOpen] = useState(false);
+    const [addStepType, setAddStepType] = useState<'text' | 'card'>('text');
+    const [linkedCardId, setLinkedCardId] = useState<string>('');
 
     const handleUpdateTitle = (newTitle: string) => {
         onUpdate({ ...resource, name: newTitle });
@@ -97,10 +130,27 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
     };
 
     const handleAddPoint = () => {
-        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: 'New step', type: 'text' };
+        let newPoint: ResourcePoint;
+
+        if (addStepType === 'card') {
+            if (!linkedCardId) return;
+            const linkedCard = resources.find(r => r.id === linkedCardId);
+            if (!linkedCard) return;
+            newPoint = {
+                id: `point_${Date.now()}`,
+                text: linkedCard.name,
+                type: 'card',
+                resourceId: linkedCardId
+            };
+        } else {
+             newPoint = { id: `point_${Date.now()}`, text: 'New step', type: 'text' };
+        }
+        
         const updatedPoints = [...(resource.points || []), newPoint];
         onUpdate({ ...resource, points: updatedPoints });
         setEditingPointId(newPoint.id);
+        setAddStepPopoverOpen(false);
+        setLinkedCardId('');
     };
 
     const handleDeletePoint = (pointId: string) => {
@@ -137,42 +187,94 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
             </CardHeader>
             <CardContent className="flex-grow">
                 <ul className="space-y-3">
-                    {(resource.points || []).map((point) => (
-                        <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
-                            <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
-                            <div className="flex-grow">
-                                {editingPointId === point.id ? (
-                                    <Textarea value={point.text} onChange={e => handleUpdatePoint(point.id, e.target.value)} onBlur={() => setEditingPointId(null)} autoFocus className="text-sm" rows={2}/>
-                                ) : point.type === 'youtube' && point.url ? (
-                                    <div className="w-full aspect-video rounded-md overflow-hidden border">
-                                        <iframe src={point.url} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
-                                    </div>
-                                ) : point.type === 'obsidian' && point.url ? (
-                                    <div className="w-full aspect-[4/3] rounded-md overflow-hidden border">
-                                        <iframe src={point.url} title={resource.name} frameBorder="0" allowFullScreen className="w-full h-full"></iframe>
-                                    </div>
-                                ) : (
-                                    <span onClick={() => setEditingPointId(point.id)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/<br>/g, '') }} />
-                                )}
-                            </div>
-                            <div className="flex flex-col items-center flex-shrink-0">
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={() => handleDeletePoint(point.id)}>
-                                    <Trash2 className="h-3 w-3"/>
-                                </Button>
-                                {(point.type === 'youtube' || point.type === 'obsidian') && (
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground opacity-0 group-hover/item:opacity-100" onClick={() => setFloatingVideoUrl(point.text)}>
-                                        <PictureInPicture className="h-3 w-3"/>
+                    {(resource.points || []).map((point) => {
+                        if (point.type === 'card' && point.resourceId) {
+                            const linkedResource = resources.find(r => r.id === point.resourceId);
+                            if (!linkedResource) return null;
+                            return (
+                                <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <div className="flex items-start gap-3 flex-grow cursor-pointer p-2 rounded-md hover:bg-muted/50 border border-dashed">
+                                                <Library className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0"/>
+                                                <span className="font-medium text-foreground">{point.text}</span>
+                                            </div>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" side="right" align="start">
+                                            <ResourceCardPreview resource={linkedResource} />
+                                        </PopoverContent>
+                                    </Popover>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={() => handleDeletePoint(point.id)}>
+                                        <Trash2 className="h-3 w-3"/>
                                     </Button>
-                                )}
-                            </div>
-                        </li>
-                    ))}
+                                </li>
+                            )
+                        }
+                        return (
+                            <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
+                                <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
+                                <div className="flex-grow">
+                                    {editingPointId === point.id ? (
+                                        <Textarea value={point.text} onChange={e => handleUpdatePoint(point.id, e.target.value)} onBlur={() => setEditingPointId(null)} autoFocus className="text-sm" rows={2}/>
+                                    ) : point.type === 'youtube' && point.url ? (
+                                        <div className="w-full aspect-video rounded-md overflow-hidden border">
+                                            <iframe src={point.url} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
+                                        </div>
+                                    ) : point.type === 'obsidian' && point.url ? (
+                                        <div className="w-full aspect-[4/3] rounded-md overflow-hidden border">
+                                            <iframe src={point.url} title={resource.name} frameBorder="0" allowFullScreen className="w-full h-full"></iframe>
+                                        </div>
+                                    ) : (
+                                        <span onClick={() => setEditingPointId(point.id)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/<br>/g, '') }} />
+                                    )}
+                                </div>
+                                <div className="flex flex-col items-center flex-shrink-0">
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={() => handleDeletePoint(point.id)}>
+                                        <Trash2 className="h-3 w-3"/>
+                                    </Button>
+                                    {(point.type === 'youtube' || point.type === 'obsidian') && (
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground opacity-0 group-hover/item:opacity-100" onClick={() => setFloatingVideoUrl(point.text)}>
+                                            <PictureInPicture className="h-3 w-3"/>
+                                        </Button>
+                                    )}
+                                </div>
+                            </li>
+                        )
+                    })}
                 </ul>
             </CardContent>
             <CardContent className="pt-0">
-                 <Button variant="outline" size="sm" className="w-full" onClick={handleAddPoint}>
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Step
-                </Button>
+                 <Popover open={addStepPopoverOpen} onOpenChange={setAddStepPopoverOpen}>
+                    <PopoverTrigger asChild>
+                         <Button variant="outline" size="sm" className="w-full">
+                            <PlusCircle className="mr-2 h-4 w-4" /> Add Step
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80">
+                        <Tabs value={addStepType} onValueChange={(v) => setAddStepType(v as 'text' | 'card')} className="w-full">
+                            <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="text">Text/Link</TabsTrigger>
+                                <TabsTrigger value="card">Card</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="text" className="pt-4">
+                                <p className="text-sm text-muted-foreground mb-4">Add a new text or link-based step. The editor will automatically handle embeds.</p>
+                                 <Button onClick={handleAddPoint} className="w-full">Add Text Step</Button>
+                            </TabsContent>
+                            <TabsContent value="card" className="pt-4 space-y-3">
+                                <p className="text-sm text-muted-foreground">Link an existing resource card as a nested step.</p>
+                                <Select value={linkedCardId} onValueChange={setLinkedCardId}>
+                                    <SelectTrigger><SelectValue placeholder="Select a card..."/></SelectTrigger>
+                                    <SelectContent>
+                                        {resources.filter(r => r.type === 'card' && r.id !== resource.id).map(r => (
+                                            <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button onClick={handleAddPoint} disabled={!linkedCardId} className="w-full">Link Card</Button>
+                            </TabsContent>
+                        </Tabs>
+                    </PopoverContent>
+                 </Popover>
             </CardContent>
         </Card>
     );
@@ -742,6 +844,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
