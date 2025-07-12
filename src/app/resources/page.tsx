@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical as DragHandle } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -22,6 +22,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DndContext, useDraggable, useDroppable, type DragEndEvent, DragOverlay } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -94,20 +98,25 @@ const ResourceCardPreview = ({ resource }: { resource: Resource }) => {
     );
 };
 
-
-const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEmbedUrl }: { resource: Resource; onUpdate: (resource: Resource) => void; onDelete: (resourceId: string) => void; setFloatingVideoUrl: (url: string | null) => void; setEmbedUrl: (url: string | null) => void; }) => {
+const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUrl, setEmbedUrl, editingPointId, setEditingPointId }: {
+    point: ResourcePoint;
+    resource: Resource;
+    onUpdate: (resource: Resource) => void;
+    onDelete: (resourceId: string) => void;
+    setFloatingVideoUrl: (url: string | null) => void;
+    setEmbedUrl: (url: string | null) => void;
+    editingPointId: string | null;
+    setEditingPointId: (id: string | null) => void;
+}) => {
     const { resources } = useAuth();
-    const [editingTitle, setEditingTitle] = useState(false);
-    const [editingPointId, setEditingPointId] = useState<string | null>(null);
+    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: point.id });
 
-    const [linkCardPopoverOpen, setLinkCardPopoverOpen] = useState(false);
-    const [linkedCardId, setLinkedCardId] = useState<string>('');
-
-    const handleUpdateTitle = (newTitle: string) => {
-        onUpdate({ ...resource, name: newTitle });
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
     };
 
-    const handleUpdatePoint = (pointId: string, newText: string) => {
+    const handleUpdatePoint = (newText: string) => {
         const youtubeEmbedUrl = getYouTubeEmbedUrl(newText);
         const obsidianEmbedUrl = (isObsidianUrl(newText) || isNotionUrl(newText)) ? newText : null;
         let updatedPointData: Partial<ResourcePoint>;
@@ -121,15 +130,92 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
         }
         
         const updatedPoints = (resource.points || []).map(p => 
-            p.id === pointId 
+            p.id === point.id 
                 ? { ...p, ...updatedPointData } 
                 : p
         );
         onUpdate({ ...resource, points: updatedPoints });
     };
 
+    const handleBlur = (e: React.FocusEvent<HTMLTextAreaElement>) => {
+        if (e.target.value.trim() === '') {
+            onDelete(point.id);
+        }
+        setEditingPointId(null);
+    };
+
+    if (point.type === 'card' && point.resourceId) {
+        const linkedResource = resources.find(r => r.id === point.resourceId);
+        if (!linkedResource) return null;
+        return (
+            <div ref={setNodeRef} style={style} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
+                <button {...attributes} {...listeners} className="cursor-grab p-1"><DragHandle className="h-4 w-4 text-muted-foreground/50" /></button>
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <div className="flex items-start gap-3 flex-grow cursor-pointer p-2 rounded-md hover:bg-muted/50 border border-dashed">
+                            <Library className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0"/>
+                            <span className="font-medium text-foreground">{point.text}</span>
+                        </div>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" side="right" align="start">
+                        <ResourceCardPreview resource={linkedResource} />
+                    </PopoverContent>
+                </Popover>
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={() => onDelete(point.id)}>
+                    <Trash2 className="h-3 w-3"/>
+                </Button>
+            </div>
+        )
+    }
+
+    return (
+        <div ref={setNodeRef} style={style} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
+            <button {...attributes} {...listeners} className="cursor-grab p-1"><DragHandle className="h-4 w-4 text-muted-foreground/50" /></button>
+            <div className="flex-grow">
+                {editingPointId === point.id ? (
+                    <Textarea value={point.text} onChange={e => handleUpdatePoint(e.target.value)} onBlur={handleBlur} autoFocus placeholder="New step..." className="text-sm" rows={2}/>
+                ) : point.type === 'youtube' && point.url ? (
+                    <div className="w-full aspect-video rounded-md overflow-hidden border">
+                        <iframe src={point.url} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
+                    </div>
+                ) : point.type === 'obsidian' && point.url ? (
+                    <div className="w-full aspect-[4/3] rounded-md overflow-hidden border">
+                        <iframe src={point.url} title={resource.name} frameBorder="0" allowFullScreen className="w-full h-full"></iframe>
+                    </div>
+                ) : (
+                    <span onClick={() => setEditingPointId(point.id)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/<br>/g, '') || '<span class="text-muted-foreground italic">Empty step...</span>' }} />
+                )}
+            </div>
+            <div className="flex flex-col items-center flex-shrink-0">
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={() => onDelete(point.id)}>
+                    <Trash2 className="h-3 w-3"/>
+                </Button>
+                {(point.type === 'youtube' || point.type === 'obsidian') && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground opacity-0 group-hover/item:opacity-100" onClick={() => setFloatingVideoUrl(point.text)}>
+                        <PictureInPicture className="h-3 w-3"/>
+                    </Button>
+                )}
+            </div>
+        </div>
+    );
+};
+
+
+const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEmbedUrl }: { resource: Resource; onUpdate: (resource: Resource) => void; onDelete: (resourceId: string) => void; setFloatingVideoUrl: (url: string | null) => void; setEmbedUrl: (url: string | null) => void; }) => {
+    const { resources } = useAuth();
+    const [editingTitle, setEditingTitle] = useState(false);
+    const [editingPointId, setEditingPointId] = useState<string | null>(null);
+    const [activePointId, setActivePointId] = useState<string | null>(null);
+
+    const [linkCardPopoverOpen, setLinkCardPopoverOpen] = useState(false);
+    const [linkedCardId, setLinkedCardId] = useState<string>('');
+
+    const handleUpdateTitle = (newTitle: string) => {
+        onUpdate({ ...resource, name: newTitle });
+    };
+
     const handleAddTextPoint = () => {
-        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: 'New step', type: 'text' };
+        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: '', type: 'text' };
         const updatedPoints = [...(resource.points || []), newPoint];
         onUpdate({ ...resource, points: updatedPoints });
         setEditingPointId(newPoint.id);
@@ -155,6 +241,21 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
     const handleDeletePoint = (pointId: string) => {
         const updatedPoints = (resource.points || []).filter(p => p.id !== pointId);
         onUpdate({ ...resource, points: updatedPoints });
+    };
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        setActivePointId(null);
+        if (over && active.id !== over.id) {
+          const oldIndex = (resource.points || []).findIndex(p => p.id === active.id);
+          const newIndex = (resource.points || []).findIndex(p => p.id === over.id);
+          if (oldIndex > -1 && newIndex > -1) {
+            const newPoints = [...(resource.points || [])];
+            const [movedItem] = newPoints.splice(oldIndex, 1);
+            newPoints.splice(newIndex, 0, movedItem);
+            onUpdate({ ...resource, points: newPoints });
+          }
+        }
     };
     
     return (
@@ -185,62 +286,35 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
                 </div>
             </CardHeader>
             <CardContent className="flex-grow">
-                <ul className="space-y-3">
-                    {(resource.points || []).map((point) => {
-                        if (point.type === 'card' && point.resourceId) {
-                            const linkedResource = resources.find(r => r.id === point.resourceId);
-                            if (!linkedResource) return null;
-                            return (
-                                <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <div className="flex items-start gap-3 flex-grow cursor-pointer p-2 rounded-md hover:bg-muted/50 border border-dashed">
-                                                <Library className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0"/>
-                                                <span className="font-medium text-foreground">{point.text}</span>
-                                            </div>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0" side="right" align="start">
-                                            <ResourceCardPreview resource={linkedResource} />
-                                        </PopoverContent>
-                                    </Popover>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={() => handleDeletePoint(point.id)}>
-                                        <Trash2 className="h-3 w-3"/>
-                                    </Button>
-                                </li>
-                            )
-                        }
-                        return (
-                            <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
-                                <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
-                                <div className="flex-grow">
-                                    {editingPointId === point.id ? (
-                                        <Textarea value={point.text} onChange={e => handleUpdatePoint(point.id, e.target.value)} onBlur={() => setEditingPointId(null)} autoFocus className="text-sm" rows={2}/>
-                                    ) : point.type === 'youtube' && point.url ? (
-                                        <div className="w-full aspect-video rounded-md overflow-hidden border">
-                                            <iframe src={point.url} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
-                                        </div>
-                                    ) : point.type === 'obsidian' && point.url ? (
-                                        <div className="w-full aspect-[4/3] rounded-md overflow-hidden border">
-                                            <iframe src={point.url} title={resource.name} frameBorder="0" allowFullScreen className="w-full h-full"></iframe>
-                                        </div>
-                                    ) : (
-                                        <span onClick={() => setEditingPointId(point.id)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/<br>/g, '') }} />
-                                    )}
-                                </div>
-                                <div className="flex flex-col items-center flex-shrink-0">
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={() => handleDeletePoint(point.id)}>
-                                        <Trash2 className="h-3 w-3"/>
-                                    </Button>
-                                    {(point.type === 'youtube' || point.type === 'obsidian') && (
-                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground opacity-0 group-hover/item:opacity-100" onClick={() => setFloatingVideoUrl(point.text)}>
-                                            <PictureInPicture className="h-3 w-3"/>
-                                        </Button>
-                                    )}
-                                </div>
-                            </li>
-                        )
-                    })}
-                </ul>
+                <DndContext 
+                    onDragStart={e => setActivePointId(e.active.id as string)}
+                    onDragEnd={handleDragEnd}
+                >
+                    <SortableContext items={(resource.points || []).map(p => p.id)} strategy={verticalListSortingStrategy}>
+                        <ul className="space-y-3">
+                            {(resource.points || []).map((point) => (
+                                <SortablePoint 
+                                    key={point.id} 
+                                    point={point} 
+                                    resource={resource}
+                                    onUpdate={onUpdate}
+                                    onDelete={handleDeletePoint}
+                                    setEmbedUrl={setEmbedUrl}
+                                    setFloatingVideoUrl={setFloatingVideoUrl}
+                                    editingPointId={editingPointId}
+                                    setEditingPointId={setEditingPointId}
+                                />
+                            ))}
+                        </ul>
+                    </SortableContext>
+                    <DragOverlay>
+                        {activePointId ? (
+                            <div className="bg-card p-2 rounded-md shadow-lg opacity-80">
+                                Dragging...
+                            </div>
+                        ) : null}
+                    </DragOverlay>
+                </DndContext>
             </CardContent>
             <CardContent className="pt-0">
                  <div className="flex gap-2">
@@ -843,6 +917,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
