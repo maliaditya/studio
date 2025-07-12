@@ -146,6 +146,14 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
   if (!intention) return null;
   const suggestion = getProductivitySuggestion(avgDailyProductiveHours);
 
+  const solutionText = solutionTasks.length > 0 
+    ? solutionTasks.map(st => st.action.name).join(', ')
+    : "No solution tasks pending";
+
+  const outcomeText = outcomeObjectives.length > 0 
+    ? outcomeObjectives.map(obj => obj.name).join(', ')
+    : "Not yet defined";
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl h-[90vh] flex flex-col p-2">
@@ -155,82 +163,49 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
         <div className="flex-grow min-h-0">
             <ScrollArea className="h-full p-4">
                 <div className="flex flex-col items-center gap-4 text-center">
-                    
-                    {/* SOLUTION */}
-                    <Card className="w-full max-w-lg">
-                        <CardHeader>
-                            <CardTitle className="flex items-center justify-center gap-2">
-                                <Workflow className="h-5 w-5 text-primary"/>
-                                Solution
-                            </CardTitle>
-                            <CardDescription>The actionable steps required to achieve the outcome.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                             <ScrollArea className="h-32 p-3 border rounded-md bg-muted/50">
-                                <ul className="text-sm list-disc list-inside space-y-2 text-left">
-                                    {solutionTasks.length > 0 ? (
-                                    solutionTasks.map(({ action, linkedVisualizations }) => (
-                                        <li key={action.id} className="font-semibold text-foreground" title={action.name}>
-                                        {action.name}
-                                        {linkedVisualizations.length > 0 && (
-                                            <ul className="pl-4 list-['▹'] list-inside text-muted-foreground font-normal">
-                                            {linkedVisualizations.map(viz => (
-                                                <li key={viz.id} className="truncate" title={viz.name}>{viz.name}</li>
-                                            ))}
-                                            </ul>
-                                        )}
-                                        </li>
-                                    ))
-                                    ) : (
-                                    <li>No actions scheduled or pending.</li>
-                                    )}
-                                </ul>
-                            </ScrollArea>
-                        </CardContent>
-                    </Card>
 
-                    <ArrowDown className="h-6 w-6 text-muted-foreground"/>
-
-                    {/* INTENTION */}
-                     <Card className="w-full max-w-lg">
-                        <CardHeader>
-                            <CardTitle className="flex items-center justify-center gap-2">
-                                <Lightbulb className="h-5 w-5 text-primary"/>
-                                Intention
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-lg font-medium text-foreground">{intention.name}</p>
-                        </CardContent>
-                    </Card>
-
-                    <ArrowDown className="h-6 w-6 text-muted-foreground"/>
-
-                    {/* STATE & OUTCOME */}
-                    <div className="w-full max-w-3xl grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-4">
-                        <Card>
-                             <CardHeader>
-                                <CardTitle className="text-base">Current State</CardTitle>
-                             </CardHeader>
-                             <CardContent>
-                                <p className="text-sm text-muted-foreground">Productivity: <strong>{avgDailyProductiveHours.toFixed(1)}h/day</strong></p>
-                             </CardContent>
-                        </Card>
+                   <div className="w-full h-full flex items-center justify-center bg-muted/30 p-8 min-h-[500px]">
+                      <div className="relative w-[800px] h-[450px]">
                         
-                        <ArrowRight className="h-6 w-6 text-muted-foreground hidden md:block"/>
-                        <ArrowDown className="h-6 w-6 text-muted-foreground md:hidden"/>
+                        {/* Nodes */}
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 text-center max-w-sm">
+                          <div className="font-semibold text-lg">Solution</div>
+                          <p className="text-sm text-muted-foreground truncate" title={solutionText}>{solutionText}</p>
+                        </div>
 
-                        <Card>
-                             <CardHeader>
-                                <CardTitle className="text-base">Desired Outcome</CardTitle>
-                             </CardHeader>
-                             <CardContent>
-                                 <p className="text-sm text-muted-foreground font-medium">
-                                    {outcomeObjectives.length > 0 ? outcomeObjectives.map(obj => obj.name).join(', ') : 'Not yet defined.'}
-                                 </p>
-                             </CardContent>
-                        </Card>
+                        <div className="absolute bottom-0 left-0 text-center max-w-sm">
+                          <div className="font-semibold text-lg">Current State</div>
+                           <p className="text-sm text-muted-foreground">Productivity: <strong>{avgDailyProductiveHours.toFixed(1)}h/day</strong></p>
+                        </div>
+                        
+                        <div className="absolute bottom-0 right-0 text-center max-w-sm">
+                          <div className="font-semibold text-lg">Outcome</div>
+                          <p className="text-sm text-muted-foreground truncate" title={outcomeText}>{outcomeText}</p>
+                        </div>
+
+                        {/* Lines and Arrows */}
+                        <svg className="absolute top-0 left-0 w-full h-full overflow-visible">
+                          <defs>
+                            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto" markerUnits="strokeWidth">
+                              <polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--foreground))" />
+                            </marker>
+                          </defs>
+                          {/* Base Line */}
+                          <line x1="100" y1="430" x2="700" y2="430" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
+                          {/* Left Line */}
+                          <line x1="80" y1="410" x2="390" y2="60" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
+                          {/* Right Line */}
+                          <line x1="410" y1="60" x2="720" y2="410" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
+                        </svg>
+
+                        {/* Labels on lines */}
+                        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-center max-w-xs">
+                           <div className="text-sm text-muted-foreground truncate" title={intention.name}>{intention.name}</div>
+                          <div className="font-semibold mt-1">Intention</div>
+                        </div>
+                      </div>
                     </div>
+
 
                     {/* FOOTER */}
                      <div className="w-full max-w-lg pt-8">
@@ -248,3 +223,4 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
     </Dialog>
   );
 }
+
