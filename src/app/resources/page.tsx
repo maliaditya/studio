@@ -956,7 +956,7 @@ function ResourcesPageContent() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                         {filteredResources.map(res => {
                             const hasMarkdown = res.points?.some(p => p.type === 'markdown');
-                            const cardClassName = hasMarkdown ? "lg:col-span-2 xl:col-span-2" : "";
+                            const cardClassName = hasMarkdown ? "lg:col-span-2 xl:col-span-3" : "";
 
                             return (
                                 <SortableResourceCard key={res.id} item={res} className={cardClassName}>
@@ -1195,5 +1195,6 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
