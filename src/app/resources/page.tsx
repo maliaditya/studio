@@ -114,7 +114,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
-        opacity: isDragging ? 0.5 : 1,
+        opacity: isDragging ? 0 : 1,
     };
 
     const handleUpdatePoint = (newText: string) => {
@@ -921,4 +921,5 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
