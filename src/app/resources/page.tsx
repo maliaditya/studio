@@ -82,7 +82,7 @@ interface PopupState {
 
 interface ResourcePopupProps {
   popupState: PopupState;
-  onOpenNested: (resourceId: string, level: number, parentX: number, parentY: number, parentId: string) => void;
+  onOpenNested: (resourceId: string, parentX: number, parentY: number, parentId: string) => void;
   onClose: (resourceId: string) => void;
 }
 
@@ -109,12 +109,8 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onClose }: ResourcePopupP
     if (!resource) return null;
 
     return (
-        <motion.div 
+        <div 
             ref={setNodeRef} style={style} {...attributes}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.1 }}
         >
             <Card className="z-[60] w-80 shadow-2xl border-2 border-primary/50 bg-background/80 backdrop-blur-sm">
                 <CardHeader className="p-3 relative cursor-grab" {...listeners}>
@@ -133,7 +129,7 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onClose }: ResourcePopupP
                                 <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
                                 {point.type === 'card' && point.resourceId ? (
                                     <button
-                                        onClick={() => onOpenNested(point.resourceId!, level + 1, x, y, resourceId)}
+                                        onClick={() => onOpenNested(point.resourceId!, x, y, resourceId)}
                                         className="text-left font-medium text-primary hover:underline"
                                     >
                                         {point.text}
@@ -146,7 +142,7 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onClose }: ResourcePopupP
                     </ul>
                 </CardContent>
             </Card>
-        </motion.div>
+        </div>
     );
 };
 
@@ -794,7 +790,8 @@ function ResourcesPageContent() {
     });
   };
 
-  const handleOpenNested = (resourceId: string, level: number, parentX: number, parentY: number, parentId: string) => {
+  const handleOpenNested = (resourceId: string, parentX: number, parentY: number, parentId: string) => {
+    const level = (openPopups.get(parentId)?.level ?? -1) + 1;
     setOpenPopups(prev => {
         const newPopups = new Map(prev);
         // Close any popups at the same or higher level
@@ -823,7 +820,7 @@ function ResourcesPageContent() {
         // Recursive function to find all children of a popup
         const findChildren = (parentId: string) => {
             popupsToDelete.add(parentId);
-            prev.forEach((popup, id) => {
+            newPopups.forEach((popup, id) => {
                 if (popup.parentId === parentId) {
                     findChildren(id);
                 }
@@ -883,6 +880,9 @@ function ResourcesPageContent() {
         onDragStart={(e) => setActiveId(e.active.id as string)}
         onDragEnd={handleDragEndMain}
     >
+        {openPopups.size > 0 && (
+          <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm" aria-hidden="true" />
+        )}
         <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {/* Left Sidebar */}
@@ -1009,16 +1009,14 @@ function ResourcesPageContent() {
         </div>
         </div>
 
-        <AnimatePresence>
-            {Array.from(openPopups.values()).map((popupState) => (
-                <ResourcePopupCard
-                    key={popupState.resourceId}
-                    popupState={popupState}
-                    onOpenNested={handleOpenNested}
-                    onClose={handleClosePopup}
-                />
-            ))}
-        </AnimatePresence>
+        {Array.from(openPopups.values()).map((popupState) => (
+            <ResourcePopupCard
+                key={popupState.resourceId}
+                popupState={popupState}
+                onOpenNested={handleOpenNested}
+                onClose={handleClosePopup}
+            />
+        ))}
         <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-50">
           {Array.from(openPopups.values()).map(popup => {
             if (!popup.parentId) return null;
