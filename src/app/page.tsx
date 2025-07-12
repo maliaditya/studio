@@ -478,57 +478,70 @@ function HomePageContent() {
       };
 
       const calculateLearningStats = (logs: DatedWorkout[], goals: typeof topicGoals) => {
-          const topicStats: Record<string, any> = {};
-          const topicData: Record<string, { totalDuration: number; logs: { date: Date; progress: number }[] }> = {};
+        const topicStats: Record<string, any> = {};
+        if (!logs || !goals) return topicStats;
+      
+        Object.entries(goals).forEach(([topic, goal]) => {
+          const topicData: { totalDuration: number; logs: { date: Date; progress: number }[] } = {
+            totalDuration: 0,
+            logs: []
+          };
+      
           logs.forEach(log => {
-              log.exercises.forEach(ex => {
-                  if (goals[ex.category]) {
-                      if (!topicData[ex.category]) topicData[ex.category] = { totalDuration: 0, logs: [] };
-                      const dailyProgress = ex.loggedSets.reduce((sum, set) => sum + set.weight, 0);
-                      const dailyDuration = ex.loggedSets.reduce((sum, set) => sum + set.reps, 0);
-                      if (dailyProgress > 0) topicData[ex.category].logs.push({ date: parseISO(log.date), progress: dailyProgress });
-                      topicData[ex.category].totalDuration += dailyDuration;
-                  }
-              });
+            log.exercises.forEach(ex => {
+              if (ex.category === topic) {
+                const dailyProgress = ex.loggedSets.reduce((sum, set) => sum + set.weight, 0);
+                const dailyDuration = ex.loggedSets.reduce((sum, set) => sum + set.reps, 0);
+                if (dailyProgress > 0) {
+                  topicData.logs.push({ date: parseISO(log.date), progress: dailyProgress });
+                }
+                topicData.totalDuration += dailyDuration;
+              }
+            });
           });
-          Object.keys(topicData).forEach(topic => {
-              const data = topicData[topic]; const goal = goals[topic]; if (!goal || data.logs.length === 0) return;
-              const totalProgress = data.logs.reduce((sum, log) => sum + log.progress, 0);
-              const remainingProgress = Math.max(0, goal.goalValue - totalProgress);
-              const sortedLogs = data.logs.sort((a,b) => a.date.getTime() - b.date.getTime());
-              const firstDay = sortedLogs[0].date;
-              const durationInDays = differenceInDays(new Date(), firstDay) + 1;
-              const averageRatePerDay = durationInDays > 0 ? totalProgress / durationInDays : 0;
-              const todaysProgress = logs.find(log => log.date === todayStr)?.exercises.filter(ex => ex.category === topic).reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + set.weight, 0), 0) || 0;
-              const speed = data.totalDuration > 0 ? (totalProgress / data.totalDuration) * 60 : 0; // units per hour
-              let completionStats = null;
-              if (averageRatePerDay > 0.01 && remainingProgress > 0) {
-                  const daysToCompletion = Math.ceil(remainingProgress / averageRatePerDay);
-                  completionStats = { date: format(addDays(new Date(), daysToCompletion), 'PPP'), daysRemaining: daysToCompletion, timeNeeded: (remainingProgress / (speed / 60)) || null };
-              }
-              let milestoneStats = null;
-              const milestones = [0.25, 0.50, 0.75, 1.0].map(m => m * goal.goalValue);
-              for (let i = 0; i < milestones.length; i++) {
-                  if (totalProgress < milestones[i]) {
-                      const progressToMilestone = milestones[i] - totalProgress;
-                      const daysToMilestone = Math.ceil(progressToMilestone / averageRatePerDay);
-                      const unitType = goal.goalType.endsWith('s') && progressToMilestone === 1 ? goal.goalType.slice(0, -1) : goal.goalType;
-                      milestoneStats = {
-                          percent: (i + 1) * 25, date: format(addDays(new Date(), daysToMilestone), 'PPP'), daysRemaining: daysToMilestone,
-                          progressNeeded: Math.round(progressToMilestone), unit: unitType, timeNeeded: (progressToMilestone / (speed / 60)) || null,
-                      };
-                      break;
-                  }
-              }
-              let requiredDailyRate = (milestoneStats?.progressNeeded || remainingProgress) / (milestoneStats?.daysRemaining || 1);
-              const remainingForToday = Math.max(0, requiredDailyRate - todaysProgress);
-              topicStats[topic] = {
-                  topic, speed, unit: `${goal.goalType}/hr`, totalProgress: Math.round(totalProgress), remainingProgress: Math.round(remainingProgress),
-                  goalValue: goal.goalValue, completion: completionStats, nextMilestone: milestoneStats, requiredDailyRate, todaysProgress,
-                  timeForTodaysProgress: (todaysProgress / (speed / 60)) || null, progressUnit: goal.goalType, remainingForToday: parseFloat(remainingForToday.toFixed(1)),
+      
+          if (topicData.logs.length === 0) return;
+      
+          const totalProgress = topicData.logs.reduce((sum, log) => sum + log.progress, 0);
+          const remainingProgress = Math.max(0, goal.goalValue - totalProgress);
+          const sortedLogs = topicData.logs.sort((a,b) => a.date.getTime() - b.date.getTime());
+          const firstDay = sortedLogs[0].date;
+          const durationInDays = differenceInDays(new Date(), firstDay) + 1;
+          const averageRatePerDay = durationInDays > 0 ? totalProgress / durationInDays : 0;
+          const todaysProgress = logs.find(log => log.date === todayStr)?.exercises.filter(ex => ex.category === topic).reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + set.weight, 0), 0) || 0;
+          const speed = topicData.totalDuration > 0 ? (totalProgress / topicData.totalDuration) * 60 : 0;
+      
+          let completionStats = null;
+          if (averageRatePerDay > 0.01 && remainingProgress > 0) {
+            const daysToCompletion = Math.ceil(remainingProgress / averageRatePerDay);
+            completionStats = { date: format(addDays(new Date(), daysToCompletion), 'PPP'), daysRemaining: daysToCompletion, timeNeeded: (remainingProgress / (speed / 60)) || null };
+          }
+      
+          let milestoneStats = null;
+          const milestones = [0.25, 0.50, 0.75, 1.0].map(m => m * goal.goalValue);
+          for (let i = 0; i < milestones.length; i++) {
+            if (totalProgress < milestones[i]) {
+              const progressToMilestone = milestones[i] - totalProgress;
+              const daysToMilestone = Math.ceil(progressToMilestone / averageRatePerDay);
+              const unitType = goal.goalType.endsWith('s') && progressToMilestone === 1 ? goal.goalType.slice(0, -1) : goal.goalType;
+              milestoneStats = {
+                percent: (i + 1) * 25, date: format(addDays(new Date(), daysToMilestone), 'PPP'), daysRemaining: daysToMilestone,
+                progressNeeded: Math.round(progressToMilestone), unit: unitType, timeNeeded: (progressToMilestone / (speed / 60)) || null,
               };
-          });
-          return topicStats;
+              break;
+            }
+          }
+      
+          let requiredDailyRate = (milestoneStats?.progressNeeded || remainingProgress) / (milestoneStats?.daysRemaining || 1);
+          const remainingForToday = Math.max(0, requiredDailyRate - todaysProgress);
+      
+          topicStats[topic] = {
+            topic, speed, unit: `${goal.goalType}/hr`, totalProgress: Math.round(totalProgress), remainingProgress: Math.round(remainingProgress),
+            goalValue: goal.goalValue, completion: completionStats, nextMilestone: milestoneStats, requiredDailyRate, todaysProgress,
+            timeForTodaysProgress: (todaysProgress / (speed / 60)) || null, progressUnit: goal.goalType, remainingForToday: parseFloat(remainingForToday.toFixed(1)),
+          };
+        });
+        return topicStats;
       };
       
       const calculateBrandingStatus = () => {
@@ -1099,3 +1112,4 @@ function HomePageContent() {
 export default function Page() {
     return <AuthGuard><HomePageContent/></AuthGuard>
 }
+
