@@ -24,7 +24,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { DndContext, useDraggable, useDroppable, type DragEndEvent, DragOverlay, useSensor, PointerSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -77,12 +77,13 @@ interface PopupState {
   level: number;
   x: number;
   y: number;
+  parentId?: string;
 }
 
 interface ResourcePopupProps {
   popupState: PopupState;
-  onOpenNested: (resourceId: string, level: number, parentX: number, parentY: number) => void;
-  onClose: (resourceId: string, level: number) => void;
+  onOpenNested: (resourceId: string, level: number, parentX: number, parentY: number, parentId: string) => void;
+  onClose: (resourceId: string) => void;
 }
 
 const ResourcePopupCard = ({ popupState, onOpenNested, onClose }: ResourcePopupProps) => {
@@ -108,14 +109,20 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onClose }: ResourcePopupP
     if (!resource) return null;
 
     return (
-        <motion.div ref={setNodeRef} style={style} {...attributes}>
-            <Card className="z-[60] w-80 bg-background shadow-2xl border-2 border-primary/50">
+        <motion.div 
+            ref={setNodeRef} style={style} {...attributes}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.1 }}
+        >
+            <Card className="z-[60] w-80 shadow-2xl border-2 border-primary/50 bg-background/80 backdrop-blur-sm">
                 <CardHeader className="p-3 relative cursor-grab" {...listeners}>
                     <CardTitle className="text-base flex items-center gap-2">
                         <Library className="h-4 w-4" />
                         <span className="truncate">{resource.name}</span>
                     </CardTitle>
-                    <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7" onClick={() => onClose(resource.id, level)}>
+                    <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7" onClick={(e) => { e.stopPropagation(); onClose(resource.id); }}>
                         <X className="h-4 w-4" />
                     </Button>
                 </CardHeader>
@@ -126,7 +133,7 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onClose }: ResourcePopupP
                                 <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
                                 {point.type === 'card' && point.resourceId ? (
                                     <button
-                                        onClick={() => onOpenNested(point.resourceId!, level + 1, x, y)}
+                                        onClick={() => onOpenNested(point.resourceId!, level + 1, x, y, resourceId)}
                                         className="text-left font-medium text-primary hover:underline"
                                     >
                                         {point.text}
@@ -140,6 +147,25 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onClose }: ResourcePopupP
                 </CardContent>
             </Card>
         </motion.div>
+    );
+};
+
+const SortableResourceCard = ({ children, item }: { children: React.ReactNode; item: Resource }) => {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+  
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+  
+    return (
+        <div ref={setNodeRef} style={style}>
+          <div className="relative group/sortable">
+            <button {...attributes} {...listeners} className="absolute -top-2 -left-2 z-10 p-1 bg-muted rounded-full cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 transition-opacity"><DragHandle className="h-4 w-4" /></button>
+            {children}
+          </div>
+        </div>
     );
 };
 
@@ -437,6 +463,20 @@ function ResourcesPageContent() {
 
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  
+  const [activeId, setActiveId] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+            setOpenPopups(new Map());
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   useEffect(() => {
     if (editingResource) {
@@ -740,20 +780,21 @@ function ResourcesPageContent() {
     );
   }, [resourceFolders, editingFolder, selectedFolderId, collapsedFolders, toggleFolderCollapse, commitFolderEdit, cancelFolderEdit, handleContextMenu]);
 
-  const handleOpenNestedPopup = (resourceId: string) => {
+  const handleOpenNestedPopup = (resourceId: string, initialX: number, initialY: number, parentId?: string) => {
     setOpenPopups(prev => {
         const newPopups = new Map(prev);
         newPopups.set(resourceId, {
             resourceId,
             level: 0,
-            x: 400,
-            y: 80,
+            x: initialX,
+            y: initialY,
+            parentId: parentId,
         });
         return newPopups;
     });
   };
 
-  const handleOpenNested = (resourceId: string, level: number, parentX: number, parentY: number) => {
+  const handleOpenNested = (resourceId: string, level: number, parentX: number, parentY: number, parentId: string) => {
     setOpenPopups(prev => {
         const newPopups = new Map(prev);
         // Close any popups at the same or higher level
@@ -768,23 +809,37 @@ function ResourcesPageContent() {
             level,
             x: parentX + 40,
             y: parentY + 40,
+            parentId: parentId,
         });
         return newPopups;
     });
   };
 
-  const handleClosePopup = (resourceId: string, level: number) => {
+  const handleClosePopup = (resourceId: string) => {
     setOpenPopups(prev => {
         const newPopups = new Map(prev);
-        // Close this popup and any deeper ones
-        prev.forEach((popup) => {
-            if (popup.level >= level) {
-                newPopups.delete(popup.resourceId);
-            }
+        const popupsToDelete = new Set<string>();
+
+        // Recursive function to find all children of a popup
+        const findChildren = (parentId: string) => {
+            popupsToDelete.add(parentId);
+            prev.forEach((popup, id) => {
+                if (popup.parentId === parentId) {
+                    findChildren(id);
+                }
+            });
+        };
+
+        findChildren(resourceId);
+        
+        popupsToDelete.forEach(id => {
+            newPopups.delete(id);
         });
+
         return newPopups;
     });
-  };
+};
+
 
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -809,6 +864,15 @@ function ResourcesPageContent() {
         setActiveDragId(null);
         return;
     }
+
+    if (activeId && over && activeId !== over.id) {
+        setResources(items => {
+            const oldIndex = items.findIndex(item => item.id === active.id);
+            const newIndex = items.findIndex(item => item.id === over.id);
+            return arrayMove(items, oldIndex, newIndex);
+        });
+    }
+    setActiveId(null);
   };
 
 
@@ -816,7 +880,7 @@ function ResourcesPageContent() {
     <>
     <DndContext 
         sensors={sensors}
-        onDragStart={(e) => setActiveDragId(e.active.id as string)}
+        onDragStart={(e) => setActiveId(e.active.id as string)}
         onDragEnd={handleDragEndMain}
     >
         <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
@@ -848,102 +912,138 @@ function ResourcesPageContent() {
                     : 'Resources'}
                 </h2>
                 
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {filteredResources.map(res => {
-                    if (res.type === 'card') {
-                        return <ResourceCard key={res.id} resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} />;
-                    }
+                <SortableContext items={filteredResources.map(r => r.id)} strategy={verticalListSortingStrategy}>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                        {filteredResources.map(res => {
+                          if (res.type === 'card') {
+                            return <SortableResourceCard key={res.id} item={res}><ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={(id) => handleOpenNestedPopup(id, 400, 80, res.id)} /></SortableResourceCard>;
+                          }
+                          
+                          // Link type rendering
+                          const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
+                          const isObsidianEmbed = isObsidianUrl(res.link);
+                          const isSpecialEmbed = isNotionUrl(res.link) || isObsidianEmbed;
+                          const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? res.link : null);
+                          const isLongContent = res.name.length > 20 && (res.description?.length ?? 0) > 30;
 
-                    // Link type rendering
-                    const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
-                    const isObsidianEmbed = isObsidianUrl(res.link);
-                    const isSpecialEmbed = isNotionUrl(res.link) || isObsidianEmbed;
-                    
-                    const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? res.link : null);
-
-                    const isLongContent = res.name.length > 20 && (res.description?.length ?? 0) > 30;
-
-                    return (
-                        <Card key={res.id} className={cn(
-                            "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5",
-                            isLongContent ? "bg-gradient-to-br from-card to-muted/20" : "bg-card"
-                        )}>
-                            {youtubeEmbedUrl && res.link ? (
-                                <>
-                                    <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="h-4 w-4" /></Button>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setEmbedUrl(youtubeEmbedUrl); }} aria-label="View in App"><Expand className="h-4 w-4" /></Button>
-                                        <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                                    </div>
-                                    <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl"><iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe></div>
-                                    <div className="p-4 flex-grow"><div className="flex items-start justify-between gap-2"><div className="flex-grow min-w-0"><div className="flex items-center gap-2"><Youtube className="h-5 w-5 flex-shrink-0 text-red-500" /><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div></div></div></div>
-                                </>
-                            ) : isObsidianEmbed && res.link ? (
-                                <div className="flex flex-col h-full">
-                                    <div className="p-3 border-b flex items-start justify-between">
-                                        <div className="flex-grow min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                {res.iconUrl ? <Image src={res.iconUrl} alt="" width={16} height={16} className="rounded-sm flex-shrink-0" unoptimized/> : <Globe className="h-4 w-4 flex-shrink-0" />}
-                                                <p className="text-sm font-bold truncate" title={res.name}>{res.name}</p>
+                          return (
+                            <SortableResourceCard key={res.id} item={res}>
+                                <Card className={cn(
+                                    "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5",
+                                    isLongContent ? "bg-gradient-to-br from-card to-muted/20" : "bg-card"
+                                )}>
+                                    {youtubeEmbedUrl && res.link ? (
+                                        <>
+                                            <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover/sortable:opacity-100 transition-opacity">
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="h-4 w-4" /></Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setEmbedUrl(youtubeEmbedUrl); }} aria-label="View in App"><Expand className="h-4 w-4" /></Button>
+                                                <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                                            </div>
+                                            <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl"><iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe></div>
+                                            <div className="p-4 flex-grow"><div className="flex items-start justify-between gap-2"><div className="flex-grow min-w-0"><div className="flex items-center gap-2"><Youtube className="h-5 w-5 flex-shrink-0 text-red-500" /><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div></div></div></div>
+                                        </>
+                                    ) : isObsidianEmbed && res.link ? (
+                                        <div className="flex flex-col h-full">
+                                            <div className="p-3 border-b flex items-start justify-between">
+                                                <div className="flex-grow min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        {res.iconUrl ? <Image src={res.iconUrl} alt="" width={16} height={16} className="rounded-sm flex-shrink-0" unoptimized/> : <Globe className="h-4 w-4 flex-shrink-0" />}
+                                                        <p className="text-sm font-bold truncate" title={res.name}>{res.name}</p>
+                                                    </div>
+                                                </div>
+                                                <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 -mr-2 -mt-1"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                                            </div>
+                                            <div className="flex-grow min-h-0 aspect-[4/3]">
+                                                <iframe src={res.link} title={res.name} frameBorder="0" className="w-full h-full" />
+                                            </div>
+                                            <div className="p-2 border-t flex items-center gap-2">
+                                                <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
+                                                <Button variant="outline" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
                                             </div>
                                         </div>
-                                        <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 -mr-2 -mt-1"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                                    </div>
-                                    <div className="flex-grow min-h-0 aspect-[4/3]">
-                                        <iframe src={res.link} title={res.name} frameBorder="0" className="w-full h-full" />
-                                    </div>
-                                    <div className="p-2 border-t flex items-center gap-2">
-                                        <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
-                                        <Button variant="outline" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="p-5 flex flex-col flex-grow">
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="flex-grow min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                {res.iconUrl ? <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm flex-shrink-0" unoptimized/> : <LinkIcon className="h-4 w-4 flex-shrink-0" />}
-                                                <p className="text-base font-bold truncate" title={res.name}>{res.name}</p>
+                                    ) : (
+                                        <div className="p-5 flex flex-col flex-grow">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="flex-grow min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        {res.iconUrl ? <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm flex-shrink-0" unoptimized/> : <LinkIcon className="h-4 w-4 flex-shrink-0" />}
+                                                        <p className="text-base font-bold truncate" title={res.name}>{res.name}</p>
+                                                    </div>
+                                                </div>
+                                                <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 -mr-2 -mt-1"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                                            </div>
+                                            <a href={res.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline mt-1">{res.link}</a>
+                                            <p className="text-sm text-muted-foreground mt-3 line-clamp-3 flex-grow min-h-[60px]">{res.description || 'No description available.'}</p>
+                                            <div className="mt-auto pt-4 flex items-center gap-2">
+                                                <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
+                                                {res.link && (
+                                                    <Button variant="outline" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
+                                                )}
                                             </div>
                                         </div>
-                                        <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 -mr-2 -mt-1"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                                    </div>
-                                    <a href={res.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline mt-1">{res.link}</a>
-                                    <p className="text-sm text-muted-foreground mt-3 line-clamp-3 flex-grow min-h-[60px]">{res.description || 'No description available.'}</p>
-                                    <div className="mt-auto pt-4 flex items-center gap-2">
-                                        <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
-                                        {res.link && (
-                                            <Button variant="outline" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
-                                        )}
-                                    </div>
-                                </div>
+                                    )}
+                                </Card>
+                            </SortableResourceCard>
+                          )
+                        })}
+                        {selectedFolderId && (
+                            <Card 
+                                onClick={() => setIsAdding(true)}
+                                className="rounded-3xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[220px] hover:shadow-xl hover:-translate-y-1"
+                            >
+                                <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add New Resource</p>
+                            </Card>
                             )}
+                    </div>
+                </SortableContext>
+                <DragOverlay>
+                    {activeId ? (
+                        <Card className="shadow-2xl">
+                            <CardContent className="p-4">Moving resource...</CardContent>
                         </Card>
-                    )
-                    })}
-                    {selectedFolderId && (
-                        <Card 
-                            onClick={() => setIsAdding(true)}
-                            className="rounded-3xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[220px] hover:shadow-xl hover:-translate-y-1"
-                        >
-                            <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                            <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add New Resource</p>
-                        </Card>
-                        )}
-                </div>
+                    ) : null}
+                </DragOverlay>
                 </div>
             </main>
         </div>
         </div>
 
-        {Array.from(openPopups.values()).map((popupState) => (
-            <ResourcePopupCard
-                key={popupState.resourceId}
-                popupState={popupState}
-                onOpenNested={handleOpenNested}
-                onClose={handleClosePopup}
-            />
-        ))}
+        <AnimatePresence>
+            {Array.from(openPopups.values()).map((popupState) => (
+                <ResourcePopupCard
+                    key={popupState.resourceId}
+                    popupState={popupState}
+                    onOpenNested={handleOpenNested}
+                    onClose={handleClosePopup}
+                />
+            ))}
+        </AnimatePresence>
+        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-50">
+          {Array.from(openPopups.values()).map(popup => {
+            if (!popup.parentId) return null;
+            const parentPopup = openPopups.get(popup.parentId);
+            if (!parentPopup) return null;
+            
+            const startX = parentPopup.x + 320; // width of card
+            const startY = parentPopup.y + 40; // approx middle
+            const endX = popup.x;
+            const endY = popup.y + 40;
+            
+            return (
+              <line 
+                key={`${popup.parentId}-${popup.resourceId}`}
+                x1={startX} 
+                y1={startY} 
+                x2={endX} 
+                y2={endY} 
+                stroke="hsl(var(--primary))" 
+                strokeWidth="2"
+                strokeOpacity="0.5"
+              />
+            )
+          })}
+        </svg>
     
         {contextMenu && (
             <div ref={contextMenuRef} style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }} className="fixed z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => e.stopPropagation()}>
