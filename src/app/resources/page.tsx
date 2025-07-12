@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical as DragHandle, X } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical as DragHandle, X, Code, MessageSquare, Plus } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -146,7 +146,7 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClos
                                         {point.text}
                                     </button>
                                 ) : (
-                                    <span title={point.text} className='flex-grow'>{point.text}</span>
+                                    <span title={point.text}>{point.text}</span>
                                 )}
                             </li>
                         ))}
@@ -202,17 +202,20 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
         opacity: isDragging ? 0 : 1,
     };
 
-    const handleUpdatePoint = (newText: string) => {
-        const youtubeEmbedUrl = getYouTubeEmbedUrl(newText);
-        const obsidianEmbedUrl = (isObsidianUrl(newText) || isNotionUrl(newText)) ? newText : null;
-        let updatedPointData: Partial<ResourcePoint>;
-    
-        if (youtubeEmbedUrl) {
-            updatedPointData = { text: newText, type: 'youtube', url: youtubeEmbedUrl };
-        } else if (obsidianEmbedUrl) {
-            updatedPointData = { text: newText, type: 'obsidian', url: obsidianEmbedUrl };
-        } else {
-            updatedPointData = { text: newText, type: 'text', url: undefined };
+    const handleUpdatePoint = (newText: string, newType?: ResourcePoint['type']) => {
+        let updatedPointData: Partial<ResourcePoint> = { text: newText };
+        if (newType) {
+            updatedPointData.type = newType;
+        }
+
+        if(updatedPointData.type === 'text' || newType === 'text') {
+            const youtubeEmbedUrl = getYouTubeEmbedUrl(newText);
+            const obsidianEmbedUrl = (isObsidianUrl(newText) || isNotionUrl(newText)) ? newText : null;
+            if (youtubeEmbedUrl) {
+                updatedPointData = { text: newText, type: 'youtube', url: youtubeEmbedUrl };
+            } else if (obsidianEmbedUrl) {
+                updatedPointData = { text: newText, type: 'obsidian', url: obsidianEmbedUrl };
+            }
         }
         
         const updatedPoints = (resource.points || []).map(p => 
@@ -253,7 +256,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
             <button {...attributes} {...listeners} className="cursor-grab p-1"><DragHandle className="h-4 w-4 text-muted-foreground/50" /></button>
             <div className="flex-grow">
                 {editingPointId === point.id ? (
-                    <Textarea value={point.text} onChange={e => handleUpdatePoint(e.target.value)} onBlur={handleBlur} autoFocus placeholder="New step..." className="text-sm" rows={2}/>
+                    <Textarea value={point.text} onChange={e => handleUpdatePoint(e.target.value)} onBlur={handleBlur} autoFocus placeholder="New step..." className={cn("text-sm", (point.type === 'code' || point.type === 'markdown') && "font-mono text-xs")} rows={(point.type === 'code' || point.type === 'markdown') ? 6 : 2}/>
                 ) : point.type === 'youtube' && point.url ? (
                     <div className="w-full aspect-video rounded-md overflow-hidden border">
                         <iframe src={point.url} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
@@ -262,6 +265,8 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
                     <div className="w-full aspect-[4/3] rounded-md overflow-hidden border">
                         <iframe src={point.url} title={resource.name} frameBorder="0" allowFullScreen className="w-full h-full"></iframe>
                     </div>
+                ) : (point.type === 'code' || point.type === 'markdown') ? (
+                    <pre onClick={() => setEditingPointId(point.id)} className="w-full cursor-pointer bg-muted/50 p-3 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text || <span className="text-muted-foreground italic">New step...</span>}</pre>
                 ) : (
                     <span onClick={() => setEditingPointId(point.id)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/<br>/g, '') || '<span class="text-muted-foreground italic">New step...</span>' }} />
                 )}
@@ -295,8 +300,8 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
         onUpdate({ ...resource, name: newTitle });
     };
 
-    const handleAddTextPoint = () => {
-        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: '', type: 'text' };
+    const handleAddPoint = (type: ResourcePoint['type']) => {
+        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: '', type };
         const updatedPoints = [...(resource.points || []), newPoint];
         onUpdate({ ...resource, points: updatedPoints });
         setEditingPointId(newPoint.id);
@@ -400,13 +405,24 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
             </CardContent>
             <CardContent className="pt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="w-full" onClick={handleAddTextPoint}>
-                        Add Text Step
-                    </Button>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="w-full">
+                                <Plus className="mr-2 h-4 w-4" /> Add Step
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-48 p-1">
+                           <div className="space-y-1">
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('text')}><MessageSquare className="mr-2 h-4 w-4" />Text</Button>
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('markdown')}><MessageSquare className="mr-2 h-4 w-4" />Markdown</Button>
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('code')}><Code className="mr-2 h-4 w-4" />Code</Button>
+                           </div>
+                        </PopoverContent>
+                    </Popover>
                     <Popover open={linkCardPopoverOpen} onOpenChange={setLinkCardPopoverOpen}>
                         <PopoverTrigger asChild>
                              <Button variant="outline" size="sm" className="w-full">
-                                Link Card
+                                <LinkIcon className="mr-2 h-4 w-4" /> Link Card
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-80">
@@ -1020,19 +1036,17 @@ function ResourcesPageContent() {
         </div>
         </div>
 
-        <AnimatePresence>
-          {Array.from(openPopups.values()).map((popupState) => (
-              <ResourcePopupCard
-                  key={popupState.resourceId}
-                  popupState={popupState}
-                  onOpenNested={handleOpenNested}
-                  onOpenNestedPopup={handleOpenNestedPopup}
-                  onClose={handleClosePopup}
-              />
-          ))}
-        </AnimatePresence>
+        {Array.from(openPopups.values()).map((popupState) => (
+            <ResourcePopupCard
+                key={popupState.resourceId}
+                popupState={popupState}
+                onOpenNested={handleOpenNested}
+                onOpenNestedPopup={handleOpenNestedPopup}
+                onClose={handleClosePopup}
+            />
+        ))}
 
-        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-50">
+        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
           {Array.from(openPopups.values()).map(popup => {
             if (!popup.parentId) return null;
             const parentPopup = openPopups.get(popup.parentId);
@@ -1164,9 +1178,3 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
-
-    
-
-
-
-
