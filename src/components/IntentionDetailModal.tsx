@@ -9,12 +9,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from './ui/scroll-area';
-import { BrainCircuit, ArrowDown, Workflow, Clock, AlertTriangle } from 'lucide-react';
+import { BrainCircuit, ArrowDown, Workflow, Clock, AlertTriangle, ArrowRight } from 'lucide-react';
 import type { ExerciseDefinition, DatedWorkout, DailySchedule } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, parseISO, isBefore, startOfToday, isAfter } from 'date-fns';
 import { Separator } from './ui/separator';
-import { Card } from './ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from './ui/card';
 
 interface IntentionDetailModalProps {
   isOpen: boolean;
@@ -242,22 +242,32 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
 
 
                     {/* FOOTER */}
-                     <div className="w-full max-w-lg pt-8 mx-auto">
+                    <div className="w-full max-w-4xl pt-8 mx-auto">
                         <Separator className="my-8" />
-                        <h4 className="font-semibold text-lg flex items-center justify-center gap-2">
-                            <BrainCircuit className="h-5 w-5 text-primary" />
-                            {suggestion.title}
-                        </h4>
-                        <p className="text-sm text-muted-foreground max-w-xl mx-auto mt-2">{suggestion.description}</p>
-
-                        <Separator className="my-8" />
-                        <h4 className="font-semibold text-lg flex items-center justify-center gap-2">
-                            <AlertTriangle className="h-5 w-5 text-amber-500" />
-                            Challenge Your Doubts
-                        </h4>
-                        <p className="text-sm text-muted-foreground max-w-xl mx-auto mt-2">
-                            Ask yourself: Do you have any doubt, fear, or anxiety? Do you have a better intention that will keep your present fulfilled and tomorrow intact? If not, do not return with this doubt again. Come back only when you have a better intention than this.
-                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <Card className="text-center">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center justify-center gap-2">
+                                        <BrainCircuit className="h-5 w-5 text-primary" />
+                                        The Truth of the Moment
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardDescription className="px-6 pb-6">
+                                    Fulfillment doesn't come from chasing feelings or perfection. It comes from taking justified action, aligned with the truth of your current moment.
+                                </CardDescription>
+                            </Card>
+                            <Card className="text-center">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center justify-center gap-2">
+                                        <AlertTriangle className="h-5 w-5 text-amber-500" />
+                                        Challenge Your Doubts
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardDescription className="px-6 pb-6">
+                                    Ask: Do you have doubt, fear, or a better intention? If not, do not return to this doubt. Come back only when you have a better intention than this one.
+                                </CardDescription>
+                            </Card>
+                        </div>
                     </div>
                 </div>
             </ScrollArea>
