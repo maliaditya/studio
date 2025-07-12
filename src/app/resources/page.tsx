@@ -831,14 +831,25 @@ function ResourcesPageContent() {
 
     const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown');
     const popupWidth = hasMarkdown ? 896 : 512;
+    const popupHeight = 600; // Fixed height
+
+    let x, y;
+
+    if (hasMarkdown) {
+        x = (window.innerWidth - popupWidth) / 2;
+        y = (window.innerHeight - popupHeight) / 2;
+    } else {
+        x = event.clientX;
+        y = event.clientY;
+    }
 
     setOpenPopups(prev => {
         const newPopups = new Map(prev);
         newPopups.set(resourceId, {
             resourceId,
             level: 0,
-            x: event.clientX,
-            y: event.clientY,
+            x: x,
+            y: y,
             parentId: undefined,
             width: popupWidth,
         });
@@ -1214,6 +1225,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
