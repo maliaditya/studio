@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -110,9 +111,9 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onClose }: ResourcePopupP
 
     return (
         <div 
-            ref={setNodeRef} style={style} {...attributes}
+            ref={setNodeRef} style={style} {...attributes} className="z-[60]"
         >
-            <Card className="z-[60] w-80 shadow-2xl border-2 border-primary/50 bg-background/80 backdrop-blur-sm">
+            <Card className="w-80 shadow-2xl border-2 border-primary/50 bg-background/80 backdrop-blur-sm">
                 <CardHeader className="p-3 relative cursor-grab" {...listeners}>
                     <CardTitle className="text-base flex items-center gap-2">
                         <Library className="h-4 w-4" />
@@ -222,7 +223,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
                     onClick={() => onOpenNestedPopup(point.resourceId!)}
                     className="flex items-start gap-3 flex-grow cursor-pointer p-2 rounded-md hover:bg-muted/50 border border-dashed"
                 >
-                    <Library className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0"/>
+                    <Library className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
                     <span className="font-medium text-foreground">{point.text}</span>
                 </div>
                 <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={() => onDelete(point.id)}>
