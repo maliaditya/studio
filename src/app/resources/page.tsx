@@ -22,7 +22,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { DndContext, useDraggable, useDroppable, type DragEndEvent, DragOverlay } from '@dnd-kit/core';
+import { DndContext, useDraggable, useDroppable, type DragEndEvent, DragOverlay, useSensor, PointerSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -109,11 +109,12 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
     setEditingPointId: (id: string | null) => void;
 }) => {
     const { resources } = useAuth();
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: point.id });
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } = useSortable({ id: point.id });
 
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
+        opacity: isDragging ? 0.5 : 1,
     };
 
     const handleUpdatePoint = (newText: string) => {
@@ -148,7 +149,8 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
         const linkedResource = resources.find(r => r.id === point.resourceId);
         if (!linkedResource) return null;
         return (
-            <div ref={setNodeRef} style={style} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
+            <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
+                 {isOver && !isDragging && <div className="absolute -top-1.5 left-0 right-0 h-0.5 bg-primary" />}
                 <button {...attributes} {...listeners} className="cursor-grab p-1"><DragHandle className="h-4 w-4 text-muted-foreground/50" /></button>
                 <Popover>
                     <PopoverTrigger asChild>
@@ -169,7 +171,8 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
     }
 
     return (
-        <div ref={setNodeRef} style={style} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
+        <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
+            {isOver && !isDragging && <div className="absolute -top-1.5 left-0 right-0 h-0.5 bg-primary" />}
             <button {...attributes} {...listeners} className="cursor-grab p-1"><DragHandle className="h-4 w-4 text-muted-foreground/50" /></button>
             <div className="flex-grow">
                 {editingPointId === point.id ? (
@@ -209,6 +212,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
 
     const [linkCardPopoverOpen, setLinkCardPopoverOpen] = useState(false);
     const [linkedCardId, setLinkedCardId] = useState<string>('');
+    const sensors = useSensors(useSensor(PointerSensor));
 
     const handleUpdateTitle = (newTitle: string) => {
         onUpdate({ ...resource, name: newTitle });
@@ -285,6 +289,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
             </CardHeader>
             <CardContent className="flex-grow">
                 <DndContext 
+                    sensors={sensors}
                     onDragStart={e => setActivePointId(e.active.id as string)}
                     onDragEnd={handleDragEnd}
                 >
@@ -307,8 +312,9 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
                     </SortableContext>
                     <DragOverlay>
                         {activePointId ? (
-                            <div className="bg-card p-2 rounded-md shadow-lg opacity-80">
-                                Dragging...
+                            <div className="bg-card p-2 rounded-md shadow-lg opacity-80 flex items-start gap-3">
+                                <DragHandle className="h-4 w-4 text-muted-foreground/50" />
+                                {resource.points?.find(p => p.id === activePointId)?.text}
                             </div>
                         ) : null}
                     </DragOverlay>
@@ -915,3 +921,4 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
