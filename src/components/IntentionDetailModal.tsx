@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from './ui/scroll-area';
-import { BrainCircuit, ArrowDown, Workflow } from 'lucide-react';
+import { BrainCircuit, ArrowDown, Workflow, Clock } from 'lucide-react';
 import type { ExerciseDefinition, DatedWorkout, DailySchedule } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, parseISO, isBefore, startOfToday, isAfter } from 'date-fns';
@@ -162,6 +162,9 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
   
   const formattedEstimate = formatMinutes(totalEstimatedMinutes);
 
+  const totalEstimatedHours = totalEstimatedMinutes / 60;
+  const daysToComplete = avgDailyProductiveHours > 0 ? Math.ceil(totalEstimatedHours / avgDailyProductiveHours) : null;
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl h-[90vh] flex flex-col p-2">
@@ -227,6 +230,12 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
                         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-center max-w-xs">
                            <div className="text-sm text-muted-foreground truncate" title={intention.name}>{intention.name}</div>
                           <div className="font-semibold mt-1">Intention</div>
+                          {daysToComplete !== null && (
+                            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-1">
+                                <Clock className="h-3 w-3" />
+                                <span><strong>{daysToComplete} days</strong> at <strong>{avgDailyProductiveHours.toFixed(1)}h/day</strong></span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
