@@ -123,12 +123,8 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClos
     };
 
     return (
-        <motion.div 
+        <div
             ref={setNodeRef} style={style} {...attributes} className="z-[60]"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
         >
             <Card className="w-80 shadow-2xl border-2 border-primary/50 bg-card">
                 <CardHeader className="p-3 relative cursor-grab" {...listeners}>
@@ -162,7 +158,7 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClos
                     </Button>
                 </CardFooter>
             </Card>
-        </motion.div>
+        </div>
     );
 };
 
@@ -899,9 +895,6 @@ function ResourcesPageContent() {
         onDragStart={(e) => setActiveId(e.active.id as string)}
         onDragEnd={handleDragEndMain}
     >
-        {openPopups.size > 0 && (
-          <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm" aria-hidden="true" onClick={() => setOpenPopups(new Map())}/>
-        )}
         <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {/* Left Sidebar */}
@@ -1173,6 +1166,7 @@ export default function ResourcesPage() {
 }
 
     
+
 
 
 
