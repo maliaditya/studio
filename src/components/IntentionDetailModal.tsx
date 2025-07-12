@@ -9,11 +9,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from './ui/scroll-area';
-import { BrainCircuit, ArrowDown } from 'lucide-react';
+import { BrainCircuit, ArrowDown, Workflow } from 'lucide-react';
 import type { ExerciseDefinition, DatedWorkout, DailySchedule } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, parseISO, isBefore, startOfToday, isAfter } from 'date-fns';
 import { Separator } from './ui/separator';
+import { Card } from './ui/card';
 
 interface IntentionDetailModalProps {
   isOpen: boolean;
@@ -45,6 +46,15 @@ const getProductivitySuggestion = (hours: number): { title: string; description:
         title: "The Truth of the Moment",
         description: "Fulfillment doesn't come from chasing feelings or perfection. It comes from taking justified action, aligned with the truth of your current moment."
     };
+};
+
+const formatMinutes = (minutes: number) => {
+    if (minutes <= 0) return null;
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
+    if (hours > 0) return `${hours}h`;
+    return `${mins}m`;
 };
 
 export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDailyProductiveHours = 1 }: IntentionDetailModalProps) {
@@ -100,16 +110,19 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
     
     const solutionTasks: { action: ExerciseDefinition, linkedVisualizations: ExerciseDefinition[] }[] = [];
     const outcomeObjectiveIds = new Set<string>();
-    let estimatedMinutes = 0;
-
+    
     const solutionLeafs = allScheduledOrPendingDefs.filter(def => {
         const isDWAction = deepWorkDefinitions.some(d => d.id === def.id) && (def.linkedDeepWorkIds?.length ?? 0) === 0;
         const isUpskillViz = upskillDefinitions.some(d => d.id === def.id) && (def.linkedUpskillIds?.length ?? 0) === 0;
         return isDWAction || isUpskillViz;
     });
 
+    let estimatedMinutes = 0;
     solutionLeafs.forEach(leaf => {
         estimatedMinutes += leaf.estimatedDuration || 0;
+    });
+
+    solutionLeafs.forEach(leaf => {
         if (upskillDefinitions.some(d => d.id === leaf.id)) {
             const parentAction = deepWorkDefinitions.find(action => (action.linkedUpskillIds || []).includes(leaf.id));
             if (parentAction && scheduledOrPendingDefIds.has(parentAction.id)) {
@@ -146,6 +159,8 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
   const outcomeText = outcomeObjectives.length > 0 
     ? outcomeObjectives.map(obj => obj.name).join(', ')
     : "Not yet defined";
+  
+  const formattedEstimate = formatMinutes(totalEstimatedMinutes);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -156,7 +171,6 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
         <div className="flex-grow min-h-0">
             <ScrollArea className="h-full p-4">
                 <div className="flex flex-col items-center gap-4 text-center">
-
                    <div className="w-full h-full flex items-center justify-center bg-muted/30 p-8 min-h-[550px]">
                       <div className="relative w-[800px] h-[500px]">
                         
@@ -191,6 +205,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
                         <div className="absolute bottom-0 right-0 text-center max-w-sm">
                           <div className="font-semibold text-lg">Outcome</div>
                           <p className="text-sm text-muted-foreground truncate" title={outcomeText}>{outcomeText}</p>
+                           {formattedEstimate && <p className="text-sm text-muted-foreground">Est. Time: <strong>{formattedEstimate}</strong></p>}
                         </div>
 
                         {/* Lines and Arrows */}
