@@ -7,15 +7,12 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { ScrollArea } from './ui/scroll-area';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from './ui/card';
-import { Badge } from './ui/badge';
-import { BookCopy, Link as LinkIcon, Briefcase, ExternalLink, Globe, Workflow, Clock, Lightbulb, TrendingUp, ArrowDown, BrainCircuit, ArrowRight } from 'lucide-react';
+import { BrainCircuit, ArrowDown } from 'lucide-react';
 import type { ExerciseDefinition, DatedWorkout, DailySchedule } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, parseISO, isBefore, startOfToday } from 'date-fns';
+import { format, parseISO, isBefore, startOfToday, isAfter } from 'date-fns';
 import { Separator } from './ui/separator';
 
 interface IntentionDetailModalProps {
@@ -51,7 +48,7 @@ const getProductivitySuggestion = (hours: number): { title: string; description:
 };
 
 export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDailyProductiveHours = 1 }: IntentionDetailModalProps) {
-  const { deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, schedule } = useAuth();
+  const { deepWorkDefinitions, upskillDefinitions, schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs } = useAuth();
   
   const { solutionTasks, outcomeObjectives, totalEstimatedMinutes } = useMemo(() => {
     if (!intention) return { solutionTasks: [], outcomeObjectives: [], totalEstimatedMinutes: 0 };
@@ -79,7 +76,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
         const scheduleDate = parseISO(dateKey);
         const dailySchedule = schedule[dateKey] as DailySchedule;
         if (dailySchedule) {
-            const isTodayOrPast = isBefore(scheduleDate, new Date());
+            const isTodayOrPast = isBefore(scheduleDate, new Date()) || format(scheduleDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
 
             Object.values(dailySchedule).flat().forEach(activity => {
                 if (activity && !activity.completed && isTodayOrPast) {
@@ -145,11 +142,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
 
   if (!intention) return null;
   const suggestion = getProductivitySuggestion(avgDailyProductiveHours);
-
-  const solutionText = solutionTasks.length > 0 
-    ? solutionTasks.map(st => st.action.name).join(', ')
-    : "No solution tasks pending";
-
+  
   const outcomeText = outcomeObjectives.length > 0 
     ? outcomeObjectives.map(obj => obj.name).join(', ')
     : "Not yet defined";
@@ -164,13 +157,30 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
             <ScrollArea className="h-full p-4">
                 <div className="flex flex-col items-center gap-4 text-center">
 
-                   <div className="w-full h-full flex items-center justify-center bg-muted/30 p-8 min-h-[500px]">
-                      <div className="relative w-[800px] h-[450px]">
+                   <div className="w-full h-full flex items-center justify-center bg-muted/30 p-8 min-h-[550px]">
+                      <div className="relative w-[800px] h-[500px]">
                         
                         {/* Nodes */}
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 text-center max-w-sm">
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 text-center max-w-md">
                           <div className="font-semibold text-lg">Solution</div>
-                          <p className="text-sm text-muted-foreground truncate" title={solutionText}>{solutionText}</p>
+                          <div className="text-sm text-muted-foreground text-left">
+                            {solutionTasks.length > 0 ? (
+                                <ul className="list-disc list-inside mt-1 space-y-1">
+                                    {solutionTasks.map(st => (
+                                        <li key={st.action.id} className="font-medium text-foreground">
+                                            {st.action.name}
+                                            {st.linkedVisualizations.length > 0 && (
+                                                <ul className="list-[circle] list-inside pl-4 mt-1">
+                                                    {st.linkedVisualizations.map(viz => (
+                                                        <li key={viz.id} className="font-normal text-muted-foreground">{viz.name}</li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : "No solution tasks pending"}
+                          </div>
                         </div>
 
                         <div className="absolute bottom-0 left-0 text-center max-w-sm">
@@ -184,18 +194,18 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
                         </div>
 
                         {/* Lines and Arrows */}
-                        <svg className="absolute top-0 left-0 w-full h-full overflow-visible">
+                        <svg className="absolute top-0 left-0 w-full h-full overflow-visible pointer-events-none">
                           <defs>
                             <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto" markerUnits="strokeWidth">
                               <polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--foreground))" />
                             </marker>
                           </defs>
                           {/* Base Line */}
-                          <line x1="100" y1="430" x2="700" y2="430" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
+                          <line x1="100" y1="480" x2="700" y2="480" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
                           {/* Left Line */}
-                          <line x1="80" y1="410" x2="390" y2="60" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
+                          <line x1="80" y1="460" x2="390" y2="100" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
                           {/* Right Line */}
-                          <line x1="410" y1="60" x2="720" y2="410" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
+                          <line x1="410" y1="100" x2="720" y2="460" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
                         </svg>
 
                         {/* Labels on lines */}
@@ -223,4 +233,3 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
     </Dialog>
   );
 }
-
