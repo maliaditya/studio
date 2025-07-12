@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -82,8 +81,8 @@ interface PopupState {
 
 interface ResourcePopupProps {
   popupState: PopupState;
-  onOpenNested: (resourceId: string, level: number) => void;
-  onClose: () => void;
+  onOpenNested: (resourceId: string, level: number, parentX: number, parentY: number) => void;
+  onClose: (resourceId: string, level: number) => void;
 }
 
 const ResourcePopupCard = ({ popupState, onOpenNested, onClose }: ResourcePopupProps) => {
@@ -116,7 +115,7 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onClose }: ResourcePopupP
                         <Library className="h-4 w-4" />
                         <span className="truncate">{resource.name}</span>
                     </CardTitle>
-                    <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7" onClick={onClose}>
+                    <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7" onClick={() => onClose(resource.id, level)}>
                         <X className="h-4 w-4" />
                     </Button>
                 </CardHeader>
@@ -127,7 +126,7 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onClose }: ResourcePopupP
                                 <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
                                 {point.type === 'card' && point.resourceId ? (
                                     <button
-                                        onClick={() => onOpenNested(point.resourceId!, level + 1)}
+                                        onClick={() => onOpenNested(point.resourceId!, level + 1, x, y)}
                                         className="text-left font-medium text-primary hover:underline"
                                     >
                                         {point.text}
@@ -754,7 +753,7 @@ function ResourcesPageContent() {
     });
   };
 
-  const handleOpenNested = (resourceId: string, level: number) => {
+  const handleOpenNested = (resourceId: string, level: number, parentX: number, parentY: number) => {
     setOpenPopups(prev => {
         const newPopups = new Map(prev);
         // Close any popups at the same or higher level
@@ -763,12 +762,12 @@ function ResourcesPageContent() {
                 newPopups.delete(popup.resourceId);
             }
         });
-        // Add new popup
+        // Add new popup, positioned relative to its parent
         newPopups.set(resourceId, {
             resourceId,
             level,
-            x: 400 + level * 320,
-            y: 80 + level * 30,
+            x: parentX + 40,
+            y: parentY + 40,
         });
         return newPopups;
     });
@@ -942,7 +941,7 @@ function ResourcesPageContent() {
                 key={popupState.resourceId}
                 popupState={popupState}
                 onOpenNested={handleOpenNested}
-                onClose={() => handleClosePopup(popupState.resourceId, popupState.level)}
+                onClose={handleClosePopup}
             />
         ))}
     
@@ -1053,9 +1052,4 @@ export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
 
-
-
-
-
-
-
+    
