@@ -128,7 +128,7 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClos
         <div
             ref={setNodeRef} style={style} {...attributes} className="z-[60]"
         >
-            <Card className="w-80 shadow-2xl border-2 border-primary/50 bg-card">
+            <Card className="w-auto max-w-lg shadow-2xl border-2 border-primary/50 bg-card">
                 <CardHeader className="p-3 relative cursor-grab" {...listeners}>
                     <CardTitle className="text-base flex items-center gap-2">
                         <Library className="h-4 w-4" />
@@ -147,8 +147,14 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClos
                                     >
                                         {point.text}
                                     </button>
+                                ) : point.type === 'markdown' ? (
+                                    <div className="w-full prose dark:prose-invert prose-sm">
+                                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                    </div>
+                                ) : point.type === 'code' ? (
+                                     <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
                                 ) : (
-                                    <span title={point.text}>{point.text}</span>
+                                    <span className="break-words w-full" title={point.text}>{point.text}</span>
                                 )}
                             </li>
                         ))}
@@ -175,7 +181,7 @@ const SortableResourceCard = ({ children, item }: { children: React.ReactNode; i
   
     return (
         <div ref={setNodeRef} style={style}>
-          <div className="relative group/sortable" onDoubleClick={(e) => { e.stopPropagation(); (item as any).onClick?.(); }}>
+          <div className="relative group/sortable" onClick={(e) => { e.stopPropagation(); (item as any).onClick?.(); }}>
             <button {...attributes} {...listeners} className="absolute -top-2 -left-2 z-10 p-1 bg-muted rounded-full cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 transition-opacity"><DragHandle className="h-4 w-4" /></button>
             {children}
           </div>
@@ -270,7 +276,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
                 ) : point.type === 'code' ? (
                     <pre onClick={() => setEditingPointId(point.id)} className="w-full cursor-pointer bg-muted/50 p-3 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text || <span className="text-muted-foreground italic">New step...</span>}</pre>
                 ) : point.type === 'markdown' ? (
-                    <div onClick={() => setEditingPointId(point.id)} className="w-full cursor-pointer bg-muted/50 p-3 rounded-md prose dark:prose-invert">
+                    <div onClick={() => setEditingPointId(point.id)} className="w-full cursor-pointer bg-muted/50 p-3 rounded-md prose dark:prose-invert prose-sm">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
                     </div>
                 ) : (
@@ -1184,3 +1190,4 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
