@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical as DragHandle } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical as DragHandle, X } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -72,33 +72,55 @@ const isObsidianUrl = (url: string | undefined): boolean => {
     } catch (e) { return false; }
 };
 
-const ResourceCardPreview = ({ resource }: { resource: Resource }) => {
+interface ResourcePopupProps {
+  resourceId: string;
+  onOpenNested: (resourceId: string, level: number) => void;
+  onClose: () => void;
+  level: number;
+}
+
+const ResourcePopupCard = ({ resourceId, onOpenNested, onClose, level }: ResourcePopupProps) => {
+    const { resources } = useAuth();
+    const resource = resources.find(r => r.id === resourceId);
+
+    if (!resource) return null;
+
     return (
-        <Card className="w-64 bg-background shadow-lg">
-            <CardHeader className="p-3">
+        <Card className="fixed z-[60] w-80 bg-background shadow-2xl border-2 border-primary/50" style={{ top: `${80 + level * 30}px`, left: `${400 + level * 320}px` }}>
+            <CardHeader className="p-3 relative">
                 <CardTitle className="text-base flex items-center gap-2">
                     <Library className="h-4 w-4" />
-                    {resource.name}
+                    <span className="truncate">{resource.name}</span>
                 </CardTitle>
+                <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7" onClick={onClose}>
+                    <X className="h-4 w-4" />
+                </Button>
             </CardHeader>
-            <CardContent className="p-3 pt-0">
-                <ul className="space-y-1 text-sm text-muted-foreground">
-                    {(resource.points || []).slice(0, 5).map(point => (
+            <CardContent className="p-3 pt-0 max-h-[60vh] overflow-y-auto">
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                    {(resource.points || []).map(point => (
                         <li key={point.id} className="flex items-start gap-2">
                             <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
-                            <span className="truncate" title={point.text}>{point.text}</span>
+                            {point.type === 'card' && point.resourceId ? (
+                                <button
+                                    onClick={() => onOpenNested(point.resourceId!, level + 1)}
+                                    className="text-left font-medium text-primary hover:underline"
+                                >
+                                    {point.text}
+                                </button>
+                            ) : (
+                                <span className="truncate" title={point.text}>{point.text}</span>
+                            )}
                         </li>
                     ))}
-                    {(resource.points?.length ?? 0) > 5 && (
-                        <li className="text-xs text-center text-muted-foreground">...and more</li>
-                    )}
                 </ul>
             </CardContent>
         </Card>
     );
 };
 
-const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUrl, setEmbedUrl, editingPointId, setEditingPointId }: {
+
+const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUrl, setEmbedUrl, editingPointId, setEditingPointId, onOpenNestedPopup }: {
     point: ResourcePoint;
     resource: Resource;
     onUpdate: (resource: Resource) => void;
@@ -107,9 +129,10 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
     setEmbedUrl: (url: string | null) => void;
     editingPointId: string | null;
     setEditingPointId: (id: string | null) => void;
+    onOpenNestedPopup: (resourceId: string) => void;
 }) => {
     const { resources } = useAuth();
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } = useSortable({ id: point.id });
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id });
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -146,23 +169,16 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
     };
 
     if (point.type === 'card' && point.resourceId) {
-        const linkedResource = resources.find(r => r.id === point.resourceId);
-        if (!linkedResource) return null;
         return (
             <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
-                 {isOver && !isDragging && <div className="absolute -top-1.5 left-0 right-0 h-0.5 bg-primary" />}
                 <button {...attributes} {...listeners} className="cursor-grab p-1"><DragHandle className="h-4 w-4 text-muted-foreground/50" /></button>
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <div className="flex items-start gap-3 flex-grow cursor-pointer p-2 rounded-md hover:bg-muted/50 border border-dashed">
-                            <Library className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0"/>
-                            <span className="font-medium text-foreground">{point.text}</span>
-                        </div>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" side="right" align="start">
-                        <ResourceCardPreview resource={linkedResource} />
-                    </PopoverContent>
-                </Popover>
+                <div 
+                    onClick={() => onOpenNestedPopup(point.resourceId!)}
+                    className="flex items-start gap-3 flex-grow cursor-pointer p-2 rounded-md hover:bg-muted/50 border border-dashed"
+                >
+                    <Library className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0"/>
+                    <span className="font-medium text-foreground">{point.text}</span>
+                </div>
                 <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={() => onDelete(point.id)}>
                     <Trash2 className="h-3 w-3"/>
                 </Button>
@@ -172,7 +188,6 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
 
     return (
         <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
-            {isOver && !isDragging && <div className="absolute -top-1.5 left-0 right-0 h-0.5 bg-primary" />}
             <button {...attributes} {...listeners} className="cursor-grab p-1"><DragHandle className="h-4 w-4 text-muted-foreground/50" /></button>
             <div className="flex-grow">
                 {editingPointId === point.id ? (
@@ -204,7 +219,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
 };
 
 
-const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEmbedUrl }: { resource: Resource; onUpdate: (resource: Resource) => void; onDelete: (resourceId: string) => void; setFloatingVideoUrl: (url: string | null) => void; setEmbedUrl: (url: string | null) => void; }) => {
+const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEmbedUrl, onOpenNestedPopup }: { resource: Resource; onUpdate: (resource: Resource) => void; onDelete: (resourceId: string) => void; setFloatingVideoUrl: (url: string | null) => void; setEmbedUrl: (url: string | null) => void; onOpenNestedPopup: (resourceId: string) => void; }) => {
     const { resources } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
     const [editingPointId, setEditingPointId] = useState<string | null>(null);
@@ -306,6 +321,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
                                     setFloatingVideoUrl={setFloatingVideoUrl}
                                     editingPointId={editingPointId}
                                     setEditingPointId={setEditingPointId}
+                                    onOpenNestedPopup={onOpenNestedPopup}
                                 />
                             ))}
                         </ul>
@@ -394,6 +410,8 @@ function ResourcesPageContent() {
   const [mindMapRootFolderId, setMindMapRootFolderId] = useState<string | null>(null);
   
   const [addResourceType, setAddResourceType] = useState<'link' | 'card'>('link');
+
+  const [openPopups, setOpenPopups] = useState<{ resourceId: string; level: number }[]>([]);
 
   useEffect(() => {
     if (editingResource) {
@@ -697,6 +715,23 @@ function ResourcesPageContent() {
     );
   }, [resourceFolders, editingFolder, selectedFolderId, collapsedFolders, toggleFolderCollapse, commitFolderEdit, cancelFolderEdit, handleContextMenu]);
 
+  const handleOpenNestedPopup = (resourceId: string) => {
+    setOpenPopups([{ resourceId, level: 0 }]);
+  };
+
+  const handleOpenNested = (resourceId: string, level: number) => {
+    setOpenPopups(prev => {
+      const newPopups = prev.slice(0, level);
+      newPopups.push({ resourceId, level });
+      return newPopups;
+    });
+  };
+
+  const handleClosePopup = (level: number) => {
+    setOpenPopups(prev => prev.slice(0, level));
+  };
+
+
   return (
     <>
     <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
@@ -731,7 +766,7 @@ function ResourcesPageContent() {
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                 {filteredResources.map(res => {
                   if (res.type === 'card') {
-                    return <ResourceCard key={res.id} resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} setEmbedUrl={setEmbedUrl} />;
+                    return <ResourceCard key={res.id} resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} />;
                   }
 
                   // Link type rendering
@@ -815,6 +850,16 @@ function ResourcesPageContent() {
           </main>
       </div>
     </div>
+
+    {openPopups.map((popup, index) => (
+        <ResourcePopupCard
+            key={`${popup.resourceId}-${index}`}
+            resourceId={popup.resourceId}
+            level={popup.level}
+            onOpenNested={handleOpenNested}
+            onClose={() => handleClosePopup(index)}
+        />
+    ))}
     
     {contextMenu && (
         <div ref={contextMenuRef} style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }} className="fixed z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => e.stopPropagation()}>
@@ -921,6 +966,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
