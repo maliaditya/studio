@@ -320,7 +320,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
                     </DragOverlay>
                 </DndContext>
             </CardContent>
-            <CardContent className="pt-0">
+            <CardContent className="pt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                  <div className="flex gap-2">
                     <Button variant="outline" size="sm" className="w-full" onClick={handleAddTextPoint}>
                         Add Text Step
@@ -921,6 +921,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
