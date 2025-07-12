@@ -23,31 +23,6 @@ interface IntentionDetailModalProps {
   avgDailyProductiveHours?: number;
 }
 
-const getProductivitySuggestion = (hours: number): { title: string; description: string } => {
-    if (hours >= 8) {
-        return {
-            title: "Apex Zone: Monitor for Burnout",
-            description: "Your output is exceptional. Ensure this pace is sustainable. Prioritize rest and recovery to maintain this high level of performance without compromising your well-being."
-        };
-    }
-    if (hours >= 4) {
-        return {
-            title: "High-Intensity Zone: Optimize & Sustain",
-            description: "You're in a highly productive zone. Focus on maintaining this momentum with structured breaks. Your current pace is ideal for making significant progress on key objectives."
-        };
-    }
-    if (hours >= 2) {
-        return {
-            title: "Stable Zone: Build Consistency",
-            description: "You have a solid, consistent work habit. Focus on maintaining this routine daily. This is the foundation from which you can build towards more intensive work sprints when needed."
-        };
-    }
-    return {
-        title: "The Truth of the Moment",
-        description: "Fulfillment doesn't come from chasing feelings or perfection. It comes from taking justified action, aligned with the truth of your current moment."
-    };
-};
-
 const formatMinutes = (minutes: number) => {
     if (minutes <= 0) return null;
     const hours = Math.floor(minutes / 60);
@@ -154,7 +129,6 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
   }, [intention, schedule, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs]);
 
   if (!intention) return null;
-  const suggestion = getProductivitySuggestion(avgDailyProductiveHours);
   
   const outcomeText = outcomeObjectives.length > 0 
     ? outcomeObjectives.map(obj => obj.name).join(', ')
@@ -219,11 +193,11 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
                             </marker>
                           </defs>
                           {/* Base Line */}
-                          <line x1="175" y1="480" x2="625" y2="480" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
+                          <line x1="225" y1="480" x2="575" y2="480" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
                           {/* Left Line */}
-                          <line x1="118" y1="415" x2="352" y2="145" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
+                          <line x1="175" y1="415" x2="368" y2="145" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
                           {/* Right Line */}
-                          <line x1="448" y1="145" x2="682" y2="415" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
+                          <line x1="432" y1="145" x2="625" y2="415" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
                         </svg>
 
                         {/* Labels on lines */}
@@ -264,7 +238,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
                                     </CardTitle>
                                 </CardHeader>
                                 <CardDescription className="px-6 pb-6">
-                                    Ask: Do you have doubt, fear, or a better intention? If not, do not return to this doubt. Come back only when you have a better intention than this one.
+                                    Do you have a better alternative intention which will keep your present fulfilled and tomorrow intact? If not, do not return to this doubt. Come back only when you have a better intention than this one.
                                 </CardDescription>
                             </Card>
                         </div>
