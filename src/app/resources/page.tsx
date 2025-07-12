@@ -28,7 +28,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ScrollArea } from './ui/scroll-area';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -1214,6 +1214,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
