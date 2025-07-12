@@ -183,7 +183,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
         <ScrollArea className="h-full">
             <Card className="h-full flex flex-col border-0 shadow-none">
                 <CardContent className="flex-grow min-h-0 flex flex-col items-center justify-between p-6">
-                    <div className="relative w-full h-[300px] max-w-3xl mb-12">
+                    <div className="relative w-full h-[400px] max-w-3xl mb-16">
                         <svg className="absolute top-0 left-0 w-full h-full overflow-visible" preserveAspectRatio="none">
                             <defs>
                                 <marker id="arrowhead" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -268,3 +268,4 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
     </Dialog>
   );
 }
+
