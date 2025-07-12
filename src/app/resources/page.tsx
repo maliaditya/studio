@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical as DragHandle, X, Code, MessageSquare, Plus } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -28,6 +28,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { ScrollArea } from './ui/scroll-area';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -81,6 +82,7 @@ interface PopupState {
   x: number;
   y: number;
   parentId?: string;
+  width?: number;
 }
 
 interface ResourcePopupProps {
@@ -92,7 +94,7 @@ interface ResourcePopupProps {
 
 const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClose }: ResourcePopupProps) => {
     const { resources } = useAuth();
-    const { resourceId, level, x, y } = popupState;
+    const { resourceId, level, x, y, width } = popupState;
     const resource = resources.find(r => r.id === resourceId);
 
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -104,6 +106,7 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClos
         top: y,
         left: x,
         willChange: 'transform',
+        width: width ? `${width}px` : 'auto',
     };
 
     if (transform) {
@@ -128,7 +131,7 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClos
         <div
             ref={setNodeRef} style={style} {...attributes} className="z-[60]"
         >
-            <Card className="w-auto max-w-lg shadow-2xl border-2 border-primary/50 bg-card">
+            <Card className="max-w-4xl shadow-2xl border-2 border-primary/50 bg-card">
                 <CardHeader className="p-3 relative cursor-grab" {...listeners}>
                     <CardTitle className="text-base flex items-center gap-2">
                         <Library className="h-4 w-4" />
@@ -136,29 +139,31 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClos
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-3 pt-0 max-h-[60vh] overflow-y-auto">
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                        {(resource.points || []).map(point => (
-                            <li key={point.id} className="flex items-start gap-2">
-                                <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
-                                {point.type === 'card' && point.resourceId ? (
-                                    <button
-                                        onClick={(e) => handleLinkClick(e, point.resourceId!)}
-                                        className="text-left font-medium text-primary hover:underline"
-                                    >
-                                        {point.text}
-                                    </button>
-                                ) : point.type === 'markdown' ? (
-                                    <div className="w-full prose dark:prose-invert prose-sm">
-                                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
-                                    </div>
-                                ) : point.type === 'code' ? (
-                                     <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
-                                ) : (
-                                    <span className="break-words w-full" title={point.text}>{point.text}</span>
-                                )}
-                            </li>
-                        ))}
-                    </ul>
+                    <ScrollArea className="h-full">
+                        <ul className="space-y-2 text-sm text-muted-foreground pr-2">
+                            {(resource.points || []).map(point => (
+                                <li key={point.id} className="flex items-start gap-2">
+                                    <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
+                                    {point.type === 'card' && point.resourceId ? (
+                                        <button
+                                            onClick={(e) => handleLinkClick(e, point.resourceId!)}
+                                            className="text-left font-medium text-primary hover:underline"
+                                        >
+                                            {point.text}
+                                        </button>
+                                    ) : point.type === 'markdown' ? (
+                                        <div className="w-full prose dark:prose-invert prose-sm">
+                                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                        </div>
+                                    ) : point.type === 'code' ? (
+                                         <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                                    ) : (
+                                        <span className="break-words w-full" title={point.text}>{point.text}</span>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    </ScrollArea>
                 </CardContent>
                 <CardFooter className="p-2 flex justify-end">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onClose(resource.id); }}>
@@ -182,7 +187,7 @@ const SortableResourceCard = ({ children, item, className }: { children: React.R
     return (
         <div ref={setNodeRef} style={style} className={className}>
           <div className="relative group/sortable h-full" onClick={(e) => { e.stopPropagation(); (item as any).onClick?.(); }}>
-            <button {...attributes} {...listeners} className="absolute -top-2 -left-2 z-10 p-1 bg-muted rounded-full cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 transition-opacity"><DragHandle className="h-4 w-4" /></button>
+            <button {...attributes} {...listeners} className="absolute -top-2 -left-2 z-10 p-1 bg-muted rounded-full cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 transition-opacity"><GripVertical className="h-4 w-4" /></button>
             {children}
           </div>
         </div>
@@ -244,7 +249,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
     if (point.type === 'card' && point.resourceId) {
         return (
             <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
-                <button {...attributes} {...listeners} className="cursor-grab p-1"><DragHandle className="h-4 w-4 text-muted-foreground/50" /></button>
+                <button {...attributes} {...listeners} className="cursor-grab p-1"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
                 <div 
                     onClick={(e) => onOpenNestedPopup(point.resourceId!, e)}
                     className="flex items-start gap-3 flex-grow cursor-pointer p-2 rounded-md hover:bg-muted/50 border border-dashed"
@@ -261,7 +266,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
 
     return (
         <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
-            <button {...attributes} {...listeners} className="cursor-grab p-1"><DragHandle className="h-4 w-4 text-muted-foreground/50" /></button>
+            <button {...attributes} {...listeners} className="cursor-grab p-1"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
             <div className="flex-grow">
                 {editingPointId === point.id ? (
                     <Textarea value={point.text} onChange={e => handleUpdatePoint(e.target.value)} onBlur={handleBlur} autoFocus placeholder="New step..." className={cn("text-sm", (point.type === 'code' || point.type === 'markdown') && "font-mono text-xs")} rows={(point.type === 'code' || point.type === 'markdown') ? 6 : 2}/>
@@ -408,7 +413,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
                     <DragOverlay>
                         {activePointId ? (
                             <div className="bg-card p-2 rounded-md shadow-lg opacity-80 flex items-start gap-3">
-                                <DragHandle className="h-4 w-4 text-muted-foreground/50" />
+                                <GripVertical className="h-4 w-4 text-muted-foreground/50" />
                                 {resource.points?.find(p => p.id === activePointId)?.text}
                             </div>
                         ) : null}
@@ -821,6 +826,12 @@ function ResourcesPageContent() {
   }, [resourceFolders, editingFolder, selectedFolderId, collapsedFolders, toggleFolderCollapse, commitFolderEdit, cancelFolderEdit, handleContextMenu]);
 
   const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent) => {
+    const resource = resources.find(r => r.id === resourceId);
+    if (!resource) return;
+
+    const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown');
+    const popupWidth = hasMarkdown ? 896 : 512;
+
     setOpenPopups(prev => {
         const newPopups = new Map(prev);
         newPopups.set(resourceId, {
@@ -829,6 +840,7 @@ function ResourcesPageContent() {
             x: event.clientX,
             y: event.clientY,
             parentId: undefined,
+            width: popupWidth,
         });
         return newPopups;
     });
@@ -836,6 +848,12 @@ function ResourcesPageContent() {
 
   const handleOpenNested = (resourceId: string, parentX: number, parentY: number, parentId: string) => {
     const level = (openPopups.get(parentId)?.level ?? -1) + 1;
+    const resource = resources.find(r => r.id === resourceId);
+    if (!resource) return;
+
+    const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown');
+    const popupWidth = hasMarkdown ? 896 : 512;
+
     setOpenPopups(prev => {
         const newPopups = new Map(prev);
         // Close any popups at the same or higher level
@@ -851,6 +869,7 @@ function ResourcesPageContent() {
             x: parentX + 40,
             y: parentY + 40,
             parentId: parentId,
+            width: popupWidth,
         });
         return newPopups;
     });
@@ -1195,6 +1214,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
