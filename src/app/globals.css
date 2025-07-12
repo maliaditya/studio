@@ -118,6 +118,32 @@
   }
 }
 
+/* Styles for react-markdown rendered content */
+@layer components {
+  .prose {
+    @apply text-foreground;
+  }
+  .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+    @apply font-semibold mt-4 mb-2;
+  }
+  .prose h1 { @apply text-2xl; }
+  .prose h2 { @apply text-xl; }
+  .prose h3 { @apply text-lg; }
+  .prose p { @apply my-2; }
+  .prose ul, .prose ol { @apply my-2 ml-6; }
+  .prose li { @apply my-1; }
+  .prose a { @apply text-primary underline; }
+  .prose code { @apply bg-muted text-muted-foreground px-1 py-0.5 rounded-sm text-sm; }
+  .prose pre { @apply bg-muted p-2 rounded-md overflow-x-auto; }
+  .prose blockquote { @apply border-l-4 border-border pl-4 italic text-muted-foreground; }
+
+  .dark .prose {
+    @apply text-foreground;
+  }
+  .dark .prose code { @apply bg-muted/50; }
+}
+
+
 /* React Calendar Heatmap Styles */
 .react-calendar-heatmap text {
   font-size: 10px;

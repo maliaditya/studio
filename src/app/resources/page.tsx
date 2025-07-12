@@ -25,7 +25,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { DndContext, useDraggable, useDroppable, type DragEndEvent, DragOverlay, useSensor, PointerSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -173,7 +175,7 @@ const SortableResourceCard = ({ children, item }: { children: React.ReactNode; i
   
     return (
         <div ref={setNodeRef} style={style}>
-          <div className="relative group/sortable">
+          <div className="relative group/sortable" onDoubleClick={(e) => { e.stopPropagation(); (item as any).onClick?.(); }}>
             <button {...attributes} {...listeners} className="absolute -top-2 -left-2 z-10 p-1 bg-muted rounded-full cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 transition-opacity"><DragHandle className="h-4 w-4" /></button>
             {children}
           </div>
@@ -265,8 +267,12 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
                     <div className="w-full aspect-[4/3] rounded-md overflow-hidden border">
                         <iframe src={point.url} title={resource.name} frameBorder="0" allowFullScreen className="w-full h-full"></iframe>
                     </div>
-                ) : (point.type === 'code' || point.type === 'markdown') ? (
+                ) : point.type === 'code' ? (
                     <pre onClick={() => setEditingPointId(point.id)} className="w-full cursor-pointer bg-muted/50 p-3 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text || <span className="text-muted-foreground italic">New step...</span>}</pre>
+                ) : point.type === 'markdown' ? (
+                    <div onClick={() => setEditingPointId(point.id)} className="w-full cursor-pointer bg-muted/50 p-3 rounded-md prose dark:prose-invert">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                    </div>
                 ) : (
                     <span onClick={() => setEditingPointId(point.id)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/<br>/g, '') || '<span class="text-muted-foreground italic">New step...</span>' }} />
                 )}
