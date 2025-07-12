@@ -86,7 +86,7 @@ export function WeightGoalCard({
     const [weightDate, setWeightDate] = useState<Date | undefined>(new Date());
     const [showLogForm, setShowLogForm] = useState(false);
     const [weightView, setWeightView] = useState<'chart' | 'details'>('details');
-    const [mainView, setMainView] = useState<'weight' | 'diet' | 'projects'>('weight');
+    const [mainView, setMainView] = useState<'weight' | 'diet' | 'projects'>('projects');
     const [selectedIntention, setSelectedIntention] = useState<ExerciseDefinition | null>(null);
 
     const [heightInput, setHeightInput] = useState('');
