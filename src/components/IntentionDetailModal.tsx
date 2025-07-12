@@ -1,9 +1,6 @@
-
-
 "use client";
 
 import React, { useMemo } from 'react';
-import Image from 'next/image';
 import {
   Dialog,
   DialogContent,
@@ -14,13 +11,10 @@ import {
 import { ScrollArea } from './ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from './ui/card';
 import { Badge } from './ui/badge';
-import { BookCopy, Link as LinkIcon, Briefcase, ExternalLink, Globe, Workflow, Clock, Lightbulb, TrendingUp } from 'lucide-react';
-import type { ExerciseDefinition, Resource, DatedWorkout, DailySchedule } from '@/types/workout';
+import { BookCopy, Link as LinkIcon, Briefcase, ExternalLink, Globe, Workflow, Clock, Lightbulb, TrendingUp, ArrowDown, BrainCircuit } from 'lucide-react';
+import type { ExerciseDefinition, DatedWorkout, DailySchedule } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, subDays, parseISO, addDays, isBefore, startOfToday, isAfter } from 'date-fns';
-import { Progress } from './ui/progress';
-import { cn } from '@/lib/utils';
-import { BrainCircuit, ArrowUp, ArrowDown, PauseCircle, AlertTriangle, CheckSquare, Zap } from 'lucide-react';
+import { format, parseISO, isBefore, startOfToday } from 'date-fns';
 import { Separator } from './ui/separator';
 
 interface IntentionDetailModalProps {
@@ -84,7 +78,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
         const scheduleDate = parseISO(dateKey);
         const dailySchedule = schedule[dateKey] as DailySchedule;
         if (dailySchedule) {
-            const isTodayOrPast = isBefore(scheduleDate, addDays(today, 1));
+            const isTodayOrPast = isBefore(scheduleDate, new Date());
 
             Object.values(dailySchedule).flat().forEach(activity => {
                 if (activity && !activity.completed && isTodayOrPast) {
@@ -148,124 +142,108 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
     return { solutionTasks, outcomeObjectives, totalEstimatedMinutes: estimatedMinutes };
   }, [intention, schedule, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs]);
 
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    const days = Math.floor(hours / 24);
-    const remainingHours = hours % 24;
-
-    if (days > 0) return `${days}d ${remainingHours}h ${mins}m`;
-    if (hours > 0) return `${hours}h ${mins}m`;
-    return `${mins}m`;
-  };
-  
-  const projectedCompletion = useMemo(() => {
-    if (avgDailyProductiveHours <= 0 || totalEstimatedMinutes <= 0) return null;
-    const totalHours = totalEstimatedMinutes / 60;
-    const days = totalHours / avgDailyProductiveHours;
-
-    if (days < 1) {
-        return `${(days * avgDailyProductiveHours).toFixed(1)} hours`;
-    }
-    return `${Math.ceil(days)} days`;
-  }, [totalEstimatedMinutes, avgDailyProductiveHours]);
-
-
   if (!intention) return null;
   const suggestion = getProductivitySuggestion(avgDailyProductiveHours);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl h-[90vh] flex flex-col p-2">
-        <DialogHeader className="p-4">
+        <DialogHeader className="p-4 flex-shrink-0">
           <DialogTitle>Conceptual Flow: {intention.name}</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="h-full">
-            <Card className="h-full flex flex-col border-0 shadow-none">
-                <CardContent className="flex-grow min-h-0 flex flex-col items-center justify-between p-6">
-                    <div className="relative w-full h-[400px] max-w-3xl mb-16">
-                        <svg className="absolute top-0 left-0 w-full h-full overflow-visible" preserveAspectRatio="none">
-                            <defs>
-                                <marker id="arrowhead" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                                    <path d="M 0 0 L 10 5 L 0 10 z" fill="hsl(var(--muted-foreground))" />
-                                </marker>
-                            </defs>
-                            <line x1="5%" y1="90%" x2="50%" y2="20%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
-                            <line x1="50%" y1="20%" x2="95%" y2="90%" stroke="hsl(var(--muted-foreground))" strokeWidth="1" markerEnd="url(#arrowhead)" />
-                        </svg>
+        <div className="flex-grow min-h-0">
+            <ScrollArea className="h-full p-4">
+                <div className="flex flex-col items-center gap-4 text-center">
+                    
+                    {/* SOLUTION */}
+                    <Card className="w-full max-w-lg">
+                        <CardHeader>
+                            <CardTitle className="flex items-center justify-center gap-2">
+                                <Workflow className="h-5 w-5 text-primary"/>
+                                Solution
+                            </CardTitle>
+                            <CardDescription>The actionable steps required to achieve the outcome.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                             <ScrollArea className="h-32 p-3 border rounded-md bg-muted/50">
+                                <ul className="text-sm list-disc list-inside space-y-2 text-left">
+                                    {solutionTasks.length > 0 ? (
+                                    solutionTasks.map(({ action, linkedVisualizations }) => (
+                                        <li key={action.id} className="font-semibold text-foreground" title={action.name}>
+                                        {action.name}
+                                        {linkedVisualizations.length > 0 && (
+                                            <ul className="pl-4 list-['▹'] list-inside text-muted-foreground font-normal">
+                                            {linkedVisualizations.map(viz => (
+                                                <li key={viz.id} className="truncate" title={viz.name}>{viz.name}</li>
+                                            ))}
+                                            </ul>
+                                        )}
+                                        </li>
+                                    ))
+                                    ) : (
+                                    <li>No actions scheduled or pending.</li>
+                                    )}
+                                </ul>
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
 
-                         <div className="absolute left-[5%] top-[90%] -translate-x-1/2 translate-y-4 text-center">
-                            <p className="font-semibold text-foreground">Current state</p>
-                            <p className="text-xs text-muted-foreground">Productivity: <strong>{avgDailyProductiveHours.toFixed(1)}h/day</strong></p>
-                        </div>
+                    <ArrowDown className="h-6 w-6 text-muted-foreground"/>
+
+                    {/* INTENTION */}
+                     <Card className="w-full max-w-lg">
+                        <CardHeader>
+                            <CardTitle className="flex items-center justify-center gap-2">
+                                <Lightbulb className="h-5 w-5 text-primary"/>
+                                Intention
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-lg font-medium text-foreground">{intention.name}</p>
+                        </CardContent>
+                    </Card>
+
+                    <ArrowDown className="h-6 w-6 text-muted-foreground"/>
+
+                    {/* STATE & OUTCOME */}
+                    <div className="w-full max-w-3xl grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-4">
+                        <Card>
+                             <CardHeader>
+                                <CardTitle className="text-base">Current State</CardTitle>
+                             </CardHeader>
+                             <CardContent>
+                                <p className="text-sm text-muted-foreground">Productivity: <strong>{avgDailyProductiveHours.toFixed(1)}h/day</strong></p>
+                             </CardContent>
+                        </Card>
                         
-                        <div className="absolute left-1/2 top-[20%] -translate-x-1/2 -translate-y-full text-center w-full px-4">
-                            <p className="font-semibold text-foreground text-lg">Solution</p>
-                             <div className="text-sm text-muted-foreground w-full max-w-sm mx-auto p-2 border rounded-md bg-background/50 backdrop-blur-sm mt-2">
-                                <ScrollArea className="h-32">
-                                  <ul className="text-xs list-disc list-inside space-y-2 text-left">
-                                      {solutionTasks.length > 0 ? (
-                                        solutionTasks.map(({ action, linkedVisualizations }) => (
-                                          <li key={action.id} className="font-semibold text-foreground" title={action.name}>
-                                            {action.name}
-                                            {linkedVisualizations.length > 0 && (
-                                              <ul className="pl-4 list-['▹'] list-inside text-muted-foreground font-normal">
-                                                {linkedVisualizations.map(viz => (
-                                                  <li key={viz.id} className="truncate" title={viz.name}>{viz.name}</li>
-                                                ))}
-                                              </ul>
-                                            )}
-                                          </li>
-                                        ))
-                                      ) : (
-                                        <li>No actions scheduled or pending.</li>
-                                      )}
-                                  </ul>
-                                </ScrollArea>
-                            </div>
-                        </div>
+                        <ArrowRight className="h-6 w-6 text-muted-foreground hidden md:block"/>
+                        <ArrowDown className="h-6 w-6 text-muted-foreground md:hidden"/>
 
-                        <div className="absolute right-[5%] top-[90%] translate-x-1/2 translate-y-4 text-center">
-                             <p className="font-semibold text-foreground">Outcome</p>
-                             <div className="text-xs text-muted-foreground mt-1 max-w-[150px]">
-                                {outcomeObjectives.length > 0 ? (
-                                  outcomeObjectives.map(obj => obj.name).join(', ')
-                                ) : (
-                                  'No objectives targeted.'
-                                )}
-                             </div>
-                              {totalEstimatedMinutes > 0 && (
-                                <div className="mt-2 pt-2 border-t font-semibold">
-                                    <p className="text-xs flex items-center gap-1 justify-center"><Clock className="h-3 w-3" /> {formatDuration(totalEstimatedMinutes)}</p>
-                                </div>
-                              )}
-                        </div>
-
-                        <div className="absolute left-1/2 top-[90%] -translate-x-1/2 translate-y-4 text-center w-full px-4">
-                             <p className="font-semibold text-foreground text-lg">Intention</p>
-                             <p className="text-sm text-muted-foreground truncate" title={intention.name}>
-                                {intention.name}
-                             </p>
-                             {projectedCompletion && (
-                                <div className="mt-2 pt-2 border-t font-semibold">
-                                    <p className="text-xs flex items-center gap-1 justify-center"><Clock className="h-3 w-3" /> Est. {projectedCompletion}</p>
-                                </div>
-                             )}
-                        </div>
+                        <Card>
+                             <CardHeader>
+                                <CardTitle className="text-base">Desired Outcome</CardTitle>
+                             </CardHeader>
+                             <CardContent>
+                                 <p className="text-sm text-muted-foreground font-medium">
+                                    {outcomeObjectives.length > 0 ? outcomeObjectives.map(obj => obj.name).join(', ') : 'Not yet defined.'}
+                                 </p>
+                             </CardContent>
+                        </Card>
                     </div>
 
-                </CardContent>
-                 <CardFooter className="text-center">
-                    <div className="w-full">
-                        <Separator className="my-20" />
-                        <h4 className="font-semibold text-sm">{suggestion.title}</h4>
-                        <p className="text-xs text-muted-foreground max-w-xl mx-auto">{suggestion.description}</p>
+                    {/* FOOTER */}
+                     <div className="w-full max-w-lg pt-8">
+                        <Separator className="my-8" />
+                        <h4 className="font-semibold text-lg flex items-center justify-center gap-2">
+                            <BrainCircuit className="h-5 w-5 text-primary" />
+                            {suggestion.title}
+                        </h4>
+                        <p className="text-sm text-muted-foreground max-w-xl mx-auto mt-2">{suggestion.description}</p>
                     </div>
-                </CardFooter>
-            </Card>
-        </ScrollArea>
+                </div>
+            </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   );
 }
-
