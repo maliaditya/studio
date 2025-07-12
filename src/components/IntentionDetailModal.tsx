@@ -216,11 +216,11 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
                             </marker>
                           </defs>
                           {/* Base Line */}
-                          <line x1="100" y1="480" x2="700" y2="480" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
+                          <line x1="175" y1="480" x2="625" y2="480" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
                           {/* Left Line */}
-                          <line x1="80" y1="460" x2="390" y2="100" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
+                          <line x1="118" y1="415" x2="352" y2="145" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
                           {/* Right Line */}
-                          <line x1="410" y1="100" x2="720" y2="460" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
+                          <line x1="448" y1="145" x2="682" y2="415" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
                         </svg>
 
                         {/* Labels on lines */}
