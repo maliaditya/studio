@@ -238,7 +238,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
                                     </CardTitle>
                                 </CardHeader>
                                 <CardDescription className="px-6 pb-6">
-                                    Do you have a better alternative intention which will keep your present fulfilled and tomorrow intact? If not, do not return to this doubt. Come back only when you have a better intention than this one.
+                                    Do you have a better alternative intention which will keep my present fulfilled and tomorrow intact? If not, do not return to this doubt. Come back only when you have a better intention than this one.
                                 </CardDescription>
                             </Card>
                         </div>
