@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from './ui/scroll-area';
-import { BrainCircuit, ArrowDown, Workflow, Clock } from 'lucide-react';
+import { BrainCircuit, ArrowDown, Workflow, Clock, AlertTriangle } from 'lucide-react';
 import type { ExerciseDefinition, DatedWorkout, DailySchedule } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, parseISO, isBefore, startOfToday, isAfter } from 'date-fns';
@@ -180,7 +180,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
                         {/* Nodes */}
                         <div className="absolute top-0 left-1/2 -translate-x-1/2 text-center max-w-md">
                           <div className="font-semibold text-lg">Solution</div>
-                          <div className="text-sm text-muted-foreground text-left">
+                           <div className="text-sm text-muted-foreground text-left">
                             {solutionTasks.length > 0 ? (
                                 <ul className="list-disc list-inside mt-1 space-y-1">
                                     {solutionTasks.map(st => (
@@ -242,13 +242,22 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDaily
 
 
                     {/* FOOTER */}
-                     <div className="w-full max-w-lg pt-8">
+                     <div className="w-full max-w-lg pt-8 mx-auto">
                         <Separator className="my-8" />
                         <h4 className="font-semibold text-lg flex items-center justify-center gap-2">
                             <BrainCircuit className="h-5 w-5 text-primary" />
                             {suggestion.title}
                         </h4>
                         <p className="text-sm text-muted-foreground max-w-xl mx-auto mt-2">{suggestion.description}</p>
+
+                        <Separator className="my-8" />
+                        <h4 className="font-semibold text-lg flex items-center justify-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-amber-500" />
+                            Challenge Your Doubts
+                        </h4>
+                        <p className="text-sm text-muted-foreground max-w-xl mx-auto mt-2">
+                            Ask yourself: Do you have any doubt, fear, or anxiety? Do you have a better intention that will keep your present fulfilled and tomorrow intact? If not, do not return with this doubt again. Come back only when you have a better intention than this.
+                        </p>
                     </div>
                 </div>
             </ScrollArea>
