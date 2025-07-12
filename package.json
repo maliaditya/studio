@@ -64,6 +64,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@dnd-kit/utilities": "^3.2.2",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-calendar-heatmap": "^1.6.7",

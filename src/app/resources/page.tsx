@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent, DragOverlay } from '@dnd-kit/core';
-import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
 
@@ -183,7 +183,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
                         <iframe src={point.url} title={resource.name} frameBorder="0" allowFullScreen className="w-full h-full"></iframe>
                     </div>
                 ) : (
-                    <span onClick={() => setEditingPointId(point.id)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/<br>/g, '') || '<span class="text-muted-foreground italic">Empty step...</span>' }} />
+                    <span onClick={() => setEditingPointId(point.id)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/<br>/g, '') || '<span class="text-muted-foreground italic">New step...</span>' }} />
                 )}
             </div>
             <div className="flex flex-col items-center flex-shrink-0">
@@ -250,9 +250,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
           const oldIndex = (resource.points || []).findIndex(p => p.id === active.id);
           const newIndex = (resource.points || []).findIndex(p => p.id === over.id);
           if (oldIndex > -1 && newIndex > -1) {
-            const newPoints = [...(resource.points || [])];
-            const [movedItem] = newPoints.splice(oldIndex, 1);
-            newPoints.splice(newIndex, 0, movedItem);
+            const newPoints = arrayMove(resource.points || [], oldIndex, newIndex);
             onUpdate({ ...resource, points: newPoints });
           }
         }
@@ -917,6 +915,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
