@@ -110,10 +110,14 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onClose }: ResourcePopupP
     if (!resource) return null;
 
     return (
-        <div 
+        <motion.div 
             ref={setNodeRef} style={style} {...attributes} className="z-[60]"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.1 }}
         >
-            <Card className="w-80 shadow-2xl border-2 border-primary/50 bg-background/80 backdrop-blur-sm">
+            <Card className="w-80 shadow-2xl border-2 border-primary/50 bg-background">
                 <CardHeader className="p-3 relative cursor-grab" {...listeners}>
                     <CardTitle className="text-base flex items-center gap-2">
                         <Library className="h-4 w-4" />
@@ -143,7 +147,7 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onClose }: ResourcePopupP
                     </ul>
                 </CardContent>
             </Card>
-        </div>
+        </motion.div>
     );
 };
 
@@ -1010,14 +1014,17 @@ function ResourcesPageContent() {
         </div>
         </div>
 
-        {Array.from(openPopups.values()).map((popupState) => (
-            <ResourcePopupCard
-                key={popupState.resourceId}
-                popupState={popupState}
-                onOpenNested={handleOpenNested}
-                onClose={handleClosePopup}
-            />
-        ))}
+        <AnimatePresence>
+            {Array.from(openPopups.values()).map((popupState) => (
+                <ResourcePopupCard
+                    key={popupState.resourceId}
+                    popupState={popupState}
+                    onOpenNested={handleOpenNested}
+                    onClose={handleClosePopup}
+                />
+            ))}
+        </AnimatePresence>
+
         <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-50">
           {Array.from(openPopups.values()).map(popup => {
             if (!popup.parentId) return null;
