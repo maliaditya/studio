@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent, DragOverlay, useSensor, PointerSensor, useSensors } from '@dnd-kit/core';
-import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
@@ -128,7 +128,7 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClos
             const dy = e.clientY - resizeStart.y;
             setCurrentSize({
                 width: Math.max(320, resizeStart.width + dx),
-                height: Math.max(200, resizeStart.height + dy),
+                height: 600, // Fixed height
             });
         }
     };
@@ -448,7 +448,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
                     onDragStart={e => setActivePointId(e.active.id as string)}
                     onDragEnd={handleDragEnd}
                 >
-                    <SortableContext items={(resource.points || []).map(p => p.id)} strategy={verticalListSortingStrategy}>
+                    <SortableContext items={(resource.points || []).map(p => p.id)}>
                         <ul className="space-y-3">
                             {(resource.points || []).map((point) => (
                                 <SortablePoint 
@@ -567,6 +567,9 @@ function ResourcesPageContent() {
   
   const [activeId, setActiveId] = useState<string | null>(null);
   
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
         if (event.key === 'Escape') {
@@ -805,6 +808,48 @@ function ResourcesPageContent() {
   const onUpdateResource = (updatedResource: Resource) => {
     setResources(prev => prev.map(res => res.id === updatedResource.id ? updatedResource : res));
   };
+
+  const getChildFoldersRecursive = (folderId: string): ResourceFolder[] => {
+    let children: ResourceFolder[] = [];
+    const directChildren = resourceFolders.filter(f => f.parentId === folderId);
+    children.push(...directChildren);
+    directChildren.forEach(child => {
+        children.push(...getChildFoldersRecursive(child.id));
+    });
+    return children;
+  };
+  
+  const handleShareFolder = async (folder: ResourceFolder) => {
+    toast({ title: 'Sharing Folder...', description: 'Please wait while we generate a public link.' });
+
+    const childFolders = getChildFoldersRecursive(folder.id);
+    const allFolderIds = [folder.id, ...childFolders.map(f => f.id)];
+    const resourcesToShare = resources.filter(r => allFolderIds.includes(r.folderId));
+
+    try {
+        const response = await fetch('/api/share/folder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder, resources: resourcesToShare, childFolders }),
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to share folder.');
+        }
+
+        const fullUrl = `${window.location.origin}${result.publicUrl}`;
+        setShareUrl(fullUrl);
+        setShareDialogOpen(true);
+
+    } catch (error) {
+        toast({
+            title: "Sharing Failed",
+            description: error instanceof Error ? error.message : "An unknown error occurred.",
+            variant: "destructive",
+        });
+    }
+  };
+  
   
   const renderFolderOptions = useCallback((parentId: string | null, level: number): JSX.Element[] => {
     const folders = resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => a.name.localeCompare(b.name));
@@ -922,6 +967,7 @@ function ResourcesPageContent() {
 
     const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown');
     const popupWidth = hasMarkdown ? 896 : 512;
+    const popupHeight = 600;
 
     setOpenPopups(prev => {
         const newPopups = new Map(prev);
@@ -939,7 +985,7 @@ function ResourcesPageContent() {
             y: parentY + 40,
             parentId: parentId,
             width: popupWidth,
-            height: 600,
+            height: popupHeight,
         });
         return newPopups;
     });
@@ -1041,7 +1087,7 @@ function ResourcesPageContent() {
                     : 'Resources'}
                 </h2>
                 
-                <SortableContext items={filteredResources.map(r => r.id)} strategy={verticalListSortingStrategy}>
+                <SortableContext items={filteredResources}>
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                         {filteredResources.map(res => {
                             const hasMarkdown = res.points?.some(p => p.type === 'markdown');
@@ -1192,6 +1238,7 @@ function ResourcesPageContent() {
         {contextMenu && (
             <div ref={contextMenuRef} style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }} className="fixed z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => e.stopPropagation()}>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleAddNewNestedFolder(contextMenu.item); setContextMenu(null); }}>New Folder</Button>
+                <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleShareFolder(contextMenu.item); setContextMenu(null); }}><Share className="mr-2 h-4 w-4" />Share Publicly</Button>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { setEditingFolder(contextMenu.item); setContextMenu(null); }}>Rename</Button>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2 text-destructive hover:text-destructive" onClick={() => { setDeleteConfirmation({ item: contextMenu.item }); setContextMenu(null); }}>Delete</Button>
             </div>
@@ -1287,6 +1334,21 @@ function ResourcesPageContent() {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+        <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Folder Shared Publicly</DialogTitle>
+                    <DialogDescription>Anyone with this link can view the contents of this folder.</DialogDescription>
+                </DialogHeader>
+                <div className="flex items-center space-x-2">
+                    <Input id="share-link" value={shareUrl} readOnly />
+                    <Button onClick={() => {
+                        navigator.clipboard.writeText(shareUrl);
+                        toast({ title: 'Copied to clipboard!' });
+                    }}>Copy</Button>
+                </div>
+            </DialogContent>
+        </Dialog>
     </DndContext>
     </>
   );
@@ -1295,10 +1357,3 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
-
-
-
-
-
-
-
