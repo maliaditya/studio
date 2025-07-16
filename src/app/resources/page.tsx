@@ -60,6 +60,16 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
     return null;
 };
 
+const isImageUrl = (url: string | undefined): boolean => {
+    if (!url) return false;
+    return /\.(jpg|jpeg|png|webp|avif|svg)$/i.test(url);
+};
+  
+const isGifUrl = (url: string | undefined): boolean => {
+    if (!url) return false;
+    return /\.gif$/i.test(url);
+};
+
 const isNotionUrl = (url: string | undefined): boolean => {
     if (!url) return false;
     try {
@@ -83,6 +93,7 @@ interface PopupState {
   y: number;
   parentId?: string;
   width?: number;
+  height?: number;
 }
 
 interface ResourcePopupProps {
@@ -94,19 +105,60 @@ interface ResourcePopupProps {
 
 const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClose }: ResourcePopupProps) => {
     const { resources } = useAuth();
-    const { resourceId, level, x, y, width } = popupState;
+    const { resourceId, level, x, y, width, height } = popupState;
     const resource = resources.find(r => r.id === resourceId);
 
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `popup-${resourceId}`,
     });
 
+    const [currentSize, setCurrentSize] = useState({ width: width || 512, height: height || 600 });
+    const [isResizing, setIsResizing] = useState(false);
+    const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
+
+    const handleResizeMouseDown = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsResizing(true);
+        setResizeStart({ x: e.clientX, y: e.clientY, width: currentSize.width, height: currentSize.height });
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+        if (isResizing) {
+            const dx = e.clientX - resizeStart.x;
+            const dy = e.clientY - resizeStart.y;
+            setCurrentSize({
+                width: Math.max(320, resizeStart.width + dx),
+                height: Math.max(200, resizeStart.height + dy),
+            });
+        }
+    };
+
+    const handleMouseUp = () => {
+        setIsResizing(false);
+    };
+
+    useEffect(() => {
+        if (isResizing) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        } else {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        }
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isResizing, resizeStart]);
+
+
     const style: React.CSSProperties = {
         position: 'fixed',
         top: y,
         left: x,
         willChange: 'transform',
-        width: width ? `${width}px` : 'auto',
+        width: `${currentSize.width}px`,
+        height: `${currentSize.height}px`,
     };
 
     if (transform) {
@@ -131,14 +183,14 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClos
         <div
             ref={setNodeRef} style={style} {...attributes} className="z-[60]"
         >
-            <Card className="max-w-4xl shadow-2xl border-2 border-primary/50 bg-card">
-                <CardHeader className="p-3 relative cursor-grab" {...listeners}>
+            <Card className="max-w-4xl shadow-2xl border-2 border-primary/50 bg-card h-full flex flex-col">
+                <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
                     <CardTitle className="text-base flex items-center gap-2">
                         <Library className="h-4 w-4" />
                         <span className="truncate">{resource.name}</span>
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="p-3 pt-0 max-h-[60vh] overflow-y-auto">
+                <CardContent className="p-3 pt-0 flex-grow min-h-0">
                     <ScrollArea className="h-full">
                         <ul className="space-y-2 text-sm text-muted-foreground pr-2">
                             {(resource.points || []).map(point => (
@@ -165,10 +217,14 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClos
                         </ul>
                     </ScrollArea>
                 </CardContent>
-                <CardFooter className="p-2 flex justify-end">
+                <CardFooter className="p-2 flex justify-end flex-shrink-0 relative">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onClose(resource.id); }}>
                         <X className="h-4 w-4" />
                     </Button>
+                    <div
+                        onMouseDown={handleResizeMouseDown}
+                        className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize z-10"
+                    />
                 </CardFooter>
             </Card>
         </div>
@@ -187,7 +243,7 @@ const SortableResourceCard = ({ children, item, className }: { children: React.R
     return (
         <div ref={setNodeRef} style={style} className={className}>
           <div className="relative group/sortable h-full" onClick={(e) => { e.stopPropagation(); (item as any).onClick?.(); }}>
-            <button {...attributes} {...listeners} className="absolute -top-2 -left-2 z-10 p-1 bg-muted rounded-full cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 transition-opacity"><GripVertical className="h-4 w-4" /></button>
+            <button {...attributes} {...listeners} className="absolute -top-2 -left-2 z-10 p-1 bg-muted rounded-full cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
             {children}
           </div>
         </div>
@@ -830,14 +886,15 @@ function ResourcesPageContent() {
     if (!resource) return;
 
     const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown');
-    const popupWidth = hasMarkdown ? 896 : 512;
-    const popupHeight = 600; // Fixed height
-
+    let popupWidth = 512;
+    if (hasMarkdown) {
+        popupWidth = 896; 
+    }
+    
     let x, y;
-
     if (hasMarkdown) {
         x = (window.innerWidth - popupWidth) / 2;
-        y = (window.innerHeight - popupHeight) / 2;
+        y = (window.innerHeight - 600) / 2;
     } else {
         x = event.clientX;
         y = event.clientY;
@@ -852,6 +909,7 @@ function ResourcesPageContent() {
             y: y,
             parentId: undefined,
             width: popupWidth,
+            height: 600
         });
         return newPopups;
     });
@@ -881,6 +939,7 @@ function ResourcesPageContent() {
             y: parentY + 40,
             parentId: parentId,
             width: popupWidth,
+            height: 600,
         });
         return newPopups;
     });
@@ -986,7 +1045,7 @@ function ResourcesPageContent() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                         {filteredResources.map(res => {
                             const hasMarkdown = res.points?.some(p => p.type === 'markdown');
-                            const cardClassName = hasMarkdown ? "lg:col-span-2 xl:col-span-3" : "";
+                            const cardClassName = hasMarkdown ? "lg:col-span-3" : "";
 
                             return (
                                 <SortableResourceCard key={res.id} item={res} className={cardClassName}>
@@ -995,6 +1054,7 @@ function ResourcesPageContent() {
                                     ) : (
                                     (() => {
                                         const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
+                                        const imageEmbedUrl = isImageUrl(res.link) || isGifUrl(res.link) ? res.link : null;
                                         const isSpecialEmbed = isNotionUrl(res.link) || isObsidianUrl(res.link);
                                         const isLongContent = res.name.length > 20 && (res.description?.length ?? 0) > 30;
 
@@ -1003,7 +1063,17 @@ function ResourcesPageContent() {
                                                 "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full",
                                                 isLongContent ? "bg-gradient-to-br from-card to-muted/20" : "bg-card"
                                             )}>
-                                                {youtubeEmbedUrl && res.link ? (
+                                                {imageEmbedUrl ? (
+                                                  <>
+                                                      <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover/sortable:opacity-100 transition-opacity">
+                                                        <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                                                      </div>
+                                                      <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl relative">
+                                                          <Image src={imageEmbedUrl} alt={res.name} layout="fill" objectFit="contain" data-ai-hint="illustration" />
+                                                      </div>
+                                                      <div className="p-4 flex-grow"><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div>
+                                                  </>
+                                                ) : youtubeEmbedUrl && res.link ? (
                                                     <>
                                                         <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover/sortable:opacity-100 transition-opacity">
                                                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="h-4 w-4" /></Button>
@@ -1225,6 +1295,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
