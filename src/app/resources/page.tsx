@@ -3,6 +3,7 @@
 
 
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -1103,7 +1104,8 @@ function ResourcesPageContent() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                         {filteredResources.map(res => {
                             const isCardType = res.type === 'card';
-                            const cardClassName = isCardType ? "lg:col-span-3" : "";
+                            const hasMarkdownContent = isCardType && (res.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+                            const cardClassName = hasMarkdownContent ? "lg:col-span-3" : "";
 
                             return (
                                 <SortableResourceCard key={res.id} item={res} className={cardClassName}>
@@ -1369,4 +1371,5 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 

@@ -290,7 +290,9 @@ export default function SharedFolderPage() {
                     {filteredResources.length > 0 ? (
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                             {filteredResources.map(res => {
-                                const cardClassName = res.type === 'card' ? "lg:col-span-3" : "";
+                                const isCardType = res.type === 'card';
+                                const hasMarkdownContent = isCardType && (res.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+                                const cardClassName = hasMarkdownContent ? "lg:col-span-3" : "";
                                 return (
                                     <div key={res.id} className={cardClassName}>
                                         <ResourceLinkCard resource={res} />
@@ -308,4 +310,5 @@ export default function SharedFolderPage() {
         </div>
     );
 }
+
 
