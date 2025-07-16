@@ -34,7 +34,7 @@ export function Header() {
 
 
   const navLinks = [
-    { href: '/my-plate', label: 'My Plate' },
+    { href: '/my-plate', label: 'Dashboard' },
     { href: '/workout-tracker', label: 'Workout Tracker' },
     { href: '/upskill', label: 'Upskill' },
     { href: '/deep-work', label: 'Deep Work' },
@@ -59,7 +59,7 @@ export function Header() {
               <span>LifeOS</span>
             </Link>
             <nav className="hidden md:flex items-center gap-4">
-              {navLinks.map(link => (
+              {currentUser && navLinks.map(link => (
                 <Link
                   key={link.href}
                   href={link.href}

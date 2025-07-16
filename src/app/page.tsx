@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Heart, Briefcase, TrendingUp, Package, Magnet, DollarSign, GitMerge } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Heart, Briefcase, TrendingUp, DollarSign, GitMerge, Package } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 
