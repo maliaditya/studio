@@ -11,6 +11,7 @@ import { ExternalLink, Folder, Link as LinkIcon, Globe, Loader2, AlertTriangle, 
 import type { Resource, ResourceFolder } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import Link from 'next/link';
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -129,12 +130,19 @@ const FolderView = ({ folder, resources, childFolders }: { folder: ResourceFolde
     );
 };
 
+interface SharedData {
+  folder: ResourceFolder;
+  resources: Resource[];
+  childFolders: ResourceFolder[];
+  sharedBy: string;
+}
+
 export default function SharedFolderPage() {
     const params = useParams();
     const router = useRouter();
     const folderId = params.folderId as string;
 
-    const [data, setData] = useState<{ folder: ResourceFolder, resources: Resource[], childFolders: ResourceFolder[] } | null>(null);
+    const [data, setData] = useState<SharedData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -185,7 +193,7 @@ export default function SharedFolderPage() {
 
     if (!data) return null;
 
-    const { folder, resources, childFolders } = data;
+    const { folder, resources, childFolders, sharedBy } = data;
     const rootResources = resources.filter(r => r.folderId === folder.id);
 
     return (
@@ -195,14 +203,14 @@ export default function SharedFolderPage() {
                     <Folder className="h-8 w-8 text-amber-500"/>
                     <div>
                         <h1 className="text-3xl font-bold">{folder.name}</h1>
-                        <p className="text-muted-foreground">A shared collection of resources from LifeOS.</p>
+                        <p className="text-muted-foreground">A shared collection by {sharedBy}</p>
                     </div>
                 </div>
                 <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
                     <p>Powered by</p>
-                    <a href="https://firebase.google.com/docs/studio" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 font-semibold text-primary hover:underline">
+                    <Link href="/" className="flex items-center gap-1 font-semibold text-primary hover:underline">
                         <BrainCircuit className="h-4 w-4"/> LifeOS
-                    </a>
+                    </Link>
                 </div>
             </header>
             
@@ -220,4 +228,3 @@ export default function SharedFolderPage() {
         </div>
     );
 }
-

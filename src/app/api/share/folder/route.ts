@@ -9,6 +9,7 @@ interface ShareFolderPayload {
   folder: ResourceFolder;
   resources: Resource[];
   childFolders: ResourceFolder[];
+  username: string;
 }
 
 // POST handler to create or update a shared folder's public data
@@ -18,15 +19,15 @@ export async function POST(request: Request) {
     }
 
     try {
-        const { folder, resources, childFolders } = await request.json() as ShareFolderPayload;
+        const { folder, resources, childFolders, username } = await request.json() as ShareFolderPayload;
 
-        if (!folder || !folder.id) {
-            return NextResponse.json({ error: 'Invalid folder data provided.' }, { status: 400 });
+        if (!folder || !folder.id || !username) {
+            return NextResponse.json({ error: 'Invalid folder data or username provided.' }, { status: 400 });
         }
         
         const blobPathname = `shared/folders/${folder.id}.json`;
 
-        const dataToStore = JSON.stringify({ folder, resources, childFolders, sharedAt: new Date().toISOString() }, null, 2);
+        const dataToStore = JSON.stringify({ folder, resources, childFolders, sharedAt: new Date().toISOString(), sharedBy: username }, null, 2);
 
         await put(blobPathname, dataToStore, {
             access: 'public',

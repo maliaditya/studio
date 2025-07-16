@@ -1,5 +1,6 @@
 
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -62,7 +63,7 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
 
 const isImageUrl = (url: string | undefined): boolean => {
     if (!url) return false;
-    return /\.(jpg|jpeg|png|webp|avif|svg)$/i.test(url);
+    return /\.(jpg|jpeg|png|webp|avif|gif|svg)$/i.test(url);
 };
   
 const isGifUrl = (url: string | undefined): boolean => {
@@ -527,6 +528,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
 
 function ResourcesPageContent() {
   const { 
+    currentUser,
     resources, setResources, 
     resourceFolders, setResourceFolders,
     setFloatingVideoUrl
@@ -820,6 +822,10 @@ function ResourcesPageContent() {
   };
   
   const handleShareFolder = async (folder: ResourceFolder) => {
+    if (!currentUser?.username) {
+        toast({ title: 'Error', description: 'You must be logged in to share.', variant: 'destructive' });
+        return;
+    }
     toast({ title: 'Sharing Folder...', description: 'Please wait while we generate a public link.' });
 
     const childFolders = getChildFoldersRecursive(folder.id);
@@ -830,7 +836,7 @@ function ResourcesPageContent() {
         const response = await fetch('/api/share/folder', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ folder, resources: resourcesToShare, childFolders }),
+            body: JSON.stringify({ folder, resources: resourcesToShare, childFolders, username: currentUser.username }),
         });
         const result = await response.json();
         if (!response.ok) {
