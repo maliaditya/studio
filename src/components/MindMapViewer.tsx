@@ -38,22 +38,7 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
         <path d="M11.472 24a1.5 1.5 0 0 1-1.06-.44L.439 13.587a1.5 1.5 0 0 1 0-2.12l9.97-9.97a1.5 1.5 0 0 1 2.12 0L22.503 11.47a1.5 1.5 0 0 1 0 2.121l-9.972 9.971a1.5 1.5 0 0 1-1.06.44Zm-8.485-11.25 8.485 8.485 8.485-8.485-8.485-8.485-8.485 8.485ZM19.5 18h-3V9h3v9Z"/>
     </svg>
 );
-const FlowCard = ({ icon, title, description, children }: { icon: React.ReactNode, title: string, description: string, children?: React.ReactNode }) => (
-  <div className="flex flex-col items-center p-4 border rounded-lg bg-card shadow-sm w-64 text-center h-full">
-    <div className="text-primary">{icon}</div>
-    <h3 className="mt-2 font-semibold text-foreground">{title}</h3>
-    <p className="mt-1 text-xs text-muted-foreground flex-grow">{description}</p>
-    {children}
-  </div>
-);
 
-const FeatureList = ({ features }: { features: string[] }) => (
-    <div className="mt-3 pt-3 border-t w-full">
-        <ul className="text-left text-xs list-disc list-inside space-y-1 text-muted-foreground">
-            {features.map((feature, i) => <li key={i}>{feature}</li>)}
-        </ul>
-    </div>
-);
 
 const ConceptualFlowDiagram = () => {
   return (
@@ -95,64 +80,6 @@ const ConceptualFlowDiagram = () => {
       </div>
     </div>
   );
-};
-
-
-const StrategicOverviewDiagram = () => {
-    return (
-        <div className="flex items-start justify-center p-8 overflow-x-auto">
-            {/* Main container changed to flex-row */}
-            <div className="flex flex-row items-center gap-8">
-
-                {/* Stage 1: Foundation (Vertical stack) */}
-                <div className="flex flex-col items-center gap-4 text-center">
-                    <FlowCard icon={<HeartPulse size={32} />} title="1. Health" description="Track workouts, diet, and physical progress.">
-                        <FeatureList features={["Workout Plans", "Exercise Library", "Diet Planning", "Weight Tracking"]} />
-                    </FlowCard>
-                    <FlowCard icon={<BookCopy size={32} />} title="2. Upskill" description="Structured learning and skill acquisition.">
-                        <FeatureList features={["Topic & Goal Setting", "Session Logging", "Progress Visualization"]} />
-                    </FlowCard>
-                </div>
-
-                <ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" />
-
-                {/* Stage 2: Application */}
-                <div className="flex flex-col items-center gap-4 text-center">
-                    <FlowCard icon={<Briefcase size={32} />} title="3. Deep Work" description="Apply skills to focus areas, creating tangible value.">
-                        <FeatureList features={["Focus Area Management", "Skill Integration", "Time Tracking", "Ready for Branding Pipeline"]} />
-                    </FlowCard>
-                </div>
-
-                <ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" />
-
-                {/* Stage 3: Systemization & Monetization (Vertical stack) */}
-                <div className="flex flex-col items-center gap-4 text-center">
-                    <FlowCard icon={<Share2 size={32} />} title="4a. Personal Branding" description="Bundle completed Deep Work into shareable content.">
-                        <FeatureList features={["Content Bundling", "Creation Workflow (4-stage)", "Publishing Checklist"]} />
-                    </FlowCard>
-                    <FlowCard icon={<Package size={32} />} title="4b. Productization & Offerization" description="Systematically plan products and services.">
-                        <FeatureList features={["Gap Analysis", "Product/Service Definition", "Release Planning"]} />
-                    </FlowCard>
-                     <FlowCard icon={<Magnet size={32} />} title="4c. Lead Gen & Offer System" description="Define and track outreach and service offerings.">
-                        <FeatureList features={["Daily Action Tracking", "Service Offer Definition"]} />
-                    </FlowCard>
-                </div>
-
-                 <ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" />
-
-                {/* Stage 4: Overview & Control (Vertical stack) */}
-                <div className="flex flex-col items-center gap-4 text-center">
-                    <FlowCard icon={<LayoutDashboard size={32} />} title="5. Dashboard" description="Your daily command center for all activities.">
-                        <FeatureList features={["Time-Slotted Agenda", "Productivity Snapshot", "Activity Heatmap"]} />
-                    </FlowCard>
-                    <FlowCard icon={<GitMerge size={32} />} title="6. Strategic Views" description="High-level visualization of all plans.">
-                        <FeatureList features={["Strategic Matrix", "Interactive Mind Map"]} />
-                    </FlowCard>
-                </div>
-
-            </div>
-        </div>
-    );
 };
 
 
@@ -840,7 +767,7 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
 
 // Main Component
 export function MindMapViewer({ defaultView, showControls = true, rootFolderId = null, rootFocusAreaId = null }: MindMapViewerProps) {
-  const { toast } = useToast();
+  const { toast } = useAuth();
   const { 
       deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs, scheduleTaskFromMindMap, addFeatureToRelease, setDeepWorkDefinitions, resources, resourceFolders,
   } = useAuth();
@@ -1330,14 +1257,14 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
                     <div className="flex justify-center items-center min-w-full min-h-full">
                         {renderNode(mindMapData, 0)}
                     </div>
-                  ) : selectedTopic === 'Strategic Overview' ? (
-                     <StrategicOverviewDiagram />
                   ) : selectedTopic ? (
                      <div className="w-full h-full flex items-center justify-center">
                         <p className="text-muted-foreground">No data for this topic. Add some releases or focus areas to get started.</p>
                      </div>
                   ) : (
-                    <StrategicOverviewDiagram />
+                    <div className="w-full h-full flex items-center justify-center">
+                      <p className="text-muted-foreground">Select a view to get started</p>
+                    </div>
                   )}
                 </TransformComponent>
               </>

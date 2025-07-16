@@ -4,9 +4,10 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Heart, Briefcase, TrendingUp, DollarSign, GitMerge, Package } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Heart, Briefcase, TrendingUp, DollarSign, GitMerge, Package, Share2, Rocket, LayoutDashboard, BookCopy, Magnet, Activity as ActivityIcon, HeartPulse } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
+import React from 'react';
 
 const featureCards = [
     {
@@ -34,6 +35,75 @@ const featureCards = [
       link: '/monetization-engine'
     }
 ];
+
+const FlowCard = ({ icon, title, description, children }: { icon: React.ReactNode, title: string, description: string, children?: React.ReactNode }) => (
+  <div className="flex flex-col items-center p-4 border rounded-lg bg-card shadow-sm w-64 text-center h-full">
+    <div className="text-primary">{icon}</div>
+    <h3 className="mt-2 font-semibold text-foreground">{title}</h3>
+    <p className="mt-1 text-xs text-muted-foreground flex-grow">{description}</p>
+    {children}
+  </div>
+);
+
+const FeatureList = ({ features }: { features: string[] }) => (
+    <div className="mt-3 pt-3 border-t w-full">
+        <ul className="text-left text-xs list-disc list-inside space-y-1 text-muted-foreground">
+            {features.map((feature, i) => <li key={i}>{feature}</li>)}
+        </ul>
+    </div>
+);
+
+const StrategicOverviewDiagram = () => {
+    return (
+        <div className="flex items-start justify-center p-8 overflow-x-auto bg-muted/30 rounded-lg">
+            <div className="flex flex-row items-center gap-8">
+                <div className="flex flex-col items-center gap-4 text-center">
+                    <FlowCard icon={<HeartPulse size={32} />} title="1. Health" description="Track workouts, diet, and physical progress.">
+                        <FeatureList features={["Workout Plans", "Exercise Library", "Diet Planning", "Weight Tracking"]} />
+                    </FlowCard>
+                    <FlowCard icon={<BookCopy size={32} />} title="2. Upskill" description="Structured learning and skill acquisition.">
+                        <FeatureList features={["Topic & Goal Setting", "Session Logging", "Progress Visualization"]} />
+                    </FlowCard>
+                </div>
+
+                <ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" />
+
+                <div className="flex flex-col items-center gap-4 text-center">
+                    <FlowCard icon={<Briefcase size={32} />} title="3. Deep Work" description="Apply skills to focus areas, creating tangible value.">
+                        <FeatureList features={["Focus Area Management", "Skill Integration", "Time Tracking", "Ready for Branding Pipeline"]} />
+                    </FlowCard>
+                </div>
+
+                <ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" />
+
+                <div className="flex flex-col items-center gap-4 text-center">
+                    <FlowCard icon={<Share2 size={32} />} title="4a. Personal Branding" description="Bundle completed Deep Work into shareable content.">
+                        <FeatureList features={["Content Bundling", "Creation Workflow (4-stage)", "Publishing Checklist"]} />
+                    </FlowCard>
+                    <FlowCard icon={<Package size={32} />} title="4b. Productization & Offerization" description="Systematically plan products and services.">
+                        <FeatureList features={["Gap Analysis", "Product/Service Definition", "Release Planning"]} />
+                    </FlowCard>
+                     <FlowCard icon={<Magnet size={32} />} title="4c. Lead Gen & Offer System" description="Define and track outreach and service offerings.">
+                        <FeatureList features={["Daily Action Tracking", "Service Offer Definition"]} />
+                    </FlowCard>
+                </div>
+
+                 <ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" />
+
+                <div className="flex flex-col items-center gap-4 text-center">
+                    <FlowCard icon={<LayoutDashboard size={32} />} title="5. Dashboard" description="Your daily command center for all activities.">
+                        <FeatureList features={["Time-Slotted Agenda", "Productivity Snapshot", "Activity Heatmap"]} />
+                    </FlowCard>
+                    <FlowCard icon={<GitMerge size={32} />} title="6. Strategic Views" description="High-level visualization of all plans.">
+                        <FeatureList features={["Strategic Matrix", "Interactive Mind Map"]} />
+                    </FlowCard>
+                </div>
+
+            </div>
+        </div>
+    );
+};
+
 
 export default function LandingPage() {
   const { currentUser } = useAuth();
@@ -95,47 +165,27 @@ export default function LandingPage() {
         </section>
         
         <section className="container mx-auto px-4 py-20">
-            <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div className="grid md:grid-cols-1 gap-12 items-center">
                 <motion.div
-                    initial={{ opacity: 0, x: -50 }}
-                    whileInView={{ opacity: 1, x: 0 }}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.7 }}
+                    className="text-center"
                 >
                     <h2 className="text-3xl font-bold">From Learning to Earning</h2>
-                    <p className="mt-4 text-muted-foreground">
+                    <p className="mt-4 text-muted-foreground max-w-3xl mx-auto">
                         LifeOS is built on a simple but powerful premise: what you learn should be applied, and what you apply can be monetized. Our integrated modules create a seamless pipeline from skill acquisition to value creation.
                     </p>
-                    <ul className="mt-6 space-y-4">
-                        <li className="flex items-start gap-4">
-                            <div className="flex-shrink-0 bg-primary/10 text-primary p-2 rounded-full"><GitMerge className="h-5 w-5" /></div>
-                            <div>
-                                <h4 className="font-semibold">Connect Everything</h4>
-                                <p className="text-sm text-muted-foreground">Link learning tasks to deep work projects, and projects to content bundles, creating a clear and actionable mind map of your strategy.</p>
-                            </div>
-                        </li>
-                        <li className="flex items-start gap-4">
-                            <div className="flex-shrink-0 bg-primary/10 text-primary p-2 rounded-full"><Package className="h-5 w-5" /></div>
-                            <div>
-                                <h4 className="font-semibold">Systematize Your Genius</h4>
-                                <p className="text-sm text-muted-foreground">Use the Productization and Offerization frameworks to turn your unique knowledge into sellable products and services.</p>
-                            </div>
-                        </li>
-                    </ul>
                 </motion.div>
                 <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     whileInView={{ opacity: 1, scale: 1 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 0.7 }}
+                    transition={{ duration: 0.7, delay: 0.2 }}
+                    className="mt-8"
                 >
-                    <Card className="shadow-2xl">
-                        <CardContent className="p-6">
-                           <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-                               <img src="https://placehold.co/600x400.png" data-ai-hint="dashboard product" alt="LifeOS Dashboard Screenshot" className="rounded-md"/>
-                           </div>
-                        </CardContent>
-                    </Card>
+                    <StrategicOverviewDiagram />
                 </motion.div>
             </div>
         </section>
