@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -53,7 +54,7 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
     
     if (resource.type === 'card') {
         return (
-            <Card className="flex flex-col rounded-xl group overflow-hidden transition-all duration-300 hover:shadow-xl h-full">
+            <Card className="flex flex-col rounded-xl group overflow-hidden transition-all duration-300 hover:shadow-xl">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-3 text-lg">
                         <span className="text-primary"><Library className="h-5 w-5" /></span>
@@ -61,7 +62,7 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="flex-grow">
-                  <ScrollArea className="h-48 pr-3">
+                  <div>
                     <ul className="space-y-3">
                         {(resource.points || []).map((point) => (
                             <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground">
@@ -83,7 +84,7 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
                             </li>
                         ))}
                     </ul>
-                  </ScrollArea>
+                  </div>
                 </CardContent>
             </Card>
         );
