@@ -4,34 +4,34 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Heart, Briefcase, TrendingUp, DollarSign, GitMerge, Package, Share2, Rocket, LayoutDashboard, BookCopy, Magnet, Activity as ActivityIcon, HeartPulse } from 'lucide-react';
+import { ArrowRight, BrainCircuit, HeartPulse, Briefcase, TrendingUp, DollarSign, GitMerge, Package, Share2, Rocket, LayoutDashboard, BookCopy, Magnet, Activity as ActivityIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import React from 'react';
 
 const featureCards = [
     {
-      icon: <Heart className="h-8 w-8 text-red-500" />,
-      title: 'Health',
-      description: 'Track workouts, plan your diet, and monitor your physical progress towards your health goals.',
+      icon: <HeartPulse className="h-8 w-8 mb-4 text-red-500" />,
+      title: 'Health & Fitness',
+      description: 'Track workouts, plan your diet, and monitor physical progress.',
       link: '/workout-tracker'
     },
     {
-      icon: <TrendingUp className="h-8 w-8 text-blue-500" />,
-      title: 'Growth',
-      description: 'Systematically acquire new skills, track your learning hours, and visualize your upskilling journey.',
+      icon: <TrendingUp className="h-8 w-8 mb-4 text-blue-500" />,
+      title: 'Skill Acquisition',
+      description: 'Systematically acquire new skills and track your learning journey.',
       link: '/upskill'
     },
     {
-      icon: <Briefcase className="h-8 w-8 text-green-500" />,
-      title: 'Strategy',
-      description: 'Connect skills to projects, plan your deep work, and build a strategic map of your ambitions.',
+      icon: <Briefcase className="h-8 w-8 mb-4 text-green-500" />,
+      title: 'Strategic Projects',
+      description: 'Connect skills to projects and manage your deep work sessions.',
       link: '/deep-work'
     },
     {
-      icon: <DollarSign className="h-8 w-8 text-yellow-500" />,
-      title: 'Monetization',
-      description: 'Turn your completed projects into tangible products, services, and content to build your personal brand.',
+      icon: <DollarSign className="h-8 w-8 mb-4 text-yellow-500" />,
+      title: 'Monetization Engine',
+      description: 'Turn projects into products, services, and content.',
       link: '/monetization-engine'
     }
 ];
@@ -109,37 +109,36 @@ export default function LandingPage() {
   const { currentUser } = useAuth();
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-background">
       <main className="flex-grow">
-        <section className="container mx-auto px-4 py-20 md:py-32 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <BrainCircuit className="mx-auto h-20 w-20 text-primary mb-4" />
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
-              LifeOS: Your Personal Operating System
-            </h1>
-            <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
-              An all-in-one dashboard to systematically manage your growth, productivity, and personal projects. From health tracking to monetizing your skills, LifeOS provides the framework for a structured and goal-oriented life.
-            </p>
-            <div className="mt-8 flex justify-center gap-4">
-              <Button asChild size="lg">
-                <Link href={currentUser ? "/my-plate" : "/login"}>
-                  {currentUser ? 'Go to Dashboard' : 'Get Started'} <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
-              </Button>
+        <section className="relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-background via-muted/50 to-background"></div>
+            <div className="relative container mx-auto px-4 py-24 md:py-32 text-center">
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                >
+                    <BrainCircuit className="mx-auto h-16 w-16 text-primary mb-6" />
+                    <h1 className="text-4xl md:text-6xl font-bold tracking-tighter text-foreground">
+                    Your Personal OS for Growth
+                    </h1>
+                    <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
+                    LifeOS is an all-in-one dashboard to systematically manage your health, skills, and strategic projects. Turn ambition into tangible results.
+                    </p>
+                    <div className="mt-8 flex justify-center gap-4">
+                    <Button asChild size="lg" className="text-base font-semibold">
+                        <Link href={currentUser ? "/my-plate" : "/login"}>
+                        {currentUser ? 'Go to Dashboard' : 'Launch Your LifeOS'} <ArrowRight className="ml-2 h-5 w-5" />
+                        </Link>
+                    </Button>
+                    </div>
+                </motion.div>
             </div>
-          </motion.div>
         </section>
 
-        <section className="bg-muted/50 py-20">
+        <section className="py-20 bg-background">
             <div className="container mx-auto px-4">
-                <div className="text-center mb-12">
-                    <h2 className="text-3xl font-bold">The Four Pillars of LifeOS</h2>
-                    <p className="text-muted-foreground mt-2">A holistic approach to personal development.</p>
-                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                     {featureCards.map((card, index) => (
                       <motion.div
@@ -149,13 +148,13 @@ export default function LandingPage() {
                         viewport={{ once: true }}
                         transition={{ duration: 0.5, delay: index * 0.1 }}
                       >
-                        <Card className="text-center h-full hover:shadow-xl hover:-translate-y-1 transition-all">
+                        <Card className="text-center h-full border-0 bg-muted/30 hover:bg-muted/60 transition-all hover:shadow-lg">
                             <CardHeader className="items-center">
                                 {card.icon}
-                                <CardTitle>{card.title}</CardTitle>
+                                <CardTitle className="text-lg">{card.title}</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <CardDescription>{card.description}</CardDescription>
+                                <p className="text-sm text-muted-foreground">{card.description}</p>
                             </CardContent>
                         </Card>
                       </motion.div>
@@ -173,13 +172,13 @@ export default function LandingPage() {
                     transition={{ duration: 0.7 }}
                     className="text-center"
                 >
-                    <h2 className="text-3xl font-bold">From Learning to Earning</h2>
+                    <h2 className="text-3xl font-bold tracking-tight">The LifeOS Flywheel</h2>
                     <p className="mt-4 text-muted-foreground max-w-3xl mx-auto">
-                        LifeOS is built on a simple but powerful premise: what you learn should be applied, and what you apply can be monetized. Our integrated modules create a seamless pipeline from skill acquisition to value creation.
+                        A seamless pipeline from skill acquisition to value creation. What you learn is applied, and what you apply can be monetized.
                     </p>
                 </motion.div>
                 <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
+                    initial={{ opacity: 0, scale: 0.95 }}
                     whileInView={{ opacity: 1, scale: 1 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.7, delay: 0.2 }}
@@ -191,9 +190,9 @@ export default function LandingPage() {
         </section>
       </main>
       
-      <footer className="border-t">
+      <footer className="border-t bg-muted/50">
           <div className="container mx-auto px-4 py-6 text-center text-muted-foreground text-sm">
-              &copy; {new Date().getFullYear()} LifeOS. All rights reserved.
+              &copy; {new Date().getFullYear()} LifeOS. All systems operational.
           </div>
       </footer>
     </div>
