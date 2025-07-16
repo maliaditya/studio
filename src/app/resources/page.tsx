@@ -2,6 +2,7 @@
 
 
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -417,6 +418,8 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
         }
     };
     
+    const hasMarkdownContent = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+
     return (
         <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl">
             <CardHeader>
@@ -445,40 +448,42 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
                 </div>
             </CardHeader>
             <CardContent className="flex-grow min-h-0">
-              <ScrollArea className="h-[450px]">
-                <DndContext 
-                    sensors={sensors}
-                    onDragStart={e => setActivePointId(e.active.id as string)}
-                    onDragEnd={handleDragEnd}
-                >
-                    <SortableContext items={(resource.points || []).map(p => p.id)}>
-                        <ul className="space-y-3 pr-3">
-                            {(resource.points || []).map((point) => (
-                                <SortablePoint 
-                                    key={point.id} 
-                                    point={point} 
-                                    resource={resource}
-                                    onUpdate={onUpdate}
-                                    onDelete={handleDeletePoint}
-                                    setEmbedUrl={setEmbedUrl}
-                                    setFloatingVideoUrl={setFloatingVideoUrl}
-                                    editingPointId={editingPointId}
-                                    setEditingPointId={setEditingPointId}
-                                    onOpenNestedPopup={onOpenNestedPopup}
-                                />
-                            ))}
-                        </ul>
-                    </SortableContext>
-                    <DragOverlay>
-                        {activePointId ? (
-                            <div className="bg-card p-2 rounded-md shadow-lg opacity-80 flex items-start gap-3">
-                                <GripVertical className="h-4 w-4 text-muted-foreground/50" />
-                                {resource.points?.find(p => p.id === activePointId)?.text}
-                            </div>
-                        ) : null}
-                    </DragOverlay>
-                </DndContext>
-              </ScrollArea>
+              <div className={cn(hasMarkdownContent ? 'h-[450px]' : '')}>
+                <ScrollArea className="h-full">
+                    <DndContext 
+                        sensors={sensors}
+                        onDragStart={e => setActivePointId(e.active.id as string)}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <SortableContext items={(resource.points || []).map(p => p.id)}>
+                            <ul className="space-y-3 pr-3">
+                                {(resource.points || []).map((point) => (
+                                    <SortablePoint 
+                                        key={point.id} 
+                                        point={point} 
+                                        resource={resource}
+                                        onUpdate={onUpdate}
+                                        onDelete={handleDeletePoint}
+                                        setEmbedUrl={setEmbedUrl}
+                                        setFloatingVideoUrl={setFloatingVideoUrl}
+                                        editingPointId={editingPointId}
+                                        setEditingPointId={setEditingPointId}
+                                        onOpenNestedPopup={onOpenNestedPopup}
+                                    />
+                                ))}
+                            </ul>
+                        </SortableContext>
+                        <DragOverlay>
+                            {activePointId ? (
+                                <div className="bg-card p-2 rounded-md shadow-lg opacity-80 flex items-start gap-3">
+                                    <GripVertical className="h-4 w-4 text-muted-foreground/50" />
+                                    {resource.points?.find(p => p.id === activePointId)?.text}
+                                </div>
+                            ) : null}
+                        </DragOverlay>
+                    </DndContext>
+                </ScrollArea>
+              </div>
             </CardContent>
             <CardContent className="pt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                  <div className="flex gap-2">
