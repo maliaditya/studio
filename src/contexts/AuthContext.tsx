@@ -544,7 +544,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { success, message, user } = await localRegisterUser(username, password);
     if (success && user) {
       setCurrentUser(user);
-      router.push('/');
+      router.push('/my-plate');
       toast({ title: "Success", description: message });
     } else {
       toast({ title: "Error", description: message, variant: "destructive" });
@@ -560,11 +560,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (user.username === 'demo') {
         await pullDataFromCloud(user.username);
-        router.push('/');
-      } else {
-        router.push('/');
-        toast({ title: "Success", description: message });
       }
+      router.push('/my-plate');
+      toast({ title: "Success", description: message });
     } else {
       toast({ title: "Error", description: message, variant: "destructive" });
     }
