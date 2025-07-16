@@ -52,21 +52,16 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
     const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
     const imageEmbedUrl = isImageUrl(resource.link) ? resource.link : null;
     
-    const cardClassName = cn(
-        "flex flex-col rounded-xl group overflow-hidden transition-all duration-300 hover:shadow-xl",
-        resource.type === 'link' && "h-full"
-    );
-
     if (resource.type === 'card') {
         return (
-            <Card className={cardClassName}>
+            <Card className="flex flex-col rounded-xl group overflow-hidden transition-all duration-300 hover:shadow-xl">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-3 text-lg">
                         <span className="text-primary"><Library className="h-5 w-5" /></span>
                         <span className="truncate">{resource.name}</span>
                     </CardTitle>
                 </CardHeader>
-                <div className="p-6 pt-0 flex-grow min-h-0">
+                <CardContent className="p-6 pt-0 flex-grow min-h-0">
                   <ScrollArea className="h-[650px]">
                     <div>
                         <ul className="space-y-3">
@@ -92,7 +87,7 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
                         </ul>
                     </div>
                   </ScrollArea>
-                </div>
+                </CardContent>
             </Card>
         );
     }
@@ -272,17 +267,17 @@ export default function SharedFolderPage() {
             </header>
             
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8 items-start">
-                <aside className="md:col-span-1 md:sticky top-6 md:max-h-[calc(100vh-3rem)] md:overflow-y-auto">
+                <aside className="md:col-span-1 md:sticky md:top-6">
                     <Card>
                         <CardHeader>
                             <CardTitle>Folders</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ScrollArea className="max-h-[calc(100vh-14rem)] pr-2">
-                                <ul className="space-y-1">
+                            <div className="max-h-[calc(100vh-14rem)] overflow-y-auto">
+                                <ul className="space-y-1 pr-2">
                                     {renderSidebarFolders(folder, childFolders, 0)}
                                 </ul>
-                            </ScrollArea>
+                            </div>
                         </CardContent>
                     </Card>
                 </aside>
@@ -310,5 +305,4 @@ export default function SharedFolderPage() {
         </div>
     );
 }
-
 
