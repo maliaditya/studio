@@ -114,6 +114,7 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
                         <div className="flex items-center gap-2"><Youtube className="h-4 w-4 text-red-500"/><p className="font-semibold text-sm truncate" title={resource.name}>{resource.name}</p></div>
                         <div className="mt-auto pt-2 flex gap-2">
                              <Button asChild variant="outline" size="sm" className="w-full"><a href={resource.link} target="_blank" rel="noopener noreferrer">On YouTube <ExternalLink className="ml-2 h-3 w-3"/></a></Button>
+                             <Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(youtubeEmbedUrl)}><Expand className="mr-2 h-3 w-3"/>Expand</Button>
                         </div>
                     </CardContent>
                 </Card>
