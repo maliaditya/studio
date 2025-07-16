@@ -4,7 +4,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, Folder, Link as LinkIcon, Globe, Loader2, AlertTriangle, Youtube, Expand, PictureInPicture, ChevronDown, ChevronRight, BrainCircuit, Library, MessageSquare, Code, ArrowRight } from 'lucide-react';
@@ -47,7 +46,6 @@ const isImageUrl = (url: string | undefined): boolean => {
 };
 
 const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
-    const { setFloatingVideoUrl } = useAuth();
     const [embedUrl, setEmbedUrl] = useState<string | null>(null);
 
     const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
@@ -115,7 +113,6 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
                     <CardContent className="p-3 flex-grow flex flex-col">
                         <div className="flex items-center gap-2"><Youtube className="h-4 w-4 text-red-500"/><p className="font-semibold text-sm truncate" title={resource.name}>{resource.name}</p></div>
                         <div className="mt-auto pt-2 flex gap-2">
-                             <Button variant="secondary" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(resource.link!)}><PictureInPicture className="mr-2 h-3 w-3"/> Float</Button>
                              <Button asChild variant="outline" size="sm" className="w-full"><a href={resource.link} target="_blank" rel="noopener noreferrer">On YouTube <ExternalLink className="ml-2 h-3 w-3"/></a></Button>
                         </div>
                     </CardContent>
@@ -303,3 +300,4 @@ export default function SharedFolderPage() {
         </div>
     );
 }
+
