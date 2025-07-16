@@ -417,7 +417,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
     };
     
     return (
-        <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl h-full">
+        <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl">
             <CardHeader>
                 <div className="flex justify-between items-start gap-2">
                    <div className="flex items-center gap-2 flex-grow min-w-0">
@@ -443,14 +443,15 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
                    </DropdownMenu>
                 </div>
             </CardHeader>
-            <CardContent className="flex-grow">
+            <CardContent className="flex-grow min-h-0">
+              <ScrollArea className="h-[450px]">
                 <DndContext 
                     sensors={sensors}
                     onDragStart={e => setActivePointId(e.active.id as string)}
                     onDragEnd={handleDragEnd}
                 >
                     <SortableContext items={(resource.points || []).map(p => p.id)}>
-                        <ul className="space-y-3">
+                        <ul className="space-y-3 pr-3">
                             {(resource.points || []).map((point) => (
                                 <SortablePoint 
                                     key={point.id} 
@@ -476,6 +477,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
                         ) : null}
                     </DragOverlay>
                 </DndContext>
+              </ScrollArea>
             </CardContent>
             <CardContent className="pt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                  <div className="flex gap-2">
@@ -1094,12 +1096,12 @@ function ResourcesPageContent() {
                 <SortableContext items={filteredResources.map(r => r.id)}>
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                         {filteredResources.map(res => {
-                            const hasMarkdown = res.points?.some(p => p.type === 'markdown');
-                            const cardClassName = hasMarkdown ? "lg:col-span-3" : "";
+                            const isCardType = res.type === 'card';
+                            const cardClassName = isCardType ? "lg:col-span-3" : "";
 
                             return (
                                 <SortableResourceCard key={res.id} item={res} className={cardClassName}>
-                                    {res.type === 'card' ? (
+                                    {isCardType ? (
                                         <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} />
                                     ) : (
                                     (() => {
@@ -1361,3 +1363,4 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+

@@ -54,7 +54,7 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
     
     const cardClassName = cn(
         "flex flex-col rounded-xl group overflow-hidden transition-all duration-300 hover:shadow-xl",
-        !resource.points?.some(p => p.type === 'markdown') && "h-full"
+        resource.type === 'link' && "h-full"
     );
 
     if (resource.type === 'card') {
@@ -66,30 +66,32 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
                         <span className="truncate">{resource.name}</span>
                     </CardTitle>
                 </CardHeader>
-                <div className="p-6 pt-0 flex-grow">
-                  <div>
-                    <ul className="space-y-3">
-                        {(resource.points || []).map((point) => (
-                            <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground">
-                                {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                 point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                 <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
-                                }
-                                {point.type === 'card' && point.resourceId ? (
-                                    <span className="font-medium text-primary">{point.text}</span>
-                                ) : point.type === 'markdown' ? (
-                                    <div className="w-full prose dark:prose-invert prose-sm">
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
-                                    </div>
-                                ) : point.type === 'code' ? (
-                                    <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
-                                ) : (
-                                    <span className="break-words w-full" title={point.text}>{point.text}</span>
-                                )}
-                            </li>
-                        ))}
-                    </ul>
-                  </div>
+                <div className="p-6 pt-0 flex-grow min-h-0">
+                  <ScrollArea className="h-[450px]">
+                    <div>
+                        <ul className="space-y-3">
+                            {(resource.points || []).map((point) => (
+                                <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground">
+                                    {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                     point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                     <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
+                                    }
+                                    {point.type === 'card' && point.resourceId ? (
+                                        <span className="font-medium text-primary">{point.text}</span>
+                                    ) : point.type === 'markdown' ? (
+                                        <div className="w-full prose dark:prose-invert prose-sm">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                        </div>
+                                    ) : point.type === 'code' ? (
+                                        <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                                    ) : (
+                                        <span className="break-words w-full" title={point.text}>{point.text}</span>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                  </ScrollArea>
                 </div>
             </Card>
         );
@@ -269,8 +271,8 @@ export default function SharedFolderPage() {
                 </div>
             </header>
             
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                <aside className="md:col-span-1 space-y-6 md:sticky md:top-6 md:max-h-[calc(100vh-4rem)] md:overflow-y-auto">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 items-start">
+                <aside className="md:col-span-1 md:sticky md:top-24 md:max-h-[calc(100vh-7rem)] md:overflow-y-auto">
                     <Card>
                         <CardHeader>
                             <CardTitle>Folders</CardTitle>
@@ -290,8 +292,7 @@ export default function SharedFolderPage() {
                     {filteredResources.length > 0 ? (
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                             {filteredResources.map(res => {
-                                const hasMarkdown = res.points?.some(p => p.type === 'markdown');
-                                const cardClassName = hasMarkdown ? "lg:col-span-3" : "";
+                                const cardClassName = res.type === 'card' ? "lg:col-span-3" : "";
                                 return (
                                     <div key={res.id} className={cardClassName}>
                                         <ResourceLinkCard resource={res} />
@@ -309,3 +310,4 @@ export default function SharedFolderPage() {
         </div>
     );
 }
+
