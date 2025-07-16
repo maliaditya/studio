@@ -208,9 +208,9 @@ export default function SharedFolderPage() {
                 </div>
                 <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
                     <p>Powered by</p>
-                    <Link href="/" className="flex items-center gap-1 font-semibold text-primary hover:underline">
+                    <a href="https://corelifeos.vercel.app/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 font-semibold text-primary hover:underline">
                         <BrainCircuit className="h-4 w-4"/> LifeOS
-                    </Link>
+                    </a>
                 </div>
             </header>
             
