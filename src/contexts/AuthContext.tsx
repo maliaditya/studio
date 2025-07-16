@@ -141,7 +141,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<LocalUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDemoTokenModalOpen, setIsDemoTokenModalOpen] = useState(false);
-  const [theme, setTheme] = useState('default');
+  const [theme, setTheme] = useState('ad-dark');
   const [floatingVideoUrl, setFloatingVideoUrl] = useState<string | null>(null);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const router = useRouter();
@@ -195,7 +195,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setCurrentUser(user);
     setLoading(false);
     
-    const savedTheme = localStorage.getItem('lifeos_theme') || 'default';
+    const savedTheme = localStorage.getItem('lifeos_theme') || 'ad-dark';
     setTheme(savedTheme);
   }, []);
 
@@ -470,7 +470,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     if (carriedOver) {
-      setSchedule(prev => ({ ...prev, [todayDateKey]: newTodaySchedule }));
+      setSchedule(prev => ({ ...prev, [todayKey]: newTodaySchedule }));
       toast({ title: "Tasks Carried Over", description: "Yesterday's incomplete tasks have been moved to today." });
     }
 
