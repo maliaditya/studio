@@ -67,7 +67,7 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
                     </CardTitle>
                 </CardHeader>
                 <div className="p-6 pt-0 flex-grow min-h-0">
-                  <ScrollArea className="h-[450px]">
+                  <ScrollArea className="h-[650px]">
                     <div>
                         <ul className="space-y-3">
                             {(resource.points || []).map((point) => (
@@ -272,7 +272,7 @@ export default function SharedFolderPage() {
             </header>
             
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8 items-start">
-                <aside className="md:col-span-1 md:sticky md:top-24 md:max-h-[calc(100vh-7rem)] md:overflow-y-auto">
+                <aside className="md:col-span-1 md:sticky top-6 md:max-h-[calc(100vh-3rem)] md:overflow-y-auto">
                     <Card>
                         <CardHeader>
                             <CardTitle>Folders</CardTitle>
@@ -310,4 +310,5 @@ export default function SharedFolderPage() {
         </div>
     );
 }
+
 
