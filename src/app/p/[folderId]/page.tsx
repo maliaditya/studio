@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,7 +11,6 @@ import { ExternalLink, Folder, Link as LinkIcon, Globe, Loader2, AlertTriangle, 
 import type { Resource, ResourceFolder } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -54,7 +53,6 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
     const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
     const imageEmbedUrl = isImageUrl(resource.link) ? resource.link : null;
     
-    // Handle 'card' type resources
     if (resource.type === 'card') {
         return (
             <Card className="flex flex-col rounded-xl group overflow-hidden transition-all duration-300 hover:shadow-xl h-full">
@@ -93,7 +91,6 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
         );
     }
 
-    // Handle 'link' type resources (existing logic)
     if (imageEmbedUrl) {
         return (
             <Card className="overflow-hidden h-full flex flex-col">
@@ -146,33 +143,6 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
     )
 }
 
-const FolderView = ({ folder, resources, childFolders }: { folder: ResourceFolder, resources: Resource[], childFolders: ResourceFolder[] }) => {
-    const [collapsed, setCollapsed] = useState(false);
-    const resourcesInFolder = resources.filter(r => r.folderId === folder.id);
-
-    return (
-        <div className="ml-4 pl-4 border-l">
-            <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 text-lg font-semibold hover:text-primary transition-colors w-full text-left">
-                {collapsed ? <ChevronRight className="h-5 w-5"/> : <ChevronDown className="h-5 w-5"/>}
-                <Folder className="h-5 w-5 text-amber-500"/>
-                {folder.name}
-            </button>
-            {!collapsed && (
-                <div className="mt-4">
-                    {resourcesInFolder.length > 0 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
-                            {resourcesInFolder.map(res => <ResourceLinkCard key={res.id} resource={res}/>)}
-                        </div>
-                    )}
-                    {childFolders.map(child => (
-                        <FolderView key={child.id} folder={child} resources={resources} childFolders={childFolders.filter(f => f.parentId === child.id)}/>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-};
-
 interface SharedData {
   folder: ResourceFolder;
   resources: Resource[];
@@ -188,10 +158,15 @@ export default function SharedFolderPage() {
     const [data, setData] = useState<SharedData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    
+    const [selectedFolderId, setSelectedFolderId] = useState<string | null>(folderId);
+    const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         if (!folderId) return;
 
+        setSelectedFolderId(folderId);
+        
         const fetchData = async () => {
             setLoading(true);
             setError(null);
@@ -212,7 +187,45 @@ export default function SharedFolderPage() {
         fetchData();
     }, [folderId]);
 
-    const topLevelFolders = data ? [data.folder, ...data.childFolders.filter(f => f.parentId === data.folder.id)] : [];
+    const toggleFolderCollapse = useCallback((id: string) => {
+      setCollapsedFolders(prev => {
+          const newSet = new Set(prev);
+          if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
+          return newSet;
+      });
+    }, []);
+
+    const renderSidebarFolders = useCallback((currentFolder: ResourceFolder, allChildFolders: ResourceFolder[], level: number): JSX.Element => {
+      const children = allChildFolders.filter(f => f.parentId === currentFolder.id).sort((a,b) => a.name.localeCompare(b.name));
+      const isCollapsed = collapsedFolders.has(currentFolder.id);
+
+      return (
+        <li key={currentFolder.id}>
+            <div 
+                onClick={() => { setSelectedFolderId(currentFolder.id); if (children.length > 0) toggleFolderCollapse(currentFolder.id); }}
+                className={cn("flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer group", selectedFolderId === currentFolder.id && "bg-muted")}
+            >
+                {children.length > 0 ? (
+                    <ChevronDown className={cn("h-4 w-4 transition-transform", isCollapsed && "-rotate-90")} />
+                ) : (
+                    <div className="w-4" /> // Placeholder for alignment
+                )}
+                <Folder className="h-4 w-4"/>
+                <span className='flex-grow truncate'>{currentFolder.name}</span>
+            </div>
+            {!isCollapsed && children.length > 0 && (
+                <ul className="pl-4 border-l ml-4 space-y-1">
+                    {children.map(child => renderSidebarFolders(child, allChildFolders, level + 1))}
+                </ul>
+            )}
+        </li>
+      );
+    }, [collapsedFolders, selectedFolderId, toggleFolderCollapse]);
+
+    const filteredResources = useMemo(() => {
+      if (!data || !selectedFolderId) return [];
+      return data.resources.filter(r => r.folderId === selectedFolderId);
+    }, [data, selectedFolderId]);
 
     if (loading) {
         return (
@@ -237,18 +250,13 @@ export default function SharedFolderPage() {
     if (!data) return null;
 
     const { folder, resources, childFolders, sharedBy } = data;
-    const rootResources = resources.filter(r => r.folderId === folder.id);
+    const selectedFolderName = childFolders.find(f => f.id === selectedFolderId)?.name || folder.name;
 
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-             <header className="mb-8">
-                <div className="flex items-center gap-4">
-                    <Folder className="h-8 w-8 text-amber-500"/>
-                    <div>
-                        <h1 className="text-3xl font-bold">{folder.name}</h1>
-                        <p className="text-muted-foreground">A shared collection by {sharedBy}</p>
-                    </div>
-                </div>
+            <header className="mb-8">
+                <h1 className="text-3xl font-bold">Shared Collection</h1>
+                <p className="text-muted-foreground">Shared by {sharedBy}</p>
                 <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
                     <p>Powered by</p>
                     <a href="https://corelifeos.vercel.app/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 font-semibold text-primary hover:underline">
@@ -257,16 +265,40 @@ export default function SharedFolderPage() {
                 </div>
             </header>
             
-            <div className="space-y-8">
-                {rootResources.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {rootResources.map(res => <ResourceLinkCard key={res.id} resource={res}/>)}
-                    </div>
-                )}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <aside className="md:col-span-1 space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Folders</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <ul className="space-y-1">
+                                {renderSidebarFolders(folder, childFolders, 0)}
+                            </ul>
+                        </CardContent>
+                    </Card>
+                </aside>
 
-                {childFolders.filter(f => f.parentId === folder.id).map(child => (
-                    <FolderView key={child.id} folder={child} resources={resources} childFolders={childFolders.filter(f => f.parentId === child.id)}/>
-                ))}
+                <main className="md:col-span-3">
+                    <h2 className="text-2xl font-bold mb-4">{selectedFolderName}</h2>
+                    {filteredResources.length > 0 ? (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                            {filteredResources.map(res => {
+                                const hasMarkdown = res.points?.some(p => p.type === 'markdown');
+                                const cardClassName = hasMarkdown ? "lg:col-span-3" : "";
+                                return (
+                                    <div key={res.id} className={cardClassName}>
+                                        <ResourceLinkCard resource={res} />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="text-center text-muted-foreground p-12 border-2 border-dashed rounded-lg">
+                            <p>This folder is empty.</p>
+                        </div>
+                    )}
+                </main>
             </div>
         </div>
     );
