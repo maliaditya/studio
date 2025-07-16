@@ -66,7 +66,7 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
                         <span className="truncate">{resource.name}</span>
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="flex-grow">
+                <div className="p-6 pt-0 flex-grow">
                   <div>
                     <ul className="space-y-3">
                         {(resource.points || []).map((point) => (
@@ -90,7 +90,7 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
                         ))}
                     </ul>
                   </div>
-                </CardContent>
+                </div>
             </Card>
         );
     }
@@ -270,21 +270,19 @@ export default function SharedFolderPage() {
             </header>
             
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                <aside className="md:col-span-1 space-y-6">
-                    <div className="sticky top-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Folders</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <ScrollArea className="max-h-[calc(100vh-14rem)] pr-2">
-                                    <ul className="space-y-1">
-                                        {renderSidebarFolders(folder, childFolders, 0)}
-                                    </ul>
-                                </ScrollArea>
-                            </CardContent>
-                        </Card>
-                    </div>
+                <aside className="md:col-span-1 space-y-6 md:sticky md:top-6 md:max-h-[calc(100vh-4rem)] md:overflow-y-auto">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Folders</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <ScrollArea className="max-h-[calc(100vh-14rem)] pr-2">
+                                <ul className="space-y-1">
+                                    {renderSidebarFolders(folder, childFolders, 0)}
+                                </ul>
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
                 </aside>
 
                 <main className="md:col-span-3">
@@ -311,5 +309,3 @@ export default function SharedFolderPage() {
         </div>
     );
 }
-
-
