@@ -52,9 +52,14 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
     const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
     const imageEmbedUrl = isImageUrl(resource.link) ? resource.link : null;
     
+    const cardClassName = cn(
+        "flex flex-col rounded-xl group overflow-hidden transition-all duration-300 hover:shadow-xl",
+        !resource.points?.some(p => p.type === 'markdown') && "h-full"
+    );
+
     if (resource.type === 'card') {
         return (
-            <Card className="flex flex-col rounded-xl group overflow-hidden transition-all duration-300 hover:shadow-xl">
+            <Card className={cardClassName}>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-3 text-lg">
                         <span className="text-primary"><Library className="h-5 w-5" /></span>
@@ -266,16 +271,20 @@ export default function SharedFolderPage() {
             
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
                 <aside className="md:col-span-1 space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Folders</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <ul className="space-y-1">
-                                {renderSidebarFolders(folder, childFolders, 0)}
-                            </ul>
-                        </CardContent>
-                    </Card>
+                    <div className="sticky top-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Folders</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <ScrollArea className="max-h-[calc(100vh-14rem)] pr-2">
+                                    <ul className="space-y-1">
+                                        {renderSidebarFolders(folder, childFolders, 0)}
+                                    </ul>
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </aside>
 
                 <main className="md:col-span-3">
@@ -302,4 +311,5 @@ export default function SharedFolderPage() {
         </div>
     );
 }
+
 
