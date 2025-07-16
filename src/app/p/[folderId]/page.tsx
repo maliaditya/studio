@@ -7,11 +7,14 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, Folder, Link as LinkIcon, Globe, Loader2, AlertTriangle, Youtube, Expand, PictureInPicture, ChevronDown, ChevronRight, BrainCircuit } from 'lucide-react';
+import { ExternalLink, Folder, Link as LinkIcon, Globe, Loader2, AlertTriangle, Youtube, Expand, PictureInPicture, ChevronDown, ChevronRight, BrainCircuit, Library, MessageSquare, Code, ArrowRight } from 'lucide-react';
 import type { Resource, ResourceFolder } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Link from 'next/link';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -51,6 +54,46 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
     const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
     const imageEmbedUrl = isImageUrl(resource.link) ? resource.link : null;
     
+    // Handle 'card' type resources
+    if (resource.type === 'card') {
+        return (
+            <Card className="flex flex-col rounded-xl group overflow-hidden transition-all duration-300 hover:shadow-xl h-full">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-3 text-lg">
+                        <span className="text-primary"><Library className="h-5 w-5" /></span>
+                        <span className="truncate">{resource.name}</span>
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="flex-grow">
+                  <ScrollArea className="h-48 pr-3">
+                    <ul className="space-y-3">
+                        {(resource.points || []).map((point) => (
+                            <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground">
+                                {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                 point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                 <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
+                                }
+                                {point.type === 'card' && point.resourceId ? (
+                                    <span className="font-medium text-primary">{point.text}</span>
+                                ) : point.type === 'markdown' ? (
+                                    <div className="w-full prose dark:prose-invert prose-sm">
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                    </div>
+                                ) : point.type === 'code' ? (
+                                    <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                                ) : (
+                                    <span className="break-words w-full" title={point.text}>{point.text}</span>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                  </ScrollArea>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    // Handle 'link' type resources (existing logic)
     if (imageEmbedUrl) {
         return (
             <Card className="overflow-hidden h-full flex flex-col">
