@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent, DragOverlay, useSensor, PointerSensor, useSensors } from '@dnd-kit/core';
-import { useSortable, arrayMove } from '@dnd-kit/sortable';
+import { SortableContext, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
@@ -931,15 +931,13 @@ function ResourcesPageContent() {
     if (!resource) return;
 
     const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown');
-    let popupWidth = 512;
-    if (hasMarkdown) {
-        popupWidth = 896; 
-    }
-    
+    const popupWidth = hasMarkdown ? 896 : 512;
+    const popupHeight = 600;
+
     let x, y;
     if (hasMarkdown) {
         x = (window.innerWidth - popupWidth) / 2;
-        y = (window.innerHeight - 600) / 2;
+        y = (window.innerHeight - popupHeight) / 2;
     } else {
         x = event.clientX;
         y = event.clientY;
@@ -954,7 +952,7 @@ function ResourcesPageContent() {
             y: y,
             parentId: undefined,
             width: popupWidth,
-            height: 600
+            height: popupHeight
         });
         return newPopups;
     });
@@ -1087,7 +1085,7 @@ function ResourcesPageContent() {
                     : 'Resources'}
                 </h2>
                 
-                <SortableContext items={filteredResources}>
+                <SortableContext items={filteredResources.map(r => r.id)}>
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                         {filteredResources.map(res => {
                             const hasMarkdown = res.points?.some(p => p.type === 'markdown');
