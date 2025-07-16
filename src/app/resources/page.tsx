@@ -13,7 +13,7 @@ import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLi
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
-import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -1250,7 +1250,7 @@ function ResourcesPageContent() {
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Edit Resource</DialogTitle>
-                    <DialogDescriptionComponent>Update the details or move this resource to a new folder.</DialogDescriptionComponent>
+                    <DialogDescription>Update the details or move this resource to a new folder.</DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-4 items-center gap-4">
