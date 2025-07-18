@@ -4,6 +4,7 @@
 
 
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -66,7 +67,22 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
 
 const isImageUrl = (url: string | undefined): boolean => {
     if (!url) return false;
-    return /\.(jpg|jpeg|png|webp|avif|gif|svg)$/i.test(url);
+    // Check for common image file extensions
+    if (/\.(jpg|jpeg|png|webp|avif|gif|svg)$/i.test(url)) {
+        return true;
+    }
+    // Check for image hosting domains that use URL parameters
+    try {
+        const urlObj = new URL(url);
+        const imageHosts = ['images.unsplash.com', 'plus.unsplash.com'];
+        if (imageHosts.includes(urlObj.hostname)) {
+            return true;
+        }
+    } catch (e) {
+        // Invalid URL
+        return false;
+    }
+    return false;
 };
   
 const isGifUrl = (url: string | undefined): boolean => {
@@ -1371,5 +1387,6 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
