@@ -61,9 +61,11 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
 
 const isImageUrl = (url: string | undefined): boolean => {
     if (!url) return false;
+    // Check for common image file extensions
     if (/\.(jpg|jpeg|png|webp|avif|gif|svg)$/i.test(url)) {
         return true;
     }
+    // Check for image hosting domains that use URL parameters
     try {
         const urlObj = new URL(url);
         const imageHosts = ['images.unsplash.com', 'plus.unsplash.com'];
@@ -71,6 +73,7 @@ const isImageUrl = (url: string | undefined): boolean => {
             return true;
         }
     } catch (e) {
+        // Invalid URL
         return false;
     }
     return false;
@@ -423,11 +426,10 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
     };
 
     const handleDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event;
         setActivePointId(null);
-        if (over && active.id !== over.id) {
-          const oldIndex = (resource.points || []).findIndex(p => p.id === active.id);
-          const newIndex = (resource.points || []).findIndex(p => p.id === over.id);
+        if (event.over && event.active.id !== event.over.id) {
+          const oldIndex = (resource.points || []).findIndex(p => p.id === event.active.id);
+          const newIndex = (resource.points || []).findIndex(p => p.id === event.over!.id);
           if (oldIndex > -1 && newIndex > -1) {
             const newPoints = arrayMove(resource.points || [], oldIndex, newIndex);
             onUpdate({ ...resource, points: newPoints });
@@ -973,7 +975,7 @@ function ResourcesPageContent() {
                         onClick={() => { setSelectedFolderId(folder.id); toggleFolderCollapse(folder.id); }}
                         onDoubleClick={() => setEditingFolder(folder)}
                         onContextMenu={(e) => handleContextMenu(e, folder)}
-                        className={cn("flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer group", selectedFolderId === folder.id && "bg-muted")}
+                        className={cn("flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer group", selectedFolderId === folder.id && "bg-accent font-semibold")}
                     >
                         <ChevronDown className={cn("h-4 w-4 transition-transform", collapsedFolders.has(folder.id) && "-rotate-90", resourceFolders.every(f => f.parentId !== folder.id) && "invisible")} />
                         <Folder className="h-4 w-4"/>
