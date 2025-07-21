@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subYears, differenceInYears, addWeeks, startOfISOWeek, setISOWeek, getISOWeekYear, subDays } from 'date-fns';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { MindMapViewer } from '@/components/MindMapViewer';
@@ -788,7 +788,7 @@ function MyPlatePageContent() {
       }
     }
     return durations;
-  }, [schedule, selectedDateKey, getActivityDuration]);
+  }, [schedule, selectedDateKey, getActivityDuration, upskillDefinitions, deepWorkDefinitions]);
   
   const formatMinutes = (minutes: number) => {
     if (minutes <= 0) return "0m";
@@ -949,7 +949,7 @@ function MyPlatePageContent() {
         upskillDefinitions,
     };
 
-}, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, schedule, upskillDefinitions, deepWorkDefinitions]);
+  }, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, schedule, upskillDefinitions, deepWorkDefinitions]);
 
   const timeAllocationData = useMemo(() => {
     if (!productivityStats.todayHoursData) return [];
