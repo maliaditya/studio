@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Separator } from './ui/separator';
+import { Button } from './ui/button';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -77,6 +78,14 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
     });
   };
 
+  const handleResetLandingPage = () => {
+    localStorage.removeItem('lifeos_hide_landing_page');
+    toast({
+      title: "Preference Reset",
+      description: "The landing page will now be shown on your next visit.",
+    });
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -115,9 +124,9 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
           </div>
           <div className="space-y-4 rounded-lg border p-4">
             <div className="space-y-0.5">
-              <Label className="text-base">Carry-forward Tasks</Label>
+              <Label className="text-base">General</Label>
               <p className="text-sm text-muted-foreground">
-                Automatically copy yesterday's activities to today's empty schedule.
+                Manage general application behavior.
               </p>
             </div>
             <div className="flex items-center space-x-2">
@@ -127,8 +136,16 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                 onCheckedChange={(checked) => handleSettingChange('carryForward', checked)}
               />
               <Label htmlFor="carry-forward" className="font-normal">
-                {settings.carryForward ? "Enabled" : "Disabled"}
+                Carry-forward yesterday's incomplete tasks to today.
               </Label>
+            </div>
+             <div className="flex items-center justify-between">
+              <Label htmlFor="reset-landing" className="font-normal">
+                Show the welcome page on next visit.
+              </Label>
+              <Button id="reset-landing" variant="outline" size="sm" onClick={handleResetLandingPage}>
+                Reset
+              </Button>
             </div>
           </div>
         </div>

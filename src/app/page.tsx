@@ -1,13 +1,16 @@
 
 "use client";
 
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ArrowRight, BrainCircuit, HeartPulse, Briefcase, TrendingUp, DollarSign, GitMerge, Package, Share2, Rocket, LayoutDashboard, BookCopy, Magnet, Activity as ActivityIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
-import React from 'react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 const featureCards = [
     {
@@ -107,6 +110,24 @@ const StrategicOverviewDiagram = () => {
 
 export default function LandingPage() {
   const { currentUser } = useAuth();
+  const router = useRouter();
+  const [dontShowAgain, setDontShowAgain] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      const hideLanding = localStorage.getItem('lifeos_hide_landing_page');
+      if (hideLanding === 'true') {
+        router.push('/my-plate');
+      }
+    }
+  }, [currentUser, router]);
+  
+  const handleProceed = () => {
+    if (dontShowAgain && currentUser) {
+        localStorage.setItem('lifeos_hide_landing_page', 'true');
+    }
+    router.push(currentUser ? "/my-plate" : "/login");
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -126,12 +147,16 @@ export default function LandingPage() {
                     <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
                     LifeOS is an all-in-one dashboard to systematically manage your health, skills, and strategic projects. Turn ambition into tangible results.
                     </p>
-                    <div className="mt-8 flex justify-center gap-4">
-                    <Button asChild size="lg" className="text-base font-semibold">
-                        <Link href={currentUser ? "/my-plate" : "/login"}>
-                        {currentUser ? 'Go to Dashboard' : 'Launch Your LifeOS'} <ArrowRight className="ml-2 h-5 w-5" />
-                        </Link>
-                    </Button>
+                    <div className="mt-8 flex flex-col items-center justify-center gap-4">
+                        <Button onClick={handleProceed} size="lg" className="text-base font-semibold">
+                            {currentUser ? 'Go to Dashboard' : 'Launch Your LifeOS'} <ArrowRight className="ml-2 h-5 w-5" />
+                        </Button>
+                        {currentUser && (
+                            <div className="flex items-center space-x-2">
+                                <Checkbox id="dont-show-again" checked={dontShowAgain} onCheckedChange={(checked) => setDontShowAgain(!!checked)} />
+                                <Label htmlFor="dont-show-again" className="text-sm font-normal text-muted-foreground">Don't show this again</Label>
+                            </div>
+                        )}
                     </div>
                 </motion.div>
             </div>
