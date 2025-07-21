@@ -5,6 +5,7 @@
 
 
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -67,11 +68,9 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
 
 const isImageUrl = (url: string | undefined): boolean => {
     if (!url) return false;
-    // Check for common image file extensions
     if (/\.(jpg|jpeg|png|webp|avif|gif|svg)$/i.test(url)) {
         return true;
     }
-    // Check for image hosting domains that use URL parameters
     try {
         const urlObj = new URL(url);
         const imageHosts = ['images.unsplash.com', 'plus.unsplash.com'];
@@ -79,7 +78,6 @@ const isImageUrl = (url: string | undefined): boolean => {
             return true;
         }
     } catch (e) {
-        // Invalid URL
         return false;
     }
     return false;
@@ -379,7 +377,15 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
 };
 
 
-const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEmbedUrl, onOpenNestedPopup }: { resource: Resource; onUpdate: (resource: Resource) => void; onDelete: (resourceId: string) => void; setFloatingVideoUrl: (url: string | null) => void; setEmbedUrl: (url: string | null) => void; onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void; }) => {
+const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEmbedUrl, onOpenNestedPopup, onOpenMarkdownModal }: { 
+    resource: Resource; 
+    onUpdate: (resource: Resource) => void; 
+    onDelete: (resourceId: string) => void; 
+    setFloatingVideoUrl: (url: string | null) => void; 
+    setEmbedUrl: (url: string | null) => void; 
+    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
+    onOpenMarkdownModal: (content: string) => void;
+}) => {
     const { resources } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
     const [editingPointId, setEditingPointId] = useState<string | null>(null);
@@ -436,6 +442,9 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
     };
     
     const hasMarkdownContent = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+    const fullMarkdownContent = (resource.points || []).filter(p => p.type === 'markdown' || p.type === 'code').map(p => {
+        return p.type === 'code' ? `\`\`\`\n${p.text}\n\`\`\`` : p.text;
+    }).join('\n\n---\n\n');
 
     return (
         <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl">
@@ -459,6 +468,9 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                             <DropdownMenuItem onSelect={() => setEditingTitle(true)}>Edit Title</DropdownMenuItem>
+                            {hasMarkdownContent && (
+                                <DropdownMenuItem onSelect={() => onOpenMarkdownModal(fullMarkdownContent)}>View Content</DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onSelect={() => onDelete(resource.id)} className="text-destructive">Delete Card</DropdownMenuItem>
                         </DropdownMenuContent>
                    </DropdownMenu>
@@ -596,6 +608,8 @@ function ResourcesPageContent() {
   
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
+
+  const [markdownModalContent, setMarkdownModalContent] = useState<string | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1126,7 +1140,7 @@ function ResourcesPageContent() {
                             return (
                                 <SortableResourceCard key={res.id} item={res} className={cardClassName}>
                                     {isCardType ? (
-                                        <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} />
+                                        <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={setMarkdownModalContent} />
                                     ) : (
                                     (() => {
                                         const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
@@ -1379,6 +1393,20 @@ function ResourcesPageContent() {
                 </div>
             </DialogContent>
         </Dialog>
+        <Dialog open={!!markdownModalContent} onOpenChange={() => setMarkdownModalContent(null)}>
+            <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
+                <DialogHeader className="sr-only">
+                    <DialogTitle>Resource Content</DialogTitle>
+                </DialogHeader>
+                <div className="flex-grow min-h-0 p-4">
+                    <ScrollArea className="h-full">
+                        <div className="prose dark:prose-invert max-w-full">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdownModalContent || ""}</ReactMarkdown>
+                        </div>
+                    </ScrollArea>
+                </div>
+            </DialogContent>
+        </Dialog>
     </DndContext>
     </>
   );
@@ -1387,6 +1415,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
