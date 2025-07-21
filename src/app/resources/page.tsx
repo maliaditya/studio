@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -49,7 +49,6 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
     try {
         const urlObj = new URL(url);
         let videoId: string | null = null;
-
         if (urlObj.hostname.includes('youtube.com')) {
             if (urlObj.pathname.startsWith('/shorts/')) {
                 videoId = urlObj.pathname.split('/shorts/')[1];
@@ -59,10 +58,7 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
         } else if (urlObj.hostname.includes('youtu.be')) {
             videoId = urlObj.pathname.slice(1);
         }
-
-        if (videoId) {
-            return `https://www.youtube.com/embed/${videoId}`;
-        }
+        if (videoId) return `https://www.youtube.com/embed/${videoId}`;
     } catch (e) {}
     return null;
 };
@@ -167,7 +163,7 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClos
         } else {
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
-        }
+        };
         return () => {
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
@@ -596,7 +592,8 @@ function ResourcesPageContent() {
   
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   const [editedResourceData, setEditedResourceData] = useState<Partial<Resource>>({});
-  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+  
+  const [modalVideoState, setModalVideoState] = useState<{ videos: Resource[], currentIndex: number } | null>(null);
 
   const [contextMenu, setContextMenu] = useState<{
     mouseX: number;
@@ -710,6 +707,7 @@ function ResourcesPageContent() {
     const handleKeyDown = (event: KeyboardEvent) => {
         if (event.key === 'Escape') {
             setOpenPopups(new Map());
+            setModalVideoState(null);
         }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -740,6 +738,15 @@ function ResourcesPageContent() {
     if (!selectedResourceFolderId) return [];
     return resources.filter(r => r.folderId === selectedResourceFolderId);
   }, [resources, selectedResourceFolderId]);
+
+  const handleOpenVideoModal = (resourceId: string) => {
+    const youtubeVideosInFolder = filteredResources.filter(r => getYouTubeEmbedUrl(r.link));
+    const currentIndex = youtubeVideosInFolder.findIndex(r => r.id === resourceId);
+    if (currentIndex > -1) {
+        setModalVideoState({ videos: youtubeVideosInFolder, currentIndex });
+    }
+  };
+
   
   const handleAddFolder = (e: FormEvent) => {
     e.preventDefault();
@@ -1253,7 +1260,7 @@ function ResourcesPageContent() {
                             return (
                                 <SortableResourceCard key={res.id} item={res} className={cardClassName}>
                                     {isCardType ? (
-                                        <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={setMarkdownModalContent} />
+                                        <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} setEmbedUrl={(url) => {}} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={setMarkdownModalContent} />
                                     ) : (
                                     (() => {
                                         const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
@@ -1280,7 +1287,7 @@ function ResourcesPageContent() {
                                                     <>
                                                         <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover/sortable:opacity-100 transition-opacity">
                                                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="h-4 w-4" /></Button>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setEmbedUrl(youtubeEmbedUrl); }} aria-label="View in App"><Expand className="h-4 w-4" /></Button>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); handleOpenVideoModal(res.id); }} aria-label="View in App"><Expand className="h-4 w-4" /></Button>
                                                             <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                                                         </div>
                                                         <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl"><iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe></div>
@@ -1406,7 +1413,7 @@ function ResourcesPageContent() {
         )}
         
         {deleteConfirmation && (
-            <AlertDialog open={!!deleteConfirmation} onOpenChange={() => setDeleteConfirmation(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete "{deleteConfirmation.item.name}" and all its contents. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setDeleteConfirmation(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { handleDeleteFolder(deleteConfirmation.item.id); setDeleteConfirmation(null); }}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+            <AlertDialog open={!!deleteConfirmation} onOpenChange={() => setDeleteConfirmation(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete "{deleteConfirmation.item.name}" and all its contents. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={()={() => setDeleteConfirmation(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { handleDeleteFolder(deleteConfirmation.item.id); setDeleteConfirmation(null); }}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
         )}
 
         <Dialog open={!!editingResource} onOpenChange={(isOpen) => !isOpen && setEditingResource(null)}>
@@ -1447,11 +1454,40 @@ function ResourcesPageContent() {
             </DialogContent>
         </Dialog>
 
-        <Dialog open={!!embedUrl} onOpenChange={(isOpen) => !isOpen && setEmbedUrl(null)}>
+        <Dialog open={!!modalVideoState} onOpenChange={(isOpen) => !isOpen && setModalVideoState(null)}>
             <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
-                <div className="flex-grow min-h-0">{embedUrl && (<iframe src={embedUrl} className="w-full h-full border-0 rounded-md" title="Embedded Resource" sandbox="allow-scripts allow-same-origin allow-forms" allow="picture-in-picture"></iframe>)}</div>
+                <div className="flex-grow min-h-0 relative group/modal">
+                    {modalVideoState && getYouTubeEmbedUrl(modalVideoState.videos[modalVideoState.currentIndex].link) && (
+                        <iframe 
+                            src={getYouTubeEmbedUrl(modalVideoState.videos[modalVideoState.currentIndex].link)!}
+                            className="w-full h-full border-0 rounded-md" 
+                            title={modalVideoState.videos[modalVideoState.currentIndex].name}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                        ></iframe>
+                    )}
+                    <Button 
+                        variant="secondary" 
+                        size="icon" 
+                        className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full opacity-0 group-hover/modal:opacity-100 transition-opacity disabled:opacity-0"
+                        disabled={modalVideoState?.currentIndex === 0}
+                        onClick={() => setModalVideoState(prev => prev ? ({ ...prev, currentIndex: prev.currentIndex - 1 }) : null)}
+                    >
+                        <ChevronLeftIcon className="h-6 w-6" />
+                    </Button>
+                     <Button 
+                        variant="secondary" 
+                        size="icon" 
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full opacity-0 group-hover/modal:opacity-100 transition-opacity disabled:opacity-0"
+                        disabled={modalVideoState?.currentIndex === (modalVideoState?.videos.length ?? 0) - 1}
+                        onClick={() => setModalVideoState(prev => prev ? ({ ...prev, currentIndex: prev.currentIndex + 1 }) : null)}
+                    >
+                        <ChevronRightIcon className="h-6 w-6" />
+                    </Button>
+                </div>
             </DialogContent>
         </Dialog>
+
         <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
             <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                 <DialogHeader className="sr-only"><DialogTitle>Resource Mind Map</DialogTitle></DialogHeader>
@@ -1532,3 +1568,4 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
