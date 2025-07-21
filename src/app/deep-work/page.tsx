@@ -88,7 +88,11 @@ const getYouTubeEmbedUrl = (url: string): string | null => {
         let videoId: string | null = null;
 
         if (urlObj.hostname.includes('youtube.com')) {
-            videoId = urlObj.searchParams.get('v');
+            if (urlObj.pathname.startsWith('/shorts/')) {
+                videoId = urlObj.pathname.split('/shorts/')[1];
+            } else {
+                videoId = urlObj.searchParams.get('v');
+            }
         } else if (urlObj.hostname.includes('youtu.be')) {
             videoId = urlObj.pathname.slice(1);
         }

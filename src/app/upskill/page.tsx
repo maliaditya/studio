@@ -1,5 +1,6 @@
 
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -54,12 +55,20 @@ const getYouTubeEmbedUrl = (url: string): string | null => {
     try {
         const urlObj = new URL(url);
         let videoId: string | null = null;
+
         if (urlObj.hostname.includes('youtube.com')) {
-            videoId = urlObj.searchParams.get('v');
+            if (urlObj.pathname.startsWith('/shorts/')) {
+                videoId = urlObj.pathname.split('/shorts/')[1];
+            } else {
+                videoId = urlObj.searchParams.get('v');
+            }
         } else if (urlObj.hostname.includes('youtu.be')) {
             videoId = urlObj.pathname.slice(1);
         }
-        if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+
+        if (videoId) {
+            return `https://www.youtube.com/embed/${videoId}`;
+        }
     } catch (e) {}
     return null;
 };
