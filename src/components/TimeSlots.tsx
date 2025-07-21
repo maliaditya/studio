@@ -12,6 +12,7 @@ import {
   Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet
 } from 'lucide-react';
 import type { ActivityType, Activity, DailySchedule } from '@/types/workout';
+import { useAuth } from '@/contexts/AuthContext';
 
 const slots = [
   { name: 'Late Night', time: '12 AM - 4 AM', icon: <Moon className="h-6 w-6 text-indigo-400" /> },
