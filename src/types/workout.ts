@@ -232,6 +232,7 @@ export interface ResourceFolder {
   name: string;
   parentId: string | null;
   icon?: string; // Optional: for root folders or special folders
+  isPinned?: boolean;
 }
 
 // Canvas Types

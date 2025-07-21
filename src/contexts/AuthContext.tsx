@@ -109,6 +109,9 @@ interface AuthContextType {
   setResourceFolders: React.Dispatch<React.SetStateAction<ResourceFolder[]>>;
   resources: Resource[];
   setResources: React.Dispatch<React.SetStateAction<Resource[]>>;
+  pinnedFolderIds: Set<string>;
+  setPinnedFolderIds: React.Dispatch<React.SetStateAction<Set<string>>>;
+
 
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
@@ -182,6 +185,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Resources State
   const [resources, setResources] = useState<Resource[]>([]);
   const [resourceFolders, setResourceFolders] = useState<ResourceFolder[]>([]);
+  const [pinnedFolderIds, setPinnedFolderIds] = useState<Set<string>>(new Set());
+
 
   // Canvas State
   const [canvasLayout, setCanvasLayout] = useState<CanvasLayout>({ nodes: [], edges: [] });
@@ -244,43 +249,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`productization_plans_${username}`); setProductizationPlans(d ? JSON.parse(d) : {}); } catch (e) { setProductizationPlans({}); }
       try { const d = loadItem(`offerization_plans_${username}`); setOfferizationPlans(d ? JSON.parse(d) : {}); } catch (e) { setOfferizationPlans({}); }
 
-      // Resources Data Migration
-      const storedCategories = localStorage.getItem(`resourceCategories_${username}`);
-      const storedSubcategories = localStorage.getItem(`resourceSubcategories_${username}`);
+      // Resources Data Migration & Loading
       const storedFolders = localStorage.getItem(`resourceFolders_${username}`);
-
       if (storedFolders) {
         setResourceFolders(JSON.parse(storedFolders));
-      } else if (storedCategories) {
-        const categories = JSON.parse(storedCategories);
-        const subcategories = storedSubcategories ? JSON.parse(storedSubcategories) : [];
-        const migratedFolders: ResourceFolder[] = [];
-        categories.forEach((cat: any) => {
-          migratedFolders.push({ id: cat.id, name: cat.name, parentId: null, icon: cat.icon });
-        });
-        subcategories.forEach((sub: any) => {
-          migratedFolders.push({ id: sub.id, name: sub.name, parentId: sub.categoryId });
-        });
-        setResourceFolders(migratedFolders);
       } else {
         setResourceFolders([]);
       }
-
+      
       const storedResources = localStorage.getItem(`resources_${username}`);
       if (storedResources) {
-          let resourcesData = JSON.parse(storedResources);
-          if (resourcesData.length > 0 && resourcesData[0].categoryId) {
-              resourcesData = resourcesData.map((res: any) => ({
-                  id: res.id,
-                  name: res.name,
-                  link: res.link,
-                  description: res.description,
-                  folderId: res.subcategoryId || res.categoryId,
-              }));
-          }
-          setResources(resourcesData);
+          setResources(JSON.parse(storedResources));
       } else {
           setResources([]);
+      }
+      
+      try {
+        const pinnedIds = loadItem(`pinned_folder_ids_${username}`);
+        setPinnedFolderIds(pinnedIds ? new Set(JSON.parse(pinnedIds)) : new Set());
+      } catch (e) {
+        setPinnedFolderIds(new Set());
       }
       
       // Canvas Data
@@ -301,7 +289,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLeadGenDefinitions(LEAD_GEN_DEFINITIONS);
       setProductizationPlans({});
       setOfferizationPlans({});
-      setResources([]); setResourceFolders([]);
+      setResources([]); setResourceFolders([]); setPinnedFolderIds(new Set());
       setCanvasLayout({ nodes: [], edges: [] });
       setMindsetCards(DEFAULT_MINDSET_CARDS);
     }
@@ -342,24 +330,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Resources
       localStorage.setItem(`resources_${username}`, JSON.stringify(resources));
       localStorage.setItem(`resourceFolders_${username}`, JSON.stringify(resourceFolders));
+      localStorage.setItem(`pinned_folder_ids_${username}`, JSON.stringify(Array.from(pinnedFolderIds)));
+
       
       // Canvas
       localStorage.setItem(`canvas_layout_${username}`, JSON.stringify(canvasLayout));
 
       // Mindset
       localStorage.setItem(`mindset_cards_${username}`, JSON.stringify(mindsetCards));
-
-
-      // Clean up old resource keys after migration
-      localStorage.removeItem(`resourceCategories_${username}`);
-      localStorage.removeItem(`resourceSubcategories_${username}`);
     }
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
     schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
     exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, deepWorkTopicMetadata, leadGenDefinitions,
     productizationPlans, offerizationPlans,
-    resources, resourceFolders,
+    resources, resourceFolders, pinnedFolderIds,
     canvasLayout,
     mindsetCards,
     currentUser, loading
@@ -510,30 +495,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setDateOfBirth(data.dateOfBirth || null);
     setGender(data.gender || null);
     
-    // Resource Migration Logic
-    if (data.resourceFolders) {
-        setResourceFolders(data.resourceFolders);
-    } else if (data.resourceCategories) {
-        const migratedFolders: ResourceFolder[] = [];
-        data.resourceCategories.forEach((cat: any) => {
-            migratedFolders.push({ id: cat.id, name: cat.name, parentId: null, icon: cat.icon });
-        });
-        (data.resourceSubcategories || []).forEach((sub: any) => {
-            migratedFolders.push({ id: sub.id, name: sub.name, parentId: sub.categoryId });
-        });
-        setResourceFolders(migratedFolders);
-    } else {
-        setResourceFolders([]);
-    }
+    // Resources Data
+    setResourceFolders(data.resourceFolders || []);
+    setResources(data.resources || []);
+    setPinnedFolderIds(data.pinnedFolderIds ? new Set(data.pinnedFolderIds) : new Set());
 
-    let resourcesData = data.resources || [];
-    if (resourcesData.length > 0 && resourcesData[0].categoryId) {
-        resourcesData = resourcesData.map((res: any) => ({
-            id: res.id, name: res.name, link: res.link, description: res.description,
-            folderId: res.subcategoryId || res.categoryId,
-        }));
-    }
-    setResources(resourcesData);
 
     setCanvasLayout(data.canvasLayout || { nodes: [], edges: [] });
     setMindsetCards(data.mindsetCards || DEFAULT_MINDSET_CARDS);
@@ -588,7 +554,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       offerizationPlans,
       schedule,
       dietPlan, weightLogs, goalWeight, height, dateOfBirth, gender,
-      resources, resourceFolders,
+      resources, resourceFolders, pinnedFolderIds: Array.from(pinnedFolderIds),
       canvasLayout,
       mindsetCards,
     };
@@ -1291,6 +1257,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     copyOffer,
     resourceFolders, setResourceFolders,
     resources, setResources,
+    pinnedFolderIds, setPinnedFolderIds,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,

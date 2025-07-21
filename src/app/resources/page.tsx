@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -568,7 +568,9 @@ function ResourcesPageContent() {
     currentUser,
     resources, setResources, 
     resourceFolders, setResourceFolders,
-    setFloatingVideoUrl
+    setFloatingVideoUrl,
+    pinnedFolderIds,
+    setPinnedFolderIds
   } = useAuth();
   const { toast } = useToast();
   
@@ -577,6 +579,7 @@ function ResourcesPageContent() {
   const [newResourceLink, setNewResourceLink] = useState('');
 
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [activeTabIds, setActiveTabIds] = useState<string[]>([]);
   const [editingFolder, setEditingFolder] = useState<ResourceFolder | null>(null);
   const [newlyCreatedFolderId, setNewlyCreatedFolderId] = useState<string | null>(null);
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
@@ -634,6 +637,45 @@ function ResourcesPageContent() {
         setCollapsedFolders(new Set(resourceFolders.map(f => f.id)));
     }
   }, [expandedFoldersKey, resourceFolders]);
+  
+  const handleSelectFolder = (folderId: string) => {
+    setSelectedFolderId(folderId);
+    if (!activeTabIds.includes(folderId)) {
+        setActiveTabIds(prev => [...prev, folderId]);
+    }
+  };
+
+  const handleCloseTab = (folderIdToClose: string) => {
+    let newSelectedFolderId = selectedFolderId;
+    const tabIndex = activeTabIds.findIndex(id => id === folderIdToClose);
+
+    if (selectedFolderId === folderIdToClose) {
+        if (activeTabIds.length === 1) {
+            newSelectedFolderId = null;
+        } else if (tabIndex > 0) {
+            newSelectedFolderId = activeTabIds[tabIndex - 1];
+        } else {
+            newSelectedFolderId = activeTabIds[1];
+        }
+    }
+    
+    setActiveTabIds(prev => prev.filter(id => id !== folderIdToClose));
+    setSelectedFolderId(newSelectedFolderId);
+  };
+  
+  const togglePinFolder = (folderId: string) => {
+    setPinnedFolderIds(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(folderId)) {
+            newSet.delete(folderId);
+            toast({ title: "Folder unpinned" });
+        } else {
+            newSet.add(folderId);
+            toast({ title: "Folder pinned" });
+        }
+        return newSet;
+    });
+  };
 
   const toggleFolderCollapse = useCallback((folderId: string) => {
     setCollapsedFolders(prev => {
@@ -720,6 +762,7 @@ function ResourcesPageContent() {
     
     setResourceFolders(prev => prev.filter(f => !idsToDelete.includes(f.id)));
     setResources(prev => prev.filter(r => !idsToDelete.includes(r.folderId)));
+    setActiveTabIds(prev => prev.filter(id => !idsToDelete.includes(id)));
     
     if (selectedFolderId && idsToDelete.includes(selectedFolderId)) {
         setSelectedFolderId(null);
@@ -946,7 +989,13 @@ function ResourcesPageContent() {
   const renderSidebarFolders = useCallback((parentId: string | null, level: number) => {
     const foldersToRender = resourceFolders
         .filter(f => f.parentId === parentId)
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .sort((a, b) => {
+            const aIsPinned = pinnedFolderIds.has(a.id);
+            const bIsPinned = pinnedFolderIds.has(b.id);
+            if (aIsPinned && !bIsPinned) return -1;
+            if (!aIsPinned && bIsPinned) return 1;
+            return a.name.localeCompare(b.name);
+        });
 
     if (foldersToRender.length === 0 && level > 0) return null;
 
@@ -972,11 +1021,12 @@ function ResourcesPageContent() {
                     </div>
                 ) : (
                     <div 
-                        onClick={() => { setSelectedFolderId(folder.id); toggleFolderCollapse(folder.id); }}
+                        onClick={() => { handleSelectFolder(folder.id); toggleFolderCollapse(folder.id); }}
                         onDoubleClick={() => setEditingFolder(folder)}
                         onContextMenu={(e) => handleContextMenu(e, folder)}
                         className={cn("flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer group", selectedFolderId === folder.id && "bg-accent font-semibold")}
                     >
+                        {pinnedFolderIds.has(folder.id) && <Pin className="h-3 w-3 text-primary flex-shrink-0" />}
                         <ChevronDown className={cn("h-4 w-4 transition-transform", collapsedFolders.has(folder.id) && "-rotate-90", resourceFolders.every(f => f.parentId !== folder.id) && "invisible")} />
                         <Folder className="h-4 w-4"/>
                         <span className='flex-grow truncate'>{folder.name}</span>
@@ -1000,7 +1050,7 @@ function ResourcesPageContent() {
         ))}
       </ul>
     );
-  }, [resourceFolders, editingFolder, selectedFolderId, collapsedFolders, toggleFolderCollapse, commitFolderEdit, cancelFolderEdit, handleContextMenu]);
+  }, [resourceFolders, editingFolder, selectedFolderId, collapsedFolders, toggleFolderCollapse, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds]);
 
   const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent) => {
     const resource = resources.find(r => r.id === resourceId);
@@ -1154,11 +1204,33 @@ function ResourcesPageContent() {
 
             {/* Main Content */}
             <main className="md:col-span-3">
+                 <div className="flex items-center border-b mb-4 overflow-x-auto">
+                    {activeTabIds.map(tabId => {
+                        const folder = resourceFolders.find(f => f.id === tabId);
+                        if (!folder) return null;
+                        return (
+                            <button
+                                key={tabId}
+                                onClick={() => setSelectedFolderId(tabId)}
+                                className={cn(
+                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2",
+                                    selectedFolderId === tabId 
+                                        ? "border-primary text-primary" 
+                                        : "border-transparent text-muted-foreground hover:bg-muted"
+                                )}
+                            >
+                                <Folder className="h-4 w-4" />
+                                <span className="whitespace-nowrap">{folder.name}</span>
+                                <X className="h-4 w-4 ml-2 hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleCloseTab(tabId); }} />
+                            </button>
+                        );
+                    })}
+                </div>
                 <div>
                 <h2 className="text-2xl font-bold mb-4">
                     {selectedFolderId
                     ? resourceFolders.find(f => f.id === selectedFolderId)?.name
-                    : 'Resources'}
+                    : 'Select a folder to view resources'}
                 </h2>
                 
                 <SortableContext items={filteredResources.map(r => r.id)}>
@@ -1312,6 +1384,10 @@ function ResourcesPageContent() {
     
         {contextMenu && (
             <div ref={contextMenuRef} style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }} className="fixed z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => e.stopPropagation()}>
+                <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { togglePinFolder(contextMenu.item.id); setContextMenu(null); }}>
+                    {pinnedFolderIds.has(contextMenu.item.id) ? <PinOff className="mr-2 h-4 w-4" /> : <Pin className="mr-2 h-4 w-4" />}
+                    {pinnedFolderIds.has(contextMenu.item.id) ? 'Unpin' : 'Pin'}
+                </Button>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleAddNewNestedFolder(contextMenu.item); setContextMenu(null); }}>New Folder</Button>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleShareFolder(contextMenu.item); setContextMenu(null); }}><Share className="mr-2 h-4 w-4" />Share Publicly</Button>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { setEditingFolder(contextMenu.item); setContextMenu(null); }}>Rename</Button>
