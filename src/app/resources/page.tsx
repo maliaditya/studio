@@ -1,12 +1,4 @@
 
-
-
-
-
-
-
-
-
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -69,11 +61,9 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
 
 const isImageUrl = (url: string | undefined): boolean => {
     if (!url) return false;
-    // Check for common image file extensions
     if (/\.(jpg|jpeg|png|webp|avif|gif|svg)$/i.test(url)) {
         return true;
     }
-    // Check for image hosting domains that use URL parameters
     try {
         const urlObj = new URL(url);
         const imageHosts = ['images.unsplash.com', 'plus.unsplash.com'];
@@ -81,7 +71,6 @@ const isImageUrl = (url: string | undefined): boolean => {
             return true;
         }
     } catch (e) {
-        // Invalid URL
         return false;
     }
     return false;
@@ -148,6 +137,7 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClos
         if (isResizing) {
             const dx = e.clientX - resizeStart.x;
             const dy = e.clientY - resizeStart.y;
+            
             setCurrentSize({
                 width: Math.max(320, resizeStart.width + dx),
                 height: 600, // Fixed height
@@ -619,6 +609,49 @@ function ResourcesPageContent() {
 
   const [markdownModalContent, setMarkdownModalContent] = useState<string | null>(null);
 
+  const expandedFoldersKey = useMemo(() => currentUser ? `resource_expanded_folders_${currentUser.username}` : null, [currentUser]);
+
+  useEffect(() => {
+    if (expandedFoldersKey) {
+        try {
+            const storedExpanded = localStorage.getItem(expandedFoldersKey);
+            const expandedIds = storedExpanded ? JSON.parse(storedExpanded) : [];
+            const allFolderIds = new Set(resourceFolders.map(f => f.id));
+            const initialCollapsed = new Set<string>();
+            allFolderIds.forEach(id => {
+                if (!expandedIds.includes(id)) {
+                    initialCollapsed.add(id);
+                }
+            });
+            setCollapsedFolders(initialCollapsed);
+        } catch (e) {
+            console.error("Failed to parse collapsed folders state from localStorage", e);
+            setCollapsedFolders(new Set(resourceFolders.map(f => f.id)));
+        }
+    } else {
+        setCollapsedFolders(new Set(resourceFolders.map(f => f.id)));
+    }
+  }, [expandedFoldersKey, resourceFolders]);
+
+  const toggleFolderCollapse = useCallback((folderId: string) => {
+    setCollapsedFolders(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(folderId)) {
+            newSet.delete(folderId);
+        } else {
+            newSet.add(folderId);
+        }
+
+        if (expandedFoldersKey) {
+            const allFolderIds = resourceFolders.map(f => f.id);
+            const expandedIds = allFolderIds.filter(id => !newSet.has(id));
+            localStorage.setItem(expandedFoldersKey, JSON.stringify(expandedIds));
+        }
+        return newSet;
+    });
+  }, [expandedFoldersKey, resourceFolders]);
+
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
         if (event.key === 'Escape') {
@@ -653,18 +686,6 @@ function ResourcesPageContent() {
     if (!selectedFolderId) return [];
     return resources.filter(r => r.folderId === selectedFolderId);
   }, [resources, selectedFolderId]);
-
-  const toggleFolderCollapse = useCallback((folderId: string) => {
-    setCollapsedFolders(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(folderId)) {
-            newSet.delete(folderId);
-        } else {
-            newSet.add(folderId);
-        }
-        return newSet;
-    });
-  }, []);
   
   const handleAddFolder = (e: FormEvent) => {
     e.preventDefault();
@@ -1423,8 +1444,3 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
-
-
-
-
-
