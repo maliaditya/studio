@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -182,21 +181,72 @@ function MyPlatePageContent() {
     }
     localStorage.setItem(lastCarryForwardKey, todayDateKey);
   }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast]);
+  
+  const getActivityDuration = useCallback((activity: Activity, dateKey: string): number => {
+    if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.taskIds && activity.taskIds.length > 0) {
+        const logSource = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
+        const defSource = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
+
+        const logForDay = logSource.find(log => log.date === dateKey);
+        const loggedMinutes = logForDay?.exercises
+            .filter(ex => activity.taskIds!.includes(ex.id))
+            .reduce((sum, ex) => {
+                const durationField = activity.type === 'upskill' ? 'reps' : 'weight';
+                return sum + ex.loggedSets.reduce((setSum, set) => setSum + set[durationField], 0);
+            }, 0) || 0;
+        
+        if (loggedMinutes > 0) return loggedMinutes;
+
+        // If not logged, calculate from estimations
+        const exerciseDefIds = logForDay?.exercises
+            .filter(ex => activity.taskIds!.includes(ex.id))
+            .map(ex => ex.definitionId) || [];
+        
+        return exerciseDefIds.reduce((sum, defId) => {
+            const def = defSource.find(d => d.id === defId);
+            return sum + (def?.estimatedDuration || 0);
+        }, 0);
+    }
+    // Default durations for activities without linked tasks
+    switch (activity.type) {
+        case 'workout': return 90;
+        case 'planning': case 'tracking': return 30;
+        case 'lead-generation': return 45;
+        case 'branding': return 120;
+        case 'upskill': case 'deepwork': return 120; // Default block size
+        default: return 30;
+    }
+  }, [allUpskillLogs, allDeepWorkLogs, upskillDefinitions, deepWorkDefinitions]);
 
   const handleAddActivity = (slotName: string, type: ActivityType) => {
     if (!currentUser?.username || !selectedDateKey) return;
-    const currentActivities = schedule[selectedDateKey]?.[slotName] || [];
-    if (currentActivities.length >= 2) { toast({ title: "Slot Full", description: "You can add a maximum of two activities per slot.", variant: "destructive" }); return; }
+    const SLOT_CAPACITY_MINUTES = 240;
+    
+    const activitiesInSlot = schedule[selectedDateKey]?.[slotName] || [];
+    const currentSlotDuration = activitiesInSlot.reduce((sum, act) => sum + getActivityDuration(act, selectedDateKey), 0);
+
     let details = '';
+    let newActivityDuration = 0;
+
     switch (type) {
-      case 'workout': { const { description } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions); details = description.split(' for ')[1] || "Workout"; break; }
-      case 'upskill': details = 'Learning Session'; break;
-      case 'deepwork': details = 'Deep Work Session'; break;
-      case 'planning': details = 'Planning Session'; break;
-      case 'tracking': details = 'Tracking Session'; break;
-      case 'branding': details = 'Branding Session'; break;
-      case 'lead-generation': details = 'Lead Generation Session'; break;
+      case 'workout': 
+        const { description } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
+        details = description.split(' for ')[1] || "Workout";
+        newActivityDuration = 90;
+        break;
+      case 'upskill': details = 'Learning Session'; newActivityDuration = 120; break;
+      case 'deepwork': details = 'Deep Work Session'; newActivityDuration = 120; break;
+      case 'planning': details = 'Planning Session'; newActivityDuration = 30; break;
+      case 'tracking': details = 'Tracking Session'; newActivityDuration = 30; break;
+      case 'branding': details = 'Branding Session'; newActivityDuration = 120; break;
+      case 'lead-generation': details = 'Lead Generation Session'; newActivityDuration = 45; break;
     }
+    
+    if (currentSlotDuration + newActivityDuration > SLOT_CAPACITY_MINUTES) {
+        toast({ title: "Slot Full", description: `This activity would exceed the 4-hour slot limit. Current time: ${formatMinutes(currentSlotDuration)}.`, variant: "destructive" });
+        return;
+    }
+    
     const newActivity: Activity = { 
       id: `${type}-${Date.now()}-${Math.random()}`, 
       type, 
@@ -723,43 +773,11 @@ function MyPlatePageContent() {
       const activitiesInSlot = daySchedule[slotName] || [];
 
       for (const activity of activitiesInSlot) {
-        let totalMinutes = 0;
-        
-        if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.taskIds && activity.taskIds.length > 0) {
-            const logSource = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
-            const logForDay = logSource.find(log => log.date === selectedDateKey);
-            const loggedMinutes = logForDay?.exercises
-                .filter(ex => activity.taskIds!.includes(ex.id))
-                .reduce((sum, ex) => {
-                    const durationField = activity.type === 'upskill' ? 'reps' : 'weight';
-                    return sum + ex.loggedSets.reduce((setSum, set) => setSum + set[durationField], 0);
-                }, 0) || 0;
-            
-            if (loggedMinutes > 0) {
-                totalMinutes = loggedMinutes;
-            } else {
-                totalMinutes = activity.taskIds.reduce((sum, taskId) => {
-                    const exerciseInstance = logForDay?.exercises.find(ex => ex.id === taskId);
-                    if (exerciseInstance) {
-                        const def = allDefs.get(exerciseInstance.definitionId);
-                        return sum + (def?.estimatedDuration || 0);
-                    }
-                    return sum;
-                }, 0);
-            }
-        } else {
-             switch (activity.type) {
-                case 'workout': totalMinutes = 90; break;
-                case 'planning': case 'tracking': totalMinutes = 30; break;
-                case 'lead-generation': totalMinutes = 45; break;
-                case 'upskill': case 'deepwork': case 'branding': totalMinutes = activitiesInSlot.length === 1 ? 240 : 120; break;
-                default: totalMinutes = 30;
-            }
-        }
+        let totalMinutes = getActivityDuration(activity, selectedDateKey);
         
         if (totalMinutes > 0) {
           const hours = Math.floor(totalMinutes / 60);
-          const minutes = totalMinutes % 60;
+          const minutes = Math.round(totalMinutes % 60);
           let durationStr = '';
           if (hours > 0) durationStr += `${hours}h `;
           if (minutes > 0) durationStr += `${minutes}m`;
@@ -770,7 +788,16 @@ function MyPlatePageContent() {
       }
     }
     return durations;
-  }, [schedule, selectedDateKey, allUpskillLogs, allDeepWorkLogs, upskillDefinitions, deepWorkDefinitions]);
+  }, [schedule, selectedDateKey, getActivityDuration]);
+  
+  const formatMinutes = (minutes: number) => {
+    if (minutes <= 0) return "0m";
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
+    if (hours > 0) return `${hours}h`;
+    return `${mins}m`;
+  };
 
   // Push calculated durations to the global context
   useEffect(() => {
