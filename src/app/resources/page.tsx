@@ -162,7 +162,6 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClos
             window.addEventListener('mouseup', handleMouseUp);
         } else {
             window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
         };
         return () => {
             window.removeEventListener('mousemove', handleMouseMove);
@@ -1413,7 +1412,7 @@ function ResourcesPageContent() {
         )}
         
         {deleteConfirmation && (
-            <AlertDialog open={!!deleteConfirmation} onOpenChange={() => setDeleteConfirmation(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete "{deleteConfirmation.item.name}" and all its contents. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={()={() => setDeleteConfirmation(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { handleDeleteFolder(deleteConfirmation.item.id); setDeleteConfirmation(null); }}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+            <AlertDialog open={!!deleteConfirmation} onOpenChange={() => setDeleteConfirmation(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete "{deleteConfirmation.item.name}" and all its contents. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setDeleteConfirmation(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { handleDeleteFolder(deleteConfirmation.item.id); setDeleteConfirmation(null); }}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
         )}
 
         <Dialog open={!!editingResource} onOpenChange={(isOpen) => !isOpen && setEditingResource(null)}>
@@ -1473,7 +1472,7 @@ function ResourcesPageContent() {
                         disabled={modalVideoState?.currentIndex === 0}
                         onClick={() => setModalVideoState(prev => prev ? ({ ...prev, currentIndex: prev.currentIndex - 1 }) : null)}
                     >
-                        <ChevronLeftIcon className="h-6 w-6" />
+                        <ChevronLeft className="h-6 w-6" />
                     </Button>
                      <Button 
                         variant="secondary" 
@@ -1569,3 +1568,4 @@ export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
 
+    
