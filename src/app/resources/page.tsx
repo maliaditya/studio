@@ -593,6 +593,8 @@ function ResourcesPageContent() {
   const [editedResourceData, setEditedResourceData] = useState<Partial<Resource>>({});
   
   const [modalVideoState, setModalVideoState] = useState<{ videos: Resource[], currentIndex: number } | null>(null);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
 
   const [contextMenu, setContextMenu] = useState<{
     mouseX: number;
@@ -744,6 +746,29 @@ function ResourcesPageContent() {
     if (currentIndex > -1) {
         setModalVideoState({ videos: youtubeVideosInFolder, currentIndex });
     }
+  };
+
+  const handleVideoModalScroll = (e: React.WheelEvent) => {
+    if (scrollTimeoutRef.current) return; // Ignore scroll if timeout is active
+
+    e.preventDefault();
+
+    setModalVideoState(prev => {
+      if (!prev) return null;
+      const { videos, currentIndex } = prev;
+      let newIndex = currentIndex;
+      if (e.deltaY > 0) { // Scrolling down
+        newIndex = Math.min(videos.length - 1, currentIndex + 1);
+      } else { // Scrolling up
+        newIndex = Math.max(0, currentIndex - 1);
+      }
+      return { ...prev, currentIndex: newIndex };
+    });
+
+    // Set a timeout to prevent another scroll for a short period
+    scrollTimeoutRef.current = setTimeout(() => {
+        scrollTimeoutRef.current = null;
+    }, 300); // 300ms delay
   };
 
   
@@ -1454,7 +1479,7 @@ function ResourcesPageContent() {
         </Dialog>
 
         <Dialog open={!!modalVideoState} onOpenChange={(isOpen) => !isOpen && setModalVideoState(null)}>
-            <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
+            <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2" onWheel={handleVideoModalScroll}>
                 <div className="flex-grow min-h-0 relative group/modal">
                     {modalVideoState && getYouTubeEmbedUrl(modalVideoState.videos[modalVideoState.currentIndex].link) && (
                         <iframe 
@@ -1465,24 +1490,6 @@ function ResourcesPageContent() {
                             allowFullScreen
                         ></iframe>
                     )}
-                    <Button 
-                        variant="secondary" 
-                        size="icon" 
-                        className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full opacity-0 group-hover/modal:opacity-100 transition-opacity disabled:opacity-0"
-                        disabled={modalVideoState?.currentIndex === 0}
-                        onClick={() => setModalVideoState(prev => prev ? ({ ...prev, currentIndex: prev.currentIndex - 1 }) : null)}
-                    >
-                        <ChevronLeft className="h-6 w-6" />
-                    </Button>
-                     <Button 
-                        variant="secondary" 
-                        size="icon" 
-                        className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full opacity-0 group-hover/modal:opacity-100 transition-opacity disabled:opacity-0"
-                        disabled={modalVideoState?.currentIndex === (modalVideoState?.videos.length ?? 0) - 1}
-                        onClick={() => setModalVideoState(prev => prev ? ({ ...prev, currentIndex: prev.currentIndex + 1 }) : null)}
-                    >
-                        <ChevronRightIcon className="h-6 w-6" />
-                    </Button>
                 </div>
             </DialogContent>
         </Dialog>
