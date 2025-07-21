@@ -42,6 +42,17 @@ interface TimeSlotsProps {
   onActivityClick: (slotName: string, activity: Activity) => void;
 }
 
+const parseDurationToMinutes = (durationStr: string | undefined): number => {
+    if (!durationStr) return 0;
+    let totalMinutes = 0;
+    const hourMatch = durationStr.match(/(\d+)\s*h/);
+    if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
+    const minMatch = durationStr.match(/(\d+)\s*m/);
+    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+    return totalMinutes;
+};
+
+
 export function TimeSlots({
   schedule,
   currentSlot,
@@ -52,10 +63,18 @@ export function TimeSlots({
   onActivityClick,
 }: TimeSlotsProps) {
 
+  const activityDurations = useAuth().activityDurations;
+  const SLOT_CAPACITY_MINUTES = 240;
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {slots.map((slot) => {
-        const activities = schedule[slot.name];
+        const activities = schedule[slot.name] || [];
+        const currentSlotDuration = activities.reduce((sum, act) => {
+            const duration = activityDurations[act.id];
+            return sum + parseDurationToMinutes(duration);
+        }, 0);
+
         return (
           <Card
             key={slot.name}
@@ -128,7 +147,7 @@ export function TimeSlots({
                 )}
               </div>
 
-              {(!activities || activities.length < 2) && (
+              {currentSlotDuration < SLOT_CAPACITY_MINUTES && (
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" className="mt-auto self-end h-8 w-8 rounded-full">

@@ -239,7 +239,7 @@ export function TodaysScheduleCard({
   }, [isAgendaDocked]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('button') || isAgendaDocked) return;
+    if ((e.target as HTMLElement).closest('button, [role="button"]') || isAgendaDocked) return;
     setIsDragging(true);
     setDragStartOffset({
       x: e.clientX - position.x,
