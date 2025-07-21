@@ -6,6 +6,7 @@
 
 
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -68,9 +69,11 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
 
 const isImageUrl = (url: string | undefined): boolean => {
     if (!url) return false;
+    // Check for common image file extensions
     if (/\.(jpg|jpeg|png|webp|avif|gif|svg)$/i.test(url)) {
         return true;
     }
+    // Check for image hosting domains that use URL parameters
     try {
         const urlObj = new URL(url);
         const imageHosts = ['images.unsplash.com', 'plus.unsplash.com'];
@@ -78,6 +81,7 @@ const isImageUrl = (url: string | undefined): boolean => {
             return true;
         }
     } catch (e) {
+        // Invalid URL
         return false;
     }
     return false;
@@ -460,20 +464,24 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
                             </CardTitle>
                         )}
                    </div>
-                   <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 -mr-2 -mt-1">
-                                <MoreVertical className="h-4 w-4" />
+                   <div className="flex items-center">
+                        {hasMarkdownContent && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onOpenMarkdownModal(fullMarkdownContent)}>
+                                <Expand className="h-4 w-4" />
                             </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => setEditingTitle(true)}>Edit Title</DropdownMenuItem>
-                            {hasMarkdownContent && (
-                                <DropdownMenuItem onSelect={() => onOpenMarkdownModal(fullMarkdownContent)}>View Content</DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem onSelect={() => onDelete(resource.id)} className="text-destructive">Delete Card</DropdownMenuItem>
-                        </DropdownMenuContent>
-                   </DropdownMenu>
+                        )}
+                       <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 -mr-2 -mt-1">
+                                    <MoreVertical className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => setEditingTitle(true)}>Edit Title</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => onDelete(resource.id)} className="text-destructive">Delete Card</DropdownMenuItem>
+                            </DropdownMenuContent>
+                       </DropdownMenu>
+                   </div>
                 </div>
             </CardHeader>
             <CardContent className="flex-grow min-h-0">
@@ -1415,6 +1423,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
