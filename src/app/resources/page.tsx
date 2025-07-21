@@ -570,7 +570,11 @@ function ResourcesPageContent() {
     resourceFolders, setResourceFolders,
     setFloatingVideoUrl,
     pinnedFolderIds,
-    setPinnedFolderIds
+    setPinnedFolderIds,
+    activeResourceTabIds,
+    setActiveResourceTabIds,
+    selectedResourceFolderId,
+    setSelectedResourceFolderId,
   } = useAuth();
   const { toast } = useToast();
   
@@ -578,8 +582,6 @@ function ResourcesPageContent() {
   const [newResourceName, setNewResourceName] = useState('');
   const [newResourceLink, setNewResourceLink] = useState('');
 
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-  const [activeTabIds, setActiveTabIds] = useState<string[]>([]);
   const [editingFolder, setEditingFolder] = useState<ResourceFolder | null>(null);
   const [newlyCreatedFolderId, setNewlyCreatedFolderId] = useState<string | null>(null);
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
@@ -639,28 +641,28 @@ function ResourcesPageContent() {
   }, [expandedFoldersKey, resourceFolders]);
   
   const handleSelectFolder = (folderId: string) => {
-    setSelectedFolderId(folderId);
-    if (!activeTabIds.includes(folderId)) {
-        setActiveTabIds(prev => [...prev, folderId]);
+    setSelectedResourceFolderId(folderId);
+    if (!activeResourceTabIds.includes(folderId)) {
+        setActiveResourceTabIds(prev => [...prev, folderId]);
     }
   };
 
   const handleCloseTab = (folderIdToClose: string) => {
-    let newSelectedFolderId = selectedFolderId;
-    const tabIndex = activeTabIds.findIndex(id => id === folderIdToClose);
+    let newSelectedFolderId = selectedResourceFolderId;
+    const tabIndex = activeResourceTabIds.findIndex(id => id === folderIdToClose);
 
-    if (selectedFolderId === folderIdToClose) {
-        if (activeTabIds.length === 1) {
+    if (selectedResourceFolderId === folderIdToClose) {
+        if (activeResourceTabIds.length === 1) {
             newSelectedFolderId = null;
         } else if (tabIndex > 0) {
-            newSelectedFolderId = activeTabIds[tabIndex - 1];
+            newSelectedFolderId = activeResourceTabIds[tabIndex - 1];
         } else {
-            newSelectedFolderId = activeTabIds[1];
+            newSelectedFolderId = activeResourceTabIds[1];
         }
     }
     
-    setActiveTabIds(prev => prev.filter(id => id !== folderIdToClose));
-    setSelectedFolderId(newSelectedFolderId);
+    setActiveResourceTabIds(prev => prev.filter(id => id !== folderIdToClose));
+    setSelectedResourceFolderId(newSelectedFolderId);
   };
   
   const togglePinFolder = (folderId: string) => {
@@ -727,9 +729,9 @@ function ResourcesPageContent() {
   }, [contextMenuRef]);
 
   const filteredResources = useMemo(() => {
-    if (!selectedFolderId) return [];
-    return resources.filter(r => r.folderId === selectedFolderId);
-  }, [resources, selectedFolderId]);
+    if (!selectedResourceFolderId) return [];
+    return resources.filter(r => r.folderId === selectedResourceFolderId);
+  }, [resources, selectedResourceFolderId]);
   
   const handleAddFolder = (e: FormEvent) => {
     e.preventDefault();
@@ -762,10 +764,10 @@ function ResourcesPageContent() {
     
     setResourceFolders(prev => prev.filter(f => !idsToDelete.includes(f.id)));
     setResources(prev => prev.filter(r => !idsToDelete.includes(r.folderId)));
-    setActiveTabIds(prev => prev.filter(id => !idsToDelete.includes(id)));
+    setActiveResourceTabIds(prev => prev.filter(id => !idsToDelete.includes(id)));
     
-    if (selectedFolderId && idsToDelete.includes(selectedFolderId)) {
-        setSelectedFolderId(null);
+    if (selectedResourceFolderId && idsToDelete.includes(selectedResourceFolderId)) {
+        setSelectedResourceFolderId(null);
     }
     toast({ title: "Folder Deleted", description: "The folder and all its contents have been removed." });
   };
@@ -819,7 +821,7 @@ function ResourcesPageContent() {
   };
   
   const handleAddResource = async () => {
-    if (!selectedFolderId) {
+    if (!selectedResourceFolderId) {
       toast({ title: "Error", description: "Please select a folder first.", variant: "destructive" });
       return;
     }
@@ -836,7 +838,7 @@ function ResourcesPageContent() {
         const newRes: Resource = {
             id: `res_${Date.now()}`,
             name: newResourceName.trim(),
-            folderId: selectedFolderId,
+            folderId: selectedResourceFolderId,
             type: 'card',
             points: [],
             icon: 'Library'
@@ -872,7 +874,7 @@ function ResourcesPageContent() {
           name: result.title || 'Untitled Resource',
           link: fullLink,
           description: result.description || '',
-          folderId: selectedFolderId,
+          folderId: selectedResourceFolderId,
           iconUrl: getFaviconUrl(fullLink),
           type: 'link'
       };
@@ -1024,7 +1026,7 @@ function ResourcesPageContent() {
                         onClick={() => { handleSelectFolder(folder.id); toggleFolderCollapse(folder.id); }}
                         onDoubleClick={() => setEditingFolder(folder)}
                         onContextMenu={(e) => handleContextMenu(e, folder)}
-                        className={cn("flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer group", selectedFolderId === folder.id && "bg-accent font-semibold")}
+                        className={cn("flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer group", selectedResourceFolderId === folder.id && "bg-accent font-semibold")}
                     >
                         {pinnedFolderIds.has(folder.id) && <Pin className="h-3 w-3 text-primary flex-shrink-0" />}
                         <ChevronDown className={cn("h-4 w-4 transition-transform", collapsedFolders.has(folder.id) && "-rotate-90", resourceFolders.every(f => f.parentId !== folder.id) && "invisible")} />
@@ -1050,7 +1052,7 @@ function ResourcesPageContent() {
         ))}
       </ul>
     );
-  }, [resourceFolders, editingFolder, selectedFolderId, collapsedFolders, toggleFolderCollapse, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds]);
+  }, [resourceFolders, editingFolder, selectedResourceFolderId, collapsedFolders, toggleFolderCollapse, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds]);
 
   const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent) => {
     const resource = resources.find(r => r.id === resourceId);
@@ -1205,16 +1207,16 @@ function ResourcesPageContent() {
             {/* Main Content */}
             <main className="md:col-span-3">
                  <div className="flex items-center border-b mb-4 overflow-x-auto">
-                    {activeTabIds.map(tabId => {
+                    {activeResourceTabIds.map(tabId => {
                         const folder = resourceFolders.find(f => f.id === tabId);
                         if (!folder) return null;
                         return (
                             <button
                                 key={tabId}
-                                onClick={() => setSelectedFolderId(tabId)}
+                                onClick={() => setSelectedResourceFolderId(tabId)}
                                 className={cn(
                                     "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2",
-                                    selectedFolderId === tabId 
+                                    selectedResourceFolderId === tabId 
                                         ? "border-primary text-primary" 
                                         : "border-transparent text-muted-foreground hover:bg-muted"
                                 )}
@@ -1228,8 +1230,8 @@ function ResourcesPageContent() {
                 </div>
                 <div>
                 <h2 className="text-2xl font-bold mb-4">
-                    {selectedFolderId
-                    ? resourceFolders.find(f => f.id === selectedFolderId)?.name
+                    {selectedResourceFolderId
+                    ? resourceFolders.find(f => f.id === selectedResourceFolderId)?.name
                     : 'Select a folder to view resources'}
                 </h2>
                 
@@ -1323,7 +1325,7 @@ function ResourcesPageContent() {
                                 </SortableResourceCard>
                             )
                         })}
-                        {selectedFolderId && (
+                        {selectedResourceFolderId && (
                             <Card 
                                 onClick={() => setIsAdding(true)}
                                 className="rounded-3xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[220px] hover:shadow-xl hover:-translate-y-1"

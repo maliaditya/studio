@@ -111,6 +111,10 @@ interface AuthContextType {
   setResources: React.Dispatch<React.SetStateAction<Resource[]>>;
   pinnedFolderIds: Set<string>;
   setPinnedFolderIds: React.Dispatch<React.SetStateAction<Set<string>>>;
+  activeResourceTabIds: string[];
+  setActiveResourceTabIds: React.Dispatch<React.SetStateAction<string[]>>;
+  selectedResourceFolderId: string | null;
+  setSelectedResourceFolderId: React.Dispatch<React.SetStateAction<string | null>>;
 
 
   // Workout Log Handlers
@@ -186,6 +190,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [resources, setResources] = useState<Resource[]>([]);
   const [resourceFolders, setResourceFolders] = useState<ResourceFolder[]>([]);
   const [pinnedFolderIds, setPinnedFolderIds] = useState<Set<string>>(new Set());
+  const [activeResourceTabIds, setActiveResourceTabIds] = useState<string[]>([]);
+  const [selectedResourceFolderId, setSelectedResourceFolderId] = useState<string | null>(null);
 
 
   // Canvas State
@@ -270,6 +276,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (e) {
         setPinnedFolderIds(new Set());
       }
+
+      try { const d = loadItem(`activeResourceTabIds_${username}`); setActiveResourceTabIds(d ? JSON.parse(d) : []); } catch (e) { setActiveResourceTabIds([]); }
+      const storedSelectedFolder = loadItem(`selectedResourceFolderId_${username}`, false);
+      setSelectedResourceFolderId(storedSelectedFolder || null);
       
       // Canvas Data
       try { const d = localStorage.getItem(`canvas_layout_${username}`); setCanvasLayout(d ? JSON.parse(d) : { nodes: [], edges: [] }); } catch (e) { setCanvasLayout({ nodes: [], edges: [] }); }
@@ -290,6 +300,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setProductizationPlans({});
       setOfferizationPlans({});
       setResources([]); setResourceFolders([]); setPinnedFolderIds(new Set());
+      setActiveResourceTabIds([]); setSelectedResourceFolderId(null);
       setCanvasLayout({ nodes: [], edges: [] });
       setMindsetCards(DEFAULT_MINDSET_CARDS);
     }
@@ -331,6 +342,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`resources_${username}`, JSON.stringify(resources));
       localStorage.setItem(`resourceFolders_${username}`, JSON.stringify(resourceFolders));
       localStorage.setItem(`pinned_folder_ids_${username}`, JSON.stringify(Array.from(pinnedFolderIds)));
+      localStorage.setItem(`activeResourceTabIds_${username}`, JSON.stringify(activeResourceTabIds));
+      if (selectedResourceFolderId) localStorage.setItem(`selectedResourceFolderId_${username}`, selectedResourceFolderId); else localStorage.removeItem(`selectedResourceFolderId_${username}`);
 
       
       // Canvas
@@ -344,7 +357,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
     exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, deepWorkTopicMetadata, leadGenDefinitions,
     productizationPlans, offerizationPlans,
-    resources, resourceFolders, pinnedFolderIds,
+    resources, resourceFolders, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId,
     canvasLayout,
     mindsetCards,
     currentUser, loading
@@ -499,6 +512,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setResourceFolders(data.resourceFolders || []);
     setResources(data.resources || []);
     setPinnedFolderIds(data.pinnedFolderIds ? new Set(data.pinnedFolderIds) : new Set());
+    setActiveResourceTabIds(data.activeResourceTabIds || []);
+    setSelectedResourceFolderId(data.selectedResourceFolderId || null);
 
 
     setCanvasLayout(data.canvasLayout || { nodes: [], edges: [] });
@@ -555,6 +570,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       schedule,
       dietPlan, weightLogs, goalWeight, height, dateOfBirth, gender,
       resources, resourceFolders, pinnedFolderIds: Array.from(pinnedFolderIds),
+      activeResourceTabIds, selectedResourceFolderId,
       canvasLayout,
       mindsetCards,
     };
@@ -1258,6 +1274,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     resourceFolders, setResourceFolders,
     resources, setResources,
     pinnedFolderIds, setPinnedFolderIds,
+    activeResourceTabIds, setActiveResourceTabIds,
+    selectedResourceFolderId, setSelectedResourceFolderId,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,
