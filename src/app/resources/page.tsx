@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -117,7 +118,7 @@ interface PopupState {
 interface ResourcePopupProps {
   popupState: PopupState;
   onOpenNested: (resourceId: string, parentX: number, parentY: number, parentId: string) => void;
-  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
+  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
   onClose: (resourceId: string) => void;
 }
 
@@ -191,7 +192,7 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClos
       const isTargetLeaf = !(targetResource?.points || []).some(p => p.type === 'card');
       
       if (isTargetLeaf) {
-        onOpenNestedPopup(pointResourceId, e);
+        onOpenNestedPopup(pointResourceId, e, popupState);
       } else {
         onOpenNested(pointResourceId, x, y, resourceId);
       }
@@ -1118,7 +1119,7 @@ function ResourcesPageContent() {
     );
   }, [resourceFolders, editingFolder, selectedResourceFolderId, collapsedFolders, toggleFolderCollapse, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds]);
 
-  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent) => {
+  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
     const resource = resources.find(r => r.id === resourceId);
     if (!resource) return;
 
@@ -1126,29 +1127,33 @@ function ResourcesPageContent() {
     const popupWidth = hasMarkdown ? 896 : 512;
     const popupHeight = 600;
 
-    let x, y;
-    if (hasMarkdown) {
-        x = (window.innerWidth - popupWidth) / 2;
-        y = (window.innerHeight - popupHeight) / 2;
+    let x, y, level, parentId;
+
+    if (parentPopupState) {
+        level = parentPopupState.level + 1;
+        parentId = parentPopupState.resourceId;
+        x = parentPopupState.x + 40;
+        y = parentPopupState.y + 40;
     } else {
-        x = event.clientX;
-        y = event.clientY;
+        level = 0;
+        parentId = undefined;
+        if (hasMarkdown) {
+            x = (window.innerWidth - popupWidth) / 2;
+            y = (window.innerHeight - popupHeight) / 2;
+        } else {
+            x = event.clientX;
+            y = event.clientY;
+        }
     }
 
     setOpenPopups(prev => {
         const newPopups = new Map(prev);
         newPopups.set(resourceId, {
-            resourceId,
-            level: 0,
-            x: x,
-            y: y,
-            parentId: undefined,
-            width: popupWidth,
-            height: popupHeight
+            resourceId, level, x, y, parentId, width: popupWidth, height: popupHeight
         });
         return newPopups;
     });
-  };
+};
 
   const handleOpenNested = (resourceId: string, parentX: number, parentY: number, parentId: string) => {
     const level = (openPopups.get(parentId)?.level ?? -1) + 1;
@@ -1333,7 +1338,7 @@ function ResourcesPageContent() {
                             let cardContent: React.ReactNode;
                             
                             if(isCardType) {
-                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} />;
+                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event)} onOpenMarkdownModal={handleOpenMarkdownModal} />;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                 const imageEmbedUrl = isImageUrl(res.link) || isGifUrl(res.link) ? res.link : null;
@@ -1452,7 +1457,7 @@ function ResourcesPageContent() {
                 key={popupState.resourceId}
                 popupState={popupState}
                 onOpenNested={handleOpenNested}
-                onOpenNestedPopup={handleOpenNestedPopup}
+                onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event, popupState)}
                 onClose={handleClosePopup}
             />
         ))}
@@ -1658,3 +1663,4 @@ export default function ResourcesPage() {
 
 
     
+
