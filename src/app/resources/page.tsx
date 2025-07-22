@@ -59,7 +59,7 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
         } else if (urlObj.hostname.includes('youtu.be')) {
             videoId = urlObj.pathname.slice(1);
         }
-        if (videoId) return `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+        if (videoId) return `https://www.youtube.com/embed/${videoId}`;
     } catch (e) {}
     return null;
 };
@@ -1328,7 +1328,7 @@ function ResourcesPageContent() {
                             const isCardType = res.type === 'card';
                             const hasMarkdownContent = isCardType && (res.points || []).some(p => p.type === 'markdown' || p.type === 'code');
                             const cardClassName = hasMarkdownContent ? "lg:col-span-3" : "";
-
+                            
                             return (
                                 <SortableResourceCard key={res.id} item={res} className={cardClassName}>
                                     {isCardType ? (
@@ -1538,6 +1538,10 @@ function ResourcesPageContent() {
         <Dialog open={youtubeModalState.isOpen} onOpenChange={(isOpen) => setYoutubeModalState(p => ({...p, isOpen}))}>
           <DialogContent
             className="max-w-4xl h-[90vh] flex flex-col p-2"
+            onWheel={(e) => {
+              e.stopPropagation();
+              if (e.deltaY > 0) handleNextVideo(); else handlePrevVideo();
+            }}
           >
             <DialogHeader className="sr-only">
               <DialogTitle>YouTube Playlist</DialogTitle>
