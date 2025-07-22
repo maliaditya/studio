@@ -1353,9 +1353,10 @@ function ResourcesPageContent() {
                                                     setYoutubeModalState({ isOpen: true, playlist: youtubeVideos, currentIndex });
                                                 }
                                             }}>
+                                                <div className='absolute inset-0 z-20 bg-transparent'></div>
                                                 {imageEmbedUrl ? (
                                                   <>
-                                                      <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover/sortable:opacity-100 transition-opacity">
+                                                      <div className="absolute top-2 right-2 z-30 flex items-center gap-1 opacity-0 group-hover/sortable:opacity-100 transition-opacity">
                                                         <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                                                       </div>
                                                       <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl relative">
@@ -1365,12 +1366,11 @@ function ResourcesPageContent() {
                                                   </>
                                                 ) : youtubeEmbedUrl && res.link ? (
                                                     <div className="h-full flex flex-col">
-                                                        <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover/sortable:opacity-100 transition-opacity">
+                                                        <div className="absolute top-2 right-2 z-30 flex items-center gap-1 opacity-0 group-hover/sortable:opacity-100 transition-opacity">
                                                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setFloatingVideoUrl(res.link!); }}><PictureInPicture className="h-4 w-4" /></Button>
                                                             <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                                                         </div>
                                                         <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl relative">
-                                                           <div className="absolute inset-0 bg-transparent z-10" />
                                                            <iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                                                         </div>
                                                         <div className="p-4 flex-grow"><div className="flex items-start justify-between gap-2"><div className="flex-grow min-w-0"><div className="flex items-center gap-2"><Youtube className="h-5 w-5 flex-shrink-0 text-red-500" /><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div></div></div></div>
@@ -1419,7 +1419,7 @@ function ResourcesPageContent() {
                                         );
                                     })()}
                                 </SortableResourceCard>
-                            );
+                            )
                         })}
                         {selectedResourceFolderId && (
                             <Card 
