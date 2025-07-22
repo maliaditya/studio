@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -58,7 +59,7 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
         } else if (urlObj.hostname.includes('youtu.be')) {
             videoId = urlObj.pathname.slice(1);
         }
-        if (videoId) return `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+        if (videoId) return `https://www.youtube.com/embed/${videoId}`;
     } catch (e) {}
     return null;
 };
@@ -592,7 +593,7 @@ function ResourcesPageContent() {
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   const [editedResourceData, setEditedResourceData] = useState<Partial<Resource>>({});
   
-  const [modalVideoState, setModalVideoState] = useState<{ videos: Resource[], currentIndex: number } | null>(null);
+  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
 
@@ -717,7 +718,6 @@ function ResourcesPageContent() {
     const handleKeyDown = (event: KeyboardEvent) => {
         if (event.key === 'Escape') {
             setOpenPopups(new Map());
-            setModalVideoState(null);
         }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -748,38 +748,6 @@ function ResourcesPageContent() {
     if (!selectedResourceFolderId) return [];
     return resources.filter(r => r.folderId === selectedResourceFolderId);
   }, [resources, selectedResourceFolderId]);
-
-  const handleOpenVideoModal = (resourceId: string) => {
-    const youtubeVideosInFolder = filteredResources.filter(r => getYouTubeEmbedUrl(r.link));
-    const currentIndex = youtubeVideosInFolder.findIndex(r => r.id === resourceId);
-    if (currentIndex > -1) {
-        setModalVideoState({ videos: youtubeVideosInFolder, currentIndex });
-    }
-  };
-
-  const handleVideoModalScroll = (e: React.WheelEvent) => {
-    if (scrollTimeoutRef.current) return; // Ignore scroll if timeout is active
-
-    e.preventDefault();
-
-    setModalVideoState(prev => {
-      if (!prev) return null;
-      const { videos, currentIndex } = prev;
-      let newIndex = currentIndex;
-      if (e.deltaY > 0) { // Scrolling down
-        newIndex = Math.min(videos.length - 1, currentIndex + 1);
-      } else { // Scrolling up
-        newIndex = Math.max(0, currentIndex - 1);
-      }
-      return { ...prev, currentIndex: newIndex };
-    });
-
-    // Set a timeout to prevent another scroll for a short period
-    scrollTimeoutRef.current = setTimeout(() => {
-        scrollTimeoutRef.current = null;
-    }, 300); // 300ms delay
-  };
-
   
   const handleAddFolder = (e: FormEvent) => {
     e.preventDefault();
@@ -1324,11 +1292,10 @@ function ResourcesPageContent() {
                                                     <div className="h-full flex flex-col">
                                                         <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover/sortable:opacity-100 transition-opacity">
                                                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="h-4 w-4" /></Button>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); handleOpenVideoModal(res.id); }} aria-label="View in App"><Expand className="h-4 w-4" /></Button>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setEmbedUrl(youtubeEmbedUrl); }} aria-label="View in App"><Expand className="h-4 w-4" /></Button>
                                                             <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                                                         </div>
                                                         <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl relative">
-                                                            <div className="absolute inset-0 z-10" onWheel={(e) => { e.stopPropagation(); handleVideoModalScroll(e); }}/>
                                                             <iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                                                         </div>
                                                         <div className="p-4 flex-grow"><div className="flex items-start justify-between gap-2"><div className="flex-grow min-w-0"><div className="flex items-center gap-2"><Youtube className="h-5 w-5 flex-shrink-0 text-red-500" /><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div></div></div></div>
@@ -1494,15 +1461,14 @@ function ResourcesPageContent() {
             </DialogContent>
         </Dialog>
 
-        <Dialog open={!!modalVideoState} onOpenChange={(isOpen) => !isOpen && setModalVideoState(null)}>
+        <Dialog open={!!embedUrl} onOpenChange={(isOpen) => !isOpen && setEmbedUrl(null)}>
             <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
-                <div className="flex-grow min-h-0 relative group/modal" onWheel={handleVideoModalScroll}>
-                    <div className="absolute inset-0 z-10"/>
-                    {modalVideoState && getYouTubeEmbedUrl(modalVideoState.videos[modalVideoState.currentIndex].link) && (
+                <div className="flex-grow min-h-0 relative group/modal">
+                    {embedUrl && (
                         <iframe 
-                            src={getYouTubeEmbedUrl(modalVideoState.videos[modalVideoState.currentIndex].link)!}
+                            src={embedUrl}
                             className="w-full h-full border-0 rounded-md" 
-                            title={modalVideoState.videos[modalVideoState.currentIndex].name}
+                            title="Embedded Resource"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             allowFullScreen
                         ></iframe>
@@ -1593,4 +1559,5 @@ export default function ResourcesPage() {
 }
 
     
+
 
