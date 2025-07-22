@@ -112,38 +112,47 @@ interface PopupState {
   y: number;
   parentId?: string;
   width?: number;
+  height?: number;
 }
 
 interface ResourcePopupProps {
   popupState: PopupState;
   onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
   onClose: (resourceId: string) => void;
+  onSizeChange: (resourceId: string, newSize: { width: number; height: number }) => void;
 }
 
-const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose }: ResourcePopupProps) => {
+const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChange }: ResourcePopupProps) => {
     const { resources } = useAuth();
-    const { resourceId, level, x, y, width } = popupState;
+    const { resourceId, level, x, y, width, height } = popupState;
     const resource = resources.find(r => r.id === resourceId);
+    const cardRef = useRef<HTMLDivElement>(null);
 
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `popup-${resourceId}`,
     });
+    
+    useEffect(() => {
+        if (cardRef.current && !height) { // Only set initial height if it's not already set
+            onSizeChange(resourceId, { width: width || 512, height: cardRef.current.offsetHeight });
+        }
+    }, [resource, height, width, onSizeChange, resourceId]);
 
-    const [currentSize, setCurrentSize] = useState({ width: width || 512 });
     const [isResizing, setIsResizing] = useState(false);
     const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
     const handleResizeMouseDown = (e: React.MouseEvent) => {
         e.stopPropagation();
         setIsResizing(true);
-        setResizeStart({ x: e.clientX, y: e.clientY, width: currentSize.width, height: 0 });
+        setResizeStart({ x: e.clientX, y: e.clientY, width: width || 512, height: height || 0 });
     };
 
     const handleMouseMove = (e: MouseEvent) => {
         if (isResizing) {
             const dx = e.clientX - resizeStart.x;
-            setCurrentSize({
-                width: Math.max(320, resizeStart.width + dx)
+            onSizeChange(resourceId, {
+                width: Math.max(320, resizeStart.width + dx),
+                height: height || 0
             });
         }
     };
@@ -163,7 +172,7 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose }: ResourceP
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [isResizing, resizeStart]);
+    }, [isResizing, resizeStart, onSizeChange]);
 
 
     const style: React.CSSProperties = {
@@ -171,7 +180,7 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose }: ResourceP
         top: y,
         left: x,
         willChange: 'transform',
-        width: `${currentSize.width}px`,
+        width: `${width}px`,
         maxHeight: '70vh',
     };
 
@@ -190,7 +199,7 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose }: ResourceP
         <div
             ref={setNodeRef} style={style} {...attributes} className="z-[60]"
         >
-            <Card className="max-w-4xl shadow-2xl border-2 border-primary/50 bg-card h-full flex flex-col">
+            <Card ref={cardRef} className="max-w-4xl shadow-2xl border-2 border-primary/50 bg-card h-full flex flex-col">
                 <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
                     <CardTitle className="text-base flex items-center gap-2">
                         <Library className="h-4 w-4" />
@@ -1094,34 +1103,34 @@ function ResourcesPageContent() {
   }, [resourceFolders, editingFolder, selectedResourceFolderId, collapsedFolders, toggleFolderCollapse, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds]);
 
   const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
-    const resource = resources.find(r => r.id === resourceId);
-    if (!resource) return;
-
-    const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
-    const popupWidth = hasMarkdown ? 896 : 512;
-
-    let x, y, level, parentId;
-
-    if (parentPopupState) {
-        level = parentPopupState.level + 1;
-        parentId = parentPopupState.resourceId;
-        x = parentPopupState.x + 40;
-        y = parentPopupState.y + 40;
-    } else {
-        level = 0;
-        parentId = undefined;
-        x = event.clientX;
-        y = event.clientY;
-    }
-    
     setOpenPopups(prev => {
+        const resource = resources.find(r => r.id === resourceId);
+        if (!resource) return prev;
+        
+        const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+        const popupWidth = hasMarkdown ? 896 : 512;
+    
+        let x, y, level, parentId;
+    
+        if (parentPopupState) {
+            level = parentPopupState.level + 1;
+            parentId = parentPopupState.resourceId;
+            x = parentPopupState.x + 40;
+            y = parentPopupState.y + 40;
+        } else {
+            level = 0;
+            parentId = undefined;
+            x = event.clientX;
+            y = event.clientY;
+        }
+        
         const newPopups = new Map(prev);
         newPopups.set(resourceId, {
             resourceId, level, x, y, parentId, width: popupWidth
         });
         return newPopups;
     });
-};
+  };
 
   const handleClosePopup = (resourceId: string) => {
     setOpenPopups(prev => {
@@ -1185,6 +1194,20 @@ function ResourcesPageContent() {
   const handleOpenMarkdownModal = (resourceId: string, pointId: string) => {
       setMarkdownModalState({ isOpen: true, resourceId, pointId });
   };
+  
+  const handleSizeChange = useCallback((resourceId: string, newSize: { width: number; height: number }) => {
+    setOpenPopups(prev => {
+        const newPopups = new Map(prev);
+        const popup = newPopups.get(resourceId);
+        if (popup) {
+            newPopups.set(resourceId, {
+                ...popup,
+                ...newSize
+            });
+        }
+        return newPopups;
+    });
+  }, []);
 
   const currentMarkdownResource = resources.find(r => r.id === markdownModalState.resourceId);
   const currentMarkdownPoint = currentMarkdownResource?.points?.find(p => p.id === markdownModalState.pointId);
@@ -1261,7 +1284,7 @@ function ResourcesPageContent() {
                             let cardContent: React.ReactNode;
                             
                             if(isCardType) {
-                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event)} onOpenMarkdownModal={handleOpenMarkdownModal} />;
+                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event)} onOpenMarkdownModal={onOpenMarkdownModal} />;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                 const imageEmbedUrl = isImageUrl(res.link) || isGifUrl(res.link) ? res.link : null;
@@ -1381,6 +1404,7 @@ function ResourcesPageContent() {
                 popupState={popupState}
                 onOpenNestedPopup={handleOpenNestedPopup}
                 onClose={handleClosePopup}
+                onSizeChange={handleSizeChange}
             />
         ))}
 
@@ -1391,9 +1415,9 @@ function ResourcesPageContent() {
             if (!parentPopup) return null;
             
             const startX = parentPopup.x + (parentPopup.width || 0) / 2;
-            const startY = parentPopup.y + (popupState.height || 0) / 2;
+            const startY = parentPopup.y + (parentPopup.height || 0) / 2;
             const endX = popup.x + (popup.width || 0) / 2;
-            const endY = popup.y + (popupState.height || 0) / 2;
+            const endY = popup.y + (popup.height || 0) / 2;
             
             return (
               <line 
@@ -1583,6 +1607,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
