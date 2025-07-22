@@ -662,14 +662,17 @@ function ResourcesPageContent() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (markdownModalState.isOpen) {
-        if (event.key === 'ArrowRight') handleNextMarkdown();
-        if (event.key === 'ArrowLeft') handlePrevMarkdown();
-      }
+        if (markdownModalState.isOpen) {
+            if (event.key === 'ArrowRight') handleNextMarkdown();
+            if (event.key === 'ArrowLeft') handlePrevMarkdown();
+        } else if (youtubeModalState.isOpen) {
+            if (event.key === 'ArrowRight') handleNextVideo();
+            if (event.key === 'ArrowLeft') handlePrevVideo();
+        }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [markdownModalState.isOpen, handleNextMarkdown, handlePrevMarkdown]);
+}, [markdownModalState.isOpen, youtubeModalState.isOpen, handleNextMarkdown, handlePrevMarkdown, handleNextVideo, handlePrevVideo]);
 
   const handleWheelScroll = (e: React.WheelEvent<HTMLDivElement>) => {
     if (e.deltaY === 0) return;
@@ -1329,7 +1332,7 @@ function ResourcesPageContent() {
                             const hasMarkdownContent = isCardType && (res.points || []).some(p => p.type === 'markdown' || p.type === 'code');
                             const cardClassName = hasMarkdownContent ? "lg:col-span-3" : "";
 
-                            return (
+                             return (
                                 <SortableResourceCard key={res.id} item={res} className={cardClassName}>
                                     {isCardType ? (
                                         <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} />
@@ -1345,15 +1348,18 @@ function ResourcesPageContent() {
                                                 "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full",
                                                 isLongContent ? "bg-gradient-to-br from-card to-muted/20" : "bg-card"
                                             )}
-                                            onClick={(e) => {
-                                                if (youtubeEmbedUrl) {
-                                                    e.stopPropagation();
-                                                    const youtubeVideos = filteredResources.filter(r => getYouTubeEmbedUrl(r.link));
-                                                    const currentIndex = youtubeVideos.findIndex(v => v.id === res.id);
-                                                    setYoutubeModalState({ isOpen: true, playlist: youtubeVideos, currentIndex });
-                                                }
-                                            }}>
-                                                <div className='absolute inset-0 z-20 bg-transparent'></div>
+                                            >
+                                                <div 
+                                                    className='absolute inset-0 z-20 bg-transparent'
+                                                    onClick={(e) => {
+                                                        if (youtubeEmbedUrl) {
+                                                            e.stopPropagation();
+                                                            const youtubeVideos = filteredResources.filter(r => getYouTubeEmbedUrl(r.link));
+                                                            const currentIndex = youtubeVideos.findIndex(v => v.id === res.id);
+                                                            setYoutubeModalState({ isOpen: true, playlist: youtubeVideos, currentIndex });
+                                                        }
+                                                    }}
+                                                />
                                                 {imageEmbedUrl ? (
                                                   <>
                                                       <div className="absolute top-2 right-2 z-30 flex items-center gap-1 opacity-0 group-hover/sortable:opacity-100 transition-opacity">
@@ -1420,7 +1426,8 @@ function ResourcesPageContent() {
                                         );
                                     })()}
                                 </SortableResourceCard>
-                            )})}
+                             );
+                            })}
                         {selectedResourceFolderId && (
                             <Card 
                                 onClick={() => setIsAdding(true)}
@@ -1538,10 +1545,6 @@ function ResourcesPageContent() {
         <Dialog open={youtubeModalState.isOpen} onOpenChange={(isOpen) => setYoutubeModalState(p => ({...p, isOpen}))}>
           <DialogContent
             className="max-w-4xl h-[90vh] flex flex-col p-2"
-            onWheel={(e) => {
-              e.stopPropagation();
-              if (e.deltaY > 0) handleNextVideo(); else handlePrevVideo();
-            }}
           >
             <DialogHeader className="sr-only">
               <DialogTitle>YouTube Playlist</DialogTitle>
@@ -1652,3 +1655,4 @@ export default function ResourcesPage() {
 }
 
     
+
