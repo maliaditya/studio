@@ -267,17 +267,15 @@ const SortableResourceCard = ({ children, item, className }: { children: React.R
 };
 
 
-const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUrl, setEmbedUrl, onOpenNestedPopup, onOpenMarkdownModal }: {
+const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUrl, onOpenNestedPopup, onOpenMarkdownModal }: {
     point: ResourcePoint;
     resource: Resource;
     onUpdate: (resource: Resource) => void;
     onDelete: (resourceId: string) => void;
     setFloatingVideoUrl: (url: string | null) => void;
-    setEmbedUrl: (url: string | null) => void;
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
     onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
 }) => {
-    const { resources } = useAuth();
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id });
 
     const [isEditing, setIsEditing] = useState(false);
@@ -289,38 +287,26 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
         transition,
         opacity: isDragging ? 0 : 1,
     };
-
-    const handleUpdatePoint = (newText: string, newType?: ResourcePoint['type']) => {
-        let updatedPointData: Partial<ResourcePoint> = { text: newText };
-        if (newType) {
-            updatedPointData.type = newType;
-        }
-
-        if(updatedPointData.type === 'text' || newType === 'text') {
-            const youtubeEmbedUrl = getYouTubeEmbedUrl(newText);
-            const obsidianEmbedUrl = (isObsidianUrl(newText) || isNotionUrl(newText)) ? newText : null;
-            if (youtubeEmbedUrl) {
-                updatedPointData = { text: newText, type: 'youtube', url: youtubeEmbedUrl };
-            } else if (obsidianEmbedUrl) {
-                updatedPointData = { text: newText, type: 'obsidian', url: obsidianEmbedUrl };
-            }
-        }
-        
-        const updatedPoints = (resource.points || []).map(p => 
-            p.id === point.id 
-                ? { ...p, ...updatedPointData } 
-                : p
-        );
-        onUpdate({ ...resource, points: updatedPoints });
-    };
     
     const handleSave = () => {
         if (editText.trim() === '') {
             onDelete(point.id);
         } else {
-            handleUpdatePoint(editText);
+             const updatedPoints = (resource.points || []).map(p => p.id === point.id ? { ...p, text: editText } : p);
+             onUpdate({ ...resource, points: updatedPoints });
         }
         setIsEditing(false);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSave();
+        }
+        if (e.key === 'Escape') {
+            setIsEditing(false);
+            setEditText(point.text);
+        }
     };
     
     useEffect(() => {
@@ -360,7 +346,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
             <button {...attributes} {...listeners} className="cursor-grab p-1"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
             <div className="flex-grow">
                 {isEditing ? (
-                    <Textarea ref={textareaRef} value={editText} onChange={handleTextareaChange} onBlur={handleSave} placeholder="New step..." className={cn("text-sm", (point.type === 'code' || point.type === 'markdown') && "font-mono text-xs")} rows={1}/>
+                    <Textarea ref={textareaRef} value={editText} onChange={handleTextareaChange} onBlur={handleSave} onKeyDown={handleKeyDown} placeholder="New step..." className={cn("text-sm", (point.type === 'code' || point.type === 'markdown') && "font-mono text-xs")} rows={1}/>
                 ) : point.type === 'youtube' && point.url ? (
                     <div className="w-full aspect-video rounded-md overflow-hidden border">
                         <iframe src={point.url} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
@@ -1284,7 +1270,7 @@ function ResourcesPageContent() {
                             let cardContent: React.ReactNode;
                             
                             if(isCardType) {
-                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event)} onOpenMarkdownModal={onOpenMarkdownModal} />;
+                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event)} onOpenMarkdownModal={handleOpenMarkdownModal} />;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                 const imageEmbedUrl = isImageUrl(res.link) || isGifUrl(res.link) ? res.link : null;
@@ -1607,6 +1593,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
