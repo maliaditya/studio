@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -58,7 +59,7 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
         } else if (urlObj.hostname.includes('youtu.be')) {
             videoId = urlObj.pathname.slice(1);
         }
-        if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+        if (videoId) return `https://www.youtube.com/embed/${videoId}?autoplay=1`;
     } catch (e) {}
     return null;
 };
@@ -162,6 +163,7 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClos
             window.addEventListener('mouseup', handleMouseUp);
         } else {
             window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
         };
         return () => {
             window.removeEventListener('mousemove', handleMouseMove);
@@ -260,7 +262,7 @@ const SortableResourceCard = ({ children, item, className }: { children: React.R
   
     return (
         <div ref={setNodeRef} style={style} className={className}>
-          <div className="relative group/sortable h-full" onClick={(e) => { e.stopPropagation(); (item as any).onClick?.(); }}>
+          <div className="relative group/sortable h-full">
             <button {...attributes} {...listeners} className="absolute -top-2 -left-2 z-10 p-1 bg-muted rounded-full cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
             {children}
           </div>
@@ -377,12 +379,11 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
 };
 
 
-const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEmbedUrl, onOpenNestedPopup, onOpenMarkdownModal }: { 
+const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpenNestedPopup, onOpenMarkdownModal }: { 
     resource: Resource; 
     onUpdate: (resource: Resource) => void; 
     onDelete: (resourceId: string) => void; 
     setFloatingVideoUrl: (url: string | null) => void; 
-    setEmbedUrl: (url: string | null) => void; 
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
     onOpenMarkdownModal: (resourceId: string) => void;
 }) => {
@@ -493,7 +494,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
                                         resource={resource}
                                         onUpdate={onUpdate}
                                         onDelete={handleDeletePoint}
-                                        setEmbedUrl={setEmbedUrl}
+                                        setEmbedUrl={() => {}}
                                         setFloatingVideoUrl={setFloatingVideoUrl}
                                         editingPointId={editingPointId}
                                         setEditingPointId={setEditingPointId}
@@ -1331,7 +1332,7 @@ function ResourcesPageContent() {
                             return (
                                 <SortableResourceCard key={res.id} item={res} className={cardClassName}>
                                     {isCardType ? (
-                                        <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} setEmbedUrl={(url) => {}} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} />
+                                        <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} />
                                     ) : (
                                     (() => {
                                         const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
@@ -1343,7 +1344,15 @@ function ResourcesPageContent() {
                                             <Card className={cn(
                                                 "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full",
                                                 isLongContent ? "bg-gradient-to-br from-card to-muted/20" : "bg-card"
-                                            )}>
+                                            )}
+                                            onClick={(e) => {
+                                                if (youtubeEmbedUrl) {
+                                                    e.stopPropagation();
+                                                    const youtubeVideos = filteredResources.filter(r => getYouTubeEmbedUrl(r.link));
+                                                    const currentIndex = youtubeVideos.findIndex(v => v.id === res.id);
+                                                    setYoutubeModalState({ isOpen: true, playlist: youtubeVideos, currentIndex });
+                                                }
+                                            }}>
                                                 {imageEmbedUrl ? (
                                                   <>
                                                       <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover/sortable:opacity-100 transition-opacity">
@@ -1357,17 +1366,12 @@ function ResourcesPageContent() {
                                                 ) : youtubeEmbedUrl && res.link ? (
                                                     <div className="h-full flex flex-col">
                                                         <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover/sortable:opacity-100 transition-opacity">
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="h-4 w-4" /></Button>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                const youtubeVideos = filteredResources.filter(r => getYouTubeEmbedUrl(r.link));
-                                                                const currentIndex = youtubeVideos.findIndex(v => v.id === res.id);
-                                                                setYoutubeModalState({ isOpen: true, playlist: youtubeVideos, currentIndex });
-                                                            }} aria-label="View in App"><Expand className="h-4 w-4" /></Button>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setFloatingVideoUrl(res.link!); }}><PictureInPicture className="h-4 w-4" /></Button>
                                                             <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                                                         </div>
                                                         <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl relative">
-                                                          <iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+                                                           <div className="absolute inset-0 bg-transparent z-10" />
+                                                           <iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                                                         </div>
                                                         <div className="p-4 flex-grow"><div className="flex items-start justify-between gap-2"><div className="flex-grow min-w-0"><div className="flex items-center gap-2"><Youtube className="h-5 w-5 flex-shrink-0 text-red-500" /><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div></div></div></div>
                                                     </div>
@@ -1406,17 +1410,16 @@ function ResourcesPageContent() {
                                                         <div className="mt-auto pt-4 flex items-center gap-2">
                                                             <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
                                                             {res.link && (
-                                                                <Button variant="outline" size="sm" className="w-full" onClick={()={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
+                                                                <Button variant="outline" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
                                                             )}
                                                         </div>
                                                     </div>
                                                 )}
                                             </Card>
                                         );
-                                    })()
-                                    )}
+                                    })()}
                                 </SortableResourceCard>
-                            )
+                            );
                         })}
                         {selectedResourceFolderId && (
                             <Card 
@@ -1485,7 +1488,7 @@ function ResourcesPageContent() {
                 </Button>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleAddNewNestedFolder(contextMenu.item); setContextMenu(null); }}>New Folder</Button>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleShareFolder(contextMenu.item); setContextMenu(null); }}><Share className="mr-2 h-4 w-4" />Share Publicly</Button>
-                <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={()={() => { setEditingFolder(contextMenu.item); setContextMenu(null); }}>Rename</Button>
+                <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { setEditingFolder(contextMenu.item); setContextMenu(null); }}>Rename</Button>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2 text-destructive hover:text-destructive" onClick={() => { setDeleteConfirmation({ item: contextMenu.item }); setContextMenu(null); }}>Delete</Button>
             </div>
         )}
@@ -1542,6 +1545,7 @@ function ResourcesPageContent() {
             <div className="flex-grow min-h-0 relative group/modal">
               {youtubeModalState.playlist.length > 0 && (
                 <div className="w-full h-full relative">
+                  <div className="absolute inset-0 z-10" />
                   <iframe
                     src={getYouTubeEmbedUrl(youtubeModalState.playlist[youtubeModalState.currentIndex]?.link) || ''}
                     className="w-full h-full border-0 rounded-md"
