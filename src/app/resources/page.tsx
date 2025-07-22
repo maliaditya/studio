@@ -59,7 +59,7 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
         } else if (urlObj.hostname.includes('youtu.be')) {
             videoId = urlObj.pathname.slice(1);
         }
-        if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+        if (videoId) return `https://www.youtube.com/embed/${videoId}?autoplay=1`;
     } catch (e) {}
     return null;
 };
@@ -1255,7 +1255,7 @@ function ResourcesPageContent() {
   const fullMarkdownContent = currentMarkdownResource
     ? (currentMarkdownResource.points || [])
         .filter(p => p.type === 'markdown' || p.type === 'code')
-        .map(p => (p.type === 'code' ? `\`\`\`\n${p.text}\n\`\`\`` : p.text))
+        .map(p => (p.type === 'code' ? '```\n' + p.text + '\n```' : p.text))
         .join('\n\n---\n\n')
     : null;
 
@@ -1325,10 +1325,10 @@ function ResourcesPageContent() {
                 <SortableContext items={filteredResources.map(r => r.id)}>
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                         {filteredResources.map(res => {
-                            const isCardType = res.type === 'card';
+                             const isCardType = res.type === 'card';
                             const hasMarkdownContent = isCardType && (res.points || []).some(p => p.type === 'markdown' || p.type === 'code');
                             const cardClassName = hasMarkdownContent ? "lg:col-span-3" : "";
-                            
+
                             return (
                                 <SortableResourceCard key={res.id} item={res} className={cardClassName}>
                                     {isCardType ? (
@@ -1371,6 +1371,7 @@ function ResourcesPageContent() {
                                                             <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                                                         </div>
                                                         <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl relative">
+                                                           <div className="absolute inset-0 z-10" />
                                                            <iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                                                         </div>
                                                         <div className="p-4 flex-grow"><div className="flex items-start justify-between gap-2"><div className="flex-grow min-w-0"><div className="flex items-center gap-2"><Youtube className="h-5 w-5 flex-shrink-0 text-red-500" /><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div></div></div></div>
@@ -1419,8 +1420,7 @@ function ResourcesPageContent() {
                                         );
                                     })()}
                                 </SortableResourceCard>
-                            )
-                        })}
+                            )})}
                         {selectedResourceFolderId && (
                             <Card 
                                 onClick={() => setIsAdding(true)}
