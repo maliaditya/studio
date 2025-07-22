@@ -59,7 +59,7 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
         } else if (urlObj.hostname.includes('youtu.be')) {
             videoId = urlObj.pathname.slice(1);
         }
-        if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+        if (videoId) return `https://www.youtube.com/embed/${videoId}?autoplay=1`;
     } catch (e) {}
     return null;
 };
@@ -73,7 +73,7 @@ const isImageUrl = (url: string | undefined): boolean => {
     // Check for image hosting domains that use URL parameters
     try {
         const urlObj = new URL(url);
-        const imageHosts = ['images.unsplash.com', 'plus.unsplash.com'];
+        const imageHosts = ['images.unsplash.com', 'plus.unsplash.com', 'upload.wikimedia.org'];
         if (imageHosts.includes(urlObj.hostname)) {
             return true;
         }
@@ -385,7 +385,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
     setFloatingVideoUrl: (url: string | null) => void; 
     setEmbedUrl: (url: string | null) => void; 
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
-    onOpenMarkdownModal: (content: string) => void;
+    onOpenMarkdownModal: (resourceId: string) => void;
 }) => {
     const { resources } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
@@ -442,9 +442,6 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
     };
     
     const hasMarkdownContent = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
-    const fullMarkdownContent = (resource.points || []).filter(p => p.type === 'markdown' || p.type === 'code').map(p => {
-        return p.type === 'code' ? `\`\`\`\n${p.text}\n\`\`\`` : p.text;
-    }).join('\n\n---\n\n');
 
     return (
         <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl">
@@ -462,7 +459,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, setEm
                    </div>
                    <div className="flex items-center">
                         {hasMarkdownContent && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onOpenMarkdownModal(fullMarkdownContent)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onOpenMarkdownModal(resource.id)}>
                                 <Expand className="h-4 w-4" />
                             </Button>
                         )}
@@ -625,7 +622,12 @@ function ResourcesPageContent() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
 
-  const [markdownModalContent, setMarkdownModalContent] = useState<string | null>(null);
+  const [markdownModalState, setMarkdownModalState] = useState<{
+    isOpen: boolean;
+    playlist: Resource[];
+    currentIndex: number;
+  }>({ isOpen: false, playlist: [], currentIndex: 0 });
+  
   const tabsContainerRef = useRef<HTMLDivElement>(null);
 
   const handleNextVideo = useCallback(() => {
@@ -643,16 +645,29 @@ function ResourcesPageContent() {
       return { ...prev, currentIndex: prevIndex };
     });
   }, []);
+  
+  const handleNextMarkdown = useCallback(() => {
+    setMarkdownModalState(prev => {
+      if (!prev.isOpen) return prev;
+      const nextIndex = (prev.currentIndex + 1) % prev.playlist.length;
+      return { ...prev, currentIndex: nextIndex };
+    });
+  }, []);
+
+  const handlePrevMarkdown = useCallback(() => {
+    setMarkdownModalState(prev => {
+      if (!prev.isOpen) return prev;
+      const prevIndex = (prev.currentIndex - 1 + prev.playlist.length) % prev.playlist.length;
+      return { ...prev, currentIndex: prevIndex };
+    });
+  }, []);
 
   useEffect(() => {
     if (youtubeModalState.isOpen) {
       const handleGlobalWheel = (e: WheelEvent) => {
         if (scrollTimeoutRef.current) return;
-        if (e.deltaY > 5) {
-          handleNextVideo();
-        } else if (e.deltaY < -5) {
-          handlePrevVideo();
-        }
+        if (e.deltaY > 5) handleNextVideo();
+        else if (e.deltaY < -5) handlePrevVideo();
         scrollTimeoutRef.current = setTimeout(() => {
           scrollTimeoutRef.current = null;
         }, 300);
@@ -661,12 +676,28 @@ function ResourcesPageContent() {
       window.addEventListener('wheel', handleGlobalWheel);
       return () => {
         window.removeEventListener('wheel', handleGlobalWheel);
-        if (scrollTimeoutRef.current) {
-          clearTimeout(scrollTimeoutRef.current);
-        }
+        if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
       };
     }
   }, [youtubeModalState.isOpen, handleNextVideo, handlePrevVideo]);
+  
+  useEffect(() => {
+    if (markdownModalState.isOpen) {
+        const handleGlobalWheel = (e: WheelEvent) => {
+            if (scrollTimeoutRef.current) return;
+            if (e.deltaY > 5) handleNextMarkdown();
+            else if (e.deltaY < -5) handlePrevMarkdown();
+            scrollTimeoutRef.current = setTimeout(() => {
+                scrollTimeoutRef.current = null;
+            }, 300);
+        };
+        window.addEventListener('wheel', handleGlobalWheel);
+        return () => {
+            window.removeEventListener('wheel', handleGlobalWheel);
+            if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+        };
+    }
+  }, [markdownModalState.isOpen, handleNextMarkdown, handlePrevMarkdown]);
 
   const handleWheelScroll = (e: React.WheelEvent<HTMLDivElement>) => {
     if (e.deltaY === 0) return;
@@ -1235,6 +1266,26 @@ function ResourcesPageContent() {
     }
     setActiveId(null);
   };
+  
+  const handleOpenMarkdownModal = (resourceId: string) => {
+    const markdownResources = filteredResources.filter(r => r.type === 'card' && r.points?.some(p => p.type === 'markdown' || p.type === 'code'));
+    const currentIndex = markdownResources.findIndex(r => r.id === resourceId);
+    if (currentIndex !== -1) {
+        setMarkdownModalState({
+            isOpen: true,
+            playlist: markdownResources,
+            currentIndex,
+        });
+    }
+  };
+
+  const currentMarkdownResource = markdownModalState.playlist[markdownModalState.currentIndex];
+  const fullMarkdownContent = currentMarkdownResource
+    ? (currentMarkdownResource.points || [])
+        .filter(p => p.type === 'markdown' || p.type === 'code')
+        .map(p => (p.type === 'code' ? `\`\`\`\n${p.text}\n\`\`\`` : p.text))
+        .join('\n\n---\n\n')
+    : null;
 
 
   return (
@@ -1309,7 +1360,7 @@ function ResourcesPageContent() {
                             return (
                                 <SortableResourceCard key={res.id} item={res} className={cardClassName}>
                                     {isCardType ? (
-                                        <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} setEmbedUrl={(url) => {}} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={setMarkdownModalContent} />
+                                        <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} setEmbedUrl={(url) => {}} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} />
                                     ) : (
                                     (() => {
                                         const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
@@ -1345,7 +1396,8 @@ function ResourcesPageContent() {
                                                             <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                                                         </div>
                                                         <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl relative">
-                                                            <iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+                                                          <div className="absolute inset-0 z-10" />
+                                                          <iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                                                         </div>
                                                         <div className="p-4 flex-grow"><div className="flex items-start justify-between gap-2"><div className="flex-grow min-w-0"><div className="flex items-center gap-2"><Youtube className="h-5 w-5 flex-shrink-0 text-red-500" /><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div></div></div></div>
                                                     </div>
@@ -1515,6 +1567,7 @@ function ResourcesPageContent() {
                 <DialogHeader className="sr-only"><DialogTitle>YouTube Playlist</DialogTitle></DialogHeader>
                 <div className="flex-grow min-h-0 relative group/modal">
                     {youtubeModalState.playlist.length > 0 && (
+                      <div className="w-full h-full relative">
                         <iframe
                             src={getYouTubeEmbedUrl(youtubeModalState.playlist[youtubeModalState.currentIndex]?.link) || ''}
                             className="w-full h-full border-0 rounded-md"
@@ -1522,6 +1575,8 @@ function ResourcesPageContent() {
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             allowFullScreen
                         ></iframe>
+                        <div className="absolute inset-0 z-10" />
+                      </div>
                     )}
                 </div>
             </DialogContent>
@@ -1549,7 +1604,7 @@ function ResourcesPageContent() {
                             placeholder="https://example.com"
                             value={newResourceLink}
                             onChange={(e) => setNewResourceLink(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') handleAddResource(); }}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddResource()}
                         />
                     </TabsContent>
                     <TabsContent value="card" className="pt-4">
@@ -1558,7 +1613,7 @@ function ResourcesPageContent() {
                             placeholder="New card name..."
                             value={newResourceName}
                             onChange={(e) => setNewResourceName(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') handleAddResource(); }}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddResource()}
                         />
                     </TabsContent>
                 </Tabs>
@@ -1585,15 +1640,15 @@ function ResourcesPageContent() {
                 </div>
             </DialogContent>
         </Dialog>
-        <Dialog open={!!markdownModalContent} onOpenChange={() => setMarkdownModalContent(null)}>
+        <Dialog open={markdownModalState.isOpen} onOpenChange={(isOpen) => setMarkdownModalState(p => ({...p, isOpen}))}>
             <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
-                <DialogHeader className="sr-only">
-                    <DialogTitle>Resource Content</DialogTitle>
+                <DialogHeader className="p-4 border-b">
+                    <DialogTitle>{currentMarkdownResource?.name || "Resource"}</DialogTitle>
                 </DialogHeader>
-                <div className="flex-grow min-h-0 p-4">
+                <div className="flex-grow min-h-0">
                     <ScrollArea className="h-full">
-                        <div className="prose dark:prose-invert max-w-full">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdownModalContent || ""}</ReactMarkdown>
+                        <div className="prose dark:prose-invert max-w-full p-6">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{fullMarkdownContent || ""}</ReactMarkdown>
                         </div>
                     </ScrollArea>
                 </div>
@@ -1609,6 +1664,7 @@ export default function ResourcesPage() {
 }
 
     
+
 
 
 
