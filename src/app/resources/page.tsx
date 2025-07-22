@@ -117,12 +117,11 @@ interface PopupState {
 
 interface ResourcePopupProps {
   popupState: PopupState;
-  onOpenNested: (resourceId: string, parentX: number, parentY: number, parentId: string) => void;
   onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
   onClose: (resourceId: string) => void;
 }
 
-const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClose }: ResourcePopupProps) => {
+const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose }: ResourcePopupProps) => {
     const { resources } = useAuth();
     const { resourceId, level, x, y, width, height } = popupState;
     const resource = resources.find(r => r.id === resourceId);
@@ -1116,7 +1115,7 @@ function ResourcesPageContent() {
     const resource = resources.find(r => r.id === resourceId);
     if (!resource) return;
 
-    const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown');
+    const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
     const popupWidth = hasMarkdown ? 896 : 512;
     const popupHeight = 600;
 
@@ -1147,30 +1146,6 @@ function ResourcesPageContent() {
         return newPopups;
     });
 };
-
-  const handleOpenNested = (resourceId: string, parentX: number, parentY: number, parentId: string) => {
-    const level = (openPopups.get(parentId)?.level ?? -1) + 1;
-    const resource = resources.find(r => r.id === resourceId);
-    if (!resource) return;
-
-    const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown');
-    const popupWidth = hasMarkdown ? 896 : 512;
-    const popupHeight = 600;
-
-    setOpenPopups(prev => {
-        const newPopups = new Map(prev);
-        newPopups.set(resourceId, {
-            resourceId,
-            level,
-            x: parentX + 40,
-            y: parentY + 40,
-            parentId: parentId,
-            width: popupWidth,
-            height: popupHeight,
-        });
-        return newPopups;
-    });
-  };
 
   const handleClosePopup = (resourceId: string) => {
     setOpenPopups(prev => {
@@ -1442,8 +1417,7 @@ function ResourcesPageContent() {
             <ResourcePopupCard
                 key={popupState.resourceId}
                 popupState={popupState}
-                onOpenNested={handleOpenNested}
-                onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event, popupState)}
+                onOpenNestedPopup={handleOpenNestedPopup}
                 onClose={handleClosePopup}
             />
         ))}
@@ -1454,10 +1428,10 @@ function ResourcesPageContent() {
             const parentPopup = openPopups.get(popup.parentId);
             if (!parentPopup) return null;
             
-            const startX = parentPopup.x + 320; // width of card
-            const startY = parentPopup.y + 40; // approx middle
-            const endX = popup.x;
-            const endY = popup.y + 40;
+            const startX = parentPopup.x + (parentPopup.width || 0) / 2;
+            const startY = parentPopup.y + (parentPopup.height || 0) / 2;
+            const endX = popup.x + (popup.width || 0) / 2;
+            const endY = popup.y + (popup.height || 0) / 2;
             
             return (
               <line 
@@ -1649,5 +1623,6 @@ export default function ResourcesPage() {
 
 
     
+
 
 
