@@ -188,14 +188,7 @@ const ResourcePopupCard = ({ popupState, onOpenNested, onOpenNestedPopup, onClos
 
     const handleLinkClick = (e: React.MouseEvent, pointResourceId: string) => {
       e.stopPropagation();
-      const targetResource = resources.find(r => r.id === pointResourceId);
-      const isTargetLeaf = !(targetResource?.points || []).some(p => p.type === 'card');
-      
-      if (isTargetLeaf) {
-        onOpenNestedPopup(pointResourceId, e, popupState);
-      } else {
-        onOpenNested(pointResourceId, x, y, resourceId);
-      }
+      onOpenNestedPopup(pointResourceId, e, popupState);
     };
 
     return (
@@ -1119,7 +1112,7 @@ function ResourcesPageContent() {
     );
   }, [resourceFolders, editingFolder, selectedResourceFolderId, collapsedFolders, toggleFolderCollapse, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds]);
 
-  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
+ const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
     const resource = resources.find(r => r.id === resourceId);
     if (!resource) return;
 
@@ -1166,13 +1159,6 @@ function ResourcesPageContent() {
 
     setOpenPopups(prev => {
         const newPopups = new Map(prev);
-        // Close any popups at the same or higher level
-        prev.forEach((popup) => {
-            if (popup.level >= level) {
-                newPopups.delete(popup.resourceId);
-            }
-        });
-        // Add new popup, positioned relative to its parent
         newPopups.set(resourceId, {
             resourceId,
             level,
@@ -1663,4 +1649,5 @@ export default function ResourcesPage() {
 
 
     
+
 
