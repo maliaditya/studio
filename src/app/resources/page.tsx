@@ -593,9 +593,13 @@ function ResourcesPageContent() {
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   const [editedResourceData, setEditedResourceData] = useState<Partial<Resource>>({});
   
-  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [youtubeModalState, setYoutubeModalState] = useState<{
+    isOpen: boolean;
+    playlist: Resource[];
+    currentIndex: number;
+  }>({ isOpen: false, playlist: [], currentIndex: 0 });
 
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [contextMenu, setContextMenu] = useState<{
     mouseX: number;
@@ -623,6 +627,46 @@ function ResourcesPageContent() {
 
   const [markdownModalContent, setMarkdownModalContent] = useState<string | null>(null);
   const tabsContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleNextVideo = useCallback(() => {
+    setYoutubeModalState(prev => {
+      if (!prev.isOpen) return prev;
+      const nextIndex = (prev.currentIndex + 1) % prev.playlist.length;
+      return { ...prev, currentIndex: nextIndex };
+    });
+  }, []);
+
+  const handlePrevVideo = useCallback(() => {
+    setYoutubeModalState(prev => {
+      if (!prev.isOpen) return prev;
+      const prevIndex = (prev.currentIndex - 1 + prev.playlist.length) % prev.playlist.length;
+      return { ...prev, currentIndex: prevIndex };
+    });
+  }, []);
+
+  useEffect(() => {
+    if (youtubeModalState.isOpen) {
+      const handleGlobalWheel = (e: WheelEvent) => {
+        if (scrollTimeoutRef.current) return;
+        if (e.deltaY > 5) {
+          handleNextVideo();
+        } else if (e.deltaY < -5) {
+          handlePrevVideo();
+        }
+        scrollTimeoutRef.current = setTimeout(() => {
+          scrollTimeoutRef.current = null;
+        }, 300);
+      };
+
+      window.addEventListener('wheel', handleGlobalWheel);
+      return () => {
+        window.removeEventListener('wheel', handleGlobalWheel);
+        if (scrollTimeoutRef.current) {
+          clearTimeout(scrollTimeoutRef.current);
+        }
+      };
+    }
+  }, [youtubeModalState.isOpen, handleNextVideo, handlePrevVideo]);
 
   const handleWheelScroll = (e: React.WheelEvent<HTMLDivElement>) => {
     if (e.deltaY === 0) return;
@@ -1292,7 +1336,12 @@ function ResourcesPageContent() {
                                                     <div className="h-full flex flex-col">
                                                         <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover/sortable:opacity-100 transition-opacity">
                                                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="h-4 w-4" /></Button>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setEmbedUrl(youtubeEmbedUrl); }} aria-label="View in App"><Expand className="h-4 w-4" /></Button>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const youtubeVideos = filteredResources.filter(r => getYouTubeEmbedUrl(r.link));
+                                                                const currentIndex = youtubeVideos.findIndex(v => v.id === res.id);
+                                                                setYoutubeModalState({ isOpen: true, playlist: youtubeVideos, currentIndex });
+                                                            }} aria-label="View in App"><Expand className="h-4 w-4" /></Button>
                                                             <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                                                         </div>
                                                         <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl relative">
@@ -1460,15 +1509,16 @@ function ResourcesPageContent() {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
-
-        <Dialog open={!!embedUrl} onOpenChange={(isOpen) => !isOpen && setEmbedUrl(null)}>
+        
+        <Dialog open={youtubeModalState.isOpen} onOpenChange={(isOpen) => setYoutubeModalState(prev => ({...prev, isOpen}))}>
             <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
+                <DialogHeader className="sr-only"><DialogTitle>YouTube Playlist</DialogTitle></DialogHeader>
                 <div className="flex-grow min-h-0 relative group/modal">
-                    {embedUrl && (
-                        <iframe 
-                            src={embedUrl}
-                            className="w-full h-full border-0 rounded-md" 
-                            title="Embedded Resource"
+                    {youtubeModalState.playlist.length > 0 && (
+                        <iframe
+                            src={getYouTubeEmbedUrl(youtubeModalState.playlist[youtubeModalState.currentIndex]?.link) || ''}
+                            className="w-full h-full border-0 rounded-md"
+                            title="Embedded YouTube Video"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             allowFullScreen
                         ></iframe>
@@ -1559,5 +1609,6 @@ export default function ResourcesPage() {
 }
 
     
+
 
 
