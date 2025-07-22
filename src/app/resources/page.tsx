@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -59,7 +58,7 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
         } else if (urlObj.hostname.includes('youtu.be')) {
             videoId = urlObj.pathname.slice(1);
         }
-        if (videoId) return `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+        if (videoId) return `https://www.youtube.com/embed/${videoId}`;
     } catch (e) {}
     return null;
 };
@@ -596,8 +595,6 @@ function ResourcesPageContent() {
     currentIndex: number;
   }>({ isOpen: false, playlist: [], currentIndex: 0 });
 
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
   const [contextMenu, setContextMenu] = useState<{
     mouseX: number;
     mouseY: number;
@@ -663,30 +660,15 @@ function ResourcesPageContent() {
   }, []);
 
   useEffect(() => {
-    const handleGlobalWheel = (e: WheelEvent) => {
-      if (youtubeModalState.isOpen) {
-        if (scrollTimeoutRef.current) return;
-        if (e.deltaY > 5) handleNextVideo();
-        else if (e.deltaY < -5) handlePrevVideo();
-        scrollTimeoutRef.current = setTimeout(() => {
-          scrollTimeoutRef.current = null;
-        }, 300);
-      } else if (markdownModalState.isOpen) {
-        if (scrollTimeoutRef.current) return;
-        if (e.deltaY > 5) handleNextMarkdown();
-        else if (e.deltaY < -5) handlePrevMarkdown();
-        scrollTimeoutRef.current = setTimeout(() => {
-          scrollTimeoutRef.current = null;
-        }, 300);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (markdownModalState.isOpen) {
+        if (event.key === 'ArrowRight') handleNextMarkdown();
+        if (event.key === 'ArrowLeft') handlePrevMarkdown();
       }
     };
-
-    window.addEventListener('wheel', handleGlobalWheel);
-    return () => {
-      window.removeEventListener('wheel', handleGlobalWheel);
-      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-    };
-  }, [youtubeModalState.isOpen, markdownModalState.isOpen, handleNextVideo, handlePrevVideo, handleNextMarkdown, handlePrevMarkdown]);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [markdownModalState.isOpen, handleNextMarkdown, handlePrevMarkdown]);
 
   const handleWheelScroll = (e: React.WheelEvent<HTMLDivElement>) => {
     if (e.deltaY === 0) return;
@@ -1424,7 +1406,7 @@ function ResourcesPageContent() {
                                                         <div className="mt-auto pt-4 flex items-center gap-2">
                                                             <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
                                                             {res.link && (
-                                                                <Button variant="outline" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
+                                                                <Button variant="outline" size="sm" className="w-full" onClick={()={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
                                                             )}
                                                         </div>
                                                     </div>
@@ -1503,7 +1485,7 @@ function ResourcesPageContent() {
                 </Button>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleAddNewNestedFolder(contextMenu.item); setContextMenu(null); }}>New Folder</Button>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleShareFolder(contextMenu.item); setContextMenu(null); }}><Share className="mr-2 h-4 w-4" />Share Publicly</Button>
-                <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { setEditingFolder(contextMenu.item); setContextMenu(null); }}>Rename</Button>
+                <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={()={() => { setEditingFolder(contextMenu.item); setContextMenu(null); }}>Rename</Button>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2 text-destructive hover:text-destructive" onClick={() => { setDeleteConfirmation({ item: contextMenu.item }); setContextMenu(null); }}>Delete</Button>
             </div>
         )}
@@ -1637,12 +1619,18 @@ function ResourcesPageContent() {
                 <DialogHeader className="p-4 border-b">
                     <DialogTitle>{currentMarkdownResource?.name || "Resource"}</DialogTitle>
                 </DialogHeader>
-                <div className="flex-grow min-h-0">
+                <div className="flex-grow min-h-0 relative group/modal">
                     <ScrollArea className="h-full">
                         <div className="prose dark:prose-invert max-w-full p-6">
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>{fullMarkdownContent || ""}</ReactMarkdown>
                         </div>
                     </ScrollArea>
+                    {markdownModalState.playlist.length > 1 && (
+                        <>
+                            <Button variant="ghost" size="icon" onClick={handlePrevMarkdown} className="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/modal:opacity-100 transition-opacity bg-background/50 hover:bg-background/80 rounded-full h-8 w-8 z-10"><ChevronLeft className="h-5 w-5" /></Button>
+                            <Button variant="ghost" size="icon" onClick={handleNextMarkdown} className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/modal:opacity-100 transition-opacity bg-background/50 hover:bg-background/80 rounded-full h-8 w-8 z-10"><ChevronRightIcon className="h-5 w-5" /></Button>
+                        </>
+                    )}
                 </div>
             </DialogContent>
         </Dialog>
@@ -1656,8 +1644,3 @@ export default function ResourcesPage() {
 }
 
     
-
-
-
-
-
