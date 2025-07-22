@@ -663,41 +663,30 @@ function ResourcesPageContent() {
   }, []);
 
   useEffect(() => {
-    if (youtubeModalState.isOpen) {
-      const handleGlobalWheel = (e: WheelEvent) => {
+    const handleGlobalWheel = (e: WheelEvent) => {
+      if (youtubeModalState.isOpen) {
         if (scrollTimeoutRef.current) return;
         if (e.deltaY > 5) handleNextVideo();
         else if (e.deltaY < -5) handlePrevVideo();
         scrollTimeoutRef.current = setTimeout(() => {
           scrollTimeoutRef.current = null;
         }, 300);
-      };
+      } else if (markdownModalState.isOpen) {
+        if (scrollTimeoutRef.current) return;
+        if (e.deltaY > 5) handleNextMarkdown();
+        else if (e.deltaY < -5) handlePrevMarkdown();
+        scrollTimeoutRef.current = setTimeout(() => {
+          scrollTimeoutRef.current = null;
+        }, 300);
+      }
+    };
 
-      window.addEventListener('wheel', handleGlobalWheel);
-      return () => {
-        window.removeEventListener('wheel', handleGlobalWheel);
-        if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-      };
-    }
-  }, [youtubeModalState.isOpen, handleNextVideo, handlePrevVideo]);
-  
-  useEffect(() => {
-    if (markdownModalState.isOpen) {
-        const handleGlobalWheel = (e: WheelEvent) => {
-            if (scrollTimeoutRef.current) return;
-            if (e.deltaY > 5) handleNextMarkdown();
-            else if (e.deltaY < -5) handlePrevMarkdown();
-            scrollTimeoutRef.current = setTimeout(() => {
-                scrollTimeoutRef.current = null;
-            }, 300);
-        };
-        window.addEventListener('wheel', handleGlobalWheel);
-        return () => {
-            window.removeEventListener('wheel', handleGlobalWheel);
-            if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-        };
-    }
-  }, [markdownModalState.isOpen, handleNextMarkdown, handlePrevMarkdown]);
+    window.addEventListener('wheel', handleGlobalWheel);
+    return () => {
+      window.removeEventListener('wheel', handleGlobalWheel);
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    };
+  }, [youtubeModalState.isOpen, markdownModalState.isOpen, handleNextVideo, handlePrevVideo, handleNextMarkdown, handlePrevMarkdown]);
 
   const handleWheelScroll = (e: React.WheelEvent<HTMLDivElement>) => {
     if (e.deltaY === 0) return;
@@ -1396,7 +1385,6 @@ function ResourcesPageContent() {
                                                             <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                                                         </div>
                                                         <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl relative">
-                                                          <div className="absolute inset-0 z-10" />
                                                           <iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                                                         </div>
                                                         <div className="p-4 flex-grow"><div className="flex items-start justify-between gap-2"><div className="flex-grow min-w-0"><div className="flex items-center gap-2"><Youtube className="h-5 w-5 flex-shrink-0 text-red-500" /><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div></div></div></div>
@@ -1562,25 +1550,29 @@ function ResourcesPageContent() {
             </DialogContent>
         </Dialog>
         
-        <Dialog open={youtubeModalState.isOpen} onOpenChange={(isOpen) => setYoutubeModalState(prev => ({...prev, isOpen}))}>
-            <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
-                <DialogHeader className="sr-only"><DialogTitle>YouTube Playlist</DialogTitle></DialogHeader>
-                <div className="flex-grow min-h-0 relative group/modal">
-                    {youtubeModalState.playlist.length > 0 && (
-                      <div className="w-full h-full relative">
-                        <iframe
-                            src={getYouTubeEmbedUrl(youtubeModalState.playlist[youtubeModalState.currentIndex]?.link) || ''}
-                            className="w-full h-full border-0 rounded-md"
-                            title="Embedded YouTube Video"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                        ></iframe>
-                        <div className="absolute inset-0 z-10" />
-                      </div>
-                    )}
+        <Dialog open={youtubeModalState.isOpen} onOpenChange={(isOpen) => setYoutubeModalState(p => ({...p, isOpen}))}>
+          <DialogContent
+            className="max-w-4xl h-[90vh] flex flex-col p-2"
+          >
+            <DialogHeader className="sr-only">
+              <DialogTitle>YouTube Playlist</DialogTitle>
+            </DialogHeader>
+            <div className="flex-grow min-h-0 relative group/modal">
+              {youtubeModalState.playlist.length > 0 && (
+                <div className="w-full h-full relative">
+                  <iframe
+                    src={getYouTubeEmbedUrl(youtubeModalState.playlist[youtubeModalState.currentIndex]?.link) || ''}
+                    className="w-full h-full border-0 rounded-md"
+                    title="Embedded YouTube Video"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  ></iframe>
                 </div>
-            </DialogContent>
+              )}
+            </div>
+          </DialogContent>
         </Dialog>
+
 
         <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
             <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
@@ -1664,6 +1656,7 @@ export default function ResourcesPage() {
 }
 
     
+
 
 
 
