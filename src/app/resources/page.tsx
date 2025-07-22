@@ -112,7 +112,6 @@ interface PopupState {
   y: number;
   parentId?: string;
   width?: number;
-  height?: number;
 }
 
 interface ResourcePopupProps {
@@ -123,7 +122,7 @@ interface ResourcePopupProps {
 
 const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose }: ResourcePopupProps) => {
     const { resources } = useAuth();
-    const { resourceId, level, x, y, width, height } = popupState;
+    const { resourceId, level, x, y, width } = popupState;
     const resource = resources.find(r => r.id === resourceId);
 
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -259,7 +258,7 @@ const SortableResourceCard = ({ children, item, className }: { children: React.R
 };
 
 
-const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUrl, setEmbedUrl, onOpenNestedPopup }: {
+const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUrl, setEmbedUrl, onOpenNestedPopup, onOpenMarkdownModal }: {
     point: ResourcePoint;
     resource: Resource;
     onUpdate: (resource: Resource) => void;
@@ -267,6 +266,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
     setFloatingVideoUrl: (url: string | null) => void;
     setEmbedUrl: (url: string | null) => void;
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
+    onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
 }) => {
     const { resources } = useAuth();
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id });
@@ -391,7 +391,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     onDelete: (resourceId: string) => void; 
     setFloatingVideoUrl: (url: string | null) => void; 
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
-    onOpenMarkdownModal: (resourceId: string) => void;
+    onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
 }) => {
     const { resources } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
@@ -463,7 +463,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                    </div>
                    <div className="flex items-center">
                         {hasMarkdownContent && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onOpenMarkdownModal(resource.id)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onOpenMarkdownModal(resource.id, '')}>
                                 <Expand className="h-4 w-4" />
                             </Button>
                         )}
@@ -501,6 +501,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                                         setEmbedUrl={() => {}}
                                         setFloatingVideoUrl={setFloatingVideoUrl}
                                         onOpenNestedPopup={onOpenNestedPopup}
+                                        onOpenMarkdownModal={onOpenMarkdownModal}
                                     />
                                 ))}
                             </ul>
@@ -623,8 +624,9 @@ function ResourcesPageContent() {
 
   const [markdownModalState, setMarkdownModalState] = useState<{
     isOpen: boolean;
-    resource: Resource | null;
-  }>({ isOpen: false, resource: null });
+    resourceId: string | null;
+    pointId: string | null;
+  }>({ isOpen: false, resourceId: null, pointId: null });
   
   const tabsContainerRef = useRef<HTMLDivElement>(null);
 
@@ -955,7 +957,7 @@ function ResourcesPageContent() {
     }
     
     let finalData = { ...editingResource };
-    if (finalData.type === 'link' && finalData.link && finalData.link !== editingResource?.link) {
+    if (finalData.type === 'link' && finalData.link && editingResource.link && finalData.link !== editingResource.link) {
         finalData.iconUrl = getFaviconUrl(finalData.link);
     }
     handleUpdateResource(finalData as Resource);
@@ -1091,13 +1093,12 @@ function ResourcesPageContent() {
     );
   }, [resourceFolders, editingFolder, selectedResourceFolderId, collapsedFolders, toggleFolderCollapse, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds]);
 
- const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
+  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
     const resource = resources.find(r => r.id === resourceId);
     if (!resource) return;
 
     const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
     const popupWidth = hasMarkdown ? 896 : 512;
-    const popupHeight = 600;
 
     let x, y, level, parentId;
 
@@ -1112,11 +1113,11 @@ function ResourcesPageContent() {
         x = event.clientX;
         y = event.clientY;
     }
-
+    
     setOpenPopups(prev => {
         const newPopups = new Map(prev);
         newPopups.set(resourceId, {
-            resourceId, level, x, y, parentId, width: popupWidth, height: popupHeight
+            resourceId, level, x, y, parentId, width: popupWidth
         });
         return newPopups;
     });
@@ -1181,14 +1182,12 @@ function ResourcesPageContent() {
     setActiveId(null);
   };
   
-  const handleOpenMarkdownModal = (resourceId: string) => {
-      const resource = resources.find(r => r.id === resourceId);
-      if (resource) {
-        setMarkdownModalState({ isOpen: true, resource });
-      }
+  const handleOpenMarkdownModal = (resourceId: string, pointId: string) => {
+      setMarkdownModalState({ isOpen: true, resourceId, pointId });
   };
 
-  const currentMarkdownResource = markdownModalState.resource;
+  const currentMarkdownResource = resources.find(r => r.id === markdownModalState.resourceId);
+  const currentMarkdownPoint = currentMarkdownResource?.points?.find(p => p.id === markdownModalState.pointId);
 
   return (
     <>
@@ -1392,9 +1391,9 @@ function ResourcesPageContent() {
             if (!parentPopup) return null;
             
             const startX = parentPopup.x + (parentPopup.width || 0) / 2;
-            const startY = parentPopup.y + (parentPopup.height || 0) / 2;
+            const startY = parentPopup.y + (popupState.height || 0) / 2;
             const endX = popup.x + (popup.width || 0) / 2;
-            const endY = popup.y + (popup.height || 0) / 2;
+            const endY = popup.y + (popupState.height || 0) / 2;
             
             return (
               <line 
@@ -1430,39 +1429,41 @@ function ResourcesPageContent() {
 
         <Dialog open={!!editingResource} onOpenChange={(isOpen) => !isOpen && setEditingResource(null)}>
             <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Edit Resource</DialogTitle>
-                    <DialogDescription>Update the details or move this resource to a new folder.</DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="res-name" className="text-right">Name</Label>
-                        <Input id="res-name" value={editingResource.name || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, name: e.target.value} : null)} className="col-span-3"/>
-                    </div>
-                    {editingResource?.type === 'link' && (
-                    <>
+                {editingResource && <>
+                    <DialogHeader>
+                        <DialogTitle>Edit Resource</DialogTitle>
+                        <DialogDescription>Update the details or move this resource to a new folder.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="res-link" className="text-right">Link</Label>
-                            <Input id="res-link" value={editingResource.link || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, link: e.target.value} : null)} className="col-span-3"/>
+                            <Label htmlFor="res-name" className="text-right">Name</Label>
+                            <Input id="res-name" value={editingResource.name || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, name: e.target.value} : null)} className="col-span-3"/>
                         </div>
+                        {editingResource.type === 'link' && (
+                        <>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="res-link" className="text-right">Link</Label>
+                                <Input id="res-link" value={editingResource.link || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, link: e.target.value} : null)} className="col-span-3"/>
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="res-desc" className="text-right">Description</Label>
+                                <Textarea id="res-desc" value={editingResource.description || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, description: e.target.value} : null)} className="col-span-3"/>
+                            </div>
+                        </>
+                        )}
                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="res-desc" className="text-right">Description</Label>
-                            <Textarea id="res-desc" value={editingResource.description || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, description: e.target.value} : null)} className="col-span-3"/>
+                            <Label htmlFor="res-folder" className="text-right">Folder</Label>
+                            <Select value={editingResource.folderId || ''} onValueChange={handleResourceFolderChange}>
+                                <SelectTrigger id="res-folder" className="col-span-3"><SelectValue placeholder="Select a folder" /></SelectTrigger>
+                                <SelectContent>{renderFolderOptions(null, 0)}</SelectContent>
+                            </Select>
                         </div>
-                    </>
-                    )}
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="res-folder" className="text-right">Folder</Label>
-                        <Select value={editingResource.folderId || ''} onValueChange={handleResourceFolderChange}>
-                            <SelectTrigger id="res-folder" className="col-span-3"><SelectValue placeholder="Select a folder" /></SelectTrigger>
-                            <SelectContent>{renderFolderOptions(null, 0)}</SelectContent>
-                        </Select>
                     </div>
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setEditingResource(null)}>Cancel</Button>
-                    <Button onClick={handleSaveResourceEdit}>Save Changes</Button>
-                </DialogFooter>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditingResource(null)}>Cancel</Button>
+                        <Button onClick={handleSaveResourceEdit}>Save Changes</Button>
+                    </DialogFooter>
+                </>}
             </DialogContent>
         </Dialog>
         
@@ -1553,20 +1554,16 @@ function ResourcesPageContent() {
                 </div>
             </DialogContent>
         </Dialog>
-        <Dialog open={markdownModalState.isOpen} onOpenChange={(isOpen) => setMarkdownModalState(p => ({...p, isOpen}))}>
+        <Dialog open={markdownModalState.isOpen} onOpenChange={(isOpen) => setMarkdownModalState(prev => ({...prev, isOpen}))}>
           <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
               <DialogHeader className="p-4 border-b">
-                  <DialogTitle>{markdownModalState.resource?.name || "Resource"}</DialogTitle>
+                  <DialogTitle>{currentMarkdownResource?.name || "Resource"}</DialogTitle>
               </DialogHeader>
               <div className="flex-grow min-h-0">
                   <ScrollArea className="h-full">
                       <div className="prose dark:prose-invert max-w-full p-6">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {(markdownModalState.resource?.points || [])
-                              .filter(p => p.type === 'markdown' || p.type === 'code')
-                              .map(p => (p.type === 'code' ? '\`\`\`\n' + p.text + '\n\`\`\`' : p.text))
-                              .join('\n\n---\n\n')
-                          }
+                          {currentMarkdownPoint?.text || ""}
                         </ReactMarkdown>
                       </div>
                   </ScrollArea>
@@ -1586,6 +1583,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
