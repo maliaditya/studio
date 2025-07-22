@@ -130,24 +130,21 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose }: ResourceP
         id: `popup-${resourceId}`,
     });
 
-    const [currentSize, setCurrentSize] = useState({ width: width || 512, height: height || 600 });
+    const [currentSize, setCurrentSize] = useState({ width: width || 512 });
     const [isResizing, setIsResizing] = useState(false);
     const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
     const handleResizeMouseDown = (e: React.MouseEvent) => {
         e.stopPropagation();
         setIsResizing(true);
-        setResizeStart({ x: e.clientX, y: e.clientY, width: currentSize.width, height: currentSize.height });
+        setResizeStart({ x: e.clientX, y: e.clientY, width: currentSize.width, height: 0 });
     };
 
     const handleMouseMove = (e: MouseEvent) => {
         if (isResizing) {
             const dx = e.clientX - resizeStart.x;
-            const dy = e.clientY - resizeStart.y;
-            
             setCurrentSize({
-                width: Math.max(320, resizeStart.width + dx),
-                height: 600, // Fixed height
+                width: Math.max(320, resizeStart.width + dx)
             });
         }
     };
@@ -176,7 +173,7 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose }: ResourceP
         left: x,
         willChange: 'transform',
         width: `${currentSize.width}px`,
-        height: `${currentSize.height}px`,
+        maxHeight: '70vh',
     };
 
     if (transform) {
@@ -262,19 +259,21 @@ const SortableResourceCard = ({ children, item, className }: { children: React.R
 };
 
 
-const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUrl, setEmbedUrl, editingPointId, setEditingPointId, onOpenNestedPopup }: {
+const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUrl, setEmbedUrl, onOpenNestedPopup }: {
     point: ResourcePoint;
     resource: Resource;
     onUpdate: (resource: Resource) => void;
     onDelete: (resourceId: string) => void;
     setFloatingVideoUrl: (url: string | null) => void;
     setEmbedUrl: (url: string | null) => void;
-    editingPointId: string | null;
-    setEditingPointId: (id: string | null) => void;
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
 }) => {
     const { resources } = useAuth();
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id });
+
+    const [isEditing, setIsEditing] = useState(false);
+    const [editText, setEditText] = useState(point.text);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -305,13 +304,29 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
         );
         onUpdate({ ...resource, points: updatedPoints });
     };
-
-    const handleBlur = (e: React.FocusEvent<HTMLTextAreaElement>) => {
-        if (e.target.value.trim() === '') {
+    
+    const handleSave = () => {
+        if (editText.trim() === '') {
             onDelete(point.id);
+        } else {
+            handleUpdatePoint(editText);
         }
-        setEditingPointId(null);
+        setIsEditing(false);
     };
+    
+    useEffect(() => {
+        if (isEditing && textareaRef.current) {
+            textareaRef.current.focus();
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+    }, [isEditing]);
+    
+    const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setEditText(e.target.value);
+        e.target.style.height = 'auto';
+        e.target.style.height = `${e.target.scrollHeight}px`;
+    }
 
     if (point.type === 'card' && point.resourceId) {
         return (
@@ -335,8 +350,8 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
         <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
             <button {...attributes} {...listeners} className="cursor-grab p-1"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
             <div className="flex-grow">
-                {editingPointId === point.id ? (
-                    <Textarea value={point.text} onChange={e => handleUpdatePoint(e.target.value)} onBlur={handleBlur} autoFocus placeholder="New step..." className={cn("text-sm", (point.type === 'code' || point.type === 'markdown') && "font-mono text-xs")} rows={(point.type === 'code' || point.type === 'markdown') ? 6 : 2}/>
+                {isEditing ? (
+                    <Textarea ref={textareaRef} value={editText} onChange={handleTextareaChange} onBlur={handleSave} placeholder="New step..." className={cn("text-sm", (point.type === 'code' || point.type === 'markdown') && "font-mono text-xs")} rows={1}/>
                 ) : point.type === 'youtube' && point.url ? (
                     <div className="w-full aspect-video rounded-md overflow-hidden border">
                         <iframe src={point.url} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
@@ -346,13 +361,13 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
                         <iframe src={point.url} title={resource.name} frameBorder="0" allowFullScreen className="w-full h-full"></iframe>
                     </div>
                 ) : point.type === 'code' ? (
-                    <pre onClick={() => setEditingPointId(point.id)} className="w-full cursor-pointer bg-muted/50 p-3 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text || <span className="text-muted-foreground italic">New step...</span>}</pre>
+                    <pre onClick={() => setIsEditing(true)} className="w-full cursor-pointer bg-muted/50 p-3 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text || <span className="text-muted-foreground italic">New step...</span>}</pre>
                 ) : point.type === 'markdown' ? (
-                    <div onClick={() => setEditingPointId(point.id)} className="w-full cursor-pointer bg-muted/50 p-3 rounded-md prose dark:prose-invert prose-sm">
+                    <div onClick={() => setIsEditing(true)} className="w-full cursor-pointer bg-muted/50 p-3 rounded-md prose dark:prose-invert prose-sm">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
                     </div>
                 ) : (
-                    <span onClick={() => setEditingPointId(point.id)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/<br>/g, '') || '<span class="text-muted-foreground italic">New step...</span>' }} />
+                    <span onClick={() => setIsEditing(true)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/\n/g, '<br />') || '<span class="text-muted-foreground italic">New step...</span>' }} />
                 )}
             </div>
             <div className="flex flex-col items-center flex-shrink-0">
@@ -380,7 +395,6 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
 }) => {
     const { resources } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
-    const [editingPointId, setEditingPointId] = useState<string | null>(null);
     const [activePointId, setActivePointId] = useState<string | null>(null);
 
     const [linkCardPopoverOpen, setLinkCardPopoverOpen] = useState(false);
@@ -395,7 +409,6 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
         const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: '', type };
         const updatedPoints = [...(resource.points || []), newPoint];
         onUpdate({ ...resource, points: updatedPoints });
-        setEditingPointId(newPoint.id);
     };
 
     const handleAddCardLinkPoint = () => {
@@ -487,8 +500,6 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                                         onDelete={handleDeletePoint}
                                         setEmbedUrl={() => {}}
                                         setFloatingVideoUrl={setFloatingVideoUrl}
-                                        editingPointId={editingPointId}
-                                        setEditingPointId={setEditingPointId}
                                         onOpenNestedPopup={onOpenNestedPopup}
                                     />
                                 ))}
@@ -579,7 +590,6 @@ function ResourcesPageContent() {
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
   
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
-  const [editedResourceData, setEditedResourceData] = useState<Partial<Resource>>({});
   
   const [youtubeModalState, setYoutubeModalState] = useState<{
     isOpen: boolean;
@@ -613,9 +623,8 @@ function ResourcesPageContent() {
 
   const [markdownModalState, setMarkdownModalState] = useState<{
     isOpen: boolean;
-    playlist: Resource[];
-    currentIndex: number;
-  }>({ isOpen: false, playlist: [], currentIndex: 0 });
+    resource: Resource | null;
+  }>({ isOpen: false, resource: null });
   
   const tabsContainerRef = useRef<HTMLDivElement>(null);
 
@@ -635,35 +644,16 @@ function ResourcesPageContent() {
     });
   }, []);
   
-  const handleNextMarkdown = useCallback(() => {
-    setMarkdownModalState(prev => {
-      if (!prev.isOpen) return prev;
-      const nextIndex = (prev.currentIndex + 1) % prev.playlist.length;
-      return { ...prev, currentIndex: nextIndex };
-    });
-  }, []);
-
-  const handlePrevMarkdown = useCallback(() => {
-    setMarkdownModalState(prev => {
-      if (!prev.isOpen) return prev;
-      const prevIndex = (prev.currentIndex - 1 + prev.playlist.length) % prev.playlist.length;
-      return { ...prev, currentIndex: prevIndex };
-    });
-  }, []);
-
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-        if (markdownModalState.isOpen) {
-            if (event.key === 'ArrowRight') handleNextMarkdown();
-            if (event.key === 'ArrowLeft') handlePrevMarkdown();
-        } else if (youtubeModalState.isOpen) {
+        if (youtubeModalState.isOpen) {
             if (event.key === 'ArrowRight') handleNextVideo();
             if (event.key === 'ArrowLeft') handlePrevVideo();
         }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-}, [markdownModalState.isOpen, youtubeModalState.isOpen, handleNextMarkdown, handlePrevMarkdown, handleNextVideo, handlePrevVideo]);
+}, [youtubeModalState.isOpen, handleNextVideo, handlePrevVideo]);
 
   const handleWheelScroll = (e: React.WheelEvent<HTMLDivElement>) => {
     if (e.deltaY === 0) return;
@@ -766,12 +756,6 @@ function ResourcesPageContent() {
         window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
-
-  useEffect(() => {
-    if (editingResource) {
-        setEditedResourceData(editingResource);
-    }
-  }, [editingResource]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -955,7 +939,7 @@ function ResourcesPageContent() {
   };
   
   const handleResourceFolderChange = (value: string) => {
-      setEditedResourceData(prev => ({...prev, folderId: value}));
+      setEditingResource(prev => prev ? ({...prev, folderId: value}) : null);
   };
 
   const handleUpdateResource = (updatedResource: Resource) => {
@@ -965,22 +949,18 @@ function ResourcesPageContent() {
   };
 
   const handleSaveResourceEdit = () => {
-    if (!editingResource || !editedResourceData.name?.trim() || !editedResourceData.folderId) {
+    if (!editingResource || !editingResource.name?.trim() || !editingResource.folderId) {
         toast({ title: "Error", description: "Name and folder are required.", variant: "destructive"});
         return;
     }
     
-    let finalData = { ...editedResourceData };
+    let finalData = { ...editingResource };
     if (finalData.type === 'link' && finalData.link && finalData.link !== editingResource?.link) {
         finalData.iconUrl = getFaviconUrl(finalData.link);
     }
-    onUpdateResource(finalData as Resource);
+    handleUpdateResource(finalData as Resource);
     setEditingResource(null);
-    toast({ title: "Resource Updated", description: `"${editedResourceData.name}" has been updated.` });
-  };
-
-  const onUpdateResource = (updatedResource: Resource) => {
-    setResources(prev => prev.map(res => res.id === updatedResource.id ? updatedResource : res));
+    toast({ title: "Resource Updated", description: `"${editingResource.name}" has been updated.` });
   };
 
   const getChildFoldersRecursive = (folderId: string): ResourceFolder[] => {
@@ -1129,13 +1109,8 @@ function ResourcesPageContent() {
     } else {
         level = 0;
         parentId = undefined;
-        if (hasMarkdown) {
-            x = (window.innerWidth - popupWidth) / 2;
-            y = (window.innerHeight - popupHeight) / 2;
-        } else {
-            x = event.clientX;
-            y = event.clientY;
-        }
+        x = event.clientX;
+        y = event.clientY;
     }
 
     setOpenPopups(prev => {
@@ -1207,25 +1182,13 @@ function ResourcesPageContent() {
   };
   
   const handleOpenMarkdownModal = (resourceId: string) => {
-    const markdownResources = filteredResources.filter(r => r.type === 'card' && r.points?.some(p => p.type === 'markdown' || p.type === 'code'));
-    const currentIndex = markdownResources.findIndex(r => r.id === resourceId);
-    if (currentIndex !== -1) {
-        setMarkdownModalState({
-            isOpen: true,
-            playlist: markdownResources,
-            currentIndex,
-        });
-    }
+      const resource = resources.find(r => r.id === resourceId);
+      if (resource) {
+        setMarkdownModalState({ isOpen: true, resource });
+      }
   };
 
-  const currentMarkdownResource = markdownModalState.playlist[markdownModalState.currentIndex];
-  const fullMarkdownContent = currentMarkdownResource
-    ? (currentMarkdownResource.points || [])
-        .filter(p => p.type === 'markdown' || p.type === 'code')
-        .map(p => (p.type === 'code' ? '\`\`\`\n' + p.text + '\n\`\`\`' : p.text))
-        .join('\n\n---\n\n')
-    : null;
-
+  const currentMarkdownResource = markdownModalState.resource;
 
   return (
     <>
@@ -1388,7 +1351,7 @@ function ResourcesPageContent() {
                                     </Card>
                                 );
                             }
-                             return <div key={res.id} className={cardClassName}>{cardContent}</div>;
+                             return <SortableResourceCard key={res.id} item={res} className={cardClassName}>{cardContent}</SortableResourceCard>;
                         })}
                         {selectedResourceFolderId && (
                             <Card 
@@ -1474,23 +1437,23 @@ function ResourcesPageContent() {
                 <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="res-name" className="text-right">Name</Label>
-                        <Input id="res-name" value={editedResourceData.name || ''} onChange={(e) => setEditedResourceData(prev => ({...prev, name: e.target.value}))} className="col-span-3"/>
+                        <Input id="res-name" value={editingResource.name || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, name: e.target.value} : null)} className="col-span-3"/>
                     </div>
                     {editingResource?.type === 'link' && (
                     <>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="res-link" className="text-right">Link</Label>
-                            <Input id="res-link" value={editedResourceData.link || ''} onChange={(e) => setEditedResourceData(prev => ({...prev, link: e.target.value}))} className="col-span-3"/>
+                            <Input id="res-link" value={editingResource.link || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, link: e.target.value} : null)} className="col-span-3"/>
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="res-desc" className="text-right">Description</Label>
-                            <Textarea id="res-desc" value={editedResourceData.description || ''} onChange={(e) => setEditedResourceData(prev => ({...prev, description: e.target.value}))} className="col-span-3"/>
+                            <Textarea id="res-desc" value={editingResource.description || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, description: e.target.value} : null)} className="col-span-3"/>
                         </div>
                     </>
                     )}
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="res-folder" className="text-right">Folder</Label>
-                        <Select value={editedResourceData.folderId || ''} onValueChange={handleResourceFolderChange}>
+                        <Select value={editingResource.folderId || ''} onValueChange={handleResourceFolderChange}>
                             <SelectTrigger id="res-folder" className="col-span-3"><SelectValue placeholder="Select a folder" /></SelectTrigger>
                             <SelectContent>{renderFolderOptions(null, 0)}</SelectContent>
                         </Select>
@@ -1591,24 +1554,24 @@ function ResourcesPageContent() {
             </DialogContent>
         </Dialog>
         <Dialog open={markdownModalState.isOpen} onOpenChange={(isOpen) => setMarkdownModalState(p => ({...p, isOpen}))}>
-            <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
-                <DialogHeader className="p-4 border-b">
-                    <DialogTitle>{currentMarkdownResource?.name || "Resource"}</DialogTitle>
-                </DialogHeader>
-                <div className="flex-grow min-h-0 relative group/modal">
-                    <ScrollArea className="h-full">
-                        <div className="prose dark:prose-invert max-w-full p-6">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{fullMarkdownContent || ""}</ReactMarkdown>
-                        </div>
-                    </ScrollArea>
-                    {markdownModalState.playlist.length > 1 && (
-                        <>
-                            <Button variant="ghost" size="icon" onClick={handlePrevMarkdown} className="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/modal:opacity-100 transition-opacity bg-background/50 hover:bg-background/80 rounded-full h-8 w-8 z-10"><ChevronLeft className="h-5 w-5" /></Button>
-                            <Button variant="ghost" size="icon" onClick={handleNextMarkdown} className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/modal:opacity-100 transition-opacity bg-background/50 hover:bg-background/80 rounded-full h-8 w-8 z-10"><ChevronRightIcon className="h-5 w-5" /></Button>
-                        </>
-                    )}
-                </div>
-            </DialogContent>
+          <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
+              <DialogHeader className="p-4 border-b">
+                  <DialogTitle>{markdownModalState.resource?.name || "Resource"}</DialogTitle>
+              </DialogHeader>
+              <div className="flex-grow min-h-0">
+                  <ScrollArea className="h-full">
+                      <div className="prose dark:prose-invert max-w-full p-6">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {(markdownModalState.resource?.points || [])
+                              .filter(p => p.type === 'markdown' || p.type === 'code')
+                              .map(p => (p.type === 'code' ? '\`\`\`\n' + p.text + '\n\`\`\`' : p.text))
+                              .join('\n\n---\n\n')
+                          }
+                        </ReactMarkdown>
+                      </div>
+                  </ScrollArea>
+              </div>
+          </DialogContent>
         </Dialog>
     </DndContext>
     </>
@@ -1623,6 +1586,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
