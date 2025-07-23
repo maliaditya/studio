@@ -1161,7 +1161,7 @@ function ResourcesPageContent() {
         ))}
       </ul>
     );
-  }, [resourceFolders, editingFolder, selectedResourceFolderId, collapsedFolders, toggleFolderCollapse, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder]);
+  }, [resourceFolders, editingFolder, selectedResourceFolderId, collapsedFolders, handleSelectFolder, toggleFolderCollapse, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder]);
 
   const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
     setOpenPopups(prev => {
@@ -1364,8 +1364,7 @@ function ResourcesPageContent() {
                                     <Card
                                         className={cn(
                                             "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full",
-                                            "bg-card",
-                                            youtubeEmbedUrl && "cursor-pointer"
+                                            "bg-card"
                                         )}
                                         onClick={(e) => {
                                             if (youtubeEmbedUrl) {
@@ -1430,9 +1429,7 @@ function ResourcesPageContent() {
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 -mr-2 -mt-1"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                                             <DropdownMenuContent align="end">
-                                                                <DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit Details</span></DropdownMenuItem>
-                                                                <DropdownMenuItem onSelect={() => setEditingResource(res)}><Github className="mr-2 h-4 w-4"/>Add/Edit GitHub Link</DropdownMenuItem>
-                                                                <DropdownMenuItem onSelect={() => setEditingResource(res)}><Globe className="mr-2 h-4 w-4"/>Add/Edit Demo Link</DropdownMenuItem>
+                                                                <DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
                                                                 <DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
@@ -1702,6 +1699,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
