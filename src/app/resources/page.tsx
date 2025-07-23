@@ -181,6 +181,7 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChang
         left: x,
         willChange: 'transform',
         width: `${width}px`,
+        height: 'auto',
         maxHeight: '70vh',
     };
 
@@ -1089,8 +1090,9 @@ function ResourcesPageContent() {
 
   const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
     setOpenPopups(prev => {
+        const newPopups = new Map(prev);
         const resource = resources.find(r => r.id === resourceId);
-        if (!resource) return prev;
+        if (!resource) return newPopups;
         
         const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
         const popupWidth = hasMarkdown ? 896 : 512;
@@ -1109,7 +1111,6 @@ function ResourcesPageContent() {
             y = event.clientY;
         }
         
-        const newPopups = new Map(prev);
         newPopups.set(resourceId, {
             resourceId, level, x, y, parentId, width: popupWidth
         });
@@ -1439,41 +1440,43 @@ function ResourcesPageContent() {
         {editingResource && (
           <Dialog open={!!editingResource} onOpenChange={(isOpen) => !isOpen && setEditingResource(null)}>
             <DialogContent className="sm:max-w-md">
-                <>
-                    <DialogHeader>
-                        <DialogTitle>Edit Resource</DialogTitle>
-                        <DialogDescription>Update the details or move this resource to a new folder.</DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="res-name" className="text-right">Name</Label>
-                            <Input id="res-name" value={editingResource.name || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, name: e.target.value} : null)} className="col-span-3"/>
-                        </div>
-                        {editingResource?.type === 'link' && (
-                        <>
+                {editingResource && (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle>Edit Resource</DialogTitle>
+                            <DialogDescription>Update the details or move this resource to a new folder.</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="res-link" className="text-right">Link</Label>
-                                <Input id="res-link" value={editingResource.link || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, link: e.target.value} : null)} className="col-span-3"/>
+                                <Label htmlFor="res-name" className="text-right">Name</Label>
+                                <Input id="res-name" value={editingResource.name || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, name: e.target.value} : null)} className="col-span-3"/>
                             </div>
+                            {editingResource?.type === 'link' && (
+                            <>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="res-link" className="text-right">Link</Label>
+                                    <Input id="res-link" value={editingResource.link || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, link: e.target.value} : null)} className="col-span-3"/>
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="res-desc" className="text-right">Description</Label>
+                                    <Textarea id="res-desc" value={editingResource.description || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, description: e.target.value} : null)} className="col-span-3"/>
+                                </div>
+                            </>
+                            )}
                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="res-desc" className="text-right">Description</Label>
-                                <Textarea id="res-desc" value={editingResource.description || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, description: e.target.value} : null)} className="col-span-3"/>
+                                <Label htmlFor="res-folder" className="text-right">Folder</Label>
+                                <Select value={editingResource.folderId || ''} onValueChange={handleResourceFolderChange}>
+                                    <SelectTrigger id="res-folder" className="col-span-3"><SelectValue placeholder="Select a folder" /></SelectTrigger>
+                                    <SelectContent>{renderFolderOptions(null, 0)}</SelectContent>
+                                </Select>
                             </div>
-                        </>
-                        )}
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="res-folder" className="text-right">Folder</Label>
-                            <Select value={editingResource.folderId || ''} onValueChange={handleResourceFolderChange}>
-                                <SelectTrigger id="res-folder" className="col-span-3"><SelectValue placeholder="Select a folder" /></SelectTrigger>
-                                <SelectContent>{renderFolderOptions(null, 0)}</SelectContent>
-                            </Select>
                         </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setEditingResource(null)}>Cancel</Button>
-                        <Button onClick={handleSaveResourceEdit}>Save Changes</Button>
-                    </DialogFooter>
-                </>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setEditingResource(null)}>Cancel</Button>
+                            <Button onClick={handleSaveResourceEdit}>Save Changes</Button>
+                        </DialogFooter>
+                    </>
+                )}
             </DialogContent>
           </Dialog>
         )}
@@ -1594,6 +1597,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
