@@ -114,7 +114,7 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
                         <span className="truncate">{resource.name}</span>
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="flex-grow min-h-0 overflow-y-auto p-3 pt-0">
+                <CardContent className="p-3 pt-0 flex-grow min-h-0 overflow-y-auto">
                     <ul className="space-y-2 text-sm text-muted-foreground pr-2">
                         {(resource.points || []).map(point => (
                             <li key={point.id} className="flex items-start gap-2">
@@ -506,22 +506,13 @@ export default function SharedFolderPage() {
         <DndContext onDragEnd={handleDragEndMain}>
             <audio ref={audioRef} onEnded={() => setPlayingAudio(null)} />
             <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-                <header className="mb-8">
-                    <h1 className="text-3xl font-bold">Shared Collection</h1>
-                    <p className="text-muted-foreground">Shared by {sharedBy}</p>
-                    <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-                        <p>Powered by</p>
-                        <a href="https://corelifeos.vercel.app/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 font-semibold text-primary hover:underline">
-                            <BrainCircuit className="h-4 w-4"/> LifeOS
-                        </a>
-                    </div>
-                </header>
                 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-8 items-start">
                     <aside className="md:col-span-1 md:sticky top-6">
                         <Card>
                             <CardHeader>
                                 <CardTitle>Folders</CardTitle>
+                                <CardDescription>Shared by {sharedBy}</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="max-h-[calc(100vh-18rem)] overflow-y-auto pr-2">
@@ -594,3 +585,4 @@ export default function SharedFolderPage() {
         </DndContext>
     );
 }
+
