@@ -1,20 +1,20 @@
-
-
-
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, Folder, Link as LinkIcon, Globe, Loader2, AlertTriangle, Youtube, Expand, ChevronDown, BrainCircuit, Library, MessageSquare, Code, ArrowRight } from 'lucide-react';
-import type { Resource, ResourceFolder } from '@/types/workout';
+import { ExternalLink, Folder, Link as LinkIcon, Globe, Loader2, AlertTriangle, Youtube, Expand, ChevronDown, BrainCircuit, Library, MessageSquare, Code, ArrowRight, X, PictureInPicture, Play, Pause, GitMerge } from 'lucide-react';
+import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
+import { useAuth } from '@/contexts/AuthContext';
+
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -48,72 +48,185 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
 
 const isImageUrl = (url: string | undefined): boolean => {
     if (!url) return false;
-    // Check for common image file extensions
     if (/\.(jpg|jpeg|png|webp|avif|gif|svg)$/i.test(url)) {
         return true;
     }
-    // Check for image hosting domains that use URL parameters
     try {
         const urlObj = new URL(url);
-        const imageHosts = ['images.unsplash.com', 'plus.unsplash.com'];
-        if (imageHosts.includes(urlObj.hostname)) {
-            return true;
-        }
+        const imageHosts = ['images.unsplash.com', 'plus.unsplash.com', 'upload.wikimedia.org'];
+        return imageHosts.includes(urlObj.hostname);
     } catch (e) {
-        // Invalid URL
         return false;
     }
-    return false;
 };
 
-const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
-    const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+interface PopupState {
+  resourceId: string;
+  level: number;
+  x: number;
+  y: number;
+  parentId?: string;
+  width?: number;
+  height?: number;
+}
 
-    const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
-    const imageEmbedUrl = isImageUrl(resource.link) ? resource.link : null;
-    const hasMarkdownContent = resource.type === 'card' && (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
-    
-    if (resource.type === 'card') {
-        return (
-            <Card className="flex flex-col rounded-xl group overflow-hidden transition-all duration-300 hover:shadow-xl">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-3 text-lg">
-                        <span className="text-primary"><Library className="h-5 w-5" /></span>
+interface ResourcePopupProps {
+  popupState: PopupState;
+  allResources: Resource[];
+  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
+  onClose: (resourceId: string) => void;
+  onSizeChange: (resourceId: string, newSize: { width: number; height: number }) => void;
+}
+
+const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClose, onSizeChange }: ResourcePopupProps) => {
+    const resource = allResources.find(r => r.id === popupState.resourceId);
+    const cardRef = useRef<HTMLDivElement>(null);
+
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({
+        id: `popup-${popupState.resourceId}`,
+    });
+
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: popupState.y,
+        left: popupState.x,
+        width: `${popupState.width}px`,
+        willChange: 'transform',
+    };
+
+    if (transform) {
+        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
+    }
+
+    if (!resource) return null;
+
+    const handleLinkClick = (e: React.MouseEvent, pointResourceId: string) => {
+      e.stopPropagation();
+      onOpenNestedPopup(pointResourceId, e, popupState);
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} {...attributes} className="z-[60]">
+            <Card ref={cardRef} className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col">
+                <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <Library className="h-4 w-4" />
                         <span className="truncate">{resource.name}</span>
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="p-6 pt-0 flex-grow min-h-0">
-                  <div className={cn(hasMarkdownContent ? 'h-[650px]' : '')}>
-                    <ScrollArea className="h-full">
-                        <div>
-                            <ul className="space-y-3">
-                                {(resource.points || []).map((point) => (
-                                    <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground">
-                                        {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                        point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                        <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
-                                        }
-                                        {point.type === 'card' && point.resourceId ? (
-                                            <span className="font-medium text-primary">{point.text}</span>
-                                        ) : point.type === 'markdown' ? (
-                                            <div className="w-full prose dark:prose-invert prose-sm">
-                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
-                                            </div>
-                                        ) : point.type === 'code' ? (
-                                            <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
-                                        ) : (
-                                            <span className="break-words w-full" title={point.text}>{point.text}</span>
-                                        )}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    </ScrollArea>
-                  </div>
+                <CardContent className="flex-grow min-h-0 overflow-y-auto p-3 pt-0">
+                    <ul className="space-y-2 text-sm text-muted-foreground pr-2">
+                        {(resource.points || []).map(point => (
+                            <li key={point.id} className="flex items-start gap-2">
+                                {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
+                                }
+                                {point.type === 'card' && point.resourceId ? (
+                                    <button
+                                        onClick={(e) => handleLinkClick(e, point.resourceId!)}
+                                        className="text-left font-medium text-primary hover:underline"
+                                    >
+                                        {point.text}
+                                    </button>
+                                ) : point.type === 'markdown' ? (
+                                    <div className="w-full prose dark:prose-invert prose-sm">
+                                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                    </div>
+                                ) : point.type === 'code' ? (
+                                     <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                                ) : (
+                                    <span className="break-words w-full" title={point.text}>{point.text}</span>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
                 </CardContent>
+                <CardFooter className="p-2 flex justify-end flex-shrink-0 relative">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onClose(resource.id); }}>
+                        <X className="h-4 w-4" />
+                    </Button>
+                </CardFooter>
+            </Card>
+        </div>
+    );
+};
+
+
+const ResourceCardComponent = ({ resource, onOpenNestedPopup, playingAudio, setPlayingAudio, setFloatingVideoUrl }: { 
+  resource: Resource; 
+  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
+  playingAudio: { id: string; isPlaying: boolean } | null;
+  setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
+  setFloatingVideoUrl: (url: string | null) => void;
+}) => {
+    const hasMarkdownContent = resource.type === 'card' && (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+
+    const togglePlayAudio = () => {
+      if (playingAudio?.id === resource.id && playingAudio.isPlaying) {
+        setPlayingAudio(prev => prev ? { ...prev, isPlaying: false } : null);
+      } else {
+        setPlayingAudio({ id: resource.id, isPlaying: true });
+      }
+    };
+
+    if (resource.type === 'card') {
+        return (
+            <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl">
+              <CardHeader>
+                <div className="flex justify-between items-start gap-2">
+                   <div className="flex items-center gap-2 flex-grow min-w-0">
+                        <CardTitle className="flex items-center gap-3 text-lg cursor-pointer">
+                            <span className="text-primary"><Library className="h-5 w-5" /></span>
+                            <span className="truncate">{resource.name}</span>
+                        </CardTitle>
+                   </div>
+                   <div className="flex items-center">
+                        {resource.audioUrl && (
+                             <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={togglePlayAudio}>
+                                {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
+                            </Button>
+                        )}
+                   </div>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-grow min-h-0">
+                <div className={cn(hasMarkdownContent ? 'h-[450px]' : '')}>
+                  <ScrollArea className="h-full">
+                      <ul className="space-y-3 pr-3">
+                          {(resource.points || []).map((point) => (
+                              <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
+                                  {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                  point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                  <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
+                                  }
+                                  {point.type === 'card' && point.resourceId ? (
+                                      <button onClick={(e) => onOpenNestedPopup(point.resourceId!, e)} className="text-left font-medium text-primary hover:underline">
+                                          {point.text}
+                                      </button>
+                                  ) : point.type === 'markdown' ? (
+                                      <div className="w-full prose dark:prose-invert prose-sm">
+                                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                      </div>
+                                  ) : point.type === 'code' ? (
+                                      <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                                  ) : (
+                                      <span className="break-words w-full" title={point.text}>{point.text}</span>
+                                  )}
+                              </li>
+                          ))}
+                      </ul>
+                  </ScrollArea>
+                </div>
+              </CardContent>
             </Card>
         );
     }
+    
+    // Logic for 'link' type cards
+    const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+    const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
+    const imageEmbedUrl = isImageUrl(resource.link) ? resource.link : null;
 
     if (imageEmbedUrl) {
         return (
@@ -135,12 +248,17 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
          return (
             <>
                 <Card className="overflow-hidden h-full flex flex-col">
-                    <div className="aspect-video w-full bg-black"><iframe src={youtubeEmbedUrl} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe></div>
+                    <div className="aspect-video w-full bg-black relative group">
+                        <iframe src={youtubeEmbedUrl} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
+                        <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(resource.link!)}><PictureInPicture className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setEmbedUrl(youtubeEmbedUrl)}><Expand className="h-4 w-4" /></Button>
+                        </div>
+                    </div>
                     <CardContent className="p-3 flex-grow flex flex-col">
                         <div className="flex items-center gap-2"><Youtube className="h-4 w-4 text-red-500"/><p className="font-semibold text-sm truncate" title={resource.name}>{resource.name}</p></div>
-                        <div className="mt-auto pt-2 flex gap-2">
-                             <Button asChild variant="outline" size="sm" className="w-full"><a href={resource.link} target="_blank" rel="noopener noreferrer">On YouTube <ExternalLink className="ml-2 h-3 w-3"/></a></Button>
-                             <Button variant="secondary" size="sm" className="w-full" onClick={() => setEmbedUrl(youtubeEmbedUrl)}><Expand className="mr-2 h-3 w-3"/>Expand</Button>
+                        <div className="mt-auto pt-2">
+                            <Button asChild variant="secondary" size="sm" className="w-full"><a href={resource.link} target="_blank" rel="noopener noreferrer">View on YouTube <ExternalLink className="ml-2 h-3 w-3"/></a></Button>
                         </div>
                     </CardContent>
                 </Card>
@@ -164,8 +282,9 @@ const ResourceLinkCard = ({ resource }: { resource: Resource }) => {
                 </div>
             </CardContent>
         </Card>
-    )
-}
+    );
+};
+
 
 interface SharedData {
   folder: ResourceFolder;
@@ -186,9 +305,30 @@ export default function SharedFolderPage() {
     const [selectedFolderId, setSelectedFolderId] = useState<string | null>(folderId);
     const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
 
+    const { setFloatingVideoUrl } = useAuth();
+    const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
+    const [playingAudio, setPlayingAudio] = useState<{ id: string, isPlaying: boolean } | null>(null);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    useEffect(() => {
+        const audioEl = audioRef.current;
+        if (!audioEl) return;
+    
+        if (playingAudio && playingAudio.isPlaying) {
+          const resourceToPlay = data?.resources.find(r => r.id === playingAudio.id);
+          if (resourceToPlay?.audioUrl) {
+            if (audioEl.src !== resourceToPlay.audioUrl) {
+              audioEl.src = resourceToPlay.audioUrl;
+            }
+            audioEl.play().catch(e => console.error("Audio play failed:", e));
+          }
+        } else {
+          audioEl.pause();
+        }
+      }, [playingAudio, data?.resources]);
+
     useEffect(() => {
         if (!folderId) return;
-
         setSelectedFolderId(folderId);
         
         const fetchData = async () => {
@@ -207,9 +347,73 @@ export default function SharedFolderPage() {
                 setLoading(false);
             }
         };
-
         fetchData();
     }, [folderId]);
+
+    const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
+        setOpenPopups(prev => {
+            const newPopups = new Map(prev);
+            const resource = data?.resources.find(r => r.id === resourceId);
+            if (!resource) return newPopups;
+            
+            const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+            const popupWidth = hasMarkdown ? 896 : 512;
+        
+            let x, y, level, parentId;
+        
+            if (parentPopupState) {
+                level = parentPopupState.level + 1;
+                parentId = parentPopupState.resourceId;
+                x = parentPopupState.x + 40;
+                y = parentPopupState.y + 40;
+            } else {
+                level = 0;
+                parentId = undefined;
+                if (hasMarkdown) {
+                    x = window.innerWidth / 2 - popupWidth / 2;
+                    y = window.innerHeight / 2 - Math.min(window.innerHeight * 0.7, 700) / 2;
+                } else {
+                    x = event.clientX;
+                    y = event.clientY;
+                }
+            }
+            
+            newPopups.set(resourceId, {
+                resourceId, level, x, y, parentId, width: popupWidth
+            });
+            return newPopups;
+        });
+    };
+    
+    const handleClosePopup = (resourceId: string) => {
+        setOpenPopups(prev => {
+          const newPopups = new Map(prev);
+          const popupsToDelete = new Set<string>();
+          function findChildren(parentId: string) {
+            popupsToDelete.add(parentId);
+            for (const [id, popup] of newPopups.entries()) {
+              if (popup.parentId === parentId) findChildren(id);
+            }
+          }
+          findChildren(resourceId);
+          for (const id of popupsToDelete) newPopups.delete(id);
+          return newPopups;
+        });
+    };
+
+    const handleSizeChange = useCallback((resourceId: string, newSize: { width: number; height: number }) => {
+        setOpenPopups(prev => {
+            const newPopups = new Map(prev);
+            const popup = newPopups.get(resourceId);
+            if (popup) {
+                newPopups.set(resourceId, {
+                    ...popup,
+                    ...newSize
+                });
+            }
+            return newPopups;
+        });
+    }, []);
 
     const toggleFolderCollapse = useCallback((id: string) => {
       setCollapsedFolders(prev => {
@@ -232,7 +436,7 @@ export default function SharedFolderPage() {
                 {children.length > 0 ? (
                     <ChevronDown className={cn("h-4 w-4 transition-transform", isCollapsed && "-rotate-90")} />
                 ) : (
-                    <div className="w-4" /> // Placeholder for alignment
+                    <div className="w-4" />
                 )}
                 <Folder className="h-4 w-4"/>
                 <span className='flex-grow truncate'>{currentFolder.name}</span>
@@ -250,6 +454,28 @@ export default function SharedFolderPage() {
       if (!data || !selectedFolderId) return [];
       return data.resources.filter(r => r.folderId === selectedFolderId);
     }, [data, selectedFolderId]);
+
+    const handleDragEndMain = (event: DragEndEvent) => {
+        const { active, delta } = event;
+        const activeId = active.id as string;
+    
+        if (activeId.startsWith('popup-')) {
+            const resourceId = activeId.replace('popup-', '');
+            setOpenPopups(prev => {
+                const newPopups = new Map(prev);
+                const popup = newPopups.get(resourceId);
+                if (popup) {
+                    newPopups.set(resourceId, {
+                        ...popup,
+                        x: popup.x + delta.x,
+                        y: popup.y + delta.y,
+                    });
+                }
+                return newPopups;
+            });
+        }
+    };
+
 
     if (loading) {
         return (
@@ -277,57 +503,94 @@ export default function SharedFolderPage() {
     const selectedFolderName = childFolders.find(f => f.id === selectedFolderId)?.name || folder.name;
 
     return (
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-            <header className="mb-8">
-                <h1 className="text-3xl font-bold">Shared Collection</h1>
-                <p className="text-muted-foreground">Shared by {sharedBy}</p>
-                <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-                    <p>Powered by</p>
-                    <a href="https://corelifeos.vercel.app/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 font-semibold text-primary hover:underline">
-                        <BrainCircuit className="h-4 w-4"/> LifeOS
-                    </a>
-                </div>
-            </header>
-            
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 items-start">
-                <aside className="md:col-span-1 md:sticky top-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Folders</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="max-h-[calc(100vh-18rem)] overflow-y-auto pr-2">
-                                <ul className="space-y-1">
-                                    {renderSidebarFolders(folder, childFolders, 0)}
-                                </ul>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </aside>
+        <DndContext onDragEnd={handleDragEndMain}>
+            <audio ref={audioRef} onEnded={() => setPlayingAudio(null)} />
+            <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+                <header className="mb-8">
+                    <h1 className="text-3xl font-bold">Shared Collection</h1>
+                    <p className="text-muted-foreground">Shared by {sharedBy}</p>
+                    <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                        <p>Powered by</p>
+                        <a href="https://corelifeos.vercel.app/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 font-semibold text-primary hover:underline">
+                            <BrainCircuit className="h-4 w-4"/> LifeOS
+                        </a>
+                    </div>
+                </header>
+                
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-8 items-start">
+                    <aside className="md:col-span-1 md:sticky top-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Folders</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="max-h-[calc(100vh-18rem)] overflow-y-auto pr-2">
+                                    <ul className="space-y-1">
+                                        {renderSidebarFolders(folder, childFolders, 0)}
+                                    </ul>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </aside>
 
-                <main className="md:col-span-3">
-                    <h2 className="text-2xl font-bold mb-4">{selectedFolderName}</h2>
-                    {filteredResources.length > 0 ? (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                            {filteredResources.map(res => {
-                                const isCardType = res.type === 'card';
-                                const hasMarkdownContent = isCardType && (res.points || []).some(p => p.type === 'markdown' || p.type === 'code');
-                                const cardClassName = hasMarkdownContent ? "lg:col-span-3" : "";
-                                return (
-                                    <div key={res.id} className={cardClassName}>
-                                        <ResourceLinkCard resource={res} />
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    ) : (
-                        <div className="text-center text-muted-foreground p-12 border-2 border-dashed rounded-lg">
-                            <p>This folder is empty.</p>
-                        </div>
-                    )}
-                </main>
+                    <main className="md:col-span-3">
+                        <h2 className="text-2xl font-bold mb-4">{selectedFolderName}</h2>
+                        {filteredResources.length > 0 ? (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                                {filteredResources.map(res => {
+                                    const isCardType = res.type === 'card';
+                                    const hasMarkdownContent = isCardType && (res.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+                                    const cardClassName = hasMarkdownContent ? "lg:col-span-3" : "";
+                                    return (
+                                        <div key={res.id} className={cardClassName}>
+                                            <ResourceCardComponent resource={res} onOpenNestedPopup={handleOpenNestedPopup} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} setFloatingVideoUrl={setFloatingVideoUrl} />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="text-center text-muted-foreground p-12 border-2 border-dashed rounded-lg">
+                                <p>This folder is empty.</p>
+                            </div>
+                        )}
+                    </main>
+                </div>
             </div>
-        </div>
+            {Array.from(openPopups.values()).map((popupState) => (
+                <ResourcePopupCard
+                    key={popupState.resourceId}
+                    popupState={popupState}
+                    allResources={data.resources}
+                    onOpenNestedPopup={handleOpenNestedPopup}
+                    onClose={handleClosePopup}
+                    onSizeChange={handleSizeChange}
+                />
+            ))}
+            <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
+            {Array.from(openPopups.values()).map(popup => {
+                if (!popup.parentId) return null;
+                const parentPopup = openPopups.get(popup.parentId);
+                if (!parentPopup) return null;
+                
+                const startX = parentPopup.x + (parentPopup.width || 0) / 2;
+                const startY = parentPopup.y + (parentPopup.height || 0) / 2;
+                const endX = popup.x + (popup.width || 0) / 2;
+                const endY = popup.y + (popup.height || 0) / 2;
+                
+                return (
+                <line 
+                    key={`${popup.parentId}-${popup.resourceId}`}
+                    x1={startX} 
+                    y1={startY} 
+                    x2={endX} 
+                    y2={endY} 
+                    stroke="hsl(var(--primary))" 
+                    strokeWidth="2"
+                    strokeOpacity="0.5"
+                />
+                )
+            })}
+            </svg>
+        </DndContext>
     );
 }
-
