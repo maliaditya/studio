@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, Folder, Link as LinkIcon, Globe, Loader2, AlertTriangle, Youtube, Expand, ChevronDown, BrainCircuit, Library, MessageSquare, Code, ArrowRight, X, PictureInPicture, Play, Pause, GitMerge } from 'lucide-react';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -114,34 +114,36 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
                         <span className="truncate">{resource.name}</span>
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="p-3 pt-0 flex-grow min-h-0 overflow-y-auto">
-                    <ul className="space-y-2 text-sm text-muted-foreground pr-2">
-                        {(resource.points || []).map(point => (
-                            <li key={point.id} className="flex items-start gap-2">
-                                {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
-                                }
-                                {point.type === 'card' && point.resourceId ? (
-                                    <button
-                                        onClick={(e) => handleLinkClick(e, point.resourceId!)}
-                                        className="text-left font-medium text-primary hover:underline"
-                                    >
-                                        {point.text}
-                                    </button>
-                                ) : point.type === 'markdown' ? (
-                                    <div className="w-full prose dark:prose-invert prose-sm">
-                                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
-                                    </div>
-                                ) : point.type === 'code' ? (
-                                     <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
-                                ) : (
-                                    <span className="break-words w-full" title={point.text}>{point.text}</span>
-                                )}
-                            </li>
-                        ))}
-                    </ul>
-                </CardContent>
+                <div className="flex-grow min-h-0 overflow-y-auto">
+                    <CardContent className="p-3 pt-0">
+                        <ul className="space-y-2 text-sm text-muted-foreground pr-2">
+                            {(resource.points || []).map(point => (
+                                <li key={point.id} className="flex items-start gap-2">
+                                    {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                    point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                    <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
+                                    }
+                                    {point.type === 'card' && point.resourceId ? (
+                                        <button
+                                            onClick={(e) => handleLinkClick(e, point.resourceId!)}
+                                            className="text-left font-medium text-primary hover:underline"
+                                        >
+                                            {point.text}
+                                        </button>
+                                    ) : point.type === 'markdown' ? (
+                                        <div className="w-full prose dark:prose-invert prose-sm">
+                                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                        </div>
+                                    ) : point.type === 'code' ? (
+                                         <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                                    ) : (
+                                        <span className="break-words w-full" title={point.text}>{point.text}</span>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    </CardContent>
+                </div>
                 <CardFooter className="p-2 flex justify-end flex-shrink-0 relative">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onClose(resource.id); }}>
                         <X className="h-4 w-4" />
@@ -511,7 +513,7 @@ export default function SharedFolderPage() {
                     <aside className="md:col-span-1 md:sticky top-6">
                         <Card>
                             <CardHeader>
-                                <CardTitle>Folders</CardTitle>
+                                <CardTitle>{folder.name}</CardTitle>
                                 <CardDescription>Shared by {sharedBy}</CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -585,4 +587,5 @@ export default function SharedFolderPage() {
         </DndContext>
     );
 }
+
 
