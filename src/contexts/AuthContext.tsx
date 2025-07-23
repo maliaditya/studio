@@ -339,7 +339,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`offerization_plans_${username}`, JSON.stringify(offerizationPlans));
 
       // Resources
-      localStorage.setItem(`resources_${username}`, JSON.stringify(resources));
+      const resourcesToSave = resources.map(({ audioUrl, ...rest }) => rest);
+      localStorage.setItem(`resources_${username}`, JSON.stringify(resourcesToSave));
       localStorage.setItem(`resourceFolders_${username}`, JSON.stringify(resourceFolders));
       localStorage.setItem(`pinned_folder_ids_${username}`, JSON.stringify(Array.from(pinnedFolderIds)));
       localStorage.setItem(`activeResourceTabIds_${username}`, JSON.stringify(activeResourceTabIds));
