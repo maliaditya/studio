@@ -197,33 +197,31 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChang
                         <span className="truncate">{resource.name}</span>
                     </CardTitle>
                 </CardHeader>
-                <div className="p-3 pt-0 flex-grow min-h-0">
-                    <ScrollArea className="h-full">
-                        <ul className="space-y-2 text-sm text-muted-foreground pr-2">
-                            {(resource.points || []).map(point => (
-                                <li key={point.id} className="flex items-start gap-2">
-                                    <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
-                                    {point.type === 'card' && point.resourceId ? (
-                                        <button
-                                            onClick={(e) => handleLinkClick(e, point.resourceId!)}
-                                            className="text-left font-medium text-primary hover:underline"
-                                        >
-                                            {point.text}
-                                        </button>
-                                    ) : point.type === 'markdown' ? (
-                                        <div className="w-full prose dark:prose-invert prose-sm">
-                                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
-                                        </div>
-                                    ) : point.type === 'code' ? (
-                                         <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
-                                    ) : (
-                                        <span className="break-words w-full" title={point.text}>{point.text}</span>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    </ScrollArea>
-                </div>
+                <CardContent className="p-3 pt-0 flex-grow min-h-0 overflow-y-auto">
+                    <ul className="space-y-2 text-sm text-muted-foreground pr-2">
+                        {(resource.points || []).map(point => (
+                            <li key={point.id} className="flex items-start gap-2">
+                                <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
+                                {point.type === 'card' && point.resourceId ? (
+                                    <button
+                                        onClick={(e) => handleLinkClick(e, point.resourceId!)}
+                                        className="text-left font-medium text-primary hover:underline"
+                                    >
+                                        {point.text}
+                                    </button>
+                                ) : point.type === 'markdown' ? (
+                                    <div className="w-full prose dark:prose-invert prose-sm">
+                                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                    </div>
+                                ) : point.type === 'code' ? (
+                                     <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                                ) : (
+                                    <span className="break-words w-full" title={point.text}>{point.text}</span>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                </CardContent>
                 <CardFooter className="p-2 flex justify-end flex-shrink-0 relative">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onClose(resource.id); }}>
                         <X className="h-4 w-4" />
@@ -1580,6 +1578,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
