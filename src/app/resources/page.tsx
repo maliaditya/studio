@@ -759,14 +759,28 @@ function ResourcesPageContent() {
         const newSet = new Set(prev);
         if (newSet.has(folderId)) {
             newSet.delete(folderId);
-            toast({ title: "Folder unpinned" });
         } else {
             newSet.add(folderId);
-            toast({ title: "Folder pinned" });
         }
         return newSet;
     });
   };
+
+  // This `useEffect` synchronizes the `toast` notifications with the `pinnedFolderIds` state.
+  const prevPinnedFolderIdsRef = useRef(pinnedFolderIds);
+  useEffect(() => {
+      const prevSize = prevPinnedFolderIdsRef.current.size;
+      const currentSize = pinnedFolderIds.size;
+  
+      if (currentSize > prevSize) {
+          toast({ title: "Folder pinned" });
+      } else if (currentSize < prevSize) {
+          toast({ title: "Folder unpinned" });
+      }
+  
+      prevPinnedFolderIdsRef.current = pinnedFolderIds;
+  }, [pinnedFolderIds, toast]);
+
 
   const toggleFolderCollapse = useCallback((folderId: string) => {
     setCollapsedFolders(prev => {
@@ -1255,7 +1269,6 @@ function ResourcesPageContent() {
   }, []);
 
   const currentMarkdownResource = resources.find(r => r.id === markdownModalState.resourceId);
-  const currentMarkdownPoint = currentMarkdownResource?.points?.find(p => p.id === markdownModalState.pointId);
 
   return (
     <>
@@ -1628,10 +1641,21 @@ function ResourcesPageContent() {
               </DialogHeader>
               <div className="flex-grow min-h-0">
                   <ScrollArea className="h-full">
-                      <div className="prose dark:prose-invert max-w-full p-6">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {currentMarkdownPoint?.text || ""}
-                        </ReactMarkdown>
+                      <div className="p-6 space-y-4">
+                        {(currentMarkdownResource?.points || [])
+                            .filter(p => p.type === 'markdown' || p.type === 'code')
+                            .map((point) => (
+                                <div key={point.id}>
+                                    {point.type === 'markdown' ? (
+                                        <div className="prose dark:prose-invert max-w-full">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                        </div>
+                                    ) : (
+                                        <pre className="w-full bg-muted/50 p-3 rounded-md text-sm font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                                    )}
+                                </div>
+                            ))
+                        }
                       </div>
                   </ScrollArea>
               </div>
@@ -1650,6 +1674,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
