@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -369,13 +369,15 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
 };
 
 
-const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpenNestedPopup, onOpenMarkdownModal }: { 
+const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio }: { 
     resource: Resource; 
     onUpdate: (resource: Resource) => void; 
     onDelete: (resourceId: string) => void; 
     setFloatingVideoUrl: (url: string | null) => void; 
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void; 
     onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
+    playingAudio: { id: string, isPlaying: boolean } | null;
+    setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string, isPlaying: boolean } | null>>;
 }) => {
     const { resources } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
@@ -444,9 +446,11 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
         }
     };
     
-    const playAudio = () => {
-        if (resource.audioUrl) {
-            new Audio(resource.audioUrl).play();
+    const togglePlayAudio = () => {
+        if (playingAudio?.id === resource.id && playingAudio.isPlaying) {
+            setPlayingAudio(prev => prev ? { ...prev, isPlaying: false } : null);
+        } else {
+            setPlayingAudio({ id: resource.id, isPlaying: true });
         }
     };
 
@@ -472,8 +476,8 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                             </Button>
                         )}
                         {resource.audioUrl && (
-                             <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={playAudio}>
-                                <Play className="h-4 w-4 text-green-500" />
+                             <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={togglePlayAudio}>
+                                {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
                             </Button>
                         )}
                        <DropdownMenu>
@@ -638,6 +642,26 @@ function ResourcesPageContent() {
   }>({ isOpen: false, resourceId: null, pointId: null });
   
   const tabsContainerRef = useRef<HTMLDivElement>(null);
+  
+  const [playingAudio, setPlayingAudio] = useState<{ id: string, isPlaying: boolean } | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const audioEl = audioRef.current;
+    if (!audioEl) return;
+
+    if (playingAudio && playingAudio.isPlaying) {
+      const resourceToPlay = resources.find(r => r.id === playingAudio.id);
+      if (resourceToPlay?.audioUrl) {
+        if (audioEl.src !== resourceToPlay.audioUrl) {
+          audioEl.src = resourceToPlay.audioUrl;
+        }
+        audioEl.play().catch(e => console.error("Audio play failed:", e));
+      }
+    } else {
+      audioEl.pause();
+    }
+  }, [playingAudio, resources]);
 
   const handleNextVideo = useCallback(() => {
     setYoutubeModalState(prev => {
@@ -1221,6 +1245,7 @@ function ResourcesPageContent() {
 
   return (
     <>
+    <audio ref={audioRef} onEnded={() => setPlayingAudio(null)} />
     <DndContext 
         sensors={sensors}
         onDragStart={(e) => setActiveId(e.active.id as string)}
@@ -1291,7 +1316,7 @@ function ResourcesPageContent() {
                             let cardContent: React.ReactNode;
                             
                             if(isCardType) {
-                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event)} onOpenMarkdownModal={handleOpenMarkdownModal} />;
+                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event)} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} />;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                 const imageEmbedUrl = isImageUrl(res.link) || isGifUrl(res.link) ? res.link : null;
@@ -1611,6 +1636,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
