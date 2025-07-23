@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -1359,12 +1359,20 @@ function ResourcesPageContent() {
                                 const imageEmbedUrl = isImageUrl(res.link) || isGifUrl(res.link) ? res.link : null;
                                 const isObsidianUrlLink = isObsidianUrl(res.link);
 
-                                cardContent = (
+                                return (
+                                <SortableResourceCard key={res.id} item={res} className={cardClassName}>
                                     <Card
                                         className={cn(
                                             "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full",
                                             "bg-card",
+                                            youtubeEmbedUrl && "cursor-pointer"
                                         )}
+                                        onClick={(e) => {
+                                            if (youtubeEmbedUrl) {
+                                              e.stopPropagation(); // Prevent card click if an inner element was clicked
+                                              setYoutubeModalState({isOpen: true, playlist: filteredResources.filter(r => getYouTubeEmbedUrl(r.link)), currentIndex: filteredResources.filter(r => getYouTubeEmbedUrl(r.link)).findIndex(v => v.id === res.id) });
+                                            }
+                                        }}
                                     >
                                         {imageEmbedUrl ? (
                                         <>
@@ -1416,7 +1424,19 @@ function ResourcesPageContent() {
                                                             <p className="text-base font-bold truncate" title={res.name}>{res.name}</p>
                                                         </div>
                                                     </div>
-                                                    <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 -mr-2 -mt-1"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                                                    <div className="flex items-center">
+                                                        {res.githubLink && (<Button asChild variant="ghost" size="icon" className="h-7 w-7"><a href={res.githubLink} target="_blank" rel="noopener noreferrer"><Github className="h-4 w-4"/></a></Button>)}
+                                                        {res.demoLink && (<Button asChild variant="ghost" size="icon" className="h-7 w-7"><a href={res.demoLink} target="_blank" rel="noopener noreferrer"><Globe className="h-4 w-4"/></a></Button>)}
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 -mr-2 -mt-1"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end">
+                                                                <DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit Details</span></DropdownMenuItem>
+                                                                <DropdownMenuItem onSelect={() => setEditingResource(res)}><Github className="mr-2 h-4 w-4"/>Add/Edit GitHub Link</DropdownMenuItem>
+                                                                <DropdownMenuItem onSelect={() => setEditingResource(res)}><Globe className="mr-2 h-4 w-4"/>Add/Edit Demo Link</DropdownMenuItem>
+                                                                <DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </div>
                                                 </div>
                                                 <a href={res.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline mt-1">{res.link}</a>
                                                 <p className="text-sm text-muted-foreground mt-3 line-clamp-3 flex-grow min-h-[60px]">{res.description || 'No description available.'}</p>
@@ -1429,7 +1449,8 @@ function ResourcesPageContent() {
                                             </div>
                                         )}
                                     </Card>
-                                );
+                                </SortableResourceCard>
+                                )
                             }
                              return <SortableResourceCard key={res.id} item={res} className={cardClassName}>{cardContent}</SortableResourceCard>;
                         })}
@@ -1525,6 +1546,14 @@ function ResourcesPageContent() {
                                 <div className="grid grid-cols-4 items-center gap-4">
                                     <Label htmlFor="res-desc" className="text-right">Description</Label>
                                     <Textarea id="res-desc" value={editingResource.description || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, description: e.target.value} : null)} className="col-span-3"/>
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="res-github" className="text-right">GitHub Link</Label>
+                                    <Input id="res-github" value={editingResource.githubLink || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, githubLink: e.target.value} : null)} className="col-span-3"/>
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="res-demo" className="text-right">Demo Link</Label>
+                                    <Input id="res-demo" value={editingResource.demoLink || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, demoLink: e.target.value} : null)} className="col-span-3"/>
                                 </div>
                             </>
                             )}
@@ -1673,6 +1702,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 

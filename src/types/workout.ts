@@ -223,6 +223,8 @@ export interface Resource {
   description?: string;
   iconUrl?: string;
   audioUrl?: string;
+  githubLink?: string;
+  demoLink?: string;
   // For 'card' type
   points?: ResourcePoint[];
   icon?: string;
