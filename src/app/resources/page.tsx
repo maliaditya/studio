@@ -124,7 +124,7 @@ interface ResourcePopupProps {
 
 const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChange }: ResourcePopupProps) => {
     const { resources } = useAuth();
-    const { resourceId, level, x, y, width, height } = popupState;
+    const { resourceId, level, x, y, width } = popupState;
     const resource = resources.find(r => r.id === resourceId);
     const cardRef = useRef<HTMLDivElement>(null);
 
@@ -138,7 +138,7 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChang
     const handleResizeMouseDown = (e: React.MouseEvent) => {
         e.stopPropagation();
         setIsResizing(true);
-        setResizeStart({ x: e.clientX, y: e.clientY, width: width || 512, height: height || 0 });
+        setResizeStart({ x: e.clientX, y: e.clientY, width: width || 512, height: 0 });
     };
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -146,7 +146,7 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChang
             const dx = e.clientX - resizeStart.x;
             onSizeChange(resourceId, {
                 width: Math.max(320, resizeStart.width + dx),
-                height: height || 0
+                height: 0
             });
         }
     };
@@ -189,17 +189,15 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChang
     };
 
     return (
-        <div
-            ref={setNodeRef} style={style} {...attributes} className="z-[60]"
-        >
-            <Card ref={cardRef} className="max-w-4xl shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col">
+        <div ref={setNodeRef} style={style} {...attributes} className="z-[60]">
+            <Card ref={cardRef} className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col">
                 <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
                     <CardTitle className="text-base flex items-center gap-2">
                         <Library className="h-4 w-4" />
                         <span className="truncate">{resource.name}</span>
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="p-3 pt-0 flex-grow min-h-0">
+                <div className="p-3 pt-0 flex-grow min-h-0">
                     <ScrollArea className="h-full">
                         <ul className="space-y-2 text-sm text-muted-foreground pr-2">
                             {(resource.points || []).map(point => (
@@ -225,7 +223,7 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChang
                             ))}
                         </ul>
                     </ScrollArea>
-                </CardContent>
+                </div>
                 <CardFooter className="p-2 flex justify-end flex-shrink-0 relative">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onClose(resource.id); }}>
                         <X className="h-4 w-4" />
@@ -1582,6 +1580,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
