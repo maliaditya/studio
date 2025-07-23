@@ -650,7 +650,7 @@ function ResourcesPageContent() {
   
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   
-  const [playingAudio, setPlayingAudio] = useState<{ id: string, isPlaying: boolean } | null>(null);
+  const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -1416,18 +1416,16 @@ function ResourcesPageContent() {
                                             </div>
                                         ) : (
                                             <div className="p-5 flex flex-col flex-grow">
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <div className="flex-grow min-w-0">
-                                                        <div className="flex items-center gap-2">
-                                                            {res.iconUrl ? <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm flex-shrink-0" unoptimized/> : <LinkIcon className="h-4 w-4 flex-shrink-0" />}
-                                                            <p className="text-base font-bold truncate" title={res.name}>{res.name}</p>
-                                                        </div>
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        {res.iconUrl ? <Image src={res.iconUrl} alt={`${res.name} favicon`} width={16} height={16} className="rounded-sm flex-shrink-0" unoptimized/> : <LinkIcon className="h-4 w-4 flex-shrink-0" />}
+                                                        <p className="text-base font-bold truncate" title={res.name}>{res.name}</p>
                                                     </div>
-                                                    <div className="flex items-center">
+                                                    <div className="flex items-center flex-shrink-0">
                                                         {res.githubLink && (<Button asChild variant="ghost" size="icon" className="h-7 w-7"><a href={res.githubLink} target="_blank" rel="noopener noreferrer"><Github className="h-4 w-4"/></a></Button>)}
                                                         {res.demoLink && (<Button asChild variant="ghost" size="icon" className="h-7 w-7"><a href={res.demoLink} target="_blank" rel="noopener noreferrer"><Globe className="h-4 w-4"/></a></Button>)}
                                                         <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 -mr-2 -mt-1"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                                             <DropdownMenuContent align="end">
                                                                 <DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem>
                                                                 <DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem>
@@ -1699,6 +1697,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
