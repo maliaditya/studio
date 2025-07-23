@@ -163,6 +163,7 @@ const ResourceCardComponent = ({ resource, onOpenNestedPopup, playingAudio, setP
   setFloatingVideoUrl: (url: string | null) => void;
 }) => {
     const hasMarkdownContent = resource.type === 'card' && (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+    const [embedUrl, setEmbedUrl] = useState<string | null>(null);
 
     const togglePlayAudio = () => {
       if (playingAudio?.id === resource.id && playingAudio.isPlaying) {
@@ -226,7 +227,6 @@ const ResourceCardComponent = ({ resource, onOpenNestedPopup, playingAudio, setP
     }
     
     // Logic for 'link' type cards
-    const [embedUrl, setEmbedUrl] = useState<string | null>(null);
     const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
     const imageEmbedUrl = isImageUrl(resource.link) ? resource.link : null;
 
@@ -259,9 +259,6 @@ const ResourceCardComponent = ({ resource, onOpenNestedPopup, playingAudio, setP
                     </div>
                     <CardContent className="p-3 flex-grow flex flex-col">
                         <div className="flex items-center gap-2"><Youtube className="h-4 w-4 text-red-500"/><p className="font-semibold text-sm truncate" title={resource.name}>{resource.name}</p></div>
-                        <div className="mt-auto pt-2">
-                            <Button asChild variant="secondary" size="sm" className="w-full"><a href={resource.link} target="_blank" rel="noopener noreferrer">View on YouTube <ExternalLink className="ml-2 h-3 w-3"/></a></Button>
-                        </div>
                     </CardContent>
                 </Card>
                 <Dialog open={!!embedUrl} onOpenChange={(isOpen) => !isOpen && setEmbedUrl(null)}>
@@ -587,5 +584,6 @@ export default function SharedFolderPage() {
         </DndContext>
     );
 }
+
 
 
