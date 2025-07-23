@@ -934,7 +934,8 @@ function ResourcesPageContent() {
   };
 
   const handleSaveResourceEdit = () => {
-    if (!editingResource || !editingResource.name?.trim() || !editingResource.folderId) {
+    if (!editingResource) return;
+    if (!editingResource.name?.trim() || !editingResource.folderId) {
         toast({ title: "Error", description: "Name and folder are required.", variant: "destructive"});
         return;
     }
@@ -1095,8 +1096,14 @@ function ResourcesPageContent() {
         } else {
             level = 0;
             parentId = undefined;
-            x = event.clientX;
-            y = event.clientY;
+            if (hasMarkdown) {
+                // Center large popups
+                x = window.innerWidth / 2 - popupWidth / 2;
+                y = window.innerHeight / 2 - Math.min(window.innerHeight, 700) / 2; // Approximate height for centering
+            } else {
+                x = event.clientX;
+                y = event.clientY;
+            }
         }
         
         newPopups.set(resourceId, {
@@ -1382,7 +1389,7 @@ function ResourcesPageContent() {
             if (!parentPopup) return null;
             
             const startX = parentPopup.x + (parentPopup.width || 0) / 2;
-            const startY = parentPopup.y + (parentPopup.height || 0) / 2;
+            const startY = parentPopup.y + (popup.height || 0) / 2;
             const endX = popup.x + (popup.width || 0) / 2;
             const endY = popup.y + (popup.height || 0) / 2;
             
@@ -1578,6 +1585,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
