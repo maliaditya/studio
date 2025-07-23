@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     }
 
     try {
-        const { folder, allResources, childFolders, username } = await request.json() as ShareFolderPayload;
+        const { folder, allResources, childFolders = [], username } = await request.json() as ShareFolderPayload;
 
         if (!folder || !folder.id || !username) {
             return NextResponse.json({ error: 'Invalid folder data or username provided.' }, { status: 400 });
