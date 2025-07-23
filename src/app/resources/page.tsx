@@ -197,31 +197,38 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChang
                         <span className="truncate">{resource.name}</span>
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="p-3 pt-0 flex-grow min-h-0 overflow-y-auto">
-                    <ul className="space-y-2 text-sm text-muted-foreground pr-2">
-                        {(resource.points || []).map(point => (
-                            <li key={point.id} className="flex items-start gap-2">
-                                <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
-                                {point.type === 'card' && point.resourceId ? (
-                                    <button
-                                        onClick={(e) => handleLinkClick(e, point.resourceId!)}
-                                        className="text-left font-medium text-primary hover:underline"
-                                    >
-                                        {point.text}
-                                    </button>
-                                ) : point.type === 'markdown' ? (
-                                    <div className="w-full prose dark:prose-invert prose-sm">
-                                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
-                                    </div>
-                                ) : point.type === 'code' ? (
-                                     <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
-                                ) : (
-                                    <span className="break-words w-full" title={point.text}>{point.text}</span>
-                                )}
-                            </li>
-                        ))}
-                    </ul>
-                </CardContent>
+                <div className="flex-grow min-h-0">
+                    <ScrollArea className="h-full">
+                        <CardContent className="p-3 pt-0">
+                            <ul className="space-y-2 text-sm text-muted-foreground pr-2">
+                                {(resource.points || []).map(point => (
+                                    <li key={point.id} className="flex items-start gap-2">
+                                        {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                        point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                        <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
+                                        }
+                                        {point.type === 'card' && point.resourceId ? (
+                                            <button
+                                                onClick={(e) => handleLinkClick(e, point.resourceId!)}
+                                                className="text-left font-medium text-primary hover:underline"
+                                            >
+                                                {point.text}
+                                            </button>
+                                        ) : point.type === 'markdown' ? (
+                                            <div className="w-full prose dark:prose-invert prose-sm">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                            </div>
+                                        ) : point.type === 'code' ? (
+                                            <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                                        ) : (
+                                            <span className="break-words w-full" title={point.text}>{point.text}</span>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                        </CardContent>
+                    </ScrollArea>
+                </div>
                 <CardFooter className="p-2 flex justify-end flex-shrink-0 relative">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onClose(resource.id); }}>
                         <X className="h-4 w-4" />
@@ -376,8 +383,8 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     setFloatingVideoUrl: (url: string | null) => void; 
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void; 
     onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
-    playingAudio: { id: string, isPlaying: boolean } | null;
-    setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string, isPlaying: boolean } | null>>;
+    playingAudio: { id: string; isPlaying: boolean } | null;
+    setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
 }) => {
     const { resources } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
@@ -1015,26 +1022,29 @@ function ResourcesPageContent() {
         return;
     }
     toast({ title: 'Sharing Folder...', description: 'Please wait while we generate a public link.' });
-
+  
     const childFolders = getChildFoldersRecursive(folder.id);
-    const allFolderIds = [folder.id, ...childFolders.map(f => f.id)];
-    const resourcesToShare = resources.filter(r => allFolderIds.includes(r.folderId));
-
+  
     try {
         const response = await fetch('/api/share/folder', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ folder, resources: resourcesToShare, childFolders, username: currentUser.username }),
+            body: JSON.stringify({ 
+                folder, 
+                allResources: resources, // Send all resources to the backend
+                childFolders, 
+                username: currentUser.username 
+            }),
         });
         const result = await response.json();
         if (!response.ok) {
             throw new Error(result.error || 'Failed to share folder.');
         }
-
+  
         const fullUrl = `${window.location.origin}${result.publicUrl}`;
         setShareUrl(fullUrl);
         setShareDialogOpen(true);
-
+  
     } catch (error) {
         toast({
             title: "Sharing Failed",
@@ -1636,6 +1646,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 

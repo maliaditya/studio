@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 interface ShareFolderPayload {
   folder: ResourceFolder;
-  resources: Resource[];
+  allResources: Resource[];
   childFolders: ResourceFolder[];
   username: string;
 }
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     }
 
     try {
-        const { folder, resources, childFolders, username } = await request.json() as ShareFolderPayload;
+        const { folder, allResources, childFolders, username } = await request.json() as ShareFolderPayload;
 
         if (!folder || !folder.id || !username) {
             return NextResponse.json({ error: 'Invalid folder data or username provided.' }, { status: 400 });
@@ -27,7 +27,40 @@ export async function POST(request: Request) {
         
         const blobPathname = `shared/folders/${folder.id}.json`;
 
-        const dataToStore = JSON.stringify({ folder, resources, childFolders, sharedAt: new Date().toISOString(), sharedBy: username }, null, 2);
+        // --- Logic to include all linked resources ---
+        const sharedFolderIds = new Set([folder.id, ...childFolders.map(f => f.id)]);
+        const resourcesInSharedFolders = allResources.filter(r => sharedFolderIds.has(r.folderId));
+
+        const finalResourcesMap = new Map<string, Resource>();
+        resourcesInSharedFolders.forEach(r => finalResourcesMap.set(r.id, r));
+
+        const queue = [...resourcesInSharedFolders];
+        const visited = new Set<string>(queue.map(r => r.id));
+
+        while(queue.length > 0) {
+            const currentResource = queue.shift();
+            if (currentResource && currentResource.points) {
+                for (const point of currentResource.points) {
+                    if (point.type === 'card' && point.resourceId && !visited.has(point.resourceId)) {
+                        const linkedResource = allResources.find(r => r.id === point.resourceId);
+                        if (linkedResource) {
+                            visited.add(linkedResource.id);
+                            finalResourcesMap.set(linkedResource.id, linkedResource);
+                            queue.push(linkedResource);
+                        }
+                    }
+                }
+            }
+        }
+        // --- End of new logic ---
+
+        const dataToStore = JSON.stringify({ 
+            folder, 
+            resources: Array.from(finalResourcesMap.values()), 
+            childFolders, 
+            sharedAt: new Date().toISOString(), 
+            sharedBy: username 
+        }, null, 2);
 
         await put(blobPathname, dataToStore, {
             access: 'public',
@@ -35,7 +68,6 @@ export async function POST(request: Request) {
             addRandomSuffix: false,
         });
 
-        // After putting, we can construct the public URL for the page
         const publicUrl = `/p/${folder.id}`;
 
         return NextResponse.json({ success: true, message: 'Folder is now public.', publicUrl });
