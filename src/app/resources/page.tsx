@@ -1308,6 +1308,7 @@ function ResourcesPageContent() {
                     {activeResourceTabIds.map(tabId => {
                         const folder = resourceFolders.find(f => f.id === tabId);
                         if (!folder) return null;
+                        const isPinned = pinnedFolderIds.has(tabId);
                         return (
                             <button
                                 key={tabId}
@@ -1319,6 +1320,7 @@ function ResourcesPageContent() {
                                         : "border-transparent text-muted-foreground hover:bg-muted"
                                 )}
                             >
+                                {isPinned && <Pin className="h-3 w-3 text-primary flex-shrink-0" />}
                                 <Folder className="h-4 w-4" />
                                 <span className="whitespace-nowrap">{folder.name}</span>
                                 <X className="h-4 w-4 ml-2 hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleCloseTab(tabId); }} />
@@ -1350,24 +1352,26 @@ function ResourcesPageContent() {
                                 const isSpecialEmbed = isNotionUrl(res.link) || isObsidianUrl(res.link);
                                 const isLongContent = res.name.length > 20 && (res.description?.length ?? 0) > 30;
 
+                                const cardProps = youtubeEmbedUrl ? {
+                                    onClick: (e: React.MouseEvent) => {
+                                        e.stopPropagation();
+                                        const youtubeVideos = filteredResources.filter(r => getYouTubeEmbedUrl(r.link));
+                                        const currentIndex = youtubeVideos.findIndex(v => v.id === res.id);
+                                        if (currentIndex !== -1) {
+                                            setYoutubeModalState({ isOpen: true, playlist: youtubeVideos, currentIndex });
+                                        }
+                                    }
+                                } : {};
+
                                 cardContent = (
-                                    <Card className={cn(
-                                        "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full",
-                                        isLongContent ? "bg-gradient-to-br from-card to-muted/20" : "bg-card"
-                                    )}
+                                    <Card
+                                        {...cardProps}
+                                        className={cn(
+                                            "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full",
+                                            isLongContent ? "bg-gradient-to-br from-card to-muted/20" : "bg-card",
+                                            youtubeEmbedUrl && "cursor-pointer"
+                                        )}
                                     >
-                                        <div 
-                                            className='absolute inset-0 z-20 bg-transparent' 
-                                            onClick={(e) => {
-                                            if (youtubeEmbedUrl) {
-                                                e.stopPropagation();
-                                                const youtubeVideos = filteredResources.filter(r => getYouTubeEmbedUrl(r.link));
-                                                const currentIndex = youtubeVideos.findIndex(v => v.id === res.id);
-                                                if (currentIndex !== -1) {
-                                                    setYoutubeModalState({ isOpen: true, playlist: youtubeVideos, currentIndex });
-                                                }
-                                            }
-                                        }} />
                                         {imageEmbedUrl ? (
                                         <>
                                             <div className="absolute top-2 right-2 z-30 flex items-center gap-1 opacity-0 group-hover/sortable:opacity-100 transition-opacity">
@@ -1674,6 +1678,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
