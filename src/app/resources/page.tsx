@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -384,6 +384,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     const [linkCardPopoverOpen, setLinkCardPopoverOpen] = useState(false);
     const [linkedCardId, setLinkedCardId] = useState<string>('');
     const sensors = useSensors(useSensor(PointerSensor));
+    const audioInputRef = useRef<HTMLInputElement>(null);
 
     const handleUpdateTitle = (newTitle: string) => {
         onUpdate({ ...resource, name: newTitle });
@@ -430,9 +431,28 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     };
     
     const hasMarkdownContent = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+    
+    const handleAudioUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const audioUrl = e.target?.result as string;
+                onUpdate({ ...resource, audioUrl });
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+    
+    const playAudio = () => {
+        if (resource.audioUrl) {
+            new Audio(resource.audioUrl).play();
+        }
+    };
 
     return (
         <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl">
+             <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
             <CardHeader>
                 <div className="flex justify-between items-start gap-2">
                    <div className="flex items-center gap-2 flex-grow min-w-0">
@@ -451,6 +471,11 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                                 <Expand className="h-4 w-4" />
                             </Button>
                         )}
+                        {resource.audioUrl && (
+                             <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={playAudio}>
+                                <Play className="h-4 w-4 text-green-500" />
+                            </Button>
+                        )}
                        <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 -mr-2 -mt-1">
@@ -459,6 +484,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuItem onSelect={() => setEditingTitle(true)}>Edit Title</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => audioInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />Upload Audio</DropdownMenuItem>
                                 <DropdownMenuItem onSelect={() => onDelete(resource.id)} className="text-destructive">Delete Card</DropdownMenuItem>
                             </DropdownMenuContent>
                        </DropdownMenu>
@@ -1099,7 +1125,7 @@ function ResourcesPageContent() {
             if (hasMarkdown) {
                 // Center large popups
                 x = window.innerWidth / 2 - popupWidth / 2;
-                y = window.innerHeight / 2 - Math.min(window.innerHeight, 700) / 2; // Approximate height for centering
+                y = window.innerHeight / 2 - Math.min(window.innerHeight * 0.7, 700) / 2;
             } else {
                 x = event.clientX;
                 y = event.clientY;
@@ -1389,9 +1415,9 @@ function ResourcesPageContent() {
             if (!parentPopup) return null;
             
             const startX = parentPopup.x + (parentPopup.width || 0) / 2;
-            const startY = parentPopup.y + (popup.height || 0) / 2;
+            const startY = parentPopup.y + ((parentPopup.height || 0) / 2);
             const endX = popup.x + (popup.width || 0) / 2;
-            const endY = popup.y + (popup.height || 0) / 2;
+            const endY = popup.y + ((popup.height || 0) / 2);
             
             return (
               <line 
@@ -1585,6 +1611,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 

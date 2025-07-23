@@ -222,6 +222,7 @@ export interface Resource {
   link?: string;
   description?: string;
   iconUrl?: string;
+  audioUrl?: string;
   // For 'card' type
   points?: ResourcePoint[];
   icon?: string;
