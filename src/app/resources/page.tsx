@@ -1047,7 +1047,15 @@ function ResourcesPageContent() {
                 folder, 
                 allResources: resources, // Send all resources to the backend
                 childFolders, 
-                username: currentUser.username 
+                username: currentUser.username,
+                profile: {
+                    displayName: currentUser.displayName,
+                    email: currentUser.email,
+                    phone: currentUser.phone,
+                    linkedinLink: currentUser.linkedinLink,
+                    githubLink: currentUser.githubLink,
+                    portfolioLink: currentUser.portfolioLink,
+                }
             }),
         });
         const result = await response.json();
@@ -1349,8 +1357,7 @@ function ResourcesPageContent() {
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                 const imageEmbedUrl = isImageUrl(res.link) || isGifUrl(res.link) ? res.link : null;
-                                const isSpecialEmbed = isNotionUrl(res.link) || isObsidianUrl(res.link);
-                                const isLongContent = res.name.length > 20 && (res.description?.length ?? 0) > 30;
+                                const isObsidianUrlLink = isObsidianUrl(res.link);
 
                                 const cardProps = youtubeEmbedUrl ? {
                                     onClick: (e: React.MouseEvent) => {
@@ -1393,7 +1400,7 @@ function ResourcesPageContent() {
                                                 </div>
                                                 <div className="p-4 flex-grow"><div className="flex items-start justify-between gap-2"><div className="flex-grow min-w-0"><div className="flex items-center gap-2"><Youtube className="h-5 w-5 flex-shrink-0 text-red-500" /><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div></div></div></div>
                                             </div>
-                                        ) : isObsidianUrl(res.link) && res.link ? (
+                                        ) : isObsidianUrlLink && res.link ? (
                                             <div className="flex flex-col h-full">
                                                 <div className="p-3 border-b flex items-start justify-between">
                                                     <div className="flex-grow min-w-0">
@@ -1678,6 +1685,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
