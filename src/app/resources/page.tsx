@@ -132,12 +132,6 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChang
         id: `popup-${resourceId}`,
     });
     
-    useEffect(() => {
-        if (cardRef.current && !height) { // Only set initial height if it's not already set
-            onSizeChange(resourceId, { width: width || 512, height: cardRef.current.offsetHeight });
-        }
-    }, [resource, height, width, onSizeChange, resourceId]);
-
     const [isResizing, setIsResizing] = useState(false);
     const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
@@ -181,8 +175,6 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChang
         left: x,
         willChange: 'transform',
         width: `${width}px`,
-        height: 'auto',
-        maxHeight: '70vh',
     };
 
     if (transform) {
@@ -200,7 +192,7 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChang
         <div
             ref={setNodeRef} style={style} {...attributes} className="z-[60]"
         >
-            <Card ref={cardRef} className="max-w-4xl shadow-2xl border-2 border-primary/50 bg-card h-full flex flex-col">
+            <Card ref={cardRef} className="max-w-4xl shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col">
                 <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
                     <CardTitle className="text-base flex items-center gap-2">
                         <Library className="h-4 w-4" />
@@ -1372,13 +1364,6 @@ function ResourcesPageContent() {
                             )}
                     </div>
                 </SortableContext>
-                <DragOverlay>
-                    {activeId ? (
-                        <Card className="shadow-2xl">
-                            <CardContent className="p-4">Moving resource...</CardContent>
-                        </Card>
-                    ) : null}
-                </DragOverlay>
                 </div>
             </main>
         </div>
@@ -1597,6 +1582,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
