@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -1115,6 +1115,10 @@ function ResourcesPageContent() {
                         <ChevronDown className={cn("h-4 w-4 transition-transform", collapsedFolders.has(folder.id) && "-rotate-90", resourceFolders.every(f => f.parentId !== folder.id) && "invisible")} />
                         <Folder className="h-4 w-4"/>
                         <span className='flex-grow truncate'>{folder.name}</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleShareFolder(folder); }}>
+                            <Share className="h-4 w-4" />
+                            <span className="sr-only">Share {folder.name}</span>
+                        </Button>
                         <Button
                             variant="ghost"
                             size="icon"
@@ -1135,7 +1139,7 @@ function ResourcesPageContent() {
         ))}
       </ul>
     );
-  }, [resourceFolders, editingFolder, selectedResourceFolderId, collapsedFolders, toggleFolderCollapse, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds]);
+  }, [resourceFolders, editingFolder, selectedResourceFolderId, collapsedFolders, toggleFolderCollapse, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder]);
 
   const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
     setOpenPopups(prev => {
@@ -1613,7 +1617,7 @@ function ResourcesPageContent() {
                     <Button onClick={() => {
                         navigator.clipboard.writeText(shareUrl);
                         toast({ title: 'Copied to clipboard!' });
-                    }}>Copy</Button>
+                    }}><Copy className="mr-2 h-4 w-4"/>Copy</Button>
                 </div>
             </DialogContent>
         </Dialog>
@@ -1646,6 +1650,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
