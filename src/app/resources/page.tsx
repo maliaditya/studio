@@ -385,7 +385,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     onUpdate: (resource: Resource) => void; 
     onDelete: (resourceId: string) => void; 
     setFloatingVideoUrl: (url: string | null) => void; 
-    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
+    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void; 
     onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
 }) => {
     const { resources } = useAuth();
@@ -493,7 +493,6 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                                         resource={resource}
                                         onUpdate={onUpdate}
                                         onDelete={handleDeletePoint}
-                                        setEmbedUrl={() => {}}
                                         setFloatingVideoUrl={setFloatingVideoUrl}
                                         onOpenNestedPopup={onOpenNestedPopup}
                                         onOpenMarkdownModal={onOpenMarkdownModal}
@@ -1437,9 +1436,10 @@ function ResourcesPageContent() {
             <AlertDialog open={!!deleteConfirmation} onOpenChange={() => setDeleteConfirmation(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete "{deleteConfirmation.item.name}" and all its contents. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setDeleteConfirmation(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { handleDeleteFolder(deleteConfirmation.item.id); setDeleteConfirmation(null); }}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
         )}
 
-        <Dialog open={!!editingResource} onOpenChange={(isOpen) => !isOpen && setEditingResource(null)}>
+        {editingResource && (
+          <Dialog open={!!editingResource} onOpenChange={(isOpen) => !isOpen && setEditingResource(null)}>
             <DialogContent className="sm:max-w-md">
-                {editingResource && <>
+                <>
                     <DialogHeader>
                         <DialogTitle>Edit Resource</DialogTitle>
                         <DialogDescription>Update the details or move this resource to a new folder.</DialogDescription>
@@ -1449,7 +1449,7 @@ function ResourcesPageContent() {
                             <Label htmlFor="res-name" className="text-right">Name</Label>
                             <Input id="res-name" value={editingResource.name || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, name: e.target.value} : null)} className="col-span-3"/>
                         </div>
-                        {editingResource.type === 'link' && (
+                        {editingResource?.type === 'link' && (
                         <>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="res-link" className="text-right">Link</Label>
@@ -1473,9 +1473,10 @@ function ResourcesPageContent() {
                         <Button variant="outline" onClick={() => setEditingResource(null)}>Cancel</Button>
                         <Button onClick={handleSaveResourceEdit}>Save Changes</Button>
                     </DialogFooter>
-                </>}
+                </>
             </DialogContent>
-        </Dialog>
+          </Dialog>
+        )}
         
         <Dialog open={youtubeModalState.isOpen} onOpenChange={(isOpen) => setYoutubeModalState(p => ({...p, isOpen}))}>
           <DialogContent
@@ -1593,6 +1594,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
