@@ -1359,23 +1359,21 @@ function ResourcesPageContent() {
                                 const imageEmbedUrl = isImageUrl(res.link) || isGifUrl(res.link) ? res.link : null;
                                 const isObsidianUrlLink = isObsidianUrl(res.link);
 
-                                const cardProps = youtubeEmbedUrl ? {
-                                    onClick: (e: React.MouseEvent) => {
-                                        e.stopPropagation();
-                                        const youtubeVideos = filteredResources.filter(r => getYouTubeEmbedUrl(r.link));
-                                        const currentIndex = youtubeVideos.findIndex(v => v.id === res.id);
-                                        if (currentIndex !== -1) {
-                                            setYoutubeModalState({ isOpen: true, playlist: youtubeVideos, currentIndex });
-                                        }
-                                    }
-                                } : {};
-
                                 cardContent = (
                                     <Card
-                                        {...cardProps}
+                                        onClick={(e: React.MouseEvent) => {
+                                            if (youtubeEmbedUrl) {
+                                                e.stopPropagation();
+                                                const youtubeVideos = filteredResources.filter(r => getYouTubeEmbedUrl(r.link));
+                                                const currentIndex = youtubeVideos.findIndex(v => v.id === res.id);
+                                                if (currentIndex !== -1) {
+                                                    setYoutubeModalState({ isOpen: true, playlist: youtubeVideos, currentIndex });
+                                                }
+                                            }
+                                        }}
                                         className={cn(
                                             "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full",
-                                            isLongContent ? "bg-gradient-to-br from-card to-muted/20" : "bg-card",
+                                            "bg-card",
                                             youtubeEmbedUrl && "cursor-pointer"
                                         )}
                                     >
@@ -1685,6 +1683,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
