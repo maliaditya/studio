@@ -1373,7 +1373,10 @@ function ResourcesPageContent() {
                                 return (
                                 <SortableResourceCard key={res.id} item={res} className={cardClassName}>
                                      <Card
-                                        className={cn("relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full bg-card")}
+                                        className={cn(
+                                            "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full bg-card",
+                                            youtubeEmbedUrl && "cursor-pointer"
+                                        )}
                                         onClick={(e) => {
                                             if (youtubeEmbedUrl) {
                                                 e.stopPropagation();
@@ -1717,6 +1720,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
