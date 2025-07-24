@@ -1390,7 +1390,7 @@ function ResourcesPageContent() {
                                             (youtubeEmbedUrl || (isGif && res.linkedResourceId)) && "cursor-pointer"
                                         )}
                                     >
-                                        <div className="absolute top-2 right-2 z-30 flex items-center gap-1 opacity-0 group-hover/sortable:opacity-100 transition-opacity">
+                                        <div className="absolute top-2 right-2 z-30 flex items-center gap-1">
                                             {res.githubLink && (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><a href={res.githubLink} target="_blank" rel="noopener noreferrer"><Github className="h-4 w-4"/></a></Button>)}
                                             {res.demoLink && (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><a href={res.demoLink} target="_blank" rel="noopener noreferrer"><Globe className="h-4 w-4"/></a></Button>)}
                                             {youtubeEmbedUrl && <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setFloatingVideoUrl(res.link!); }}><PictureInPicture className="h-4 w-4" /></Button>}
@@ -1559,13 +1559,13 @@ function ResourcesPageContent() {
                                         <Label htmlFor="res-linked-card" className="text-right">Link to Card</Label>
                                         <Select
                                             value={editingResource.linkedResourceId || ''}
-                                            onValueChange={(value) => setEditingResource(prev => prev ? { ...prev, linkedResourceId: value } : null)}
+                                            onValueChange={(value) => setEditingResource(prev => prev ? { ...prev, linkedResourceId: value === 'none' ? undefined : value } : null)}
                                         >
                                             <SelectTrigger id="res-linked-card" className="col-span-3">
                                                 <SelectValue placeholder="Select a card to link..." />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="">-- None --</SelectItem>
+                                                <SelectItem value="none">-- None --</SelectItem>
                                                 {resources.filter(r => r.type === 'card' && r.id !== editingResource?.id).map(r => (
                                                     <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                                                 ))}
@@ -1720,6 +1720,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
