@@ -1370,11 +1370,30 @@ function ResourcesPageContent() {
                                 const imageEmbedUrl = isImageUrl(res.link) || isGifUrl(res.link) ? res.link : null;
                                 const isObsidianUrlLink = isObsidianUrl(res.link);
 
+                                if (imageEmbedUrl) {
+                                  return (
+                                    <SortableResourceCard key={res.id} item={res} className={cardClassName}>
+                                      <Card className={cn("relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full bg-card")}>
+                                        <div className="absolute top-2 right-2 z-30 flex items-center gap-1 opacity-0 group-hover/sortable:opacity-100 transition-opacity">
+                                            {res.githubLink && (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><a href={res.githubLink} target="_blank" rel="noopener noreferrer"><Github className="h-4 w-4"/></a></Button>)}
+                                            {res.demoLink && (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><a href={res.demoLink} target="_blank" rel="noopener noreferrer"><Globe className="h-4 w-4"/></a></Button>)}
+                                            <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                                        </div>
+                                        <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl relative">
+                                            <Image src={imageEmbedUrl} alt={res.name} layout="fill" objectFit="contain" data-ai-hint="illustration" />
+                                        </div>
+                                        <div className="p-4 flex-grow"><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div>
+                                      </Card>
+                                    </SortableResourceCard>
+                                  )
+                                }
+
                                 return (
                                 <SortableResourceCard key={res.id} item={res} className={cardClassName}>
                                      <Card
                                         className={cn(
-                                            "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full bg-card"
+                                            "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full bg-card",
+                                            youtubeEmbedUrl && "cursor-pointer"
                                         )}
                                         onClick={(e) => {
                                             if (youtubeEmbedUrl) {
@@ -1383,17 +1402,7 @@ function ResourcesPageContent() {
                                             }
                                         }}
                                     >
-                                        {imageEmbedUrl ? (
-                                        <>
-                                            <div className="absolute top-2 right-2 z-30 flex items-center gap-1 opacity-0 group-hover/sortable:opacity-100 transition-opacity">
-                                                <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                                            </div>
-                                            <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl relative">
-                                                <Image src={imageEmbedUrl} alt={res.name} layout="fill" objectFit="contain" data-ai-hint="illustration" />
-                                            </div>
-                                            <div className="p-4 flex-grow"><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div>
-                                        </>
-                                        ) : youtubeEmbedUrl ? (
+                                        {youtubeEmbedUrl ? (
                                             <div className="h-full flex flex-col">
                                                 <div className="absolute top-2 right-2 z-30 flex items-center gap-1 opacity-0 group-hover/sortable:opacity-100 transition-opacity">
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setFloatingVideoUrl(res.link!); }}><PictureInPicture className="h-4 w-4" /></Button>
@@ -1719,6 +1728,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
