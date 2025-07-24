@@ -310,6 +310,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (currentUser?.username && !loading) {
       const username = currentUser.username;
+      const resourcesToSave = resources.map(({ audioUrl, ...rest }) => rest);
       // Health
       localStorage.setItem(`weightLogs_${username}`, JSON.stringify(weightLogs));
       localStorage.setItem(`dietPlan_${username}`, JSON.stringify(dietPlan));
@@ -339,7 +340,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`offerization_plans_${username}`, JSON.stringify(offerizationPlans));
 
       // Resources
-      const resourcesToSave = resources.map(({ audioUrl, ...rest }) => rest);
       localStorage.setItem(`resources_${username}`, JSON.stringify(resourcesToSave));
       localStorage.setItem(`resourceFolders_${username}`, JSON.stringify(resourceFolders));
       localStorage.setItem(`pinned_folder_ids_${username}`, JSON.stringify(Array.from(pinnedFolderIds)));
@@ -560,6 +560,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const getAllUserData = () => {
+    const resourcesToSave = resources.map(({ audioUrl, ...rest }) => rest);
     return {
       exerciseDefinitions, workoutPlans, allWorkoutLogs, workoutMode,
       upskillDefinitions, upskillLogs: allUpskillLogs, upskillTopicGoals: topicGoals,
@@ -570,7 +571,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       offerizationPlans,
       schedule,
       dietPlan, weightLogs, goalWeight, height, dateOfBirth, gender,
-      resources, resourceFolders, pinnedFolderIds: Array.from(pinnedFolderIds),
+      resources: resourcesToSave, resourceFolders, pinnedFolderIds: Array.from(pinnedFolderIds),
       activeResourceTabIds, selectedResourceFolderId,
       canvasLayout,
       mindsetCards,
