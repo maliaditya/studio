@@ -1373,7 +1373,7 @@ function ResourcesPageContent() {
                                 return (
                                 <SortableResourceCard key={res.id} item={res} className={cardClassName}>
                                      <Card
-                                        className="relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full bg-card"
+                                        className={cn("relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full bg-card")}
                                         onClick={(e) => {
                                             if (youtubeEmbedUrl) {
                                                 e.stopPropagation();
@@ -1430,8 +1430,20 @@ function ResourcesPageContent() {
                                                         <p className="text-base font-bold truncate" title={res.name}>{res.name}</p>
                                                     </div>
                                                     <div className="flex items-center flex-shrink-0">
-                                                        {res.githubLink && (<Button asChild variant="ghost" size="icon" className="h-7 w-7"><a href={res.githubLink} target="_blank" rel="noopener noreferrer"><Github className="h-4 w-4"/></a></Button>)}
-                                                        {res.demoLink && (<Button asChild variant="ghost" size="icon" className="h-7 w-7"><a href={res.demoLink} target="_blank" rel="noopener noreferrer"><Globe className="h-4 w-4"/></a></Button>)}
+                                                        {res.githubLink && (
+                                                            <Button asChild variant="ghost" size="icon" className="h-7 w-7">
+                                                                <a href={res.githubLink} target="_blank" rel="noopener noreferrer">
+                                                                    <Github className="h-4 w-4"/>
+                                                                </a>
+                                                            </Button>
+                                                        )}
+                                                        {res.demoLink && (
+                                                            <Button asChild variant="ghost" size="icon" className="h-7 w-7">
+                                                                <a href={res.demoLink} target="_blank" rel="noopener noreferrer">
+                                                                    <Globe className="h-4 w-4"/>
+                                                                </a>
+                                                            </Button>
+                                                        )}
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                                             <DropdownMenuContent align="end">
@@ -1705,6 +1717,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
