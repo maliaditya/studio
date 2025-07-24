@@ -766,7 +766,6 @@ function ResourcesPageContent() {
     });
   };
 
-  // This `useEffect` synchronizes the `toast` notifications with the `pinnedFolderIds` state.
   const prevPinnedFolderIdsRef = useRef(pinnedFolderIds);
   useEffect(() => {
       const prevSize = prevPinnedFolderIdsRef.current.size;
@@ -1161,7 +1160,7 @@ function ResourcesPageContent() {
         ))}
       </ul>
     );
-  }, [resourceFolders, editingFolder, selectedResourceFolderId, collapsedFolders, handleSelectFolder, toggleFolderCollapse, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder]);
+  }, [resourceFolders, editingFolder, selectedResourceFolderId, collapsedFolders, handleSelectFolder, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder, toggleFolderCollapse]);
 
   const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
     setOpenPopups(prev => {
@@ -1278,6 +1277,16 @@ function ResourcesPageContent() {
 
   const currentMarkdownResource = resources.find(r => r.id === markdownModalState.resourceId);
 
+  const sortedTabs = useMemo(() => {
+    return [...activeResourceTabIds].sort((a, b) => {
+        const aIsPinned = pinnedFolderIds.has(a);
+        const bIsPinned = pinnedFolderIds.has(b);
+        if (aIsPinned && !bIsPinned) return -1;
+        if (!aIsPinned && bIsPinned) return 1;
+        return 0; // Keep original order for same-pinned-status tabs
+    });
+  }, [activeResourceTabIds, pinnedFolderIds]);
+
   return (
     <>
     <audio ref={audioRef} onEnded={() => setPlayingAudio(null)} />
@@ -1313,7 +1322,7 @@ function ResourcesPageContent() {
                     onWheel={handleWheelScroll}
                     className="flex items-center border-b mb-4 overflow-x-auto"
                 >
-                    {activeResourceTabIds.map(tabId => {
+                    {sortedTabs.map(tabId => {
                         const folder = resourceFolders.find(f => f.id === tabId);
                         if (!folder) return null;
                         const isPinned = pinnedFolderIds.has(tabId);
@@ -1331,7 +1340,9 @@ function ResourcesPageContent() {
                                 {isPinned && <Pin className="h-3 w-3 text-primary flex-shrink-0" />}
                                 <Folder className="h-4 w-4" />
                                 <span className="whitespace-nowrap">{folder.name}</span>
-                                <X className="h-4 w-4 ml-2 hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleCloseTab(tabId); }} />
+                                {!isPinned && (
+                                    <X className="h-4 w-4 ml-2 hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleCloseTab(tabId); }} />
+                                )}
                             </button>
                         );
                     })}
@@ -1361,15 +1372,12 @@ function ResourcesPageContent() {
 
                                 return (
                                 <SortableResourceCard key={res.id} item={res} className={cardClassName}>
-                                    <Card
-                                        className={cn(
-                                            "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full",
-                                            "bg-card"
-                                        )}
+                                     <Card
+                                        className="relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full bg-card"
                                         onClick={(e) => {
                                             if (youtubeEmbedUrl) {
-                                              e.stopPropagation(); // Prevent card click if an inner element was clicked
-                                              setYoutubeModalState({isOpen: true, playlist: filteredResources.filter(r => getYouTubeEmbedUrl(r.link)), currentIndex: filteredResources.filter(r => getYouTubeEmbedUrl(r.link)).findIndex(v => v.id === res.id) });
+                                                e.stopPropagation();
+                                                setYoutubeModalState({isOpen: true, playlist: filteredResources.filter(r => getYouTubeEmbedUrl(r.link)), currentIndex: filteredResources.filter(r => getYouTubeEmbedUrl(r.link)).findIndex(v => v.id === res.id) });
                                             }
                                         }}
                                     >
@@ -1697,6 +1705,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
