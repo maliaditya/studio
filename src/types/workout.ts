@@ -225,6 +225,7 @@ export interface Resource {
   audioUrl?: string;
   githubLink?: string;
   demoLink?: string;
+  linkedResourceId?: string;
   // For 'card' type
   points?: ResourcePoint[];
   icon?: string;
