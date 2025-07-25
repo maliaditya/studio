@@ -7,6 +7,7 @@
 
 
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -42,6 +43,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useRouter } from 'next/navigation';
 
 interface PopupState {
   resourceId: string;
@@ -355,6 +357,7 @@ function UpskillPageContent() {
     resources, setResources, resourceFolders,
     setFloatingVideoUrl
   } = useAuth();
+  const router = useRouter();
 
   const [newTopicName, setNewTopicName] = useState('');
   const [newTopicGoalType, setNewTopicGoalType] = useState<'pages' | 'hours'>('pages');
@@ -1462,6 +1465,7 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
+
 
 
 

@@ -275,7 +275,7 @@ function LinkedUpskillCard({
     upskillDefinitions,
     formatDuration,
     calculatedEstimate,
-    setSelectedFocusArea,
+    setSelectedSubtopic,
     setViewMode,
 } : {
     id: string;
@@ -291,7 +291,7 @@ function LinkedUpskillCard({
     upskillDefinitions: ExerciseDefinition[];
     formatDuration: (minutes: number) => string;
     calculatedEstimate: number;
-    setSelectedFocusArea: (def: ExerciseDefinition) => void;
+    setSelectedSubtopic: (def: ExerciseDefinition) => void;
     setViewMode: (mode: 'session' | 'library') => void;
 }) {
     const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id });
@@ -417,7 +417,7 @@ function LinkedUpskillCard({
                                         childName={childDef.name} 
                                         isLogged={isChildComplete} 
                                         type="upskill" 
-                                        onClick={() => { setSelectedFocusArea(childDef); setViewMode('library'); }}
+                                        onClick={() => { setSelectedSubtopic(childDef); setViewMode('library'); }}
                                     />
                                   );
                                 })}
@@ -456,7 +456,8 @@ function LinkedDeepWorkCard({
     formatDuration,
     calculatedEstimate,
     upskillDefinitions,
-    resources
+    resources,
+    setSelectedSubtopic
 } : {
     id: string;
     deepworkDef: ExerciseDefinition;
@@ -475,6 +476,7 @@ function LinkedDeepWorkCard({
     calculatedEstimate: number;
     upskillDefinitions: ExerciseDefinition[];
     resources: Resource[];
+    setSelectedSubtopic: (def: ExerciseDefinition | null) => void;
 }) {
     const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
@@ -491,6 +493,7 @@ function LinkedDeepWorkCard({
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
     const estDuration = isObjective ? calculatedEstimate : deepworkDef.estimatedDuration;
     const hasLinkedLearning = (deepworkDef.linkedUpskillIds?.length ?? 0) > 0 || (deepworkDef.linkedResourceIds?.length ?? 0) > 0;
+    const router = useRouter();
 
     const isComplete = useMemo(() => {
         if (!isObjective) return permanentlyLoggedActionIds.has(deepworkDef.id);
@@ -591,12 +594,12 @@ function LinkedDeepWorkCard({
                     {(deepworkDef.linkedUpskillIds || []).map(childId => {
                         const childDef = upskillDefinitions.find(d => d.id === childId);
                         if (!childDef) return null;
-                        return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="upskill" onClick={() => { /* needs navigation to upskill page */ }} />;
+                        return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="upskill" onClick={() => { router.push('/upskill'); setSelectedSubtopic(childDef) }} />;
                     })}
                      {(deepworkDef.linkedResourceIds || []).map(childId => {
                         const childDef = resources.find(d => d.id === childId);
                         if (!childDef) return null;
-                        return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="resource" onClick={() => { /* needs navigation to resource page */ }}/>;
+                        return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="resource" onClick={() => { router.push('/resources') }}/>;
                     })}
                 </div>
               ) : (
@@ -629,6 +632,7 @@ function DeepWorkPageContent() {
     resourceFolders,
     topicGoals,
     setFloatingVideoUrl,
+    setSelectedSubtopic,
   } = useAuth();
 
   const [newTopicName, setNewTopicName] = useState('');
@@ -2185,7 +2189,7 @@ function DeepWorkPageContent() {
                                             upskillDefinitions={upskillDefinitions}
                                             formatDuration={formatDuration}
                                             calculatedEstimate={calculateTotalEstimate(upskillDef)}
-                                            setSelectedFocusArea={setSelectedFocusArea}
+                                            setSelectedSubtopic={setSelectedFocusArea}
                                             setViewMode={setViewMode}
                                         />
                                       )
@@ -2226,6 +2230,7 @@ function DeepWorkPageContent() {
                                             calculatedEstimate={calculateTotalEstimate(deepworkDef)}
                                             upskillDefinitions={upskillDefinitions}
                                             resources={resources}
+                                            setSelectedSubtopic={setSelectedSubtopic}
                                         />
                                       );
                                     })}
@@ -2909,3 +2914,4 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
+
