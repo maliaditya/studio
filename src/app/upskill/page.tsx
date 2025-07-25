@@ -6,6 +6,7 @@
 
 
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -345,7 +346,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, setFloati
 }
 
 function UpskillPageContent() {
-  const { toast } = useAuth();
+  const { toast } = useToast();
   const { 
     currentUser, exportData,
     allUpskillLogs, setAllUpskillLogs,
@@ -1461,6 +1462,7 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
+
 
 
 
