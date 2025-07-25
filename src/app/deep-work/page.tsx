@@ -132,7 +132,7 @@ const DraggableSubtaskItem: React.FC<{
     parentId: string;
     childName: string;
     isLogged: boolean;
-    type: 'deepwork' | 'upskill';
+    type: 'deepwork' | 'upskill' | 'resource';
   }> = ({ childId, parentId, childName, isLogged, type }) => {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: `subtask-${childId}-from-${parentId}`,
@@ -347,7 +347,8 @@ function LinkedDeepWorkCard({
     deepWorkDefinitions,
     formatDuration,
     calculatedEstimate,
-    upskillDefinitions
+    upskillDefinitions,
+    resources
 } : {
     id: string;
     deepworkDef: ExerciseDefinition;
@@ -365,6 +366,7 @@ function LinkedDeepWorkCard({
     formatDuration: (minutes: number) => string;
     calculatedEstimate: number;
     upskillDefinitions: ExerciseDefinition[];
+    resources: Resource[];
 }) {
     const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
@@ -380,7 +382,7 @@ function LinkedDeepWorkCard({
     const nodeType = isObjective ? 'Objective' : 'Action';
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
     const estDuration = isObjective ? calculatedEstimate : deepworkDef.estimatedDuration;
-    const hasLinkedLearning = (deepworkDef.linkedUpskillIds?.length ?? 0) > 0;
+    const hasLinkedLearning = (deepworkDef.linkedUpskillIds?.length ?? 0) > 0 || (deepworkDef.linkedResourceIds?.length ?? 0) > 0;
 
     const isComplete = useMemo(() => {
         if (!isObjective) return permanentlyLoggedActionIds.has(deepworkDef.id);
@@ -473,8 +475,12 @@ function LinkedDeepWorkCard({
                     {(deepworkDef.linkedUpskillIds || []).map(childId => {
                         const childDef = upskillDefinitions.find(d => d.id === childId);
                         if (!childDef) return null;
-                        // For display purposes, we assume linked learning is not "completable" in the same way.
                         return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="upskill"/>;
+                    })}
+                     {(deepworkDef.linkedResourceIds || []).map(childId => {
+                        const childDef = resources.find(d => d.id === childId);
+                        if (!childDef) return null;
+                        return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="resource"/>;
                     })}
                 </div>
               ) : (
@@ -1571,6 +1577,7 @@ function DeepWorkPageContent() {
         // Determine if child is deep work or upskill
         const childIsDeepWork = deepWorkDefinitions.some(d => d.id === childId);
         const childIsUpskill = upskillDefinitions.some(d => d.id === childId);
+        const childIsResource = resources.some(d => d.id === childId);
   
         // Remove from old parent (which can be deep work or upskill def)
         setDeepWorkDefinitions(prev => prev.map(def => {
@@ -1578,7 +1585,8 @@ function DeepWorkPageContent() {
                 return {
                     ...def,
                     linkedDeepWorkIds: (def.linkedDeepWorkIds || []).filter(id => id !== childId),
-                    linkedUpskillIds: (def.linkedUpskillIds || []).filter(id => id !== childId)
+                    linkedUpskillIds: (def.linkedUpskillIds || []).filter(id => id !== childId),
+                    linkedResourceIds: (def.linkedResourceIds || []).filter(id => id !== childId)
                 };
             }
             return def;
@@ -1587,7 +1595,8 @@ function DeepWorkPageContent() {
             if (def.id === parentId) {
                 return {
                     ...def,
-                    linkedUpskillIds: (def.linkedUpskillIds || []).filter(id => id !== childId)
+                    linkedUpskillIds: (def.linkedUpskillIds || []).filter(id => id !== childId),
+                    linkedResourceIds: (def.linkedResourceIds || []).filter(id => id !== childId)
                 };
             }
             return def;
@@ -1597,15 +1606,11 @@ function DeepWorkPageContent() {
         if (selectedFocusArea) {
             let updatedFocusArea: ExerciseDefinition;
             if (childIsDeepWork) {
-                updatedFocusArea = {
-                    ...selectedFocusArea,
-                    linkedDeepWorkIds: [...(selectedFocusArea.linkedDeepWorkIds || []), childId]
-                }
+                updatedFocusArea = { ...selectedFocusArea, linkedDeepWorkIds: [...(selectedFocusArea.linkedDeepWorkIds || []), childId] }
             } else if (childIsUpskill) {
-                updatedFocusArea = {
-                    ...selectedFocusArea,
-                    linkedUpskillIds: [...(selectedFocusArea.linkedUpskillIds || []), childId]
-                }
+                updatedFocusArea = { ...selectedFocusArea, linkedUpskillIds: [...(selectedFocusArea.linkedUpskillIds || []), childId] }
+            } else if (childIsResource) {
+                 updatedFocusArea = { ...selectedFocusArea, linkedResourceIds: [...(selectedFocusArea.linkedResourceIds || []), childId] }
             } else {
                 return; // should not happen
             }
@@ -1623,7 +1628,7 @@ function DeepWorkPageContent() {
     const draggedId = active.id as string;
     const targetId = over.id as string;
   
-    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions, ...resources];
     const draggedDef = allDefs.find(d => d.id === draggedId);
     const targetDef = allDefs.find(d => d.id === targetId);
   
@@ -1635,6 +1640,7 @@ function DeepWorkPageContent() {
     const parentChildrenIds = new Set([
       ...(selectedFocusArea.linkedDeepWorkIds || []),
       ...(selectedFocusArea.linkedUpskillIds || []),
+      ...(selectedFocusArea.linkedResourceIds || []),
     ]);
   
     if (!parentChildrenIds.has(draggedId) || !parentChildrenIds.has(targetId)) {
@@ -1643,6 +1649,7 @@ function DeepWorkPageContent() {
     }
   
     const isDraggedUpskill = upskillDefinitions.some(d => d.id === draggedId);
+    const isDraggedResource = resources.some(d => d.id === draggedId);
     const isTargetUpskill = upskillDefinitions.some(d => d.id === targetId);
   
     if (isTargetUpskill) {
@@ -1654,7 +1661,10 @@ function DeepWorkPageContent() {
         if (def.id === targetId) {
             if (isDraggedUpskill) {
                  return { ...def, linkedUpskillIds: [...(def.linkedUpskillIds || []), draggedId] };
-            } else {
+            } else if(isDraggedResource) {
+                 return { ...def, linkedResourceIds: [...(def.linkedResourceIds || []), draggedId] };
+            }
+            else {
                  return { ...def, linkedDeepWorkIds: [...(def.linkedDeepWorkIds || []), draggedId] };
             }
         }
@@ -1665,6 +1675,7 @@ function DeepWorkPageContent() {
       ...selectedFocusArea,
       linkedDeepWorkIds: (selectedFocusArea.linkedDeepWorkIds || []).filter(id => id !== draggedId),
       linkedUpskillIds: (selectedFocusArea.linkedUpskillIds || []).filter(id => id !== draggedId),
+      linkedResourceIds: (selectedFocusArea.linkedResourceIds || []).filter(id => id !== draggedId),
     };
     
     setDeepWorkDefinitions(prev => prev.map(def => def.id === selectedFocusArea.id ? updatedParent : def));
@@ -2015,6 +2026,7 @@ function DeepWorkPageContent() {
                                             formatDuration={formatDuration}
                                             calculatedEstimate={calculateTotalEstimate(deepworkDef)}
                                             upskillDefinitions={upskillDefinitions}
+                                            resources={resources}
                                         />
                                       );
                                     })}
@@ -2680,6 +2692,7 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
+
 
 
 
