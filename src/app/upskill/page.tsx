@@ -11,6 +11,7 @@
 
 
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -945,8 +946,15 @@ function UpskillPageContent() {
     setManageLinksConfig({ type, parent });
     setTempLinkedIds(type === 'upskill' ? (parent.linkedUpskillIds || []) : (parent.linkedResourceIds || []));
     setNewLinkedItemTopic(parent.category);
-    setNewLinkedItemName(''); setNewLinkedItemDescription(''); setNewLinkedItemLink(''); setNewLinkedItemHours(''); setNewLinkedItemMinutes(''); setNewLinkedItemFolderId('');
-    setLinkSearchTerm(''); setLinkResourceFolderId(''); setLinkUpskillTopic('');
+    setNewLinkedItemName(''); 
+    setNewLinkedItemDescription(''); 
+    setNewLinkedItemLink(''); 
+    setNewLinkedItemHours(''); 
+    setNewLinkedItemMinutes(''); 
+    setNewLinkedItemFolderId('');
+    setLinkSearchTerm(''); 
+    setLinkResourceFolderId(''); 
+    setLinkUpskillTopic('');
     setIsManageLinksModalOpen(true);
   };
   
@@ -1363,3 +1371,4 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
+
