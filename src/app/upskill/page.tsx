@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -270,8 +271,8 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, setFloati
   
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: isDragging ? 100 : 'auto', } : undefined;
 
-  const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
-  const isSpecialEmbed = isNotionUrl(resource.link) || isObsidianUrl(resource.link);
+  const youtubeEmbedUrl = resource.link ? getYouTubeEmbedUrl(resource.link) : null;
+  const isSpecialEmbed = resource.link ? (isNotionUrl(resource.link) || isObsidianUrl(resource.link)) : false;
   const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? resource.link : null);
 
   if (resource.type === 'card') {
@@ -327,7 +328,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, setFloati
                 {embedLinkForModal ? (
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setEmbedUrl(embedLinkForModal)}><Expand className="h-4 w-4" /></Button>
                 ) : (
-                    <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><a href={resource.link} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a></Button>
+                    resource.link ? <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><a href={resource.link} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a></Button> : null
                 )}
                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm text-destructive" onClick={() => handleUnlinkItem('resource', resource.id)}>
                     <Unlink className="h-4 w-4" />
@@ -975,7 +976,8 @@ function UpskillPageContent() {
         } finally { setIsCreatingLink(false); }
         return;
     }
-
+    
+    // For type 'upskill'
     if (!newLinkedItemName.trim() || !newLinkedItemTopic.trim()) {
         toast({ title: "Error", description: "Name and topic are required.", variant: "destructive" }); return;
     }
@@ -999,6 +1001,7 @@ function UpskillPageContent() {
       setIsManageLinksModalOpen(false);
     }
   };
+
 
   const handleSaveExistingLinks = () => {
     if (!manageLinksConfig) return;

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -458,7 +459,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, setFloati
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: isDragging ? 100 : 'auto', } : undefined;
 
   const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
-  const isSpecialEmbed = isNotionUrl(resource.link) || isObsidianUrl(resource.link);
+  const isSpecialEmbed = resource.link ? (isNotionUrl(resource.link) || isObsidianUrl(resource.link)) : false;
   const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? resource.link : null);
 
   if (resource.type === 'card') {
@@ -1579,7 +1580,6 @@ function DeepWorkPageContent() {
   
   const handleCreateAndLinkItem = async () => {
     if (!manageLinksConfig) return;
-
     const { type, parent } = manageLinksConfig;
     let updatedParent;
 
@@ -1641,7 +1641,6 @@ function DeepWorkPageContent() {
         return;
     }
 
-    // Logic for non-resource types
     if (!newLinkedItemName.trim()) {
         toast({ title: "Error", description: "Name is required.", variant: "destructive" });
         return;
@@ -1650,6 +1649,7 @@ function DeepWorkPageContent() {
     const hours = parseInt(newLinkedItemHours, 10) || 0;
     const minutes = parseInt(newLinkedItemMinutes, 10) || 0;
     const totalMinutes = hours * 60 + minutes;
+    let newId: string;
 
     if (type === 'upskill') {
         if (!newLinkedItemTopic.trim()) {
@@ -1666,9 +1666,10 @@ function DeepWorkPageContent() {
             iconUrl: getFaviconUrl(link),
             estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
         };
+        newId = newUpskillDef.id;
         setUpskillDefinitions(prev => [...prev, newUpskillDef]);
-        updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newUpskillDef.id] };
-    } else if (type === 'deepwork') {
+        updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newId] };
+    } else { // 'deepwork'
         if (!newLinkedItemTopic.trim()) {
             toast({ title: "Error", description: "Topic is required.", variant: "destructive" });
             return;
@@ -1679,8 +1680,9 @@ function DeepWorkPageContent() {
             category: newLinkedItemTopic.trim() as ExerciseCategory,
             estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
         };
+        newId = newDeepWorkDef.id;
         setDeepWorkDefinitions(prev => [...prev, newDeepWorkDef]);
-        updatedParent = { ...parent, linkedDeepWorkIds: [...(parent.linkedDeepWorkIds || []), newDeepWorkDef.id] };
+        updatedParent = { ...parent, linkedDeepWorkIds: [...(parent.linkedDeepWorkIds || []), newId] };
     }
 
     if (updatedParent) {
@@ -2023,7 +2025,7 @@ function DeepWorkPageContent() {
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => { if (contextMenu) setContextMenu(null); if (focusAreaContextMenu) setFocusAreaContextMenu(null); }}>
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => { if (contextMenu) setContextMenu(null); if (focusAreaContextMenu) setFocusAreaContextMenu(null); }}>
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
             
             <aside className="lg:col-span-1 space-y-6">
@@ -2430,3 +2432,4 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
+
