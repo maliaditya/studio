@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -61,15 +62,14 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `popup-${popupState.resourceId}`,
     });
-
+    
     const style: React.CSSProperties = {
         position: 'fixed',
         top: popupState.y,
         left: popupState.x,
-        width: `${popupState.width}px`,
         willChange: 'transform',
     };
-
+    
     if (transform) {
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
@@ -83,7 +83,7 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
 
     return (
         <div ref={setNodeRef} style={style} {...attributes} className="z-[60]">
-            <Card ref={cardRef} className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col">
+            <Card ref={cardRef} className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col" style={{ width: `${popupState.width}px` }}>
                 <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
                     <CardTitle className="text-base flex items-center gap-2">
                         <Library className="h-4 w-4" />
@@ -220,7 +220,7 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
   };
   
   return (
-    <div ref={setCombinedRefs} style={style} className={cn(isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background", isDragging && "opacity-80 shadow-2xl rounded-lg")}>
+    <div ref={setCombinedRefs} style={style} className={cn(isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg", isDragging && "opacity-80 shadow-2xl")}>
       <Card className={cn("relative group transition-all duration-300 hover:shadow-xl", isComplete && "opacity-70 bg-muted/30")}>
         <button ref={setActivatorNodeRef} {...listeners} {...attributes} className="absolute top-1/2 -left-2 -translate-y-1/2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()}>
             <GripVertical className="h-5 w-5 text-muted-foreground" />
@@ -254,12 +254,12 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
   );
 }
 
-function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, setFloatingVideoUrl, onOpenNestedPopup }: {
+function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, onOpenNestedPopup, handleStartEditResource }: {
   resource: Resource;
   handleUnlinkItem: (type: 'upskill' | 'resource', id: string) => void;
   setEmbedUrl: (url: string | null) => void;
-  setFloatingVideoUrl: (url: string | null) => void;
   onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
+  handleStartEditResource: (resource: Resource) => void;
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id: resource.id });
   const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: resource.id });
@@ -283,10 +283,16 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, setFloati
           <button ref={setActivatorNodeRef} {...listeners} {...attributes} className="absolute bottom-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
             <GripVertical className="h-5 w-5 text-muted-foreground" />
           </button>
-          <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm text-destructive" onClick={() => handleUnlinkItem('resource', resource.id)}>
-              <Unlink className="h-4 w-4" />
-            </Button>
+           <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', resource.id)} className="text-destructive"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -330,9 +336,13 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, setFloati
                 ) : (
                     resource.link ? <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><a href={resource.link} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a></Button> : null
                 )}
-                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm text-destructive" onClick={() => handleUnlinkItem('resource', resource.id)}>
-                    <Unlink className="h-4 w-4" />
-                </Button>
+                 <DropdownMenu>
+                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', resource.id)} className="text-destructive"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                    </DropdownMenuContent>
+                 </DropdownMenu>
             </div>
              {youtubeEmbedUrl ? (
                 <>
@@ -415,7 +425,7 @@ function UpskillPageContent() {
   const [linkSearchTerm, setLinkSearchTerm] = useState('');
   const [tempLinkedIds, setTempLinkedIds] = useState<string[]>([]);
   const [linkResourceFolderId, setLinkResourceFolderId] = useState<string>('');
-  const [linkUpskillTopic, setLinkUpskillTopic] = useState<string>('');
+  const [linkUpskillTopic, setLinkUpskillTopic] = useState('');
   const [isCreatingLink, setIsCreatingLink] = useState(false);
 
   const [isNewSubtopicModalOpen, setIsNewSubtopicModalOpen] = useState(false);
@@ -931,7 +941,7 @@ function UpskillPageContent() {
   
   const handleOpenManageLinksModal = (type: 'upskill' | 'resource', parent: ExerciseDefinition) => {
     setManageLinksConfig({ type, parent });
-    setTempLinkedIds(type === 'upskill' ? (parent.linkedUpskillIds || []) : (parent.linkedResourceIds || []));
+    setTempLinkedIds(type === 'upskill' ? (parent.linkedUpskillIds || []) : (parent.linkedResourceIds || []);
     setNewLinkedItemTopic(parent.category);
     setNewLinkedItemName(''); 
     setNewLinkedItemDescription(''); 
@@ -948,16 +958,17 @@ function UpskillPageContent() {
   const handleCreateAndLinkItem = async () => {
     if (!manageLinksConfig) return;
     const { type, parent } = manageLinksConfig;
-    let updatedParent: ExerciseDefinition | undefined;
-
+    
     if (type === 'resource') {
-        if (!newLinkedItemFolderId || !newLinkedItemLink.trim()) {
-            toast({ title: "Error", description: "A folder and link are required.", variant: "destructive" }); return;
-        }
+        if (!newLinkedItemFolderId) { toast({ title: "Error", description: "A folder must be selected.", variant: "destructive" }); return; }
+        if (!newLinkedItemLink.trim()) { toast({ title: "Error", description: "A link is required.", variant: "destructive" }); return; }
+        
         setIsCreatingLink(true);
         try {
             let fullLink = newLinkedItemLink.trim();
-            if (!fullLink.startsWith('http')) fullLink = 'https://' + fullLink;
+            if (!fullLink.startsWith('http://') && !fullLink.startsWith('https://')) {
+                fullLink = 'https://' + fullLink;
+            }
             const response = await fetch('/api/get-link-metadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: fullLink }), });
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Failed to fetch metadata.');
@@ -966,8 +977,8 @@ function UpskillPageContent() {
                 description: result.description || '', folderId: newLinkedItemFolderId, iconUrl: getFaviconUrl(fullLink),
             };
             setResources(prev => [...prev, newResource]);
-            updatedParent = { ...parent, linkedResourceIds: [...(parent.linkedResourceIds || []), newResource.id] };
-            setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent! : def));
+            const updatedParent = { ...parent, linkedResourceIds: [...(parent.linkedResourceIds || []), newResource.id] };
+            setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
             setSelectedSubtopic(updatedParent);
             toast({ title: "Resource Added", description: `"${newResource.name}" has been saved and linked.`});
             setIsManageLinksModalOpen(false);
@@ -981,11 +992,9 @@ function UpskillPageContent() {
     if (!newLinkedItemName.trim() || !newLinkedItemTopic.trim()) {
         toast({ title: "Error", description: "Name and topic are required.", variant: "destructive" }); return;
     }
-
     const hours = parseInt(newLinkedItemHours, 10) || 0;
     const minutes = parseInt(newLinkedItemMinutes, 10) || 0;
     const totalMinutes = hours * 60 + minutes;
-    
     const link = newLinkedItemLink.trim();
     const newUpskillDef: ExerciseDefinition = {
         id: `def_${Date.now()}_upskill_${Math.random()}`, name: newLinkedItemName.trim(), category: newLinkedItemTopic.trim() as ExerciseCategory,
@@ -993,13 +1002,11 @@ function UpskillPageContent() {
         estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
     };
     setUpskillDefinitions(prev => [...prev, newUpskillDef]);
-    updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newUpskillDef.id] };
-    if (updatedParent) {
-      setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent! : def));
-      setSelectedSubtopic(updatedParent);
-      toast({ title: "Success", description: "New item created and linked." });
-      setIsManageLinksModalOpen(false);
-    }
+    const updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newUpskillDef.id] };
+    setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
+    setSelectedSubtopic(updatedParent);
+    toast({ title: "Success", description: "New item created and linked." });
+    setIsManageLinksModalOpen(false);
   };
 
 
@@ -1059,6 +1066,12 @@ function UpskillPageContent() {
     });
     return options;
   }, [resourceFolders]);
+
+  const handleStartEditResource = (res: Resource) => {
+    // This function is passed to the LinkedResourceItem but its implementation lives in the Resources page.
+    // For now, a placeholder to avoid crashes.
+    router.push('/resources');
+  };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over, delta } = event;
@@ -1318,7 +1331,7 @@ function UpskillPageContent() {
                                     {(selectedSubtopic.linkedResourceIds || []).map(id => {
                                       const resource = resources.find(r => r.id === id);
                                       if (!resource) return null;
-                                      return <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={handleUnlinkItem} setEmbedUrl={setEmbedUrl} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={handleOpenNestedPopup} />;
+                                      return <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={handleUnlinkItem} setEmbedUrl={setEmbedUrl} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} />;
                                     })}
                                     <Card 
                                         onClick={() => selectedSubtopic && handleOpenManageLinksModal('resource', selectedSubtopic)}
@@ -1360,3 +1373,6 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
+
+
+    

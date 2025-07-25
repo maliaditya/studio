@@ -94,15 +94,14 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `popup-${popupState.resourceId}`,
     });
-
+    
     const style: React.CSSProperties = {
         position: 'fixed',
         top: popupState.y,
         left: popupState.x,
-        width: `${popupState.width}px`,
         willChange: 'transform',
     };
-
+    
     if (transform) {
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
@@ -116,7 +115,7 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
 
     return (
         <div ref={setNodeRef} style={style} {...attributes} className="z-[60]">
-            <Card ref={cardRef} className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col">
+            <Card ref={cardRef} className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col" style={{ width: `${popupState.width}px` }}>
                 <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
                     <CardTitle className="text-base flex items-center gap-2">
                         <Library className="h-4 w-4" />
@@ -162,7 +161,6 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
         </div>
     );
 };
-
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -292,7 +290,7 @@ function LinkedUpskillCard({
     upskillDefinitions: ExerciseDefinition[];
     formatDuration: (minutes: number) => string;
     calculatedEstimate: number;
-    setSelectedSubtopic: (def: ExerciseDefinition) => void;
+    setSelectedSubtopic: (def: ExerciseDefinition | null) => void;
     setViewMode: (mode: 'session' | 'library') => void;
 }) {
     const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id });
@@ -440,11 +438,10 @@ function LinkedUpskillCard({
     )
 }
 
-function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, setFloatingVideoUrl, onOpenNestedPopup, handleStartEditResource }: {
+function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, onOpenNestedPopup, handleStartEditResource }: {
   resource: Resource;
   handleUnlinkItem: (type: 'upskill' | 'deepwork' | 'resource', id: string) => void;
   setEmbedUrl: (url: string | null) => void;
-  setFloatingVideoUrl: (url: string | null) => void;
   onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
   handleStartEditResource: (resource: Resource) => void;
 }) {
@@ -521,7 +518,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, setFloati
                 {embedLinkForModal ? (
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setEmbedUrl(embedLinkForModal)}><Expand className="h-4 w-4" /></Button>
                 ) : (
-                    <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><a href={resource.link} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a></Button>
+                    resource.link ? <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><a href={resource.link} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a></Button> : null
                 )}
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
@@ -1015,7 +1012,7 @@ function DeepWorkPageContent() {
 
         const isIntention = isParent && !isLinkedAsChild;
         const isObjective = isParent && isLinkedAsChild;
-        const isAction = !isParent && isLinkedAsChild;
+        const isAction = !isParent && !isLinkedAsChild;
         const isStandalone = !isParent && !isLinkedAsChild;
 
         if (effectiveFilters.has('intention') && isIntention) return true;
@@ -1581,17 +1578,10 @@ function DeepWorkPageContent() {
   const handleCreateAndLinkItem = async () => {
     if (!manageLinksConfig) return;
     const { type, parent } = manageLinksConfig;
-    let updatedParent;
-
+    
     if (type === 'resource') {
-        if (!newLinkedItemFolderId) {
-            toast({ title: "Error", description: "A folder must be selected.", variant: "destructive" });
-            return;
-        }
-        if (!newLinkedItemLink.trim()) {
-            toast({ title: "Error", description: "A link is required.", variant: "destructive" });
-            return;
-        }
+        if (!newLinkedItemFolderId) { toast({ title: "Error", description: "A folder must be selected.", variant: "destructive" }); return; }
+        if (!newLinkedItemLink.trim()) { toast({ title: "Error", description: "A link is required.", variant: "destructive" }); return; }
         
         setIsCreatingLink(true);
         try {
@@ -1599,99 +1589,58 @@ function DeepWorkPageContent() {
             if (!fullLink.startsWith('http://') && !fullLink.startsWith('https://')) {
                 fullLink = 'https://' + fullLink;
             }
-
-            const response = await fetch('/api/get-link-metadata', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ url: fullLink }),
-            });
-
+            const response = await fetch('/api/get-link-metadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: fullLink }), });
             const result = await response.json();
-            if (!response.ok) {
-              throw new Error(result.error || 'Failed to fetch metadata.');
-            }
-
+            if (!response.ok) throw new Error(result.error || 'Failed to fetch metadata.');
             const newResource: Resource = {
-                id: `res_${Date.now()}_${Math.random()}`,
-                name: result.title || 'Untitled Resource',
-                link: fullLink,
-                description: result.description || '',
-                folderId: newLinkedItemFolderId,
-                iconUrl: getFaviconUrl(fullLink),
-                type: 'link',
+                id: `res_${Date.now()}_${Math.random()}`, name: result.title || 'Untitled Resource', link: fullLink, type: 'link',
+                description: result.description || '', folderId: newLinkedItemFolderId, iconUrl: getFaviconUrl(fullLink),
             };
-
             setResources(prev => [...prev, newResource]);
-            updatedParent = { ...parent, linkedResourceIds: [...(parent.linkedResourceIds || []), newResource.id] };
-            
-            setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent! : def));
+            const updatedParent = { ...parent, linkedResourceIds: [...(parent.linkedResourceIds || []), newResource.id] };
+            setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
             setSelectedFocusArea(updatedParent);
             toast({ title: "Resource Added", description: `"${newResource.name}" has been saved and linked.`});
             setIsManageLinksModalOpen(false);
-
         } catch (error) {
-            toast({
-                title: "Error adding resource",
-                description: error instanceof Error ? error.message : "Could not fetch metadata from URL.",
-                variant: "destructive",
-            });
-        } finally {
-            setIsCreatingLink(false);
-        }
+            toast({ title: "Error adding resource", description: error instanceof Error ? error.message : "Could not fetch metadata.", variant: "destructive" });
+        } finally { setIsCreatingLink(false); }
         return;
     }
 
-    if (!newLinkedItemName.trim()) {
-        toast({ title: "Error", description: "Name is required.", variant: "destructive" });
-        return;
-    }
-
+    if (!newLinkedItemName.trim()) { toast({ title: "Error", description: "Name is required.", variant: "destructive" }); return; }
     const hours = parseInt(newLinkedItemHours, 10) || 0;
     const minutes = parseInt(newLinkedItemMinutes, 10) || 0;
     const totalMinutes = hours * 60 + minutes;
-    let newId: string;
 
     if (type === 'upskill') {
-        if (!newLinkedItemTopic.trim()) {
-            toast({ title: "Error", description: "Topic is required.", variant: "destructive" });
-            return;
-        }
+        if (!newLinkedItemTopic.trim()) { toast({ title: "Error", description: "Topic is required.", variant: "destructive" }); return; }
         const link = newLinkedItemLink.trim();
         const newUpskillDef: ExerciseDefinition = {
-            id: `def_${Date.now()}_upskill_${Math.random()}`,
-            name: newLinkedItemName.trim(),
-            category: newLinkedItemTopic.trim() as ExerciseCategory,
-            description: newLinkedItemDescription.trim(),
-            link: link,
-            iconUrl: getFaviconUrl(link),
+            id: `def_${Date.now()}_upskill_${Math.random()}`, name: newLinkedItemName.trim(), category: newLinkedItemTopic.trim() as ExerciseCategory,
+            description: newLinkedItemDescription.trim(), link: link, iconUrl: getFaviconUrl(link),
             estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
         };
-        newId = newUpskillDef.id;
         setUpskillDefinitions(prev => [...prev, newUpskillDef]);
-        updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newId] };
+        const updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newUpskillDef.id] };
+        setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
+        setSelectedFocusArea(updatedParent);
+        toast({ title: "Success", description: "New upskill task created and linked." });
     } else { // 'deepwork'
-        if (!newLinkedItemTopic.trim()) {
-            toast({ title: "Error", description: "Topic is required.", variant: "destructive" });
-            return;
-        }
+        if (!newLinkedItemTopic.trim()) { toast({ title: "Error", description: "Topic is required.", variant: "destructive" }); return; }
         const newDeepWorkDef: ExerciseDefinition = {
-            id: `def_${Date.now()}_deepwork_${Math.random()}`,
-            name: newLinkedItemName.trim(),
-            category: newLinkedItemTopic.trim() as ExerciseCategory,
+            id: `def_${Date.now()}_deepwork_${Math.random()}`, name: newLinkedItemName.trim(), category: newLinkedItemTopic.trim() as ExerciseCategory,
             estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
         };
-        newId = newDeepWorkDef.id;
         setDeepWorkDefinitions(prev => [...prev, newDeepWorkDef]);
-        updatedParent = { ...parent, linkedDeepWorkIds: [...(parent.linkedDeepWorkIds || []), newId] };
+        const updatedParent = { ...parent, linkedDeepWorkIds: [...(parent.linkedDeepWorkIds || []), newDeepWorkDef.id] };
+        setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
+        setSelectedFocusArea(updatedParent);
+        toast({ title: "Success", description: "New focus area created and linked." });
     }
-
-    if (updatedParent) {
-      setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent! : def));
-      setSelectedFocusArea(updatedParent);
-      toast({ title: "Success", description: "New item created and linked." });
-      setIsManageLinksModalOpen(false);
-    }
+    setIsManageLinksModalOpen(false);
   };
+
 
   const handleSaveExistingLinks = () => {
     if (!manageLinksConfig) return;
@@ -2308,7 +2257,7 @@ function DeepWorkPageContent() {
                                               upskillDefinitions={upskillDefinitions}
                                               formatDuration={formatDuration}
                                               calculatedEstimate={calculateTotalEstimate(upskillDef)}
-                                              setSelectedSubtopic={setSelectedFocusArea}
+                                              setSelectedSubtopic={setSelectedSubtopic}
                                               setViewMode={setViewMode}
                                           />
                                         )
@@ -2369,7 +2318,7 @@ function DeepWorkPageContent() {
                                       {(selectedFocusArea.linkedResourceIds || []).map((id, index) => {
                                         const resource = resources.find(r => r.id === id);
                                         if (!resource) return null;
-                                        return <LinkedResourceItem key={`${id}-${index}`} resource={resource} handleUnlinkItem={handleUnlinkItem} setEmbedUrl={setEmbedUrl} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} />;
+                                        return <LinkedResourceItem key={`${id}-${index}`} resource={resource} handleUnlinkItem={handleUnlinkItem} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} />;
                                       })}
                                       <Card 
                                           onClick={() => handleOpenManageLinksModal('resource', selectedFocusArea)}
@@ -2433,3 +2382,6 @@ export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
 
+
+
+    
