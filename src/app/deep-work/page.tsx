@@ -440,6 +440,113 @@ function LinkedUpskillCard({
     )
 }
 
+function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, setFloatingVideoUrl, onOpenNestedPopup }: {
+  resource: Resource;
+  handleUnlinkItem: (type: 'upskill' | 'deepwork' | 'resource', id: string) => void;
+  setEmbedUrl: (url: string | null) => void;
+  setFloatingVideoUrl: (url: string | null) => void;
+  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
+}) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id: resource.id });
+  const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: resource.id });
+
+  const setCombinedRefs = (node: HTMLElement | null) => {
+    setNodeRef(node);
+    setDroppableNodeRef(node);
+  };
+  
+  const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: isDragging ? 100 : 'auto', } : undefined;
+
+  const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
+  const isSpecialEmbed = isNotionUrl(resource.link) || isObsidianUrl(resource.link);
+  const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? resource.link : null);
+
+  if (resource.type === 'card') {
+    const hasMarkdownContent = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+    return (
+      <div ref={setCombinedRefs} style={style} className={cn(isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg", isDragging && "opacity-80 shadow-2xl")}>
+        <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl", hasMarkdownContent ? 'md:col-span-2 xl:col-span-3' : '')}>
+          <button ref={setActivatorNodeRef} {...listeners} {...attributes} className="absolute bottom-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
+            <GripVertical className="h-5 w-5 text-muted-foreground" />
+          </button>
+          <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm text-destructive" onClick={() => handleUnlinkItem('resource', resource.id)}>
+              <Unlink className="h-4 w-4" />
+            </Button>
+          </div>
+          <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                  <Library className="h-5 w-5 text-primary" />
+                  <span className="truncate" title={resource.name}>{resource.name}</span>
+              </CardTitle>
+          </CardHeader>
+          <CardContent className="flex-grow min-h-0">
+              <ScrollArea className={cn(hasMarkdownContent ? 'h-[200px]' : '')}>
+                  <ul className="space-y-3 pr-3">
+                      {(resource.points || []).map((point) => (
+                        <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
+                          {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />}
+                          {point.type === 'card' && point.resourceId ? (
+                            <button
+                              onClick={(e) => onOpenNestedPopup(point.resourceId!, e)}
+                              className="text-left font-medium text-primary hover:underline"
+                            >
+                              {point.text}
+                            </button>
+                          ) : point.type === 'markdown' ? (<div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown></div>) : point.type === 'code' ? (<pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>) : (<span className="break-words w-full" title={point.text}>{point.text}</span>)}
+                        </li>
+                      ))}
+                  </ul>
+              </ScrollArea>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={setCombinedRefs} style={style} className={cn(isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg", isDragging && "opacity-80 shadow-2xl")}>
+        <Card className="relative group transition-all duration-300 hover:shadow-xl">
+            <button ref={setActivatorNodeRef} {...listeners} {...attributes} className="absolute bottom-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
+                <GripVertical className="h-5 w-5 text-muted-foreground" />
+            </button>
+            <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {embedLinkForModal ? (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setEmbedUrl(embedLinkForModal)}><Expand className="h-4 w-4" /></Button>
+                ) : (
+                    <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><a href={resource.link} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a></Button>
+                )}
+                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm text-destructive" onClick={() => handleUnlinkItem('resource', resource.id)}>
+                    <Unlink className="h-4 w-4" />
+                </Button>
+            </div>
+             {youtubeEmbedUrl ? (
+                <>
+                    <div className="aspect-video w-full bg-black overflow-hidden rounded-t-lg">
+                        <iframe src={youtubeEmbedUrl} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
+                    </div>
+                    <div className="p-3">
+                        <div className="flex items-center gap-2">
+                            <Youtube className="h-5 w-5 flex-shrink-0 text-red-500" />
+                            <p className="text-sm font-bold truncate" title={resource.name}>{resource.name}</p>
+                        </div>
+                    </div>
+                </>
+            ) : (
+                <div className="p-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                    {resource.iconUrl ? <Image src={resource.iconUrl} alt="" width={16} height={16} className="h-4 w-4 rounded-sm flex-shrink-0" unoptimized /> : <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                    <span className="truncate" title={resource.name}>{resource.name}</span>
+                    </CardTitle>
+                    <CardDescription className="text-xs mt-1 truncate">{resource.link}</CardDescription>
+                </div>
+            )}
+        </Card>
+    </div>
+  );
+}
+
+
 function LinkedDeepWorkCard({
     id,
     deepworkDef,
@@ -1905,8 +2012,7 @@ function DeepWorkPageContent() {
   }
 
   return (
-    <>
-      <DndContext onDragEnd={handleDragEnd}>
+    <DndContext onDragEnd={handleDragEnd}>
         <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => { if (contextMenu) setContextMenu(null); if (focusAreaContextMenu) setFocusAreaContextMenu(null); }}>
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
             
@@ -2425,7 +2531,6 @@ function DeepWorkPageContent() {
               />
           )}
         </div>
-      </DndContext>
       {Array.from(openPopups.values()).map((popupState) => (
           <ResourcePopupCard
               key={popupState.resourceId}
@@ -2436,11 +2541,10 @@ function DeepWorkPageContent() {
               onSizeChange={handleSizeChange}
           />
       ))}
-    </>
+    </DndContext>
   );
 }
 
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
-
