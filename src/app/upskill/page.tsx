@@ -9,6 +9,7 @@
 
 
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -1325,140 +1326,15 @@ function UpskillPageContent() {
         </div>
       </DndContext>
       {Array.from(openPopups.values()).map((popupState) => (
-        <ResourcePopupCard
-            key={popupState.resourceId}
-            popupState={popupState}
-            allResources={resources}
-            onOpenNestedPopup={handleOpenNestedPopup}
-            onClose={handleClosePopup}
-            onSizeChange={handleSizeChange}
-        />
+          <ResourcePopupCard
+              key={popupState.resourceId}
+              popupState={popupState}
+              allResources={resources}
+              onOpenNestedPopup={handleOpenNestedPopup}
+              onClose={handleClosePopup}
+              onSizeChange={handleSizeChange}
+          />
       ))}
-      <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
-        {Array.from(openPopups.values()).map(popup => {
-          if (!popup.parentId) return null;
-          const parentPopup = openPopups.get(popup.parentId);
-          if (!parentPopup) return null;
-          
-          const startX = parentPopup.x + (parentPopup.width || 0) / 2;
-          const startY = parentPopup.y + ((parentPopup.height || 0) / 2);
-          const endX = popup.x + (popup.width || 0) / 2;
-          const endY = popup.y + ((popup.height || 0) / 2);
-          
-          return (
-            <line 
-              key={`${popup.parentId}-${popup.resourceId}`}
-              x1={startX} 
-              y1={startY} 
-              x2={endX} 
-              y2={endY} 
-              stroke="hsl(var(--primary))" 
-              strokeWidth="2"
-              strokeOpacity="0.5"
-            />
-          )
-        })}
-      </svg>
-      <AlertDialog open={showBackupPrompt} onOpenChange={setShowBackupPrompt}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Weekly Backup Reminder</AlertDialogTitle><AlertDialogDescription>It's Monday! Would you like to back up your upskilling data?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={markBackupPromptAsHandled}>Maybe Later</AlertDialogCancel><AlertDialogAction onClick={handleBackupConfirm}>Yes, Back Up Now</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-      {contextMenu && (
-        <div ref={contextMenuRef} style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }} className="fixed z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => e.stopPropagation()}>
-          <Button
-              variant="ghost" className="w-full h-9 justify-start px-2"
-              onClick={() => { 
-                setNewSubtopicParentTopic(contextMenu.item);
-                setNewSubtopicData({ name: '', description: '', link: '', hours: '', minutes: '' });
-                setIsNewSubtopicModalOpen(true);
-                setContextMenu(null);
-              }}>
-              <PlusCircle className="mr-2 h-4 w-4" /> New Sub Topic
-          </Button>
-          <Button
-              variant="ghost" className="w-full h-9 justify-start px-2"
-              onClick={() => { handleStartEditingGoal(contextMenu.item); setContextMenu(null); }}>
-              <Edit3 className="mr-2 h-4 w-4" /> Edit Goal
-          </Button>
-          <div className="-mx-1 my-1 h-px bg-muted" />
-          <Button
-              variant="ghost" className="w-full h-9 justify-start px-2 text-destructive hover:text-destructive"
-              onClick={() => { setTopicToDelete(contextMenu.item); setContextMenu(null); }}>
-              <Trash2 className="mr-2 h-4 w-4" /> Delete Topic
-          </Button>
-        </div>
-      )}
-      {subtopicContextMenu && (
-        <div
-            ref={subtopicContextMenuRef}
-            style={{ top: subtopicContextMenu.mouseY, left: subtopicContextMenu.mouseX }}
-            className="fixed z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
-            onClick={(e) => e.stopPropagation()}
-        >
-            <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleViewProgress(subtopicContextMenu.item); setSubtopicContextMenu(null); }}>
-                <TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span>
-            </Button>
-            <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleStartEditSubtopic(subtopicContextMenu.item); setSubtopicContextMenu(null); }}>
-                <Edit3 className="mr-2 h-4 w-4"/>Edit
-            </Button>
-            <Button variant="ghost" className="w-full h-9 justify-start px-2 text-destructive hover:text-destructive" onClick={() => { handleDeleteSubtopic(subtopicContextMenu.item.id); setSubtopicContextMenu(null); }}>
-                <Trash2 className="mr-2 h-4 w-4"/>Delete
-            </Button>
-        </div>
-      )}
-      <Dialog open={isManageLinksModalOpen} onOpenChange={setIsManageLinksModalOpen}>
-        <DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>Manage Links for "{manageLinksConfig?.parent.name}"</DialogTitle><DialogDescription>Create a new item and link it, or link existing items from your library.</DialogDescription></DialogHeader>
-            <Tabs defaultValue="create-new" className="w-full"><TabsList className="grid w-full grid-cols-2"><TabsTrigger value="create-new">Create New</TabsTrigger><TabsTrigger value="link-existing">Link from Library</TabsTrigger></TabsList>
-                <TabsContent value="create-new">
-                    <div className="space-y-4 py-4">{manageLinksConfig?.type === 'resource' ? (<><div className="space-y-1"><Label htmlFor="new-linked-folder">Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger id="new-linked-folder"><SelectValue placeholder="Select a folder..." /></SelectTrigger><SelectContent>{renderFolderOptions(null, 0)}</SelectContent></Select></div><div className="space-y-1"><Label htmlFor="new-linked-link">Link</Label><Input id="new-linked-link" value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} placeholder="https://..." /></div></>) : (<><div className="space-y-1"><Label htmlFor="new-linked-topic">Topic</Label><Select value={newLinkedItemTopic} onValueChange={setNewLinkedItemTopic}><SelectTrigger id="new-linked-topic"><SelectValue placeholder="Select a topic..." /></SelectTrigger><SelectContent>{allKnownTopics.map(topic => (<SelectItem key={topic} value={topic}>{topic}</SelectItem>))}</SelectContent></Select></div><div className="space-y-1"><Label htmlFor="new-linked-name">Name</Label><Input id="new-linked-name" value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} placeholder={'e.g., CUDA Fundamentals Course'} /></div><div className="space-y-1"><Label>Estimated Duration</Label><div className="flex gap-2"><Input id="new-linked-hours" type="number" value={newLinkedItemHours} onChange={e => setNewLinkedItemHours(e.target.value)} placeholder="Hours" /><Input id="new-linked-minutes" type="number" value={newLinkedItemMinutes} onChange={e => setNewLinkedItemMinutes(e.target.value)} placeholder="Minutes" /></div></div><> <div className="space-y-1"><Label htmlFor="new-linked-desc">Description</Label><Textarea id="new-linked-desc" value={newLinkedItemDescription} onChange={e => setNewLinkedItemDescription(e.target.value)} placeholder="Key points, summary..." /></div><div className="space-y-1"><Label htmlFor="new-linked-link">Link</Label><Input id="new-linked-link" value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} placeholder="https://..." /></div></></>)}</div>
-                    <DialogFooter><Button variant="outline" onClick={() => setIsManageLinksModalOpen(false)}>Cancel</Button><Button onClick={handleCreateAndLinkItem} disabled={isCreatingLink}>{isCreatingLink ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}{isCreatingLink ? 'Fetching...' : 'Create & Link'}</Button></DialogFooter>
-                </TabsContent>
-                <TabsContent value="link-existing">
-                    <div className="py-4">
-                      {manageLinksConfig?.type === 'upskill' && (<div className="mb-4 space-y-1"><Label htmlFor="link-upskill-topic">Select Topic</Label><Select value={linkUpskillTopic} onValueChange={(value) => setLinkUpskillTopic(value === 'all-topics-placeholder' ? '' : value)}><SelectTrigger id="link-upskill-topic"><SelectValue placeholder="All Topics" /></SelectTrigger><SelectContent><SelectItem value="all-topics-placeholder">All Topics</SelectItem>{allKnownTopics.map(topic => (<SelectItem key={topic} value={topic}>{topic}</SelectItem>))}</SelectContent></Select></div>)}
-                      {manageLinksConfig?.type === 'resource' && (<div className="mb-4 space-y-1"><Label htmlFor="link-resource-folder">Select Folder</Label><Select value={linkResourceFolderId} onValueChange={setLinkResourceFolderId}><SelectTrigger id="link-resource-folder"><SelectValue placeholder="Select a folder to view resources..." /></SelectTrigger><SelectContent>{renderFolderOptions(null, 0)}</SelectContent></Select></div>)}
-                      <Input placeholder="Search library..." value={linkSearchTerm} onChange={e => setLinkSearchTerm(e.target.value)} className="mb-4"/>
-                      <ScrollArea className="h-64"><div className="space-y-2 pr-4">{filteredItemsForLinking.length > 0 ? filteredItemsForLinking.map(item => (<div key={item.id} className="flex items-center space-x-3"><Checkbox id={`link-${item.id}`} checked={tempLinkedIds.includes(item.id)} onCheckedChange={checked => {setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id) );}}/><Label htmlFor={`link-${item.id}`} className="font-normal w-full cursor-pointer">{item.name}{item.category && <span className="text-muted-foreground text-xs ml-2">({item.category})</span>}{item.folderId && <span className="text-muted-foreground text-xs ml-2">({resourceFolders.find(f => f.id === item.folderId)?.name})</span>}</Label></div>)) : (<p className="text-sm text-center text-muted-foreground py-4">{manageLinksConfig?.type === 'resource' && !linkResourceFolderId ? "Please select a folder." : "No matching items found."}</p>)}</div></ScrollArea>
-                    </div><DialogFooter><Button variant="outline" onClick={() => setIsManageLinksModalOpen(false)}>Cancel</Button><Button onClick={handleSaveExistingLinks}>Save Links</Button></DialogFooter>
-                </TabsContent>
-            </Tabs>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={!!editingTopicGoal} onOpenChange={() => setEditingTopicGoal(null)}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Edit Goal for "{editingTopicGoal}"</DialogTitle><DialogDescription>Update the target goal for this topic.</DialogDescription></DialogHeader><div className="grid gap-4 py-4"><RadioGroup value={currentGoal.goalType} onValueChange={(v) => setCurrentGoal(prev => ({...prev, goalType: v as 'pages' | 'hours'}))} className="flex gap-4"><div className="flex items-center space-x-2"><RadioGroupItem value="pages" id="type-pages" /><Label htmlFor="type-pages" className="font-normal">Pages</Label></div><div className="flex items-center space-x-2"><RadioGroupItem value="hours" id="type-hours" /><Label htmlFor="type-hours" className="font-normal">Hours</Label></div></RadioGroup><Input type="number" placeholder="Total" value={currentGoal.goalValue} onChange={(e) => setCurrentGoal(prev => ({...prev, goalValue: parseInt(e.target.value, 10) || 0}))} aria-label="Goal value" /></div><DialogFooter><Button variant="outline" onClick={() => setEditingTopicGoal(null)}>Cancel</Button><Button onClick={handleSaveGoal}>Save Goal</Button></DialogFooter></DialogContent></Dialog>
-      <Dialog open={!!editingSubtopic} onOpenChange={() => setEditingSubtopic(null)}><DialogContent><DialogHeader><DialogTitle>Edit Learning Task</DialogTitle><DialogDescription>Update the details of this learning task.</DialogDescription></DialogHeader><div className="space-y-4 py-4"><div className="space-y-1"><Label htmlFor="subtopic-name">Name</Label><Input id="subtopic-name" value={editedSubtopicData.name || ''} onChange={e => setEditedSubtopicData(d => ({ ...d, name: e.target.value }))} /></div><div className="space-y-1"><Label htmlFor="subtopic-desc">Description</Label><Textarea id="subtopic-desc" value={editedSubtopicData.description || ''} onChange={e => setEditedSubtopicData(d => ({ ...d, description: e.target.value }))} /></div><div className="space-y-1"><Label htmlFor="subtopic-link">Link</Label><Input id="subtopic-link" value={editedSubtopicData.link || ''} onChange={e => setEditedSubtopicData(d => ({ ...d, link: e.target.value }))} /></div><div className="space-y-1"><Label>Estimated Duration</Label><div className="flex gap-2"><Input type="number" placeholder="Hours" value={editedSubtopicData.estHours || ''} onChange={e => setEditedSubtopicData(d => ({ ...d, estHours: e.target.value }))} /><Input type="number" placeholder="Minutes" value={editedSubtopicData.estMinutes || ''} onChange={e => setEditedSubtopicData(d => ({ ...d, estMinutes: e.target.value }))} /></div></div></div><DialogFooter><Button variant="outline" onClick={() => setEditingSubtopic(null)}>Cancel</Button><Button onClick={handleSaveSubtopicEdit}>Save Changes</Button></DialogFooter></DialogContent></Dialog>
-      <Dialog open={!!embedUrl} onOpenChange={(isOpen) => !isOpen && setEmbedUrl(null)}><DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2"><div className="flex-grow min-h-0">{embedUrl && (<iframe src={embedUrl} className="w-full h-full border-0 rounded-md" title="Embedded Resource" sandbox="allow-scripts allow-same-origin allow-forms" allow="picture-in-picture" allowFullScreen></iframe>)}</div></DialogContent></Dialog>
-      <Dialog open={isNewSubtopicModalOpen} onOpenChange={setIsNewSubtopicModalOpen}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Create New Sub Topic for "{newSubtopicParentTopic}"</DialogTitle>
-                <DialogDescription>
-                    This will create a new learning task. You can link it to others later to build a hierarchy.
-                </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-                <div className="space-y-1">
-                    <Label htmlFor="new-subtopic-name">Name</Label>
-                    <Input id="new-subtopic-name" value={newSubtopicData.name} onChange={e => setNewSubtopicData(d => ({ ...d, name: e.target.value }))} placeholder="e.g., Learn about React Hooks" />
-                </div>
-                <div className="space-y-1">
-                    <Label htmlFor="new-subtopic-desc">Description (Optional)</Label>
-                    <Textarea id="new-subtopic-desc" value={newSubtopicData.description} onChange={e => setNewSubtopicData(d => ({ ...d, description: e.target.value }))} placeholder="Key points, summary..." />
-                </div>
-                <div className="space-y-1">
-                    <Label htmlFor="new-subtopic-link">Link (Optional)</Label>
-                    <Input id="new-subtopic-link" value={newSubtopicData.link} onChange={e => setNewSubtopicData(d => ({ ...d, link: e.target.value }))} placeholder="https://..." />
-                </div>
-                <div className="space-y-1">
-                    <Label>Estimated Duration (Optional)</Label>
-                    <div className="flex gap-2">
-                      <Input type="number" placeholder="Hours" value={newSubtopicData.hours} onChange={e => setNewSubtopicData(d => ({ ...d, hours: e.target.value }))} />
-                      <Input type="number" placeholder="Minutes" value={newSubtopicData.minutes} onChange={e => setNewSubtopicData(d => ({ ...d, minutes: e.target.value }))} />
-                    </div>
-                </div>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setIsNewSubtopicModalOpen(false)}>Cancel</Button>
-                <Button onClick={handleCreateSubtopic}>Create & Select</Button>
-            </DialogFooter>
-        </DialogContent>
-    </Dialog>
     </>
   );
 }
@@ -1466,6 +1342,7 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
+
 
 
 

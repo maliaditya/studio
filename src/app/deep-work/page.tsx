@@ -323,7 +323,7 @@ function LinkedUpskillCard({
                 {youtubeEmbedUrl ? (
                     <>
                         <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(upskillDef.link)} onMouseDown={(e) => e.stopPropagation()}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(upskillDef.link!)} onMouseDown={(e) => e.stopPropagation()}>
                                 <PictureInPicture className="h-4 w-4" />
                             </Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
@@ -1507,7 +1507,7 @@ function DeepWorkPageContent() {
             setResources(prev => [...prev, newResource]);
             updatedParent = { ...parent, linkedResourceIds: [...(parent.linkedResourceIds || []), newResource.id] };
             
-            setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
+            setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent! : def));
             setSelectedFocusArea(updatedParent);
             toast({ title: "Resource Added", description: `"${newResource.name}" has been saved and linked.`});
             setIsManageLinksModalOpen(false);
@@ -1567,7 +1567,7 @@ function DeepWorkPageContent() {
     }
 
     if (updatedParent) {
-      setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
+      setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent! : def));
       setSelectedFocusArea(updatedParent);
       toast({ title: "Success", description: "New item created and linked." });
       setIsManageLinksModalOpen(false);
@@ -1907,1007 +1907,535 @@ function DeepWorkPageContent() {
   return (
     <>
       <DndContext onDragEnd={handleDragEnd}>
-      <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => { if (contextMenu) setContextMenu(null); if (focusAreaContextMenu) setFocusAreaContextMenu(null); }}>
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-          
-          <aside className="lg:col-span-1 space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="flex items-center gap-2 text-lg text-primary">
-                      <Folder /> Topic Library
-                    </CardTitle>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <FilterIcon className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuCheckboxItem
-                                checked={visibilityFilters.has('intention')}
-                                onCheckedChange={() => handleVisibilityFilterChange('intention')}
-                            >
-                                <Lightbulb className="mr-2 h-4 w-4 text-amber-500" />
-                                <span>Intentions</span>
-                            </DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem
-                                checked={visibilityFilters.has('objective')}
-                                onCheckedChange={() => handleVisibilityFilterChange('objective')}
-                            >
-                                <Flag className="mr-2 h-4 w-4 text-green-500" />
-                                <span>Objectives</span>
-                            </DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem
-                                checked={visibilityFilters.has('action')}
-                                onCheckedChange={() => handleVisibilityFilterChange('action')}
-                            >
-                                <Bolt className="mr-2 h-4 w-4 text-blue-500" />
-                                <span>Actions</span>
-                            </DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem
-                                checked={visibilityFilters.has('standalone')}
-                                onCheckedChange={() => handleVisibilityFilterChange('standalone')}
-                            >
-                                <Focus className="mr-2 h-4 w-4 text-purple-500" />
-                                <span>Standalone</span>
-                            </DropdownMenuCheckboxItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                <CardDescription>Organize your focus areas by topic.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleAddTopic} className="flex gap-2 mb-4">
-                  <Input value={newTopicName} onChange={e => setNewTopicName(e.target.value)} placeholder="New Topic" />
-                  <Button size="icon" type="submit"><PlusCircle className="h-4 w-4" /></Button>
-                </form>
-                <div className="space-y-2">
-                  {topicsWithFocusAreas.map(([topic, focusAreas]) => {
-                    const isCollapsed = !expandedTopics.has(topic);
-                    // Hide topics that become empty after filtering, unless they are in the metadata
-                    if (focusAreas.length === 0 && !deepWorkTopicMetadata[topic]) {
-                      return null;
-                    }
-                    return (
-                    <div key={topic}>
-                      <div 
-                        className="group flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer" 
-                        onClick={() => toggleTopicExpansion(topic)}
-                        onContextMenu={(e) => handleContextMenu(e, topic)}
-                      >
-                        <div className="flex items-center gap-2 min-w-0 flex-grow">
-                          <ChevronDown className={cn("h-4 w-4 transition-transform", isCollapsed && "-rotate-90")} />
-                          <Folder className="h-4 w-4 flex-shrink-0 text-primary/80" />
-                          <h4 className="font-semibold text-sm truncate">{topic}</h4>
-                        </div>
-                      </div>
-                      {!isCollapsed && (
-                        <ul className="space-y-1 pl-4 border-l-2 border-muted ml-4">
-                            {focusAreas.sort((a,b) => a.name.localeCompare(b.name)).map(def => {
-                              const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
-                              const isLinkedAsChild = linkedDeepWorkChildIds.has(def.id);
-                              
-                              const isIntention = isParent && !isLinkedAsChild;
-                              const isObjective = isParent && isLinkedAsChild;
-                              const isStandalone = !isParent && !isLinkedAsChild;
-                              const isAction = !isParent && isLinkedAsChild;
-
-                              const calculatedEst = calculateTotalEstimate(def);
-                              const estDuration = isParent ? calculatedEst : def.estimatedDuration;
-
-                              return (
-                                <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted" onContextMenu={(e) => handleFocusAreaContextMenu(e, def)}>
-                                    <>
-                                      <div className="flex items-center gap-2 flex-grow min-w-0">
-                                        {isIntention ? (
-                                          <Lightbulb className="h-4 w-4 flex-shrink-0 text-amber-500" />
-                                        ) : isObjective ? (
-                                          <Flag className="h-4 w-4 flex-shrink-0 text-green-500" />
-                                        ) : isStandalone ? (
-                                          <Focus className="h-4 w-4 flex-shrink-0 text-purple-500" />
-                                        ) : (
-                                          <Bolt className="h-4 w-4 flex-shrink-0 text-blue-500" />
-                                        )}
-                                        <span className="truncate cursor-pointer" onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} title={`View details for ${def.name}`}>{def.name}</span>
-                                        {def.isReadyForBranding && <Share2 className="h-3 w-3 text-primary flex-shrink-0" title="Ready for Branding" />}
-                                        {estDuration && estDuration > 0 && <Badge variant="secondary" className="text-xs ml-auto">{formatDuration(estDuration)}</Badge>}
-                                      </div>
-                                      <div className='hidden items-center flex-shrink-0 group-hover:flex'>
-                                        <TooltipProvider>
-                                          <Tooltip>
-                                              <TooltipTrigger asChild>
-                                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openMindMapFor(def.id)}>
-                                                      <GitMerge className="h-4 w-4" />
-                                                  </Button>
-                                              </TooltipTrigger>
-                                              <TooltipContent>View Mind Map</TooltipContent>
-                                          </Tooltip>
-                                          <Tooltip>
-                                            <TooltipTrigger asChild>
-                                              <span tabIndex={isParent ? 0 : -1}>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => !isParent && handleAddTaskToSession(def)} disabled={isParent}>
-                                                  <PlusCircle className="h-4 w-4" />
-                                                </Button>
-                                              </span>
-                                            </TooltipTrigger>
-                                            <TooltipContent>{isParent ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent>
-                                          </Tooltip>
-                                        </TooltipProvider>
-                                      </div>
-                                    </>
-                                </li>
-                              )})}
-                        </ul>
-                      )}
+        <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => { if (contextMenu) setContextMenu(null); if (focusAreaContextMenu) setFocusAreaContextMenu(null); }}>
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+            
+            <aside className="lg:col-span-1 space-y-6">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between gap-2">
+                      <CardTitle className="flex items-center gap-2 text-lg text-primary">
+                        <Folder /> Topic Library
+                      </CardTitle>
+                      <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <FilterIcon className="h-4 w-4" />
+                              </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                              <DropdownMenuCheckboxItem
+                                  checked={visibilityFilters.has('intention')}
+                                  onCheckedChange={() => handleVisibilityFilterChange('intention')}
+                              >
+                                  <Lightbulb className="mr-2 h-4 w-4 text-amber-500" />
+                                  <span>Intentions</span>
+                              </DropdownMenuCheckboxItem>
+                              <DropdownMenuCheckboxItem
+                                  checked={visibilityFilters.has('objective')}
+                                  onCheckedChange={() => handleVisibilityFilterChange('objective')}
+                              >
+                                  <Flag className="mr-2 h-4 w-4 text-green-500" />
+                                  <span>Objectives</span>
+                              </DropdownMenuCheckboxItem>
+                              <DropdownMenuCheckboxItem
+                                  checked={visibilityFilters.has('action')}
+                                  onCheckedChange={() => handleVisibilityFilterChange('action')}
+                              >
+                                  <Bolt className="mr-2 h-4 w-4 text-blue-500" />
+                                  <span>Actions</span>
+                              </DropdownMenuCheckboxItem>
+                              <DropdownMenuCheckboxItem
+                                  checked={visibilityFilters.has('standalone')}
+                                  onCheckedChange={() => handleVisibilityFilterChange('standalone')}
+                              >
+                                  <Focus className="mr-2 h-4 w-4 text-purple-500" />
+                                  <span>Standalone</span>
+                              </DropdownMenuCheckboxItem>
+                          </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                  )})}
-                </div>
-              </CardContent>
-            </Card>
-            {selectedFocusArea && (
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <div>
-                            <CardTitle className="text-lg flex items-center gap-2">
-                                <TrendingUp className="h-5 w-5 text-primary" />
-                                Focus Area Stats
-                            </CardTitle>
-                            <CardDescription className="text-xs">
-                                Aggregated progress for "{selectedFocusArea.name}"
-                            </CardDescription>
+                  <CardDescription>Organize your focus areas by topic.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleAddTopic} className="flex gap-2 mb-4">
+                    <Input value={newTopicName} onChange={e => setNewTopicName(e.target.value)} placeholder="New Topic" />
+                    <Button size="icon" type="submit"><PlusCircle className="h-4 w-4" /></Button>
+                  </form>
+                  <div className="space-y-2">
+                    {topicsWithFocusAreas.map(([topic, focusAreas]) => {
+                      const isCollapsed = !expandedTopics.has(topic);
+                      // Hide topics that become empty after filtering, unless they are in the metadata
+                      if (focusAreas.length === 0 && !deepWorkTopicMetadata[topic]) {
+                        return null;
+                      }
+                      return (
+                      <div key={topic}>
+                        <div 
+                          className="group flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer" 
+                          onClick={() => toggleTopicExpansion(topic)}
+                          onContextMenu={(e) => handleContextMenu(e, topic)}
+                        >
+                          <div className="flex items-center gap-2 min-w-0 flex-grow">
+                            <ChevronDown className={cn("h-4 w-4 transition-transform", isCollapsed && "-rotate-90")} />
+                            <Folder className="h-4 w-4 flex-shrink-0 text-primary/80" />
+                            <h4 className="font-semibold text-sm truncate">{topic}</h4>
+                          </div>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsFocusAreaProgressModalOpen(true)}>
-                            <LineChartIcon className="h-4 w-4"/>
-                        </Button>
-                    </CardHeader>
-                    <CardContent className="space-y-4 pt-4">
-                        <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">Total Logged Time</span>
-                                <span className="font-medium">{formatDuration(totalLoggedTime)}</span>
-                            </div>
-                            {totalEstimatedDuration > 0 && (
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Total Estimated Time</span>
-                                    <span className="font-medium">{formatDuration(totalEstimatedDuration)}</span>
-                                </div>
+                        {!isCollapsed && (
+                          <ul className="space-y-1 pl-4 border-l-2 border-muted ml-4">
+                              {focusAreas.sort((a,b) => a.name.localeCompare(b.name)).map(def => {
+                                const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
+                                const isLinkedAsChild = linkedDeepWorkChildIds.has(def.id);
+                                
+                                const isIntention = isParent && !isLinkedAsChild;
+                                const isObjective = isParent && isLinkedAsChild;
+                                const isStandalone = !isParent && !isLinkedAsChild;
+                                const isAction = !isParent && isLinkedAsChild;
+
+                                const calculatedEst = calculateTotalEstimate(def);
+                                const estDuration = isParent ? calculatedEst : def.estimatedDuration;
+
+                                return (
+                                  <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted" onContextMenu={(e) => handleFocusAreaContextMenu(e, def)}>
+                                      <>
+                                        <div className="flex items-center gap-2 flex-grow min-w-0">
+                                          {isIntention ? (
+                                            <Lightbulb className="h-4 w-4 flex-shrink-0 text-amber-500" />
+                                          ) : isObjective ? (
+                                            <Flag className="h-4 w-4 flex-shrink-0 text-green-500" />
+                                          ) : isStandalone ? (
+                                            <Focus className="h-4 w-4 flex-shrink-0 text-purple-500" />
+                                          ) : (
+                                            <Bolt className="h-4 w-4 flex-shrink-0 text-blue-500" />
+                                          )}
+                                          <span className="truncate cursor-pointer" onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} title={`View details for ${def.name}`}>{def.name}</span>
+                                          {def.isReadyForBranding && <Share2 className="h-3 w-3 text-primary flex-shrink-0" title="Ready for Branding" />}
+                                          {estDuration && estDuration > 0 && <Badge variant="secondary" className="text-xs ml-auto">{formatDuration(estDuration)}</Badge>}
+                                        </div>
+                                        <div className='hidden items-center flex-shrink-0 group-hover:flex'>
+                                          <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openMindMapFor(def.id)}>
+                                                        <GitMerge className="h-4 w-4" />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>View Mind Map</TooltipContent>
+                                            </Tooltip>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <span tabIndex={isParent ? 0 : -1}>
+                                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => !isParent && handleAddTaskToSession(def)} disabled={isParent}>
+                                                    <PlusCircle className="h-4 w-4" />
+                                                  </Button>
+                                                </span>
+                                              </TooltipTrigger>
+                                              <TooltipContent>{isParent ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
+                                        </div>
+                                      </>
+                                  </li>
+                                )})}
+                          </ul>
+                        )}
+                      </div>
+                    )})}
+                  </div>
+                </CardContent>
+              </Card>
+              {selectedFocusArea && (
+                  <Card>
+                      <CardHeader className="flex flex-row items-center justify-between pb-2">
+                          <div>
+                              <CardTitle className="text-lg flex items-center gap-2">
+                                  <TrendingUp className="h-5 w-5 text-primary" />
+                                  Focus Area Stats
+                              </CardTitle>
+                              <CardDescription className="text-xs">
+                                  Aggregated progress for "{selectedFocusArea.name}"
+                              </CardDescription>
+                          </div>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsFocusAreaProgressModalOpen(true)}>
+                              <LineChartIcon className="h-4 w-4"/>
+                          </Button>
+                      </CardHeader>
+                      <CardContent className="space-y-4 pt-4">
+                          <div className="space-y-2">
+                              <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Total Logged Time</span>
+                                  <span className="font-medium">{formatDuration(totalLoggedTime)}</span>
+                              </div>
+                              {totalEstimatedDuration > 0 && (
+                                  <div className="flex justify-between text-sm">
+                                      <span className="text-muted-foreground">Total Estimated Time</span>
+                                      <span className="font-medium">{formatDuration(totalEstimatedDuration)}</span>
+                                  </div>
+                              )}
+                          </div>
+                          
+                          {totalEstimatedDuration > 0 && (
+                              <div>
+                                  <Progress 
+                                      value={Math.min(100, (totalLoggedTime / totalEstimatedDuration) * 100)} 
+                                      className="h-2" 
+                                  />
+                                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                      <span>0%</span>
+                                      <span>{((totalLoggedTime / totalEstimatedDuration) * 100).toFixed(0)}%</span>
+                                  </div>
+                              </div>
+                          )}
+                          
+                          {totalEstimatedDuration > 0 && totalLoggedTime > totalEstimatedDuration && (
+                              <Badge variant="destructive" className="w-full justify-center">
+                                  Overspent by {formatDuration(totalLoggedTime - totalEstimatedDuration)}
+                              </Badge>
+                          )}
+                      </CardContent>
+                  </Card>
+              )}
+            </aside>
+
+            <section aria-labelledby="main-panel-heading" className="lg:col-span-3 space-y-6">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between p-4">
+                        <div className="flex-grow">
+                            <CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">
+                                {viewMode === 'session' ? <ListChecks /> : <Library />}
+                                {viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedFocusArea?.name || 'Select an item'}`}
+                            </CardTitle>
+                            {viewMode === 'library' && selectedFocusArea && (
+                              <CardDescription className="text-xs mt-1">{selectedFocusArea.category}</CardDescription>
                             )}
                         </div>
-                        
-                        {totalEstimatedDuration > 0 && (
-                            <div>
-                                <Progress 
-                                    value={Math.min(100, (totalLoggedTime / totalEstimatedDuration) * 100)} 
-                                    className="h-2" 
-                                />
-                                <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                                    <span>0%</span>
-                                    <span>{((totalLoggedTime / totalEstimatedDuration) * 100).toFixed(0)}%</span>
-                                </div>
+
+                        <div className='flex items-center gap-2 flex-shrink-0'>
+                          <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
+                          <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('library')} disabled={!selectedFocusArea}>Library</Button>
+                          {viewMode === 'library' && selectedFocusArea && (
+                              <TooltipProvider>
+                                  <Tooltip>
+                                      <TooltipTrigger asChild>
+                                          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setIsFocusAreaTimesheetModalOpen(true)}>
+                                              <Clock className="h-4 w-4"/>
+                                              <span className="sr-only">View Timesheet</span>
+                                          </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                          <p>View Timesheet</p>
+                                      </TooltipContent>
+                                  </Tooltip>
+                              </TooltipProvider>
+                          )}
+                          <Popover>
+                              <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger>
+                              <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent>
+                          </Popover>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-4">
+                        {viewMode === 'session' ? (
+                            <div className="max-h-[calc(100vh-16rem)] overflow-y-auto pr-2">
+                                {currentWorkoutExercises.length === 0 ? (
+                                  <div className="text-center py-10"><Briefcase className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" /><p className="text-muted-foreground">No focus areas for {format(selectedDate, 'PPP')}.</p><p className="text-sm text-muted-foreground/80">Add focus areas from the library to get started!</p></div>
+                                ) : (
+                                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                    {currentWorkoutExercises.map((exercise) => {
+                                        const definition = deepWorkDefinitions.find(def => def.id === exercise.definitionId);
+                                        return (
+                                          <WorkoutExerciseCard 
+                                            key={exercise.id} 
+                                            exercise={exercise}
+                                            definition={definition}
+                                            selectedDate={selectedDate}
+                                            allDeepWorkLogs={allDeepWorkLogs}
+                                            allUpskillLogs={allUpskillLogs}
+                                            onLogSet={handleLogSet} 
+                                            onDeleteSet={handleDeleteSet} 
+                                            onUpdateSet={handleUpdateSet} 
+                                            onRemoveExercise={handleRemoveExerciseFromWorkout}
+                                            onViewProgress={definition ? () => handleViewProgress(definition, 'deepwork') : undefined}
+                                            pageType="deepwork"
+                                          />
+                                        );
+                                    })}
+                                  </div>
+                                )}
                             </div>
-                        )}
-                        
-                        {totalEstimatedDuration > 0 && totalLoggedTime > totalEstimatedDuration && (
-                            <Badge variant="destructive" className="w-full justify-center">
-                                Overspent by {formatDuration(totalLoggedTime - totalEstimatedDuration)}
-                            </Badge>
+                        ) : selectedFocusArea ? (
+                            <DndContext onDragEnd={handleDragEnd}>
+                              <ScrollArea className="h-[calc(100vh-16rem)] pr-2">
+                                <div className="space-y-6">
+                                  <div className="space-y-3">
+                                    <h3 className="font-semibold flex items-center gap-2"><BookCopy className="h-5 w-5 text-primary" /> Linked Learning</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                      {Array.from(new Set(selectedFocusArea.linkedUpskillIds || [])).map((id, index) => {
+                                        const upskillDef = upskillDefinitions.find(ud => ud.id === id);
+                                        if (!upskillDef) return null;
+                                        return (
+                                          <LinkedUpskillCard
+                                              key={`${id}-${index}`}
+                                              id={id}
+                                              upskillDef={upskillDef}
+                                              getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
+                                              isUpskillObjectiveComplete={isUpskillObjectiveComplete}
+                                              setEmbedUrl={setEmbedUrl}
+                                              setFloatingVideoUrl={setFloatingVideoUrl}
+                                              handleViewProgress={handleViewProgress}
+                                              handleStartEditUpskill={handleStartEditUpskill}
+                                              handleUnlinkItem={handleUnlinkItem}
+                                              handleDeleteUpskillDefinition={handleDeleteUpskillDefinition}
+                                              upskillDefinitions={upskillDefinitions}
+                                              formatDuration={formatDuration}
+                                              calculatedEstimate={calculateTotalEstimate(upskillDef)}
+                                              setSelectedSubtopic={setSelectedFocusArea}
+                                              setViewMode={setViewMode}
+                                          />
+                                        )
+                                      })}
+                                      <Card 
+                                          onClick={() => handleOpenManageLinksModal('upskill', selectedFocusArea)}
+                                          className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
+                                      >
+                                          <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                          <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
+                                      </Card>
+                                    </div>
+                                  </div>
+                                  <div className="space-y-3">
+                                    <h3 className="font-semibold flex items-center gap-2"><LinkIcon className="h-5 w-5 text-primary" /> Linked Work</h3>
+                                    <DroppableArea id={`linked-work-area-${selectedFocusArea.id}`} className="-m-2 p-2">
+                                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                      {Array.from(new Set(selectedFocusArea.linkedDeepWorkIds || [])).map((id, index) => {
+                                        const deepworkDef = deepWorkDefinitions.find(dd => dd.id === id);
+                                        if (!deepworkDef) return null;
+                                        return (
+                                          <LinkedDeepWorkCard 
+                                              key={`${id}-${index}`}
+                                              id={id}
+                                              deepworkDef={deepworkDef}
+                                              getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes}
+                                              permanentlyLoggedActionIds={permanentlyLoggedActionIds}
+                                              handleAddTaskToSession={handleAddTaskToSession}
+                                              setSelectedFocusArea={setSelectedFocusArea}
+                                              setViewMode={setViewMode}
+                                              handleToggleReadyForBranding={handleToggleReadyForBranding}
+                                              handleStartEditDefinition={handleStartEditDefinition}
+                                              handleUnlinkItem={handleUnlinkItem}
+                                              handleDeleteExerciseDefinition={handleDeleteExerciseDefinition}
+                                              handleViewProgress={handleViewProgress}
+                                              deepWorkDefinitions={deepWorkDefinitions}
+                                              formatDuration={formatDuration}
+                                              calculatedEstimate={calculateTotalEstimate(deepworkDef)}
+                                              upskillDefinitions={upskillDefinitions}
+                                              resources={resources}
+                                              setSelectedSubtopic={setSelectedSubtopic}
+                                          />
+                                        );
+                                      })}
+                                      <Card 
+                                          onClick={() => handleOpenManageLinksModal('deepwork', selectedFocusArea)}
+                                          className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
+                                      >
+                                          <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                          <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Focus Area</p>
+                                      </Card>
+                                    </div>
+                                    </DroppableArea>
+                                  </div>
+                                  <div className="space-y-3">
+                                    <h3 className="font-semibold flex items-center gap-2"><Library className="h-5 w-5 text-primary" /> Linked Resources</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                      {(selectedFocusArea.linkedResourceIds || []).map((id, index) => {
+                                        const resource = resources.find(r => r.id === id);
+                                        if (!resource) return null;
+    
+                                        const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
+                                        const isNotionObsidianEmbed = resource.link ? (isNotionUrl(resource.link) || isObsidianUrl(resource.link)) : false;
+                                        const embedLinkForModal = youtubeEmbedUrl || (isNotionObsidianEmbed ? resource.link : null);
+    
+                                        if (resource.type === 'card') {
+                                          const hasMarkdownContent = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+                                          return (
+                                            <Card key={`${id}-${index}`} className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1", hasMarkdownContent ? 'md:col-span-2 xl:col-span-3' : '')}>
+                                              <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                                        <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                                        <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                              </div>
+                                              <CardHeader className="pb-3">
+                                                  <CardTitle className="text-base flex items-center gap-2">
+                                                      <Library className="h-5 w-5 text-primary" />
+                                                      <span className="truncate" title={resource.name}>{resource.name}</span>
+                                                  </CardTitle>
+                                              </CardHeader>
+                                              <CardContent className="flex-grow min-h-0">
+                                                  <ScrollArea className={cn(hasMarkdownContent ? 'h-[200px]' : '')}>
+                                                      <ul className="space-y-3 pr-3">
+                                                          {(resource.points || []).map((point) => (
+                                                            <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
+                                                              {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />}
+                                                              {point.type === 'card' && point.resourceId ? (
+                                                                <button
+                                                                  onClick={(e) => handleOpenNestedPopup(point.resourceId!, e)}
+                                                                  className="text-left font-medium text-primary hover:underline"
+                                                                >
+                                                                  {point.text}
+                                                                </button>
+                                                              ) : point.type === 'markdown' ? (<div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown></div>) : point.type === 'code' ? (<pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>) : (<span className="break-words w-full" title={point.text}>{point.text}</span>)}
+                                                            </li>
+                                                          ))}
+                                                      </ul>
+                                                  </ScrollArea>
+                                              </CardContent>
+                                            </Card>
+                                          );
+                                        }
+
+                                        return (
+                                            <Card key={`${id}-${index}`} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
+                                                {youtubeEmbedUrl ? (
+                                                    <>
+                                                        <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(resource.link!)} onMouseDown={(e) => e.stopPropagation()}>
+                                                                <PictureInPicture className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
+                                                                <Expand className="h-4 w-4" />
+                                                            </Button>
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onMouseDown={(e) => e.stopPropagation()}>
+                                                                        <MoreVertical className="h-4 w-4" />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                                                    <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                                                    <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </div>
+                                                        <div className="aspect-video w-full bg-black overflow-hidden rounded-t-2xl">
+                                                            <iframe src={youtubeEmbedUrl} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
+                                                        </div>
+                                                        <div className="p-4 flex-grow">
+                                                          <div className="flex items-start justify-between gap-2">
+                                                            <div className="flex-grow min-w-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <Youtube className="h-5 w-5 flex-shrink-0 text-red-500" />
+                                                                    <p className="text-base font-bold truncate" title={resource.name}>{resource.name}</p>
+                                                                </div>
+                                                                <CardDescription className="text-xs">{resourceFolders.find(f => f.id === resource.folderId)?.name || 'Uncategorized'}</CardDescription>
+                                                            </div>
+                                                          </div>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            {isNotionObsidianEmbed ? (
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
+                                                                <Expand className="h-4 w-4" />
+                                                            </Button>
+                                                            ) : (
+                                                                <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
+                                                                    <a href={resource.link} target="_blank" rel="noopener noreferrer" onMouseDown={(e) => e.stopPropagation()}>
+                                                                        <ExternalLink className="h-4 w-4" />
+                                                                    </a>
+                                                                </Button>
+                                                            )}
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onMouseDown={(e) => e.stopPropagation()}>
+                                                                        <MoreVertical className="h-4 w-4" />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                                                    <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                                                    <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </div>
+                                                        <CardHeader className="pb-3">
+                                                          <CardTitle className="text-base flex items-center gap-2">
+                                                            {resource.iconUrl ? (
+                                                                <Image src={resource.iconUrl} alt="" width={20} height={20} className="h-5 w-5 rounded-sm flex-shrink-0" unoptimized />
+                                                            ) : (
+                                                                <Globe className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                                            )}
+                                                            <span className="truncate" title={resource.name}>{resource.name}</span>
+                                                          </CardTitle>
+                                                          <CardDescription>{resourceFolders.find(f => f.id === resource.folderId)?.name || 'Uncategorized'}</CardDescription>
+                                                        </CardHeader>
+                                                        <CardContent className="flex-grow">
+                                                          <p className="text-sm text-muted-foreground line-clamp-2">{resource.description || "No description provided."}</p>
+                                                        </CardContent>
+                                                    </>
+                                                )}
+                                            </Card>
+                                        )
+                                      })}
+                                      <Card 
+                                          onClick={() => handleOpenManageLinksModal('resource', selectedFocusArea)}
+                                          className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
+                                      >
+                                          <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                          <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p>
+                                      </Card>
+                                    </div>
+                                  </div>
+                                </div>
+                              </ScrollArea>
+                            </DndContext>
+                        ) : (
+                            <div className="text-center py-10"><p className="text-muted-foreground">Select a Focus Area from the library to view its details.</p></div>
                         )}
                     </CardContent>
                 </Card>
-            )}
-          </aside>
-
-          <section aria-labelledby="main-panel-heading" className="lg:col-span-3 space-y-6">
-              <Card>
-                  <CardHeader className="flex flex-row items-center justify-between p-4">
-                      <div className="flex-grow">
-                          <CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">
-                              {viewMode === 'session' ? <ListChecks /> : <Library />}
-                              {viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedFocusArea?.name || 'Select an item'}`}
-                          </CardTitle>
-                          {viewMode === 'library' && selectedFocusArea && (
-                            <CardDescription className="text-xs mt-1">{selectedFocusArea.category}</CardDescription>
-                          )}
-                      </div>
-
-                      <div className='flex items-center gap-2 flex-shrink-0'>
-                        <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
-                        <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('library')} disabled={!selectedFocusArea}>Library</Button>
-                        {viewMode === 'library' && selectedFocusArea && (
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setIsFocusAreaTimesheetModalOpen(true)}>
-                                            <Clock className="h-4 w-4"/>
-                                            <span className="sr-only">View Timesheet</span>
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>View Timesheet</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                        )}
-                        <Popover>
-                            <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger>
-                            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent>
-                        </Popover>
-                      </div>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                      {viewMode === 'session' ? (
-                          <div className="max-h-[calc(100vh-16rem)] overflow-y-auto pr-2">
-                              {currentWorkoutExercises.length === 0 ? (
-                                <div className="text-center py-10"><Briefcase className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" /><p className="text-muted-foreground">No focus areas for {format(selectedDate, 'PPP')}.</p><p className="text-sm text-muted-foreground/80">Add focus areas from the library to get started!</p></div>
-                              ) : (
-                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                                  {currentWorkoutExercises.map((exercise) => {
-                                      const definition = deepWorkDefinitions.find(def => def.id === exercise.definitionId);
-                                      return (
-                                        <WorkoutExerciseCard 
-                                          key={exercise.id} 
-                                          exercise={exercise}
-                                          definition={definition}
-                                          selectedDate={selectedDate}
-                                          allDeepWorkLogs={allDeepWorkLogs}
-                                          allUpskillLogs={allUpskillLogs}
-                                          onLogSet={handleLogSet} 
-                                          onDeleteSet={handleDeleteSet} 
-                                          onUpdateSet={handleUpdateSet} 
-                                          onRemoveExercise={handleRemoveExerciseFromWorkout}
-                                          onViewProgress={definition ? () => handleViewProgress(definition, 'deepwork') : undefined}
-                                          pageType="deepwork"
-                                        />
-                                      );
-                                  })}
-                                </div>
-                              )}
-                          </div>
-                      ) : selectedFocusArea ? (
-                          <DndContext onDragEnd={handleDragEnd}>
-                            <ScrollArea className="h-[calc(100vh-16rem)] pr-2">
-                              <div className="space-y-6">
-                                <div className="space-y-3">
-                                  <h3 className="font-semibold flex items-center gap-2"><BookCopy className="h-5 w-5 text-primary" /> Linked Learning</h3>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {Array.from(new Set(selectedFocusArea.linkedUpskillIds || [])).map((id, index) => {
-                                      const upskillDef = upskillDefinitions.find(ud => ud.id === id);
-                                      if (!upskillDef) return null;
-                                      return (
-                                        <LinkedUpskillCard
-                                            key={`${id}-${index}`}
-                                            id={id}
-                                            upskillDef={upskillDef}
-                                            getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
-                                            isUpskillObjectiveComplete={isUpskillObjectiveComplete}
-                                            setEmbedUrl={setEmbedUrl}
-                                            setFloatingVideoUrl={setFloatingVideoUrl}
-                                            handleViewProgress={handleViewProgress}
-                                            handleStartEditUpskill={handleStartEditUpskill}
-                                            handleUnlinkItem={handleUnlinkItem}
-                                            handleDeleteUpskillDefinition={handleDeleteUpskillDefinition}
-                                            upskillDefinitions={upskillDefinitions}
-                                            formatDuration={formatDuration}
-                                            calculatedEstimate={calculateTotalEstimate(upskillDef)}
-                                            setSelectedSubtopic={setSelectedFocusArea}
-                                            setViewMode={setViewMode}
-                                        />
-                                      )
-                                    })}
-                                    <Card 
-                                        onClick={() => handleOpenManageLinksModal('upskill', selectedFocusArea)}
-                                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
-                                    >
-                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
-                                    </Card>
-                                  </div>
-                                </div>
-                                <div className="space-y-3">
-                                  <h3 className="font-semibold flex items-center gap-2"><LinkIcon className="h-5 w-5 text-primary" /> Linked Work</h3>
-                                  <DroppableArea id={`linked-work-area-${selectedFocusArea.id}`} className="-m-2 p-2">
-                                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {Array.from(new Set(selectedFocusArea.linkedDeepWorkIds || [])).map((id, index) => {
-                                      const deepworkDef = deepWorkDefinitions.find(dd => dd.id === id);
-                                      if (!deepworkDef) return null;
-                                      return (
-                                        <LinkedDeepWorkCard 
-                                            key={`${id}-${index}`}
-                                            id={id}
-                                            deepworkDef={deepworkDef}
-                                            getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes}
-                                            permanentlyLoggedActionIds={permanentlyLoggedActionIds}
-                                            handleAddTaskToSession={handleAddTaskToSession}
-                                            setSelectedFocusArea={setSelectedFocusArea}
-                                            setViewMode={setViewMode}
-                                            handleToggleReadyForBranding={handleToggleReadyForBranding}
-                                            handleStartEditDefinition={handleStartEditDefinition}
-                                            handleUnlinkItem={handleUnlinkItem}
-                                            handleDeleteExerciseDefinition={handleDeleteExerciseDefinition}
-                                            handleViewProgress={handleViewProgress}
-                                            deepWorkDefinitions={deepWorkDefinitions}
-                                            formatDuration={formatDuration}
-                                            calculatedEstimate={calculateTotalEstimate(deepworkDef)}
-                                            upskillDefinitions={upskillDefinitions}
-                                            resources={resources}
-                                            setSelectedSubtopic={setSelectedSubtopic}
-                                        />
-                                      );
-                                    })}
-                                    <Card 
-                                        onClick={() => handleOpenManageLinksModal('deepwork', selectedFocusArea)}
-                                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
-                                    >
-                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Focus Area</p>
-                                    </Card>
-                                  </div>
-                                  </DroppableArea>
-                                </div>
-                                <div className="space-y-3">
-                                  <h3 className="font-semibold flex items-center gap-2"><Library className="h-5 w-5 text-primary" /> Linked Resources</h3>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {(selectedFocusArea.linkedResourceIds || []).map((id, index) => {
-                                      const resource = resources.find(r => r.id === id);
-                                      if (!resource) return null;
-  
-                                      const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
-                                      const isNotionObsidianEmbed = resource.link ? (isNotionUrl(resource.link) || isObsidianUrl(resource.link)) : false;
-                                      const embedLinkForModal = youtubeEmbedUrl || (isNotionObsidianEmbed ? resource.link : null);
-  
-                                      if (resource.type === 'card') {
-                                        const hasMarkdownContent = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
-                                        return (
-                                          <Card key={`${id}-${index}`} className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1", hasMarkdownContent ? 'md:col-span-2 xl:col-span-3' : '')}>
-                                            <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                              <DropdownMenu>
-                                                  <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                                                      <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                                      <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
-                                                  </DropdownMenuContent>
-                                              </DropdownMenu>
-                                            </div>
-                                            <CardHeader className="pb-3">
-                                                <CardTitle className="text-base flex items-center gap-2">
-                                                    <Library className="h-5 w-5 text-primary" />
-                                                    <span className="truncate" title={resource.name}>{resource.name}</span>
-                                                </CardTitle>
-                                            </CardHeader>
-                                            <CardContent className="flex-grow min-h-0">
-                                                <ScrollArea className={cn(hasMarkdownContent ? 'h-[200px]' : '')}>
-                                                    <ul className="space-y-3 pr-3">
-                                                        {(resource.points || []).map((point) => (
-                                                          <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
-                                                            {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />}
-                                                            {point.type === 'card' && point.resourceId ? (
-                                                              <button
-                                                                onClick={(e) => handleOpenNestedPopup(point.resourceId!, e)}
-                                                                className="text-left font-medium text-primary hover:underline"
-                                                              >
-                                                                {point.text}
-                                                              </button>
-                                                            ) : point.type === 'markdown' ? (<div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown></div>) : point.type === 'code' ? (<pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>) : (<span className="break-words w-full" title={point.text}>{point.text}</span>)}
-                                                          </li>
-                                                        ))}
-                                                    </ul>
-                                                </ScrollArea>
-                                            </CardContent>
-                                          </Card>
-                                        );
-                                      }
-
-                                      return (
-                                          <Card key={`${id}-${index}`} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
-                                              {youtubeEmbedUrl ? (
-                                                  <>
-                                                      <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(resource.link)} onMouseDown={(e) => e.stopPropagation()}>
-                                                              <PictureInPicture className="h-4 w-4" />
-                                                          </Button>
-                                                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
-                                                              <Expand className="h-4 w-4" />
-                                                          </Button>
-                                                          <DropdownMenu>
-                                                              <DropdownMenuTrigger asChild>
-                                                                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onMouseDown={(e) => e.stopPropagation()}>
-                                                                      <MoreVertical className="h-4 w-4" />
-                                                                  </Button>
-                                                              </DropdownMenuTrigger>
-                                                              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                                                                  <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                                                  <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
-                                                              </DropdownMenuContent>
-                                                          </DropdownMenu>
-                                                      </div>
-                                                      <div className="aspect-video w-full bg-black overflow-hidden rounded-t-2xl">
-                                                          <iframe src={youtubeEmbedUrl} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
-                                                      </div>
-                                                      <div className="p-4 flex-grow">
-                                                        <div className="flex items-start justify-between gap-2">
-                                                          <div className="flex-grow min-w-0">
-                                                              <div className="flex items-center gap-2">
-                                                                  <Youtube className="h-5 w-5 flex-shrink-0 text-red-500" />
-                                                                  <p className="text-base font-bold truncate" title={resource.name}>{resource.name}</p>
-                                                              </div>
-                                                              <CardDescription className="text-xs">{resourceFolders.find(f => f.id === resource.folderId)?.name || 'Uncategorized'}</CardDescription>
-                                                          </div>
-                                                        </div>
-                                                      </div>
-                                                  </>
-                                              ) : (
-                                                  <>
-                                                      <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                          {isNotionObsidianEmbed ? (
-                                                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
-                                                              <Expand className="h-4 w-4" />
-                                                          </Button>
-                                                          ) : (
-                                                              <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
-                                                                  <a href={resource.link} target="_blank" rel="noopener noreferrer" onMouseDown={(e) => e.stopPropagation()}>
-                                                                      <ExternalLink className="h-4 w-4" />
-                                                                  </a>
-                                                              </Button>
-                                                          )}
-                                                          <DropdownMenu>
-                                                              <DropdownMenuTrigger asChild>
-                                                                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onMouseDown={(e) => e.stopPropagation()}>
-                                                                      <MoreVertical className="h-4 w-4" />
-                                                                  </Button>
-                                                              </DropdownMenuTrigger>
-                                                              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                                                                  <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                                                  <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
-                                                              </DropdownMenuContent>
-                                                          </DropdownMenu>
-                                                      </div>
-                                                      <CardHeader className="pb-3">
-                                                        <CardTitle className="text-base flex items-center gap-2">
-                                                          {resource.iconUrl ? (
-                                                              <Image src={resource.iconUrl} alt="" width={20} height={20} className="h-5 w-5 rounded-sm flex-shrink-0" unoptimized />
-                                                          ) : (
-                                                              <Globe className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                                                          )}
-                                                          <span className="truncate" title={resource.name}>{resource.name}</span>
-                                                        </CardTitle>
-                                                        <CardDescription>{resourceFolders.find(f => f.id === resource.folderId)?.name || 'Uncategorized'}</CardDescription>
-                                                      </CardHeader>
-                                                      <CardContent className="flex-grow">
-                                                        <p className="text-sm text-muted-foreground line-clamp-2">{resource.description || "No description provided."}</p>
-                                                      </CardContent>
-                                                  </>
-                                              )}
-                                          </Card>
-                                      )
-                                    })}
-                                    <Card 
-                                        onClick={() => handleOpenManageLinksModal('resource', selectedFocusArea)}
-                                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
-                                    >
-                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p>
-                                    </Card>
-                                  </div>
-                                </div>
-                              </div>
-                            </ScrollArea>
-                          </DndContext>
-                      ) : (
-                          <div className="text-center py-10"><p className="text-muted-foreground">Select a Focus Area from the library to view its details.</p></div>
-                      )}
-                  </CardContent>
-              </Card>
-          </section>
-        </div>
-        
-        {progressModalConfig.isOpen && progressModalConfig.exercise && (
-          <ExerciseProgressModal 
-            isOpen={progressModalConfig.isOpen} 
-            onOpenChange={(isOpen) => setProgressModalConfig(prev => ({...prev, isOpen}))}
-            exercise={progressModalConfig.exercise} 
-            allWorkoutLogs={progressModalConfig.pageType === 'upskill' ? allUpskillLogs : allDeepWorkLogs}
-            pageType={progressModalConfig.pageType}
-            topicGoals={progressModalConfig.pageType === 'upskill' ? topicGoals : undefined}
-          />
-        )}
-        
-        {selectedFocusArea && (
-            <FocusAreaProgressModal 
-                isOpen={isFocusAreaProgressModalOpen}
-                onOpenChange={setIsFocusAreaProgressModalOpen}
-                focusArea={selectedFocusArea}
-                deepWorkDefinitions={deepWorkDefinitions}
-                upskillDefinitions={upskillDefinitions}
-                allDeepWorkLogs={allDeepWorkLogs}
-                allUpskillLogs={allUpskillLogs}
-                avgDailyProductiveHours={productivityStats.avgProductiveHours}
+            </section>
+          </div>
+          
+          {progressModalConfig.isOpen && progressModalConfig.exercise && (
+            <ExerciseProgressModal 
+              isOpen={progressModalConfig.isOpen} 
+              onOpenChange={(isOpen) => setProgressModalConfig(prev => ({...prev, isOpen}))}
+              exercise={progressModalConfig.exercise} 
+              allWorkoutLogs={progressModalConfig.pageType === 'upskill' ? allUpskillLogs : allDeepWorkLogs}
+              pageType={progressModalConfig.pageType}
+              topicGoals={progressModalConfig.pageType === 'upskill' ? topicGoals : undefined}
             />
-        )}
-      </div>
-
-      <AlertDialog open={showBackupPrompt} onOpenChange={setShowBackupPrompt}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Weekly Backup Reminder</AlertDialogTitle>
-            <AlertDialogDescription>It's Monday! Would you like to back up your deep work data?</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={markBackupPromptAsHandled}>Maybe Later</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBackupConfirm}>Yes, Back Up Now</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {contextMenu && (
-        <div
-            ref={contextMenuRef}
-            style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }}
-            className="fixed z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
-            onClick={(e) => {
-              e.stopPropagation();
-              setContextMenu(null);
-            }}
-        >
-          <Button variant="ghost" className="w-full justify-start h-9 px-2" onClick={(e) => {
-              e.stopPropagation();
-              handleOpenNewFocusAreaModal(contextMenu.item);
-              setContextMenu(null);
-          }}>
-            <PlusCircle className="mr-2 h-4 w-4" /> New Focus Area
-          </Button>
-          <Button variant="ghost" className="w-full justify-start h-9 px-2" onClick={() => {
-              setEditingTopic(contextMenu.item);
-              setContextMenu(null);
-          }}>
-            <Edit3 className="mr-2 h-4 w-4" /> Edit Topic
-          </Button>
-          <div className="-mx-1 my-1 h-px bg-muted" />
-          <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive h-9 px-2" onClick={() => {
-              setTopicToDelete(contextMenu.item);
-              setContextMenu(null);
-          }}>
-              <Trash2 className="mr-2 h-4 w-4" /> Delete Topic
-          </Button>
+          )}
+          
+          {selectedFocusArea && (
+              <FocusAreaProgressModal 
+                  isOpen={isFocusAreaProgressModalOpen}
+                  onOpenChange={setIsFocusAreaProgressModalOpen}
+                  focusArea={selectedFocusArea}
+                  deepWorkDefinitions={deepWorkDefinitions}
+                  upskillDefinitions={upskillDefinitions}
+                  allDeepWorkLogs={allDeepWorkLogs}
+                  allUpskillLogs={allUpskillLogs}
+                  avgDailyProductiveHours={productivityStats.avgProductiveHours}
+              />
+          )}
         </div>
-      )}
-
-      {focusAreaContextMenu && (
-        <div
-            ref={focusAreaContextMenuRef}
-            style={{ top: focusAreaContextMenu.mouseY, left: focusAreaContextMenu.mouseX }}
-            className="fixed z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
-            onClick={(e) => {
-                e.stopPropagation();
-                setFocusAreaContextMenu(null);
-            }}
-        >
-            <div
-                role="menuitem"
-                className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
-                onMouseDown={() => { handleViewProgress(focusAreaContextMenu.item, 'deepwork'); setFocusAreaContextMenu(null); }}>
-                <TrendingUp /> View Progress
-            </div>
-            <div className="-mx-1 my-1 h-px bg-muted" />
-            <div
-                role="menuitem"
-                className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
-                onMouseDown={(e) => {
-                    e.preventDefault();
-                    handleToggleReadyForBranding(focusAreaContextMenu.item.id);
-                    setFocusAreaContextMenu(null);
-                }}
-            >
-                <Checkbox checked={!!focusAreaContextMenu.item.isReadyForBranding} className="h-4 w-4 pointer-events-none mr-2" />
-                <span className="pointer-events-none">Ready for Branding</span>
-            </div>
-            <div className="-mx-1 my-1 h-px bg-muted" />
-            <div role="menuitem" className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground" onMouseDown={() => { handleStartEditDefinition(focusAreaContextMenu.item); setFocusAreaContextMenu(null); }}>
-                <Edit3 /> Edit
-            </div>
-            <div role="menuitem" className="relative flex cursor-pointer select-none items-center rounded-sm h-9 px-2 gap-2 text-sm outline-none transition-colors text-destructive hover:bg-accent hover:text-destructive" onMouseDown={() => { handleDeleteExerciseDefinition(focusAreaContextMenu.item.id); setFocusAreaContextMenu(null); }}>
-                <Trash2 /> Delete
-            </div>
-        </div>
-      )}
-
-      <Dialog open={isManageLinksModalOpen} onOpenChange={setIsManageLinksModalOpen}>
-        <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Manage Links for "{manageLinksConfig?.parent.name}"</DialogTitle>
-              <DialogDescription>
-                Create a new item and link it, or link existing items from your library.
-              </DialogDescription>
-            </DialogHeader>
-            <Tabs defaultValue="create-new" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="create-new">Create New</TabsTrigger>
-                    <TabsTrigger value="link-existing">Link from Library</TabsTrigger>
-                </TabsList>
-                <TabsContent value="create-new">
-                    <div className="space-y-4 py-4">
-                        {manageLinksConfig?.type === 'resource' ? (
-                            <>
-                                <div className="space-y-1">
-                                    <Label htmlFor="new-linked-folder">Folder</Label>
-                                    <Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}>
-                                        <SelectTrigger id="new-linked-folder"><SelectValue placeholder="Select a folder..." /></SelectTrigger>
-                                        <SelectContent>
-                                            {renderFolderOptions(null, 0)}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="new-linked-link">Link</Label>
-                                    <Input id="new-linked-link" value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} placeholder="https://..." />
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <div className="space-y-1">
-                                  <Label htmlFor="new-linked-topic">Topic</Label>
-                                  <Select value={newLinkedItemTopic} onValueChange={setNewLinkedItemTopic}>
-                                      <SelectTrigger id="new-linked-topic"><SelectValue placeholder="Select a topic..." /></SelectTrigger>
-                                      <SelectContent>
-                                          {manageLinksConfig?.type === 'upskill' 
-                                              ? allUpskillTopics.map(topic => (<SelectItem key={topic} value={topic}>{topic}</SelectItem>))
-                                              : allKnownTopics.map(topic => (<SelectItem key={topic} value={topic}>{topic}</SelectItem>))
-                                          }
-                                      </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="space-y-1">
-                                <Label htmlFor="new-linked-name">Name</Label>
-                                <Input id="new-linked-name" value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} placeholder={manageLinksConfig?.type === 'upskill' ? 'e.g., CUDA Fundamentals Course' : 'e.g., Implement Ray Tracing'} />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label>Estimated Duration</Label>
-                                    <div className="flex gap-2">
-                                        <Input id="new-linked-hours" type="number" value={newLinkedItemHours} onChange={e => setNewLinkedItemHours(e.target.value)} placeholder="Hours" />
-                                        <Input id="new-linked-minutes" type="number" value={newLinkedItemMinutes} onChange={e => setNewLinkedItemMinutes(e.target.value)} placeholder="Minutes" />
-                                    </div>
-                                </div>
-                                {manageLinksConfig?.type === 'upskill' && (
-                                <>
-                                    <div className="space-y-1">
-                                    <Label htmlFor="new-linked-desc">Description</Label>
-                                    <Textarea id="new-linked-desc" value={newLinkedItemDescription} onChange={e => setNewLinkedItemDescription(e.target.value)} placeholder="Key points, summary..." />
-                                    </div>
-                                    <div className="space-y-1">
-                                    <Label htmlFor="new-linked-link">Link</Label>
-                                    <Input id="new-linked-link" value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} placeholder="https://..." />
-                                    </div>
-                                </>
-                                )}
-                            </>
-                        )}
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsManageLinksModalOpen(false)}>Cancel</Button>
-                        <Button onClick={handleCreateAndLinkItem} disabled={isCreatingLink}>
-                          {isCreatingLink ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                          {isCreatingLink ? 'Fetching...' : 'Create & Link'}
-                        </Button>
-                    </DialogFooter>
-                </TabsContent>
-                <TabsContent value="link-existing">
-                    <div className="py-4">
-                      {manageLinksConfig?.type === 'upskill' && (
-                        <div className="mb-4 space-y-1">
-                          <Label htmlFor="link-upskill-topic">Select Topic</Label>
-                          <Select value={linkUpskillTopic} onValueChange={(value) => setLinkUpskillTopic(value === 'all-topics-placeholder' ? '' : value)}>
-                            <SelectTrigger id="link-upskill-topic"><SelectValue placeholder="All Topics" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all-topics-placeholder">All Topics</SelectItem>
-                              {allUpskillTopics.map(topic => (<SelectItem key={topic} value={topic}>{topic}</SelectItem>))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                      {manageLinksConfig?.type === 'deepwork' && (
-                        <div className="mb-4 space-y-1">
-                          <Label htmlFor="link-deepwork-topic">Select Topic</Label>
-                          <Select value={linkDeepWorkTopic} onValueChange={(value) => setLinkDeepWorkTopic(value === 'all-topics-placeholder' ? '' : value)}>
-                            <SelectTrigger id="link-deepwork-topic"><SelectValue placeholder="All Topics" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all-topics-placeholder">All Topics</SelectItem>
-                              {allKnownTopics.map(topic => (<SelectItem key={topic} value={topic}>{topic}</SelectItem>))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                      {manageLinksConfig?.type === 'resource' && (
-                        <div className="mb-4 space-y-1">
-                            <Label htmlFor="link-resource-folder">Select Folder</Label>
-                            <Select value={linkResourceFolderId} onValueChange={setLinkResourceFolderId}>
-                                <SelectTrigger id="link-resource-folder">
-                                    <SelectValue placeholder="Select a folder to view resources..." />
-                                </SelectTrigger>
-                                <SelectContent>{renderFolderOptions(null, 0)}</SelectContent>
-                            </Select>
-                        </div>
-                      )}
-                      <Input 
-                          placeholder="Search library..."
-                          value={linkSearchTerm}
-                          onChange={e => setLinkSearchTerm(e.target.value)}
-                          className="mb-4"
-                      />
-                      <ScrollArea className="h-64">
-                          <div className="space-y-2 pr-4">
-                              {filteredItemsForLinking.length > 0 ? filteredItemsForLinking.map(item => (
-                                  <div key={item.id} className="flex items-center space-x-2">
-                                      <Checkbox
-                                          id={`link-${item.id}`}
-                                          checked={tempLinkedIds.includes(item.id)}
-                                          onCheckedChange={checked => {
-                                              setTempLinkedIds(prev =>
-                                                  checked
-                                                      ? [...prev, item.id]
-                                                      : prev.filter(id => id !== item.id)
-                                              );
-                                          }}
-                                      />
-                                      <Label htmlFor={`link-${item.id}`} className="font-normal w-full cursor-pointer">
-                                          {item.name}
-                                          {item.category && <span className="text-muted-foreground text-xs ml-2">({item.category})</span>}
-                                          {item.folderId && <span className="text-muted-foreground text-xs ml-2">({resourceFolders.find(f => f.id === item.folderId)?.name})</span>}
-                                      </Label>
-                                  </div>
-                              )) : (
-                                <p className="text-sm text-center text-muted-foreground py-4">
-                                  {manageLinksConfig?.type === 'resource' && !linkResourceFolderId 
-                                      ? "Please select a folder." 
-                                      : "No matching items found."}
-                                </p>
-                              )}
-                          </div>
-                      </ScrollArea>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsManageLinksModalOpen(false)}>Cancel</Button>
-                        <Button onClick={handleSaveExistingLinks}>Save Links</Button>
-                    </DialogFooter>
-                </TabsContent>
-            </Tabs>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={!!editingTopic} onOpenChange={(isOpen) => !isOpen && setEditingTopic(null)}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Edit Topic</DialogTitle>
-                <DialogDescription>
-                    Rename the topic or change its classification. This will move it between the Productization and Offerization pages.
-                </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-                <div className="space-y-1">
-                  <Label htmlFor="edit-topic-name">Topic Name</Label>
-                  <Input id="edit-topic-name" value={newTopicNameForEdit} onChange={(e) => setNewTopicNameForEdit(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Classification</Label>
-                  <RadioGroup value={newTopicClassificationForEdit} onValueChange={(v) => setNewTopicClassificationForEdit(v as 'product' | 'service')} className="flex gap-4 pt-1">
-                      <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="product" id="class-product" />
-                          <Label htmlFor="class-product" className="font-normal">Product</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="service" id="class-service" />
-                          <Label htmlFor="class-service" className="font-normal">Service</Label>
-                      </div>
-                  </RadioGroup>
-                </div>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setEditingTopic(null)}>Cancel</Button>
-                <Button onClick={handleSaveTopicEdit}>Save Changes</Button>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      <AlertDialog open={!!topicToDelete} onOpenChange={(isOpen) => !isOpen && setTopicToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-                This will permanently delete the topic "{topicToDelete}" and ALL of its focus areas and logged sessions. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteTopic} className="bg-destructive hover:bg-destructive/90">
-                Delete Topic
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <Dialog open={!!embedUrl} onOpenChange={(isOpen) => !isOpen && setEmbedUrl(null)}>
-        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
-            <DialogHeader className="sr-only">
-              <DialogTitle>Embedded Resource</DialogTitle>
-            </DialogHeader>
-            <div className="flex-grow min-h-0">
-                {embedUrl && (
-                    <iframe
-                        src={embedUrl}
-                        className="w-full h-full border-0 rounded-md"
-                        title="Embedded Resource"
-                        sandbox="allow-scripts allow-same-origin allow-forms"
-                        allow="picture-in-picture"
-                    ></iframe>
-                )}
-            </div>
-        </DialogContent>
-    </Dialog>
-
-    <Dialog open={!!editingUpskill} onOpenChange={() => setEditingUpskill(null)}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Edit Learning Task</DialogTitle>
-                <DialogDescription>Update the details of this learning task.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-                <div className="space-y-1"><Label htmlFor="upskill-name">Name</Label><Input id="upskill-name" value={editedUpskillData.name || ''} onChange={e => setEditedUpskillData(d => ({ ...d, name: e.target.value }))} /></div>
-                <div className="space-y-1"><Label htmlFor="upskill-desc">Description</Label><Textarea id="upskill-desc" value={editedUpskillData.description || ''} onChange={e => setEditedUpskillData(d => ({ ...d, description: e.target.value }))} /></div>
-                <div className="space-y-1"><Label htmlFor="upskill-link">Link</Label><Input id="upskill-link" value={editedUpskillData.link || ''} onChange={e => setEditedUpskillData(d => ({ ...d, link: e.target.value }))} /></div>
-                <div className="space-y-1">
-                    <Label>Estimated Duration</Label>
-                    <div className="flex gap-2">
-                      <Input type="number" placeholder="Hours" value={editedUpskillData.estHours || ''} onChange={e => setEditedUpskillData(d => ({ ...d, estHours: e.target.value }))} />
-                      <Input type="number" placeholder="Minutes" value={editedUpskillData.estMinutes || ''} onChange={e => setEditedUpskillData(d => ({ ...d, estMinutes: e.target.value }))} />
-                    </div>
-                </div>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setEditingUpskill(null)}>Cancel</Button>
-                <Button onClick={handleSaveUpskillEdit}>Save Changes</Button>
-            </DialogFooter>
-        </DialogContent>
-    </Dialog>
-
-    <Dialog open={!!editingResource} onOpenChange={() => setEditingResource(null)}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Edit Resource</DialogTitle>
-                <DialogDescription>Update the details of this resource.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-                <div className="space-y-1"><Label htmlFor="resource-name">Name</Label><Input id="resource-name" value={editedResourceData.name || ''} onChange={e => setEditedResourceData(d => ({ ...d, name: e.target.value }))} /></div>
-                <div className="space-y-1"><Label htmlFor="resource-folder">Folder</Label>
-                    <Select value={editedResourceData.folderId || ''} onValueChange={v => setEditedResourceData(d => ({ ...d, folderId: v }))}>
-                        <SelectTrigger id="resource-folder"><SelectValue placeholder="Select a folder..." /></SelectTrigger>
-                        <SelectContent>{renderFolderOptions(null, 0)}</SelectContent>
-                    </Select>
-                </div>
-                <div className="space-y-1"><Label htmlFor="resource-desc">Description</Label><Textarea id="resource-desc" value={editedResourceData.description || ''} onChange={e => setEditedResourceData(d => ({ ...d, description: e.target.value }))} /></div>
-                <div className="space-y-1"><Label htmlFor="resource-link">Link</Label><Input id="resource-link" value={editedResourceData.link || ''} onChange={e => setEditedResourceData(d => ({ ...d, link: e.target.value }))} /></div>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setEditingResource(null)}>Cancel</Button>
-                <Button onClick={handleSaveResourceEdit}>Save Changes</Button>
-            </DialogFooter>
-        </DialogContent>
-    </Dialog>
-
-    <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
-        <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
-            <DialogHeader className="sr-only">
-              <DialogTitle>Focus Area Mind Map</DialogTitle>
-            </DialogHeader>
-            <MindMapViewer rootFocusAreaId={mindMapRootId} showControls={false} />
-        </DialogContent>
-    </Dialog>
-    
-    <Dialog open={!!editingDefinition} onOpenChange={() => setEditingDefinition(null)}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Edit Focus Area</DialogTitle>
-                <DialogDescription>Update the details of this focus area.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-                <div className="space-y-1">
-                    <Label htmlFor="dw-name">Name</Label>
-                    <Input id="dw-name" value={editingDefinitionName} onChange={e => setEditingDefinitionName(e.target.value)} />
-                </div>
-                 <div className="space-y-1">
-                    <Label>Estimated Duration</Label>
-                    <div className="flex gap-2">
-                        <Input id="dw-hours" type="number" value={editingDefinitionHours} onChange={e => setEditingDefinitionHours(e.target.value)} placeholder="Hours" />
-                        <Input id="dw-minutes" type="number" value={editingDefinitionMinutes} onChange={e => setEditingDefinitionMinutes(e.target.value)} placeholder="Minutes" />
-                    </div>
-                </div>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setEditingDefinition(null)}>Cancel</Button>
-                <Button onClick={handleSaveEditDefinition}>Save Changes</Button>
-            </DialogFooter>
-        </DialogContent>
-    </Dialog>
-
-    <Dialog open={isFocusAreaTimesheetModalOpen} onOpenChange={setIsFocusAreaTimesheetModalOpen}>
-        <DialogContent className="max-w-3xl">
-            <DialogHeader>
-                <DialogTitle>Timesheet for "{selectedFocusArea?.name}"</DialogTitle>
-                <DialogDescription>
-                    A detailed log of all time spent on this focus area and its linked tasks.
-                </DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="max-h-[60vh] mt-4 pr-6">
-                <div className="space-y-4">
-                    {timesheetData.length > 0 ? timesheetData.map(day => (
-                        <Card key={day.date}>
-                            <CardHeader className="p-3 flex flex-row justify-between items-center">
-                                <div>
-                                    <CardTitle className="text-base">{format(parseISO(day.date), 'PPP')}</CardTitle>
-                                    <CardDescription className="text-xs">Total: {formatDuration(day.totalDuration)}</CardDescription>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-3 pt-0">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Task</TableHead>
-                                            <TableHead className="text-right w-24">Duration</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {day.tasks.map((task, index) => (
-                                            <TableRow key={index}>
-                                                <TableCell className="font-medium">{task.taskName}</TableCell>
-                                                <TableCell className="text-right">{formatDuration(task.duration)}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </CardContent>
-                        </Card>
-                    )) : (
-                        <p className="text-center text-muted-foreground py-8">No time logged for this focus area yet.</p>
-                    )}
-                </div>
-            </ScrollArea>
-        </DialogContent>
-    </Dialog>
-
-     <Dialog open={isNewFocusAreaModalOpen} onOpenChange={setIsNewFocusAreaModalOpen}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>New Focus Area for "{newFocusAreaParentTopic}"</DialogTitle>
-                <DialogDescription>Create a new task to focus on. You can link other items to it later.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-                <div className="space-y-1">
-                    <Label htmlFor="new-focus-name">Name</Label>
-                    <Input id="new-focus-name" autoFocus value={newFocusAreaData.name} onChange={(e) => setNewFocusAreaData(prev => ({ ...prev, name: e.target.value }))} />
-                </div>
-                 <div className="space-y-1">
-                    <Label>Estimated Duration (Optional)</Label>
-                    <div className="flex gap-2">
-                        <Input type="number" placeholder="Hours" value={newFocusAreaData.hours} onChange={(e) => setNewFocusAreaData(prev => ({ ...prev, hours: e.target.value }))} />
-                        <Input type="number" placeholder="Minutes" value={newFocusAreaData.minutes} onChange={(e) => setNewFocusAreaData(prev => ({ ...prev, minutes: e.target.value }))} />
-                    </div>
-                </div>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setIsNewFocusAreaModalOpen(false)}>Cancel</Button>
-                <Button onClick={handleCreateFocusArea}>Create Focus Area</Button>
-            </DialogFooter>
-        </DialogContent>
-    </Dialog>
-    </DndContext>
-    {Array.from(openPopups.values()).map((popupState) => (
-        <ResourcePopupCard
-            key={popupState.resourceId}
-            popupState={popupState}
-            allResources={resources}
-            onOpenNestedPopup={handleOpenNestedPopup}
-            onClose={handleClosePopup}
-            onSizeChange={handleSizeChange}
-        />
-    ))}
+      </DndContext>
+      {Array.from(openPopups.values()).map((popupState) => (
+          <ResourcePopupCard
+              key={popupState.resourceId}
+              popupState={popupState}
+              allResources={resources}
+              onOpenNestedPopup={handleOpenNestedPopup}
+              onClose={handleClosePopup}
+              onSizeChange={handleSizeChange}
+          />
+      ))}
     </>
   );
 }
@@ -2915,5 +2443,4 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
-
 
