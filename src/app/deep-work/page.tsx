@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +65,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -1305,6 +1307,7 @@ function DeepWorkPageContent() {
                 description: result.description || '',
                 folderId: newLinkedItemFolderId,
                 iconUrl: getFaviconUrl(fullLink),
+                type: 'link',
             };
 
             setResources(prev => [...prev, newResource]);
@@ -2032,10 +2035,45 @@ function DeepWorkPageContent() {
                                       const resource = resources.find(r => r.id === id);
                                       if (!resource) return null;
   
-                                      const youtubeEmbedUrl = resource.link ? getYouTubeEmbedUrl(resource.link) : null;
+                                      const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
                                       const isNotionObsidianEmbed = resource.link ? (isNotionUrl(resource.link) || isObsidianUrl(resource.link)) : false;
                                       const embedLinkForModal = youtubeEmbedUrl || (isNotionObsidianEmbed ? resource.link : null);
   
+                                      if (resource.type === 'card') {
+                                        const hasMarkdownContent = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+                                        return (
+                                          <Card key={`${id}-${index}`} className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1", hasMarkdownContent ? 'md:col-span-2 xl:col-span-3' : '')}>
+                                            <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                              <DropdownMenu>
+                                                  <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                                      <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                                      <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                                                  </DropdownMenuContent>
+                                              </DropdownMenu>
+                                            </div>
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-base flex items-center gap-2">
+                                                    <Library className="h-5 w-5 text-primary" />
+                                                    <span className="truncate" title={resource.name}>{resource.name}</span>
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="flex-grow min-h-0">
+                                                <ScrollArea className={cn(hasMarkdownContent ? 'h-[200px]' : '')}>
+                                                    <ul className="space-y-3 pr-3">
+                                                        {(resource.points || []).map((point, pIndex) => (
+                                                            <li key={pIndex} className="flex items-start gap-3 text-sm text-muted-foreground">
+                                                                {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />}
+                                                                {point.type === 'card' && point.resourceId ? (<span className="font-medium">{point.text}</span>) : point.type === 'markdown' ? (<div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown></div>) : point.type === 'code' ? (<pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>) : (<span className="break-words w-full" title={point.text}>{point.text}</span>)}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </ScrollArea>
+                                            </CardContent>
+                                          </Card>
+                                        );
+                                      }
+
                                       return (
                                           <Card key={`${id}-${index}`} className="relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 min-h-[230px]">
                                               {youtubeEmbedUrl ? (
@@ -2642,4 +2680,5 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
+
 

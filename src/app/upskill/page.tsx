@@ -2,6 +2,7 @@
 
 
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -10,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, GitMerge, Clock, Unlink, Flashlight, Focus, Frame, Lightbulb, PictureInPicture, GripVertical, Flag, Bolt } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, GitMerge, Clock, Unlink, Flashlight, Focus, Frame, Lightbulb, PictureInPicture, GripVertical, Flag, Bolt, Code, MessageSquare } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,8 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/comp
 import { Progress } from '@/components/ui/progress';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -169,6 +172,40 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, setFloati
   const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
   const isSpecialEmbed = isNotionUrl(resource.link) || isObsidianUrl(resource.link);
   const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? resource.link : null);
+
+  if (resource.type === 'card') {
+    const hasMarkdownContent = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+    return (
+      <Card className={cn("relative rounded-lg flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl", hasMarkdownContent ? 'md:col-span-2 xl:col-span-3' : '')}>
+        <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <DropdownMenu>
+              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', resource.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+              </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+                <Library className="h-5 w-5 text-primary" />
+                <span className="truncate" title={resource.name}>{resource.name}</span>
+            </CardTitle>
+        </CardHeader>
+        <CardContent className="flex-grow min-h-0">
+          <ScrollArea className={cn(hasMarkdownContent ? 'h-[200px]' : '')}>
+              <ul className="space-y-3 pr-3">
+                  {(resource.points || []).map((point, pIndex) => (
+                      <li key={pIndex} className="flex items-start gap-3 text-sm text-muted-foreground">
+                          {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />}
+                          {point.type === 'card' && point.resourceId ? (<span className="font-medium">{point.text}</span>) : point.type === 'markdown' ? (<div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown></div>) : point.type === 'code' ? (<pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>) : (<span className="break-words w-full" title={point.text}>{point.text}</span>)}
+                      </li>
+                  ))}
+              </ul>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="relative group transition-all duration-300 hover:shadow-xl">
@@ -730,7 +767,7 @@ function UpskillPageContent() {
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Failed to fetch metadata.');
             const newResource: Resource = {
-                id: `res_${Date.now()}_${Math.random()}`, name: result.title || 'Untitled Resource', link: fullLink,
+                id: `res_${Date.now()}_${Math.random()}`, name: result.title || 'Untitled Resource', link: fullLink, type: 'link',
                 description: result.description || '', folderId: newLinkedItemFolderId, iconUrl: getFaviconUrl(fullLink),
             };
             setResources(prev => [...prev, newResource]);
@@ -1202,4 +1239,5 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
+
 
