@@ -133,7 +133,8 @@ const DraggableSubtaskItem: React.FC<{
     childName: string;
     isLogged: boolean;
     type: 'deepwork' | 'upskill' | 'resource';
-  }> = ({ childId, parentId, childName, isLogged, type }) => {
+    onClick: () => void;
+  }> = ({ childId, parentId, childName, isLogged, type, onClick }) => {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: `subtask-${childId}-from-${parentId}`,
     });
@@ -151,16 +152,17 @@ const DraggableSubtaskItem: React.FC<{
         <div 
             ref={setNodeRef} 
             style={style} 
-            {...listeners} 
-            {...attributes} 
             className={cn(
-                "text-xs text-muted-foreground truncate cursor-grab transition-transform", 
+                "text-xs text-muted-foreground truncate transition-transform", 
                 isLogged && "line-through text-muted-foreground/70",
                 isDragging && "opacity-50 scale-90"
             )} 
             title={childName}
         >
-            - {childName}
+          <span {...listeners} {...attributes} className="cursor-grab pr-1"> - </span>
+          <span onClick={onClick} className="cursor-pointer hover:text-foreground">
+             {childName}
+          </span>
         </div>
     );
 };
@@ -178,7 +180,9 @@ function LinkedUpskillCard({
     handleDeleteUpskillDefinition,
     upskillDefinitions,
     formatDuration,
-    calculatedEstimate
+    calculatedEstimate,
+    setSelectedFocusArea,
+    setViewMode,
 } : {
     id: string;
     upskillDef: ExerciseDefinition;
@@ -193,6 +197,8 @@ function LinkedUpskillCard({
     upskillDefinitions: ExerciseDefinition[];
     formatDuration: (minutes: number) => string;
     calculatedEstimate: number;
+    setSelectedFocusArea: (def: ExerciseDefinition) => void;
+    setViewMode: (mode: 'session' | 'library') => void;
 }) {
     const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
@@ -310,7 +316,15 @@ function LinkedUpskillCard({
                                   if (!childDef) return null;
                                   const isChildComplete = isUpskillObjectiveComplete(childId);
                                   return (
-                                    <DraggableSubtaskItem key={childId} childId={childId} parentId={upskillDef.id} childName={childDef.name} isLogged={isChildComplete} type="upskill" />
+                                    <DraggableSubtaskItem 
+                                        key={childId} 
+                                        childId={childId} 
+                                        parentId={upskillDef.id} 
+                                        childName={childDef.name} 
+                                        isLogged={isChildComplete} 
+                                        type="upskill" 
+                                        onClick={() => { setSelectedFocusArea(childDef); setViewMode('library'); }}
+                                    />
                                   );
                                 })}
                               </div>
@@ -463,7 +477,15 @@ function LinkedDeepWorkCard({
                               if (!childDef) return null;
                               const isChildPermanentlyLogged = permanentlyLoggedActionIds.has(childDef.id);
                               return (
-                                  <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={isChildPermanentlyLogged} type="deepwork" />
+                                  <DraggableSubtaskItem 
+                                    key={childId} 
+                                    childId={childId} 
+                                    parentId={deepworkDef.id} 
+                                    childName={childDef.name} 
+                                    isLogged={isChildPermanentlyLogged} 
+                                    type="deepwork" 
+                                    onClick={() => { setSelectedFocusArea(childDef); setViewMode('library'); }}
+                                  />
                               );
                           })}
                       </div>
@@ -475,12 +497,12 @@ function LinkedDeepWorkCard({
                     {(deepworkDef.linkedUpskillIds || []).map(childId => {
                         const childDef = upskillDefinitions.find(d => d.id === childId);
                         if (!childDef) return null;
-                        return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="upskill"/>;
+                        return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="upskill" onClick={() => { /* needs navigation to upskill page */ }} />;
                     })}
                      {(deepworkDef.linkedResourceIds || []).map(childId => {
                         const childDef = resources.find(d => d.id === childId);
                         if (!childDef) return null;
-                        return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="resource"/>;
+                        return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="resource" onClick={() => { /* needs navigation to resource page */ }}/>;
                     })}
                 </div>
               ) : (
@@ -1988,6 +2010,8 @@ function DeepWorkPageContent() {
                                             upskillDefinitions={upskillDefinitions}
                                             formatDuration={formatDuration}
                                             calculatedEstimate={calculateTotalEstimate(upskillDef)}
+                                            setSelectedFocusArea={setSelectedFocusArea}
+                                            setViewMode={setViewMode}
                                         />
                                       )
                                     })}
@@ -2692,6 +2716,7 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
+
 
 
 
