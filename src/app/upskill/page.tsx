@@ -1,17 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -1315,7 +1301,7 @@ function UpskillPageContent() {
                                       )
                                     })}
                                     <Card 
-                                        onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
+                                        onClick={() => selectedSubtopic && handleOpenManageLinksModal('upskill', selectedSubtopic)}
                                         className="group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
                                     >
                                         <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -1332,7 +1318,7 @@ function UpskillPageContent() {
                                       return <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={handleUnlinkItem} setEmbedUrl={setEmbedUrl} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={handleOpenNestedPopup} />;
                                     })}
                                     <Card 
-                                        onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)}
+                                        onClick={() => selectedSubtopic && handleOpenManageLinksModal('resource', selectedSubtopic)}
                                         className="group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
                                     >
                                         <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -1371,4 +1357,3 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
-
