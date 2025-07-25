@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -317,7 +318,7 @@ function LinkedUpskillCard({
                         </CardContent>
                         <CardFooter className="pt-3 flex items-center justify-end">
                           <div className="flex items-center gap-1 flex-shrink-0">
-                            {estDuration && <Badge variant="outline" className="flex-shrink-0">{formatDuration(estDuration)} est.</Badge>}
+                            {estDuration && <Badge variant="outline" className="flex-shrink-0">{formatDuration(estDuration)}</Badge>}
                             {loggedMinutes > 0 && <Badge variant="secondary">{formatDuration(loggedMinutes)} logged</Badge>}
                           </div>
                         </CardFooter>
@@ -480,7 +481,7 @@ function LinkedDeepWorkCard({
             </CardContent>
            <CardFooter className="pt-3 flex items-center justify-end">
               <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                  {estDuration && <Badge variant="outline">{formatDuration(estDuration)} est.</Badge>}
+                  {estDuration && <Badge variant="outline">{formatDuration(estDuration)}</Badge>}
                   {loggedMinutes > 0 && <Badge variant="secondary">{formatDuration(loggedMinutes)} logged</Badge>}
               </div>
             </CardFooter>
@@ -2641,3 +2642,4 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
+
