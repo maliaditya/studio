@@ -5,6 +5,7 @@
 
 
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -40,6 +41,100 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+
+interface PopupState {
+  resourceId: string;
+  level: number;
+  x: number;
+  y: number;
+  parentId?: string;
+  width?: number;
+  height?: number;
+}
+
+interface ResourcePopupProps {
+  popupState: PopupState;
+  allResources: Resource[];
+  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
+  onClose: (resourceId: string) => void;
+  onSizeChange: (resourceId: string, newSize: { width: number; height: number }) => void;
+}
+
+const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClose, onSizeChange }: ResourcePopupProps) => {
+    const resource = allResources.find(r => r.id === popupState.resourceId);
+    const cardRef = useRef<HTMLDivElement>(null);
+
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({
+        id: `popup-${popupState.resourceId}`,
+    });
+
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: popupState.y,
+        left: popupState.x,
+        width: `${popupState.width}px`,
+        willChange: 'transform',
+    };
+
+    if (transform) {
+        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
+    }
+
+    if (!resource) return null;
+
+    const handleLinkClick = (e: React.MouseEvent, pointResourceId: string) => {
+      e.stopPropagation();
+      onOpenNestedPopup(pointResourceId, e, popupState);
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} {...attributes} className="z-[60]">
+            <Card ref={cardRef} className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col">
+                <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <Library className="h-4 w-4" />
+                        <span className="truncate">{resource.name}</span>
+                    </CardTitle>
+                </CardHeader>
+                <div className="flex-grow min-h-0 overflow-y-auto">
+                    <CardContent className="p-3 pt-0">
+                        <ul className="space-y-2 text-sm text-muted-foreground pr-2">
+                            {(resource.points || []).map(point => (
+                                <li key={point.id} className="flex items-start gap-2">
+                                    {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                    point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                    <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
+                                    }
+                                    {point.type === 'card' && point.resourceId ? (
+                                        <button
+                                            onClick={(e) => handleLinkClick(e, point.resourceId!)}
+                                            className="text-left font-medium text-primary hover:underline"
+                                        >
+                                            {point.text}
+                                        </button>
+                                    ) : point.type === 'markdown' ? (
+                                        <div className="w-full prose dark:prose-invert prose-sm">
+                                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                        </div>
+                                    ) : point.type === 'code' ? (
+                                         <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                                    ) : (
+                                        <span className="break-words w-full" title={point.text}>{point.text}</span>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    </CardContent>
+                </div>
+                <CardFooter className="p-2 flex justify-end flex-shrink-0 relative">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onClose(resource.id); }}>
+                        <X className="h-4 w-4" />
+                    </Button>
+                </CardFooter>
+            </Card>
+        </div>
+    );
+};
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -165,11 +260,12 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
   );
 }
 
-function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, setFloatingVideoUrl }: {
+function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, setFloatingVideoUrl, onOpenNestedPopup }: {
   resource: Resource;
   handleUnlinkItem: (type: 'upskill' | 'resource', id: string) => void;
   setEmbedUrl: (url: string | null) => void;
   setFloatingVideoUrl: (url: string | null) => void;
+  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
 }) {
   const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
   const isSpecialEmbed = isNotionUrl(resource.link) || isObsidianUrl(resource.link);
@@ -196,11 +292,18 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, setFloati
         <CardContent className="flex-grow min-h-0">
           <ScrollArea className={cn(hasMarkdownContent ? 'h-[200px]' : '')}>
               <ul className="space-y-3 pr-3">
-                  {(resource.points || []).map((point, pIndex) => (
-                      <li key={pIndex} className="flex items-start gap-3 text-sm text-muted-foreground">
-                          {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />}
-                          {point.type === 'card' && point.resourceId ? (<span className="font-medium">{point.text}</span>) : point.type === 'markdown' ? (<div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown></div>) : point.type === 'code' ? (<pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>) : (<span className="break-words w-full" title={point.text}>{point.text}</span>)}
-                      </li>
+                  {(resource.points || []).map((point) => (
+                    <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
+                      {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />}
+                      {point.type === 'card' && point.resourceId ? (
+                        <button
+                          onClick={(e) => onOpenNestedPopup(point.resourceId!, e)}
+                          className="text-left font-medium text-primary hover:underline"
+                        >
+                          {point.text}
+                        </button>
+                      ) : point.type === 'markdown' ? (<div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown></div>) : point.type === 'code' ? (<pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>) : (<span className="break-words w-full" title={point.text}>{point.text}</span>)}
+                    </li>
                   ))}
               </ul>
           </ScrollArea>
@@ -212,7 +315,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, setFloati
   return (
     <Card className="relative group transition-all duration-300 hover:shadow-xl">
       <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        {youtubeEmbedUrl && <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(resource.link)}><PictureInPicture className="h-4 w-4" /></Button>}
+        {youtubeEmbedUrl && <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(resource.link!)}><PictureInPicture className="h-4 w-4" /></Button>}
         {embedLinkForModal ? (<Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setEmbedUrl(embedLinkForModal)}><Expand className="h-4 w-4" /></Button>) : (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><a href={resource.link} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a></Button>)}
         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm text-destructive hover:text-destructive" onClick={() => handleUnlinkItem('resource', resource.id)}><Trash2 className="h-4 w-4" /></Button>
       </div>
@@ -242,7 +345,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, setFloati
 }
 
 function UpskillPageContent() {
-  const { toast } = useToast();
+  const { toast } = useAuth();
   const { 
     currentUser, exportData,
     allUpskillLogs, setAllUpskillLogs,
@@ -303,6 +406,72 @@ function UpskillPageContent() {
   const [newSubtopicData, setNewSubtopicData] = useState({ name: '', description: '', link: '', hours: '', minutes: '' });
 
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+  const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
+
+  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
+      setOpenPopups(prev => {
+          const newPopups = new Map(prev);
+          const resource = resources.find(r => r.id === resourceId);
+          if (!resource) return newPopups;
+          
+          const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+          const popupWidth = hasMarkdown ? 896 : 512;
+      
+          let x, y, level, parentId;
+      
+          if (parentPopupState) {
+              level = parentPopupState.level + 1;
+              parentId = parentPopupState.resourceId;
+              x = parentPopupState.x + 40;
+              y = parentPopupState.y + 40;
+          } else {
+              level = 0;
+              parentId = undefined;
+              if (hasMarkdown) {
+                  x = window.innerWidth / 2 - popupWidth / 2;
+                  y = window.innerHeight / 2 - Math.min(window.innerHeight * 0.7, 700) / 2;
+              } else {
+                  x = event.clientX;
+                  y = event.clientY;
+              }
+          }
+          
+          newPopups.set(resourceId, {
+              resourceId, level, x, y, parentId, width: popupWidth
+          });
+          return newPopups;
+      });
+  };
+  
+  const handleClosePopup = (resourceId: string) => {
+      setOpenPopups(prev => {
+        const newPopups = new Map(prev);
+        const popupsToDelete = new Set<string>();
+        function findChildren(parentId: string) {
+          popupsToDelete.add(parentId);
+          for (const [id, popup] of newPopups.entries()) {
+            if (popup.parentId === parentId) findChildren(id);
+          }
+        }
+        findChildren(resourceId);
+        for (const id of popupsToDelete) newPopups.delete(id);
+        return newPopups;
+      });
+  };
+
+  const handleSizeChange = useCallback((resourceId: string, newSize: { width: number; height: number }) => {
+      setOpenPopups(prev => {
+          const newPopups = new Map(prev);
+          const popup = newPopups.get(resourceId);
+          if (popup) {
+              newPopups.set(resourceId, {
+                  ...popup,
+                  ...newSize
+              });
+          }
+          return newPopups;
+      });
+  }, []);
 
   const permanentlyLoggedVisualizationIds = useMemo(() => {
     const loggedIds = new Set<string>();
@@ -866,7 +1035,21 @@ function UpskillPageContent() {
   }, [resourceFolders]);
 
   const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
+    const { active, over, delta } = event;
+
+    if (active.id.toString().startsWith('popup-')) {
+        const resourceId = active.id.toString().replace('popup-', '');
+        setOpenPopups(prev => {
+            const newPopups = new Map(prev);
+            const popup = newPopups.get(resourceId);
+            if (popup) {
+                newPopups.set(resourceId, { ...popup, x: popup.x + delta.x, y: popup.y + delta.y });
+            }
+            return newPopups;
+        });
+        return;
+    }
+    
     if (!over || active.id === over.id) return;
 
     const draggedId = active.id as string;
@@ -911,229 +1094,266 @@ function UpskillPageContent() {
 
   return (
     <>
-      <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => { if (contextMenu) setContextMenu(null); if (subtopicContextMenu) setSubtopicContextMenu(null); }}>
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-          
-          <aside className="lg:col-span-1 space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="flex items-center gap-2 text-lg text-primary"><Folder /> Topic Library</CardTitle>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><FilterIcon className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('curiosity')} onCheckedChange={() => handleVisibilityFilterChange('curiosity')}><Flashlight className="mr-2 h-4 w-4 text-amber-500" /><span>Curiosities</span></DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('objective')} onCheckedChange={() => handleVisibilityFilterChange('objective')}><Flag className="mr-2 h-4 w-4 text-green-500" /><span>Objectives</span></DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('visualization')} onCheckedChange={() => handleVisibilityFilterChange('visualization')}><Frame className="mr-2 h-4 w-4 text-blue-500" /><span>Visualizations</span></DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem checked={visibilityFilters.has('standalone')} onCheckedChange={() => handleVisibilityFilterChange('standalone')}><Focus className="mr-2 h-4 w-4 text-purple-500" /><span>Standalone</span></DropdownMenuCheckboxItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                <CardDescription>Organize your learning tasks by topic.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleAddTopic} className="space-y-3 p-3 border rounded-md mb-4">
-                    <Input type="text" placeholder="New Topic" value={newTopicName} onChange={(e) => setNewTopicName(e.target.value)} list="topics-datalist" aria-label="New topic name" className="h-10 text-sm" />
-                    <datalist id="topics-datalist">{topicsWithSubtopics.map(([topic]) => <option key={topic} value={topic} />)}</datalist>
-                    <AnimatePresence>
-                      {newTopicName.trim() && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="space-y-3 overflow-hidden"
-                        >
-                          <div>
-                              <Label className="text-xs text-muted-foreground">Set a Goal for this New Topic</Label>
-                              <div className="flex gap-2 items-center mt-1">
-                                  <RadioGroup value={newTopicGoalType} onValueChange={(v) => setNewTopicGoalType(v as 'pages' | 'hours')} className="flex gap-4">
-                                      <div className="flex items-center space-x-2"><RadioGroupItem value="pages" id="type-pages-new" /><Label htmlFor="type-pages-new" className="font-normal">Pages</Label></div>
-                                      <div className="flex items-center space-x-2"><RadioGroupItem value="hours" id="type-hours-new" /><Label htmlFor="type-hours-new" className="font-normal">Hours</Label></div>
-                                  </RadioGroup>
-                                  <Input type="number" placeholder="Total" value={newTopicGoalValue} onChange={(e) => setNewTopicGoalValue(e.target.value)} aria-label="Goal value" className="h-9" />
-                              </div>
-                          </div>
-                          <Button type="submit" size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Add Topic</Button>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                </form>
-                <div className="space-y-2 max-h-[calc(100vh-30rem)] overflow-y-auto pr-2">
-                  {topicsWithSubtopics.map(([topic, subtopics]) => {
-                    const isCollapsed = !expandedTopics.has(topic);
-                    if (subtopics.length === 0 && !topicGoals[topic]) return null;
-                    return (
-                    <div key={topic}>
-                      <div className="group flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer" onClick={() => toggleTopicExpansion(topic)} onContextMenu={(e) => handleContextMenu(e, topic)}>
-                        <div className="flex items-center gap-2 min-w-0 flex-grow">
-                          <ChevronDown className={cn("h-4 w-4 transition-transform", isCollapsed && "-rotate-90")} />
-                          <Folder className="h-4 w-4 flex-shrink-0 text-primary/80" />
-                          <div className='truncate'>
-                            <h4 className="font-semibold text-sm truncate">{topic}</h4>
-                            {topicGoals[topic] && <p className="text-xs text-muted-foreground">Goal: {topicGoals[topic].goalValue} {topicGoals[topic].goalType}</p>}
-                          </div>
-                        </div>
-                      </div>
-                      {!isCollapsed && (
-                        <ul className="space-y-1 pl-4 border-l-2 border-muted ml-4">
-                            {subtopics.sort((a,b) => a.name.localeCompare(b.name)).map(def => {
-                              const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-                              const isChild = linkedUpskillChildIds.has(def.id);
-                              
-                              const isCuriosity = isParent && !isChild;
-                              const isObjective = isParent && isChild;
-                              const isVisualization = !isParent && isChild;
-                              const isStandalone = !isParent && !isChild;
-                              
-                              const estDuration = isParent ? calculateTotalEstimate(def) : def.estimatedDuration;
-                              
-                              return (
-                                <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted" onContextMenu={(e) => handleSubtopicContextMenu(e, def)}>
-                                    <div className="flex items-center gap-2 flex-grow min-w-0">
-                                      {isCuriosity ? <Flashlight className="h-4 w-4 flex-shrink-0 text-amber-500" />
-                                       : isObjective ? <Flag className="h-4 w-4 flex-shrink-0 text-green-500" />
-                                       : isVisualization ? <Frame className="h-4 w-4 flex-shrink-0 text-blue-500" />
-                                       : <Focus className="h-4 w-4 flex-shrink-0 text-purple-500" />}
-                                      <span className="truncate cursor-pointer" onClick={() => { setSelectedSubtopic(def); setViewMode('library'); }}>{def.name}</span>
-                                      {estDuration && estDuration > 0 && <Badge variant="secondary" className="text-xs ml-auto">{formatMinutes(estDuration)}</Badge>}
-                                    </div>
-                                    <div className='hidden items-center flex-shrink-0 group-hover:flex'>
-                                        <TooltipProvider>
-                                          <Tooltip><TooltipTrigger asChild><span tabIndex={isVisualization ? 0 : -1}><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => isVisualization && handleAddTaskToSession(def)} disabled={!isVisualization}><PlusCircle className="h-4 w-4" /></Button></span></TooltipTrigger><TooltipContent>{isVisualization ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent></Tooltip>
-                                        </TooltipProvider>
-                                    </div>
-                                </li>
-                              )})}
-                        </ul>
-                      )}
+      <DndContext onDragEnd={handleDragEnd}>
+        <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => { if (contextMenu) setContextMenu(null); if (subtopicContextMenu) setSubtopicContextMenu(null); }}>
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+            
+            <aside className="lg:col-span-1 space-y-6">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between gap-2">
+                      <CardTitle className="flex items-center gap-2 text-lg text-primary"><Folder /> Topic Library</CardTitle>
+                      <DropdownMenu>
+                          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><FilterIcon className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                              <DropdownMenuCheckboxItem checked={visibilityFilters.has('curiosity')} onCheckedChange={() => handleVisibilityFilterChange('curiosity')}><Flashlight className="mr-2 h-4 w-4 text-amber-500" /><span>Curiosities</span></DropdownMenuCheckboxItem>
+                              <DropdownMenuCheckboxItem checked={visibilityFilters.has('objective')} onCheckedChange={() => handleVisibilityFilterChange('objective')}><Flag className="mr-2 h-4 w-4 text-green-500" /><span>Objectives</span></DropdownMenuCheckboxItem>
+                              <DropdownMenuCheckboxItem checked={visibilityFilters.has('visualization')} onCheckedChange={() => handleVisibilityFilterChange('visualization')}><Frame className="mr-2 h-4 w-4 text-blue-500" /><span>Visualizations</span></DropdownMenuCheckboxItem>
+                              <DropdownMenuCheckboxItem checked={visibilityFilters.has('standalone')} onCheckedChange={() => handleVisibilityFilterChange('standalone')}><Focus className="mr-2 h-4 w-4 text-purple-500" /><span>Standalone</span></DropdownMenuCheckboxItem>
+                          </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                  )})}
-                </div>
-              </CardContent>
-            </Card>
-            {selectedSubtopic && (
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <div><CardTitle className="text-lg flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary" /> Subtopic Stats</CardTitle><CardDescription className="text-xs">Aggregated progress for "{selectedSubtopic.name}"</CardDescription></div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewProgress(selectedSubtopic)}><TrendingUp className="h-4 w-4"/></Button>
-                    </CardHeader>
-                    <CardContent className="space-y-4 pt-4">
-                        <div className="space-y-2">
-                            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Logged Time</span><span className="font-medium">{formatMinutes(totalLoggedTime)}</span></div>
-                            {totalEstimatedDuration > 0 && (<div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Estimated Time</span><span className="font-medium">{formatMinutes(totalEstimatedDuration)}</span></div>)}
-                        </div>
-                        {totalEstimatedDuration > 0 && (
+                  <CardDescription>Organize your learning tasks by topic.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleAddTopic} className="space-y-3 p-3 border rounded-md mb-4">
+                      <Input type="text" placeholder="New Topic" value={newTopicName} onChange={(e) => setNewTopicName(e.target.value)} list="topics-datalist" aria-label="New topic name" className="h-10 text-sm" />
+                      <datalist id="topics-datalist">{topicsWithSubtopics.map(([topic]) => <option key={topic} value={topic} />)}</datalist>
+                      <AnimatePresence>
+                        {newTopicName.trim() && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="space-y-3 overflow-hidden"
+                          >
                             <div>
-                                <Progress value={Math.min(100, (totalLoggedTime / totalEstimatedDuration) * 100)} className="h-2" />
-                                <div className="flex justify-between text-xs text-muted-foreground mt-1"><span>0%</span><span>{((totalLoggedTime / totalEstimatedDuration) * 100).toFixed(0)}%</span></div>
+                                <Label className="text-xs text-muted-foreground">Set a Goal for this New Topic</Label>
+                                <div className="flex gap-2 items-center mt-1">
+                                    <RadioGroup value={newTopicGoalType} onValueChange={(v) => setNewTopicGoalType(v as 'pages' | 'hours')} className="flex gap-4">
+                                        <div className="flex items-center space-x-2"><RadioGroupItem value="pages" id="type-pages-new" /><Label htmlFor="type-pages-new" className="font-normal">Pages</Label></div>
+                                        <div className="flex items-center space-x-2"><RadioGroupItem value="hours" id="type-hours-new" /><Label htmlFor="type-hours-new" className="font-normal">Hours</Label></div>
+                                    </RadioGroup>
+                                    <Input type="number" placeholder="Total" value={newTopicGoalValue} onChange={(e) => setNewTopicGoalValue(e.target.value)} aria-label="Goal value" className="h-9" />
+                                </div>
                             </div>
+                            <Button type="submit" size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Add Topic</Button>
+                          </motion.div>
                         )}
-                        {totalEstimatedDuration > 0 && totalLoggedTime > totalEstimatedDuration && (<Badge variant="destructive" className="w-full justify-center">Overspent by {formatMinutes(totalLoggedTime - totalEstimatedDuration)}</Badge>)}
+                      </AnimatePresence>
+                  </form>
+                  <div className="space-y-2 max-h-[calc(100vh-30rem)] overflow-y-auto pr-2">
+                    {topicsWithSubtopics.map(([topic, subtopics]) => {
+                      const isCollapsed = !expandedTopics.has(topic);
+                      if (subtopics.length === 0 && !topicGoals[topic]) return null;
+                      return (
+                      <div key={topic}>
+                        <div className="group flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer" onClick={() => toggleTopicExpansion(topic)} onContextMenu={(e) => handleContextMenu(e, topic)}>
+                          <div className="flex items-center gap-2 min-w-0 flex-grow">
+                            <ChevronDown className={cn("h-4 w-4 transition-transform", isCollapsed && "-rotate-90")} />
+                            <Folder className="h-4 w-4 flex-shrink-0 text-primary/80" />
+                            <div className='truncate'>
+                              <h4 className="font-semibold text-sm truncate">{topic}</h4>
+                              {topicGoals[topic] && <p className="text-xs text-muted-foreground">Goal: {topicGoals[topic].goalValue} {topicGoals[topic].goalType}</p>}
+                            </div>
+                          </div>
+                        </div>
+                        {!isCollapsed && (
+                          <ul className="space-y-1 pl-4 border-l-2 border-muted ml-4">
+                              {subtopics.sort((a,b) => a.name.localeCompare(b.name)).map(def => {
+                                const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+                                const isChild = linkedUpskillChildIds.has(def.id);
+                                
+                                const isCuriosity = isParent && !isChild;
+                                const isObjective = isParent && isChild;
+                                const isVisualization = !isParent && isChild;
+                                const isStandalone = !isParent && !isChild;
+                                
+                                const estDuration = isParent ? calculateTotalEstimate(def) : def.estimatedDuration;
+                                
+                                return (
+                                  <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted" onContextMenu={(e) => handleSubtopicContextMenu(e, def)}>
+                                      <div className="flex items-center gap-2 flex-grow min-w-0">
+                                        {isCuriosity ? <Flashlight className="h-4 w-4 flex-shrink-0 text-amber-500" />
+                                         : isObjective ? <Flag className="h-4 w-4 flex-shrink-0 text-green-500" />
+                                         : isVisualization ? <Frame className="h-4 w-4 flex-shrink-0 text-blue-500" />
+                                         : <Focus className="h-4 w-4 flex-shrink-0 text-purple-500" />}
+                                        <span className="truncate cursor-pointer" onClick={() => { setSelectedSubtopic(def); setViewMode('library'); }}>{def.name}</span>
+                                        {estDuration && estDuration > 0 && <Badge variant="secondary" className="text-xs ml-auto">{formatMinutes(estDuration)}</Badge>}
+                                      </div>
+                                      <div className='hidden items-center flex-shrink-0 group-hover:flex'>
+                                          <TooltipProvider>
+                                            <Tooltip><TooltipTrigger asChild><span tabIndex={isVisualization ? 0 : -1}><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => isVisualization && handleAddTaskToSession(def)} disabled={!isVisualization}><PlusCircle className="h-4 w-4" /></Button></span></TooltipTrigger><TooltipContent>{isVisualization ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent></Tooltip>
+                                          </TooltipProvider>
+                                      </div>
+                                  </li>
+                                )})}
+                          </ul>
+                        )}
+                      </div>
+                    )})}
+                  </div>
+                </CardContent>
+              </Card>
+              {selectedSubtopic && (
+                  <Card>
+                      <CardHeader className="flex flex-row items-center justify-between pb-2">
+                          <div><CardTitle className="text-lg flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary" /> Subtopic Stats</CardTitle><CardDescription className="text-xs">Aggregated progress for "{selectedSubtopic.name}"</CardDescription></div>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewProgress(selectedSubtopic)}><TrendingUp className="h-4 w-4"/></Button>
+                      </CardHeader>
+                      <CardContent className="space-y-4 pt-4">
+                          <div className="space-y-2">
+                              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Logged Time</span><span className="font-medium">{formatMinutes(totalLoggedTime)}</span></div>
+                              {totalEstimatedDuration > 0 && (<div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Estimated Time</span><span className="font-medium">{formatMinutes(totalEstimatedDuration)}</span></div>)}
+                          </div>
+                          {totalEstimatedDuration > 0 && (
+                              <div>
+                                  <Progress value={Math.min(100, (totalLoggedTime / totalEstimatedDuration) * 100)} className="h-2" />
+                                  <div className="flex justify-between text-xs text-muted-foreground mt-1"><span>0%</span><span>{((totalLoggedTime / totalEstimatedDuration) * 100).toFixed(0)}%</span></div>
+                              </div>
+                          )}
+                          {totalEstimatedDuration > 0 && totalLoggedTime > totalEstimatedDuration && (<Badge variant="destructive" className="w-full justify-center">Overspent by {formatMinutes(totalLoggedTime - totalEstimatedDuration)}</Badge>)}
+                      </CardContent>
+                  </Card>
+              )}
+            </aside>
+
+            <section aria-labelledby="main-panel-heading" className="lg:col-span-3 space-y-6">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between p-4">
+                        <div className="flex-grow"><CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">{viewMode === 'session' ? <ListChecks /> : <Library />}{viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedSubtopic?.name || 'Select an item'}`}</CardTitle>{viewMode === 'library' && selectedSubtopic && (<CardDescription className="text-xs mt-1">{selectedSubtopic.category}</CardDescription>)}</div>
+                        <div className='flex items-center gap-2 flex-shrink-0'>
+                          <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
+                          <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('library')} disabled={!selectedSubtopic}>Library</Button>
+                          <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent></Popover>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-4">
+                        {viewMode === 'session' ? (
+                            <div className="max-h-[calc(100vh-16rem)] overflow-y-auto pr-2">
+                                {currentWorkoutExercises.length === 0 ? (
+                                  <div className="text-center py-10"><BookCopy className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" /><p className="text-muted-foreground">No tasks for {format(selectedDate, 'PPP')}.</p><p className="text-sm text-muted-foreground/80">Add tasks from the library to get started!</p></div>
+                                ) : (
+                                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                    {currentWorkoutExercises.map((exercise) => {
+                                        const definition = upskillDefinitions.find(def => def.id === exercise.definitionId);
+                                        return (
+                                          <WorkoutExerciseCard 
+                                            key={exercise.id} exercise={exercise} definition={definition} definitionGoal={topicGoals[exercise.category]}
+                                            onLogSet={handleLogSet} onDeleteSet={handleDeleteSet} onUpdateSet={handleUpdateSet} 
+                                            onRemoveExercise={handleRemoveExerciseFromWorkout} onViewProgress={definition ? () => handleViewProgress(definition) : undefined}
+                                            pageType="upskill"
+                                          />
+                                        );
+                                    })}
+                                  </div>
+                                )}
+                            </div>
+                        ) : selectedSubtopic ? (
+                          <DndContext onDragEnd={handleDragEnd}>
+                            <ScrollArea className="h-[calc(100vh-16rem)] pr-2">
+                              <div className="space-y-6">
+                                <div className="space-y-3">
+                                  <h3 className="font-semibold flex items-center gap-2"><BookCopy className="h-5 w-5 text-primary" /> Linked Sub-Topics</h3>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    {(selectedSubtopic.linkedUpskillIds || []).map(id => {
+                                      const upskillDef = upskillDefinitions.find(ud => ud.id === id);
+                                      if (!upskillDef) return null;
+                                      return (
+                                          <LinkedUpskillItem
+                                              key={id}
+                                              upskillDef={upskillDef}
+                                              handleAddTaskToSession={handleAddTaskToSession}
+                                              setSelectedSubtopic={setSelectedSubtopic}
+                                              setViewMode={setViewMode}
+                                              handleStartEditSubtopic={handleStartEditSubtopic}
+                                              handleUnlinkItem={handleUnlinkItem}
+                                              handleDeleteSubtopic={handleDeleteSubtopic}
+                                              handleViewProgress={handleViewProgress}
+                                              isComplete={isUpskillObjectiveComplete(id)}
+                                              getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
+                                              upskillDefinitions={upskillDefinitions}
+                                              calculatedEstimate={calculateTotalEstimate(upskillDef)}
+                                          />
+                                      )
+                                    })}
+                                    <Card 
+                                        onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
+                                        className="group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
+                                    >
+                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
+                                    </Card>
+                                  </div>
+                                </div>
+                                <div className="space-y-3">
+                                  <h3 className="font-semibold flex items-center gap-2"><Library className="h-5 w-5 text-primary" /> Linked Resources</h3>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    {(selectedSubtopic.linkedResourceIds || []).map(id => {
+                                      const resource = resources.find(r => r.id === id);
+                                      if (!resource) return null;
+                                      return <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={handleUnlinkItem} setEmbedUrl={setEmbedUrl} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={handleOpenNestedPopup} />;
+                                    })}
+                                    <Card 
+                                        onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)}
+                                        className="group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
+                                    >
+                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p>
+                                    </Card>
+                                  </div>
+                                </div>
+                              </div>
+                          </ScrollArea>
+                          </DndContext>
+                        ) : (
+                            <div className="text-center py-10"><p className="text-muted-foreground">Select a subtopic from the library to view its details.</p></div>
+                        )}
                     </CardContent>
                 </Card>
-            )}
-          </aside>
-
-          <section aria-labelledby="main-panel-heading" className="lg:col-span-3 space-y-6">
-              <Card>
-                  <CardHeader className="flex flex-row items-center justify-between p-4">
-                      <div className="flex-grow"><CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">{viewMode === 'session' ? <ListChecks /> : <Library />}{viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedSubtopic?.name || 'Select an item'}`}</CardTitle>{viewMode === 'library' && selectedSubtopic && (<CardDescription className="text-xs mt-1">{selectedSubtopic.category}</CardDescription>)}</div>
-                      <div className='flex items-center gap-2 flex-shrink-0'>
-                        <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
-                        <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('library')} disabled={!selectedSubtopic}>Library</Button>
-                        <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent></Popover>
-                      </div>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                      {viewMode === 'session' ? (
-                          <div className="max-h-[calc(100vh-16rem)] overflow-y-auto pr-2">
-                              {currentWorkoutExercises.length === 0 ? (
-                                <div className="text-center py-10"><BookCopy className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" /><p className="text-muted-foreground">No tasks for {format(selectedDate, 'PPP')}.</p><p className="text-sm text-muted-foreground/80">Add tasks from the library to get started!</p></div>
-                              ) : (
-                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                                  {currentWorkoutExercises.map((exercise) => {
-                                      const definition = upskillDefinitions.find(def => def.id === exercise.definitionId);
-                                      return (
-                                        <WorkoutExerciseCard 
-                                          key={exercise.id} exercise={exercise} definition={definition} definitionGoal={topicGoals[exercise.category]}
-                                          onLogSet={handleLogSet} onDeleteSet={handleDeleteSet} onUpdateSet={handleUpdateSet} 
-                                          onRemoveExercise={handleRemoveExerciseFromWorkout} onViewProgress={definition ? () => handleViewProgress(definition) : undefined}
-                                          pageType="upskill"
-                                        />
-                                      );
-                                  })}
-                                </div>
-                              )}
-                          </div>
-                      ) : selectedSubtopic ? (
-                        <DndContext onDragEnd={handleDragEnd}>
-                          <ScrollArea className="h-[calc(100vh-16rem)] pr-2">
-                            <div className="space-y-6">
-                              <div className="space-y-3">
-                                <h3 className="font-semibold flex items-center gap-2"><BookCopy className="h-5 w-5 text-primary" /> Linked Sub-Topics</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                  {(selectedSubtopic.linkedUpskillIds || []).map(id => {
-                                    const upskillDef = upskillDefinitions.find(ud => ud.id === id);
-                                    if (!upskillDef) return null;
-                                    return (
-                                        <LinkedUpskillItem
-                                            key={id}
-                                            upskillDef={upskillDef}
-                                            handleAddTaskToSession={handleAddTaskToSession}
-                                            setSelectedSubtopic={setSelectedSubtopic}
-                                            setViewMode={setViewMode}
-                                            handleStartEditSubtopic={handleStartEditSubtopic}
-                                            handleUnlinkItem={handleUnlinkItem}
-                                            handleDeleteSubtopic={handleDeleteSubtopic}
-                                            handleViewProgress={handleViewProgress}
-                                            isComplete={isUpskillObjectiveComplete(id)}
-                                            getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
-                                            upskillDefinitions={upskillDefinitions}
-                                            calculatedEstimate={calculateTotalEstimate(upskillDef)}
-                                        />
-                                    )
-                                  })}
-                                  <Card 
-                                      onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}
-                                      className="group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
-                                  >
-                                      <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                      <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
-                                  </Card>
-                                </div>
-                              </div>
-                              <div className="space-y-3">
-                                <h3 className="font-semibold flex items-center gap-2"><Library className="h-5 w-5 text-primary" /> Linked Resources</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                  {(selectedSubtopic.linkedResourceIds || []).map(id => {
-                                    const resource = resources.find(r => r.id === id);
-                                    if (!resource) return null;
-                                    return <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={handleUnlinkItem} setEmbedUrl={setEmbedUrl} setFloatingVideoUrl={setFloatingVideoUrl} />;
-                                  })}
-                                  <Card 
-                                      onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)}
-                                      className="group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
-                                  >
-                                      <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                      <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p>
-                                  </Card>
-                                </div>
-                              </div>
-                            </div>
-                        </ScrollArea>
-                        </DndContext>
-                      ) : (
-                          <div className="text-center py-10"><p className="text-muted-foreground">Select a subtopic from the library to view its details.</p></div>
-                      )}
-                  </CardContent>
-              </Card>
-          </section>
+            </section>
+          </div>
+          {progressModalConfig.isOpen && progressModalConfig.exercise && (
+            <ExerciseProgressModal isOpen={progressModalConfig.isOpen} onOpenChange={(isOpen) => setProgressModalConfig(prev => ({...prev, isOpen}))} exercise={progressModalConfig.exercise} allWorkoutLogs={allUpskillLogs} pageType="upskill" topicGoals={topicGoals} />
+          )}
         </div>
-        {progressModalConfig.isOpen && progressModalConfig.exercise && (
-          <ExerciseProgressModal isOpen={progressModalConfig.isOpen} onOpenChange={(isOpen) => setProgressModalConfig(prev => ({...prev, isOpen}))} exercise={progressModalConfig.exercise} allWorkoutLogs={allUpskillLogs} pageType="upskill" topicGoals={topicGoals} />
-        )}
-      </div>
+      </DndContext>
+      {Array.from(openPopups.values()).map((popupState) => (
+        <ResourcePopupCard
+            key={popupState.resourceId}
+            popupState={popupState}
+            allResources={resources}
+            onOpenNestedPopup={handleOpenNestedPopup}
+            onClose={handleClosePopup}
+            onSizeChange={handleSizeChange}
+        />
+      ))}
+      <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
+        {Array.from(openPopups.values()).map(popup => {
+          if (!popup.parentId) return null;
+          const parentPopup = openPopups.get(popup.parentId);
+          if (!parentPopup) return null;
+          
+          const startX = parentPopup.x + (parentPopup.width || 0) / 2;
+          const startY = parentPopup.y + ((parentPopup.height || 0) / 2);
+          const endX = popup.x + (popup.width || 0) / 2;
+          const endY = popup.y + ((popup.height || 0) / 2);
+          
+          return (
+            <line 
+              key={`${popup.parentId}-${popup.resourceId}`}
+              x1={startX} 
+              y1={startY} 
+              x2={endX} 
+              y2={endY} 
+              stroke="hsl(var(--primary))" 
+              strokeWidth="2"
+              strokeOpacity="0.5"
+            />
+          )
+        })}
+      </svg>
       <AlertDialog open={showBackupPrompt} onOpenChange={setShowBackupPrompt}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Weekly Backup Reminder</AlertDialogTitle><AlertDialogDescription>It's Monday! Would you like to back up your upskilling data?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={markBackupPromptAsHandled}>Maybe Later</AlertDialogCancel><AlertDialogAction onClick={handleBackupConfirm}>Yes, Back Up Now</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       {contextMenu && (
         <div ref={contextMenuRef} style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }} className="fixed z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => e.stopPropagation()}>
@@ -1241,6 +1461,7 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
+
 
 
 

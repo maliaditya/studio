@@ -68,6 +68,100 @@ import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+interface PopupState {
+  resourceId: string;
+  level: number;
+  x: number;
+  y: number;
+  parentId?: string;
+  width?: number;
+  height?: number;
+}
+
+interface ResourcePopupProps {
+  popupState: PopupState;
+  allResources: Resource[];
+  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
+  onClose: (resourceId: string) => void;
+  onSizeChange: (resourceId: string, newSize: { width: number; height: number }) => void;
+}
+
+const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClose, onSizeChange }: ResourcePopupProps) => {
+    const resource = allResources.find(r => r.id === popupState.resourceId);
+    const cardRef = useRef<HTMLDivElement>(null);
+
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({
+        id: `popup-${popupState.resourceId}`,
+    });
+
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: popupState.y,
+        left: popupState.x,
+        width: `${popupState.width}px`,
+        willChange: 'transform',
+    };
+
+    if (transform) {
+        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
+    }
+
+    if (!resource) return null;
+
+    const handleLinkClick = (e: React.MouseEvent, pointResourceId: string) => {
+      e.stopPropagation();
+      onOpenNestedPopup(pointResourceId, e, popupState);
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} {...attributes} className="z-[60]">
+            <Card ref={cardRef} className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col">
+                <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <Library className="h-4 w-4" />
+                        <span className="truncate">{resource.name}</span>
+                    </CardTitle>
+                </CardHeader>
+                <div className="flex-grow min-h-0 overflow-y-auto">
+                    <CardContent className="p-3 pt-0">
+                        <ul className="space-y-2 text-sm text-muted-foreground pr-2">
+                            {(resource.points || []).map(point => (
+                                <li key={point.id} className="flex items-start gap-2">
+                                    {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                    point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                    <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
+                                    }
+                                    {point.type === 'card' && point.resourceId ? (
+                                        <button
+                                            onClick={(e) => handleLinkClick(e, point.resourceId!)}
+                                            className="text-left font-medium text-primary hover:underline"
+                                        >
+                                            {point.text}
+                                        </button>
+                                    ) : point.type === 'markdown' ? (
+                                        <div className="w-full prose dark:prose-invert prose-sm">
+                                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                        </div>
+                                    ) : point.type === 'code' ? (
+                                         <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                                    ) : (
+                                        <span className="break-words w-full" title={point.text}>{point.text}</span>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    </CardContent>
+                </div>
+                <CardFooter className="p-2 flex justify-end flex-shrink-0 relative">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onClose(resource.id); }}>
+                        <X className="h-4 w-4" />
+                    </Button>
+                </CardFooter>
+            </Card>
+        </div>
+    );
+};
+
 
 const getFaviconUrl = (link: string): string | undefined => {
   try {
@@ -581,6 +675,73 @@ function DeepWorkPageContent() {
   // Mind map modal state
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [mindMapRootId, setMindMapRootId] = useState<string | null>(null);
+
+  const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
+
+  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
+      setOpenPopups(prev => {
+          const newPopups = new Map(prev);
+          const resource = resources.find(r => r.id === resourceId);
+          if (!resource) return newPopups;
+          
+          const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+          const popupWidth = hasMarkdown ? 896 : 512;
+      
+          let x, y, level, parentId;
+      
+          if (parentPopupState) {
+              level = parentPopupState.level + 1;
+              parentId = parentPopupState.resourceId;
+              x = parentPopupState.x + 40;
+              y = parentPopupState.y + 40;
+          } else {
+              level = 0;
+              parentId = undefined;
+              if (hasMarkdown) {
+                  x = window.innerWidth / 2 - popupWidth / 2;
+                  y = window.innerHeight / 2 - Math.min(window.innerHeight * 0.7, 700) / 2;
+              } else {
+                  x = event.clientX;
+                  y = event.clientY;
+              }
+          }
+          
+          newPopups.set(resourceId, {
+              resourceId, level, x, y, parentId, width: popupWidth
+          });
+          return newPopups;
+      });
+  };
+  
+  const handleClosePopup = (resourceId: string) => {
+      setOpenPopups(prev => {
+        const newPopups = new Map(prev);
+        const popupsToDelete = new Set<string>();
+        function findChildren(parentId: string) {
+          popupsToDelete.add(parentId);
+          for (const [id, popup] of newPopups.entries()) {
+            if (popup.parentId === parentId) findChildren(id);
+          }
+        }
+        findChildren(resourceId);
+        for (const id of popupsToDelete) newPopups.delete(id);
+        return newPopups;
+      });
+  };
+
+  const handleSizeChange = useCallback((resourceId: string, newSize: { width: number; height: number }) => {
+      setOpenPopups(prev => {
+          const newPopups = new Map(prev);
+          const popup = newPopups.get(resourceId);
+          if (popup) {
+              newPopups.set(resourceId, {
+                  ...popup,
+                  ...newSize
+              });
+          }
+          return newPopups;
+      });
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1588,7 +1749,20 @@ function DeepWorkPageContent() {
   }, [upskillDefinitions, permanentlyLoggedVisualizationIds]);
 
   const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
+    const { active, over, delta } = event;
+
+    if (active.id.toString().startsWith('popup-')) {
+        const resourceId = active.id.toString().replace('popup-', '');
+        setOpenPopups(prev => {
+            const newPopups = new Map(prev);
+            const popup = newPopups.get(resourceId);
+            if (popup) {
+                newPopups.set(resourceId, { ...popup, x: popup.x + delta.x, y: popup.y + delta.y });
+            }
+            return newPopups;
+        });
+        return;
+    }
   
     if (!over) return;
   
@@ -1727,6 +1901,7 @@ function DeepWorkPageContent() {
 
   return (
     <>
+      <DndContext onDragEnd={handleDragEnd}>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => { if (contextMenu) setContextMenu(null); if (focusAreaContextMenu) setFocusAreaContextMenu(null); }}>
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
           
@@ -2097,11 +2272,18 @@ function DeepWorkPageContent() {
                                             <CardContent className="flex-grow min-h-0">
                                                 <ScrollArea className={cn(hasMarkdownContent ? 'h-[200px]' : '')}>
                                                     <ul className="space-y-3 pr-3">
-                                                        {(resource.points || []).map((point, pIndex) => (
-                                                            <li key={pIndex} className="flex items-start gap-3 text-sm text-muted-foreground">
-                                                                {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />}
-                                                                {point.type === 'card' && point.resourceId ? (<span className="font-medium">{point.text}</span>) : point.type === 'markdown' ? (<div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown></div>) : point.type === 'code' ? (<pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>) : (<span className="break-words w-full" title={point.text}>{point.text}</span>)}
-                                                            </li>
+                                                        {(resource.points || []).map((point) => (
+                                                          <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
+                                                            {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />}
+                                                            {point.type === 'card' && point.resourceId ? (
+                                                              <button
+                                                                onClick={(e) => handleOpenNestedPopup(point.resourceId!, e)}
+                                                                className="text-left font-medium text-primary hover:underline"
+                                                              >
+                                                                {point.text}
+                                                              </button>
+                                                            ) : point.type === 'markdown' ? (<div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown></div>) : point.type === 'code' ? (<pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>) : (<span className="break-words w-full" title={point.text}>{point.text}</span>)}
+                                                          </li>
                                                         ))}
                                                     </ul>
                                                 </ScrollArea>
@@ -2709,6 +2891,17 @@ function DeepWorkPageContent() {
             </DialogFooter>
         </DialogContent>
     </Dialog>
+    </DndContext>
+    {Array.from(openPopups.values()).map((popupState) => (
+        <ResourcePopupCard
+            key={popupState.resourceId}
+            popupState={popupState}
+            allResources={resources}
+            onOpenNestedPopup={handleOpenNestedPopup}
+            onClose={handleClosePopup}
+            onSizeChange={handleSizeChange}
+        />
+    ))}
     </>
   );
 }
@@ -2716,8 +2909,3 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
-
-
-
-
-
