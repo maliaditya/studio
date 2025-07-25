@@ -47,18 +47,13 @@ interface PopupState {
   height?: number;
 }
 
-interface ResourcePopupProps {
-  popupState: PopupState;
-  allResources: Resource[];
-  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
-  onClose: (resourceId: string) => void;
-  onSizeChange: (resourceId: string, newSize: { width: number; height: number }) => void;
-}
-
-const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClose, onSizeChange }: ResourcePopupProps) => {
-    const resource = allResources.find(r => r.id === popupState.resourceId);
-    const cardRef = useRef<HTMLDivElement>(null);
-
+const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChange }: {
+    popupState: PopupState;
+    allResources: Resource[];
+    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
+    onClose: (resourceId: string) => void;
+    onSizeChange: (resourceId: string, newSize: { width: number, height: number }) => void;
+}) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `popup-${popupState.resourceId}`,
     });
@@ -73,7 +68,7 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
     if (transform) {
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
-
+    const resource = popupState.allResources.find(r => r.id === popupState.resourceId);
     if (!resource) return null;
 
     const handleLinkClick = (e: React.MouseEvent, pointResourceId: string) => {
@@ -83,7 +78,7 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
 
     return (
         <div ref={setNodeRef} style={style} {...attributes} className="z-[60]">
-            <Card ref={cardRef} className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col" style={{ width: `${popupState.width}px` }}>
+            <Card className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col" style={{ width: `${popupState.width}px` }}>
                 <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
                     <CardTitle className="text-base flex items-center gap-2">
                         <Library className="h-4 w-4" />
@@ -263,6 +258,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, onOpenNes
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id: resource.id });
   const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: resource.id });
+  const { setFloatingVideoUrl } = useAuth();
 
   const setCombinedRefs = (node: HTMLElement | null) => {
     setNodeRef(node);
@@ -331,6 +327,11 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, onOpenNes
                 <GripVertical className="h-5 w-5 text-muted-foreground" />
             </button>
             <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {youtubeEmbedUrl && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(resource.link!)} onMouseDown={(e) => e.stopPropagation()}>
+                        <PictureInPicture className="h-4 w-4" />
+                    </Button>
+                )}
                 {embedLinkForModal ? (
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setEmbedUrl(embedLinkForModal)}><Expand className="h-4 w-4" /></Button>
                 ) : (
@@ -941,7 +942,7 @@ function UpskillPageContent() {
   
   const handleOpenManageLinksModal = (type: 'upskill' | 'resource', parent: ExerciseDefinition) => {
     setManageLinksConfig({ type, parent });
-    setTempLinkedIds(type === 'upskill' ? (parent.linkedUpskillIds || []) : (parent.linkedResourceIds || []);
+    setTempLinkedIds(type === 'upskill' ? (parent.linkedUpskillIds || []) : (parent.linkedResourceIds || []));
     setNewLinkedItemTopic(parent.category);
     setNewLinkedItemName(''); 
     setNewLinkedItemDescription(''); 
@@ -1331,7 +1332,7 @@ function UpskillPageContent() {
                                     {(selectedSubtopic.linkedResourceIds || []).map(id => {
                                       const resource = resources.find(r => r.id === id);
                                       if (!resource) return null;
-                                      return <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={handleUnlinkItem} setEmbedUrl={setEmbedUrl} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} />;
+                                      return <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={handleUnlinkItem} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} />;
                                     })}
                                     <Card 
                                         onClick={() => selectedSubtopic && handleOpenManageLinksModal('resource', selectedSubtopic)}
@@ -1356,16 +1357,17 @@ function UpskillPageContent() {
             <ExerciseProgressModal isOpen={progressModalConfig.isOpen} onOpenChange={(isOpen) => setProgressModalConfig(prev => ({...prev, isOpen}))} exercise={progressModalConfig.exercise} allWorkoutLogs={allUpskillLogs} pageType="upskill" topicGoals={topicGoals} />
           )}
         </div>
-      {Array.from(openPopups.values()).map((popupState) => (
-          <ResourcePopupCard
-              key={popupState.resourceId}
-              popupState={popupState}
-              allResources={resources}
-              onOpenNestedPopup={handleOpenNestedPopup}
-              onClose={handleClosePopup}
-              onSizeChange={handleSizeChange}
-          />
-      ))}
+        <DndContext onDragEnd={handleDragEnd}>
+          {Array.from(openPopups.values()).map((popupState) => (
+              <ResourcePopupCard
+                  key={popupState.resourceId}
+                  popupState={{...popupState, allResources: resources}}
+                  onOpenNestedPopup={handleOpenNestedPopup}
+                  onClose={handleClosePopup}
+                  onSizeChange={handleSizeChange}
+              />
+          ))}
+        </DndContext>
     </DndContext>
   );
 }
