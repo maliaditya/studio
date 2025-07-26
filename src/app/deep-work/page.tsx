@@ -79,15 +79,13 @@ interface PopupState {
   height?: number;
 }
 
-const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClose, onSizeChange }: {
+const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChange }: {
     popupState: PopupState;
-    allResources: Resource[];
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
     onClose: (resourceId: string) => void;
     onSizeChange: (resourceId: string, newSize: { width: number; height: number }) => void;
 }) => {
-    const resource = allResources.find(r => r.id === popupState.resourceId);
-    
+    const { resources } = useAuth();
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `popup-${popupState.resourceId}`,
     });
@@ -104,6 +102,7 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
 
+    const resource = resources.find(r => r.id === popupState.resourceId);
     if (!resource) return null;
 
     const handleLinkClick = (e: React.MouseEvent, pointResourceId: string) => {
@@ -1011,7 +1010,7 @@ function DeepWorkPageContent() {
         const isIntention = isParent && !isLinkedAsChild;
         const isObjective = isParent && isLinkedAsChild;
         const isAction = !isParent && isLinkedAsChild;
-        const isStandalone = !isParent && !isChild;
+        const isStandalone = !isParent && !isLinkedAsChild;
 
         if (effectiveFilters.has('intention') && isIntention) return true;
         if (effectiveFilters.has('objective') && isObjective) return true;
@@ -2463,7 +2462,6 @@ function DeepWorkPageContent() {
           <ResourcePopupCard
               key={popupState.resourceId}
               popupState={popupState}
-              allResources={resources}
               onOpenNestedPopup={handleOpenNestedPopup}
               onClose={handleClosePopup}
               onSizeChange={handleSizeChange}
