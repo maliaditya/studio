@@ -79,29 +79,27 @@ interface PopupState {
   height?: number;
 }
 
-interface ResourcePopupProps {
-  popupState: PopupState;
-  allResources: Resource[];
-  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
-  onClose: (resourceId: string) => void;
-  onSizeChange: (resourceId: string, newSize: { width: number; height: number }) => void;
-}
-
-const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClose, onSizeChange }: ResourcePopupProps) => {
+const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClose, onSizeChange }: {
+    popupState: PopupState;
+    allResources: Resource[];
+    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
+    onClose: (resourceId: string) => void;
+    onSizeChange: (resourceId: string, newSize: { width: number; height: number }) => void;
+}) => {
     const resource = allResources.find(r => r.id === popupState.resourceId);
-    const cardRef = useRef<HTMLDivElement>(null);
-
+    
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `popup-${popupState.resourceId}`,
     });
-    
+
     const style: React.CSSProperties = {
         position: 'fixed',
         top: popupState.y,
         left: popupState.x,
+        width: `${popupState.width}px`,
         willChange: 'transform',
     };
-    
+
     if (transform) {
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
@@ -109,13 +107,13 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
     if (!resource) return null;
 
     const handleLinkClick = (e: React.MouseEvent, pointResourceId: string) => {
-      e.stopPropagation();
-      onOpenNestedPopup(pointResourceId, e, popupState);
+        e.stopPropagation();
+        onOpenNestedPopup(pointResourceId, e, popupState);
     };
 
     return (
         <div ref={setNodeRef} style={style} {...attributes} className="z-[60]">
-            <Card ref={cardRef} className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col" style={{ width: `${popupState.width}px` }}>
+            <Card className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col">
                 <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
                     <CardTitle className="text-base flex items-center gap-2">
                         <Library className="h-4 w-4" />
@@ -1012,8 +1010,8 @@ function DeepWorkPageContent() {
 
         const isIntention = isParent && !isLinkedAsChild;
         const isObjective = isParent && isLinkedAsChild;
-        const isAction = !isParent && !isLinkedAsChild;
-        const isStandalone = !isParent && !isLinkedAsChild;
+        const isAction = !isParent && isLinkedAsChild;
+        const isStandalone = !isParent && !isChild;
 
         if (effectiveFilters.has('intention') && isIntention) return true;
         if (effectiveFilters.has('objective') && isObjective) return true;
@@ -1579,6 +1577,9 @@ function DeepWorkPageContent() {
     if (!manageLinksConfig) return;
     const { type, parent } = manageLinksConfig;
     
+    let newId: string;
+    let updatedParent: ExerciseDefinition;
+
     if (type === 'resource') {
         if (!newLinkedItemFolderId) { toast({ title: "Error", description: "A folder must be selected.", variant: "destructive" }); return; }
         if (!newLinkedItemLink.trim()) { toast({ title: "Error", description: "A link is required.", variant: "destructive" }); return; }
@@ -1596,15 +1597,22 @@ function DeepWorkPageContent() {
                 id: `res_${Date.now()}_${Math.random()}`, name: result.title || 'Untitled Resource', link: fullLink, type: 'link',
                 description: result.description || '', folderId: newLinkedItemFolderId, iconUrl: getFaviconUrl(fullLink),
             };
+            newId = newResource.id;
             setResources(prev => [...prev, newResource]);
-            const updatedParent = { ...parent, linkedResourceIds: [...(parent.linkedResourceIds || []), newResource.id] };
+
+            updatedParent = { ...parent, linkedResourceIds: [...(parent.linkedResourceIds || []), newId] };
             setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
-            setSelectedFocusArea(updatedParent);
+            if (selectedFocusArea?.id === parent.id) {
+                setSelectedFocusArea(updatedParent);
+            }
             toast({ title: "Resource Added", description: `"${newResource.name}" has been saved and linked.`});
-            setIsManageLinksModalOpen(false);
+
         } catch (error) {
             toast({ title: "Error adding resource", description: error instanceof Error ? error.message : "Could not fetch metadata.", variant: "destructive" });
-        } finally { setIsCreatingLink(false); }
+        } finally { 
+            setIsCreatingLink(false);
+            setIsManageLinksModalOpen(false); 
+        }
         return;
     }
 
@@ -1621,10 +1629,13 @@ function DeepWorkPageContent() {
             description: newLinkedItemDescription.trim(), link: link, iconUrl: getFaviconUrl(link),
             estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
         };
+        newId = newUpskillDef.id;
         setUpskillDefinitions(prev => [...prev, newUpskillDef]);
-        const updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newUpskillDef.id] };
+        updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newId] };
         setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
-        setSelectedFocusArea(updatedParent);
+        if (selectedFocusArea?.id === parent.id) {
+            setSelectedFocusArea(updatedParent);
+        }
         toast({ title: "Success", description: "New upskill task created and linked." });
     } else { // 'deepwork'
         if (!newLinkedItemTopic.trim()) { toast({ title: "Error", description: "Topic is required.", variant: "destructive" }); return; }
@@ -1632,10 +1643,13 @@ function DeepWorkPageContent() {
             id: `def_${Date.now()}_deepwork_${Math.random()}`, name: newLinkedItemName.trim(), category: newLinkedItemTopic.trim() as ExerciseCategory,
             estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
         };
+        newId = newDeepWorkDef.id;
         setDeepWorkDefinitions(prev => [...prev, newDeepWorkDef]);
-        const updatedParent = { ...parent, linkedDeepWorkIds: [...(parent.linkedDeepWorkIds || []), newDeepWorkDef.id] };
+        updatedParent = { ...parent, linkedDeepWorkIds: [...(parent.linkedDeepWorkIds || []), newId] };
         setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
-        setSelectedFocusArea(updatedParent);
+        if (selectedFocusArea?.id === parent.id) {
+            setSelectedFocusArea(updatedParent);
+        }
         toast({ title: "Success", description: "New focus area created and linked." });
     }
     setIsManageLinksModalOpen(false);
@@ -1666,31 +1680,35 @@ function DeepWorkPageContent() {
     const { type, parent } = manageLinksConfig;
 
     let definitionsSource: any[];
+    let parentLinkedIds: string[] = [];
+
     if (type === 'upskill') {
         definitionsSource = upskillDefinitions;
         if (linkUpskillTopic) {
             definitionsSource = definitionsSource.filter(def => def.category === linkUpskillTopic);
         }
+        parentLinkedIds = parent.linkedUpskillIds || [];
     } else if (type === 'deepwork') {
         definitionsSource = linkDeepWorkTopic ? deepWorkDefinitions.filter(d => d.category === linkDeepWorkTopic) : deepWorkDefinitions;
+        parentLinkedIds = parent.linkedDeepWorkIds || [];
     } else { // 'resource'
         if (!linkResourceFolderId) return [];
         definitionsSource = resources.filter(res => res.folderId === linkResourceFolderId);
+        parentLinkedIds = parent.linkedResourceIds || [];
     }
     
     return definitionsSource.filter(def => {
-        if (!def.name || def.name === 'placeholder' || def.id === parent.id || (linkSearchTerm && !def.name.toLowerCase().includes(linkSearchTerm.toLowerCase()))) {
-          return false;
+        if (!def.name || def.name === 'placeholder' || def.id === parent.id || parentLinkedIds.includes(def.id)) {
+            return false;
+        }
+
+        if (linkSearchTerm && !def.name.toLowerCase().includes(linkSearchTerm.toLowerCase())) {
+            return false;
         }
         
-        // This is the new logic to allow standalone tasks to be linked
-        const isChild = linkedDeepWorkChildIds.has(def.id);
-        const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
-        const isStandalone = !isParent && !isChild;
-
-        return isStandalone || isParent;
+        return true;
     });
-}, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkUpskillTopic, linkDeepWorkTopic, linkedDeepWorkChildIds]);
+}, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkUpskillTopic, linkDeepWorkTopic]);
 
 
   const handleStartEditUpskill = (def: ExerciseDefinition) => {
@@ -2232,44 +2250,46 @@ function DeepWorkPageContent() {
                                 )}
                             </div>
                         ) : selectedFocusArea ? (
-                            <DndContext onDragEnd={handleDragEnd}>
+                            
                               <ScrollArea className="h-[calc(100vh-16rem)] pr-2">
                                 <div className="space-y-6">
                                   <div className="space-y-3">
                                     <h3 className="font-semibold flex items-center gap-2"><BookCopy className="h-5 w-5 text-primary" /> Linked Learning</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                      {Array.from(new Set(selectedFocusArea.linkedUpskillIds || [])).map((id, index) => {
-                                        const upskillDef = upskillDefinitions.find(ud => ud.id === id);
-                                        if (!upskillDef) return null;
-                                        return (
-                                          <LinkedUpskillCard
-                                              key={`${id}-${index}`}
-                                              id={id}
-                                              upskillDef={upskillDef}
-                                              getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
-                                              isUpskillObjectiveComplete={isUpskillObjectiveComplete}
-                                              setEmbedUrl={setEmbedUrl}
-                                              setFloatingVideoUrl={setFloatingVideoUrl}
-                                              handleViewProgress={handleViewProgress}
-                                              handleStartEditUpskill={handleStartEditUpskill}
-                                              handleUnlinkItem={handleUnlinkItem}
-                                              handleDeleteUpskillDefinition={handleDeleteUpskillDefinition}
-                                              upskillDefinitions={upskillDefinitions}
-                                              formatDuration={formatDuration}
-                                              calculatedEstimate={calculateTotalEstimate(upskillDef)}
-                                              setSelectedSubtopic={setSelectedSubtopic}
-                                              setViewMode={setViewMode}
-                                          />
-                                        )
-                                      })}
-                                      <Card 
-                                          onClick={() => handleOpenManageLinksModal('upskill', selectedFocusArea)}
-                                          className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
-                                      >
-                                          <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                          <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
-                                      </Card>
-                                    </div>
+                                    <DroppableArea id={`linked-learning-area-${selectedFocusArea.id}`} className="-m-2 p-2">
+                                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                        {Array.from(new Set(selectedFocusArea.linkedUpskillIds || [])).map((id, index) => {
+                                          const upskillDef = upskillDefinitions.find(ud => ud.id === id);
+                                          if (!upskillDef) return null;
+                                          return (
+                                            <LinkedUpskillCard
+                                                key={`${id}-${index}`}
+                                                id={id}
+                                                upskillDef={upskillDef}
+                                                getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
+                                                isUpskillObjectiveComplete={isUpskillObjectiveComplete}
+                                                setEmbedUrl={setEmbedUrl}
+                                                setFloatingVideoUrl={setFloatingVideoUrl}
+                                                handleViewProgress={handleViewProgress}
+                                                handleStartEditUpskill={handleStartEditUpskill}
+                                                handleUnlinkItem={handleUnlinkItem}
+                                                handleDeleteUpskillDefinition={handleDeleteUpskillDefinition}
+                                                upskillDefinitions={upskillDefinitions}
+                                                formatDuration={formatDuration}
+                                                calculatedEstimate={calculateTotalEstimate(upskillDef)}
+                                                setSelectedSubtopic={setSelectedSubtopic}
+                                                setViewMode={setViewMode}
+                                            />
+                                          )
+                                        })}
+                                        <Card 
+                                            onClick={() => handleOpenManageLinksModal('upskill', selectedFocusArea)}
+                                            className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
+                                        >
+                                            <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                            <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
+                                        </Card>
+                                      </div>
+                                    </DroppableArea>
                                   </div>
                                   <div className="space-y-3">
                                     <h3 className="font-semibold flex items-center gap-2"><LinkIcon className="h-5 w-5 text-primary" /> Linked Work</h3>
@@ -2314,24 +2334,26 @@ function DeepWorkPageContent() {
                                   </div>
                                   <div className="space-y-3">
                                     <h3 className="font-semibold flex items-center gap-2"><Library className="h-5 w-5 text-primary" /> Linked Resources</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                      {(selectedFocusArea.linkedResourceIds || []).map((id, index) => {
-                                        const resource = resources.find(r => r.id === id);
-                                        if (!resource) return null;
-                                        return <LinkedResourceItem key={`${id}-${index}`} resource={resource} handleUnlinkItem={handleUnlinkItem} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} />;
-                                      })}
-                                      <Card 
-                                          onClick={() => handleOpenManageLinksModal('resource', selectedFocusArea)}
-                                          className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
-                                      >
-                                          <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                          <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p>
-                                      </Card>
-                                    </div>
+                                    <DroppableArea id={`linked-resource-area-${selectedFocusArea.id}`} className="-m-2 p-2">
+                                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                        {(selectedFocusArea.linkedResourceIds || []).map((id, index) => {
+                                          const resource = resources.find(r => r.id === id);
+                                          if (!resource) return null;
+                                          return <LinkedResourceItem key={`${id}-${index}`} resource={resource} handleUnlinkItem={handleUnlinkItem} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} />;
+                                        })}
+                                        <Card 
+                                            onClick={() => handleOpenManageLinksModal('resource', selectedFocusArea)}
+                                            className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
+                                        >
+                                            <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                            <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p>
+                                        </Card>
+                                      </div>
+                                    </DroppableArea>
                                   </div>
                                 </div>
                               </ScrollArea>
-                            </DndContext>
+                            
                         ) : (
                             <div className="text-center py-10"><p className="text-muted-foreground">Select a Focus Area from the library to view its details.</p></div>
                         )}
@@ -2363,6 +2385,79 @@ function DeepWorkPageContent() {
                   avgDailyProductiveHours={productivityStats.avgProductiveHours}
               />
           )}
+
+          {isManageLinksModalOpen && manageLinksConfig && (
+              <Dialog open={isManageLinksModalOpen} onOpenChange={setIsManageLinksModalOpen}>
+                <DialogContent className="sm:max-w-3xl h-[80vh] flex flex-col">
+                  <DialogHeader>
+                    <DialogTitle>Manage Links for: {manageLinksConfig.parent.name}</DialogTitle>
+                    <DialogDescription>Link existing items or create new ones to build out this objective.</DialogDescription>
+                  </DialogHeader>
+                  <Tabs defaultValue="link" className="flex-grow flex flex-col min-h-0">
+                      <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="link">Link Existing</TabsTrigger>
+                          <TabsTrigger value="create">Create New</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="link" className="flex-grow min-h-0">
+                          <div className="flex flex-col h-full">
+                              <div className="flex gap-2 mb-2 p-1">
+                                  {manageLinksConfig.type === 'resource' && <Select value={linkResourceFolderId} onValueChange={setLinkResourceFolderId}><SelectTrigger placeholder="Select Folder..."/><SelectContent>{renderFolderOptions(null, 0)}</SelectContent></Select>}
+                                  {manageLinksConfig.type === 'upskill' && <Select value={linkUpskillTopic} onValueChange={setLinkUpskillTopic}><SelectTrigger placeholder="Select Topic..."/><SelectContent>{allUpskillTopics.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select>}
+                                  {manageLinksConfig.type === 'deepwork' && <Select value={linkDeepWorkTopic} onValueChange={setLinkDeepWorkTopic}><SelectTrigger placeholder="Select Topic..."/><SelectContent>{allKnownTopics.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select>}
+                                  <Input placeholder="Search..." value={linkSearchTerm} onChange={e => setLinkSearchTerm(e.target.value)} />
+                              </div>
+                              <ScrollArea className="flex-grow border rounded-md p-2">
+                                  {filteredItemsForLinking.length > 0 ? (
+                                      filteredItemsForLinking.map(item => (
+                                          <div key={item.id} className="flex items-center space-x-2 p-1">
+                                              <Checkbox
+                                                  id={`link-${item.id}`}
+                                                  checked={tempLinkedIds.includes(item.id)}
+                                                  onCheckedChange={(checked) => {
+                                                      setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id));
+                                                  }}
+                                              />
+                                              <Label htmlFor={`link-${item.id}`} className="font-normal">{item.name}</Label>
+                                          </div>
+                                      ))
+                                  ) : <p className="text-sm text-center text-muted-foreground p-4">No items to link. Try another filter or create a new item.</p>}
+                              </ScrollArea>
+                              <DialogFooter className="pt-4">
+                                  <Button onClick={handleSaveExistingLinks}>Save Links</Button>
+                              </DialogFooter>
+                          </div>
+                      </TabsContent>
+                      <TabsContent value="create" className="flex-grow">
+                          <ScrollArea className="h-full pr-4">
+                              <div className="space-y-4">
+                                  {manageLinksConfig.type !== 'resource' ? (
+                                      <>
+                                          <div className="space-y-1"><Label>Topic</Label><Input value={newLinkedItemTopic} onChange={e => setNewLinkedItemTopic(e.target.value)} /></div>
+                                          <div className="space-y-1"><Label>Name</Label><Input value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} /></div>
+                                          <div className="space-y-1"><Label>Description</Label><Textarea value={newLinkedItemDescription} onChange={e => setNewLinkedItemDescription(e.target.value)} /></div>
+                                          <div className="space-y-1"><Label>Link (Optional)</Label><Input value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} /></div>
+                                          <div className="grid grid-cols-2 gap-4">
+                                              <div className="space-y-1"><Label>Est. Hours</Label><Input type="number" value={newLinkedItemHours} onChange={e => setNewLinkedItemHours(e.target.value)} /></div>
+                                              <div className="space-y-1"><Label>Est. Minutes</Label><Input type="number" value={newLinkedItemMinutes} onChange={e => setNewLinkedItemMinutes(e.target.value)} /></div>
+                                          </div>
+                                      </>
+                                  ) : (
+                                      <>
+                                          <div className="space-y-1"><Label>Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger/><SelectContent>{renderFolderOptions(null, 0)}</SelectContent></Select></div>
+                                          <div className="space-y-1"><Label>Link</Label><Input value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} /></div>
+                                      </>
+                                  )}
+                                  <DialogFooter className="pt-4">
+                                      <Button onClick={handleCreateAndLinkItem} disabled={isCreatingLink}>{isCreatingLink && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create & Link</Button>
+                                  </DialogFooter>
+                              </div>
+                          </ScrollArea>
+                      </TabsContent>
+                  </Tabs>
+                </DialogContent>
+              </Dialog>
+          )}
+
         </div>
       {Array.from(openPopups.values()).map((popupState) => (
           <ResourcePopupCard
@@ -2381,7 +2476,3 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
-
-
-
-    
