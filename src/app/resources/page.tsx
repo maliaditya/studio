@@ -404,7 +404,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void; 
     onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
     playingAudio: { id: string; isPlaying: boolean } | null;
-    setPlayingAudio: React.Dispatch<React.SetStateAction<<{ id: string; isPlaying: boolean } | null>>>;
+    setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
     onLinkClick: (resourceId: string) => void;
     linkingFromId: string | null;
 }) => {
@@ -1577,7 +1577,7 @@ function ResourcesPageContent() {
                                         ) : (
                                             <div className="p-5 flex flex-col flex-grow">
                                                 <a href={res.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline mt-1">{res.link}</a>
-                                                <p className="text-sm text-muted-foreground mt-3 line-clamp-3 flex-grow min-h-[60px]">{res.description || 'No description available.'}</p>
+                                                <p className="text-sm text-muted-foreground mt-3 line-clamp-2 flex-grow min-h-[60px]">{res.description || 'No description available.'}</p>
                                                 <div className="mt-auto pt-4 flex items-center gap-2">
                                                     <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
                                                     {res.link && (
