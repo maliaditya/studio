@@ -1331,7 +1331,6 @@ function ResourcesPageContent() {
     
     const activeIsResource = active.id.toString().startsWith('res_');
     const overIsFolder = over.data.current?.type === 'folder';
-    const overIsLinkDropzone = over.data.current?.type === 'link-dropzone';
 
     if (activeIsResource && overIsFolder) {
         const resourceId = active.id;
@@ -1339,49 +1338,6 @@ function ResourcesPageContent() {
         setResources(prev => prev.map(r => r.id === resourceId ? { ...r, folderId: folderId } : r));
         toast({ title: "Resource Moved", description: `Moved resource to a new folder.` });
         return;
-    }
-    
-    if(activeIsResource && overIsLinkDropzone) {
-      const draggedResource = resources.find(r => r.id === active.id);
-      const targetResourceId = over.data.current?.resourceId;
-      const targetResource = resources.find(r => r.id === targetResourceId);
-      
-      if (draggedResource && targetResource && targetResource.type === 'card') {
-          const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: draggedResource.name, type: 'card', resourceId: draggedResource.id };
-          const updatedPoints = [...(targetResource.points || []), newPoint];
-          
-          let subFolderId: string;
-          let newFolders: ResourceFolder[] = [];
-
-          const existingSubFolder = resourceFolders.find(f => f.name === targetResource.name && f.parentId === targetResource.folderId);
-
-          if (existingSubFolder) {
-              subFolderId = existingSubFolder.id;
-          } else {
-              const newSubFolder: ResourceFolder = {
-                  id: `folder_${Date.now()}`,
-                  name: targetResource.name,
-                  parentId: targetResource.folderId,
-              };
-              subFolderId = newSubFolder.id;
-              newFolders.push(newSubFolder);
-          }
-
-          setResources(prevResources => {
-              return prevResources.map(r => {
-                  if (r.id === targetResourceId) return { ...r, points: updatedPoints };
-                  if (r.id === draggedResource.id) return { ...draggedResource, folderId: subFolderId };
-                  return r;
-              });
-          });
-          
-          if (newFolders.length > 0) {
-              setResourceFolders(prevFolders => [...prevFolders, ...newFolders]);
-          }
-
-          toast({ title: "Resource Linked", description: `"${draggedResource.name}" was linked to "${targetResource.name}" and moved to a new sub-folder.` });
-      }
-      return;
     }
 
     if (active.id !== over.id) {
@@ -1436,14 +1392,48 @@ function ResourcesPageContent() {
         const targetCard = resources.find(r => r.id === resourceId);
 
         if (sourceCard && targetCard && targetCard.type === 'card') {
+          // --- Start of new logic ---
+          let updatedFolders = [...resourceFolders];
+          let subFolderId: string;
+          
+          const existingSubFolder = resourceFolders.find(
+            f => f.name === targetCard.name && f.parentId === targetCard.folderId
+          );
+
+          if (existingSubFolder) {
+            subFolderId = existingSubFolder.id;
+          } else {
+            const newSubFolder: ResourceFolder = {
+              id: `folder_${Date.now()}`,
+              name: targetCard.name,
+              parentId: targetCard.folderId,
+            };
+            subFolderId = newSubFolder.id;
+            updatedFolders.push(newSubFolder);
+          }
+
+          setResourceFolders(updatedFolders);
+
+          // Update resources
           const newPoint: ResourcePoint = {
             id: `point_${Date.now()}`,
             text: sourceCard.name,
             type: 'card',
             resourceId: sourceCard.id,
           };
-          const updatedPoints = [...(targetCard.points || []), newPoint];
-          handleUpdateResource({ ...targetCard, points: updatedPoints });
+          
+          const updatedResources = resources.map(r => {
+            if (r.id === targetCard.id) {
+              return { ...r, points: [...(r.points || []), newPoint] };
+            }
+            if (r.id === sourceCard.id) {
+              return { ...r, folderId: subFolderId };
+            }
+            return r;
+          });
+
+          setResources(updatedResources);
+          // --- End of new logic ---
           
           toast({ title: "Success!", description: `Linked "${sourceCard.name}" to "${targetCard.name}".` });
         } else {
@@ -1912,6 +1902,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
