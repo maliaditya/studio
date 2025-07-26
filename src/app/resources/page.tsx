@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -509,7 +509,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                                 {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
                             </Button>
                         )}
-                         <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onLinkClick(resource.id)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onLinkClick(resource.id)}>
                             <LinkIcon className="h-4 w-4" />
                         </Button>
                        <DropdownMenu>
@@ -680,7 +680,7 @@ function ResourcesPageContent() {
   } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
-  const [deleteConfirmation, setDeleteConfirmation] = useState<{ item: ResourceFolder } | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{ item: ResourceFolder | Resource } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isFetchingMeta, setIsFetchingMeta] = useState(false);
   
@@ -1048,8 +1048,27 @@ function ResourcesPageContent() {
     }
   };
   
-  const handleDeleteResource = (resourceId: string) => {
-      setResources(prev => prev.filter(r => r.id !== resourceId));
+  const handleDeleteResource = (resource: Resource) => {
+    const isLinked = resources.some(r => 
+        r.points?.some(p => p.type === 'card' && p.resourceId === resource.id)
+    );
+    
+    if (isLinked) {
+        setDeleteConfirmation({ item: resource });
+    } else {
+        performDeleteResource(resource.id);
+    }
+  };
+
+  const performDeleteResource = (resourceId: string) => {
+      setResources(prev => {
+          // Also remove any links pointing to this resource from other cards.
+          return prev.map(r => ({
+              ...r,
+              points: r.points?.filter(p => p.resourceId !== resourceId)
+          })).filter(r => r.id !== resourceId);
+      });
+      toast({ title: "Resource Deleted", description: "The resource has been removed." });
   };
   
   const handleResourceFolderChange = (value: string) => {
@@ -1504,7 +1523,7 @@ function ResourcesPageContent() {
                             let cardContent: React.ReactNode;
                             
                             if(isCardType) {
-                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event)} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} />;
+                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event)} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} />;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                 const isGif = isGifUrl(res.link);
@@ -1535,7 +1554,7 @@ function ResourcesPageContent() {
                                             {res.demoLink && (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><a href={res.demoLink} target="_blank" rel="noopener noreferrer"><Globe className="h-4 w-4"/></a></Button>)}
                                             {youtubeEmbedUrl && <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setFloatingVideoUrl(res.link!); }}><PictureInPicture className="h-4 w-4" /></Button>}
                                             {youtubeEmbedUrl && <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setYoutubeModalState({isOpen: true, playlist: [res], currentIndex: 0}); }}><Expand className="h-4 w-4" /></Button>}
-                                            <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                                            <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                                         </div>
                                         {imageEmbedUrl ? (
                                             <>
@@ -1660,7 +1679,30 @@ function ResourcesPageContent() {
         )}
         
         {deleteConfirmation && (
-            <AlertDialog open={!!deleteConfirmation} onOpenChange={() => setDeleteConfirmation(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete "{deleteConfirmation.item.name}" and all its contents. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setDeleteConfirmation(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { handleDeleteFolder(deleteConfirmation.item.id); setDeleteConfirmation(null); }}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+            <AlertDialog open={!!deleteConfirmation} onOpenChange={() => setDeleteConfirmation(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {deleteConfirmation.item.hasOwnProperty('folderId') 
+                                ? `This resource is linked in other cards. Deleting it will break those links. Are you sure you want to proceed?`
+                                : `This will permanently delete "${deleteConfirmation.item.name}" and all its contents. This action cannot be undone.`
+                            }
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setDeleteConfirmation(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => { 
+                            if ('parentId' in deleteConfirmation.item) {
+                                handleDeleteFolder(deleteConfirmation.item.id);
+                            } else {
+                                performDeleteResource(deleteConfirmation.item.id);
+                            }
+                            setDeleteConfirmation(null); 
+                        }}>Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         )}
 
         {editingResource && (
@@ -1861,6 +1903,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
