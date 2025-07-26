@@ -1347,6 +1347,7 @@ function ResourcesPageContent() {
         const targetResource = resources.find(r => r.id === targetResourceId);
         
         if (draggedResource && targetResource && targetResource.type === 'card') {
+            // 1. Link the card by creating a new point
             const newPoint: ResourcePoint = {
                 id: `point_${Date.now()}`,
                 text: draggedResource.name,
@@ -1357,6 +1358,7 @@ function ResourcesPageContent() {
             const updatedTargetResource = { ...targetResource, points: updatedPoints };
             handleUpdateResource(updatedTargetResource);
             
+            // 2. Find or create the sub-folder
             let subFolder = resourceFolders.find(f => f.name === targetResource.name && f.parentId === targetResource.folderId);
             if (!subFolder) {
                 subFolder = {
@@ -1367,6 +1369,7 @@ function ResourcesPageContent() {
                 setResourceFolders(prev => [...prev, subFolder!]);
             }
             
+            // 3. Move the dragged resource into the sub-folder
             const updatedDraggedResource = { ...draggedResource, folderId: subFolder.id };
             setResources(prev => prev.map(r => r.id === draggedResource.id ? updatedDraggedResource : r));
 
@@ -1414,35 +1417,35 @@ function ResourcesPageContent() {
     });
   }, [activeResourceTabIds, pinnedFolderIds]);
   
-  const handleLinkClick = (idToLink: string) => {
-      if (linkingFromId === null) {
-          setLinkingFromId(idToLink);
-          toast({ title: "Linking Mode", description: "Click the link icon on another card to link to it." });
+  const handleLinkClick = (resourceId: string) => {
+    if (linkingFromId === null) {
+      setLinkingFromId(resourceId);
+      toast({ title: "Linking Mode", description: "Click the link icon on another card to link to it." });
+    } else {
+      if (linkingFromId === resourceId) {
+        setLinkingFromId(null);
+        toast({ title: "Linking Canceled" });
       } else {
-          if (linkingFromId === idToLink) {
-              setLinkingFromId(null);
-              toast({ title: "Linking Canceled" });
-          } else {
-              const sourceCard = resources.find(r => r.id === linkingFromId);
-              const targetCard = resources.find(r => r.id === idToLink);
+        const sourceCard = resources.find(r => r.id === linkingFromId);
+        const targetCard = resources.find(r => r.id === resourceId);
 
-              if (sourceCard && targetCard && targetCard.type === 'card') {
-                  const newPoint: ResourcePoint = {
-                      id: `point_${Date.now()}`,
-                      text: sourceCard.name,
-                      type: 'card',
-                      resourceId: sourceCard.id
-                  };
-                  const updatedPoints = [...(targetCard.points || []), newPoint];
-                  handleUpdateResource({ ...targetCard, points: updatedPoints });
-                  
-                  toast({ title: "Success!", description: `Linked "${sourceCard.name}" to "${targetCard.name}".` });
-              } else {
-                  toast({ title: "Invalid Link", description: "You can only link to a 'Card' type resource.", variant: "destructive" });
-              }
-              setLinkingFromId(null);
-          }
+        if (sourceCard && targetCard && targetCard.type === 'card') {
+          const newPoint: ResourcePoint = {
+            id: `point_${Date.now()}`,
+            text: sourceCard.name,
+            type: 'card',
+            resourceId: sourceCard.id,
+          };
+          const updatedPoints = [...(targetCard.points || []), newPoint];
+          handleUpdateResource({ ...targetCard, points: updatedPoints });
+          
+          toast({ title: "Success!", description: `Linked "${sourceCard.name}" to "${targetCard.name}".` });
+        } else {
+          toast({ title: "Invalid Link", description: "You can only link to a 'Card' type resource.", variant: "destructive" });
+        }
+        setLinkingFromId(null);
       }
+    }
   };
 
 
@@ -1903,6 +1906,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
