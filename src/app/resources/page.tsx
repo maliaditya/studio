@@ -591,6 +591,36 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     );
 };
 
+interface DroppableFolderProps {
+    folder: ResourceFolder;
+    children: React.ReactNode;
+    onClick: () => void;
+    onContextMenu: (e: React.MouseEvent) => void;
+    className?: string;
+}
+  
+const DroppableFolder = ({ folder, children, onClick, onContextMenu, className }: DroppableFolderProps) => {
+    const { isOver, setNodeRef } = useDroppable({
+        id: folder.id,
+        data: { type: 'folder' }
+    });
+
+    return (
+        <div 
+            ref={setNodeRef}
+            onClick={onClick}
+            onContextMenu={onContextMenu}
+            className={cn(
+                "flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer group transition-colors", 
+                isOver && "bg-primary/10 ring-2 ring-primary",
+                className
+            )}
+        >
+            {children}
+        </div>
+    );
+};
+
 
 function ResourcesPageContent() {
   const { 
@@ -1131,34 +1161,34 @@ function ResourcesPageContent() {
                         />
                     </div>
                 ) : (
-                    <div 
-                        onClick={() => { handleSelectFolder(folder.id); toggleFolderCollapse(folder.id); }}
-                        onDoubleClick={() => setEditingFolder(folder)}
-                        onContextMenu={(e) => handleContextMenu(e, folder)}
-                        className={cn("flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer group", selectedResourceFolderId === folder.id && "bg-accent font-semibold")}
+                    <DroppableFolder
+                      folder={folder}
+                      onClick={() => { handleSelectFolder(folder.id); toggleFolderCollapse(folder.id); }}
+                      onContextMenu={(e) => handleContextMenu(e, folder)}
+                      className={cn(selectedResourceFolderId === folder.id && "bg-accent font-semibold")}
                     >
-                        {pinnedFolderIds.has(folder.id) && <Pin className="h-3 w-3 text-primary flex-shrink-0" />}
-                        <ChevronDown className={cn("h-4 w-4 transition-transform", collapsedFolders.has(folder.id) && "-rotate-90", resourceFolders.every(f => f.parentId !== folder.id) && "invisible")} />
-                        <Folder className="h-4 w-4"/>
-                        <span className='flex-grow truncate'>{folder.name}</span>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleShareFolder(folder); }}>
-                            <Share className="h-4 w-4" />
-                            <span className="sr-only">Share {folder.name}</span>
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setMindMapRootFolderId(folder.id);
-                                setIsMindMapModalOpen(true);
-                            }}
-                        >
-                            <GitMerge className="h-4 w-4" />
-                            <span className="sr-only">View Mind Map for {folder.name}</span>
-                        </Button>
-                    </div>
+                      {pinnedFolderIds.has(folder.id) && <Pin className="h-3 w-3 text-primary flex-shrink-0" />}
+                      <ChevronDown className={cn("h-4 w-4 transition-transform", collapsedFolders.has(folder.id) && "-rotate-90", resourceFolders.every(f => f.parentId !== folder.id) && "invisible")} />
+                      <Folder className="h-4 w-4"/>
+                      <span className='flex-grow truncate'>{folder.name}</span>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleShareFolder(folder); }}>
+                          <Share className="h-4 w-4" />
+                          <span className="sr-only">Share {folder.name}</span>
+                      </Button>
+                      <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                              e.stopPropagation();
+                              setMindMapRootFolderId(folder.id);
+                              setIsMindMapModalOpen(true);
+                          }}
+                      >
+                          <GitMerge className="h-4 w-4" />
+                          <span className="sr-only">View Mind Map for {folder.name}</span>
+                      </Button>
+                    </DroppableFolder>
                 )}
                 {!collapsedFolders.has(folder.id) && renderSidebarFolders(folder.id, level + 1)}
             </li>
@@ -1255,6 +1285,18 @@ function ResourcesPageContent() {
     }
     
     if (over && active.id !== over.id) {
+        const activeIsResource = active.id.toString().startsWith('res_');
+        const overIsFolder = over.data.current?.type === 'folder';
+
+        if(activeIsResource && overIsFolder) {
+            const resourceId = active.id;
+            const folderId = over.id as string;
+            setResources(prev => prev.map(r => r.id === resourceId ? { ...r, folderId: folderId } : r));
+            toast({ title: "Resource Moved", description: `Moved resource to a new folder.` });
+            return;
+        }
+
+
         const targetIsCard = over.data.current?.type === 'resource-card';
         if (targetIsCard) {
             const draggedResource = resources.find(r => r.id === active.id);
@@ -1747,6 +1789,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
