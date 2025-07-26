@@ -242,25 +242,38 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChang
     );
 };
 
+const LinkDropZone = ({ resourceId }: { resourceId: string }) => {
+    const { isOver, setNodeRef } = useDroppable({
+        id: `link-dropzone-${resourceId}`,
+        data: { type: 'link-dropzone', resourceId },
+    });
+    return (
+        <div
+            ref={setNodeRef}
+            className={cn(
+                "absolute -top-3 -right-3 z-20 h-7 w-7 rounded-full bg-muted/80 backdrop-blur-sm border border-dashed flex items-center justify-center transition-all opacity-0 group-hover/sortable:opacity-100",
+                isOver && "ring-2 ring-primary scale-125 bg-primary/20"
+            )}
+        >
+            <LinkIcon className="h-4 w-4 text-primary" />
+        </div>
+    );
+};
+
 const SortableResourceCard = ({ children, item, className }: { children: React.ReactNode; item: Resource; className?: string }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
-    const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: item.id, data: { type: 'resource-card' } });
 
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.5 : 1,
     };
-    
-    const setCombinedRefs = useCallback((node: HTMLDivElement) => {
-        setNodeRef(node);
-        setDroppableNodeRef(node);
-    }, [setNodeRef, setDroppableNodeRef]);
   
     return (
-        <div ref={setCombinedRefs} style={style} className={cn(className, isOver && "ring-2 ring-primary ring-offset-2")}>
+        <div ref={setNodeRef} style={style} className={cn(className)}>
           <div className="relative group/sortable h-full">
             <button {...attributes} {...listeners} className="absolute -top-2 -left-2 z-10 p-1 bg-muted rounded-full cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
+            {item.type === 'card' && <LinkDropZone resourceId={item.id} />}
             {children}
           </div>
         </div>
@@ -1284,62 +1297,63 @@ function ResourcesPageContent() {
         return;
     }
     
-    if (over) {
-        const activeIsResource = active.id.toString().startsWith('res_');
-        const overIsFolder = over.data.current?.type === 'folder';
-        const targetIsCard = over.data.current?.type === 'resource-card';
+    if (!over) return;
+    
+    const activeIsResource = active.id.toString().startsWith('res_');
+    const overIsFolder = over.data.current?.type === 'folder';
+    const overIsLinkDropzone = over.data.current?.type === 'link-dropzone';
 
-        if(activeIsResource && overIsFolder) {
-            const resourceId = active.id;
-            const folderId = over.id as string;
-            setResources(prev => prev.map(r => r.id === resourceId ? { ...r, folderId: folderId } : r));
-            toast({ title: "Resource Moved", description: `Moved resource to a new folder.` });
-            return;
-        }
-
-        if (activeIsResource && targetIsCard) {
-            const draggedResource = resources.find(r => r.id === active.id);
-            const targetResource = resources.find(r => r.id === over.id);
-
-            if (draggedResource && targetResource && targetResource.type === 'card') {
-                // Create link point
-                const newPoint: ResourcePoint = {
-                    id: `point_${Date.now()}`,
-                    text: draggedResource.name,
-                    type: 'card',
-                    resourceId: draggedResource.id
+    if (activeIsResource && overIsFolder) {
+        const resourceId = active.id;
+        const folderId = over.id as string;
+        setResources(prev => prev.map(r => r.id === resourceId ? { ...r, folderId: folderId } : r));
+        toast({ title: "Resource Moved", description: `Moved resource to a new folder.` });
+        return;
+    }
+    
+    if(activeIsResource && overIsLinkDropzone) {
+        const draggedResource = resources.find(r => r.id === active.id);
+        const targetResourceId = over.data.current?.resourceId;
+        const targetResource = resources.find(r => r.id === targetResourceId);
+        
+        if (draggedResource && targetResource && targetResource.type === 'card') {
+            // Create link point
+            const newPoint: ResourcePoint = {
+                id: `point_${Date.now()}`,
+                text: draggedResource.name,
+                type: 'card',
+                resourceId: draggedResource.id
+            };
+            const updatedPoints = [...(targetResource.points || []), newPoint];
+            const updatedTargetResource = { ...targetResource, points: updatedPoints };
+            handleUpdateResource(updatedTargetResource);
+            
+            // Create sub-folder and move resource
+            let subFolder = resourceFolders.find(f => f.name === targetResource.name && f.parentId === targetResource.folderId);
+            if (!subFolder) {
+                subFolder = {
+                    id: `folder_${Date.now()}`,
+                    name: targetResource.name,
+                    parentId: targetResource.folderId,
                 };
-                const updatedPoints = [...(targetResource.points || []), newPoint];
-                const updatedTargetResource = { ...targetResource, points: updatedPoints };
-                handleUpdateResource(updatedTargetResource);
-                
-                // Create sub-folder and move resource
-                let subFolder = resourceFolders.find(f => f.name === targetResource.name && f.parentId === targetResource.folderId);
-                if (!subFolder) {
-                    subFolder = {
-                        id: `folder_${Date.now()}`,
-                        name: targetResource.name,
-                        parentId: targetResource.folderId,
-                    };
-                    setResourceFolders(prev => [...prev, subFolder!]);
-                }
-                
-                const updatedDraggedResource = { ...draggedResource, folderId: subFolder.id };
-                setResources(prev => prev.map(r => r.id === draggedResource.id ? updatedDraggedResource : r));
-
-                toast({ title: "Resource Linked", description: `"${draggedResource.name}" was linked to "${targetResource.name}" and moved to a new sub-folder.` });
+                setResourceFolders(prev => [...prev, subFolder!]);
             }
-            return;
-        }
+            
+            const updatedDraggedResource = { ...draggedResource, folderId: subFolder.id };
+            setResources(prev => prev.map(r => r.id === draggedResource.id ? updatedDraggedResource : r));
 
-        // Handle reordering within the same folder
-        if (active.id !== over.id) {
-            setResources(items => {
-                const oldIndex = items.findIndex(item => item.id === active.id);
-                const newIndex = items.findIndex(item => item.id === over.id);
-                return arrayMove(items, oldIndex, newIndex);
-            });
+            toast({ title: "Resource Linked", description: `"${draggedResource.name}" was linked to "${targetResource.name}" and moved to a new sub-folder.` });
         }
+        return;
+    }
+
+    // Handle reordering within the same folder
+    if (active.id !== over.id) {
+        setResources(items => {
+            const oldIndex = items.findIndex(item => item.id === active.id);
+            const newIndex = items.findIndex(item => item.id === over.id);
+            return arrayMove(items, oldIndex, newIndex);
+        });
     }
   };
   
@@ -1807,6 +1821,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
