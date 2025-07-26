@@ -1284,9 +1284,10 @@ function ResourcesPageContent() {
         return;
     }
     
-    if (over && active.id !== over.id) {
+    if (over) {
         const activeIsResource = active.id.toString().startsWith('res_');
         const overIsFolder = over.data.current?.type === 'folder';
+        const targetIsCard = over.data.current?.type === 'resource-card';
 
         if(activeIsResource && overIsFolder) {
             const resourceId = active.id;
@@ -1296,13 +1297,12 @@ function ResourcesPageContent() {
             return;
         }
 
-
-        const targetIsCard = over.data.current?.type === 'resource-card';
-        if (targetIsCard) {
+        if (activeIsResource && targetIsCard) {
             const draggedResource = resources.find(r => r.id === active.id);
             const targetResource = resources.find(r => r.id === over.id);
 
             if (draggedResource && targetResource && targetResource.type === 'card') {
+                // Create link point
                 const newPoint: ResourcePoint = {
                     id: `point_${Date.now()}`,
                     text: draggedResource.name,
@@ -1310,18 +1310,36 @@ function ResourcesPageContent() {
                     resourceId: draggedResource.id
                 };
                 const updatedPoints = [...(targetResource.points || []), newPoint];
-                handleUpdateResource({ ...targetResource, points: updatedPoints });
-                toast({ title: "Resource Linked", description: `"${draggedResource.name}" was linked to "${targetResource.name}".` });
+                const updatedTargetResource = { ...targetResource, points: updatedPoints };
+                handleUpdateResource(updatedTargetResource);
+                
+                // Create sub-folder and move resource
+                let subFolder = resourceFolders.find(f => f.name === targetResource.name && f.parentId === targetResource.folderId);
+                if (!subFolder) {
+                    subFolder = {
+                        id: `folder_${Date.now()}`,
+                        name: targetResource.name,
+                        parentId: targetResource.folderId,
+                    };
+                    setResourceFolders(prev => [...prev, subFolder!]);
+                }
+                
+                const updatedDraggedResource = { ...draggedResource, folderId: subFolder.id };
+                setResources(prev => prev.map(r => r.id === draggedResource.id ? updatedDraggedResource : r));
+
+                toast({ title: "Resource Linked", description: `"${draggedResource.name}" was linked to "${targetResource.name}" and moved to a new sub-folder.` });
             }
             return;
         }
 
-        // Handle reordering
-        setResources(items => {
-            const oldIndex = items.findIndex(item => item.id === active.id);
-            const newIndex = items.findIndex(item => item.id === over.id);
-            return arrayMove(items, oldIndex, newIndex);
-        });
+        // Handle reordering within the same folder
+        if (active.id !== over.id) {
+            setResources(items => {
+                const oldIndex = items.findIndex(item => item.id === active.id);
+                const newIndex = items.findIndex(item => item.id === over.id);
+                return arrayMove(items, oldIndex, newIndex);
+            });
+        }
     }
   };
   
@@ -1789,6 +1807,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
