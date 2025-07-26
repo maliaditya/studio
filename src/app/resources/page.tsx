@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -245,15 +244,21 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChang
 
 const SortableResourceCard = ({ children, item, className }: { children: React.ReactNode; item: Resource; className?: string }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
-  
+    const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: item.id, data: { type: 'resource-card' } });
+
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.5 : 1,
     };
+    
+    const setCombinedRefs = useCallback((node: HTMLDivElement) => {
+        setNodeRef(node);
+        setDroppableNodeRef(node);
+    }, [setNodeRef, setDroppableNodeRef]);
   
     return (
-        <div ref={setNodeRef} style={style} className={className}>
+        <div ref={setCombinedRefs} style={style} className={cn(className, isOver && "ring-2 ring-primary ring-offset-2")}>
           <div className="relative group/sortable h-full">
             <button {...attributes} {...listeners} className="absolute -top-2 -left-2 z-10 p-1 bg-muted rounded-full cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
             {children}
@@ -1228,6 +1233,8 @@ function ResourcesPageContent() {
   const handleDragEndMain = (event: DragEndEvent) => {
     const { active, over, delta } = event;
     const activeId = active.id as string;
+    
+    setActiveId(null);
 
     if (activeId.startsWith('popup-')) {
         const resourceId = activeId.replace('popup-', '');
@@ -1246,15 +1253,34 @@ function ResourcesPageContent() {
         setActiveDragId(null);
         return;
     }
+    
+    if (over && active.id !== over.id) {
+        const targetIsCard = over.data.current?.type === 'resource-card';
+        if (targetIsCard) {
+            const draggedResource = resources.find(r => r.id === active.id);
+            const targetResource = resources.find(r => r.id === over.id);
 
-    if (activeId && over && activeId !== over.id) {
+            if (draggedResource && targetResource && targetResource.type === 'card') {
+                const newPoint: ResourcePoint = {
+                    id: `point_${Date.now()}`,
+                    text: draggedResource.name,
+                    type: 'card',
+                    resourceId: draggedResource.id
+                };
+                const updatedPoints = [...(targetResource.points || []), newPoint];
+                handleUpdateResource({ ...targetResource, points: updatedPoints });
+                toast({ title: "Resource Linked", description: `"${draggedResource.name}" was linked to "${targetResource.name}".` });
+            }
+            return;
+        }
+
+        // Handle reordering
         setResources(items => {
             const oldIndex = items.findIndex(item => item.id === active.id);
             const newIndex = items.findIndex(item => item.id === over.id);
             return arrayMove(items, oldIndex, newIndex);
         });
     }
-    setActiveId(null);
   };
   
   const handleOpenMarkdownModal = (resourceId: string, pointId: string) => {
@@ -1721,6 +1747,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
