@@ -1342,44 +1342,46 @@ function ResourcesPageContent() {
     }
     
     if(activeIsResource && overIsLinkDropzone) {
-        const draggedResource = resources.find(r => r.id === active.id);
-        const targetResourceId = over.data.current?.resourceId;
-        const targetResource = resources.find(r => r.id === targetResourceId);
-        
-        if (draggedResource && targetResource && targetResource.type === 'card') {
-            const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: draggedResource.name, type: 'card', resourceId: draggedResource.id };
-            const updatedPoints = [...(targetResource.points || []), newPoint];
-            const updatedTargetResource = { ...targetResource, points: updatedPoints };
-            
-            let finalSubFolderId: string;
-            
-            setResourceFolders(currentFolders => {
-                let subFolder = currentFolders.find(f => f.name === targetResource.name && f.parentId === targetResource.folderId);
-                if (!subFolder) {
-                    subFolder = {
-                        id: `folder_${Date.now()}`,
-                        name: targetResource.name,
-                        parentId: targetResource.folderId,
-                    };
-                    finalSubFolderId = subFolder.id;
-                    return [...currentFolders, subFolder];
-                } else {
-                    finalSubFolderId = subFolder.id;
-                    return currentFolders;
-                }
-            });
+      const draggedResource = resources.find(r => r.id === active.id);
+      const targetResourceId = over.data.current?.resourceId;
+      const targetResource = resources.find(r => r.id === targetResourceId);
+      
+      if (draggedResource && targetResource && targetResource.type === 'card') {
+          const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: draggedResource.name, type: 'card', resourceId: draggedResource.id };
+          const updatedPoints = [...(targetResource.points || []), newPoint];
+          
+          let subFolderId: string;
+          let newFolders: ResourceFolder[] = [];
 
-            setResources(prevResources => {
-                return prevResources.map(r => {
-                    if (r.id === targetResourceId) return updatedTargetResource;
-                    if (r.id === draggedResource.id) return { ...draggedResource, folderId: finalSubFolderId };
-                    return r;
-                });
-            });
+          const existingSubFolder = resourceFolders.find(f => f.name === targetResource.name && f.parentId === targetResource.folderId);
 
-            toast({ title: "Resource Linked", description: `"${draggedResource.name}" was linked to "${targetResource.name}" and moved to a new sub-folder.` });
-        }
-        return;
+          if (existingSubFolder) {
+              subFolderId = existingSubFolder.id;
+          } else {
+              const newSubFolder: ResourceFolder = {
+                  id: `folder_${Date.now()}`,
+                  name: targetResource.name,
+                  parentId: targetResource.folderId,
+              };
+              subFolderId = newSubFolder.id;
+              newFolders.push(newSubFolder);
+          }
+
+          setResources(prevResources => {
+              return prevResources.map(r => {
+                  if (r.id === targetResourceId) return { ...r, points: updatedPoints };
+                  if (r.id === draggedResource.id) return { ...draggedResource, folderId: subFolderId };
+                  return r;
+              });
+          });
+          
+          if (newFolders.length > 0) {
+              setResourceFolders(prevFolders => [...prevFolders, ...newFolders]);
+          }
+
+          toast({ title: "Resource Linked", description: `"${draggedResource.name}" was linked to "${targetResource.name}" and moved to a new sub-folder.` });
+      }
+      return;
     }
 
     if (active.id !== over.id) {
@@ -1910,6 +1912,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
