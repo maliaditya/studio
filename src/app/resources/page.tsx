@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -242,7 +243,7 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChang
     );
 };
 
-const LinkDropZone = ({ resourceId }: { resourceId: string }) => {
+const LinkDropZone = ({ resourceId, linkingFromId }: { resourceId: string; linkingFromId: string | null; }) => {
     const { isOver, setNodeRef } = useDroppable({
         id: `link-dropzone-${resourceId}`,
         data: { type: 'link-dropzone', resourceId },
@@ -251,7 +252,8 @@ const LinkDropZone = ({ resourceId }: { resourceId: string }) => {
         <div
             ref={setNodeRef}
             className={cn(
-                "absolute -top-3 -right-3 z-20 h-7 w-7 rounded-full bg-muted/80 backdrop-blur-sm border border-dashed flex items-center justify-center transition-all opacity-0 group-hover/sortable:opacity-100",
+                "absolute -top-3 -right-3 z-20 h-7 w-7 rounded-full bg-muted/80 backdrop-blur-sm border border-dashed flex items-center justify-center transition-all opacity-0",
+                linkingFromId && linkingFromId !== resourceId && "opacity-100",
                 isOver && "ring-2 ring-primary scale-125 bg-primary/20"
             )}
         >
@@ -260,7 +262,7 @@ const LinkDropZone = ({ resourceId }: { resourceId: string }) => {
     );
 };
 
-const SortableResourceCard = ({ children, item, className }: { children: React.ReactNode; item: Resource; className?: string }) => {
+const SortableResourceCard = ({ children, item, className, linkingFromId }: { children: React.ReactNode; item: Resource; className?: string; linkingFromId: string | null; }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
 
     const style = {
@@ -273,7 +275,7 @@ const SortableResourceCard = ({ children, item, className }: { children: React.R
         <div ref={setNodeRef} style={style} className={cn(className)}>
           <div className="relative group/sortable h-full">
             <button {...attributes} {...listeners} className="absolute -top-2 -left-2 z-10 p-1 bg-muted rounded-full cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
-            {item.type === 'card' && <LinkDropZone resourceId={item.id} />}
+            {item.type === 'card' && <LinkDropZone resourceId={item.id} linkingFromId={linkingFromId} />}
             {children}
           </div>
         </div>
@@ -394,7 +396,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
 };
 
 
-const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio }: { 
+const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId }: { 
     resource: Resource; 
     onUpdate: (resource: Resource) => void; 
     onDelete: (resourceId: string) => void; 
@@ -402,7 +404,9 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void; 
     onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
     playingAudio: { id: string; isPlaying: boolean } | null;
-    setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
+    setPlayingAudio: React.Dispatch<React.SetStateAction<<{ id: string; isPlaying: boolean } | null>>>;
+    onLinkClick: (resourceId: string) => void;
+    linkingFromId: string | null;
 }) => {
     const { resources } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
@@ -480,7 +484,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     };
 
     return (
-        <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl">
+        <Card className={cn("flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl", linkingFromId === resource.id && "ring-2 ring-primary", linkingFromId && linkingFromId !== resource.id && "cursor-pointer hover:ring-2 hover:ring-primary/50")}>
              <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
             <CardHeader>
                 <div className="flex justify-between items-start gap-2">
@@ -512,6 +516,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => onLinkClick(resource.id)}><LinkIcon className="mr-2 h-4 w-4" />Link to another card</DropdownMenuItem>
                                 <DropdownMenuItem onSelect={() => setEditingTitle(true)}>Edit Title</DropdownMenuItem>
                                 <DropdownMenuItem onSelect={() => audioInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />Upload Audio</DropdownMenuItem>
                                 <DropdownMenuItem onSelect={() => onDelete(resource.id)} className="text-destructive">Delete Card</DropdownMenuItem>
@@ -700,6 +705,9 @@ function ResourcesPageContent() {
   
   const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  
+  const [linkingFromId, setLinkingFromId] = useState<string | null>(null);
+
 
   useEffect(() => {
     const audioEl = audioRef.current;
@@ -852,6 +860,7 @@ function ResourcesPageContent() {
     const handleKeyDown = (event: KeyboardEvent) => {
         if (event.key === 'Escape') {
             setOpenPopups(new Map());
+            setLinkingFromId(null);
         }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -1317,7 +1326,6 @@ function ResourcesPageContent() {
         const targetResource = resources.find(r => r.id === targetResourceId);
         
         if (draggedResource && targetResource && targetResource.type === 'card') {
-            // Create link point
             const newPoint: ResourcePoint = {
                 id: `point_${Date.now()}`,
                 text: draggedResource.name,
@@ -1328,7 +1336,6 @@ function ResourcesPageContent() {
             const updatedTargetResource = { ...targetResource, points: updatedPoints };
             handleUpdateResource(updatedTargetResource);
             
-            // Create sub-folder and move resource
             let subFolder = resourceFolders.find(f => f.name === targetResource.name && f.parentId === targetResource.folderId);
             if (!subFolder) {
                 subFolder = {
@@ -1347,7 +1354,6 @@ function ResourcesPageContent() {
         return;
     }
 
-    // Handle reordering within the same folder
     if (active.id !== over.id) {
         setResources(items => {
             const oldIndex = items.findIndex(item => item.id === active.id);
@@ -1386,6 +1392,38 @@ function ResourcesPageContent() {
         return 0; // Keep original order for same-pinned-status tabs
     });
   }, [activeResourceTabIds, pinnedFolderIds]);
+  
+  const handleLinkClick = (idToLink: string) => {
+      if (linkingFromId === null) {
+          setLinkingFromId(idToLink);
+          toast({ title: "Linking Mode", description: "Click the link icon on another card to link to it." });
+      } else {
+          if (linkingFromId === idToLink) {
+              setLinkingFromId(null);
+              toast({ title: "Linking Canceled" });
+          } else {
+              const sourceCard = resources.find(r => r.id === linkingFromId);
+              const targetCard = resources.find(r => r.id === idToLink);
+
+              if (sourceCard && targetCard && targetCard.type === 'card') {
+                  const newPoint: ResourcePoint = {
+                      id: `point_${Date.now()}`,
+                      text: sourceCard.name,
+                      type: 'card',
+                      resourceId: sourceCard.id
+                  };
+                  const updatedPoints = [...(targetCard.points || []), newPoint];
+                  handleUpdateResource({ ...targetCard, points: updatedPoints });
+                  
+                  toast({ title: "Success!", description: `Linked "${sourceCard.name}" to "${targetCard.name}".` });
+              } else {
+                  toast({ title: "Invalid Link", description: "You can only link to a 'Card' type resource.", variant: "destructive" });
+              }
+              setLinkingFromId(null);
+          }
+      }
+  };
+
 
   return (
     <>
@@ -1464,7 +1502,7 @@ function ResourcesPageContent() {
                             let cardContent: React.ReactNode;
                             
                             if(isCardType) {
-                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event)} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} />;
+                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={handleDeleteResource} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event)} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} />;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                 const isGif = isGifUrl(res.link);
@@ -1482,7 +1520,7 @@ function ResourcesPageContent() {
                                 }
                                 
                                 return (
-                                <SortableResourceCard key={res.id} item={res} className={cardClassName}>
+                                <SortableResourceCard key={res.id} item={res} className={cardClassName} linkingFromId={linkingFromId}>
                                      <Card
                                         {...cardProps}
                                         className={cn(
@@ -1552,7 +1590,7 @@ function ResourcesPageContent() {
                                 </SortableResourceCard>
                                 )
                             }
-                             return <SortableResourceCard key={res.id} item={res} className={cardClassName}>{cardContent}</SortableResourceCard>;
+                             return <SortableResourceCard key={res.id} item={res} className={cardClassName} linkingFromId={linkingFromId}>{cardContent}</SortableResourceCard>;
                         })}
                         {selectedResourceFolderId && (
                             <Card 

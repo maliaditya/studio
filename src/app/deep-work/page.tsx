@@ -273,8 +273,6 @@ function LinkedUpskillCard({
     calculatedEstimate,
     setSelectedSubtopic,
     setViewMode,
-    handleLinkClick,
-    linkingFromId,
 } : {
     id: string;
     upskillDef: ExerciseDefinition;
@@ -291,16 +289,14 @@ function LinkedUpskillCard({
     calculatedEstimate: number;
     setSelectedSubtopic: (def: ExerciseDefinition | null) => void;
     setViewMode: (mode: 'session' | 'library') => void;
-    handleLinkClick: (id: string) => void;
-    linkingFromId: string | null;
 }) {
-    const { attributes: dragHandleAttributes, listeners: dragHandleListeners, setNodeRef: setDragHandleNodeRef, transform } = useDraggable({ id });
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
     
     const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: transform ? 100 : 'auto', } : undefined;
 
     const setCombinedRefs = (node: HTMLElement | null) => {
-        setDragHandleNodeRef(node);
+        setNodeRef(node);
         setDroppableNodeRef(node);
     };
 
@@ -312,15 +308,11 @@ function LinkedUpskillCard({
     const isComplete = isUpskillObjectiveComplete(upskillDef.id);
     const isParent = (upskillDef.linkedUpskillIds?.length ?? 0) > 0 || (upskillDef.linkedResourceIds?.length ?? 0) > 0;
     const estDuration = isParent ? calculatedEstimate : upskillDef.estimatedDuration;
-    
-    const isLinkingTarget = linkingFromId !== null && linkingFromId !== upskillDef.id;
 
     return (
-        <div ref={setCombinedRefs} style={style} className={cn((isOver || isLinkingTarget) && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-2xl")}>
+        <div ref={setCombinedRefs} style={style} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-2xl")}>
             <Card className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isComplete && "opacity-70 bg-muted/30")}>
-                <button ref={setDragHandleNodeRef} {...dragHandleListeners} {...dragHandleAttributes} className="absolute bottom-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
-                  <GripVertical className="h-5 w-5 text-muted-foreground" />
-                </button>
+                <div {...listeners} {...attributes} className="absolute inset-0 z-0"/>
                 {youtubeEmbedUrl ? (
                     <>
                         <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -369,7 +361,6 @@ function LinkedUpskillCard({
                 ) : (
                     <>
                         <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => handleLinkClick(id)}><LinkIcon className={cn("h-4 w-4", linkingFromId === id && "text-primary")}/></Button>
                             {isNotionObsidianEmbed ? (
                                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setEmbedUrl(embedLinkForModal)} onMouseDown={(e) => e.stopPropagation()}>
                                     <Expand className="h-4 w-4" />
@@ -442,20 +433,18 @@ function LinkedUpskillCard({
     )
 }
 
-function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, onOpenNestedPopup, handleStartEditResource, handleLinkClick, linkingFromId }: {
+function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, onOpenNestedPopup, handleStartEditResource }: {
   resource: Resource;
   handleUnlinkItem: (type: 'upskill' | 'deepwork' | 'resource', id: string) => void;
   setEmbedUrl: (url: string | null) => void;
   onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
   handleStartEditResource: (resource: Resource) => void;
-  handleLinkClick: (id: string) => void;
-  linkingFromId: string | null;
 }) {
-  const { attributes: dragHandleAttributes, listeners: dragHandleListeners, setNodeRef: setDragHandleNodeRef, transform } = useDraggable({ id: resource.id });
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: resource.id });
   const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: resource.id });
 
   const setCombinedRefs = (node: HTMLElement | null) => {
-    setDragHandleNodeRef(node);
+    setNodeRef(node);
     setDroppableNodeRef(node);
   };
   
@@ -464,18 +453,14 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, onOpenNes
   const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
   const isSpecialEmbed = resource.link ? (isNotionUrl(resource.link) || isObsidianUrl(resource.link)) : false;
   const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? resource.link : null);
-  const isLinkingTarget = linkingFromId !== null && linkingFromId !== resource.id;
 
   if (resource.type === 'card') {
     const hasMarkdownContent = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
     return (
-      <div ref={setCombinedRefs} style={style} className={cn((isOver || isLinkingTarget) && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
+      <div ref={setCombinedRefs} style={style} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
         <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl", hasMarkdownContent ? 'md:col-span-2 xl:col-span-3' : '')}>
-          <button {...dragHandleListeners} {...dragHandleAttributes} className="absolute bottom-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
-            <GripVertical className="h-5 w-5 text-muted-foreground" />
-          </button>
+           <div {...listeners} {...attributes} className="absolute inset-0 z-0"/>
            <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => handleLinkClick(resource.id)}><LinkIcon className={cn("h-4 w-4", linkingFromId === resource.id && "text-primary")}/></Button>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button>
@@ -517,11 +502,9 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, onOpenNes
   }
 
   return (
-    <div ref={setCombinedRefs} style={style} className={cn((isOver || isLinkingTarget) && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
+    <div ref={setCombinedRefs} style={style} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
         <Card className="relative group transition-all duration-300 hover:shadow-xl">
-            <button {...dragHandleListeners} {...dragHandleAttributes} className="absolute bottom-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
-                <GripVertical className="h-5 w-5 text-muted-foreground" />
-            </button>
+            <div {...listeners} {...attributes} className="absolute inset-0 z-0"/>
             <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 {embedLinkForModal ? (
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setEmbedUrl(embedLinkForModal)}><Expand className="h-4 w-4" /></Button>
@@ -582,8 +565,6 @@ function LinkedDeepWorkCard({
     upskillDefinitions,
     resources,
     setSelectedSubtopic,
-    handleLinkClick,
-    linkingFromId,
 } : {
     id: string;
     deepworkDef: ExerciseDefinition;
@@ -603,16 +584,14 @@ function LinkedDeepWorkCard({
     upskillDefinitions: ExerciseDefinition[];
     resources: Resource[];
     setSelectedSubtopic: (def: ExerciseDefinition | null) => void;
-    handleLinkClick: (id: string) => void;
-    linkingFromId: string | null;
 }) {
-    const { attributes: dragHandleAttributes, listeners: dragHandleListeners, setNodeRef: setDragHandleNodeRef, transform } = useDraggable({ id });
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
     
     const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: transform ? 100 : 'auto', } : undefined;
 
     const setCombinedRefs = (node: HTMLElement | null) => {
-        setDragHandleNodeRef(node);
+        setNodeRef(node);
         setDroppableNodeRef(node);
     };
 
@@ -622,7 +601,6 @@ function LinkedDeepWorkCard({
     const estDuration = isObjective ? calculatedEstimate : deepworkDef.estimatedDuration;
     const hasLinkedLearning = (deepworkDef.linkedUpskillIds?.length ?? 0) > 0 || (deepworkDef.linkedResourceIds?.length ?? 0) > 0;
     const router = useRouter();
-    const isLinkingTarget = linkingFromId !== null && linkingFromId !== deepworkDef.id;
 
     const isComplete = useMemo(() => {
         if (!isObjective) return permanentlyLoggedActionIds.has(deepworkDef.id);
@@ -639,13 +617,10 @@ function LinkedDeepWorkCard({
     }, [deepworkDef, isObjective, permanentlyLoggedActionIds, deepWorkDefinitions]);
 
     return (
-        <div ref={setCombinedRefs} style={style} className={cn((isOver || isLinkingTarget) && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-2xl")}>
+        <div ref={setCombinedRefs} style={style} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-2xl")}>
          <Card className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isComplete && "opacity-70 bg-muted/30")}>
-            <button {...dragHandleListeners} {...dragHandleAttributes} className="absolute bottom-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
-                <GripVertical className="h-5 w-5 text-muted-foreground" />
-            </button>
+            <div {...listeners} {...attributes} className="absolute inset-0 z-0"/>
             <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => handleLinkClick(id)}><LinkIcon className={cn("h-4 w-4", linkingFromId === id && "text-primary")}/></Button>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -876,53 +851,6 @@ function DeepWorkPageContent() {
           return newPopups;
       });
   }, []);
-
-  const [linkingFromId, setLinkingFromId] = useState<string | null>(null);
-
-  const handleLinkClick = (idToLink: string) => {
-    if (linkingFromId === null) {
-      setLinkingFromId(idToLink);
-      toast({ title: "Linking Mode", description: "Select another item to link to." });
-    } else {
-      if (linkingFromId === idToLink) {
-        setLinkingFromId(null);
-        toast({ title: "Linking Canceled" });
-      } else {
-        // Find which definitions list the target belongs to
-        const isTargetDeepWork = deepWorkDefinitions.some(d => d.id === idToLink);
-        const isTargetUpskill = upskillDefinitions.some(d => d.id === idToLink);
-        const isTargetResource = resources.some(r => r.id === idToLink);
-        
-        let linkType: 'deepwork' | 'upskill' | 'resource' | null = null;
-        if(deepWorkDefinitions.some(d => d.id === linkingFromId)) linkType = 'deepwork';
-        else if (upskillDefinitions.some(d => d.id === linkingFromId)) linkType = 'upskill';
-        else if (resources.some(r => r.id === linkingFromId)) linkType = 'resource';
-
-        if(isTargetDeepWork){
-            setDeepWorkDefinitions(prev => prev.map(def => {
-                if (def.id === idToLink) {
-                    if (linkType === 'deepwork') {
-                        return { ...def, linkedDeepWorkIds: [...(def.linkedDeepWorkIds || []), linkingFromId] };
-                    } else if (linkType === 'upskill') {
-                        return { ...def, linkedUpskillIds: [...(def.linkedUpskillIds || []), linkingFromId] };
-                    } else { // resource
-                         return { ...def, linkedResourceIds: [...(def.linkedResourceIds || []), linkingFromId] };
-                    }
-                }
-                return def;
-            }));
-            toast({ title: "Success!", description: "Items linked." });
-        } else if (isTargetUpskill) {
-            toast({ title: "Invalid Link", description: "You can only link items to a Deep Work Focus Area, not a Learning Task.", variant: "destructive" });
-        } else if (isTargetResource) {
-            toast({ title: "Invalid Link", description: "You cannot link items to a resource.", variant: "destructive" });
-        }
-
-        setLinkingFromId(null);
-      }
-    }
-  };
-
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1903,20 +1831,7 @@ function DeepWorkPageContent() {
   }, [upskillDefinitions, permanentlyLoggedVisualizationIds]);
 
   const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over, delta } = event;
-
-    if (active.id.toString().startsWith('popup-')) {
-        const resourceId = active.id.toString().replace('popup-', '');
-        setOpenPopups(prev => {
-            const newPopups = new Map(prev);
-            const popup = newPopups.get(resourceId);
-            if (popup) {
-                newPopups.set(resourceId, { ...popup, x: popup.x + delta.x, y: popup.y + delta.y });
-            }
-            return newPopups;
-        });
-        return;
-    }
+    const { active, over } = event;
   
     if (!over) return;
   
@@ -2320,12 +2235,12 @@ function DeepWorkPageContent() {
                                     <h3 className="font-semibold flex items-center gap-2"><BookCopy className="h-5 w-5 text-primary" /> Linked Learning</h3>
                                     <DroppableArea id={`linked-learning-area-${selectedFocusArea.id}`} className="-m-2 p-2">
                                       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                        {Array.from(new Set(selectedFocusArea.linkedUpskillIds || [])).map((id, index) => {
+                                        {(selectedFocusArea.linkedUpskillIds || []).map(id => {
                                           const upskillDef = upskillDefinitions.find(ud => ud.id === id);
                                           if (!upskillDef) return null;
                                           return (
                                             <LinkedUpskillCard
-                                                key={`${id}-${index}`}
+                                                key={id}
                                                 id={id}
                                                 upskillDef={upskillDef}
                                                 getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
@@ -2341,8 +2256,6 @@ function DeepWorkPageContent() {
                                                 calculatedEstimate={calculateTotalEstimate(upskillDef)}
                                                 setSelectedSubtopic={setSelectedSubtopic}
                                                 setViewMode={setViewMode}
-                                                handleLinkClick={handleLinkClick}
-                                                linkingFromId={linkingFromId}
                                             />
                                           )
                                         })}
@@ -2360,12 +2273,12 @@ function DeepWorkPageContent() {
                                     <h3 className="font-semibold flex items-center gap-2"><LinkIcon className="h-5 w-5 text-primary" /> Linked Work</h3>
                                     <DroppableArea id={`linked-work-area-${selectedFocusArea.id}`} className="-m-2 p-2">
                                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                      {Array.from(new Set(selectedFocusArea.linkedDeepWorkIds || [])).map((id, index) => {
+                                      {(selectedFocusArea.linkedDeepWorkIds || []).map(id => {
                                         const deepworkDef = deepWorkDefinitions.find(dd => dd.id === id);
                                         if (!deepworkDef) return null;
                                         return (
                                           <LinkedDeepWorkCard 
-                                              key={`${id}-${index}`}
+                                              key={id}
                                               id={id}
                                               deepworkDef={deepworkDef}
                                               getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes}
@@ -2384,8 +2297,6 @@ function DeepWorkPageContent() {
                                               upskillDefinitions={upskillDefinitions}
                                               resources={resources}
                                               setSelectedSubtopic={setSelectedSubtopic}
-                                              handleLinkClick={handleLinkClick}
-                                              linkingFromId={linkingFromId}
                                           />
                                         );
                                       })}
@@ -2403,10 +2314,10 @@ function DeepWorkPageContent() {
                                     <h3 className="font-semibold flex items-center gap-2"><Library className="h-5 w-5 text-primary" /> Linked Resources</h3>
                                     <DroppableArea id={`linked-resource-area-${selectedFocusArea.id}`} className="-m-2 p-2">
                                       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                        {(selectedFocusArea.linkedResourceIds || []).map((id, index) => {
+                                        {(selectedFocusArea.linkedResourceIds || []).map(id => {
                                           const resource = resources.find(r => r.id === id);
                                           if (!resource) return null;
-                                          return <LinkedResourceItem key={`${id}-${index}`} resource={resource} handleUnlinkItem={handleUnlinkItem} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} handleLinkClick={handleLinkClick} linkingFromId={linkingFromId} />;
+                                          return <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={handleUnlinkItem} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} />;
                                         })}
                                         <Card 
                                             onClick={() => handleOpenManageLinksModal('resource', selectedFocusArea)}
