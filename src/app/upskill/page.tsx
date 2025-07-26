@@ -219,7 +219,7 @@ const DraggableSubtaskItem: React.FC<{
     );
 };
 
-function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleStartEditSubtopic, handleUnlinkItem, handleDeleteSubtopic, handleViewProgress, isComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate, setEmbedUrl, setFloatingVideoUrl }: {
+function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleStartEditSubtopic, handleUnlinkItem, handleDeleteSubtopic, handleViewProgress, isComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate, setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds }: {
   upskillDef: ExerciseDefinition;
   handleAddTaskToSession: (def: ExerciseDefinition) => void;
   setSelectedSubtopic: (def: ExerciseDefinition | null) => void;
@@ -235,10 +235,10 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
   calculatedEstimate: number;
   setEmbedUrl: (url: string | null) => void;
   setFloatingVideoUrl: (url: string | null) => void;
+  linkedUpskillChildIds: Set<string>;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: upskillDef.id });
   const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: upskillDef.id });
-  const { linkedUpskillChildIds } = useAuth();
   const router = useRouter();
 
   const setCombinedRefs = (node: HTMLElement | null) => {
@@ -1370,6 +1370,7 @@ function UpskillPageContent() {
                                               calculatedEstimate={calculateTotalEstimate(upskillDef)}
                                               setEmbedUrl={setEmbedUrl}
                                               setFloatingVideoUrl={setFloatingVideoUrl}
+                                              linkedUpskillChildIds={linkedUpskillChildIds}
                                           />
                                       )
                                     })}
@@ -1410,7 +1411,7 @@ function UpskillPageContent() {
             </section>
           </div>
           {progressModalConfig.isOpen && progressModalConfig.exercise && (
-            <ExerciseProgressModal isOpen={progressModalConfig.isOpen} onOpenChange={(isOpen) => setProgressModalConfig(prev => ({...prev, isOpen}))} exercise={progressModalConfig.exercise} allWorkoutLogs={allUpskillLogs} pageType="upskill" topicGoals={topicGoals} />
+            <ExerciseProgressModal isOpen={isProgressModalConfig.isOpen} onOpenChange={(isOpen) => setProgressModalConfig(prev => ({...prev, isOpen}))} exercise={progressModalConfig.exercise} allWorkoutLogs={allUpskillLogs} pageType="upskill" topicGoals={topicGoals} />
           )}
           {isManageLinksModalOpen && manageLinksConfig && (
               <Dialog open={isManageLinksModalOpen} onOpenChange={setIsManageLinksModalOpen}>

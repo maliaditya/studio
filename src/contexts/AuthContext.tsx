@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
@@ -1027,112 +1028,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Feature Added", description: `"${newFeatureDef.name}" was added to the "${release.name}" release.` });
   };
   
-  const updateWorkoutInLog = (dateKey: string, updatedWorkout: DatedWorkout) => {
-    setAllWorkoutLogs(prevLogs => {
-      const existingLogIndex = prevLogs.findIndex(log => log.id === dateKey);
-      if (existingLogIndex > -1) {
-        const newLogs = [...prevLogs];
-        newLogs[existingLogIndex] = updatedWorkout;
-        return newLogs;
-      }
-      return [...prevLogs, updatedWorkout];
-    });
-  };
-
-  const logWorkoutSet = (date: Date, exerciseId: string, reps: number, weight: number) => {
-    const dateKey = format(date, 'yyyy-MM-dd');
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
-    if (existingWorkout) {
-      const newSet: LoggedSet = { id: `${Date.now()}-${Math.random()}`, reps, weight, timestamp: Date.now() };
-      const updatedExercises = existingWorkout.exercises.map(ex => 
-        ex.id === exerciseId ? { ...ex, loggedSets: [...ex.loggedSets, newSet] } : ex
-      );
-      updateWorkoutInLog(dateKey, { ...existingWorkout, exercises: updatedExercises });
-      toast({ title: "Set Logged!", description: `Logged ${reps} reps at ${weight} kg/lb.`});
-    }
-  };
-
-  const updateWorkoutSet = (date: Date, exerciseId: string, setId: string, reps: number, weight: number) => {
-    const dateKey = format(date, 'yyyy-MM-dd');
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
-    if (existingWorkout) {
-      const updatedExercises = existingWorkout.exercises.map(ex => {
-        if (ex.id === exerciseId) {
-          return { ...ex, loggedSets: ex.loggedSets.map(set => 
-              set.id === setId ? { ...set, reps, weight, timestamp: Date.now() } : set
-            )};
-        }
-        return ex;
-      });
-      updateWorkoutInLog(dateKey, { ...existingWorkout, exercises: updatedExercises });
-      toast({ title: "Set Updated", description: "The set has been updated."});
-    }
-  };
-
-  const deleteWorkoutSet = (date: Date, exerciseId: string, setId: string) => {
-    const dateKey = format(date, 'yyyy-MM-dd');
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
-    if (existingWorkout) {
-      const updatedExercises = existingWorkout.exercises.map(ex =>
-        ex.id === exerciseId ? { ...ex, loggedSets: ex.loggedSets.filter(s => s.id !== setId) } : ex
-      );
-      updateWorkoutInLog(dateKey, { ...existingWorkout, exercises: updatedExercises });
-      toast({ title: "Set Deleted", description: "The set has been removed." });
-    }
-  };
-  
-  const removeExerciseFromWorkout = (date: Date, exerciseId: string) => {
-    const dateKey = format(date, 'yyyy-MM-dd');
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
-    if (existingWorkout) {
-      const updatedExercises = existingWorkout.exercises.filter(ex => ex.id !== exerciseId);
-      const exerciseName = existingWorkout.exercises.find(ex => ex.id === exerciseId)?.name;
-      if (updatedExercises.length === 0) { 
-        setAllWorkoutLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
-      } else {
-        updateWorkoutInLog(dateKey, { ...existingWorkout, exercises: updatedExercises });
-      }
-      toast({ title: "Success", description: `"${exerciseName || ''}" removed from workout.` });
-    }
-  };
-  
-  const swapWorkoutExercise = (date: Date, oldExerciseId: string, newExerciseDefinition: ExerciseDefinition) => {
-    const dateKey = format(date, 'yyyy-MM-dd');
-    const workoutLog = allWorkoutLogs.find(log => log.id === dateKey);
-
-    if (!workoutLog) {
-      toast({ title: "Error", description: "Could not find workout log for the selected date.", variant: "destructive" });
-      return;
-    }
-
-    const exerciseIndex = workoutLog.exercises.findIndex(ex => ex.id === oldExerciseId);
-    if (exerciseIndex === -1) {
-      toast({ title: "Error", description: "Could not find the exercise to replace.", variant: "destructive" });
-      return;
-    }
-
-    const oldExerciseName = workoutLog.exercises[exerciseIndex].name;
-
-    const newWorkoutExercise: WorkoutExercise = {
-      id: `${newExerciseDefinition.id}-${Date.now()}_${Math.random()}`,
-      definitionId: newExerciseDefinition.id,
-      name: newExerciseDefinition.name,
-      category: newExerciseDefinition.category,
-      loggedSets: [],
-      targetSets: 3,
-      targetReps: "8-12",
-    };
-
-    const updatedExercises = [...workoutLog.exercises];
-    updatedExercises[exerciseIndex] = newWorkoutExercise;
-
-    const updatedWorkout = { ...workoutLog, exercises: updatedExercises };
-
-    setAllWorkoutLogs(prevLogs => prevLogs.map(log => log.id === dateKey ? updatedWorkout : log));
-
-    toast({ title: "Exercise Swapped!", description: `Replaced "${oldExerciseName}" with "${newWorkoutExercise.name}".` });
-  };
-  
   const updateTopic = (oldTopicName: string, newTopicName: string, newClassification: 'product' | 'service') => {
     const oldClassification = deepWorkTopicMetadata[oldTopicName]?.classification;
     const classificationDidChange = oldClassification && oldClassification !== newClassification;
@@ -1252,6 +1147,112 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Offer Copied", description: `A copy of "${offerToCopy.name}" has been created.` });
   };
 
+  const updateWorkoutInLog = (dateKey: string, updatedWorkout: DatedWorkout) => {
+    setAllWorkoutLogs(prevLogs => {
+      const existingLogIndex = prevLogs.findIndex(log => log.id === dateKey);
+      if (existingLogIndex > -1) {
+        const newLogs = [...prevLogs];
+        newLogs[existingLogIndex] = updatedWorkout;
+        return newLogs;
+      }
+      return [...prevLogs, updatedWorkout];
+    });
+  };
+
+  const logWorkoutSet = (date: Date, exerciseId: string, reps: number, weight: number) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    if (existingWorkout) {
+      const newSet: LoggedSet = { id: `${Date.now()}-${Math.random()}`, reps, weight, timestamp: Date.now() };
+      const updatedExercises = existingWorkout.exercises.map(ex => 
+        ex.id === exerciseId ? { ...ex, loggedSets: [...ex.loggedSets, newSet] } : ex
+      );
+      updateWorkoutInLog(dateKey, { ...existingWorkout, exercises: updatedExercises });
+      toast({ title: "Set Logged!", description: `Logged ${reps} reps at ${weight} kg/lb.`});
+    }
+  };
+
+  const updateWorkoutSet = (date: Date, exerciseId: string, setId: string, reps: number, weight: number) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    if (existingWorkout) {
+      const updatedExercises = existingWorkout.exercises.map(ex => {
+        if (ex.id === exerciseId) {
+          return { ...ex, loggedSets: ex.loggedSets.map(set => 
+              set.id === setId ? { ...set, reps, weight, timestamp: Date.now() } : set
+            )};
+        }
+        return ex;
+      });
+      updateWorkoutInLog(dateKey, { ...existingWorkout, exercises: updatedExercises });
+      toast({ title: "Set Updated", description: "The set has been updated."});
+    }
+  };
+
+  const deleteWorkoutSet = (date: Date, exerciseId: string, setId: string) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    if (existingWorkout) {
+      const updatedExercises = existingWorkout.exercises.map(ex =>
+        ex.id === exerciseId ? { ...ex, loggedSets: ex.loggedSets.filter(s => s.id !== setId) } : ex
+      );
+      updateWorkoutInLog(dateKey, { ...existingWorkout, exercises: updatedExercises });
+      toast({ title: "Set Deleted", description: "The set has been removed." });
+    }
+  };
+  
+  const removeExerciseFromWorkout = (date: Date, exerciseId: string) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    if (existingWorkout) {
+      const updatedExercises = existingWorkout.exercises.filter(ex => ex.id !== exerciseId);
+      const exerciseName = existingWorkout.exercises.find(ex => ex.id === exerciseId)?.name;
+      if (updatedExercises.length === 0) { 
+        setAllWorkoutLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
+      } else {
+        updateWorkoutInLog(dateKey, { ...existingWorkout, exercises: updatedExercises });
+      }
+      toast({ title: "Success", description: `"${exerciseName || ''}" removed from workout.` });
+    }
+  };
+  
+  const swapWorkoutExercise = (date: Date, oldExerciseId: string, newExerciseDefinition: ExerciseDefinition) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    const workoutLog = allWorkoutLogs.find(log => log.id === dateKey);
+
+    if (!workoutLog) {
+      toast({ title: "Error", description: "Could not find workout log for the selected date.", variant: "destructive" });
+      return;
+    }
+
+    const exerciseIndex = workoutLog.exercises.findIndex(ex => ex.id === oldExerciseId);
+    if (exerciseIndex === -1) {
+      toast({ title: "Error", description: "Could not find the exercise to replace.", variant: "destructive" });
+      return;
+    }
+
+    const oldExerciseName = workoutLog.exercises[exerciseIndex].name;
+
+    const newWorkoutExercise: WorkoutExercise = {
+      id: `${newExerciseDefinition.id}-${Date.now()}_${Math.random()}`,
+      definitionId: newExerciseDefinition.id,
+      name: newExerciseDefinition.name,
+      category: newExerciseDefinition.category,
+      loggedSets: [],
+      targetSets: 3,
+      targetReps: "8-12",
+    };
+
+    const updatedExercises = [...workoutLog.exercises];
+    updatedExercises[exerciseIndex] = newWorkoutExercise;
+
+    const updatedWorkout = { ...workoutLog, exercises: updatedExercises };
+
+    setAllWorkoutLogs(prevLogs => prevLogs.map(log => log.id === dateKey ? updatedWorkout : log));
+
+    toast({ title: "Exercise Swapped!", description: `Replaced "${oldExerciseName}" with "${newWorkoutExercise.name}".` });
+  };
+  
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
