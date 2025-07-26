@@ -179,7 +179,7 @@ const isObsidianUrl = (url: string): boolean => {
     } catch (e) { return false; }
 };
 
-function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleStartEditSubtopic, handleUnlinkItem, handleDeleteSubtopic, handleViewProgress, isComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions, calculatedEstimate }: {
+function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleStartEditSubtopic, handleUnlinkItem, handleDeleteSubtopic, handleViewProgress, isComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions, calculatedEstimate, handleLinkClick, linkingFromId }: {
   upskillDef: ExerciseDefinition;
   handleAddTaskToSession: (def: ExerciseDefinition) => void;
   setSelectedSubtopic: (def: ExerciseDefinition | null) => void;
@@ -192,8 +192,10 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
   getUpskillLoggedMinutesRecursive: (def: ExerciseDefinition) => number;
   upskillDefinitions: ExerciseDefinition[];
   calculatedEstimate: number;
+  handleLinkClick: (id: string) => void;
+  linkingFromId: string | null;
 }) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id: upskillDef.id });
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform } = useDraggable({ id: upskillDef.id });
   const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: upskillDef.id });
 
   const setCombinedRefs = (node: HTMLElement | null) => {
@@ -201,7 +203,7 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
     setDroppableNodeRef(node);
   };
   
-  const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: isDragging ? 100 : 'auto' } : undefined;
+  const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: transform ? 100 : 'auto', } : undefined;
 
   const isParent = (upskillDef.linkedUpskillIds?.length ?? 0) > 0 || (upskillDef.linkedResourceIds?.length ?? 0) > 0;
   const isVisualization = !isParent;
@@ -216,13 +218,16 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
     return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim();
   };
   
+  const isLinkingTarget = linkingFromId !== null && linkingFromId !== upskillDef.id;
+
   return (
-    <div ref={setCombinedRefs} style={style} className={cn(isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg", isDragging && "opacity-80 shadow-2xl")}>
+    <div ref={setCombinedRefs} style={style} className={cn((isOver || isLinkingTarget) && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
       <Card className={cn("relative group transition-all duration-300 hover:shadow-xl", isComplete && "opacity-70 bg-muted/30")}>
-        <button ref={setActivatorNodeRef} {...listeners} {...attributes} className="absolute top-1/2 -left-2 -translate-y-1/2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()}>
+        <button {...listeners} {...attributes} className="absolute top-1/2 -left-2 -translate-y-1/2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()}>
             <GripVertical className="h-5 w-5 text-muted-foreground" />
         </button>
         <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => handleLinkClick(upskillDef.id)}><LinkIcon className={cn("h-4 w-4", linkingFromId === upskillDef.id && "text-primary")}/></Button>
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild><span tabIndex={isVisualization ? 0 : -1}><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); isVisualization && handleAddTaskToSession(upskillDef); }} disabled={!isVisualization}><PlusCircle className="h-4 w-4" /></Button></span></TooltipTrigger><TooltipContent>{isVisualization ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent></Tooltip>
@@ -251,14 +256,16 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
   );
 }
 
-function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, onOpenNestedPopup, handleStartEditResource }: {
+function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, onOpenNestedPopup, handleStartEditResource, handleLinkClick, linkingFromId }: {
   resource: Resource;
   handleUnlinkItem: (type: 'upskill' | 'resource', id: string) => void;
   setEmbedUrl: (url: string | null) => void;
   onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
   handleStartEditResource: (resource: Resource) => void;
+  handleLinkClick: (id: string) => void;
+  linkingFromId: string | null;
 }) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id: resource.id });
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform } = useDraggable({ id: resource.id });
   const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: resource.id });
   const { setFloatingVideoUrl } = useAuth();
 
@@ -267,21 +274,23 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, onOpenNes
     setDroppableNodeRef(node);
   };
   
-  const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: isDragging ? 100 : 'auto', } : undefined;
+  const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: transform ? 100 : 'auto', } : undefined;
 
   const youtubeEmbedUrl = resource.link ? getYouTubeEmbedUrl(resource.link) : null;
   const isSpecialEmbed = resource.link ? (isNotionUrl(resource.link) || isObsidianUrl(resource.link)) : false;
   const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? resource.link : null);
+  const isLinkingTarget = linkingFromId !== null && linkingFromId !== resource.id;
 
   if (resource.type === 'card') {
     const hasMarkdownContent = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
     return (
-      <div ref={setCombinedRefs} style={style} className={cn(isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg", isDragging && "opacity-80 shadow-2xl")}>
+      <div ref={setCombinedRefs} style={style} className={cn((isOver || isLinkingTarget) && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
         <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl", hasMarkdownContent ? 'md:col-span-2 xl:col-span-3' : '')}>
-          <button ref={setActivatorNodeRef} {...listeners} {...attributes} className="absolute bottom-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
+          <button {...listeners} {...attributes} className="absolute bottom-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
             <GripVertical className="h-5 w-5 text-muted-foreground" />
           </button>
            <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => handleLinkClick(resource.id)}><LinkIcon className={cn("h-4 w-4", linkingFromId === resource.id && "text-primary")}/></Button>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button>
@@ -323,9 +332,9 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, onOpenNes
   }
 
   return (
-    <div ref={setCombinedRefs} style={style} className={cn(isOver && !isDragging && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg", isDragging && "opacity-80 shadow-2xl")}>
+    <div ref={setCombinedRefs} style={style} className={cn((isOver || isLinkingTarget) && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
         <Card className="relative group transition-all duration-300 hover:shadow-xl">
-            <button ref={setActivatorNodeRef} {...listeners} {...attributes} className="absolute bottom-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
+            <button {...listeners} {...attributes} className="absolute bottom-2 left-2 z-20 cursor-grab rounded-full p-2 hover:bg-muted" onMouseDown={(e) => e.stopPropagation()} >
                 <GripVertical className="h-5 w-5 text-muted-foreground" />
             </button>
             <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -502,6 +511,41 @@ function UpskillPageContent() {
           return newPopups;
       });
   }, []);
+
+  const [linkingFromId, setLinkingFromId] = useState<string | null>(null);
+
+  const handleLinkClick = (idToLink: string) => {
+    if (linkingFromId === null) {
+      setLinkingFromId(idToLink);
+      toast({ title: "Linking Mode", description: "Select another item to link to." });
+    } else {
+      if (linkingFromId === idToLink) {
+        setLinkingFromId(null);
+        toast({ title: "Linking Canceled" });
+      } else {
+        setUpskillDefinitions(prev => prev.map(def => {
+            if (def.id === idToLink) {
+                return { ...def, linkedUpskillIds: [...(def.linkedUpskillIds || []), linkingFromId] };
+            }
+            return def;
+        }));
+        
+        // Unlink from the main topic if it's now a sub-item
+        if (selectedSubtopic) {
+          const updatedParent = {
+            ...selectedSubtopic,
+            linkedUpskillIds: (selectedSubtopic.linkedUpskillIds || []).filter(id => id !== linkingFromId)
+          };
+          setUpskillDefinitions(prev => prev.map(def => def.id === selectedSubtopic.id ? updatedParent : def));
+          setSelectedSubtopic(updatedParent);
+        }
+
+        toast({ title: "Success!", description: "Items linked." });
+        setLinkingFromId(null);
+      }
+    }
+  };
+
 
   const permanentlyLoggedVisualizationIds = useMemo(() => {
     const loggedIds = new Set<string>();
@@ -1096,58 +1140,31 @@ function UpskillPageContent() {
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over, delta } = event;
-
-    if (active.id.toString().startsWith('popup-')) {
-        const resourceId = active.id.toString().replace('popup-', '');
-        setOpenPopups(prev => {
-            const newPopups = new Map(prev);
-            const popup = newPopups.get(resourceId);
-            if (popup) {
-                newPopups.set(resourceId, { ...popup, x: popup.x + delta.x, y: popup.y + delta.y });
-            }
-            return newPopups;
-        });
-        return;
-    }
+    const { active, over } = event;
     
     if (!over || active.id === over.id) return;
+  
+    // Logic for reordering main linked items
+    if (selectedSubtopic) {
+        setUpskillDefinitions(prev => prev.map(def => {
+            if (def.id === selectedSubtopic.id) {
+                const oldUpskillIndex = (def.linkedUpskillIds || []).findIndex(id => id === active.id);
+                const newUpskillIndex = (def.linkedUpskillIds || []).findIndex(id => id === over.id);
 
-    const draggedId = active.id as string;
-    const targetId = over.id as string;
-
-    const draggedDef = upskillDefinitions.find(d => d.id === draggedId);
-    const targetDef = upskillDefinitions.find(d => d.id === targetId);
-
-    if (!draggedDef || !targetDef || !selectedSubtopic) {
-        toast({ title: "Error", description: "Could not find items to link.", variant: "destructive" });
-        return;
+                if (oldUpskillIndex > -1 && newUpskillIndex > -1) {
+                    const newIds = [...(def.linkedUpskillIds || [])];
+                    const [removed] = newIds.splice(oldUpskillIndex, 1);
+                    newIds.splice(newUpskillIndex, 0, removed);
+                    const updatedDef = { ...def, linkedUpskillIds: newIds };
+                    setSelectedSubtopic(updatedDef); // Update the view immediately
+                    return updatedDef;
+                }
+            }
+            return def;
+        }));
     }
-
-    const parentChildrenIds = new Set(selectedSubtopic.linkedUpskillIds || []);
-    if (!parentChildrenIds.has(draggedId) || !parentChildrenIds.has(targetId)) {
-        toast({ title: "Link Error", description: "Can only link sibling items within the same parent.", variant: "destructive" });
-        return;
-    }
-
-    // Link `draggedId` as a child of `targetId`
-    setUpskillDefinitions(prev => prev.map(def => {
-        if (def.id === targetId) {
-            return { ...def, linkedUpskillIds: [...(def.linkedUpskillIds || []), draggedId] };
-        }
-        return def;
-    }));
-
-    // Remove `draggedId` from the main parent's children list
-    const updatedParent = {
-      ...selectedSubtopic,
-      linkedUpskillIds: (selectedSubtopic.linkedUpskillIds || []).filter(id => id !== draggedId),
-    };
-    setUpskillDefinitions(prev => prev.map(def => def.id === selectedSubtopic.id ? updatedParent : def));
-    setSelectedSubtopic(updatedParent);
-
-    toast({ title: "Re-linked!", description: `"${draggedDef.name}" is now a sub-task of "${targetDef.name}".` });
   };
+
 
   if (isLoadingPage) {
     return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your upskill data...</p></div>;
@@ -1335,6 +1352,8 @@ function UpskillPageContent() {
                                               getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
                                               upskillDefinitions={upskillDefinitions}
                                               calculatedEstimate={calculateTotalEstimate(upskillDef)}
+                                              handleLinkClick={handleLinkClick}
+                                              linkingFromId={linkingFromId}
                                           />
                                       )
                                     })}
@@ -1353,7 +1372,7 @@ function UpskillPageContent() {
                                     {(selectedSubtopic.linkedResourceIds || []).map(id => {
                                       const resource = resources.find(r => r.id === id);
                                       if (!resource) return null;
-                                      return <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={handleUnlinkItem} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} />;
+                                      return <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={handleUnlinkItem} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} handleLinkClick={handleLinkClick} linkingFromId={linkingFromId} />;
                                     })}
                                     <Card 
                                         onClick={() => selectedSubtopic && handleOpenManageLinksModal('resource', selectedSubtopic)}
