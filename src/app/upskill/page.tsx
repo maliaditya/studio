@@ -1160,28 +1160,68 @@ function UpskillPageContent() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    
+  
     if (!over || active.id === over.id) return;
   
-    // Logic for reordering main linked items
-    if (selectedSubtopic) {
-        setUpskillDefinitions(prev => prev.map(def => {
-            if (def.id === selectedSubtopic.id) {
-                const oldUpskillIndex = (def.linkedUpskillIds || []).findIndex(id => id === active.id);
-                const newUpskillIndex = (def.linkedUpskillIds || []).findIndex(id => id === over.id);
-
-                if (oldUpskillIndex > -1 && newUpskillIndex > -1) {
-                    const newIds = [...(def.linkedUpskillIds || [])];
-                    const [removed] = newIds.splice(oldUpskillIndex, 1);
-                    newIds.splice(newUpskillIndex, 0, removed);
-                    const updatedDef = { ...def, linkedUpskillIds: newIds };
-                    setSelectedSubtopic(updatedDef); // Update the view immediately
-                    return updatedDef;
-                }
-            }
-            return def;
-        }));
+    const draggedId = active.id as string;
+    const targetId = over.id as string;
+  
+    const allDefs = [...upskillDefinitions, ...resources];
+    const draggedDef = allDefs.find(d => d.id === draggedId);
+    const targetDef = allDefs.find(d => d.id === targetId);
+  
+    if (!draggedDef || !targetDef || !selectedSubtopic) {
+        toast({ title: "Error", description: "Could not find items to link.", variant: "destructive" });
+        return;
     }
+    
+    // Ensure both items are direct children of the selected subtopic
+    const parentChildrenIds = new Set([
+        ...(selectedSubtopic.linkedUpskillIds || []),
+        ...(selectedSubtopic.linkedResourceIds || []),
+    ]);
+
+    if (!parentChildrenIds.has(draggedId) || !parentChildrenIds.has(targetId)) {
+        toast({ title: "Link Error", description: "Can only link sibling items within the same subtopic.", variant: "destructive" });
+        return;
+    }
+
+    // Determine the type of the dragged and target items
+    const isDraggedUpskill = upskillDefinitions.some(d => d.id === draggedId);
+    const isDraggedResource = resources.some(d => d.id === draggedId);
+    const isTargetResource = resources.some(d => d.id === targetId);
+    
+    // Prevent linking anything to a resource card
+    if (isTargetResource) {
+        toast({ title: "Invalid Link", description: "Resources cannot be parents. Drag items onto learning tasks instead.", variant: "destructive" });
+        return;
+    }
+  
+    // Update the parent (target) task
+    setUpskillDefinitions(prev => prev.map(def => {
+        if (def.id === targetId) { // targetDef is always an upskill task
+            let updatedDef = { ...def };
+            if (isDraggedUpskill) {
+                updatedDef.linkedUpskillIds = [...(updatedDef.linkedUpskillIds || []), draggedId];
+            } else if (isDraggedResource) {
+                updatedDef.linkedResourceIds = [...(updatedDef.linkedResourceIds || []), draggedId];
+            }
+            return updatedDef;
+        }
+        return def;
+    }));
+    
+    // Remove the dragged item from the main subtopic's list
+    const updatedParent = {
+        ...selectedSubtopic,
+        linkedUpskillIds: (selectedSubtopic.linkedUpskillIds || []).filter(id => id !== draggedId),
+        linkedResourceIds: (selectedSubtopic.linkedResourceIds || []).filter(id => id !== draggedId),
+    };
+    
+    setUpskillDefinitions(prev => prev.map(def => def.id === selectedSubtopic.id ? updatedParent : def));
+    setSelectedSubtopic(updatedParent);
+  
+    toast({ title: "Re-linked!", description: `"${draggedDef.name}" is now a sub-task of "${targetDef.name}".` });
   };
 
 
@@ -1260,7 +1300,6 @@ function UpskillPageContent() {
                               {subtopics.sort((a,b) => a.name.localeCompare(b.name)).map(def => {
                                 const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
                                 const isChild = linkedUpskillChildIds.has(def.id);
-                                
                                 const nodeType = isParent && !isChild ? 'Curiosity' : isParent && isChild ? 'Objective' : !isParent && isChild ? 'Visualization' : 'Standalone';
                                 const estDuration = isParent ? calculateTotalEstimate(def) : def.estimatedDuration;
                                 
@@ -1343,7 +1382,6 @@ function UpskillPageContent() {
                                 )}
                             </div>
                         ) : selectedSubtopic ? (
-                          <DndContext onDragEnd={handleDragEnd}>
                             <ScrollArea className="h-[calc(100vh-16rem)] pr-2">
                               <div className="space-y-6">
                                 <div className="space-y-3">
@@ -1402,7 +1440,6 @@ function UpskillPageContent() {
                                 </div>
                               </div>
                           </ScrollArea>
-                          </DndContext>
                         ) : (
                             <div className="text-center py-10"><p className="text-muted-foreground">Select a subtopic from the library to view its details.</p></div>
                         )}
@@ -1411,7 +1448,7 @@ function UpskillPageContent() {
             </section>
           </div>
           {progressModalConfig.isOpen && progressModalConfig.exercise && (
-            <ExerciseProgressModal isOpen={isProgressModalConfig.isOpen} onOpenChange={(isOpen) => setProgressModalConfig(prev => ({...prev, isOpen}))} exercise={progressModalConfig.exercise} allWorkoutLogs={allUpskillLogs} pageType="upskill" topicGoals={topicGoals} />
+            <ExerciseProgressModal isOpen={progressModalConfig.isOpen} onOpenChange={(isOpen) => setProgressModalConfig(prev => ({...prev, isOpen}))} exercise={progressModalConfig.exercise} allWorkoutLogs={allUpskillLogs} pageType="upskill" topicGoals={topicGoals} />
           )}
           {isManageLinksModalOpen && manageLinksConfig && (
               <Dialog open={isManageLinksModalOpen} onOpenChange={setIsManageLinksModalOpen}>
