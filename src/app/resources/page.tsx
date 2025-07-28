@@ -117,15 +117,17 @@ interface PopupState {
 
 interface ResourcePopupProps {
   popupState: PopupState;
+  allResources: Resource[];
   onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
   onClose: (resourceId: string) => void;
   onSizeChange: (resourceId: string, newSize: { width: number; height: number }) => void;
+  playingAudio: { id: string; isPlaying: boolean } | null;
+  setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
 }
 
-const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChange }: ResourcePopupProps) => {
-    const { resources } = useAuth();
+const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClose, onSizeChange, playingAudio, setPlayingAudio }: ResourcePopupProps) => {
     const { resourceId, level, x, y, width } = popupState;
-    const resource = resources.find(r => r.id === resourceId);
+    const resource = allResources.find(r => r.id === resourceId);
     const cardRef = useRef<HTMLDivElement>(null);
 
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -187,15 +189,30 @@ const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChang
       e.stopPropagation();
       onOpenNestedPopup(pointResourceId, e, popupState);
     };
+    
+    const togglePlayAudio = () => {
+        if (playingAudio?.id === resource.id && playingAudio.isPlaying) {
+            setPlayingAudio(prev => prev ? { ...prev, isPlaying: false } : null);
+        } else {
+            setPlayingAudio({ id: resource.id, isPlaying: true });
+        }
+    };
 
     return (
         <div ref={setNodeRef} style={style} {...attributes} className="z-[60]">
             <Card ref={cardRef} className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col">
                 <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
-                    <CardTitle className="text-base flex items-center gap-2">
-                        <Library className="h-4 w-4" />
-                        <span className="truncate">{resource.name}</span>
-                    </CardTitle>
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-base flex items-center gap-2">
+                            <Library className="h-4 w-4" />
+                            <span className="truncate">{resource.name}</span>
+                        </CardTitle>
+                        {resource.audioUrl && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onClick={togglePlayAudio}>
+                                {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
+                            </Button>
+                        )}
+                    </div>
                 </CardHeader>
                 <div className="flex-grow min-h-0">
                     <ScrollArea className="h-full">
@@ -1393,8 +1410,8 @@ function ResourcesPageContent() {
 
         if (sourceCard && targetCard && targetCard.type === 'card') {
           // --- Start of new logic ---
-          let updatedFolders = [...resourceFolders];
           let subFolderId: string;
+          let updatedFolders = [...resourceFolders];
           
           const existingSubFolder = resourceFolders.find(
             f => f.name === targetCard.name && f.parentId === targetCard.folderId
@@ -1409,10 +1426,8 @@ function ResourcesPageContent() {
               parentId: targetCard.folderId,
             };
             subFolderId = newSubFolder.id;
-            updatedFolders.push(newSubFolder);
+            updatedFolders = [...updatedFolders, newSubFolder];
           }
-
-          setResourceFolders(updatedFolders);
 
           // Update resources
           const newPoint: ResourcePoint = {
@@ -1422,7 +1437,7 @@ function ResourcesPageContent() {
             resourceId: sourceCard.id,
           };
           
-          const updatedResources = resources.map(r => {
+          let finalResources = resources.map(r => {
             if (r.id === targetCard.id) {
               return { ...r, points: [...(r.points || []), newPoint] };
             }
@@ -1432,7 +1447,8 @@ function ResourcesPageContent() {
             return r;
           });
 
-          setResources(updatedResources);
+          setResources(finalResources);
+          setResourceFolders(updatedFolders);
           // --- End of new logic ---
           
           toast({ title: "Success!", description: `Linked "${sourceCard.name}" to "${targetCard.name}".` });
@@ -1632,9 +1648,12 @@ function ResourcesPageContent() {
             <ResourcePopupCard
                 key={popupState.resourceId}
                 popupState={popupState}
+                allResources={resources}
                 onOpenNestedPopup={handleOpenNestedPopup}
                 onClose={handleClosePopup}
                 onSizeChange={handleSizeChange}
+                playingAudio={playingAudio}
+                setPlayingAudio={setPlayingAudio}
             />
         ))}
 
@@ -1902,6 +1921,7 @@ export default function ResourcesPage() {
 
 
     
+
 
 
 
