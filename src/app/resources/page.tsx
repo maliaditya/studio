@@ -732,7 +732,7 @@ function ResourcesPageContent() {
     const audioEl = audioRef.current;
     if (!audioEl) return;
 
-    if (playingAudio && playingAudio.isPlaying) {
+    if (playingAudio?.isPlaying) {
       const resourceToPlay = resources.find(r => r.id === playingAudio.id);
       if (resourceToPlay?.audioUrl) {
         if (audioEl.src !== resourceToPlay.audioUrl) {
@@ -1409,51 +1409,18 @@ function ResourcesPageContent() {
         const targetCard = resources.find(r => r.id === resourceId);
 
         if (sourceCard && targetCard && targetCard.type === 'card') {
-          // --- Start of new logic ---
-          let subFolderId: string;
-          let updatedFolders = [...resourceFolders];
-          
-          const existingSubFolder = resourceFolders.find(
-            f => f.name === targetCard.name && f.parentId === targetCard.folderId
-          );
-
-          if (existingSubFolder) {
-            subFolderId = existingSubFolder.id;
-          } else {
-            const newSubFolder: ResourceFolder = {
-              id: `folder_${Date.now()}`,
-              name: targetCard.name,
-              parentId: targetCard.folderId,
+            const newPoint: ResourcePoint = {
+                id: `point_${Date.now()}`,
+                text: sourceCard.name,
+                type: 'card',
+                resourceId: sourceCard.id
             };
-            subFolderId = newSubFolder.id;
-            updatedFolders = [...updatedFolders, newSubFolder];
-          }
+            const updatedPoints = [...(targetCard.points || []), newPoint];
+            handleUpdateResource({ ...targetCard, points: updatedPoints });
 
-          // Update resources
-          const newPoint: ResourcePoint = {
-            id: `point_${Date.now()}`,
-            text: sourceCard.name,
-            type: 'card',
-            resourceId: sourceCard.id,
-          };
-          
-          let finalResources = resources.map(r => {
-            if (r.id === targetCard.id) {
-              return { ...r, points: [...(r.points || []), newPoint] };
-            }
-            if (r.id === sourceCard.id) {
-              return { ...r, folderId: subFolderId };
-            }
-            return r;
-          });
-
-          setResources(finalResources);
-          setResourceFolders(updatedFolders);
-          // --- End of new logic ---
-          
-          toast({ title: "Success!", description: `Linked "${sourceCard.name}" to "${targetCard.name}".` });
+            toast({ title: "Success!", description: `Linked "${sourceCard.name}" to "${targetCard.name}".` });
         } else {
-          toast({ title: "Invalid Link", description: "You can only link to a 'Card' type resource.", variant: "destructive" });
+            toast({ title: "Invalid Link", description: "You can only link to a 'Card' type resource.", variant: "destructive" });
         }
         setLinkingFromId(null);
       }
@@ -1916,54 +1883,3 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
-
-    
-
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
