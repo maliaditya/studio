@@ -191,11 +191,12 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
     };
     
     const togglePlayAudio = () => {
-      if (playingAudio?.id === resource.id && playingAudio.isPlaying) {
-        setPlayingAudio(null);
-      } else {
-        setPlayingAudio({ id: resource.id, isPlaying: true });
-      }
+        setPlayingAudio(prev => {
+            if (prev?.id === resource.id && prev.isPlaying) {
+                return null; // Pause
+            }
+            return { id: resource.id, isPlaying: true }; // Play
+        });
     };
 
     return (
@@ -493,11 +494,12 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     };
     
     const togglePlayAudio = () => {
-        if (playingAudio?.id === resource.id && playingAudio.isPlaying) {
-            setPlayingAudio(null);
-        } else {
-            setPlayingAudio({ id: resource.id, isPlaying: true });
-        }
+        setPlayingAudio(prev => {
+            if (prev?.id === resource.id && prev.isPlaying) {
+                return null;
+            }
+            return { id: resource.id, isPlaying: true };
+        });
     };
 
     return (
@@ -732,7 +734,7 @@ function ResourcesPageContent() {
     const audioEl = audioRef.current;
     if (!audioEl) return;
 
-    if (playingAudio?.isPlaying) {
+    if (playingAudio && playingAudio.isPlaying) {
       const resourceToPlay = resources.find(r => r.id === playingAudio.id);
       if (resourceToPlay?.audioUrl) {
         if (audioEl.src !== resourceToPlay.audioUrl) {
@@ -1884,3 +1886,4 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
