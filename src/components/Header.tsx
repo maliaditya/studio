@@ -45,6 +45,7 @@ export function Header() {
     { href: '/matrix', label: 'Matrix' },
     { href: '/mind-map', label: 'Mind Map' },
     { href: '/canvas', label: 'Canvas' },
+    { href: '/mind', label: 'Mind' },
     { href: '/kanban', label: 'Kanban' },
     { href: '/timesheet', label: 'Timesheet' },
   ];
