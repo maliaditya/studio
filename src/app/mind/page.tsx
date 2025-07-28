@@ -121,7 +121,7 @@ function DraggableNode({ node, definition, status, onConnectClick, onRemoveClick
 }
 
 // Main Canvas Page Component
-function MindPageContent() {
+function CanvasPageContent() {
   const {
     deepWorkDefinitions,
     upskillDefinitions,
@@ -440,9 +440,10 @@ function MindPageContent() {
 
     return {
       deepWork: deepWorkDefinitions.filter(filterFn),
-      upskill: upskillDefinitions.filter(filterFn)
+      upskill: upskillDefinitions.filter(filterFn),
+      resources: resources.filter(filterFn),
     };
-  }, [searchTerm, deepWorkDefinitions, upskillDefinitions]);
+  }, [searchTerm, deepWorkDefinitions, upskillDefinitions, resources]);
 
   const getPath = (sourcePos: {x:number, y:number}, targetPos: {x:number, y:number}) => {
     const sourceIsLeft = sourcePos.x < targetPos.x;
@@ -471,9 +472,10 @@ function MindPageContent() {
           />
         </div>
         <Tabs defaultValue="deep-work" className="flex-grow flex flex-col min-h-0">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="deep-work">Deep Work</TabsTrigger>
             <TabsTrigger value="upskill">Upskill</TabsTrigger>
+            <TabsTrigger value="resources">Resources</TabsTrigger>
           </TabsList>
           <TabsContent value="deep-work" className="flex-grow min-h-0">
             <ScrollArea className="h-full">
@@ -497,6 +499,19 @@ function MindPageContent() {
                     <div className="flex flex-col">
                       <span className="font-medium text-sm">{def.name}</span>
                       <span className="text-xs text-muted-foreground">{def.category}</span>
+                    </div>
+                  </Button>
+                ))}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+           <TabsContent value="resources" className="flex-grow min-h-0">
+            <ScrollArea className="h-full">
+              <div className="p-2 space-y-1">
+                 {filteredDefs.resources.map((def: any) => (
+                  <Button key={def.id} variant="ghost" className="w-full justify-start h-auto text-left" onClick={() => handleAddNode(def)}>
+                    <div className="flex flex-col">
+                      <span className="font-medium text-sm">{def.name}</span>
                     </div>
                   </Button>
                 ))}
@@ -583,5 +598,5 @@ function MindPageContent() {
 }
 
 export default function MindPage() {
-    return <AuthGuard><MindPageContent /></AuthGuard>;
+    return <AuthGuard><CanvasPageContent /></AuthGuard>;
 }
