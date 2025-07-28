@@ -191,11 +191,11 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
     };
     
     const togglePlayAudio = () => {
-        if (playingAudio?.id === resource.id && playingAudio.isPlaying) {
-            setPlayingAudio(prev => prev ? { ...prev, isPlaying: false } : null);
-        } else {
-            setPlayingAudio({ id: resource.id, isPlaying: true });
-        }
+      if (playingAudio?.id === resource.id && playingAudio.isPlaying) {
+        setPlayingAudio(null);
+      } else {
+        setPlayingAudio({ id: resource.id, isPlaying: true });
+      }
     };
 
     return (
@@ -494,7 +494,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     
     const togglePlayAudio = () => {
         if (playingAudio?.id === resource.id && playingAudio.isPlaying) {
-            setPlayingAudio(prev => prev ? { ...prev, isPlaying: false } : null);
+            setPlayingAudio(null);
         } else {
             setPlayingAudio({ id: resource.id, isPlaying: true });
         }
@@ -1398,32 +1398,33 @@ function ResourcesPageContent() {
   
   const handleLinkClick = (resourceId: string) => {
     if (linkingFromId === null) {
-      setLinkingFromId(resourceId);
-      toast({ title: "Linking Mode", description: "Click the link icon on another card to link to it." });
-    } else {
-      if (linkingFromId === resourceId) {
-        setLinkingFromId(null);
-        toast({ title: "Linking Canceled" });
-      } else {
-        const sourceCard = resources.find(r => r.id === linkingFromId);
-        const targetCard = resources.find(r => r.id === resourceId);
-
-        if (sourceCard && targetCard && targetCard.type === 'card') {
-            const newPoint: ResourcePoint = {
-                id: `point_${Date.now()}`,
-                text: sourceCard.name,
-                type: 'card',
-                resourceId: sourceCard.id
-            };
-            const updatedPoints = [...(targetCard.points || []), newPoint];
-            handleUpdateResource({ ...targetCard, points: updatedPoints });
-
-            toast({ title: "Success!", description: `Linked "${sourceCard.name}" to "${targetCard.name}".` });
-        } else {
-            toast({ title: "Invalid Link", description: "You can only link to a 'Card' type resource.", variant: "destructive" });
+        const sourceCard = resources.find(r => r.id === resourceId);
+        if (sourceCard?.type !== 'card') {
+            toast({ title: "Invalid Source", description: "You can only start a link from a 'Card' type resource.", variant: "destructive" });
+            return;
         }
-        setLinkingFromId(null);
-      }
+        setLinkingFromId(resourceId);
+        toast({ title: "Linking Mode", description: "Click the link icon on another card to complete the link." });
+    } else {
+        if (linkingFromId === resourceId) {
+            setLinkingFromId(null);
+            toast({ title: "Linking Canceled" });
+        } else {
+            const sourceCard = resources.find(r => r.id === linkingFromId);
+            const targetCard = resources.find(r => r.id === resourceId);
+            
+            if (sourceCard && targetCard && targetCard.type === 'card') {
+                const updatedTargetCard = { ...targetCard };
+                if (!updatedTargetCard.points) updatedTargetCard.points = [];
+                updatedTargetCard.points.push({ id: `point_${Date.now()}`, type: 'card', text: sourceCard.name, resourceId: sourceCard.id });
+                handleUpdateResource(updatedTargetCard);
+                
+                toast({ title: "Success!", description: `Linked "${sourceCard.name}" to "${targetCard.name}".` });
+            } else {
+                toast({ title: "Invalid Link", description: "The target must also be a 'Card' type resource.", variant: "destructive" });
+            }
+            setLinkingFromId(null);
+        }
     }
   };
 
