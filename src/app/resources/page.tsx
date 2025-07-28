@@ -163,6 +163,7 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
             window.addEventListener('mouseup', handleMouseUp);
         } else {
             window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
         };
         return () => {
             window.removeEventListener('mousemove', handleMouseMove);
@@ -193,9 +194,9 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
     const togglePlayAudio = () => {
         setPlayingAudio(prev => {
             if (prev?.id === resource.id && prev.isPlaying) {
-                return null; // Pause
+                return { ...prev, isPlaying: false };
             }
-            return { id: resource.id, isPlaying: true }; // Play
+            return { id: resource.id, isPlaying: true };
         });
     };
 
@@ -496,7 +497,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     const togglePlayAudio = () => {
         setPlayingAudio(prev => {
             if (prev?.id === resource.id && prev.isPlaying) {
-                return null;
+                return { ...prev, isPlaying: false };
             }
             return { id: resource.id, isPlaying: true };
         });
@@ -734,7 +735,7 @@ function ResourcesPageContent() {
     const audioEl = audioRef.current;
     if (!audioEl) return;
 
-    if (playingAudio && playingAudio.isPlaying) {
+    if (playingAudio?.isPlaying) {
       const resourceToPlay = resources.find(r => r.id === playingAudio.id);
       if (resourceToPlay?.audioUrl) {
         if (audioEl.src !== resourceToPlay.audioUrl) {
@@ -1400,33 +1401,77 @@ function ResourcesPageContent() {
   
   const handleLinkClick = (resourceId: string) => {
     if (linkingFromId === null) {
-        const sourceCard = resources.find(r => r.id === resourceId);
-        if (sourceCard?.type !== 'card') {
-            toast({ title: "Invalid Source", description: "You can only start a link from a 'Card' type resource.", variant: "destructive" });
-            return;
-        }
-        setLinkingFromId(resourceId);
-        toast({ title: "Linking Mode", description: "Click the link icon on another card to complete the link." });
+      const sourceCard = resources.find(r => r.id === resourceId);
+      if (sourceCard?.type !== 'card') {
+        toast({ title: "Invalid Source", description: "You can only start a link from a 'Card' type resource.", variant: "destructive" });
+        return;
+      }
+      setLinkingFromId(resourceId);
+      toast({ title: "Linking Mode", description: "Click the link icon on another card to complete the link." });
     } else {
-        if (linkingFromId === resourceId) {
-            setLinkingFromId(null);
-            toast({ title: "Linking Canceled" });
-        } else {
-            const sourceCard = resources.find(r => r.id === linkingFromId);
-            const targetCard = resources.find(r => r.id === resourceId);
-            
-            if (sourceCard && targetCard && targetCard.type === 'card') {
-                const updatedTargetCard = { ...targetCard };
-                if (!updatedTargetCard.points) updatedTargetCard.points = [];
-                updatedTargetCard.points.push({ id: `point_${Date.now()}`, type: 'card', text: sourceCard.name, resourceId: sourceCard.id });
-                handleUpdateResource(updatedTargetCard);
-                
-                toast({ title: "Success!", description: `Linked "${sourceCard.name}" to "${targetCard.name}".` });
-            } else {
-                toast({ title: "Invalid Link", description: "The target must also be a 'Card' type resource.", variant: "destructive" });
-            }
-            setLinkingFromId(null);
+      if (linkingFromId === resourceId) {
+        setLinkingFromId(null);
+        toast({ title: "Linking Canceled" });
+        return;
+      }
+
+      const sourceCard = resources.find(r => r.id === linkingFromId);
+      const targetCard = resources.find(r => r.id === resourceId);
+
+      if (!sourceCard || !targetCard || targetCard.type !== 'card') {
+        toast({ title: "Invalid Link", description: "The target must also be a 'Card' type resource.", variant: "destructive" });
+        setLinkingFromId(null);
+        return;
+      }
+
+      // --- Start of automated folder logic ---
+      const parentFolderId = targetCard.folderId;
+      let subFolderId: string;
+
+      let existingSubFolder = resourceFolders.find(f => f.parentId === parentFolderId && f.name === targetCard.name);
+      
+      let finalFolders = [...resourceFolders];
+      let finalResources = [...resources];
+
+      if (!existingSubFolder) {
+        const newFolder: ResourceFolder = {
+          id: `folder_${Date.now()}`,
+          name: targetCard.name,
+          parentId: parentFolderId,
+        };
+        finalFolders.push(newFolder);
+        subFolderId = newFolder.id;
+      } else {
+        subFolderId = existingSubFolder.id;
+      }
+
+      // Update the source card to link to the target
+      finalResources = finalResources.map(r => {
+        if (r.id === targetCard.id) {
+            const newPoint: ResourcePoint = {
+                id: `point_${Date.now()}`,
+                type: 'card',
+                text: sourceCard.name,
+                resourceId: sourceCard.id,
+            };
+            return { ...r, points: [...(r.points || []), newPoint] };
         }
+        return r;
+      });
+
+      // Move the source card to the new/existing subfolder
+      finalResources = finalResources.map(r => {
+        if (r.id === sourceCard.id) {
+          return { ...r, folderId: subFolderId };
+        }
+        return r;
+      });
+      
+      setResourceFolders(finalFolders);
+      setResources(finalResources);
+      
+      setLinkingFromId(null);
+      toast({ title: "Success!", description: `Linked "${sourceCard.name}" to "${targetCard.name}" and moved it to the "${targetCard.name}" folder.` });
     }
   };
 
@@ -1886,4 +1931,5 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
