@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -132,6 +132,12 @@ interface AuthContextType {
   // Mindset
   mindsetCards: MindsetCard[];
   setMindsetCards: React.Dispatch<React.SetStateAction<MindsetCard[]>>;
+
+  // Pistons
+  isPistonsHeadOpen: boolean;
+  setIsPistonsHeadOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  pistons: PistonsCategoryData;
+  setPistons: React.Dispatch<React.SetStateAction<PistonsCategoryData>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -200,6 +206,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Mindset State
   const [mindsetCards, setMindsetCards] = useState<MindsetCard[]>(DEFAULT_MINDSET_CARDS);
+
+  // Pistons State
+  const [isPistonsHeadOpen, setIsPistonsHeadOpen] = useState(false);
+  const [pistons, setPistons] = useState<PistonsCategoryData>({});
 
 
   useEffect(() => {
@@ -287,6 +297,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Mindset Data
       try { const d = localStorage.getItem(`mindset_cards_${username}`); setMindsetCards(d ? JSON.parse(d) : DEFAULT_MINDSET_CARDS); } catch (e) { setMindsetCards(DEFAULT_MINDSET_CARDS); }
+      
+      // Pistons Data
+      try { const d = localStorage.getItem(`pistons_data_${username}`); setPistons(d ? JSON.parse(d) : {}); } catch (e) { setPistons({}); }
 
 
     } else {
@@ -304,6 +317,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setActiveResourceTabIds([]); setSelectedResourceFolderId(null);
       setCanvasLayout({ nodes: [], edges: [] });
       setMindsetCards(DEFAULT_MINDSET_CARDS);
+      setPistons({});
     }
   }, [currentUser]);
 
@@ -353,6 +367,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Mindset
       localStorage.setItem(`mindset_cards_${username}`, JSON.stringify(mindsetCards));
+      
+      // Pistons
+      localStorage.setItem(`pistons_data_${username}`, JSON.stringify(pistons));
     }
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
@@ -362,6 +379,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     resources, resourceFolders, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId,
     canvasLayout,
     mindsetCards,
+    pistons,
     currentUser, loading
   ]);
 
@@ -520,6 +538,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setCanvasLayout(data.canvasLayout || { nodes: [], edges: [] });
     setMindsetCards(data.mindsetCards || DEFAULT_MINDSET_CARDS);
+    
+    setPistons(data.pistons || {});
   };
   
   const register = async (username: string, password: string) => {
@@ -576,6 +596,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       activeResourceTabIds, selectedResourceFolderId,
       canvasLayout,
       mindsetCards,
+      pistons,
     };
   }
 
@@ -1283,6 +1304,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,
     mindsetCards, setMindsetCards,
+    isPistonsHeadOpen, setIsPistonsHeadOpen,
+    pistons, setPistons,
   };
 
   return (

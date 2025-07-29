@@ -19,9 +19,12 @@ const PISTON_NAMES: PistonType[] = [
   'Growth', 'Expression', 'Pleasure', 'Protection'
 ];
 
-// Main component that orchestrates the popups
-export function PistonsHead() {
-  const { isPistonsHeadOpen, setIsPistonsHeadOpen } = useAuth();
+interface PistonsHeadProps {
+    isPistonsHeadOpen: boolean;
+    setIsPistonsHeadOpen: (isOpen: boolean) => void;
+}
+
+export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: PistonsHeadProps) {
   const [currentView, setCurrentView] = useState<'main' | 'health' | 'wealth' | 'growth'>('main');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
 
