@@ -80,6 +80,21 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
         setCurrentView('main');
     }
   };
+  
+  const { pistons } = useAuth();
+  
+  const getTopicName = () => {
+    switch (currentView) {
+      case 'health':
+        return `Health: ${pistons.health?.activity || 'Activity'}`;
+      case 'wealth':
+        return selectedTopicId || 'Select Wealth Topic';
+      case 'growth':
+        return selectedTopicId || 'Select Growth Topic';
+      default: return 'Pistons of Intention';
+    }
+  };
+  const topicName = getTopicName();
 
   const renderContent = () => {
     switch (currentView) {
@@ -129,17 +144,23 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
                         {...attributes} 
                         {...listeners}
                     >
-                         <div className="flex items-center gap-2">
+                         <div className="flex-1">
                              {currentView !== 'main' && (
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onBack(); }}>
                                     <ChevronLeft className="h-4 w-4" />
                                 </Button>
                              )}
-                            <CardTitle className="text-base">Pistons of Intention</CardTitle>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleClose}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                        </Button>
+                        <div className="flex-1 text-center">
+                            <CardTitle className="text-base truncate" title={topicName as string}>
+                                {topicName}
+                            </CardTitle>
+                        </div>
+                        <div className="flex-1 flex justify-end">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleClose}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                            </Button>
+                        </div>
                     </CardHeader>
                     {renderContent()}
                 </Card>
@@ -240,15 +261,6 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { top
 
     return (
         <div className="flex flex-col h-[60vh] md:h-[50vh]">
-            <div className="p-4 border-b flex-shrink-0">
-                <h3 
-                  className={cn("text-lg font-semibold truncate", onEditTopicName && 'cursor-pointer hover:underline')} 
-                  title={topicName}
-                  onClick={onEditTopicName}
-                >
-                  {topicName}
-                </h3>
-            </div>
             <ScrollArea className="flex-grow min-h-0">
                 <div className="p-4 space-y-3">
                 {PISTON_NAMES.map(piston => (
