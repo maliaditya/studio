@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield } from 'lucide-react';
+import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
@@ -15,6 +15,7 @@ import { PistonType, PistonsData } from '@/types/workout';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
 
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
@@ -90,7 +91,7 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
       case 'wealth':
         return selectedTopicId || 'Select Wealth Topic';
       case 'growth':
-        return selectedTopicId || 'Select Growth Topic';
+         return selectedTopicId || 'Select Growth Topic';
       default: return 'Pistons of Intention';
     }
   };
@@ -144,7 +145,7 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
                         {...attributes} 
                         {...listeners}
                     >
-                         <div className="flex-1">
+                         <div className="w-8">
                              {currentView !== 'main' && (
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onBack(); }}>
                                     <ChevronLeft className="h-4 w-4" />
@@ -156,7 +157,7 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
                                 {topicName}
                             </CardTitle>
                         </div>
-                        <div className="flex-1 flex justify-end">
+                        <div className="w-8 flex justify-end">
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleClose}>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                             </Button>
@@ -173,11 +174,28 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
 
 const MainPistonView = ({ onSelect }: { onSelect: (view: 'health' | 'wealth' | 'growth') => void }) => (
     <CardContent className="p-4">
-        <p className="text-muted-foreground text-center mb-6 text-sm">Select a category to define or review your core motivations.</p>
-        <div className="grid grid-cols-1 gap-4">
-            <Button onClick={() => onSelect('health')} variant="outline" className="h-16 text-lg"><Heart className="mr-3 h-6 w-6 text-red-500"/>Health</Button>
-            <Button onClick={() => onSelect('wealth')} variant="outline" className="h-16 text-lg"><Briefcase className="mr-3 h-6 w-6 text-green-500"/>Wealth</Button>
-            <Button onClick={() => onSelect('growth')} variant="outline" className="h-16 text-lg"><TrendingUp className="mr-3 h-6 w-6 text-blue-500"/>Growth</Button>
+        <p className="text-muted-foreground text-center mb-4 text-sm">Select a category to define your core motivations.</p>
+        <div className="flex justify-around items-center p-2 rounded-lg bg-muted/50">
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button onClick={() => onSelect('health')} variant="ghost" size="icon" className="h-12 w-12 text-red-500 hover:bg-red-500/10 hover:text-red-600"><Heart className="h-6 w-6"/></Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Health</TooltipContent>
+                </Tooltip>
+                 <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button onClick={() => onSelect('wealth')} variant="ghost" size="icon" className="h-12 w-12 text-green-500 hover:bg-green-500/10 hover:text-green-600"><Briefcase className="h-6 w-6"/></Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Wealth</TooltipContent>
+                </Tooltip>
+                 <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button onClick={() => onSelect('growth')} variant="ghost" size="icon" className="h-12 w-12 text-blue-500 hover:bg-blue-500/10 hover:text-blue-600"><TrendingUp className="h-6 w-6"/></Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Growth</TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
         </div>
     </CardContent>
 );
