@@ -1,10 +1,10 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft } from 'lucide-react';
+import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
@@ -14,6 +14,19 @@ import { ScrollArea } from './ui/scroll-area';
 import { PistonType, PistonsData } from '@/types/workout';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
+import { cn } from '@/lib/utils';
+
+
+const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
+    'Desire': <Target className="h-5 w-5 text-red-500" />,
+    'Curiosity': <Search className="h-5 w-5 text-sky-500" />,
+    'Truth-Seeking': <HandHeart className="h-5 w-5 text-purple-500" />,
+    'Contribution': <Sprout className="h-5 w-5 text-green-500" />,
+    'Growth': <TrendingUp className="h-5 w-5 text-blue-500" />,
+    'Expression': <Mic className="h-5 w-5 text-pink-500" />,
+    'Pleasure': <Smile className="h-5 w-5 text-yellow-500" />,
+    'Protection': <Shield className="h-5 w-5 text-gray-500" />,
+};
 
 const PISTON_NAMES: PistonType[] = [
   'Desire', 'Curiosity', 'Truth-Seeking', 'Contribution', 
@@ -21,8 +34,8 @@ const PISTON_NAMES: PistonType[] = [
 ];
 
 interface PistonsHeadProps {
-    isPistonsHeadOpen: boolean;
-    setIsPistonsHeadOpen: (isOpen: boolean) => void;
+  isPistonsHeadOpen: boolean;
+  setIsPistonsHeadOpen: (isOpen: boolean) => void;
 }
 
 export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: PistonsHeadProps) {
@@ -85,7 +98,7 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
     position: 'fixed',
     top: position.y,
     left: position.x,
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    transform: transform ? `translate3d(${position.x + transform.x}px, ${position.y + transform.y}px, 0)` : `translate3d(${position.x}px, ${position.y}px, 0)`,
     willChange: 'transform',
   };
 
@@ -151,12 +164,12 @@ const MainPistonView = ({ onSelect }: { onSelect: (view: 'health' | 'wealth' | '
 
 const HealthPistonView = ({ onBack }: { onBack: () => void }) => {
     const { pistons, setPistons } = useAuth();
-    const [activity, setActivity] = useState(pistons.healthActivity || '');
-    const [isEditingActivity, setIsEditingActivity] = useState(!pistons.healthActivity);
+    const [activity, setActivity] = useState(pistons.health?.activity || '');
+    const [isEditingActivity, setIsEditingActivity] = useState(!pistons.health?.activity);
     
     const handleSaveActivity = () => {
       if (activity.trim()) {
-        setPistons(prev => ({...prev, healthActivity: activity.trim() }));
+        setPistons(prev => ({...prev, health: { ...prev.health, activity: activity.trim() } as PistonsData }));
         setIsEditingActivity(false);
       }
     };
@@ -206,7 +219,9 @@ const TopicSelector = ({ onSelect, type, onBack }: { onSelect: (topicId: string,
 }
 
 const TopicPistonView = ({ topicId, onBack }: { topicId: string, onBack: () => void }) => {
-    return <PistonEditorView topicId={topicId} topicName={topicId} onBack={onBack} />;
+    const { pistons } = useAuth();
+    const topicName = topicId === 'health' ? `Health: ${pistons.health?.activity || 'Activity'}` : topicId;
+    return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} />;
 };
 
 const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void }) => {
@@ -227,7 +242,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { top
         <div className="flex flex-col h-[60vh] md:h-[50vh]">
             <div className="p-4 border-b flex-shrink-0">
                 <h3 
-                  className={`text-lg font-semibold truncate ${onEditTopicName ? 'cursor-pointer hover:underline' : ''}`} 
+                  className={cn("text-lg font-semibold truncate", onEditTopicName && 'cursor-pointer hover:underline')} 
                   title={topicName}
                   onClick={onEditTopicName}
                 >
@@ -235,16 +250,19 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { top
                 </h3>
             </div>
             <ScrollArea className="flex-grow min-h-0">
-                <div className="p-4 space-y-4">
+                <div className="p-4 space-y-3">
                 {PISTON_NAMES.map(piston => (
-                    <div key={piston}>
-                        <Label htmlFor={`piston-${piston}`} className="font-semibold text-foreground">{piston}</Label>
+                    <div key={piston} className="p-3 bg-muted/50 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1.5">
+                            {PISTON_ICONS[piston]}
+                            <label htmlFor={`piston-${piston}`} className="font-semibold text-sm text-foreground">{piston}</label>
+                        </div>
                         <Textarea 
                             id={`piston-${piston}`}
                             value={topicPistons[piston]?.text || ''}
                             onChange={(e) => handleTextChange(piston, e.target.value)}
-                            placeholder={`What is your intention for ${piston.toLowerCase()}?`}
-                            className="mt-1"
+                            placeholder={`Define your intention for ${piston.toLowerCase()}...`}
+                            className="mt-1 bg-transparent border-0 ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm"
                             rows={2}
                         />
                     </div>
