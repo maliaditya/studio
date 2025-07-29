@@ -35,6 +35,14 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
     id: 'pistons-popup',
   });
 
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { delta } = event;
+    setPosition(prev => ({
+        x: prev.x + delta.x,
+        y: prev.y + delta.y,
+    }));
+  };
+  
   const handleClose = () => {
     setIsPistonsHeadOpen(false);
     setTimeout(() => {
@@ -43,14 +51,6 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
     }, 300);
   };
   
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { delta } = event;
-    setPosition(prev => ({
-        x: prev.x + delta.x,
-        y: prev.y + delta.y,
-    }));
-  };
-
   const handleViewChange = (newView: 'main' | 'health' | 'wealth' | 'growth') => {
     setCurrentView(newView);
   };
@@ -60,22 +60,35 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
       setCurrentView(view);
   }
 
+  const onBack = () => {
+    if (selectedTopicId) {
+        setSelectedTopicId(null);
+    } else {
+        setCurrentView('main');
+    }
+  };
+
   const renderContent = () => {
     switch (currentView) {
       case 'health':
-        return <HealthPistonView onBack={() => handleViewChange('main')} />;
+        return <HealthPistonView onBack={onBack} />;
       case 'wealth':
-        return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} onBack={() => handleViewChange('main')} /> : <TopicSelector onSelect={handleTopicSelect} type="wealth" onBack={() => handleViewChange('main')} />;
+        return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} onBack={onBack} /> : <TopicSelector onSelect={handleTopicSelect} type="wealth" onBack={onBack} />;
       case 'growth':
-         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} onBack={() => handleViewChange('main')} /> : <TopicSelector onSelect={handleTopicSelect} type="growth" onBack={() => handleViewChange('main')} />;
+         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} onBack={onBack} /> : <TopicSelector onSelect={handleTopicSelect} type="growth" onBack={onBack} />;
       default:
         return <MainPistonView onSelect={handleViewChange} />;
     }
   };
   
-  const style = transform ? {
-      transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-  } : {};
+  const style: React.CSSProperties = {
+    position: 'fixed',
+    top: position.y,
+    left: position.x,
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    willChange: 'transform',
+  };
+
 
   return (
     <>
@@ -94,13 +107,7 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
           <DndContext onDragEnd={handleDragEnd}>
             <div
                 ref={setNodeRef}
-                style={{ 
-                    position: 'fixed', 
-                    top: position.y, 
-                    left: position.x,
-                    willChange: 'transform',
-                    ...style
-                }}
+                style={style}
                 className="z-[60]"
             >
                 <Card className="w-96 shadow-2xl border-2 border-primary/50 bg-card">
@@ -130,7 +137,6 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
   );
 }
 
-// Dummy onBack prop for the main view to avoid type errors
 const MainPistonView = ({ onSelect }: { onSelect: (view: 'health' | 'wealth' | 'growth') => void }) => (
     <CardContent className="p-4">
         <p className="text-muted-foreground text-center mb-6 text-sm">Select a category to define or review your core motivations.</p>
