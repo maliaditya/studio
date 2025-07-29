@@ -3,16 +3,17 @@
 
 import React, { useState } from 'react';
 import { Button } from './ui/button';
-import { Dialog, DialogContent } from './ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
 import { PistonType, PistonsData } from '@/types/workout';
+import { DndContext, useDraggable } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
 
 const PISTON_NAMES: PistonType[] = [
   'Desire', 'Curiosity', 'Truth-Seeking', 'Contribution', 
@@ -27,13 +28,27 @@ interface PistonsHeadProps {
 export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: PistonsHeadProps) {
   const [currentView, setCurrentView] = useState<'main' | 'health' | 'wealth' | 'growth'>('main');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  
+  const [position, setPosition] = useState({ x: 50, y: 50 });
+
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: 'pistons-popup',
+  });
 
   const handleClose = () => {
     setIsPistonsHeadOpen(false);
     setTimeout(() => {
         setCurrentView('main');
         setSelectedTopicId(null);
-    }, 300); // Delay reset to allow for closing animation
+    }, 300);
+  };
+  
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { delta } = event;
+    setPosition(prev => ({
+        x: prev.x + delta.x,
+        y: prev.y + delta.y,
+    }));
   };
 
   const handleViewChange = (newView: 'main' | 'health' | 'wealth' | 'growth') => {
@@ -57,6 +72,10 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
         return <MainPistonView onSelect={handleViewChange} />;
     }
   };
+  
+  const style = transform ? {
+      transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+  } : {};
 
   return (
     <>
@@ -70,29 +89,60 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
           <BrainCircuit className="h-6 w-6" />
         </Button>
       )}
-      <Dialog open={isPistonsHeadOpen} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-md">
-            {renderContent()}
-        </DialogContent>
-      </Dialog>
+
+      {isPistonsHeadOpen && (
+          <DndContext onDragEnd={handleDragEnd}>
+            <div
+                ref={setNodeRef}
+                style={{ 
+                    position: 'fixed', 
+                    top: position.y, 
+                    left: position.x,
+                    willChange: 'transform',
+                    ...style
+                }}
+                className="z-[60]"
+            >
+                <Card className="w-96 shadow-2xl border-2 border-primary/50 bg-card">
+                    <CardHeader 
+                        className="p-3 relative cursor-grab flex items-center justify-between" 
+                        {...attributes} 
+                        {...listeners}
+                    >
+                         <div className="flex items-center gap-2">
+                             {currentView !== 'main' && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onBack(); }}>
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                             )}
+                            <CardTitle className="text-base">Pistons of Intention</CardTitle>
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleClose}>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                        </Button>
+                    </CardHeader>
+                    {renderContent()}
+                </Card>
+            </div>
+          </DndContext>
+      )}
     </>
   );
 }
 
-// The initial view with the 3 options
+// Dummy onBack prop for the main view to avoid type errors
 const MainPistonView = ({ onSelect }: { onSelect: (view: 'health' | 'wealth' | 'growth') => void }) => (
-    <div className="text-center p-4">
-        <h2 className="text-xl font-bold mb-2">Pistons of Intention</h2>
-        <p className="text-muted-foreground mb-6">Select a category to define or review your core motivations.</p>
+    <CardContent className="p-4">
+        <p className="text-muted-foreground text-center mb-6 text-sm">Select a category to define or review your core motivations.</p>
         <div className="grid grid-cols-1 gap-4">
             <Button onClick={() => onSelect('health')} variant="outline" className="h-16 text-lg"><Heart className="mr-3 h-6 w-6 text-red-500"/>Health</Button>
             <Button onClick={() => onSelect('wealth')} variant="outline" className="h-16 text-lg"><Briefcase className="mr-3 h-6 w-6 text-green-500"/>Wealth</Button>
             <Button onClick={() => onSelect('growth')} variant="outline" className="h-16 text-lg"><TrendingUp className="mr-3 h-6 w-6 text-blue-500"/>Growth</Button>
         </div>
-    </div>
+    </CardContent>
 );
 
-// View for the Health category, including first-time setup
+
 const HealthPistonView = ({ onBack }: { onBack: () => void }) => {
     const { pistons, setPistons } = useAuth();
     const [activity, setActivity] = useState(pistons.healthActivity || '');
@@ -107,8 +157,7 @@ const HealthPistonView = ({ onBack }: { onBack: () => void }) => {
 
     if (isEditingActivity) {
         return (
-            <div className="p-4">
-                <Button variant="ghost" size="sm" onClick={onBack} className="mb-4"><ChevronLeft className="mr-2 h-4 w-4"/>Back</Button>
+            <CardContent className="p-4">
                 <h3 className="text-lg font-semibold text-center mb-2">Define Your Health Activity</h3>
                 <p className="text-muted-foreground text-center mb-4">This will be the focus for your health intentions.</p>
                 <div className="flex gap-2">
@@ -120,22 +169,20 @@ const HealthPistonView = ({ onBack }: { onBack: () => void }) => {
                     />
                     <Button onClick={handleSaveActivity}>Save</Button>
                 </div>
-            </div>
+            </CardContent>
         )
     }
 
     return <PistonEditorView topicId="health" topicName={`Health: ${activity}`} onBack={onBack} onEditTopicName={() => setIsEditingActivity(true)} />;
 };
 
-// View to select a Deep Work or Upskill topic
 const TopicSelector = ({ onSelect, type, onBack }: { onSelect: (topicId: string, type: 'wealth' | 'growth') => void, type: 'wealth' | 'growth', onBack: () => void }) => {
     const { deepWorkDefinitions, upskillDefinitions } = useAuth();
     const source = type === 'wealth' ? deepWorkDefinitions : upskillDefinitions;
     const topics = [...new Set(source.map(def => def.category))];
 
     return (
-        <div className="p-4">
-            <Button variant="ghost" size="sm" onClick={onBack} className="mb-4"><ChevronLeft className="mr-2 h-4 w-4"/>Back</Button>
+        <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-center mb-2">Select a Topic</h3>
             <p className="text-muted-foreground text-center mb-4">Choose a {type} topic to define its core motivations.</p>
             <Select onValueChange={(value) => onSelect(value, type)}>
@@ -148,16 +195,14 @@ const TopicSelector = ({ onSelect, type, onBack }: { onSelect: (topicId: string,
                     ))}
                 </SelectContent>
             </Select>
-        </div>
+        </CardContent>
     )
 }
 
-// View for a specific topic (Wealth or Growth)
 const TopicPistonView = ({ topicId, onBack }: { topicId: string, onBack: () => void }) => {
     return <PistonEditorView topicId={topicId} topicName={topicId} onBack={onBack} />;
 };
 
-// The main editor UI for the 8 pistons
 const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void }) => {
     const { pistons, setPistons } = useAuth();
     const topicPistons = pistons[topicId] || {};
@@ -173,11 +218,8 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { top
     };
 
     return (
-        <div className="flex flex-col h-[70vh]">
-            <div className="flex items-center p-4 border-b flex-shrink-0">
-                 <Button variant="ghost" size="icon" onClick={onBack} className="mr-2 h-8 w-8">
-                    <ChevronLeft className="h-5 w-5"/>
-                </Button>
+        <div className="flex flex-col h-[60vh] md:h-[50vh]">
+            <div className="p-4 border-b flex-shrink-0">
                 <h3 
                   className={`text-lg font-semibold truncate ${onEditTopicName ? 'cursor-pointer hover:underline' : ''}`} 
                   title={topicName}
