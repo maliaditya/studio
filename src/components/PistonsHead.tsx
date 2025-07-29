@@ -98,7 +98,7 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
     position: 'fixed',
     top: position.y,
     left: position.x,
-    transform: transform ? `translate3d(${position.x + transform.x}px, ${position.y + transform.y}px, 0)` : `translate3d(${position.x}px, ${position.y}px, 0)`,
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     willChange: 'transform',
   };
 
