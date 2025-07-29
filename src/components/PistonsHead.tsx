@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent } from './ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
@@ -91,10 +91,18 @@ const MainPistonView = ({ onSelect }: { onSelect: (view: 'health' | 'wealth' | '
 
 // View for the Health category, including first-time setup
 const HealthPistonView = ({ onBack }: { onBack: () => void }) => {
-    const { healthActivity, setHealthActivity } = useAuth();
-    const [inputValue, setInputValue] = useState('');
+    const { pistons, setPistons } = useAuth();
+    const [activity, setActivity] = useState(pistons.healthActivity || '');
+    const [isEditingActivity, setIsEditingActivity] = useState(!pistons.healthActivity);
+    
+    const handleSaveActivity = () => {
+      if (activity.trim()) {
+        setPistons(prev => ({...prev, healthActivity: activity.trim() }));
+        setIsEditingActivity(false);
+      }
+    };
 
-    if (!healthActivity) {
+    if (isEditingActivity) {
         return (
             <div className="p-4">
                 <Button variant="ghost" size="sm" onClick={onBack} className="mb-4"><ChevronLeft className="mr-2 h-4 w-4"/>Back</Button>
@@ -102,17 +110,18 @@ const HealthPistonView = ({ onBack }: { onBack: () => void }) => {
                 <p className="text-muted-foreground text-center mb-4">This will be the focus for your health intentions.</p>
                 <div className="flex gap-2">
                     <Input 
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
+                        value={activity}
+                        onChange={(e) => setActivity(e.target.value)}
                         placeholder="e.g., GYM, Walking, Yoga"
+                        onKeyDown={(e) => e.key === 'Enter' && handleSaveActivity()}
                     />
-                    <Button onClick={() => setHealthActivity(inputValue)}>Save</Button>
+                    <Button onClick={handleSaveActivity}>Save</Button>
                 </div>
             </div>
         )
     }
 
-    return <PistonEditorView topicId="health" topicName={`Health: ${healthActivity}`} onBack={onBack} />;
+    return <PistonEditorView topicId="health" topicName={`Health: ${activity}`} onBack={onBack} onEditTopicName={() => setIsEditingActivity(true)} />;
 };
 
 // View to select a Deep Work or Upskill topic
@@ -146,9 +155,9 @@ const TopicPistonView = ({ topicId, onBack }: { topicId: string, onBack: () => v
 };
 
 // The main editor UI for the 8 pistons
-const PistonEditorView = ({ topicId, topicName, onBack }: { topicId: string, topicName: string, onBack: () => void }) => {
+const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void }) => {
     const { pistons, setPistons } = useAuth();
-    const topicPistons = pistons[topicId];
+    const topicPistons = pistons[topicId] || {};
 
     const handleTextChange = (piston: PistonType, text: string) => {
         setPistons(prev => ({
@@ -161,12 +170,18 @@ const PistonEditorView = ({ topicId, topicName, onBack }: { topicId: string, top
     };
 
     return (
-        <div className="flex flex-col h-full">
-            <div className="flex items-center p-4 border-b">
+        <div className="flex flex-col h-[70vh]">
+            <div className="flex items-center p-4 border-b flex-shrink-0">
                  <Button variant="ghost" size="icon" onClick={onBack} className="mr-2 h-8 w-8">
                     <ChevronLeft className="h-5 w-5"/>
                 </Button>
-                <h3 className="text-lg font-semibold truncate" title={topicName}>{topicName}</h3>
+                <h3 
+                  className={`text-lg font-semibold truncate ${onEditTopicName ? 'cursor-pointer hover:underline' : ''}`} 
+                  title={topicName}
+                  onClick={onEditTopicName}
+                >
+                  {topicName}
+                </h3>
             </div>
             <ScrollArea className="flex-grow min-h-0">
                 <div className="p-4 space-y-4">
@@ -175,7 +190,7 @@ const PistonEditorView = ({ topicId, topicName, onBack }: { topicId: string, top
                         <Label htmlFor={`piston-${piston}`} className="font-semibold text-foreground">{piston}</Label>
                         <Textarea 
                             id={`piston-${piston}`}
-                            value={topicPistons?.[piston]?.text || ''}
+                            value={topicPistons[piston]?.text || ''}
                             onChange={(e) => handleTextChange(piston, e.target.value)}
                             placeholder={`What is your intention for ${piston.toLowerCase()}?`}
                             className="mt-1"

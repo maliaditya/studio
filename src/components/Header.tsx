@@ -12,6 +12,7 @@ import { SupportModal } from './SupportModal';
 import { cn } from '@/lib/utils';
 import { DemoTokenModal } from './DemoTokenModal';
 import { SettingsModal } from './SettingsModal';
+import { PistonsHead } from './PistonsHead';
 
 export function Header() {
   const { 
@@ -107,6 +108,7 @@ export function Header() {
         onSubmit={pushDemoDataWithToken}
       />
       <SettingsModal isOpen={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen} />
+      <PistonsHead />
     </>
   );
 }
