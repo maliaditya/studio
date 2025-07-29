@@ -10,6 +10,7 @@ import { MatrixBackground } from '@/components/MatrixBackground';
 import { DefaultBackground } from '@/components/DefaultBackground';
 import { ClothBackground } from '@/components/ClothBackground';
 import { FloatingVideoPlayer } from '@/components/FloatingVideoPlayer';
+import { PistonsHead } from '@/components/PistonsHead';
 
 export const metadata: Metadata = {
   title: 'LifeOS',
@@ -36,6 +37,7 @@ export default function RootLayout({
           <MatrixBackground />
           <ClothBackground />
           <Header />
+          <PistonsHead />
           <main>{children}</main>
           <Toaster />
           <BackgroundAudioPlayer />
