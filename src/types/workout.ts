@@ -268,3 +268,18 @@ export interface MindsetCard {
   icon: string;
   points: MindsetPoint[];
 }
+
+// Pistons of Intention
+export type PistonType = 'Desire' | 'Curiosity' | 'Truth-Seeking' | 'Contribution' | 'Growth' | 'Expression' | 'Pleasure' | 'Protection';
+
+export interface PistonState {
+    text: string;
+    // Potentially add history tracking here later
+}
+
+export type PistonsData = Record<PistonType, PistonState>;
+
+export interface PistonsCategoryData {
+    health?: PistonsData;
+    [topicId: string]: PistonsData | undefined; // For wealth and growth topics
+}
