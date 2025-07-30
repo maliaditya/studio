@@ -472,7 +472,8 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 
     const handleOpenResource = (e: React.MouseEvent, resourceId: string) => {
         e.stopPropagation();
-        setResourcePopup({ resourceId, x: mainPosition.x - 512 - 20, y: mainPosition.y });
+        const popupX = Math.max(20, mainPosition.x - 512 - 20);
+        setResourcePopup({ resourceId, x: popupX, y: mainPosition.y });
     };
 
     const handleLinkResource = (resourceId: string | null) => {
