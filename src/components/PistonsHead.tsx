@@ -966,5 +966,3 @@ const TopicPistonView = ({ topicId, onBack, setHistoryPopup, setResourcePopup, o
 
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
-
-    
