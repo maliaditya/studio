@@ -82,7 +82,7 @@ export function PistonsHead() {
   
   const { pistons } = useAuth();
   
-  const getTopicName = (view: 'main' | 'health' | 'wealth' | 'growth') => {
+  const getTopicName = (view: 'main' | 'health' | 'wealth' | 'growth', type?: 'wealth' | 'growth') => {
     switch (view) {
       case 'health':
         return `Health: ${pistons.health?.activity || 'Activity'}`;
@@ -141,19 +141,18 @@ export function PistonsHead() {
                     <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 right-1.5 z-20" onClick={handleClose}>
                         <X className="h-4 w-4" />
                     </Button>
-                    <div className="absolute top-1.5 left-1.5 z-20">
-                      {currentView !== 'main' && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onBack(); }}>
-                              <ChevronLeft className="h-4 w-4" />
-                          </Button>
-                      )}
-                    </div>
+                    
                     <CardHeader 
-                        className="p-3 cursor-grab text-center" 
+                        className="p-3 cursor-grab text-center relative" 
                         {...attributes} 
                         {...listeners}
                     >
-                        <CardTitle className="text-base truncate" title={topicName as string}>
+                        {currentView !== 'main' && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 left-1.5 z-20" onClick={(e) => { e.stopPropagation(); onBack(); }}>
+                                <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                        )}
+                        <CardTitle className="text-base truncate px-8" title={topicName as string}>
                           {topicName}
                         </CardTitle>
                     </CardHeader>
@@ -290,7 +289,6 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { top
             if (isNewEntry) {
                 updatedEntries = [newEntry, ...currentEntries];
             } else {
-                // This is an edit of the most recent entry
                 if (currentEntries.length > 0) {
                     updatedEntries = [newEntry, ...currentEntries.slice(1)];
                 } else {
@@ -327,7 +325,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { top
     
     const handleAddNew = (piston: PistonType) => {
         setEditingPiston(piston);
-        setEditText(''); // Start with empty text for new entry
+        setEditText(''); 
     };
 
     const currentHistoryEntries = historyPiston ? (topicPistons[historyPiston] || []) : [];
@@ -362,7 +360,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { top
                                         </div>
                                     ) : (
                                         <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start">
-                                            <div className="flex-grow" onClick={() => handleStartEdit(piston)}>
+                                            <div className="flex-grow" onDoubleClick={() => handleStartEdit(piston)}>
                                               {currentEntry?.text ? (
                                                   <p className="whitespace-pre-wrap cursor-text">{currentEntry.text}</p>
                                               ) : (
@@ -373,7 +371,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { top
                                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleAddNew(piston)}>
                                                     <Plus className="h-4 w-4" />
                                                 </Button>
-                                                {entries.length > 1 && (
+                                                {entries.length > 0 && (
                                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setHistoryPiston(piston)}>
                                                         <History className="h-4 w-4" />
                                                     </Button>
