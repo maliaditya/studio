@@ -16,6 +16,7 @@ import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
@@ -65,7 +66,7 @@ const HistoryPopupCard = ({ popupState, entries, onClose }: { popupState: Histor
                            {PISTON_ICONS[popupState.piston]} 
                            <CardTitle className="text-base">{popupState.piston} History</CardTitle>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onClose(); }}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={onClose}>
                             <X className="h-4 w-4" />
                         </Button>
                     </div>
@@ -386,7 +387,8 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
         setEditText(''); 
     };
 
-    const handleOpenHistory = (piston: PistonType) => {
+    const handleOpenHistory = (e: React.MouseEvent, piston: PistonType) => {
+        e.stopPropagation();
         setHistoryPopup({
             piston,
             x: mainPosition.x + 384 + 20, // 384 is card width, 20 is offset
@@ -395,59 +397,59 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
     };
 
     return (
-        <CardContent className="p-4">
-            <ul className="space-y-2">
-                {PISTON_NAMES.map(piston => {
-                    const entries = topicPistons[piston] || [];
-                    const currentEntry = entries[0];
-                    return (
-                        <li key={piston} className="p-2 rounded-lg bg-muted/30">
-                            <div className="flex items-start gap-3">
-                                <span className="mt-1">{PISTON_ICONS[piston]}</span>
-                                <div className="flex-grow">
-                                    <h4 className="font-semibold text-sm">{piston}</h4>
-                                    {editingPiston === piston ? (
-                                        <div className="mt-1">
-                                            <Textarea 
-                                                value={editText}
-                                                onChange={(e) => setEditText(e.target.value)}
-                                                placeholder={pistonPlaceholders[piston]}
-                                                className="bg-background text-sm min-h-[4rem] border-primary"
-                                                autoFocus
-                                                rows={2}
-                                            />
-                                            <div className="flex justify-end gap-2 mt-2">
-                                                <Button size="sm" variant="ghost" onClick={() => { setEditingPiston(null); setEditText(''); }}>Cancel</Button>
-                                                <Button size="sm" onClick={() => handleSaveEdit(false)}>Save</Button>
+            <CardContent className="p-4">
+                <ul className="space-y-2">
+                    {PISTON_NAMES.map(piston => {
+                        const entries = topicPistons[piston] || [];
+                        const currentEntry = entries[0];
+                        return (
+                            <li key={piston} className="p-2 rounded-lg bg-muted/30">
+                                <div className="flex items-start gap-3">
+                                    <span className="mt-1">{PISTON_ICONS[piston]}</span>
+                                    <div className="flex-grow">
+                                        <h4 className="font-semibold text-sm">{piston}</h4>
+                                        {editingPiston === piston ? (
+                                            <div className="mt-1">
+                                                <Textarea 
+                                                    value={editText}
+                                                    onChange={(e) => setEditText(e.target.value)}
+                                                    placeholder={pistonPlaceholders[piston]}
+                                                    className="bg-background text-sm min-h-[4rem] border-primary"
+                                                    autoFocus
+                                                    rows={2}
+                                                />
+                                                <div className="flex justify-end gap-2 mt-2">
+                                                    <Button size="sm" variant="ghost" onClick={() => { setEditingPiston(null); setEditText(''); }}>Cancel</Button>
+                                                    <Button size="sm" onClick={() => handleSaveEdit(false)}>Save</Button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ) : (
-                                        <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start">
-                                            <div className="flex-grow cursor-text" onClick={() => handleStartEdit(piston)}>
-                                                {currentEntry?.text ? (
-                                                    <p className="whitespace-pre-wrap">{currentEntry.text}</p>
-                                                ) : (
-                                                    <p className="italic opacity-70">{pistonPlaceholders[piston]}</p>
-                                                )}
-                                            </div>
-                                            <div className="flex-shrink-0">
-                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleAddNew(piston)}>
-                                                    <Plus className="h-4 w-4" />
-                                                </Button>
-                                                {entries.length > 0 && (
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenHistory(piston)}>
-                                                        <History className="h-4 w-4" />
+                                        ) : (
+                                            <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start">
+                                                <div className="flex-grow cursor-text" onClick={() => handleStartEdit(piston)}>
+                                                    {currentEntry?.text ? (
+                                                        <p className="whitespace-pre-wrap">{currentEntry.text}</p>
+                                                    ) : (
+                                                        <p className="italic opacity-70">{pistonPlaceholders[piston]}</p>
+                                                    )}
+                                                </div>
+                                                <div className="flex-shrink-0">
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleAddNew(piston)}>
+                                                        <Plus className="h-4 w-4" />
                                                     </Button>
-                                                )}
+                                                    {entries.length > 0 && (
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleOpenHistory(e, piston)}>
+                                                            <History className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        </li>
-                    )
-                })}
-            </ul>
-        </CardContent>
+                            </li>
+                        )
+                    })}
+                </ul>
+            </CardContent>
     );
 };
