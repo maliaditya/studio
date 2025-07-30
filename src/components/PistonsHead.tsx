@@ -218,7 +218,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                             <Upload className="h-4 w-4"/>
                         </Button>
                     )}
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={(e) => { e.stopPropagation(); onClose(resource.id); }}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={(e) => { e.stopPropagation(); setPlayingAudio(null); onClose(resource.id); }}>
                         <X className="h-4 w-4" />
                     </Button>
                 </div>
@@ -469,19 +469,16 @@ export function PistonsHead() {
   const handleOpenHistory = (e: React.MouseEvent, piston: PistonType) => {
     e.stopPropagation();
     
-    // Check if the history popup is already open for this piston
     if (historyPopup?.piston === piston) {
-      setHistoryPopup(null); // Close it if it's already open
+      setHistoryPopup(null);
       return;
     }
   
-    // Calculate position
     const historyPopupWidth = 320;
     const pistonsHeadWidth = 384; 
     let x = position.x + pistonsHeadWidth + 20;
     let y = position.y;
   
-    // Prevent going off-screen
     if (x + historyPopupWidth > window.innerWidth) {
         x = position.x - historyPopupWidth - 20;
     }
@@ -494,20 +491,13 @@ export function PistonsHead() {
     e.stopPropagation();
 
     const popupWidth = 512;
-    let x, y;
-
-    if (historyPopup) {
-        // Position to the left of the history popup if it's open
-        x = historyPopup.x - popupWidth - 20;
-        y = historyPopup.y;
-    } else {
-        // Position in the center of the screen
-        x = window.innerWidth / 2 - popupWidth / 2;
-        y = window.innerHeight / 2 - Math.min(window.innerHeight * 0.7, 500) / 2;
+    const pistonsHeadWidth = 384;
+    let x = position.x + pistonsHeadWidth + 20;
+    let y = position.y;
+  
+    if (x + popupWidth > window.innerWidth) {
+        x = position.x - popupWidth - 20;
     }
-
-    // Ensure it doesn't go off-screen
-    x = Math.max(20, x);
     y = Math.max(20, y);
 
     setResourcePopup({ resourceId, x, y });
@@ -912,7 +902,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                                 {currentEntry?.text ? (<p className="whitespace-pre-wrap">{currentEntry.text}</p>) : (<p className="italic opacity-70">{PISTON_PLACEHOLDERS[piston]}</p>)}
                                             </div>
                                             <div className="flex-shrink-0 flex items-center">
-                                                 {isResourceLinked ? (
+                                                {isResourceLinked ? (
                                                     <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDownCapture={(e) => handleOpenResource(e, currentEntry.linkedResourceId!)}>
                                                         <Library className="h-4 w-4 text-primary" />
                                                     </Button>
@@ -930,9 +920,9 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                                             <DropdownMenuItem onSelect={() => setNewEntryPiston(piston)}><Plus className="mr-2 h-4 w-4"/>New Entry</DropdownMenuItem>
                                                             {currentEntry && <DropdownMenuItem onSelect={() => handleDeleteEntry(piston)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Current</DropdownMenuItem>}
                                                             {entries.length > 0 && <DropdownMenuItem onSelect={(e) => handleOpenHistory(e, piston)}><History className="mr-2 h-4 w-4"/>View History</DropdownMenuItem>}
-                                                             {isResourceLinked && (
+                                                            {currentEntry && (
                                                                 <DropdownMenuItem onSelect={() => onLinkResource({ piston, entryId: currentEntry.id, currentResourceId: currentEntry.linkedResourceId })}>
-                                                                    <LinkIcon className="mr-2 h-4 w-4"/> Link Resource
+                                                                    <LinkIcon className="mr-2 h-4 w-4"/> {isResourceLinked ? 'Change Resource' : 'Link Resource'}
                                                                 </DropdownMenuItem>
                                                             )}
                                                         </DropdownMenuContent>
