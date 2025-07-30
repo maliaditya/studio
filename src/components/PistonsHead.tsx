@@ -208,15 +208,16 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
                 </div>
                 
-                <div className="absolute top-2 right-2 z-20 flex items-center">
-                     <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7"><MoreVertical className="h-4 w-4"/></Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => audioInputRef.current?.click()}><Upload className="mr-2 h-4 w-4"/>Upload Audio</DropdownMenuItem>
-                        </DropdownMenuContent>
-                     </DropdownMenu>
+                 <div className="absolute top-2 right-2 z-20 flex items-center">
+                    {resource.audioUrl ? (
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={togglePlayAudio}>
+                            {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
+                        </Button>
+                    ) : (
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => audioInputRef.current?.click()}>
+                            <Upload className="h-4 w-4"/>
+                        </Button>
+                    )}
                     <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={(e) => { e.stopPropagation(); setPlayingAudio(null); onClose(); }}>
                         <X className="h-4 w-4" />
                     </Button>
@@ -238,11 +239,6 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                             <CardTitle className="text-base truncate cursor-pointer" onClick={() => setEditingTitle(true)}>
                                 {resource.name}
                             </CardTitle>
-                        )}
-                         {resource.audioUrl && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7 -mr-2" onPointerDownCapture={togglePlayAudio}>
-                                {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
-                            </Button>
                         )}
                     </div>
                 </CardHeader>
@@ -484,7 +480,7 @@ export function PistonsHead() {
     const popupWidth = 512;
     const x = window.innerWidth / 2 - popupWidth / 2;
     const y = window.innerHeight / 2 - Math.min(window.innerHeight * 0.7, 500) / 2;
-
+    
     if (historyPopup) {
         setHistoryPopup(null);
     }
@@ -753,7 +749,7 @@ const DesireSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, type
                 <ul className="space-y-2 pr-2">
                     {desires.map(desire => (
                         <li key={desire.id} className="flex items-center justify-between group p-2 rounded-md border bg-muted/20">
-                            <button onClick={() => onSelect(desire.id, 'desires')} className="flex-grow text-left">
+                            <button onClick={() => onSelect(desire.id, 'desires')} className="flex items-center gap-2 flex-grow text-left">
                                 <span className="font-medium group-hover:text-primary transition-colors">{desire.name}</span>
                             </button>
                             <AlertDialog>
@@ -888,7 +884,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                             </div>
                                             <div className="flex-shrink-0 flex items-center">
                                                 {currentEntry?.linkedResourceId ? (
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDownCapture={(e) => handleOpenResource(e, currentEntry.linkedResourceId!)}>
+                                                     <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDownCapture={(e) => handleOpenResource(e, currentEntry.linkedResourceId!)}>
                                                         <Library className="h-4 w-4 text-primary" />
                                                     </Button>
                                                 ) : currentEntry ? (
@@ -896,7 +892,6 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                                         <LinkIcon className="h-4 w-4" />
                                                     </Button>
                                                 ) : null}
-
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
                                                         <Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="h-4 w-4"/></Button>
@@ -905,8 +900,6 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                                         <DropdownMenuItem onSelect={() => setNewEntryPiston(piston)}><Plus className="mr-2 h-4 w-4"/>New Entry</DropdownMenuItem>
                                                         {currentEntry && <DropdownMenuItem onSelect={() => handleDeleteEntry(piston)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Current</DropdownMenuItem>}
                                                         {entries.length > 0 && <DropdownMenuItem onSelect={(e) => handleOpenHistory(e, piston)}><History className="mr-2 h-4 w-4"/>View History</DropdownMenuItem>}
-                                                        {currentEntry && !currentEntry.linkedResourceId && <DropdownMenuItem onSelect={() => onLinkResource({piston, entryId: currentEntry.id})}><LinkIcon className="mr-2 h-4 w-4"/>Link Resource</DropdownMenuItem>}
-                                                        {currentEntry && currentEntry.linkedResourceId && <DropdownMenuItem onSelect={(e) => handleOpenResource(e, currentEntry.linkedResourceId!)}><Library className="mr-2 h-4 w-4"/>Open Resource</DropdownMenuItem>}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </div>
