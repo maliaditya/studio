@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -36,14 +37,14 @@ const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
 };
 
 const PISTON_PLACEHOLDERS: Record<PistonType, string> = {
-    'Desire': 'What is the ultimate outcome I want?',
-    'Curiosity': 'What am I curious about? What do I want to learn?',
-    'Truth-Seeking': 'What is the core truth I need to accept?',
-    'Contribution': 'How will this help others? Who am I serving?',
-    'Growth': 'How will this make me better?',
-    'Expression': 'What do I want to create or say?',
-    'Pleasure': 'What will I enjoy about this process?',
-    'Protection': 'What risks am I mitigating? What am I protecting?',
+    'Desire': 'What is the ultimate outcome I want from [topic]?',
+    'Curiosity': 'What am I curious about regarding [topic]?',
+    'Truth-Seeking': 'What is the core truth I need to accept about [topic]?',
+    'Contribution': 'How will [topic] help others? Who am I serving?',
+    'Growth': 'How will working on [topic] make me better?',
+    'Expression': 'What do I want to create or say about [topic]?',
+    'Pleasure': 'What will I enjoy about the process of working on [topic]?',
+    'Protection': 'What risks am I mitigating by focusing on [topic]?',
 };
 
 const PISTON_NAMES: PistonType[] = [
@@ -612,7 +613,6 @@ export function PistonsHead() {
                         entries={pistons[selectedTopicId || (currentView === 'health' ? 'health' : '')]?.[historyPopup.piston] || []}
                         onClose={handleCloseHistory}
                         onEdit={(piston, entry) => {
-                            // This functionality is now handled by inline editing, but keeping prop for now
                             handleCloseHistory();
                         }}
                     />
@@ -869,6 +869,11 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
         });
     };
     
+    const getPlaceholderText = (piston: PistonType) => {
+        const defaultPlaceholder = PISTON_PLACEHOLDERS[piston];
+        return defaultPlaceholder.replace('[topic]', `"${topicName}"`);
+    };
+    
     return (
         <>
             <CardContent className="p-4 max-h-[70vh]">
@@ -901,7 +906,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                                     />
                                                 ) : (
                                                     <p className="whitespace-pre-wrap flex-grow pr-2" onDoubleClick={() => currentEntry && handleStartEditing(currentEntry)}>
-                                                        {currentEntry?.text || <span className="italic opacity-70">{PISTON_PLACEHOLDERS[piston]}</span>}
+                                                        {currentEntry?.text || <span className="italic opacity-70">{getPlaceholderText(piston)}</span>}
                                                     </p>
                                                 )}
                                                 <div className="flex-shrink-0 flex items-center">
