@@ -276,6 +276,7 @@ export interface PistonEntry {
     id: string;
     text: string;
     timestamp: number;
+    linkedResourceId?: string;
 }
 
 export type PistonState = PistonEntry[];
