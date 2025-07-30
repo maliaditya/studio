@@ -432,19 +432,22 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
     };
 
     const handleSaveEdit = () => {
-        if (!editingEntry || !editText.trim()) {
-            setEditingEntry(null); setEditText('');
-            return;
+        if (!editingEntry) return;
+        const newText = editText.trim();
+        if (!newText) { // If text is empty, delete the entry
+            handleDelete(editingEntry.piston, editingEntry.entryId);
+        } else {
+            setPistons(prev => {
+                const topicData = { ...(prev[topicId] || {}) };
+                const entries = topicData[editingEntry.piston] || [];
+                const updatedEntries = entries.map(entry =>
+                    entry.id === editingEntry.entryId ? { ...entry, text: newText, timestamp: Date.now() } : entry
+                );
+                return { ...prev, [topicId]: { ...topicData, [editingEntry.piston]: updatedEntries } };
+            });
         }
-        setPistons(prev => {
-            const topicData = { ...(prev[topicId] || {}) };
-            const entries = topicData[editingEntry.piston] || [];
-            const updatedEntries = entries.map(entry =>
-                entry.id === editingEntry.entryId ? { ...entry, text: editText } : entry
-            );
-            return { ...prev, [topicId]: { ...topicData, [editingEntry.piston]: updatedEntries } };
-        });
-        setEditingEntry(null); setEditText('');
+        setEditingEntry(null);
+        setEditText('');
     };
     
     const handleSaveNewEntry = (piston: PistonType) => {
@@ -456,6 +459,15 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
             return { ...prev, [topicId]: { ...topicData, [piston]: [newEntry, ...entries] } };
         });
         setNewEntryPiston(null); setEditText('');
+    };
+
+    const handleDelete = (piston: PistonType, entryId: string) => {
+        setPistons(prev => {
+            const topicData = { ...(prev[topicId] || {}) };
+            const entries = topicData[piston] || [];
+            const updatedEntries = entries.filter(entry => entry.id !== entryId);
+            return { ...prev, [topicId]: { ...topicData, [piston]: updatedEntries } };
+        });
     };
     
     const handleOpenHistory = (e: React.MouseEvent, piston: PistonType) => {
@@ -472,9 +484,14 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
         setPistons(prev => {
             const topicData = { ...(prev[topicId] || {}) };
             const entries = topicData[piston] || [];
-            const updatedEntries = entries.map(entry =>
-                entry.id === entryId ? { ...entry, linkedResourceId: resourceId === null ? undefined : resourceId } : entry
-            );
+            const updatedEntries = entries.map(entry => {
+                if (entry.id === entryId) {
+                    const newEntry = { ...entry, linkedResourceId: resourceId === 'none' ? undefined : resourceId };
+                    if (resourceId === 'none') delete newEntry.linkedResourceId;
+                    return newEntry;
+                }
+                return entry;
+            });
             return { ...prev, [topicId]: { ...topicData, [piston]: updatedEntries } };
         });
     };
@@ -519,7 +536,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                                                 <Select value={currentEntry.linkedResourceId || ""} onValueChange={(val) => handleLinkResource(piston, currentEntry.id, val)}>
                                                                     <SelectTrigger><SelectValue placeholder="Select a resource..." /></SelectTrigger>
                                                                     <SelectContent>
-                                                                        <SelectItem value="">-- None --</SelectItem>
+                                                                        <SelectItem value="none">-- None --</SelectItem>
                                                                         {resources.filter(r => r.type === 'card').map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                                                                     </SelectContent>
                                                                 </Select>
