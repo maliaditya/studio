@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical, PlusCircle, Trash2 } from 'lucide-react';
+import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical, PlusCircle, Trash2, Play, Pause } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
@@ -21,8 +21,6 @@ import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
     'Desire': <Target className="h-5 w-5 text-red-500" />,
@@ -114,18 +112,19 @@ interface ResourcePopupState {
   y: number;
 }
 
-const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate }: { 
+const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAudio, setPlayingAudio }: { 
     popupState: ResourcePopupState; 
     resource: Resource; 
     onClose: () => void;
     onUpdate: (updatedResource: Resource) => void;
+    playingAudio: { id: string; isPlaying: boolean } | null;
+    setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
 }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `resource-popup-${popupState.resourceId}`,
     });
     
     const [editingTitle, setEditingTitle] = useState(false);
-    const [editingPointId, setEditingPointId] = useState<string | null>(null);
     const audioInputRef = useRef<HTMLInputElement>(null);
 
     const style: React.CSSProperties = {
@@ -152,6 +151,16 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate }: {
         }
     };
     
+    const togglePlayAudio = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setPlayingAudio(prev => {
+            if (prev?.id === resource.id && prev.isPlaying) {
+                return { ...prev, isPlaying: false };
+            }
+            return { id: resource.id, isPlaying: true };
+        });
+    };
+
     const handleTitleChange = (newTitle: string) => {
         onUpdate({ ...resource, name: newTitle });
     };
@@ -183,17 +192,15 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate }: {
                 </div>
                 
                 <div className="absolute top-2 right-2 z-20 flex items-center">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                             <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={(e) => e.stopPropagation()}>
-                                <MoreVertical className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => setEditingTitle(true)}><Edit className="mr-2 h-4 w-4" />Edit Title</DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => audioInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />Upload Audio</DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    {resource.audioUrl ? (
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={(e) => e.stopPropagation()} onClick={togglePlayAudio}>
+                            {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
+                        </Button>
+                    ) : (
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={(e) => e.stopPropagation()} onClick={() => audioInputRef.current?.click()}>
+                            <Upload className="h-4 w-4" />
+                        </Button>
+                    )}
                     <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={(e) => { e.stopPropagation(); onClose(); }}>
                         <X className="h-4 w-4" />
                     </Button>
@@ -320,6 +327,25 @@ export function PistonsHead() {
   const [position, setPosition] = useState({ x: 50, y: 50 });
   const [historyPopup, setHistoryPopup] = useState<HistoryPopupState | null>(null);
   const [resourcePopup, setResourcePopup] = useState<ResourcePopupState | null>(null);
+  const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const audioEl = audioRef.current;
+    if (!audioEl) return;
+
+    if (playingAudio?.isPlaying) {
+      const resourceToPlay = resources.find(r => r.id === playingAudio.id);
+      if (resourceToPlay?.audioUrl) {
+        if (audioEl.src !== resourceToPlay.audioUrl) {
+          audioEl.src = resourceToPlay.audioUrl;
+        }
+        audioEl.play().catch(e => console.error("Audio play failed:", e));
+      }
+    } else {
+      audioEl.pause();
+    }
+  }, [playingAudio, resources]);
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: 'pistons-popup',
@@ -462,6 +488,7 @@ export function PistonsHead() {
 
         {isPistonsHeadOpen && (
             <>
+                <audio ref={audioRef} onEnded={() => setPlayingAudio(null)} />
                 <div
                     ref={setNodeRef}
                     style={style}
@@ -505,6 +532,8 @@ export function PistonsHead() {
                         resource={resources.find(r => r.id === resourcePopup.resourceId)!}
                         onClose={handleCloseResource}
                         onUpdate={handleUpdateResource}
+                        playingAudio={playingAudio}
+                        setPlayingAudio={setPlayingAudio}
                     />
                 )}
                 {editingPistonEntry && (
