@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight } from 'lucide-react';
+import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
@@ -20,6 +20,7 @@ import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
@@ -112,10 +113,18 @@ interface ResourcePopupState {
   y: number;
 }
 
-const ResourcePopupCard = ({ popupState, resource, onClose }: { popupState: ResourcePopupState; resource: Resource; onClose: () => void; }) => {
+const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate }: { 
+    popupState: ResourcePopupState; 
+    resource: Resource; 
+    onClose: () => void;
+    onUpdate: (updatedResource: Resource) => void;
+}) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `resource-popup-${popupState.resourceId}`,
     });
+    
+    const [editingTitle, setEditingTitle] = useState(false);
+    const audioInputRef = useRef<HTMLInputElement>(null);
 
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -128,19 +137,60 @@ const ResourcePopupCard = ({ popupState, resource, onClose }: { popupState: Reso
     if (transform) {
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
+    
+    const handleAudioUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const audioUrl = e.target?.result as string;
+                onUpdate({ ...resource, audioUrl });
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+    
+    const handleTitleChange = (newTitle: string) => {
+        onUpdate({ ...resource, name: newTitle });
+    };
 
     return (
         <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
+             <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
             <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col">
                 <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
                     <div className="flex justify-between items-center">
-                        <CardTitle className="text-base flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-grow min-w-0">
                             <Library className="h-4 w-4" />
-                            <span className="truncate">{resource.name}</span>
-                        </CardTitle>
-                         <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={onClose}>
-                            <X className="h-4 w-4" />
-                        </Button>
+                            {editingTitle ? (
+                                <Input 
+                                    value={resource.name} 
+                                    onChange={(e) => handleTitleChange(e.target.value)} 
+                                    onBlur={() => setEditingTitle(false)} 
+                                    onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
+                                    className="h-8 text-base"
+                                    autoFocus
+                                />
+                            ) : (
+                                <CardTitle className="text-base truncate cursor-pointer" onClick={() => setEditingTitle(true)}>
+                                    {resource.name}
+                                </CardTitle>
+                            )}
+                        </div>
+                        <div>
+                             <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7"><MoreVertical className="h-4 w-4" /></Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onSelect={() => setEditingTitle(true)}><Edit className="mr-2 h-4 w-4" />Edit Title</DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => audioInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />Upload Audio</DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={onClose}>
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
                     </div>
                 </CardHeader>
                 <div className="flex-grow min-h-0 overflow-y-auto">
@@ -174,7 +224,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose }: { popupState: Reso
 
 
 export function PistonsHead() {
-  const { isPistonsHeadOpen, setIsPistonsHeadOpen, pistons, setPistons, resources } = useAuth();
+  const { isPistonsHeadOpen, setIsPistonsHeadOpen, pistons, setPistons, resources, setResources } = useAuth();
   const [currentView, setCurrentView] = useState<'main' | 'health' | 'wealth' | 'growth'>('main');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   
@@ -188,6 +238,12 @@ export function PistonsHead() {
   
   const handleCloseHistory = () => setHistoryPopup(null);
   const handleCloseResource = () => setResourcePopup(null);
+  
+  const handleUpdateResource = (updatedResource: Resource) => {
+    setResources(prev =>
+      prev.map(res => res.id === updatedResource.id ? updatedResource : res)
+    );
+  };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, delta } = event;
@@ -332,6 +388,7 @@ export function PistonsHead() {
                         popupState={resourcePopup}
                         resource={resources.find(r => r.id === resourcePopup.resourceId)!}
                         onClose={handleCloseResource}
+                        onUpdate={handleUpdateResource}
                     />
                 )}
                 {editingPistonEntry && (
