@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -155,47 +156,51 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate }: {
     };
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
+        <div ref={setNodeRef} style={style} className="z-[70]">
              <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
-            <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col">
-                <CardHeader className="p-3 relative flex-shrink-0">
-                    <div className="flex justify-between items-center">
-                         <div className="flex items-center gap-2 flex-grow min-w-0">
-                            <Button variant="ghost" size="icon" className="h-7 w-7 cursor-grab" {...listeners}>
-                                <GripVertical className="h-4 w-4" />
+            <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative">
+                <div 
+                    className="absolute top-2 left-2 z-20 h-7 w-7 rounded-full flex items-center justify-center cursor-grab"
+                    {...attributes}
+                    {...listeners}
+                >
+                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                </div>
+                
+                <div className="absolute top-2 right-2 z-20 flex items-center">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                                <MoreVertical className="h-4 w-4" />
                             </Button>
-                            <Library className="h-4 w-4" />
-                            {editingTitle ? (
-                                <Input 
-                                    value={resource.name} 
-                                    onChange={(e) => handleTitleChange(e.target.value)} 
-                                    onBlur={() => setEditingTitle(false)} 
-                                    onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
-                                    className="h-8 text-base"
-                                    autoFocus
-                                />
-                            ) : (
-                                <CardTitle className="text-base truncate cursor-pointer" onClick={() => setEditingTitle(true)}>
-                                    {resource.name}
-                                </CardTitle>
-                            )}
-                        </div>
-                        <div>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => e.stopPropagation()}>
-                                        <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onSelect={() => setEditingTitle(true)}><Edit className="mr-2 h-4 w-4" />Edit Title</DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={() => audioInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />Upload Audio</DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={onClose}>
-                                <X className="h-4 w-4" />
-                            </Button>
-                        </div>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={() => setEditingTitle(true)}><Edit className="mr-2 h-4 w-4" />Edit Title</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => audioInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />Upload Audio</DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={onClose}>
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+
+                <CardHeader className="p-3 relative flex-shrink-0 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                        <Library className="h-4 w-4" />
+                        {editingTitle ? (
+                            <Input 
+                                value={resource.name} 
+                                onChange={(e) => handleTitleChange(e.target.value)} 
+                                onBlur={() => setEditingTitle(false)} 
+                                onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
+                                className="h-8 text-base"
+                                autoFocus
+                            />
+                        ) : (
+                            <CardTitle className="text-base truncate cursor-pointer" onClick={() => setEditingTitle(true)}>
+                                {resource.name}
+                            </CardTitle>
+                        )}
                     </div>
                 </CardHeader>
                 <div className="flex-grow min-h-0 overflow-y-auto">
@@ -306,6 +311,34 @@ export function PistonsHead() {
   
   const [editingPistonEntry, setEditingPistonEntry] = useState<{ piston: PistonType; entry: PistonEntry; } | null>(null);
 
+  const [linkingResourceFor, setLinkingResourceFor] = useState<{piston: PistonType; entryId: string; currentResourceId?: string;} | null>(null);
+
+  const handleLinkResource = (resourceId: string | null) => {
+    if (!linkingResourceFor) return;
+    const { piston, entryId } = linkingResourceFor;
+    setPistons(prev => {
+        const topicKey = selectedTopicId || (currentView === 'health' ? 'health' : '');
+        if (!topicKey) return prev;
+        const topicData = { ...(prev[topicKey] || {}) };
+        const entries = topicData[piston] || [];
+        const updatedEntries = entries.map(entry => {
+            if (entry.id === entryId) {
+                const newEntry = { ...entry };
+                if (resourceId === 'none' || resourceId === null) {
+                    delete newEntry.linkedResourceId;
+                } else {
+                    newEntry.linkedResourceId = resourceId;
+                }
+                return newEntry;
+            }
+            return entry;
+        });
+        return { ...prev, [topicKey]: { ...topicData, [piston]: updatedEntries } };
+    });
+    setLinkingResourceFor(null);
+  };
+
+
   const renderContent = () => {
     const commonProps = { 
         onBack: onBack, 
@@ -313,6 +346,7 @@ export function PistonsHead() {
         setHistoryPopup: setHistoryPopup,
         setResourcePopup: setResourcePopup,
         onEditEntry: setEditingPistonEntry,
+        onLinkResource: setLinkingResourceFor
     };
     switch (currentView) {
       case 'health':
@@ -428,6 +462,32 @@ export function PistonsHead() {
                         </DialogContent>
                     </Dialog>
                 )}
+                 {linkingResourceFor && (
+                    <Dialog open={!!linkingResourceFor} onOpenChange={() => setLinkingResourceFor(null)}>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Link Resource to {linkingResourceFor.piston}</DialogTitle>
+                                <DialogDescription>Select an existing resource card to connect to this intention.</DialogDescription>
+                            </DialogHeader>
+                            <div className="py-4">
+                                <Select
+                                    value={linkingResourceFor.currentResourceId || 'none'}
+                                    onValueChange={(val) => handleLinkResource(val)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a resource card..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">-- None --</SelectItem>
+                                        {resources.filter(r => r.type === 'card').map(r => (
+                                            <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+                )}
             </>
         )}
     </DndContext>
@@ -446,7 +506,7 @@ const MainPistonView = ({ onSelect }: { onSelect: (view: 'health' | 'wealth' | '
 );
 
 
-const HealthPistonView = ({ onBack, setHistoryPopup, mainPosition, setResourcePopup, onEditEntry }: { onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, mainPosition: {x: number, y: number}, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onEditEntry: (data: { piston: PistonType; entry: PistonEntry; }) => void; }) => {
+const HealthPistonView = ({ onBack, setHistoryPopup, mainPosition, setResourcePopup, onEditEntry, onLinkResource }: { onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, mainPosition: {x: number, y: number}, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onEditEntry: (data: { piston: PistonType; entry: PistonEntry; }) => void; onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; }) => {
     const { pistons, setPistons } = useAuth();
     const [activity, setActivity] = useState(pistons.health?.activity || '');
     const [isEditingActivity, setIsEditingActivity] = useState(!pistons.health?.activity);
@@ -476,7 +536,7 @@ const HealthPistonView = ({ onBack, setHistoryPopup, mainPosition, setResourcePo
         )
     }
 
-    return <PistonEditorView topicId="health" topicName={`Health: ${activity}`} onBack={onBack} onEditTopicName={() => setIsEditingActivity(true)} setHistoryPopup={setHistoryPopup} mainPosition={mainPosition} setResourcePopup={setResourcePopup} onEditEntry={onEditEntry} />;
+    return <PistonEditorView topicId="health" topicName={`Health: ${activity}`} onBack={onBack} onEditTopicName={() => setIsEditingActivity(true)} setHistoryPopup={setHistoryPopup} mainPosition={mainPosition} setResourcePopup={setResourcePopup} onEditEntry={onEditEntry} onLinkResource={onLinkResource} />;
 };
 
 const TopicSelector = ({ onSelect, type, onBack }: { onSelect: (topicId: string, type: 'wealth' | 'growth') => void, type: 'wealth' | 'growth', onBack: () => void }) => {
@@ -502,17 +562,16 @@ const TopicSelector = ({ onSelect, type, onBack }: { onSelect: (topicId: string,
     )
 }
 
-const TopicPistonView = ({ topicId, onBack, setHistoryPopup, mainPosition, setResourcePopup, onEditEntry }: { topicId: string, onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, mainPosition: {x: number, y: number}, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onEditEntry: (data: { piston: PistonType; entry: PistonEntry; }) => void; }) => {
+const TopicPistonView = ({ topicId, onBack, setHistoryPopup, mainPosition, setResourcePopup, onEditEntry, onLinkResource }: { topicId: string, onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, mainPosition: {x: number, y: number}, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onEditEntry: (data: { piston: PistonType; entry: PistonEntry; }) => void; onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; }) => {
     const { pistons } = useAuth();
     const topicName = topicId === 'health' ? `Health: ${pistons.health?.activity || 'Activity'}` : topicId;
-    return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} mainPosition={mainPosition} setResourcePopup={setResourcePopup} onEditEntry={onEditEntry} />;
+    return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} mainPosition={mainPosition} setResourcePopup={setResourcePopup} onEditEntry={onEditEntry} onLinkResource={onLinkResource} />;
 };
 
-const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, mainPosition, setResourcePopup, onEditEntry }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, mainPosition: {x: number, y: number}, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onEditEntry: (data: { piston: PistonType; entry: PistonEntry; }) => void; }) => {
+const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, mainPosition, setResourcePopup, onEditEntry, onLinkResource }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, mainPosition: {x: number, y: number}, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onEditEntry: (data: { piston: PistonType; entry: PistonEntry; }) => void; onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; }) => {
     const { pistons, setPistons, resources } = useAuth();
     const [newEntryPiston, setNewEntryPiston] = useState<PistonType | null>(null);
     const [newEntryText, setNewEntryText] = useState('');
-    const [linkingResourceFor, setLinkingResourceFor] = useState<{piston: PistonType; entryId: string; currentResourceId?: string;} | null>(null);
     
     const topicPistons = pistons[topicId] || {};
     const simpleTopicName = topicName.startsWith('Health: ') ? pistons.health?.activity : topicName;
@@ -539,103 +598,52 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
         setResourcePopup({ resourceId, x: popupX, y: mainPosition.y });
     };
 
-    const handleLinkResource = (resourceId: string | null) => {
-        if (!linkingResourceFor) return;
-        const { piston, entryId } = linkingResourceFor;
-        setPistons(prev => {
-            const topicData = { ...(prev[topicId] || {}) };
-            const entries = topicData[piston] || [];
-            const updatedEntries = entries.map(entry => {
-                if (entry.id === entryId) {
-                    const newEntry = { ...entry };
-                    if (resourceId === 'none' || resourceId === null) {
-                        delete newEntry.linkedResourceId;
-                    } else {
-                        newEntry.linkedResourceId = resourceId;
-                    }
-                    return newEntry;
-                }
-                return entry;
-            });
-            return { ...prev, [topicId]: { ...topicData, [piston]: updatedEntries } };
-        });
-        setLinkingResourceFor(null);
-    };
-
     return (
-        <>
-            <CardContent className="p-4 max-h-[70vh]">
-                <ScrollArea className="h-full pr-2">
-                    <ul className="space-y-2">
-                        {PISTON_NAMES.map(piston => {
-                            const entries = topicPistons[piston] || [];
-                            const currentEntry = entries[0];
-                            const isAddingNewToThisPiston = newEntryPiston === piston;
-                            
-                            return (
-                                <li key={piston} className="p-2 rounded-lg bg-muted/30">
-                                    <div className="flex items-start gap-3">
-                                        <span className="mt-1">{PISTON_ICONS[piston]}</span>
-                                        <div className="flex-grow">
-                                            <h4 className="font-semibold text-sm">{piston}</h4>
-                                            <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start">
-                                                <div className="flex-grow cursor-text pr-2" onClick={() => { if(currentEntry) { onEditEntry({piston, entry: currentEntry}); }}}>
-                                                    {currentEntry?.text ? (<p className="whitespace-pre-wrap">{currentEntry.text}</p>) : (<p className="italic opacity-70">Define your {piston} for {simpleTopicName}</p>)}
-                                                </div>
-                                                <div className="flex-shrink-0 flex items-center">
-                                                    {currentEntry && (
-                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLinkingResourceFor({piston, entryId: currentEntry.id, currentResourceId: currentEntry.linkedResourceId})}>
-                                                            <LinkIcon className="h-4 w-4" />
-                                                        </Button>
-                                                    )}
-                                                    {currentEntry?.linkedResourceId && (<Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleOpenResource(e, currentEntry.linkedResourceId!)}><Library className="h-4 w-4 text-primary" /></Button>)}
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setNewEntryPiston(piston)}><Plus className="h-4 w-4" /></Button>
-                                                    {entries.length > 0 && (<Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleOpenHistory(e, piston)}><History className="h-4 w-4" /></Button>)}
+        <CardContent className="p-4 max-h-[70vh]">
+            <ScrollArea className="h-full pr-2">
+                <ul className="space-y-2">
+                    {PISTON_NAMES.map(piston => {
+                        const entries = topicPistons[piston] || [];
+                        const currentEntry = entries[0];
+                        const isAddingNewToThisPiston = newEntryPiston === piston;
+                        
+                        return (
+                            <li key={piston} className="p-2 rounded-lg bg-muted/30">
+                                <div className="flex items-start gap-3">
+                                    <span className="mt-1">{PISTON_ICONS[piston]}</span>
+                                    <div className="flex-grow">
+                                        <h4 className="font-semibold text-sm">{piston}</h4>
+                                        <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start">
+                                            <div className="flex-grow cursor-text pr-2" onClick={() => { if(currentEntry) { onEditEntry({piston, entry: currentEntry}); }}}>
+                                                {currentEntry?.text ? (<p className="whitespace-pre-wrap">{currentEntry.text}</p>) : (<p className="italic opacity-70">Define your {piston} for {simpleTopicName}</p>)}
+                                            </div>
+                                            <div className="flex-shrink-0 flex items-center">
+                                                {currentEntry && (
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onLinkResource({piston, entryId: currentEntry.id, currentResourceId: currentEntry.linkedResourceId})}>
+                                                        <LinkIcon className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                                {currentEntry?.linkedResourceId && (<Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleOpenResource(e, currentEntry.linkedResourceId!)}><Library className="h-4 w-4 text-primary" /></Button>)}
+                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setNewEntryPiston(piston)}><Plus className="h-4 w-4" /></Button>
+                                                {entries.length > 0 && (<Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleOpenHistory(e, piston)}><History className="h-4 w-4" /></Button>)}
+                                            </div>
+                                        </div>
+                                        {isAddingNewToThisPiston && (
+                                            <div className="mt-2 pt-2 border-t">
+                                                <Textarea value={newEntryText} onChange={(e) => setNewEntryText(e.target.value)} placeholder={`Add a new entry for ${piston}...`} className="bg-background text-sm min-h-[4rem]" autoFocus rows={2} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSaveNewEntry(piston))}/>
+                                                <div className="flex justify-end gap-2 mt-2">
+                                                    <Button size="sm" variant="ghost" onClick={() => {setNewEntryPiston(null); setNewEntryText('')}}>Cancel</Button>
+                                                    <Button size="sm" onClick={() => handleSaveNewEntry(piston)}>Add</Button>
                                                 </div>
                                             </div>
-                                            {isAddingNewToThisPiston && (
-                                                <div className="mt-2 pt-2 border-t">
-                                                    <Textarea value={newEntryText} onChange={(e) => setNewEntryText(e.target.value)} placeholder={`Add a new entry for ${piston}...`} className="bg-background text-sm min-h-[4rem]" autoFocus rows={2} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSaveNewEntry(piston))}/>
-                                                    <div className="flex justify-end gap-2 mt-2">
-                                                        <Button size="sm" variant="ghost" onClick={() => {setNewEntryPiston(null); setNewEntryText('')}}>Cancel</Button>
-                                                        <Button size="sm" onClick={() => handleSaveNewEntry(piston)}>Add</Button>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
+                                        )}
                                     </div>
-                                </li>
-                            )
-                        })}
-                    </ul>
-                </ScrollArea>
-            </CardContent>
-            {linkingResourceFor && (
-                <Dialog open={!!linkingResourceFor} onOpenChange={() => setLinkingResourceFor(null)}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Link Resource to {linkingResourceFor.piston}</DialogTitle>
-                            <DialogDescription>Select an existing resource card to connect to this intention.</DialogDescription>
-                        </DialogHeader>
-                        <div className="py-4">
-                            <Select
-                                value={linkingResourceFor.currentResourceId || 'none'}
-                                onValueChange={(val) => handleLinkResource(val)}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a resource card..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">-- None --</SelectItem>
-                                    {resources.filter(r => r.type === 'card').map(r => (
-                                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </DialogContent>
-                </Dialog>
-            )}
-        </>
+                                </div>
+                            </li>
+                        )
+                    })}
+                </ul>
+            </ScrollArea>
+        </CardContent>
     );
 };
