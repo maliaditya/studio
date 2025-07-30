@@ -133,12 +133,14 @@ interface AuthContextType {
   mindsetCards: MindsetCard[];
   setMindsetCards: React.Dispatch<React.SetStateAction<MindsetCard[]>>;
   addMindsetCard: (title: string) => void;
+  deleteMindsetCard: (cardId: string) => void;
 
   // Pistons
   isPistonsHeadOpen: boolean;
   setIsPistonsHeadOpen: React.Dispatch<React.SetStateAction<boolean>>;
   pistons: PistonsCategoryData;
   setPistons: React.Dispatch<React.SetStateAction<PistonsCategoryData>>;
+  deleteDesire: (desireId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -1287,6 +1289,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setMindsetCards(prev => [...prev, newCard]);
   };
   
+  const deleteDesire = (desireId: string) => {
+    setDeepWorkDefinitions(prev => prev.filter(def => def.id !== desireId));
+  };
+  
+  const deleteMindsetCard = (cardId: string) => {
+    setMindsetCards(prev => prev.filter(card => card.id !== cardId));
+  };
+
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -1316,9 +1326,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,
-    mindsetCards, setMindsetCards, addMindsetCard,
+    mindsetCards, setMindsetCards, addMindsetCard, deleteMindsetCard,
     isPistonsHeadOpen, setIsPistonsHeadOpen,
     pistons, setPistons,
+    deleteDesire,
   };
 
   return (

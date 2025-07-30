@@ -21,6 +21,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
     'Desire': <Target className="h-5 w-5 text-red-500" />,
@@ -331,7 +333,14 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete }: { point: ResourceP
 }
 
 export function PistonsHead() {
-  const { isPistonsHeadOpen, setIsPistonsHeadOpen, pistons, setPistons, resources, setResources, deepWorkDefinitions, setDeepWorkDefinitions, mindsetCards, addMindsetCard } = useAuth();
+  const { 
+    isPistonsHeadOpen, setIsPistonsHeadOpen, 
+    pistons, setPistons, 
+    resources, setResources, 
+    deepWorkDefinitions, setDeepWorkDefinitions, 
+    mindsetCards, addMindsetCard, 
+    deleteDesire, deleteMindsetCard 
+  } = useAuth();
   const [currentView, setCurrentView] = useState<'main' | 'health' | 'wealth' | 'growth' | 'desires' | 'mindset'>('main');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   
@@ -454,22 +463,26 @@ export function PistonsHead() {
   const [linkingResourceFor, setLinkingResourceFor] = useState<{piston: PistonType; entryId: string; currentResourceId?: string;} | null>(null);
 
   const handleOpenHistory = (e: React.MouseEvent, piston: PistonType) => {
-      e.stopPropagation();
-      const historyPopupWidth = 320;
-      const x = window.innerWidth / 2 - historyPopupWidth - 20;
-      const y = window.innerHeight / 2 - Math.min(window.innerHeight * 0.7, 500) / 2;
-      setHistoryPopup({ piston, x: Math.max(20, x), y: Math.max(20, y) });
+    e.stopPropagation();
+    const historyPopupWidth = 320;
+    const x = position.x + 384 + 20; // Main popup width + margin
+    const y = position.y;
+    setHistoryPopup({ piston, x, y });
   };
-
+  
   const handleOpenResource = (e: React.MouseEvent, resourceId: string) => {
     e.stopPropagation();
     
     const popupWidth = 512;
     const x = window.innerWidth / 2 - popupWidth / 2;
     const y = window.innerHeight / 2 - Math.min(window.innerHeight * 0.7, 500) / 2;
-    
-    setResourcePopup({ resourceId, x: Math.max(20, x), y: Math.max(20, y) });
+
+    if (historyPopup) {
+        setHistoryPopup(null);
+    }
+    setResourcePopup({ resourceId, x, y });
   };
+
 
   const handleLinkResource = (resourceId: string | null) => {
     if (!linkingResourceFor) return;
@@ -706,7 +719,7 @@ const HealthPistonView = ({ onBack, setHistoryPopup, setResourcePopup, onEditEnt
 };
 
 const DesireSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, type: 'desires') => void, onBack: () => void }) => {
-    const { deepWorkDefinitions, setDeepWorkDefinitions } = useAuth();
+    const { deepWorkDefinitions, setDeepWorkDefinitions, deleteDesire } = useAuth();
     const [newDesireName, setNewDesireName] = useState('');
     
     const desires = deepWorkDefinitions.filter(def => def.category === 'Desire');
@@ -729,21 +742,31 @@ const DesireSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, type
                 <Button onClick={handleAddDesire}><Plus/></Button>
             </div>
             <ScrollArea className="h-60">
-                <div className="space-y-2 pr-2">
+                <ul className="space-y-2 pr-2">
                     {desires.map(desire => (
-                        <button key={desire.id} onClick={() => onSelect(desire.id, 'desires')} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
-                            <span className="font-medium">{desire.name}</span>
-                            <ChevronRight className="h-4 w-4" />
-                        </button>
+                        <li key={desire.id} className="flex items-center justify-between group p-2 rounded-md border bg-muted/20">
+                            <button onClick={() => onSelect(desire.id, 'desires')} className="flex-grow text-left">
+                                <span className="font-medium group-hover:text-primary transition-colors">{desire.name}</span>
+                            </button>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100"><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the desire "{desire.name}".</AlertDialogDescription></AlertDialogHeader>
+                                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => deleteDesire(desire.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </li>
                     ))}
-                </div>
+                </ul>
             </ScrollArea>
         </CardContent>
     );
 };
 
 const MindsetSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, type: 'mindset') => void, onBack: () => void }) => {
-    const { mindsetCards, addMindsetCard } = useAuth();
+    const { mindsetCards, addMindsetCard, deleteMindsetCard } = useAuth();
     const [newMindsetName, setNewMindsetName] = useState('');
     
     const handleAddMindset = () => {
@@ -759,14 +782,24 @@ const MindsetSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, typ
                 <Button onClick={handleAddMindset}><Plus/></Button>
             </div>
             <ScrollArea className="h-60">
-                <div className="space-y-2 pr-2">
+                <ul className="space-y-2 pr-2">
                     {mindsetCards.map(card => (
-                        <button key={card.id} onClick={() => onSelect(card.id, 'mindset')} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
-                            <span className="font-medium">{card.title}</span>
-                            <ChevronRight className="h-4 w-4" />
-                        </button>
+                        <li key={card.id} className="flex items-center justify-between group p-2 rounded-md border bg-muted/20">
+                            <button onClick={() => onSelect(card.id, 'mindset')} className="flex-grow text-left">
+                                <span className="font-medium group-hover:text-primary transition-colors">{card.title}</span>
+                            </button>
+                             <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100"><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the mindset "{card.title}".</AlertDialogDescription></AlertDialogHeader>
+                                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => deleteMindsetCard(card.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </li>
                     ))}
-                </div>
+                </ul>
             </ScrollArea>
         </CardContent>
     );
