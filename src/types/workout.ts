@@ -1,5 +1,4 @@
 
-
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -13,6 +12,7 @@ export type ExerciseCategory =
   | "Full Body"
   | "Content Bundle"
   | "Lead Generation"
+  | "Desire"
   | "Other";
 
 export const exerciseCategories: ExerciseCategory[] = [
@@ -285,5 +285,5 @@ export type PistonsData = Partial<Record<PistonType, PistonState> & { activity?:
 
 export interface PistonsCategoryData {
     health?: PistonsData;
-    [topicId: string]: PistonsData | undefined; // For wealth and growth topics
+    [topicId: string]: PistonsData | undefined; // For wealth, growth, and desire topics
 }

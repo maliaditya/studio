@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -12,7 +10,7 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
-import { PistonEntry, PistonType, PistonsData, Resource, ResourcePoint } from '@/types/workout';
+import { PistonEntry, PistonType, PistonsData, Resource, ResourcePoint, ExerciseDefinition } from '@/types/workout';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
@@ -32,6 +30,17 @@ const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
     'Expression': <Mic className="h-5 w-5 text-pink-500" />,
     'Pleasure': <Smile className="h-5 w-5 text-yellow-500" />,
     'Protection': <Shield className="h-5 w-5 text-gray-500" />,
+};
+
+const PISTON_PLACEHOLDERS: Record<PistonType, string> = {
+    'Desire': 'What is the ultimate outcome I want?',
+    'Curiosity': 'What am I curious about? What do I want to learn?',
+    'Truth-Seeking': 'What is the core truth I need to accept?',
+    'Contribution': 'How will this help others? Who am I serving?',
+    'Growth': 'How will this make me better?',
+    'Expression': 'What do I want to create or say?',
+    'Pleasure': 'What will I enjoy about this process?',
+    'Protection': 'What risks am I mitigating? What am I protecting?',
 };
 
 const PISTON_NAMES: PistonType[] = [
@@ -185,10 +194,10 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
     };
 
     return (
-        <div ref={setNodeRef} style={style} className="z-[70]">
+        <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
             <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
             <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative">
-                <div className="absolute top-2 left-2 z-20 h-7 w-7 rounded-full flex items-center justify-center cursor-grab" {...listeners} {...attributes}>
+                <div className="absolute top-2 left-2 z-20 h-7 w-7 rounded-full flex items-center justify-center cursor-grab" {...listeners}>
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
                 </div>
                 
@@ -202,7 +211,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                             <Upload className="h-4 w-4" />
                         </Button>
                     )}
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={(e) => { e.stopPropagation(); onClose(); }}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={(e) => { e.stopPropagation(); setPlayingAudio(null); onClose(); }}>
                         <X className="h-4 w-4" />
                     </Button>
                 </div>
@@ -321,8 +330,8 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete }: { point: ResourceP
 }
 
 export function PistonsHead() {
-  const { isPistonsHeadOpen, setIsPistonsHeadOpen, pistons, setPistons, resources, setResources } = useAuth();
-  const [currentView, setCurrentView] = useState<'main' | 'health' | 'wealth' | 'growth'>('main');
+  const { isPistonsHeadOpen, setIsPistonsHeadOpen, pistons, setPistons, resources, setResources, deepWorkDefinitions, setDeepWorkDefinitions } = useAuth();
+  const [currentView, setCurrentView] = useState<'main' | 'health' | 'wealth' | 'growth' | 'desires'>('main');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   
   const [position, setPosition] = useState({ x: 50, y: 50 });
@@ -390,11 +399,11 @@ export function PistonsHead() {
     }, 300);
   };
   
-  const handleViewChange = (newView: 'main' | 'health' | 'wealth' | 'growth') => {
+  const handleViewChange = (newView: 'main' | 'health' | 'wealth' | 'growth' | 'desires') => {
     setCurrentView(newView);
   };
   
-  const handleTopicSelect = (topicId: string, type: 'wealth' | 'growth') => {
+  const handleTopicSelect = (topicId: string, type: 'wealth' | 'growth' | 'desires') => {
       setSelectedTopicId(topicId);
       setCurrentView(type);
   }
@@ -407,14 +416,20 @@ export function PistonsHead() {
     }
   };
   
-  const getTopicName = (view: 'main' | 'health' | 'wealth' | 'growth') => {
+  const getTopicName = (view: 'main' | 'health' | 'wealth' | 'growth' | 'desires') => {
+    if (selectedTopicId) {
+        const def = deepWorkDefinitions.find(d => d.id === selectedTopicId);
+        return def?.name || "Selected Topic";
+    }
     switch (view) {
       case 'health':
         return `Health: ${pistons.health?.activity || 'Activity'}`;
       case 'wealth':
-         return selectedTopicId || `Select Wealth Topic`;
+         return `Select Wealth Topic`;
       case 'growth':
-         return selectedTopicId || `Select Growth Topic`;
+         return `Select Growth Topic`;
+      case 'desires':
+         return `Select a Desire`;
       default: return 'Pistons of Intention';
     }
   };
@@ -427,7 +442,12 @@ export function PistonsHead() {
   const handleOpenHistory = (e: React.MouseEvent, piston: PistonType) => {
       e.stopPropagation();
       const historyPopupWidth = 320;
-      const x = position.x + 384 + 20; // 384 is main widget width
+      let x = position.x + 384 + 20; // 384 is main widget width
+
+      if(resourcePopup) {
+          x = resourcePopup.x + 512 + 20;
+      }
+      
       setHistoryPopup({ piston, x: Math.min(x, window.innerWidth - historyPopupWidth - 20), y: position.y });
   };
 
@@ -435,11 +455,13 @@ export function PistonsHead() {
     e.stopPropagation();
     
     const popupWidth = 512;
-    const popupHeight = 600; // Approximate height for centering
-    const x = window.innerWidth / 2 - popupWidth / 2;
-    const y = window.innerHeight / 2 - popupHeight / 2;
+    let x = position.x - popupWidth - 20;
+    
+    if (historyPopup) {
+        x = historyPopup.x - popupWidth - 20;
+    }
 
-    setResourcePopup({ resourceId, x: Math.max(20, x), y: Math.max(20, y) });
+    setResourcePopup({ resourceId, x: Math.max(20, x), y: position.y });
   };
 
   const handleLinkResource = (resourceId: string | null) => {
@@ -485,6 +507,8 @@ export function PistonsHead() {
         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} {...commonProps} /> : <TopicSelector onSelect={handleTopicSelect} type="wealth" onBack={onBack} />;
       case 'growth':
          return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} {...commonProps} /> : <TopicSelector onSelect={handleTopicSelect} type="growth" onBack={onBack} />;
+      case 'desires':
+         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} {...commonProps} /> : <DesireSelector onSelect={handleTopicSelect} onBack={onBack} />;
       default:
         return <MainPistonView onSelect={handleViewChange} />;
     }
@@ -625,13 +649,14 @@ export function PistonsHead() {
   );
 }
 
-const MainPistonView = ({ onSelect }: { onSelect: (view: 'health' | 'wealth' | 'growth') => void }) => (
+const MainPistonView = ({ onSelect }: { onSelect: (view: 'health' | 'wealth' | 'growth' | 'desires') => void }) => (
     <CardContent className="p-4">
         <p className="text-muted-foreground text-center mb-4 text-sm">Select a category to define your core motivations.</p>
-        <div className="flex justify-around items-center p-2 rounded-lg bg-muted/50">
-            <Button onClick={() => onSelect('health')} variant="ghost" size="icon" className="h-12 w-12 text-red-500 hover:bg-red-500/10 hover:text-red-600"><Heart className="h-6 w-6"/></Button>
-            <Button onClick={() => onSelect('wealth')} variant="ghost" size="icon" className="h-12 w-12 text-green-500 hover:bg-green-500/10 hover:text-green-600"><Briefcase className="h-6 w-6"/></Button>
-            <Button onClick={() => onSelect('growth')} variant="ghost" size="icon" className="h-12 w-12 text-blue-500 hover:bg-blue-500/10 hover:text-blue-600"><TrendingUp className="h-6 w-6"/></Button>
+        <div className="grid grid-cols-2 gap-4">
+            <Button onClick={() => onSelect('health')} variant="outline" className="flex-col h-20"><Heart className="h-6 w-6 text-red-500 mb-1"/>Health</Button>
+            <Button onClick={() => onSelect('wealth')} variant="outline" className="flex-col h-20"><Briefcase className="h-6 w-6 text-green-500 mb-1"/>Wealth</Button>
+            <Button onClick={() => onSelect('growth')} variant="outline" className="flex-col h-20"><TrendingUp className="h-6 w-6 text-blue-500 mb-1"/>Growth</Button>
+            <Button onClick={() => onSelect('desires')} variant="outline" className="flex-col h-20"><Target className="h-6 w-6 text-purple-500 mb-1"/>Desires</Button>
         </div>
     </CardContent>
 );
@@ -670,10 +695,49 @@ const HealthPistonView = ({ onBack, setHistoryPopup, setResourcePopup, onEditEnt
     return <PistonEditorView topicId="health" topicName={`Health: ${activity}`} onBack={onBack} onEditTopicName={() => setIsEditingActivity(true)} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onEditEntry={onEditEntry} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
 
+const DesireSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, type: 'desires') => void, onBack: () => void }) => {
+    const { deepWorkDefinitions, setDeepWorkDefinitions } = useAuth();
+    const [newDesireName, setNewDesireName] = useState('');
+    
+    const desires = deepWorkDefinitions.filter(def => def.category === 'Desire');
+
+    const handleAddDesire = () => {
+        if (!newDesireName.trim()) return;
+        const newDesire: ExerciseDefinition = {
+            id: `desire_${Date.now()}`,
+            name: newDesireName.trim(),
+            category: 'Desire'
+        };
+        setDeepWorkDefinitions(prev => [...prev, newDesire]);
+        setNewDesireName('');
+    };
+
+    return (
+        <CardContent className="p-4">
+            <h3 className="text-lg font-semibold text-center mb-2">Select a Desire</h3>
+            <p className="text-muted-foreground text-center mb-4">Choose a high-level desire or create a new one.</p>
+            <div className="flex gap-2 mb-4">
+                <Input value={newDesireName} onChange={e => setNewDesireName(e.target.value)} placeholder="Add a new desire..."/>
+                <Button onClick={handleAddDesire}><Plus/></Button>
+            </div>
+            <ScrollArea className="h-60">
+                <div className="space-y-2 pr-2">
+                    {desires.map(desire => (
+                        <button key={desire.id} onClick={() => onSelect(desire.id, 'desires')} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
+                            <span className="font-medium">{desire.name}</span>
+                            <ChevronRight className="h-4 w-4" />
+                        </button>
+                    ))}
+                </div>
+            </ScrollArea>
+        </CardContent>
+    );
+};
+
 const TopicSelector = ({ onSelect, type, onBack }: { onSelect: (topicId: string, type: 'wealth' | 'growth') => void, type: 'wealth' | 'growth', onBack: () => void }) => {
     const { deepWorkDefinitions, upskillDefinitions } = useAuth();
     const source = type === 'wealth' ? deepWorkDefinitions : upskillDefinitions;
-    const topics = [...new Set(source.map(def => def.category))];
+    const topics = [...new Set(source.filter(def => def.category !== 'Desire').map(def => def.category))];
 
     return (
         <CardContent className="p-4">
@@ -694,20 +758,9 @@ const TopicSelector = ({ onSelect, type, onBack }: { onSelect: (topicId: string,
 }
 
 const TopicPistonView = ({ topicId, onBack, setHistoryPopup, setResourcePopup, onEditEntry, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onEditEntry: (data: { piston: PistonType; entry: PistonEntry; }) => void; onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
-    const { pistons } = useAuth();
-    const topicName = topicId === 'health' ? `Health: ${pistons.health?.activity || 'Activity'}` : topicId;
+    const { pistons, deepWorkDefinitions } = useAuth();
+    const topicName = deepWorkDefinitions.find(d => d.id === topicId)?.name || topicId;
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onEditEntry={onEditEntry} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
-};
-
-const PISTON_PLACEHOLDERS: Record<PistonType, string> = {
-    'Desire': 'What is the ultimate outcome I want?',
-    'Curiosity': 'What am I curious about? What do I want to learn?',
-    'Truth-Seeking': 'What is the core truth I need to accept?',
-    'Contribution': 'How will this help others? Who am I serving?',
-    'Growth': 'How will this make me better?',
-    'Expression': 'What do I want to create or say?',
-    'Pleasure': 'What will I enjoy about this process?',
-    'Protection': 'What risks am I mitigating? What am I protecting?',
 };
 
 const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onEditEntry, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onEditEntry: (data: { piston: PistonType; entry: PistonEntry; }) => void; onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
@@ -777,11 +830,3 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
         </CardContent>
     );
 };
-
-
-  
-
-
-
-
-
