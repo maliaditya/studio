@@ -88,7 +88,7 @@ export function PistonsHead() {
         return selectedTopicId || `Select Wealth Topic`;
       case 'growth':
          return selectedTopicId || `Select Growth Topic`;
-      default: return 'Pistons of Intention';
+      default: return '';
     }
   };
   const topicName = getTopicName();
@@ -110,7 +110,7 @@ export function PistonsHead() {
     position: 'fixed',
     top: position.y,
     left: position.x,
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    transform: transform ? `translate3d(${position.x + transform.x}px, ${position.y + transform.y}px, 0)` : `translate3d(${position.x}px, ${position.y}px, 0)`,
     willChange: 'transform',
   };
 
