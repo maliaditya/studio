@@ -5,14 +5,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical } from 'lucide-react';
+import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical, PlusCircle } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
-import { PistonEntry, PistonType, PistonsData, Resource } from '@/types/workout';
+import { PistonEntry, PistonType, PistonsData, Resource, ResourcePoint } from '@/types/workout';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
@@ -125,6 +125,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate }: {
     });
     
     const [editingTitle, setEditingTitle] = useState(false);
+    const [editingPointId, setEditingPointId] = useState<string | null>(null);
     const audioInputRef = useRef<HTMLInputElement>(null);
 
     const style: React.CSSProperties = {
@@ -155,22 +156,36 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate }: {
         onUpdate({ ...resource, name: newTitle });
     };
 
+    const handleAddPoint = (type: ResourcePoint['type']) => {
+        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: 'New step...', type };
+        const updatedPoints = [...(resource.points || []), newPoint];
+        onUpdate({ ...resource, points: updatedPoints });
+    };
+
+    const handleUpdatePoint = (pointId: string, newText: string) => {
+        const updatedPoints = (resource.points || []).map(p =>
+            p.id === pointId ? { ...p, text: newText } : p
+        );
+        onUpdate({ ...resource, points: updatedPoints });
+    };
+
+    const handleDeletePoint = (pointId: string) => {
+        const updatedPoints = (resource.points || []).filter(p => p.id !== pointId);
+        onUpdate({ ...resource, points: updatedPoints });
+    };
+
     return (
         <div ref={setNodeRef} style={style} className="z-[70]">
-             <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
+            <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
             <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative">
-                <div 
-                    className="absolute top-2 left-2 z-20 h-7 w-7 rounded-full flex items-center justify-center cursor-grab"
-                    {...attributes}
-                    {...listeners}
-                >
+                <div className="absolute top-2 left-2 z-20 h-7 w-7 rounded-full flex items-center justify-center cursor-grab" {...listeners} {...attributes}>
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
                 </div>
                 
                 <div className="absolute top-2 right-2 z-20 flex items-center">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={(e) => e.stopPropagation()}>
                                 <MoreVertical className="h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>
@@ -179,12 +194,12 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate }: {
                             <DropdownMenuItem onSelect={() => audioInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />Upload Audio</DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={onClose}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={(e) => { e.stopPropagation(); onClose(); }}>
                         <X className="h-4 w-4" />
                     </Button>
                 </div>
 
-                <CardHeader className="p-3 relative flex-shrink-0 text-center">
+                <CardHeader className="p-3 pt-8 relative flex-shrink-0 text-center">
                     <div className="flex items-center justify-center gap-2">
                         <Library className="h-4 w-4" />
                         {editingTitle ? (
@@ -205,34 +220,97 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate }: {
                 </CardHeader>
                 <div className="flex-grow min-h-0 overflow-y-auto">
                     <CardContent className="p-3 pt-0">
-                        <ul className="space-y-2 text-sm text-muted-foreground pr-2">
+                        <ul className="space-y-3 text-sm text-muted-foreground pr-2">
                             {(resource.points || []).map(point => (
-                                <li key={point.id} className="flex items-start gap-2">
-                                    {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                    point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                    <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
-                                    }
-                                    {point.type === 'card' && point.resourceId ? (
-                                       <span className="font-medium text-primary">{point.text}</span>
-                                    ) : point.type === 'markdown' ? (
-                                        <div className="w-full prose dark:prose-invert prose-sm">
-                                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
-                                        </div>
-                                    ) : point.type === 'code' ? (
-                                         <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
-                                    ) : (
-                                        <span className="break-words w-full" title={point.text}>{point.text}</span>
-                                    )}
-                                </li>
+                                <EditableResourcePoint 
+                                    key={point.id}
+                                    point={point}
+                                    onUpdate={(newText) => handleUpdatePoint(point.id, newText)}
+                                    onDelete={() => handleDeletePoint(point.id)}
+                                />
                             ))}
                         </ul>
                     </CardContent>
                 </div>
+                 <CardFooter className="p-2">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="w-full">
+                                <PlusCircle className="mr-2 h-4 w-4" /> Add Step
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-48 p-1">
+                           <div className="space-y-1">
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('text')}><MessageSquare className="mr-2 h-4 w-4" />Text</Button>
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('markdown')}><MessageSquare className="mr-2 h-4 w-4" />Markdown</Button>
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('code')}><Code className="mr-2 h-4 w-4" />Code</Button>
+                           </div>
+                        </PopoverContent>
+                    </Popover>
+                 </CardFooter>
             </Card>
         </div>
     );
 };
 
+const EditableResourcePoint = ({ point, onUpdate, onDelete }: { point: ResourcePoint, onUpdate: (text: string) => void, onDelete: () => void }) => {
+    const [isEditing, setIsEditing] = useState(point.text === 'New step...');
+    const [editText, setEditText] = useState(point.text);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    const handleSave = () => {
+        if (editText.trim() === '') {
+            onDelete();
+        } else {
+             onUpdate(editText);
+        }
+        setIsEditing(false);
+    };
+
+    useEffect(() => {
+        if (isEditing && textareaRef.current) {
+            textareaRef.current.focus();
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+    }, [isEditing]);
+    
+    const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setEditText(e.target.value);
+        e.target.style.height = 'auto';
+        e.target.style.height = `${e.target.scrollHeight}px`;
+    }
+
+    return (
+        <li className="flex items-start gap-3 group/item">
+            {point.type === 'code' ? <Code className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
+            point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
+            <ArrowRight className="h-4 w-4 mt-1.5 text-primary/50 flex-shrink-0" />
+            }
+             <div className="flex-grow min-w-0" onClick={() => !isEditing && setIsEditing(true)}>
+                {isEditing ? (
+                    <Textarea 
+                        ref={textareaRef} 
+                        value={editText} 
+                        onChange={handleTextareaChange} 
+                        onBlur={handleSave} 
+                        className="text-sm" 
+                        rows={1}
+                    />
+                ) : point.type === 'markdown' ? (
+                    <div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text}</ReactMarkdown></div>
+                ) : point.type === 'code' ? (
+                    <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                ) : (
+                    <p className="whitespace-pre-wrap">{point.text}</p>
+                )}
+            </div>
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100 flex-shrink-0" onClick={onDelete}>
+                <Trash2 className="h-3 w-3"/>
+            </Button>
+        </li>
+    );
+}
 
 export function PistonsHead() {
   const { isPistonsHeadOpen, setIsPistonsHeadOpen, pistons, setPistons, resources, setResources } = useAuth();
@@ -394,19 +472,17 @@ export function PistonsHead() {
                             <X className="h-4 w-4" />
                         </Button>
                         <CardHeader 
-                            className="p-3 text-center relative cursor-grab active:cursor-grabbing"
-                            {...attributes} 
-                            {...listeners}
+                            className="p-3 text-center"
                         >
                             {currentView !== 'main' && (
                                 <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 left-1.5 z-20" onClick={(e) => { e.stopPropagation(); onBack(); }}>
                                     <ChevronLeft className="h-4 w-4" />
                                 </Button>
                             )}
-                            <div className="w-full text-center">
-                            <CardTitle className="text-base truncate px-8" title={topicName as string}>
-                                {topicName}
-                            </CardTitle>
+                            <div className="w-full text-center cursor-grab active:cursor-grabbing flex justify-center" {...attributes} {...listeners}>
+                                <CardTitle className="text-base truncate px-8" title={topicName as string}>
+                                    {topicName}
+                                </CardTitle>
                             </div>
                         </CardHeader>
                         {renderContent()}
