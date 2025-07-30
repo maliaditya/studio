@@ -200,7 +200,8 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate }: {
                                 <li key={point.id} className="flex items-start gap-2">
                                     {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
                                     point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                    <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />}
+                                    <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
+                                    }
                                     {point.type === 'card' && point.resourceId ? (
                                        <span className="font-medium text-primary">{point.text}</span>
                                     ) : point.type === 'markdown' ? (
