@@ -79,9 +79,9 @@ const HistoryPopupCard = ({ popupState, entries, onClose, onEdit }: {
     return (
         <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
             <Card className="w-80 shadow-2xl border-2 border-primary/30 bg-card">
-                 <CardHeader className="p-3 relative">
+                 <CardHeader className="p-3 relative cursor-grab" {...listeners}>
                     <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2 cursor-grab flex-grow" {...listeners}>
+                        <div className="flex items-center gap-2 flex-grow">
                            {PISTON_ICONS[popupState.piston]} 
                            <CardTitle className="text-base">{popupState.piston} History</CardTitle>
                         </div>
@@ -713,8 +713,6 @@ const DesireSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, type
 
     return (
         <CardContent className="p-4">
-            <h3 className="text-lg font-semibold text-center mb-2">Select a Desire</h3>
-            <p className="text-muted-foreground text-center mb-4">Choose a high-level desire or create a new one.</p>
             <div className="flex gap-2 mb-4">
                 <Input value={newDesireName} onChange={e => setNewDesireName(e.target.value)} placeholder="Add a new desire..."/>
                 <Button onClick={handleAddDesire}><Plus/></Button>
