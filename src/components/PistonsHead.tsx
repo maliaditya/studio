@@ -424,6 +424,25 @@ export function PistonsHead() {
 
   const [linkingResourceFor, setLinkingResourceFor] = useState<{piston: PistonType; entryId: string; currentResourceId?: string;} | null>(null);
 
+  const handleOpenHistory = (e: React.MouseEvent, piston: PistonType) => {
+      e.stopPropagation();
+      setHistoryPopup({ piston, x: position.x + 384 + 20, y: position.y });
+  };
+
+  const handleOpenResource = (e: React.MouseEvent, resourceId: string) => {
+    e.stopPropagation();
+    let popupX;
+    if (historyPopup) {
+        // If history is open, place to the left of history
+        const historyPopupWidth = 320; // from HistoryPopupCard className="w-80"
+        popupX = Math.max(20, historyPopup.x - 512 - 20);
+    } else {
+        // Otherwise, place to the left of the main widget
+        popupX = Math.max(20, position.x - 512 - 20); // 512 is assumed width
+    }
+    setResourcePopup({ resourceId, x: popupX, y: position.y });
+  };
+
   const handleLinkResource = (resourceId: string | null) => {
     if (!linkingResourceFor) return;
     const { piston, entryId } = linkingResourceFor;
@@ -453,11 +472,12 @@ export function PistonsHead() {
   const renderContent = () => {
     const commonProps = { 
         onBack: onBack, 
-        mainPosition: position,
         setHistoryPopup: setHistoryPopup,
         setResourcePopup: setResourcePopup,
         onEditEntry: setEditingPistonEntry,
-        onLinkResource: setLinkingResourceFor
+        onLinkResource: setLinkingResourceFor,
+        handleOpenResource,
+        handleOpenHistory,
     };
     switch (currentView) {
       case 'health':
@@ -618,7 +638,7 @@ const MainPistonView = ({ onSelect }: { onSelect: (view: 'health' | 'wealth' | '
 );
 
 
-const HealthPistonView = ({ onBack, setHistoryPopup, mainPosition, setResourcePopup, onEditEntry, onLinkResource }: { onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, mainPosition: {x: number, y: number}, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onEditEntry: (data: { piston: PistonType; entry: PistonEntry; }) => void; onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; }) => {
+const HealthPistonView = ({ onBack, setHistoryPopup, setResourcePopup, onEditEntry, onLinkResource, handleOpenResource, handleOpenHistory }: { onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onEditEntry: (data: { piston: PistonType; entry: PistonEntry; }) => void; onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     const { pistons, setPistons } = useAuth();
     const [activity, setActivity] = useState(pistons.health?.activity || '');
     const [isEditingActivity, setIsEditingActivity] = useState(!pistons.health?.activity);
@@ -648,7 +668,7 @@ const HealthPistonView = ({ onBack, setHistoryPopup, mainPosition, setResourcePo
         )
     }
 
-    return <PistonEditorView topicId="health" topicName={`Health: ${activity}`} onBack={onBack} onEditTopicName={() => setIsEditingActivity(true)} setHistoryPopup={setHistoryPopup} mainPosition={mainPosition} setResourcePopup={setResourcePopup} onEditEntry={onEditEntry} onLinkResource={onLinkResource} />;
+    return <PistonEditorView topicId="health" topicName={`Health: ${activity}`} onBack={onBack} onEditTopicName={() => setIsEditingActivity(true)} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onEditEntry={onEditEntry} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
 
 const TopicSelector = ({ onSelect, type, onBack }: { onSelect: (topicId: string, type: 'wealth' | 'growth') => void, type: 'wealth' | 'growth', onBack: () => void }) => {
@@ -674,13 +694,13 @@ const TopicSelector = ({ onSelect, type, onBack }: { onSelect: (topicId: string,
     )
 }
 
-const TopicPistonView = ({ topicId, onBack, setHistoryPopup, mainPosition, setResourcePopup, onEditEntry, onLinkResource }: { topicId: string, onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, mainPosition: {x: number, y: number}, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onEditEntry: (data: { piston: PistonType; entry: PistonEntry; }) => void; onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; }) => {
+const TopicPistonView = ({ topicId, onBack, setHistoryPopup, setResourcePopup, onEditEntry, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onEditEntry: (data: { piston: PistonType; entry: PistonEntry; }) => void; onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     const { pistons } = useAuth();
     const topicName = topicId === 'health' ? `Health: ${pistons.health?.activity || 'Activity'}` : topicId;
-    return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} mainPosition={mainPosition} setResourcePopup={setResourcePopup} onEditEntry={onEditEntry} onLinkResource={onLinkResource} />;
+    return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onEditEntry={onEditEntry} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
 
-const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, mainPosition, setResourcePopup, onEditEntry, onLinkResource }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, mainPosition: {x: number, y: number}, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onEditEntry: (data: { piston: PistonType; entry: PistonEntry; }) => void; onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; }) => {
+const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onEditEntry, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onEditEntry: (data: { piston: PistonType; entry: PistonEntry; }) => void; onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     const { pistons, setPistons, resources } = useAuth();
     const [newEntryPiston, setNewEntryPiston] = useState<PistonType | null>(null);
     const [newEntryText, setNewEntryText] = useState('');
@@ -697,17 +717,6 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
             return { ...prev, [topicId]: { ...topicData, [piston]: [newEntry, ...entries] } };
         });
         setNewEntryPiston(null); setNewEntryText('');
-    };
-
-    const handleOpenHistory = (e: React.MouseEvent, piston: PistonType) => {
-        e.stopPropagation();
-        setHistoryPopup({ piston, x: mainPosition.x + 384 + 20, y: mainPosition.y });
-    };
-
-    const handleOpenResource = (e: React.MouseEvent, resourceId: string) => {
-        e.stopPropagation();
-        const popupX = Math.max(20, mainPosition.x - 512 - 20);
-        setResourcePopup({ resourceId, x: popupX, y: mainPosition.y });
     };
 
     return (
@@ -762,5 +771,6 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 
 
   
+
 
 
