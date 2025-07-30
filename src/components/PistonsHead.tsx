@@ -34,12 +34,8 @@ const PISTON_NAMES: PistonType[] = [
   'Growth', 'Expression', 'Pleasure', 'Protection'
 ];
 
-interface PistonsHeadProps {
-  isPistonsHeadOpen: boolean;
-  setIsPistonsHeadOpen: (isOpen: boolean) => void;
-}
-
-export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: PistonsHeadProps) {
+export function PistonsHead() {
+  const { isPistonsHeadOpen, setIsPistonsHeadOpen } = useAuth();
   const [currentView, setCurrentView] = useState<'main' | 'health' | 'wealth' | 'growth'>('main');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   
@@ -69,9 +65,9 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
     setCurrentView(newView);
   };
   
-  const handleTopicSelect = (topicId: string, view: 'wealth' | 'growth') => {
+  const handleTopicSelect = (topicId: string, type: 'wealth' | 'growth') => {
       setSelectedTopicId(topicId);
-      setCurrentView(view);
+      setCurrentView(type);
   }
 
   const onBack = () => {
@@ -89,9 +85,9 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
       case 'health':
         return `Health: ${pistons.health?.activity || 'Activity'}`;
       case 'wealth':
-        return selectedTopicId ? selectedTopicId : 'Select Wealth Topic';
+        return selectedTopicId || `Select Wealth Topic`;
       case 'growth':
-         return selectedTopicId ? selectedTopicId : 'Select Growth Topic';
+         return selectedTopicId || `Select Growth Topic`;
       default: return 'Pistons of Intention';
     }
   };
