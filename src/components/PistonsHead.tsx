@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -78,18 +77,18 @@ export function PistonsHead() {
     }
   };
   
-  const getTopicName = (type: 'wealth' | 'growth') => {
-    switch (currentView) {
+  const getTopicName = (view: 'main' | 'health' | 'wealth' | 'growth', type?: 'wealth' | 'growth') => {
+    switch (view) {
       case 'health':
         return `Health: ${pistons.health?.activity || 'Activity'}`;
       case 'wealth':
       case 'growth':
-         return selectedTopicId ? selectedTopicId : `Select ${type.charAt(0).toUpperCase() + type.slice(1)} Topic`;
+         return selectedTopicId ? selectedTopicId : `Select ${type} Topic`;
       default: return 'Pistons of Intention';
     }
   };
   const { pistons } = useAuth();
-  const topicName = getTopicName(currentView as 'wealth' | 'growth');
+  const topicName = getTopicName(currentView, currentView as 'wealth' | 'growth');
 
   const renderContent = () => {
     switch (currentView) {
@@ -137,26 +136,19 @@ export function PistonsHead() {
                     <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 right-1.5 z-20" onClick={handleClose}>
                         <X className="h-4 w-4" />
                     </Button>
+                    {currentView !== 'main' && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 left-1.5 z-20" onClick={(e) => { e.stopPropagation(); onBack(); }}>
+                          <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                    )}
                     <CardHeader 
-                        className="p-3 cursor-grab" 
+                        className="p-3 cursor-grab text-center" 
                         {...attributes} 
                         {...listeners}
                     >
-                        <div className="flex items-center justify-between h-7">
-                            <div className="w-7">
-                                {currentView !== 'main' && (
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onBack(); }}>
-                                        <ChevronLeft className="h-4 w-4" />
-                                    </Button>
-                                )}
-                            </div>
-                            <div className="flex-grow text-center">
-                                <CardTitle className="text-base truncate px-2" title={topicName as string}>
-                                    {topicName}
-                                </CardTitle>
-                            </div>
-                            <div className="w-7" />
-                        </div>
+                        <CardTitle className="text-base truncate px-8" title={topicName as string}>
+                          {topicName}
+                        </CardTitle>
                     </CardHeader>
                     {renderContent()}
                 </Card>
@@ -260,6 +252,8 @@ const TopicPistonView = ({ topicId, onBack }: { topicId: string, onBack: () => v
 
 const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void }) => {
     const { pistons, setPistons } = useAuth();
+    const [editingPiston, setEditingPiston] = useState<PistonType | null>(null);
+    const [editText, setEditText] = useState('');
     const topicPistons = pistons[topicId] || {};
 
     const handleTextChange = (piston: PistonType, text: string) => {
@@ -272,27 +266,56 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { top
         }));
     };
 
+    const handleStartEdit = (piston: PistonType) => {
+        setEditingPiston(piston);
+        setEditText(topicPistons[piston]?.text || '');
+    };
+    
+    const handleSaveEdit = () => {
+        if (editingPiston) {
+            handleTextChange(editingPiston, editText);
+            setEditingPiston(null);
+            setEditText('');
+        }
+    };
+    
     return (
-        <div className="flex flex-col">
-            <div className="p-4 space-y-3">
-            {PISTON_NAMES.map(piston => (
-                <div key={piston} className="p-3 bg-muted/50 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1.5">
-                        {PISTON_ICONS[piston]}
-                        <label htmlFor={`piston-${piston}`} className="font-semibold text-sm text-foreground">{piston}</label>
-                    </div>
-                    <Textarea 
-                        id={`piston-${piston}`}
-                        value={topicPistons[piston]?.text || ''}
-                        onChange={(e) => handleTextChange(piston, e.target.value)}
-                        placeholder={`Define your intention for ${piston.toLowerCase()}...`}
-                        className="mt-1 bg-background text-sm min-h-[4rem]"
-                        rows={2}
-                    />
-                </div>
-            ))}
-            </div>
-        </div>
+        <CardContent className="p-4">
+            <ul className="space-y-2">
+                {PISTON_NAMES.map(piston => (
+                    <li key={piston} className="p-2 rounded-lg bg-muted/30">
+                        <div className="flex items-start gap-3">
+                            <span className="mt-1">{PISTON_ICONS[piston]}</span>
+                            <div className="flex-grow">
+                                <h4 className="font-semibold text-sm">{piston}</h4>
+                                {editingPiston === piston ? (
+                                    <Textarea 
+                                        value={editText}
+                                        onChange={(e) => setEditText(e.target.value)}
+                                        onBlur={handleSaveEdit}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveEdit(); } }}
+                                        placeholder={`Define your intention for ${piston.toLowerCase()}...`}
+                                        className="mt-1 bg-background text-sm min-h-[4rem] border-primary"
+                                        autoFocus
+                                        rows={2}
+                                    />
+                                ) : (
+                                    <div
+                                        onClick={() => handleStartEdit(piston)}
+                                        className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 cursor-text w-full"
+                                    >
+                                        {topicPistons[piston]?.text ? (
+                                            <p className="whitespace-pre-wrap">{topicPistons[piston]?.text}</p>
+                                        ) : (
+                                            <p className="italic opacity-70">Click to define...</p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </li>
+                ))}
+            </ul>
+        </CardContent>
     );
 };
-
