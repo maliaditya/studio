@@ -132,6 +132,7 @@ interface AuthContextType {
   // Mindset
   mindsetCards: MindsetCard[];
   setMindsetCards: React.Dispatch<React.SetStateAction<MindsetCard[]>>;
+  addMindsetCard: (title: string) => void;
 
   // Pistons
   isPistonsHeadOpen: boolean;
@@ -1274,6 +1275,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Exercise Swapped!", description: `Replaced "${oldExerciseName}" with "${newWorkoutExercise.name}".` });
   };
   
+  const addMindsetCard = (title: string) => {
+    const newCard: MindsetCard = {
+      id: `card_${Date.now()}`,
+      title: title,
+      icon: 'Brain',
+      points: [
+        { id: `point_${Date.now()}`, text: 'New step' }
+      ]
+    };
+    setMindsetCards(prev => [...prev, newCard]);
+  };
+  
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -1303,7 +1316,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,
-    mindsetCards, setMindsetCards,
+    mindsetCards, setMindsetCards, addMindsetCard,
     isPistonsHeadOpen, setIsPistonsHeadOpen,
     pistons, setPistons,
   };
