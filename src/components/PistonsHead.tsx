@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save } from 'lucide-react';
@@ -15,7 +15,6 @@ import { PistonEntry, PistonType, PistonsData } from '@/types/workout';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
-import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { format } from 'date-fns';
 
@@ -36,27 +35,94 @@ const PISTON_NAMES: PistonType[] = [
   'Growth', 'Expression', 'Pleasure', 'Protection'
 ];
 
+interface HistoryPopupState {
+    piston: PistonType;
+    x: number;
+    y: number;
+}
+  
+const HistoryPopupCard = ({ popupState, entries, onClose }: { popupState: HistoryPopupState; entries: PistonEntry[]; onClose: () => void; }) => {
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({
+        id: `history-popup-${popupState.piston}`,
+    });
+
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: popupState.y,
+        left: popupState.x,
+        willChange: 'transform',
+    };
+
+    if (transform) {
+        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
+    }
+
+    return (
+        <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
+            <Card className="w-80 shadow-2xl border-2 border-primary/30 bg-card">
+                <CardHeader className="p-3 cursor-grab" {...listeners}>
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-base flex items-center gap-2">
+                           {PISTON_ICONS[popupState.piston]} {popupState.piston} History
+                        </CardTitle>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-3 pt-0">
+                    <ScrollArea className="h-60">
+                        <ul className="space-y-4 pr-4">
+                            {entries.map(entry => (
+                                <li key={entry.id} className="border-l-2 pl-3">
+                                    <p className="text-sm whitespace-pre-wrap">{entry.text}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">{format(new Date(entry.timestamp), 'PPP p')}</p>
+                                </li>
+                            ))}
+                        </ul>
+                    </ScrollArea>
+                </CardContent>
+            </Card>
+        </div>
+    );
+};
+
+
 export function PistonsHead() {
   const { isPistonsHeadOpen, setIsPistonsHeadOpen } = useAuth();
   const [currentView, setCurrentView] = useState<'main' | 'health' | 'wealth' | 'growth'>('main');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   
   const [position, setPosition] = useState({ x: 50, y: 50 });
+  const [historyPopup, setHistoryPopup] = useState<HistoryPopupState | null>(null);
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: 'pistons-popup',
   });
 
   const handleDragEnd = (event: DragEndEvent) => {
-    const { delta } = event;
-    setPosition(prev => ({
-        x: prev.x + delta.x,
-        y: prev.y + delta.y,
-    }));
+    const { active, delta } = event;
+    if (active.id === 'pistons-popup') {
+        setPosition(prev => ({
+            x: prev.x + delta.x,
+            y: prev.y + delta.y,
+        }));
+    }
+    if (typeof active.id === 'string' && active.id.startsWith('history-popup-')) {
+        setHistoryPopup(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                x: prev.x + delta.x,
+                y: prev.y + delta.y,
+            }
+        });
+    }
   };
   
   const handleClose = () => {
     setIsPistonsHeadOpen(false);
+    setHistoryPopup(null);
     setTimeout(() => {
         setCurrentView('main');
         setSelectedTopicId(null);
@@ -82,7 +148,7 @@ export function PistonsHead() {
   
   const { pistons } = useAuth();
   
-  const getTopicName = (view: 'main' | 'health' | 'wealth' | 'growth', type?: 'wealth' | 'growth') => {
+  const getTopicName = (view: 'main' | 'health' | 'wealth' | 'growth') => {
     switch (view) {
       case 'health':
         return `Health: ${pistons.health?.activity || 'Activity'}`;
@@ -98,11 +164,11 @@ export function PistonsHead() {
   const renderContent = () => {
     switch (currentView) {
       case 'health':
-        return <HealthPistonView onBack={onBack} />;
+        return <HealthPistonView onBack={onBack} setHistoryPopup={setHistoryPopup} mainPosition={position} />;
       case 'wealth':
-        return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} onBack={onBack} /> : <TopicSelector onSelect={handleTopicSelect} type="wealth" onBack={onBack} />;
+        return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} onBack={onBack} setHistoryPopup={setHistoryPopup} mainPosition={position} /> : <TopicSelector onSelect={handleTopicSelect} type="wealth" onBack={onBack} />;
       case 'growth':
-         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} onBack={onBack} /> : <TopicSelector onSelect={handleTopicSelect} type="growth" onBack={onBack} />;
+         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} onBack={onBack} setHistoryPopup={setHistoryPopup} mainPosition={position} /> : <TopicSelector onSelect={handleTopicSelect} type="growth" onBack={onBack} />;
       default:
         return <MainPistonView onSelect={handleViewChange} />;
     }
@@ -160,6 +226,13 @@ export function PistonsHead() {
                     {renderContent()}
                 </Card>
             </div>
+            {historyPopup && (
+                <HistoryPopupCard 
+                    popupState={historyPopup}
+                    entries={pistons[selectedTopicId || (currentView === 'health' ? 'health' : '')]?.[historyPopup.piston] || []}
+                    onClose={() => setHistoryPopup(null)}
+                />
+            )}
           </DndContext>
       )}
     </>
@@ -170,32 +243,15 @@ const MainPistonView = ({ onSelect }: { onSelect: (view: 'health' | 'wealth' | '
     <CardContent className="p-4">
         <p className="text-muted-foreground text-center mb-4 text-sm">Select a category to define your core motivations.</p>
         <div className="flex justify-around items-center p-2 rounded-lg bg-muted/50">
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button onClick={() => onSelect('health')} variant="ghost" size="icon" className="h-12 w-12 text-red-500 hover:bg-red-500/10 hover:text-red-600"><Heart className="h-6 w-6"/></Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Health</TooltipContent>
-                </Tooltip>
-                 <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button onClick={() => onSelect('wealth')} variant="ghost" size="icon" className="h-12 w-12 text-green-500 hover:bg-green-500/10 hover:text-green-600"><Briefcase className="h-6 w-6"/></Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Wealth</TooltipContent>
-                </Tooltip>
-                 <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button onClick={() => onSelect('growth')} variant="ghost" size="icon" className="h-12 w-12 text-blue-500 hover:bg-blue-500/10 hover:text-blue-600"><TrendingUp className="h-6 w-6"/></Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Growth</TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
+            <Button onClick={() => onSelect('health')} variant="ghost" size="icon" className="h-12 w-12 text-red-500 hover:bg-red-500/10 hover:text-red-600"><Heart className="h-6 w-6"/></Button>
+            <Button onClick={() => onSelect('wealth')} variant="ghost" size="icon" className="h-12 w-12 text-green-500 hover:bg-green-500/10 hover:text-green-600"><Briefcase className="h-6 w-6"/></Button>
+            <Button onClick={() => onSelect('growth')} variant="ghost" size="icon" className="h-12 w-12 text-blue-500 hover:bg-blue-500/10 hover:text-blue-600"><TrendingUp className="h-6 w-6"/></Button>
         </div>
     </CardContent>
 );
 
 
-const HealthPistonView = ({ onBack }: { onBack: () => void }) => {
+const HealthPistonView = ({ onBack, setHistoryPopup, mainPosition }: { onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, mainPosition: {x: number, y: number} }) => {
     const { pistons, setPistons } = useAuth();
     const [activity, setActivity] = useState(pistons.health?.activity || '');
     const [isEditingActivity, setIsEditingActivity] = useState(!pistons.health?.activity);
@@ -225,7 +281,7 @@ const HealthPistonView = ({ onBack }: { onBack: () => void }) => {
         )
     }
 
-    return <PistonEditorView topicId="health" topicName={`Health: ${activity}`} onBack={onBack} onEditTopicName={() => setIsEditingActivity(true)} />;
+    return <PistonEditorView topicId="health" topicName={`Health: ${activity}`} onBack={onBack} onEditTopicName={() => setIsEditingActivity(true)} setHistoryPopup={setHistoryPopup} mainPosition={mainPosition} />;
 };
 
 const TopicSelector = ({ onSelect, type, onBack }: { onSelect: (topicId: string, type: 'wealth' | 'growth') => void, type: 'wealth' | 'growth', onBack: () => void }) => {
@@ -251,13 +307,13 @@ const TopicSelector = ({ onSelect, type, onBack }: { onSelect: (topicId: string,
     )
 }
 
-const TopicPistonView = ({ topicId, onBack }: { topicId: string, onBack: () => void }) => {
+const TopicPistonView = ({ topicId, onBack, setHistoryPopup, mainPosition }: { topicId: string, onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, mainPosition: {x: number, y: number} }) => {
     const { pistons } = useAuth();
     const topicName = topicId === 'health' ? `Health: ${pistons.health?.activity || 'Activity'}` : topicId;
-    return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} />;
+    return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} mainPosition={mainPosition} />;
 };
 
-const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void }) => {
+const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, mainPosition }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, mainPosition: {x: number, y: number} }) => {
     const { pistons, setPistons } = useAuth();
     const [editingPiston, setEditingPiston] = useState<PistonType | null>(null);
     const [editText, setEditText] = useState('');
@@ -328,84 +384,68 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { top
         setEditText(''); 
     };
 
+    const handleOpenHistory = (piston: PistonType) => {
+        setHistoryPopup({
+            piston,
+            x: mainPosition.x + 384 + 20, // 384 is card width, 20 is offset
+            y: mainPosition.y,
+        });
+    };
+
     return (
-        <>
-            <CardContent className="p-4">
-                <ul className="space-y-2">
-                    {PISTON_NAMES.map(piston => {
-                        const entries = topicPistons[piston] || [];
-                        const currentEntry = entries[0];
-                        return (
-                            <li key={piston} className="p-2 rounded-lg bg-muted/30">
-                                <div className="flex items-start gap-3">
-                                    <span className="mt-1">{PISTON_ICONS[piston]}</span>
-                                    <div className="flex-grow">
-                                        <h4 className="font-semibold text-sm">{piston}</h4>
-                                        {editingPiston === piston ? (
-                                            <div className="mt-1">
-                                                <Textarea 
-                                                    value={editText}
-                                                    onChange={(e) => setEditText(e.target.value)}
-                                                    placeholder={pistonPlaceholders[piston]}
-                                                    className="bg-background text-sm min-h-[4rem] border-primary"
-                                                    autoFocus
-                                                    rows={2}
-                                                />
-                                                <div className="flex justify-end gap-2 mt-2">
-                                                    <Button size="sm" variant="ghost" onClick={() => { setEditingPiston(null); setEditText(''); }}>Cancel</Button>
-                                                    <Button size="sm" onClick={() => handleSaveEdit(false)}>Save</Button>
-                                                </div>
+        <CardContent className="p-4">
+            <ul className="space-y-2">
+                {PISTON_NAMES.map(piston => {
+                    const entries = topicPistons[piston] || [];
+                    const currentEntry = entries[0];
+                    return (
+                        <li key={piston} className="p-2 rounded-lg bg-muted/30">
+                            <div className="flex items-start gap-3">
+                                <span className="mt-1">{PISTON_ICONS[piston]}</span>
+                                <div className="flex-grow">
+                                    <h4 className="font-semibold text-sm">{piston}</h4>
+                                    {editingPiston === piston ? (
+                                        <div className="mt-1">
+                                            <Textarea 
+                                                value={editText}
+                                                onChange={(e) => setEditText(e.target.value)}
+                                                placeholder={pistonPlaceholders[piston]}
+                                                className="bg-background text-sm min-h-[4rem] border-primary"
+                                                autoFocus
+                                                rows={2}
+                                            />
+                                            <div className="flex justify-end gap-2 mt-2">
+                                                <Button size="sm" variant="ghost" onClick={() => { setEditingPiston(null); setEditText(''); }}>Cancel</Button>
+                                                <Button size="sm" onClick={() => handleSaveEdit(false)}>Save</Button>
                                             </div>
-                                        ) : (
-                                            <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start">
-                                                <div className="flex-grow" onClick={() => handleStartEdit(piston)}>
-                                                {currentEntry?.text ? (
-                                                    <p className="whitespace-pre-wrap cursor-text">{currentEntry.text}</p>
-                                                ) : (
-                                                    <p className="italic opacity-70 cursor-text">{pistonPlaceholders[piston]}</p>
-                                                )}
-                                                </div>
-                                                <div className="flex-shrink-0">
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleAddNew(piston)}>
-                                                        <Plus className="h-4 w-4" />
+                                        </div>
+                                    ) : (
+                                        <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start">
+                                            <div className="flex-grow" onClick={() => handleStartEdit(piston)}>
+                                            {currentEntry?.text ? (
+                                                <p className="whitespace-pre-wrap cursor-text">{currentEntry.text}</p>
+                                            ) : (
+                                                <p className="italic opacity-70 cursor-text">{pistonPlaceholders[piston]}</p>
+                                            )}
+                                            </div>
+                                            <div className="flex-shrink-0">
+                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleAddNew(piston)}>
+                                                    <Plus className="h-4 w-4" />
+                                                </Button>
+                                                {entries.length > 0 && (
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenHistory(piston)}>
+                                                        <History className="h-4 w-4" />
                                                     </Button>
-                                                    {entries.length > 0 && (
-                                                        <Popover>
-                                                            <PopoverTrigger asChild>
-                                                                <Button variant="ghost" size="icon" className="h-6 w-6">
-                                                                    <History className="h-4 w-4" />
-                                                                </Button>
-                                                            </PopoverTrigger>
-                                                            <PopoverContent className="w-80">
-                                                                <div className="grid gap-4">
-                                                                    <div className="space-y-2">
-                                                                        <h4 className="font-medium leading-none">{piston} History</h4>
-                                                                        <p className="text-sm text-muted-foreground">Previous intentions for this piston.</p>
-                                                                    </div>
-                                                                    <ScrollArea className="max-h-60">
-                                                                        <ul className="space-y-4 pr-4">
-                                                                            {entries.map(entry => (
-                                                                                <li key={entry.id} className="border-l-2 pl-4">
-                                                                                    <p className="text-sm whitespace-pre-wrap">{entry.text}</p>
-                                                                                    <p className="text-xs text-muted-foreground mt-1">{format(new Date(entry.timestamp), 'PPP p')}</p>
-                                                                                </li>
-                                                                            ))}
-                                                                        </ul>
-                                                                    </ScrollArea>
-                                                                </div>
-                                                            </PopoverContent>
-                                                        </Popover>
-                                                    )}
-                                                </div>
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
-                            </li>
-                        )
-                    })}
-                </ul>
-            </CardContent>
-        </>
+                            </div>
+                        </li>
+                    )
+                })}
+            </ul>
+        </CardContent>
     );
 };
