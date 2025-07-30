@@ -193,7 +193,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                 </div>
                 
                 <div className="absolute top-2 right-2 z-20 flex items-center">
-                    {resource.audioUrl ? (
+                     {resource.audioUrl ? (
                         <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={(e) => e.stopPropagation()} onClick={togglePlayAudio}>
                             {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
                         </Button>
@@ -355,6 +355,7 @@ export function PistonsHead() {
   const handleCloseHistory = () => setHistoryPopup(null);
   const handleCloseResource = (resourceId: string) => {
     if (resourcePopup?.resourceId === resourceId) {
+        setPlayingAudio(null);
         setResourcePopup(null);
     }
   };
@@ -536,10 +537,7 @@ export function PistonsHead() {
                     <ResourcePopupCard 
                         popupState={resourcePopup}
                         resource={resources.find(r => r.id === resourcePopup.resourceId)!}
-                        onClose={() => {
-                            setPlayingAudio(null);
-                            handleCloseResource(resourcePopup.resourceId);
-                        }}
+                        onClose={() => handleCloseResource(resourcePopup.resourceId)}
                         onUpdate={handleUpdateResource}
                         playingAudio={playingAudio}
                         setPlayingAudio={setPlayingAudio}
@@ -764,4 +762,5 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 
 
   
+
 
