@@ -1,9 +1,10 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical, PlusCircle, Trash2, Play, Pause } from 'lucide-react';
+import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical, PlusCircle, Trash2, Play, Pause, ChevronRight } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
@@ -18,7 +19,7 @@ import { format } from 'date-fns';
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
@@ -442,6 +443,7 @@ export function PistonsHead() {
   const handleOpenHistory = (e: React.MouseEvent, piston: PistonType) => {
       e.stopPropagation();
       const historyPopupWidth = 320;
+      
       let x = position.x + 384 + 20; // 384 is main widget width
 
       if(resourcePopup) {
@@ -455,13 +457,10 @@ export function PistonsHead() {
     e.stopPropagation();
     
     const popupWidth = 512;
-    let x = position.x - popupWidth - 20;
+    const x = window.innerWidth / 2 - popupWidth / 2;
+    const y = window.innerHeight / 2 - Math.min(window.innerHeight * 0.7, 500) / 2;
     
-    if (historyPopup) {
-        x = historyPopup.x - popupWidth - 20;
-    }
-
-    setResourcePopup({ resourceId, x: Math.max(20, x), y: position.y });
+    setResourcePopup({ resourceId, x: Math.max(20, x), y: Math.max(20, y) });
   };
 
   const handleLinkResource = (resourceId: string | null) => {
