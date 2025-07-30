@@ -473,12 +473,22 @@ export function PistonsHead() {
       setHistoryPopup(null);
       return;
     }
-  
+    
     const historyPopupWidth = 320;
     const pistonsHeadWidth = 384; 
-    let x = position.x + pistonsHeadWidth + 20;
+    
+    // Check if resource popup is open to decide the position
+    let x;
+    if (resourcePopup) {
+        // Position to the left of the main widget if resource popup is open
+        x = position.x - historyPopupWidth - 20;
+    } else {
+        // Default position to the right
+        x = position.x + pistonsHeadWidth + 20;
+    }
+    
     let y = position.y;
-  
+    
     if (x + historyPopupWidth > window.innerWidth) {
         x = position.x - historyPopupWidth - 20;
     }
@@ -492,7 +502,17 @@ export function PistonsHead() {
 
     const popupWidth = 512;
     const pistonsHeadWidth = 384;
-    let x = position.x + pistonsHeadWidth + 20;
+
+    // Check if history popup is open to decide the position
+    let x;
+    if (historyPopup) {
+        // Position to the left of the main widget if history is open
+        x = position.x - popupWidth - 20;
+    } else {
+        // Default position to the right
+        x = position.x + pistonsHeadWidth + 20;
+    }
+    
     let y = position.y;
   
     if (x + popupWidth > window.innerWidth) {
