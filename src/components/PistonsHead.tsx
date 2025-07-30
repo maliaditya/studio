@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { Brain, BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical, PlusCircle, Trash2, Play, Pause, ChevronRight } from 'lucide-react';
+import { Brain, BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical, PlusCircle, Trash2, Play, Pause, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
@@ -201,12 +201,10 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
             <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
             <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative">
                 <div 
-                    className="absolute top-2 left-2 z-20 h-7 w-7 rounded-full flex items-center justify-center cursor-grab" 
+                    className="absolute top-0 left-0 h-10 w-full cursor-grab active:cursor-grabbing z-10" 
                     onPointerDownCapture={listeners.onPointerDown}
                     onTouchStartCapture={listeners.onTouchStart}
-                >
-                    <GripVertical className="h-4 w-4 text-muted-foreground" />
-                </div>
+                />
                 
                  <div className="absolute top-2 right-2 z-20 flex items-center">
                     {resource.audioUrl ? (
@@ -474,24 +472,18 @@ export function PistonsHead() {
       return;
     }
     
-    const historyPopupWidth = 320;
+    const popupWidth = 320; // history popup width
     const pistonsHeadWidth = 384; 
-    
-    // Check if resource popup is open to decide the position
     let x;
     if (resourcePopup) {
         // Position to the left of the main widget if resource popup is open
-        x = position.x - historyPopupWidth - 20;
+        x = position.x - popupWidth - 20;
     } else {
         // Default position to the right
         x = position.x + pistonsHeadWidth + 20;
     }
-    
     let y = position.y;
-    
-    if (x + historyPopupWidth > window.innerWidth) {
-        x = position.x - historyPopupWidth - 20;
-    }
+    if (x + popupWidth > window.innerWidth) x = position.x - popupWidth - 20;
     y = Math.max(20, y);
     
     setHistoryPopup({ piston, x, y });
@@ -502,22 +494,14 @@ export function PistonsHead() {
 
     const popupWidth = 512;
     const pistonsHeadWidth = 384;
-
-    // Check if history popup is open to decide the position
     let x;
     if (historyPopup) {
-        // Position to the left of the main widget if history is open
         x = position.x - popupWidth - 20;
     } else {
-        // Default position to the right
         x = position.x + pistonsHeadWidth + 20;
     }
-    
     let y = position.y;
-  
-    if (x + popupWidth > window.innerWidth) {
-        x = position.x - popupWidth - 20;
-    }
+    if (x + popupWidth > window.innerWidth) x = position.x - popupWidth - 20;
     y = Math.max(20, y);
 
     setResourcePopup({ resourceId, x, y });
@@ -787,7 +771,7 @@ const DesireSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, type
                         <li key={desire.id} className="flex items-center justify-between group p-2 rounded-md border bg-muted/20">
                             <button onClick={() => onSelect(desire.id, 'desires')} className="flex items-center justify-between w-full text-left group">
                                 <span className="font-medium group-hover:text-primary transition-colors">{desire.name}</span>
-                                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors"/>
+                                <ChevronRightIcon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors"/>
                             </button>
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
@@ -828,7 +812,7 @@ const MindsetSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, typ
                         <li key={card.id} className="flex items-center justify-between group p-2 rounded-md border bg-muted/20">
                              <button onClick={() => onSelect(card.id, 'mindset')} className="flex items-center justify-between w-full text-left group">
                                 <span className="font-medium group-hover:text-primary transition-colors">{card.title}</span>
-                                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors"/>
+                                <ChevronRightIcon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors"/>
                             </button>
                              <AlertDialog>
                                 <AlertDialogTrigger asChild>
@@ -936,7 +920,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                                         <Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="h-4 w-4"/></Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuPortal>
-                                                        <DropdownMenuContent>
+                                                        <DropdownMenuContent side="right" align="start">
                                                             <DropdownMenuItem onSelect={() => setNewEntryPiston(piston)}><Plus className="mr-2 h-4 w-4"/>New Entry</DropdownMenuItem>
                                                             {currentEntry && <DropdownMenuItem onSelect={() => handleDeleteEntry(piston)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Current</DropdownMenuItem>}
                                                             {entries.length > 0 && <DropdownMenuItem onSelect={(e) => handleOpenHistory(e, piston)}><History className="mr-2 h-4 w-4"/>View History</DropdownMenuItem>}
