@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical } from 'lucide-react';
+import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
@@ -158,9 +158,12 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate }: {
         <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
              <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
             <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col">
-                <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
+                <CardHeader className="p-3 relative flex-shrink-0">
                     <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2 flex-grow min-w-0">
+                         <div className="flex items-center gap-2 flex-grow min-w-0">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 cursor-grab" {...listeners}>
+                                <GripVertical className="h-4 w-4" />
+                            </Button>
                             <Library className="h-4 w-4" />
                             {editingTitle ? (
                                 <Input 
@@ -178,9 +181,11 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate }: {
                             )}
                         </div>
                         <div>
-                             <DropdownMenu>
+                            <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => e.stopPropagation()}><MoreVertical className="h-4 w-4" /></Button>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => e.stopPropagation()}>
+                                        <MoreVertical className="h-4 w-4" />
+                                    </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                     <DropdownMenuItem onSelect={() => setEditingTitle(true)}><Edit className="mr-2 h-4 w-4" />Edit Title</DropdownMenuItem>
