@@ -382,8 +382,8 @@ export function PistonsHead() {
   const handleClose = () => {
     setIsPistonsHeadOpen(false);
     setHistoryPopup(null);
-    setResourcePopup(null);
     setPlayingAudio(null);
+    setResourcePopup(null);
     setTimeout(() => {
         setCurrentView('main');
         setSelectedTopicId(null);
@@ -426,21 +426,20 @@ export function PistonsHead() {
 
   const handleOpenHistory = (e: React.MouseEvent, piston: PistonType) => {
       e.stopPropagation();
-      setHistoryPopup({ piston, x: position.x + 384 + 20, y: position.y });
+      const historyPopupWidth = 320;
+      const x = position.x + 384 + 20; // 384 is main widget width
+      setHistoryPopup({ piston, x: Math.min(x, window.innerWidth - historyPopupWidth - 20), y: position.y });
   };
 
   const handleOpenResource = (e: React.MouseEvent, resourceId: string) => {
     e.stopPropagation();
-    let popupX;
-    if (historyPopup) {
-        // If history is open, place to the left of history
-        const historyPopupWidth = 320; // from HistoryPopupCard className="w-80"
-        popupX = Math.max(20, historyPopup.x - 512 - 20);
-    } else {
-        // Otherwise, place to the left of the main widget
-        popupX = Math.max(20, position.x - 512 - 20); // 512 is assumed width
-    }
-    setResourcePopup({ resourceId, x: popupX, y: position.y });
+    
+    const popupWidth = 512;
+    const popupHeight = 600; // Approximate height for centering
+    const x = window.innerWidth / 2 - popupWidth / 2;
+    const y = window.innerHeight / 2 - popupHeight / 2;
+
+    setResourcePopup({ resourceId, x: Math.max(20, x), y: Math.max(20, y) });
   };
 
   const handleLinkResource = (resourceId: string | null) => {
@@ -557,7 +556,7 @@ export function PistonsHead() {
                     <ResourcePopupCard 
                         popupState={resourcePopup}
                         resource={resources.find(r => r.id === resourcePopup.resourceId)!}
-                        onClose={() => handleCloseResource(resourcePopup.resourceId)}
+                        onClose={() => { setPlayingAudio(null); handleCloseResource(resourcePopup.resourceId); }}
                         onUpdate={handleUpdateResource}
                         playingAudio={playingAudio}
                         setPlayingAudio={setPlayingAudio}
@@ -771,6 +770,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 
 
   
+
 
 
 
