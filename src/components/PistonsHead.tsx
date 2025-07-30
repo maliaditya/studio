@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -22,7 +21,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
@@ -196,6 +195,12 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
         const updatedPoints = (resource.points || []).filter(p => p.id !== pointId);
         onUpdate({ ...resource, points: updatedPoints });
     };
+    
+    const handleClose = (e: React.MouseEvent | React.PointerEvent) => {
+        e.stopPropagation();
+        setPlayingAudio(null);
+        onClose(resource.id);
+    }
 
     return (
         <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
@@ -217,7 +222,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                             <Upload className="h-4 w-4"/>
                         </Button>
                     )}
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={(e) => { e.stopPropagation(); setPlayingAudio(null); onClose(resource.id); }}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={handleClose}>
                         <X className="h-4 w-4" />
                     </Button>
                 </div>
@@ -461,11 +466,8 @@ export function PistonsHead() {
   };
   const topicName = getTopicName(currentView);
 
-  const [linkingResourceFor, setLinkingResourceFor] = useState<{piston: PistonType; entryId: string; currentResourceId?: string;} | null>(null);
-
   const handleOpenHistory = (e: React.MouseEvent, piston: PistonType) => {
     e.stopPropagation();
-
     if (historyPopup?.piston === piston) {
       setHistoryPopup(null);
       return;
@@ -473,42 +475,38 @@ export function PistonsHead() {
     
     const popupWidth = 320;
     let x;
-    
-    if (resourcePopup) {
-        x = position.x - popupWidth - 20;
-    } else {
-        x = position.x + 384 + 20; // 384 is PistonsHead width
-    }
-    let y = position.y;
-    if (x + popupWidth > window.innerWidth) x = position.x - popupWidth - 20;
-    y = Math.max(20, y);
-    
-    setHistoryPopup({ piston, x, y });
-  };
 
+    if (resourcePopup) {
+      x = position.x - popupWidth - 20;
+    } else {
+      x = position.x + 384 + 20;
+    }
+
+    if (x < 20) x = position.x + 384 + 20;
+    if (x + popupWidth > window.innerWidth) x = position.x - popupWidth - 20;
+  
+    setHistoryPopup({ piston, x, y: Math.max(20, position.y) });
+  };
+  
   const handleOpenResource = (e: React.MouseEvent, resourceId: string) => {
     e.stopPropagation();
-    
     const popupWidth = 512;
     let x;
-    
+
     if (historyPopup) {
-      x = position.x + 320 + 40; // History popup width + gap
+      x = position.x - popupWidth - 20;
     } else {
-      x = position.x + 384 + 20; // Main widget width + gap
+      x = position.x + 384 + 20;
     }
-    
-    let y = position.y;
-    
-    if (x + popupWidth > window.innerWidth) {
-      x = position.x - popupWidth - 20; // Position to the left if no space
-    }
-    
-    y = Math.max(20, y);
-    
-    setResourcePopup({ resourceId, x, y });
+  
+    if (x < 20) x = position.x + 384 + 20;
+    if (x + popupWidth > window.innerWidth) x = position.x - popupWidth - 20;
+  
+    setResourcePopup({ resourceId, x, y: Math.max(20, position.y) });
   };
 
+
+  const [linkingResourceFor, setLinkingResourceFor] = useState<{piston: PistonType; entryId: string; currentResourceId?: string;} | null>(null);
 
   const handleLinkResource = (resourceId: string | null) => {
     if (!linkingResourceFor) return;
@@ -880,85 +878,83 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
     };
     
     return (
-        <div className="flex-grow min-h-0">
-            <ScrollArea className="h-full">
-                <CardContent className="p-4">
-                    <ul className="space-y-2">
-                        {PISTON_NAMES.map(piston => {
-                            const entries = topicPistons[piston] || [];
-                            const currentEntry = entries[0];
-                            const isAddingNewToThisPiston = newEntryPiston === piston;
-                            const isResourceLinked = !!currentEntry?.linkedResourceId;
-                            
-                            return (
-                                <li key={piston} className="p-2 rounded-lg bg-muted/30">
-                                    <div className="flex items-start gap-3">
-                                        <span className="mt-1">{PISTON_ICONS[piston]}</span>
-                                        <div className="flex-grow">
-                                            <h4 className="font-semibold text-sm">{piston}</h4>
-                                            <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start group">
-                                                {editingEntryId === currentEntry?.id ? (
-                                                    <Textarea 
-                                                        value={editedEntryText} 
-                                                        onChange={e => setEditedEntryText(e.target.value)}
-                                                        onBlur={() => handleSaveEdit(piston)}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveEdit(piston); }
-                                                            if (e.key === 'Escape') { setEditingEntryId(null); }
-                                                        }}
-                                                        className="text-sm bg-background"
-                                                        autoFocus
-                                                    />
-                                                ) : (
-                                                    <p className="whitespace-pre-wrap flex-grow pr-2" onDoubleClick={() => currentEntry && handleStartEditing(currentEntry)}>
-                                                        {currentEntry?.text || <span className="italic opacity-70">{getPlaceholderText(piston)}</span>}
-                                                    </p>
-                                                )}
-                                                <div className="flex-shrink-0 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    {isResourceLinked ? (
-                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDownCapture={(e) => handleOpenResource(e, currentEntry.linkedResourceId!)}>
-                                                            <Library className="h-4 w-4 text-primary" />
-                                                        </Button>
-                                                    ) : currentEntry ? (
-                                                         <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDownCapture={() => onLinkResource({piston, entryId: currentEntry.id, currentResourceId: currentEntry.linkedResourceId})}>
-                                                            <LinkIcon className="h-4 w-4" />
-                                                        </Button>
-                                                    ) : <div className="w-6 h-6"/> }
-                                                        <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
-                                                        <DropdownMenuPortal>
-                                                            <DropdownMenuContent side="right" align="start" sideOffset={5}>
-                                                                <DropdownMenuItem onSelect={() => setNewEntryPiston(piston)}><Plus className="mr-2 h-4 w-4"/>New Entry</DropdownMenuItem>
-                                                                {entries.length > 0 && <DropdownMenuItem onSelect={(e) => handleOpenHistory(e, piston)}><History className="mr-2 h-4 w-4"/>View History</DropdownMenuItem>}
-                                                                {currentEntry && (
-                                                                    <DropdownMenuItem onSelect={() => onLinkResource({ piston, entryId: currentEntry.id, currentResourceId: currentEntry.linkedResourceId })}>
-                                                                        <LinkIcon className="mr-2 h-4 w-4"/> {isResourceLinked ? 'Change Resource' : 'Link Resource'}
-                                                                    </DropdownMenuItem>
-                                                                )}
-                                                                {currentEntry && <DropdownMenuItem onSelect={() => handleDeleteEntry(piston, currentEntry.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Current</DropdownMenuItem>}
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenuPortal>
-                                                    </DropdownMenu>
-                                                </div>
-                                            </div>
-                                            {isAddingNewToThisPiston && (
-                                                <div className="mt-2 pt-2 border-t">
-                                                    <Textarea value={newEntryText} onChange={(e) => setNewEntryText(e.target.value)} placeholder={`Add a new entry for ${piston}...`} className="bg-background text-sm min-h-[4rem]" autoFocus rows={2} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSaveNewEntry(piston))}/>
-                                                    <div className="flex justify-end gap-2 mt-2">
-                                                        <Button size="sm" variant="ghost" onClick={() => {setNewEntryPiston(null); setNewEntryText('')}}>Cancel</Button>
-                                                        <Button size="sm" onClick={() => handleSaveNewEntry(piston)}>Add</Button>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </li>
-                            )
-                        })}
-                    </ul>
-                </CardContent>
+        <CardContent className="p-0 flex-grow min-h-0">
+          <ScrollArea className="h-full p-4">
+              <ul className="space-y-2">
+                  {PISTON_NAMES.map(piston => {
+                      const entries = topicPistons[piston] || [];
+                      const currentEntry = entries[0];
+                      const isAddingNewToThisPiston = newEntryPiston === piston;
+                      const isResourceLinked = !!currentEntry?.linkedResourceId;
+                      
+                      return (
+                          <li key={piston} className="p-2 rounded-lg bg-muted/30">
+                              <div className="flex items-start gap-3">
+                                  <span className="mt-1">{PISTON_ICONS[piston]}</span>
+                                  <div className="flex-grow">
+                                      <h4 className="font-semibold text-sm">{piston}</h4>
+                                      <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start group">
+                                          {editingEntryId === currentEntry?.id ? (
+                                              <Textarea 
+                                                  value={editedEntryText} 
+                                                  onChange={e => setEditedEntryText(e.target.value)}
+                                                  onBlur={() => handleSaveEdit(piston)}
+                                                  onKeyDown={(e) => {
+                                                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveEdit(piston); }
+                                                      if (e.key === 'Escape') { setEditingEntryId(null); }
+                                                  }}
+                                                  className="text-sm bg-background"
+                                                  autoFocus
+                                              />
+                                          ) : (
+                                              <p className="whitespace-pre-wrap flex-grow pr-2" onDoubleClick={() => currentEntry && handleStartEditing(currentEntry)}>
+                                                  {currentEntry?.text || <span className="italic opacity-70">{getPlaceholderText(piston)}</span>}
+                                              </p>
+                                          )}
+                                          <div className="flex-shrink-0 flex items-center">
+                                              {isResourceLinked ? (
+                                                  <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDownCapture={(e) => handleOpenResource(e, currentEntry.linkedResourceId!)}>
+                                                      <Library className="h-4 w-4 text-primary" />
+                                                  </Button>
+                                              ) : currentEntry ? (
+                                                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDownCapture={() => onLinkResource({piston, entryId: currentEntry.id, currentResourceId: currentEntry.linkedResourceId})}>
+                                                      <LinkIcon className="h-4 w-4" />
+                                                  </Button>
+                                              ) : <div className="w-6 h-6"/> }
+                                                  <DropdownMenu>
+                                                  <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
+                                                  <DropdownMenuPortal>
+                                                    <DropdownMenuContent side="right" align="start" sideOffset={5}>
+                                                        <DropdownMenuItem onSelect={() => setNewEntryPiston(piston)}><Plus className="mr-2 h-4 w-4"/>New Entry</DropdownMenuItem>
+                                                        {entries.length > 0 && <DropdownMenuItem onSelect={(e) => handleOpenHistory(e, piston)}><History className="mr-2 h-4 w-4"/>View History</DropdownMenuItem>}
+                                                        {currentEntry && (
+                                                            <DropdownMenuItem onSelect={() => onLinkResource({ piston, entryId: currentEntry.id, currentResourceId: currentEntry.linkedResourceId })}>
+                                                                <LinkIcon className="mr-2 h-4 w-4"/> {isResourceLinked ? 'Change Resource' : 'Link Resource'}
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        {currentEntry && <DropdownMenuItem onSelect={() => handleDeleteEntry(piston, currentEntry.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Current</DropdownMenuItem>}
+                                                    </DropdownMenuContent>
+                                                  </DropdownMenuPortal>
+                                              </DropdownMenu>
+                                          </div>
+                                      </div>
+                                      {isAddingNewToThisPiston && (
+                                          <div className="mt-2 pt-2 border-t">
+                                              <Textarea value={newEntryText} onChange={(e) => setNewEntryText(e.target.value)} placeholder={`Add a new entry for ${piston}...`} className="bg-background text-sm min-h-[4rem]" autoFocus rows={2} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSaveNewEntry(piston))}/>
+                                              <div className="flex justify-end gap-2 mt-2">
+                                                  <Button size="sm" variant="ghost" onClick={() => {setNewEntryPiston(null); setNewEntryText('')}}>Cancel</Button>
+                                                  <Button size="sm" onClick={() => handleSaveNewEntry(piston)}>Add</Button>
+                                              </div>
+                                          </div>
+                                      )}
+                                  </div>
+                              </div>
+                          </li>
+                      )
+                  })}
+              </ul>
             </ScrollArea>
-        </div>
+        </CardContent>
     );
 };
 
@@ -970,3 +966,5 @@ const TopicPistonView = ({ topicId, onBack, setHistoryPopup, setResourcePopup, o
 
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
+
+    
