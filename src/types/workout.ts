@@ -272,12 +272,15 @@ export interface MindsetCard {
 // Pistons of Intention
 export type PistonType = 'Desire' | 'Curiosity' | 'Truth-Seeking' | 'Contribution' | 'Growth' | 'Expression' | 'Pleasure' | 'Protection';
 
-export interface PistonState {
+export interface PistonEntry {
+    id: string;
     text: string;
-    // Potentially add history tracking here later
+    timestamp: number;
 }
 
-export type PistonsData = Record<PistonType, PistonState>;
+export type PistonState = PistonEntry[];
+
+export type PistonsData = Partial<Record<PistonType, PistonState> & { activity?: string }>;
 
 export interface PistonsCategoryData {
     health?: PistonsData;

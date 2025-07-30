@@ -1,20 +1,23 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X } from 'lucide-react';
+import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
-import { PistonType, PistonsData } from '@/types/workout';
+import { PistonEntry, PistonType, PistonsData } from '@/types/workout';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+import { format } from 'date-fns';
 
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
@@ -84,9 +87,9 @@ export function PistonsHead() {
       case 'health':
         return `Health: ${pistons.health?.activity || 'Activity'}`;
       case 'wealth':
-         return selectedTopicId ? selectedTopicId : 'Select Wealth Topic';
+         return selectedTopicId || `Select Wealth Topic`;
       case 'growth':
-         return selectedTopicId ? selectedTopicId : 'Select Growth Topic';
+         return selectedTopicId || `Select Growth Topic`;
       default: return 'Pistons of Intention';
     }
   };
@@ -138,24 +141,21 @@ export function PistonsHead() {
                     <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 right-1.5 z-20" onClick={handleClose}>
                         <X className="h-4 w-4" />
                     </Button>
+                    <div className="absolute top-1.5 left-1.5 z-20">
+                      {currentView !== 'main' && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onBack(); }}>
+                              <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                      )}
+                    </div>
                     <CardHeader 
                         className="p-3 cursor-grab text-center" 
                         {...attributes} 
                         {...listeners}
                     >
-                        <div className="flex justify-between items-center w-full">
-                            <div className="w-8">
-                                {currentView !== 'main' && (
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onBack(); }}>
-                                        <ChevronLeft className="h-4 w-4" />
-                                    </Button>
-                                )}
-                            </div>
-                            <CardTitle className="text-base truncate flex-grow" title={topicName as string}>
-                                {topicName}
-                            </CardTitle>
-                             <div className="w-8" />
-                        </div>
+                        <CardTitle className="text-base truncate" title={topicName as string}>
+                          {topicName}
+                        </CardTitle>
                     </CardHeader>
                     {renderContent()}
                 </Card>
@@ -261,8 +261,9 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { top
     const { pistons, setPistons } = useAuth();
     const [editingPiston, setEditingPiston] = useState<PistonType | null>(null);
     const [editText, setEditText] = useState('');
+    const [historyPiston, setHistoryPiston] = useState<PistonType | null>(null);
+    
     const topicPistons = pistons[topicId] || {};
-
     const simpleTopicName = topicName.startsWith('Health: ') ? pistons.health?.activity : topicName;
 
     const pistonPlaceholders: Record<PistonType, string> = {
@@ -276,67 +277,135 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { top
         'Protection': `What does pursuing ${simpleTopicName} protect you from?`
     };
 
-    const handleTextChange = (piston: PistonType, text: string) => {
-        setPistons(prev => ({
-            ...prev,
-            [topicId]: {
-                ...prev[topicId],
-                [piston]: { text }
+    const handleTextChange = (piston: PistonType, newText: string, isNewEntry: boolean) => {
+        setPistons(prev => {
+            const newEntry: PistonEntry = {
+                id: `piston_${Date.now()}`,
+                text: newText,
+                timestamp: Date.now()
+            };
+            const currentEntries = prev[topicId]?.[piston] || [];
+            
+            let updatedEntries;
+            if (isNewEntry) {
+                updatedEntries = [newEntry, ...currentEntries];
+            } else {
+                // This is an edit of the most recent entry
+                if (currentEntries.length > 0) {
+                    updatedEntries = [newEntry, ...currentEntries.slice(1)];
+                } else {
+                    updatedEntries = [newEntry];
+                }
             }
-        }));
+            
+            return {
+                ...prev,
+                [topicId]: {
+                    ...prev[topicId],
+                    [piston]: updatedEntries
+                }
+            };
+        });
     };
 
     const handleStartEdit = (piston: PistonType) => {
         setEditingPiston(piston);
-        setEditText(topicPistons[piston]?.text || '');
+        const currentText = topicPistons[piston]?.[0]?.text || '';
+        setEditText(currentText);
     };
     
-    const handleSaveEdit = () => {
-        if (editingPiston) {
-            handleTextChange(editingPiston, editText);
+    const handleSaveEdit = (isNew: boolean) => {
+        if (editingPiston && editText.trim()) {
+            handleTextChange(editingPiston, editText, isNew);
+            setEditingPiston(null);
+            setEditText('');
+        } else if (editingPiston) { // Text is empty, just cancel edit
             setEditingPiston(null);
             setEditText('');
         }
     };
     
+    const handleAddNew = (piston: PistonType) => {
+        setEditingPiston(piston);
+        setEditText(''); // Start with empty text for new entry
+    };
+
+    const currentHistoryEntries = historyPiston ? (topicPistons[historyPiston] || []) : [];
+
     return (
+      <>
         <CardContent className="p-4">
             <ul className="space-y-2">
-                {PISTON_NAMES.map(piston => (
-                    <li key={piston} className="p-2 rounded-lg bg-muted/30">
-                        <div className="flex items-start gap-3">
-                            <span className="mt-1">{PISTON_ICONS[piston]}</span>
-                            <div className="flex-grow">
-                                <h4 className="font-semibold text-sm">{piston}</h4>
-                                {editingPiston === piston ? (
-                                    <Textarea 
-                                        value={editText}
-                                        onChange={(e) => setEditText(e.target.value)}
-                                        onBlur={handleSaveEdit}
-                                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveEdit(); } }}
-                                        placeholder={pistonPlaceholders[piston]}
-                                        className="mt-1 bg-background text-sm min-h-[4rem] border-primary"
-                                        autoFocus
-                                        rows={2}
-                                    />
-                                ) : (
-                                    <div
-                                        onClick={() => handleStartEdit(piston)}
-                                        className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 cursor-text w-full"
-                                    >
-                                        {topicPistons[piston]?.text ? (
-                                            <p className="whitespace-pre-wrap">{topicPistons[piston]?.text}</p>
-                                        ) : (
-                                            <p className="italic opacity-70">{pistonPlaceholders[piston]}</p>
-                                        )}
-                                    </div>
-                                )}
+                {PISTON_NAMES.map(piston => {
+                    const entries = topicPistons[piston] || [];
+                    const currentEntry = entries[0];
+                    return (
+                        <li key={piston} className="p-2 rounded-lg bg-muted/30">
+                            <div className="flex items-start gap-3">
+                                <span className="mt-1">{PISTON_ICONS[piston]}</span>
+                                <div className="flex-grow">
+                                    <h4 className="font-semibold text-sm">{piston}</h4>
+                                    {editingPiston === piston ? (
+                                        <div className="mt-1">
+                                            <Textarea 
+                                                value={editText}
+                                                onChange={(e) => setEditText(e.target.value)}
+                                                placeholder={pistonPlaceholders[piston]}
+                                                className="bg-background text-sm min-h-[4rem] border-primary"
+                                                autoFocus
+                                                rows={2}
+                                            />
+                                            <div className="flex justify-end gap-2 mt-2">
+                                                <Button size="sm" variant="ghost" onClick={() => { setEditingPiston(null); setEditText(''); }}>Cancel</Button>
+                                                <Button size="sm" onClick={() => handleSaveEdit(false)}>Save</Button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start">
+                                            <div className="flex-grow" onClick={() => handleStartEdit(piston)}>
+                                              {currentEntry?.text ? (
+                                                  <p className="whitespace-pre-wrap cursor-text">{currentEntry.text}</p>
+                                              ) : (
+                                                  <p className="italic opacity-70 cursor-text">{pistonPlaceholders[piston]}</p>
+                                              )}
+                                            </div>
+                                            <div className="flex-shrink-0">
+                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleAddNew(piston)}>
+                                                    <Plus className="h-4 w-4" />
+                                                </Button>
+                                                {entries.length > 1 && (
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setHistoryPiston(piston)}>
+                                                        <History className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    </li>
-                ))}
+                        </li>
+                    )
+                })}
             </ul>
         </CardContent>
+        <Dialog open={!!historyPiston} onOpenChange={(isOpen) => !isOpen && setHistoryPiston(null)}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{historyPiston} History</DialogTitle>
+                    <DialogDescription>A log of your previous intentions for this piston.</DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="max-h-96 my-4 pr-4">
+                    <ul className="space-y-4">
+                        {currentHistoryEntries.map(entry => (
+                            <li key={entry.id} className="border-l-2 pl-4">
+                                <p className="text-sm whitespace-pre-wrap">{entry.text}</p>
+                                <p className="text-xs text-muted-foreground mt-1">{format(new Date(entry.timestamp), 'PPP p')}</p>
+                            </li>
+                        ))}
+                    </ul>
+                </ScrollArea>
+            </DialogContent>
+        </Dialog>
+      </>
     );
 };
-
