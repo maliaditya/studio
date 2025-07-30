@@ -337,22 +337,25 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 
     const handleTextChange = (piston: PistonType, newText: string, isNewEntry: boolean) => {
         setPistons(prev => {
-            const newEntry: PistonEntry = {
-                id: `piston_${Date.now()}`,
-                text: newText,
-                timestamp: Date.now()
-            };
             const currentEntries = prev[topicId]?.[piston] || [];
             
             let updatedEntries;
             if (isNewEntry) {
+                // Add a completely new entry at the beginning
+                const newEntry: PistonEntry = {
+                    id: `piston_${Date.now()}`,
+                    text: newText,
+                    timestamp: Date.now()
+                };
                 updatedEntries = [newEntry, ...currentEntries];
             } else {
-                if (currentEntries.length > 0) {
-                    updatedEntries = [newEntry, ...currentEntries.slice(1)];
-                } else {
-                    updatedEntries = [newEntry];
-                }
+                // Edit the most recent entry, or create one if none exist
+                const newFirstEntry: PistonEntry = {
+                    id: currentEntries[0]?.id || `piston_${Date.now()}`,
+                    text: newText,
+                    timestamp: Date.now() // Always update timestamp on edit
+                };
+                updatedEntries = [newFirstEntry, ...(currentEntries.slice(1))];
             }
             
             return {
@@ -454,3 +457,4 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
         </CardContent>
     );
 };
+
