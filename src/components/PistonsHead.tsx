@@ -21,6 +21,7 @@ import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
     'Desire': <Target className="h-5 w-5 text-red-500" />,
@@ -352,7 +353,11 @@ export function PistonsHead() {
   });
   
   const handleCloseHistory = () => setHistoryPopup(null);
-  const handleCloseResource = () => setResourcePopup(null);
+  const handleCloseResource = (resourceId: string) => {
+    if (resourcePopup?.resourceId === resourceId) {
+        setResourcePopup(null);
+    }
+  };
   
   const handleUpdateResource = (updatedResource: Resource) => {
     setResources(prev =>
@@ -377,6 +382,7 @@ export function PistonsHead() {
     setIsPistonsHeadOpen(false);
     setHistoryPopup(null);
     setResourcePopup(null);
+    setPlayingAudio(null);
     setTimeout(() => {
         setCurrentView('main');
         setSelectedTopicId(null);
@@ -530,7 +536,10 @@ export function PistonsHead() {
                     <ResourcePopupCard 
                         popupState={resourcePopup}
                         resource={resources.find(r => r.id === resourcePopup.resourceId)!}
-                        onClose={handleCloseResource}
+                        onClose={() => {
+                            setPlayingAudio(null);
+                            handleCloseResource(resourcePopup.resourceId);
+                        }}
                         onUpdate={handleUpdateResource}
                         playingAudio={playingAudio}
                         setPlayingAudio={setPlayingAudio}
@@ -755,3 +764,4 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 
 
   
+
