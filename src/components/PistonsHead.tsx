@@ -187,58 +187,58 @@ export function PistonsHead() {
 
 
   return (
-    <>
-      {!isPistonsHeadOpen && (
-        <Button
-          onClick={() => setIsPistonsHeadOpen(true)}
-          variant="secondary"
-          size="icon"
-          className="fixed bottom-4 left-4 z-50 h-12 w-12 rounded-full shadow-lg"
-        >
-          <BrainCircuit className="h-6 w-6" />
-        </Button>
-      )}
-
-      {isPistonsHeadOpen && (
-        <DndContext onDragEnd={handleDragEnd}>
-            <div
-                ref={setNodeRef}
-                style={style}
-                className="z-[60]"
+    <DndContext onDragEnd={handleDragEnd}>
+        {!isPistonsHeadOpen && (
+            <Button
+            onClick={() => setIsPistonsHeadOpen(true)}
+            variant="secondary"
+            size="icon"
+            className="fixed bottom-4 left-4 z-50 h-12 w-12 rounded-full shadow-lg"
             >
-                <Card className="w-96 shadow-2xl border-2 border-primary/50 bg-card relative">
-                     <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 right-1.5 z-20" onClick={handleClose}>
-                        <X className="h-4 w-4" />
-                    </Button>
-                    <CardHeader 
-                        className="p-3 text-center relative cursor-grab active:cursor-grabbing"
-                        {...attributes} 
-                        {...listeners}
-                    >
-                        {currentView !== 'main' && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 left-1.5 z-20" onClick={(e) => { e.stopPropagation(); onBack(); }}>
-                                <ChevronLeft className="h-4 w-4" />
-                            </Button>
-                        )}
-                        <div className="w-full text-center">
-                          <CardTitle className="text-base truncate px-8" title={topicName as string}>
-                            {topicName}
-                          </CardTitle>
-                        </div>
-                    </CardHeader>
-                    {renderContent()}
-                </Card>
-            </div>
-            {historyPopup && (
-                <HistoryPopupCard 
-                    popupState={historyPopup}
-                    entries={pistons[selectedTopicId || (currentView === 'health' ? 'health' : '')]?.[historyPopup.piston] || []}
-                    onClose={handleCloseHistory}
-                />
-            )}
-        </DndContext>
-      )}
-    </>
+            <BrainCircuit className="h-6 w-6" />
+            </Button>
+        )}
+
+        {isPistonsHeadOpen && (
+            <>
+                <div
+                    ref={setNodeRef}
+                    style={style}
+                    className="z-[60]"
+                >
+                    <Card className="w-96 shadow-2xl border-2 border-primary/50 bg-card relative">
+                        <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 right-1.5 z-20" onClick={handleClose}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                        <CardHeader 
+                            className="p-3 text-center relative cursor-grab active:cursor-grabbing"
+                            {...attributes} 
+                            {...listeners}
+                        >
+                            {currentView !== 'main' && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 left-1.5 z-20" onClick={(e) => { e.stopPropagation(); onBack(); }}>
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                            )}
+                            <div className="w-full text-center">
+                            <CardTitle className="text-base truncate px-8" title={topicName as string}>
+                                {topicName}
+                            </CardTitle>
+                            </div>
+                        </CardHeader>
+                        {renderContent()}
+                    </Card>
+                </div>
+                {historyPopup && (
+                    <HistoryPopupCard 
+                        popupState={historyPopup}
+                        entries={pistons[selectedTopicId || (currentView === 'health' ? 'health' : '')]?.[historyPopup.piston] || []}
+                        onClose={handleCloseHistory}
+                    />
+                )}
+            </>
+        )}
+    </DndContext>
   );
 }
 
@@ -397,59 +397,60 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
     };
 
     return (
-            <CardContent className="p-4">
-                <ul className="space-y-2">
-                    {PISTON_NAMES.map(piston => {
-                        const entries = topicPistons[piston] || [];
-                        const currentEntry = entries[0];
-                        return (
-                            <li key={piston} className="p-2 rounded-lg bg-muted/30">
-                                <div className="flex items-start gap-3">
-                                    <span className="mt-1">{PISTON_ICONS[piston]}</span>
-                                    <div className="flex-grow">
-                                        <h4 className="font-semibold text-sm">{piston}</h4>
-                                        {editingPiston === piston ? (
-                                            <div className="mt-1">
-                                                <Textarea 
-                                                    value={editText}
-                                                    onChange={(e) => setEditText(e.target.value)}
-                                                    placeholder={pistonPlaceholders[piston]}
-                                                    className="bg-background text-sm min-h-[4rem] border-primary"
-                                                    autoFocus
-                                                    rows={2}
-                                                />
-                                                <div className="flex justify-end gap-2 mt-2">
-                                                    <Button size="sm" variant="ghost" onClick={() => { setEditingPiston(null); setEditText(''); }}>Cancel</Button>
-                                                    <Button size="sm" onClick={() => handleSaveEdit(false)}>Save</Button>
-                                                </div>
+        <CardContent className="p-4">
+            <ul className="space-y-2">
+                {PISTON_NAMES.map(piston => {
+                    const entries = topicPistons[piston] || [];
+                    const currentEntry = entries[0];
+                    return (
+                        <li key={piston} className="p-2 rounded-lg bg-muted/30">
+                            <div className="flex items-start gap-3">
+                                <span className="mt-1">{PISTON_ICONS[piston]}</span>
+                                <div className="flex-grow">
+                                    <h4 className="font-semibold text-sm">{piston}</h4>
+                                    {editingPiston === piston ? (
+                                        <div className="mt-1">
+                                            <Textarea 
+                                                value={editText}
+                                                onChange={(e) => setEditText(e.target.value)}
+                                                placeholder={pistonPlaceholders[piston]}
+                                                className="bg-background text-sm min-h-[4rem] border-primary"
+                                                autoFocus
+                                                rows={2}
+                                                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSaveEdit(false))}
+                                            />
+                                            <div className="flex justify-end gap-2 mt-2">
+                                                <Button size="sm" variant="ghost" onClick={() => { setEditingPiston(null); setEditText(''); }}>Cancel</Button>
+                                                <Button size="sm" onClick={() => handleSaveEdit(false)}>Save</Button>
                                             </div>
-                                        ) : (
-                                            <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start">
-                                                <div className="flex-grow cursor-text" onClick={() => handleStartEdit(piston)}>
-                                                    {currentEntry?.text ? (
-                                                        <p className="whitespace-pre-wrap">{currentEntry.text}</p>
-                                                    ) : (
-                                                        <p className="italic opacity-70">{pistonPlaceholders[piston]}</p>
-                                                    )}
-                                                </div>
-                                                <div className="flex-shrink-0">
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleAddNew(piston)}>
-                                                        <Plus className="h-4 w-4" />
+                                        </div>
+                                    ) : (
+                                        <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start">
+                                            <div className="flex-grow cursor-text" onClick={() => handleStartEdit(piston)}>
+                                                {currentEntry?.text ? (
+                                                    <p className="whitespace-pre-wrap">{currentEntry.text}</p>
+                                                ) : (
+                                                    <p className="italic opacity-70">{pistonPlaceholders[piston]}</p>
+                                                )}
+                                            </div>
+                                            <div className="flex-shrink-0">
+                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleAddNew(piston)}>
+                                                    <Plus className="h-4 w-4" />
+                                                </Button>
+                                                {entries.length > 0 && (
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleOpenHistory(e, piston)}>
+                                                        <History className="h-4 w-4" />
                                                     </Button>
-                                                    {entries.length > 0 && (
-                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleOpenHistory(e, piston)}>
-                                                            <History className="h-4 w-4" />
-                                                        </Button>
-                                                    )}
-                                                </div>
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
-                            </li>
-                        )
-                    })}
-                </ul>
-            </CardContent>
+                            </div>
+                        </li>
+                    )
+                })}
+            </ul>
+        </CardContent>
     );
 };
