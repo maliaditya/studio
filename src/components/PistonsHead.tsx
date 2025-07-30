@@ -59,12 +59,13 @@ const HistoryPopupCard = ({ popupState, entries, onClose }: { popupState: Histor
     return (
         <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
             <Card className="w-80 shadow-2xl border-2 border-primary/30 bg-card">
-                <CardHeader className="p-3 cursor-grab" {...listeners}>
+                <CardHeader className="p-3">
                     <div className="flex justify-between items-center">
-                        <CardTitle className="text-base flex items-center gap-2">
-                           {PISTON_ICONS[popupState.piston]} {popupState.piston} History
-                        </CardTitle>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
+                        <div className="flex items-center gap-2 cursor-grab flex-grow" {...listeners}>
+                           {PISTON_ICONS[popupState.piston]} 
+                           <CardTitle className="text-base">{popupState.piston} History</CardTitle>
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onClose(); }}>
                             <X className="h-4 w-4" />
                         </Button>
                     </div>
@@ -88,7 +89,7 @@ const HistoryPopupCard = ({ popupState, entries, onClose }: { popupState: Histor
 
 
 export function PistonsHead() {
-  const { isPistonsHeadOpen, setIsPistonsHeadOpen } = useAuth();
+  const { isPistonsHeadOpen, setIsPistonsHeadOpen, pistons, setPistons } = useAuth();
   const [currentView, setCurrentView] = useState<'main' | 'health' | 'wealth' | 'growth'>('main');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   
@@ -98,6 +99,10 @@ export function PistonsHead() {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: 'pistons-popup',
   });
+  
+  const handleCloseHistory = () => {
+    setHistoryPopup(null);
+  };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, delta } = event;
@@ -144,8 +149,6 @@ export function PistonsHead() {
         setCurrentView('main');
     }
   };
-  
-  const { pistons } = useAuth();
   
   const getTopicName = (view: 'main' | 'health' | 'wealth' | 'growth') => {
     switch (view) {
@@ -207,7 +210,7 @@ export function PistonsHead() {
                         <X className="h-4 w-4" />
                     </Button>
                     <CardHeader 
-                        className="p-3 text-center relative" 
+                        className="p-3 text-center relative cursor-grab active:cursor-grabbing"
                         {...attributes} 
                         {...listeners}
                     >
@@ -229,7 +232,7 @@ export function PistonsHead() {
                 <HistoryPopupCard 
                     popupState={historyPopup}
                     entries={pistons[selectedTopicId || (currentView === 'health' ? 'health' : '')]?.[historyPopup.piston] || []}
-                    onClose={() => setHistoryPopup(null)}
+                    onClose={handleCloseHistory}
                 />
             )}
         </DndContext>
