@@ -84,7 +84,7 @@ export function PistonsHead() {
         return `Health: ${pistons.health?.activity || 'Activity'}`;
       case 'wealth':
       case 'growth':
-        return selectedTopicId || `Select ${type.charAt(0).toUpperCase() + type.slice(1)} Topic`;
+         return selectedTopicId ? selectedTopicId : `Select ${type.charAt(0).toUpperCase() + type.slice(1)} Topic`;
       default: return 'Pistons of Intention';
     }
   };
@@ -151,7 +151,7 @@ export function PistonsHead() {
                                 )}
                             </div>
                             <div className="flex-grow text-center">
-                                <CardTitle className="text-base truncate" title={topicName as string}>
+                                <CardTitle className="text-base truncate px-2" title={topicName as string}>
                                     {topicName}
                                 </CardTitle>
                             </div>
@@ -261,7 +261,6 @@ const TopicPistonView = ({ topicId, onBack }: { topicId: string, onBack: () => v
 const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void }) => {
     const { pistons, setPistons } = useAuth();
     const topicPistons = pistons[topicId] || {};
-    const [editingPiston, setEditingPiston] = useState<PistonType | null>(null);
 
     const handleTextChange = (piston: PistonType, text: string) => {
         setPistons(prev => ({
@@ -282,28 +281,18 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { top
                         {PISTON_ICONS[piston]}
                         <label htmlFor={`piston-${piston}`} className="font-semibold text-sm text-foreground">{piston}</label>
                     </div>
-                    {editingPiston === piston ? (
-                        <Textarea 
-                            id={`piston-${piston}`}
-                            value={topicPistons[piston]?.text || ''}
-                            onChange={(e) => handleTextChange(piston, e.target.value)}
-                            onBlur={() => setEditingPiston(null)}
-                            placeholder={`Define your intention for ${piston.toLowerCase()}...`}
-                            className="mt-1 bg-background border-primary ring-offset-0 focus-visible:ring-1 focus-visible:ring-offset-0 text-sm"
-                            rows={2}
-                            autoFocus
-                        />
-                    ) : (
-                        <div
-                            onDoubleClick={() => setEditingPiston(piston)}
-                            className="text-sm min-h-[4rem] px-3 py-2 text-muted-foreground w-full cursor-pointer"
-                        >
-                            {topicPistons[piston]?.text || <span className="italic">Double-click to define...</span>}
-                        </div>
-                    )}
+                    <Textarea 
+                        id={`piston-${piston}`}
+                        value={topicPistons[piston]?.text || ''}
+                        onChange={(e) => handleTextChange(piston, e.target.value)}
+                        placeholder={`Define your intention for ${piston.toLowerCase()}...`}
+                        className="mt-1 bg-background text-sm min-h-[4rem]"
+                        rows={2}
+                    />
                 </div>
             ))}
             </div>
         </div>
     );
 };
+
