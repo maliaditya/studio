@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit } from 'lucide-react';
+import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
@@ -89,9 +89,9 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
       case 'health':
         return `Health: ${pistons.health?.activity || 'Activity'}`;
       case 'wealth':
-        return selectedTopicId || 'Select Wealth Topic';
+        return selectedTopicId ? selectedTopicId : 'Select Wealth Topic';
       case 'growth':
-         return selectedTopicId || 'Select Growth Topic';
+         return selectedTopicId ? selectedTopicId : 'Select Growth Topic';
       default: return 'Pistons of Intention';
     }
   };
@@ -139,9 +139,12 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
                 style={style}
                 className="z-[60]"
             >
-                <Card className="w-96 shadow-2xl border-2 border-primary/50 bg-card">
+                <Card className="w-96 shadow-2xl border-2 border-primary/50 bg-card relative">
+                    <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 right-1.5 z-10" onClick={handleClose}>
+                        <X className="h-4 w-4" />
+                    </Button>
                     <CardHeader 
-                        className="p-3 relative cursor-grab flex items-center justify-between" 
+                        className="p-3 cursor-grab flex items-center justify-between" 
                         {...attributes} 
                         {...listeners}
                     >
@@ -157,11 +160,7 @@ export function PistonsHead({ isPistonsHeadOpen, setIsPistonsHeadOpen }: Pistons
                                 {topicName}
                             </CardTitle>
                         </div>
-                        <div className="w-8 flex justify-end">
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleClose}>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                            </Button>
-                        </div>
+                        <div className="w-8" />
                     </CardHeader>
                     {renderContent()}
                 </Card>
