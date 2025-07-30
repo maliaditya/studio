@@ -164,7 +164,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
         }
     };
     
-    const togglePlayAudio = (e: React.MouseEvent) => {
+    const togglePlayAudio = (e: React.MouseEvent | React.PointerEvent) => {
         e.stopPropagation();
         setPlayingAudio(prev => {
             if (prev?.id === resource.id && prev.isPlaying) {
@@ -200,20 +200,23 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
         <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
             <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
             <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative">
-                <div className="absolute top-2 left-2 z-20 h-7 w-7 rounded-full flex items-center justify-center cursor-grab" {...listeners}>
+                <div 
+                    className="absolute top-2 left-2 z-20 h-7 w-7 rounded-full flex items-center justify-center cursor-grab" 
+                    onPointerDownCapture={listeners.onPointerDown}
+                    onTouchStartCapture={listeners.onTouchStart}
+                >
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
                 </div>
                 
                 <div className="absolute top-2 right-2 z-20 flex items-center">
-                     {resource.audioUrl ? (
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={(e) => e.stopPropagation()} onClick={togglePlayAudio}>
-                            {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
-                        </Button>
-                    ) : (
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={(e) => e.stopPropagation()} onClick={() => audioInputRef.current?.click()}>
-                            <Upload className="h-4 w-4" />
-                        </Button>
-                    )}
+                     <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7"><MoreVertical className="h-4 w-4"/></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={() => audioInputRef.current?.click()}><Upload className="mr-2 h-4 w-4"/>Upload Audio</DropdownMenuItem>
+                        </DropdownMenuContent>
+                     </DropdownMenu>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={(e) => { e.stopPropagation(); setPlayingAudio(null); onClose(); }}>
                         <X className="h-4 w-4" />
                     </Button>
@@ -235,6 +238,11 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                             <CardTitle className="text-base truncate cursor-pointer" onClick={() => setEditingTitle(true)}>
                                 {resource.name}
                             </CardTitle>
+                        )}
+                         {resource.audioUrl && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 -mr-2" onPointerDownCapture={togglePlayAudio}>
+                                {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
+                            </Button>
                         )}
                     </div>
                 </CardHeader>
@@ -465,7 +473,7 @@ export function PistonsHead() {
   const handleOpenHistory = (e: React.MouseEvent, piston: PistonType) => {
     e.stopPropagation();
     const historyPopupWidth = 320;
-    const x = position.x + 384 + 20; // Main popup width + margin
+    const x = position.x + 384 + 20; 
     const y = position.y;
     setHistoryPopup({ piston, x, y });
   };
@@ -852,7 +860,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
             const topicData = { ...(prev[topicId] || {}) };
             const entries = topicData[piston] || [];
             if (entries.length > 0) {
-                const updatedEntries = entries.slice(1); // Remove the first (current) entry
+                const updatedEntries = entries.slice(1);
                 return { ...prev, [topicId]: { ...topicData, [piston]: updatedEntries } };
             }
             return prev;
@@ -879,17 +887,28 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                                 {currentEntry?.text ? (<p className="whitespace-pre-wrap">{currentEntry.text}</p>) : (<p className="italic opacity-70">{PISTON_PLACEHOLDERS[piston]}</p>)}
                                             </div>
                                             <div className="flex-shrink-0 flex items-center">
-                                                {currentEntry && (
-                                                    <>
-                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onLinkResource({piston, entryId: currentEntry.id, currentResourceId: currentEntry.linkedResourceId})}>
-                                                            <LinkIcon className="h-4 w-4" />
-                                                        </Button>
-                                                        {currentEntry.linkedResourceId && (<Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleOpenResource(e, currentEntry.linkedResourceId!)}><Library className="h-4 w-4 text-primary" /></Button>)}
-                                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => handleDeleteEntry(piston)}><Trash2 className="h-4 w-4" /></Button>
-                                                    </>
-                                                )}
-                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setNewEntryPiston(piston)}><Plus className="h-4 w-4" /></Button>
-                                                {entries.length > 0 && (<Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleOpenHistory(e, piston)}><History className="h-4 w-4" /></Button>)}
+                                                {currentEntry?.linkedResourceId ? (
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDownCapture={(e) => handleOpenResource(e, currentEntry.linkedResourceId!)}>
+                                                        <Library className="h-4 w-4 text-primary" />
+                                                    </Button>
+                                                ) : currentEntry ? (
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDownCapture={() => onLinkResource({piston, entryId: currentEntry.id, currentResourceId: currentEntry.linkedResourceId})}>
+                                                        <LinkIcon className="h-4 w-4" />
+                                                    </Button>
+                                                ) : null}
+
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="h-4 w-4"/></Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent>
+                                                        <DropdownMenuItem onSelect={() => setNewEntryPiston(piston)}><Plus className="mr-2 h-4 w-4"/>New Entry</DropdownMenuItem>
+                                                        {currentEntry && <DropdownMenuItem onSelect={() => handleDeleteEntry(piston)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Current</DropdownMenuItem>}
+                                                        {entries.length > 0 && <DropdownMenuItem onSelect={(e) => handleOpenHistory(e, piston)}><History className="mr-2 h-4 w-4"/>View History</DropdownMenuItem>}
+                                                        {currentEntry && !currentEntry.linkedResourceId && <DropdownMenuItem onSelect={() => onLinkResource({piston, entryId: currentEntry.id})}><LinkIcon className="mr-2 h-4 w-4"/>Link Resource</DropdownMenuItem>}
+                                                        {currentEntry && currentEntry.linkedResourceId && <DropdownMenuItem onSelect={(e) => handleOpenResource(e, currentEntry.linkedResourceId!)}><Library className="mr-2 h-4 w-4"/>Open Resource</DropdownMenuItem>}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             </div>
                                         </div>
                                         {isAddingNewToThisPiston && (
