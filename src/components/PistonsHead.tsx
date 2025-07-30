@@ -556,7 +556,7 @@ export function PistonsHead() {
                     <ResourcePopupCard 
                         popupState={resourcePopup}
                         resource={resources.find(r => r.id === resourcePopup.resourceId)!}
-                        onClose={() => { setPlayingAudio(null); handleCloseResource(resourcePopup.resourceId); }}
+                        onClose={() => handleCloseResource(resourcePopup.resourceId)}
                         onUpdate={handleUpdateResource}
                         playingAudio={playingAudio}
                         setPlayingAudio={setPlayingAudio}
@@ -699,13 +699,23 @@ const TopicPistonView = ({ topicId, onBack, setHistoryPopup, setResourcePopup, o
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onEditEntry={onEditEntry} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
 
+const PISTON_PLACEHOLDERS: Record<PistonType, string> = {
+    'Desire': 'What is the ultimate outcome I want?',
+    'Curiosity': 'What am I curious about? What do I want to learn?',
+    'Truth-Seeking': 'What is the core truth I need to accept?',
+    'Contribution': 'How will this help others? Who am I serving?',
+    'Growth': 'How will this make me better?',
+    'Expression': 'What do I want to create or say?',
+    'Pleasure': 'What will I enjoy about this process?',
+    'Protection': 'What risks am I mitigating? What am I protecting?',
+};
+
 const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onEditEntry, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onEditEntry: (data: { piston: PistonType; entry: PistonEntry; }) => void; onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     const { pistons, setPistons, resources } = useAuth();
     const [newEntryPiston, setNewEntryPiston] = useState<PistonType | null>(null);
     const [newEntryText, setNewEntryText] = useState('');
     
     const topicPistons = pistons[topicId] || {};
-    const simpleTopicName = topicName.startsWith('Health: ') ? pistons.health?.activity : topicName;
     
     const handleSaveNewEntry = (piston: PistonType) => {
         if (!newEntryText.trim()) { setNewEntryPiston(null); setNewEntryText(''); return; }
@@ -735,7 +745,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                         <h4 className="font-semibold text-sm">{piston}</h4>
                                         <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start">
                                             <div className="flex-grow cursor-text pr-2" onClick={() => { if(currentEntry) { onEditEntry({piston, entry: currentEntry}); }}}>
-                                                {currentEntry?.text ? (<p className="whitespace-pre-wrap">{currentEntry.text}</p>) : (<p className="italic opacity-70">Define your {piston} for {simpleTopicName}</p>)}
+                                                {currentEntry?.text ? (<p className="whitespace-pre-wrap">{currentEntry.text}</p>) : (<p className="italic opacity-70">{PISTON_PLACEHOLDERS[piston]}</p>)}
                                             </div>
                                             <div className="flex-shrink-0 flex items-center">
                                                 {currentEntry && (
@@ -770,6 +780,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 
 
   
+
 
 
 
