@@ -78,20 +78,18 @@ export function PistonsHead() {
     }
   };
   
-  const { pistons } = useAuth();
-  
-  const getTopicName = () => {
+  const getTopicName = (type: 'wealth' | 'growth') => {
     switch (currentView) {
       case 'health':
         return `Health: ${pistons.health?.activity || 'Activity'}`;
       case 'wealth':
-        return selectedTopicId ? selectedTopicId : `Select Wealth Topic`;
       case 'growth':
-         return selectedTopicId ? selectedTopicId : `Select Growth Topic`;
+        return selectedTopicId || `Select ${type.charAt(0).toUpperCase() + type.slice(1)} Topic`;
       default: return 'Pistons of Intention';
     }
   };
-  const topicName = getTopicName();
+  const { pistons } = useAuth();
+  const topicName = getTopicName(currentView as 'wealth' | 'growth');
 
   const renderContent = () => {
     switch (currentView) {
@@ -139,20 +137,25 @@ export function PistonsHead() {
                     <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 right-1.5 z-20" onClick={handleClose}>
                         <X className="h-4 w-4" />
                     </Button>
-                    {currentView !== 'main' && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 left-1.5 z-20" onClick={(e) => { e.stopPropagation(); onBack(); }}>
-                            <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                    )}
                     <CardHeader 
                         className="p-3 cursor-grab" 
                         {...attributes} 
                         {...listeners}
                     >
-                        <div className="text-center">
-                            <CardTitle className="text-base truncate px-8" title={topicName as string}>
-                                {topicName}
-                            </CardTitle>
+                        <div className="flex items-center justify-between h-7">
+                            <div className="w-7">
+                                {currentView !== 'main' && (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onBack(); }}>
+                                        <ChevronLeft className="h-4 w-4" />
+                                    </Button>
+                                )}
+                            </div>
+                            <div className="flex-grow text-center">
+                                <CardTitle className="text-base truncate" title={topicName as string}>
+                                    {topicName}
+                                </CardTitle>
+                            </div>
+                            <div className="w-7" />
                         </div>
                     </CardHeader>
                     {renderContent()}
@@ -258,6 +261,7 @@ const TopicPistonView = ({ topicId, onBack }: { topicId: string, onBack: () => v
 const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void }) => {
     const { pistons, setPistons } = useAuth();
     const topicPistons = pistons[topicId] || {};
+    const [editingPiston, setEditingPiston] = useState<PistonType | null>(null);
 
     const handleTextChange = (piston: PistonType, text: string) => {
         setPistons(prev => ({
@@ -270,27 +274,36 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { top
     };
 
     return (
-        <div className="flex flex-col h-[60vh] md:h-[50vh]">
-            <ScrollArea className="flex-grow min-h-0">
-                <div className="p-4 space-y-3">
-                {PISTON_NAMES.map(piston => (
-                    <div key={piston} className="p-3 bg-muted/50 rounded-lg">
-                        <div className="flex items-center gap-2 mb-1.5">
-                            {PISTON_ICONS[piston]}
-                            <label htmlFor={`piston-${piston}`} className="font-semibold text-sm text-foreground">{piston}</label>
-                        </div>
+        <div className="flex flex-col">
+            <div className="p-4 space-y-3">
+            {PISTON_NAMES.map(piston => (
+                <div key={piston} className="p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1.5">
+                        {PISTON_ICONS[piston]}
+                        <label htmlFor={`piston-${piston}`} className="font-semibold text-sm text-foreground">{piston}</label>
+                    </div>
+                    {editingPiston === piston ? (
                         <Textarea 
                             id={`piston-${piston}`}
                             value={topicPistons[piston]?.text || ''}
                             onChange={(e) => handleTextChange(piston, e.target.value)}
+                            onBlur={() => setEditingPiston(null)}
                             placeholder={`Define your intention for ${piston.toLowerCase()}...`}
-                            className="mt-1 bg-transparent border-0 ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm"
+                            className="mt-1 bg-background border-primary ring-offset-0 focus-visible:ring-1 focus-visible:ring-offset-0 text-sm"
                             rows={2}
+                            autoFocus
                         />
-                    </div>
-                ))}
+                    ) : (
+                        <div
+                            onDoubleClick={() => setEditingPiston(piston)}
+                            className="text-sm min-h-[4rem] px-3 py-2 text-muted-foreground w-full cursor-pointer"
+                        >
+                            {topicPistons[piston]?.text || <span className="italic">Double-click to define...</span>}
+                        </div>
+                    )}
                 </div>
-            </ScrollArea>
+            ))}
+            </div>
         </div>
     );
 };
