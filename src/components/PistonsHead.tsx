@@ -196,7 +196,7 @@ export function PistonsHead() {
       )}
 
       {isPistonsHeadOpen && (
-          <DndContext onDragEnd={handleDragEnd}>
+        <DndContext onDragEnd={handleDragEnd}>
             <div
                 ref={setNodeRef}
                 style={style}
@@ -232,7 +232,7 @@ export function PistonsHead() {
                     onClose={() => setHistoryPopup(null)}
                 />
             )}
-          </DndContext>
+        </DndContext>
       )}
     </>
   );
@@ -420,12 +420,12 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                         </div>
                                     ) : (
                                         <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start">
-                                            <div className="flex-grow" onDoubleClick={() => handleStartEdit(piston)}>
-                                            {currentEntry?.text ? (
-                                                <p className="whitespace-pre-wrap cursor-text">{currentEntry.text}</p>
-                                            ) : (
-                                                <p className="italic opacity-70 cursor-text">{pistonPlaceholders[piston]}</p>
-                                            )}
+                                            <div className="flex-grow cursor-text" onClick={() => handleStartEdit(piston)}>
+                                                {currentEntry?.text ? (
+                                                    <p className="whitespace-pre-wrap">{currentEntry.text}</p>
+                                                ) : (
+                                                    <p className="italic opacity-70">{pistonPlaceholders[piston]}</p>
+                                                )}
                                             </div>
                                             <div className="flex-shrink-0">
                                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleAddNew(piston)}>
