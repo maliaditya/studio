@@ -77,18 +77,20 @@ export function PistonsHead() {
     }
   };
   
-  const getTopicName = (view: 'main' | 'health' | 'wealth' | 'growth', type?: 'wealth' | 'growth') => {
+  const { pistons } = useAuth();
+  
+  const getTopicName = (view: 'main' | 'health' | 'wealth' | 'growth') => {
     switch (view) {
       case 'health':
         return `Health: ${pistons.health?.activity || 'Activity'}`;
       case 'wealth':
+         return selectedTopicId ? selectedTopicId : 'Select Wealth Topic';
       case 'growth':
-         return selectedTopicId ? selectedTopicId : `Select ${type} Topic`;
+         return selectedTopicId ? selectedTopicId : 'Select Growth Topic';
       default: return 'Pistons of Intention';
     }
   };
-  const { pistons } = useAuth();
-  const topicName = getTopicName(currentView, currentView as 'wealth' | 'growth');
+  const topicName = getTopicName(currentView);
 
   const renderContent = () => {
     switch (currentView) {
@@ -136,19 +138,24 @@ export function PistonsHead() {
                     <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 right-1.5 z-20" onClick={handleClose}>
                         <X className="h-4 w-4" />
                     </Button>
-                    {currentView !== 'main' && (
-                      <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 left-1.5 z-20" onClick={(e) => { e.stopPropagation(); onBack(); }}>
-                          <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                    )}
                     <CardHeader 
                         className="p-3 cursor-grab text-center" 
                         {...attributes} 
                         {...listeners}
                     >
-                        <CardTitle className="text-base truncate px-8" title={topicName as string}>
-                          {topicName}
-                        </CardTitle>
+                        <div className="flex justify-between items-center w-full">
+                            <div className="w-8">
+                                {currentView !== 'main' && (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onBack(); }}>
+                                        <ChevronLeft className="h-4 w-4" />
+                                    </Button>
+                                )}
+                            </div>
+                            <CardTitle className="text-base truncate flex-grow" title={topicName as string}>
+                                {topicName}
+                            </CardTitle>
+                             <div className="w-8" />
+                        </div>
                     </CardHeader>
                     {renderContent()}
                 </Card>
@@ -256,6 +263,19 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { top
     const [editText, setEditText] = useState('');
     const topicPistons = pistons[topicId] || {};
 
+    const simpleTopicName = topicName.startsWith('Health: ') ? pistons.health?.activity : topicName;
+
+    const pistonPlaceholders: Record<PistonType, string> = {
+        'Desire': `What is your desire for ${simpleTopicName}?`,
+        'Curiosity': `What makes you curious about ${simpleTopicName}?`,
+        'Truth-Seeking': `What core truth are you seeking with ${simpleTopicName}?`,
+        'Contribution': `How will ${simpleTopicName} contribute to others?`,
+        'Growth': `How will ${simpleTopicName} help you grow?`,
+        'Expression': `How does ${simpleTopicName} allow you to express yourself?`,
+        'Pleasure': `What is the inherent joy or pleasure in ${simpleTopicName}?`,
+        'Protection': `What does pursuing ${simpleTopicName} protect you from?`
+    };
+
     const handleTextChange = (piston: PistonType, text: string) => {
         setPistons(prev => ({
             ...prev,
@@ -294,7 +314,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { top
                                         onChange={(e) => setEditText(e.target.value)}
                                         onBlur={handleSaveEdit}
                                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveEdit(); } }}
-                                        placeholder={`Define your intention for ${piston.toLowerCase()}...`}
+                                        placeholder={pistonPlaceholders[piston]}
                                         className="mt-1 bg-background text-sm min-h-[4rem] border-primary"
                                         autoFocus
                                         rows={2}
@@ -307,7 +327,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { top
                                         {topicPistons[piston]?.text ? (
                                             <p className="whitespace-pre-wrap">{topicPistons[piston]?.text}</p>
                                         ) : (
-                                            <p className="italic opacity-70">Click to define...</p>
+                                            <p className="italic opacity-70">{pistonPlaceholders[piston]}</p>
                                         )}
                                     </div>
                                 )}
@@ -319,3 +339,4 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName }: { top
         </CardContent>
     );
 };
+
