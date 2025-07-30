@@ -464,40 +464,37 @@ export function PistonsHead() {
 
   const handleOpenHistory = (e: React.MouseEvent, piston: PistonType) => {
     e.stopPropagation();
-    
+
     if (historyPopup?.piston === piston) {
       setHistoryPopup(null);
       return;
     }
     
     const popupWidth = 320;
-    const pistonsHeadWidth = 384; 
     let x;
     
     if (resourcePopup) {
         x = position.x - popupWidth - 20;
     } else {
-        x = position.x + pistonsHeadWidth + 20;
+        x = position.x + 384 + 20; // 384 is PistonsHead width
     }
-
     let y = position.y;
     if (x + popupWidth > window.innerWidth) x = position.x - popupWidth - 20;
     y = Math.max(20, y);
     
     setHistoryPopup({ piston, x, y });
   };
-  
+
   const handleOpenResource = (e: React.MouseEvent, resourceId: string) => {
     e.stopPropagation();
 
     const popupWidth = 512;
-    const pistonsHeadWidth = 384;
     let x;
 
     if (historyPopup) {
         x = position.x - popupWidth - 20;
     } else {
-        x = position.x + pistonsHeadWidth + 20;
+        x = position.x + 384 + 20;
     }
     let y = position.y;
     if (x + popupWidth > window.innerWidth) x = position.x - popupWidth - 20;
@@ -827,10 +824,30 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
     const [newEntryPiston, setNewEntryPiston] = useState<PistonType | null>(null);
     const [newEntryText, setNewEntryText] = useState('');
     
-    const [editingPistonEntry, setEditingPistonEntry] = useState<{ piston: PistonType; entry: PistonEntry } | null>(null);
+    const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
     const [editedEntryText, setEditedEntryText] = useState('');
 
     const topicPistons = pistons[topicId] || {};
+    
+    const handleStartEditing = (entry: PistonEntry) => {
+        setEditingEntryId(entry.id);
+        setEditedEntryText(entry.text);
+    };
+
+    const handleSaveEdit = (piston: PistonType) => {
+        if (!editingEntryId) return;
+
+        setPistons(prev => {
+            const topicData = { ...(prev[topicId] || {}) };
+            const entries = topicData[piston] || [];
+            const updatedEntries = entries.map(e =>
+                e.id === editingEntryId ? { ...e, text: editedEntryText } : e
+            );
+            return { ...prev, [topicId]: { ...topicData, [piston]: updatedEntries } };
+        });
+        setEditingEntryId(null);
+    };
+
 
     const handleSaveNewEntry = (piston: PistonType) => {
         if (!newEntryText.trim()) { setNewEntryPiston(null); setNewEntryText(''); return; }
@@ -852,26 +869,6 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
         });
     };
     
-    const handleStartEditing = (piston: PistonType, entry: PistonEntry) => {
-        setEditingPistonEntry({ piston, entry });
-        setEditedEntryText(entry.text);
-    };
-
-    const handleSaveEdit = () => {
-        if (!editingPistonEntry) return;
-        const { piston, entry } = editingPistonEntry;
-
-        setPistons(prev => {
-            const topicData = { ...(prev[topicId] || {}) };
-            const entries = topicData[piston] || [];
-            const updatedEntries = entries.map(e =>
-                e.id === entry.id ? { ...e, text: editedEntryText } : e
-            );
-            return { ...prev, [topicId]: { ...topicData, [piston]: updatedEntries } };
-        });
-        setEditingPistonEntry(null);
-    };
-
     return (
         <>
             <CardContent className="p-4 max-h-[70vh]">
@@ -890,7 +887,23 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                         <div className="flex-grow">
                                             <h4 className="font-semibold text-sm">{piston}</h4>
                                             <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start">
-                                                <p className="whitespace-pre-wrap flex-grow pr-2">{currentEntry?.text || <span className="italic opacity-70">{PISTON_PLACEHOLDERS[piston]}</span>}</p>
+                                                {editingEntryId === currentEntry?.id ? (
+                                                    <Textarea 
+                                                        value={editedEntryText} 
+                                                        onChange={e => setEditedEntryText(e.target.value)}
+                                                        onBlur={() => handleSaveEdit(piston)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveEdit(piston); }
+                                                            if (e.key === 'Escape') { setEditingEntryId(null); }
+                                                        }}
+                                                        className="text-sm bg-background"
+                                                        autoFocus
+                                                    />
+                                                ) : (
+                                                    <p className="whitespace-pre-wrap flex-grow pr-2" onDoubleClick={() => currentEntry && handleStartEditing(currentEntry)}>
+                                                        {currentEntry?.text || <span className="italic opacity-70">{PISTON_PLACEHOLDERS[piston]}</span>}
+                                                    </p>
+                                                )}
                                                 <div className="flex-shrink-0 flex items-center">
                                                     {isResourceLinked ? (
                                                         <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDownCapture={(e) => handleOpenResource(e, currentEntry.linkedResourceId!)}>
@@ -901,20 +914,18 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                                             <LinkIcon className="h-4 w-4" />
                                                         </Button>
                                                     ) : <div className="w-6 h-6"/> }
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="h-4 w-4"/></Button>
-                                                        </DropdownMenuTrigger>
+                                                     <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
                                                         <DropdownMenuPortal>
-                                                            <DropdownMenuContent side="right" align="start">
+                                                            <DropdownMenuContent side="right" align="start" sideOffset={5}>
                                                                 <DropdownMenuItem onSelect={() => setNewEntryPiston(piston)}><Plus className="mr-2 h-4 w-4"/>New Entry</DropdownMenuItem>
-                                                                {currentEntry && <DropdownMenuItem onSelect={() => handleStartEditing(piston, currentEntry)}><Edit className="mr-2 h-4 w-4"/>Edit Current</DropdownMenuItem>}
                                                                 {entries.length > 0 && <DropdownMenuItem onSelect={(e) => handleOpenHistory(e, piston)}><History className="mr-2 h-4 w-4"/>View History</DropdownMenuItem>}
                                                                 {currentEntry && (
                                                                     <DropdownMenuItem onSelect={() => onLinkResource({ piston, entryId: currentEntry.id, currentResourceId: currentEntry.linkedResourceId })}>
                                                                         <LinkIcon className="mr-2 h-4 w-4"/> {isResourceLinked ? 'Change Resource' : 'Link Resource'}
                                                                     </DropdownMenuItem>
                                                                 )}
+                                                                {currentEntry && <DropdownMenuItem onSelect={() => handleDeleteEntry(piston, currentEntry.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Current</DropdownMenuItem>}
                                                             </DropdownMenuContent>
                                                         </DropdownMenuPortal>
                                                     </DropdownMenu>
@@ -937,27 +948,6 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                     </ul>
                 </ScrollArea>
             </CardContent>
-            {editingPistonEntry && (
-                <Dialog open={!!editingPistonEntry} onOpenChange={() => setEditingPistonEntry(null)}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Edit {editingPistonEntry.piston} Entry</DialogTitle>
-                        </DialogHeader>
-                        <div className="py-4">
-                            <Textarea 
-                                value={editedEntryText} 
-                                onChange={(e) => setEditedEntryText(e.target.value)} 
-                                autoFocus
-                                className="min-h-[120px]"
-                            />
-                        </div>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setEditingPistonEntry(null)}>Cancel</Button>
-                            <Button onClick={handleSaveEdit}>Save</Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-            )}
         </>
     );
 };
