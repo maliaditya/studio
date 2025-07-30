@@ -85,10 +85,10 @@ export function PistonsHead() {
       case 'health':
         return `Health: ${pistons.health?.activity || 'Activity'}`;
       case 'wealth':
-        return selectedTopicId || `Select Wealth Topic`;
+        return selectedTopicId ? selectedTopicId : `Select Wealth Topic`;
       case 'growth':
-         return selectedTopicId || `Select Growth Topic`;
-      default: return '';
+         return selectedTopicId ? selectedTopicId : `Select Growth Topic`;
+      default: return 'Pistons of Intention';
     }
   };
   const topicName = getTopicName();
@@ -110,7 +110,7 @@ export function PistonsHead() {
     position: 'fixed',
     top: position.y,
     left: position.x,
-    transform: transform ? `translate3d(${position.x + transform.x}px, ${position.y + transform.y}px, 0)` : `translate3d(${position.x}px, ${position.y}px, 0)`,
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : `translate3d(0px, 0px, 0)`,
     willChange: 'transform',
   };
 
@@ -136,27 +136,24 @@ export function PistonsHead() {
                 className="z-[60]"
             >
                 <Card className="w-96 shadow-2xl border-2 border-primary/50 bg-card relative">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 right-1.5 z-10" onClick={handleClose}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 right-1.5 z-20" onClick={handleClose}>
                         <X className="h-4 w-4" />
                     </Button>
+                    {currentView !== 'main' && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 left-1.5 z-20" onClick={(e) => { e.stopPropagation(); onBack(); }}>
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                    )}
                     <CardHeader 
-                        className="p-3 cursor-grab flex items-center justify-between" 
+                        className="p-3 cursor-grab" 
                         {...attributes} 
                         {...listeners}
                     >
-                         <div className="w-8">
-                             {currentView !== 'main' && (
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onBack(); }}>
-                                    <ChevronLeft className="h-4 w-4" />
-                                </Button>
-                             )}
-                        </div>
-                        <div className="flex-1 text-center">
-                            <CardTitle className="text-base truncate" title={topicName as string}>
+                        <div className="text-center">
+                            <CardTitle className="text-base truncate px-8" title={topicName as string}>
                                 {topicName}
                             </CardTitle>
                         </div>
-                        <div className="w-8" />
                     </CardHeader>
                     {renderContent()}
                 </Card>
