@@ -309,7 +309,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete }: { point: ResourceP
             point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
             <ArrowRight className="h-4 w-4 mt-1.5 text-primary/50 flex-shrink-0" />
             }
-             <div className="flex-grow min-w-0" onClick={() => !isEditing && setIsEditing(true)}>
+             <div className="flex-grow min-w-0" onDoubleClick={() => !isEditing && setIsEditing(true)}>
                 {isEditing ? (
                     <Textarea 
                         ref={textareaRef} 
@@ -459,8 +459,6 @@ export function PistonsHead() {
     }
   };
   const topicName = getTopicName(currentView);
-  
-  const [editingPistonEntry, setEditingPistonEntry] = useState<{ piston: PistonType; entry: PistonEntry; } | null>(null);
 
   const [linkingResourceFor, setLinkingResourceFor] = useState<{piston: PistonType; entryId: string; currentResourceId?: string;} | null>(null);
 
@@ -472,14 +470,13 @@ export function PistonsHead() {
       return;
     }
     
-    const popupWidth = 320; // history popup width
+    const popupWidth = 320;
     const pistonsHeadWidth = 384; 
     let x;
+
     if (resourcePopup) {
-        // Position to the left of the main widget if resource popup is open
         x = position.x - popupWidth - 20;
     } else {
-        // Default position to the right
         x = position.x + pistonsHeadWidth + 20;
     }
     let y = position.y;
@@ -539,7 +536,6 @@ export function PistonsHead() {
         onBack: onBack, 
         setHistoryPopup: setHistoryPopup,
         setResourcePopup: setResourcePopup,
-        onEditEntry: setEditingPistonEntry,
         onLinkResource: setLinkingResourceFor,
         handleOpenResource,
         handleOpenHistory,
@@ -617,7 +613,7 @@ export function PistonsHead() {
                         entries={pistons[selectedTopicId || (currentView === 'health' ? 'health' : '')]?.[historyPopup.piston] || []}
                         onClose={handleCloseHistory}
                         onEdit={(piston, entry) => {
-                            setEditingPistonEntry({ piston, entry });
+                            // This functionality is now handled by inline editing, but keeping prop for now
                             handleCloseHistory();
                         }}
                     />
@@ -631,37 +627,6 @@ export function PistonsHead() {
                         playingAudio={playingAudio}
                         setPlayingAudio={setPlayingAudio}
                     />
-                )}
-                {editingPistonEntry && (
-                    <Dialog open={!!editingPistonEntry} onOpenChange={() => setEditingPistonEntry(null)}>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Edit {editingPistonEntry.piston} Entry</DialogTitle>
-                            </DialogHeader>
-                            <Textarea 
-                                value={editingPistonEntry.entry.text} 
-                                onChange={e => setEditingPistonEntry(prev => prev ? {...prev, entry: {...prev.entry, text: e.target.value}} : null)}
-                                className="min-h-[120px] text-base"
-                                autoFocus
-                            />
-                            <DialogFooter>
-                                <Button variant="outline" onClick={() => setEditingPistonEntry(null)}>Cancel</Button>
-                                <Button onClick={() => {
-                                    setPistons(prev => {
-                                        const topicKey = selectedTopicId || (currentView === 'health' ? 'health' : '');
-                                        if (!topicKey) return prev;
-                                        const topicData = { ...(prev[topicKey] || {}) };
-                                        const entries = topicData[editingPistonEntry.piston] || [];
-                                        const updatedEntries = entries.map(entry =>
-                                            entry.id === editingPistonEntry.entry.id ? editingPistonEntry.entry : entry
-                                        );
-                                        return { ...prev, [topicKey]: { ...topicData, [editingPistonEntry.piston]: updatedEntries } };
-                                    });
-                                    setEditingPistonEntry(null);
-                                }}>Save Changes</Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
                 )}
                  {linkingResourceFor && (
                     <Dialog open={!!linkingResourceFor} onOpenChange={() => setLinkingResourceFor(null)}>
@@ -709,7 +674,7 @@ const MainPistonView = ({ onSelect }: { onSelect: (view: 'health' | 'wealth' | '
 );
 
 
-const HealthPistonView = ({ onBack, setHistoryPopup, setResourcePopup, onEditEntry, onLinkResource, handleOpenResource, handleOpenHistory }: { onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onEditEntry: (data: { piston: PistonType; entry: PistonEntry; }) => void; onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
+const HealthPistonView = ({ onBack, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     const { pistons, setPistons } = useAuth();
     const [activity, setActivity] = useState(pistons.health?.activity || '');
     const [isEditingActivity, setIsEditingActivity] = useState(!pistons.health?.activity);
@@ -739,7 +704,7 @@ const HealthPistonView = ({ onBack, setHistoryPopup, setResourcePopup, onEditEnt
         )
     }
 
-    return <PistonEditorView topicId="health" topicName={`Health: ${activity}`} onBack={onBack} onEditTopicName={() => setIsEditingActivity(true)} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onEditEntry={onEditEntry} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
+    return <PistonEditorView topicId="health" topicName={`Health: ${activity}`} onBack={onBack} onEditTopicName={() => setIsEditingActivity(true)} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
 
 const DesireSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, type: 'desires') => void, onBack: () => void }) => {
@@ -855,13 +820,15 @@ const TopicSelector = ({ onSelect, type, onBack }: { onSelect: (topicId: string,
     )
 }
 
-const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onEditEntry, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onEditEntry: (data: { piston: PistonType; entry: PistonEntry; }) => void; onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
-    const { pistons, setPistons, resources } = useAuth();
+const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
+    const { pistons, setPistons } = useAuth();
     const [newEntryPiston, setNewEntryPiston] = useState<PistonType | null>(null);
     const [newEntryText, setNewEntryText] = useState('');
-    
+    const [inlineEditing, setInlineEditing] = useState<{ piston: PistonType; entryId: string } | null>(null);
+    const [inlineEditText, setInlineEditText] = useState('');
+
     const topicPistons = pistons[topicId] || {};
-    
+
     const handleSaveNewEntry = (piston: PistonType) => {
         if (!newEntryText.trim()) { setNewEntryPiston(null); setNewEntryText(''); return; }
         const newEntry: PistonEntry = { id: `piston_${Date.now()}`, text: newEntryText.trim(), timestamp: Date.now() };
@@ -873,16 +840,33 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
         setNewEntryPiston(null); setNewEntryText('');
     };
 
-    const handleDeleteEntry = (piston: PistonType) => {
+    const handleDeleteEntry = (piston: PistonType, entryId: string) => {
         setPistons(prev => {
             const topicData = { ...(prev[topicId] || {}) };
             const entries = topicData[piston] || [];
-            if (entries.length > 0) {
-                const updatedEntries = entries.slice(1);
-                return { ...prev, [topicId]: { ...topicData, [piston]: updatedEntries } };
-            }
-            return prev;
+            const updatedEntries = entries.filter(entry => entry.id !== entryId);
+            return { ...prev, [topicId]: { ...topicData, [piston]: updatedEntries } };
         });
+    };
+    
+    const handleStartInlineEdit = (piston: PistonType, entry: PistonEntry) => {
+        setInlineEditing({ piston, entryId: entry.id });
+        setInlineEditText(entry.text);
+    };
+
+    const handleSaveInlineEdit = () => {
+        if (!inlineEditing) return;
+        const { piston, entryId } = inlineEditing;
+
+        setPistons(prev => {
+            const topicData = { ...(prev[topicId] || {}) };
+            const entries = topicData[piston] || [];
+            const updatedEntries = entries.map(entry =>
+                entry.id === entryId ? { ...entry, text: inlineEditText } : entry
+            );
+            return { ...prev, [topicId]: { ...topicData, [piston]: updatedEntries } };
+        });
+        setInlineEditing(null);
     };
 
     return (
@@ -902,8 +886,25 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                     <div className="flex-grow">
                                         <h4 className="font-semibold text-sm">{piston}</h4>
                                         <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start">
-                                            <div className="flex-grow cursor-text pr-2" onClick={() => { if(currentEntry) { onEditEntry({piston, entry: currentEntry}); }}}>
-                                                {currentEntry?.text ? (<p className="whitespace-pre-wrap">{currentEntry.text}</p>) : (<p className="italic opacity-70">{PISTON_PLACEHOLDERS[piston]}</p>)}
+                                            <div 
+                                                className="flex-grow pr-2" 
+                                                onDoubleClick={() => currentEntry && handleStartInlineEdit(piston, currentEntry)}
+                                            >
+                                                {inlineEditing?.entryId === currentEntry?.id ? (
+                                                     <Textarea 
+                                                        value={inlineEditText} 
+                                                        onChange={e => setInlineEditText(e.target.value)} 
+                                                        onBlur={handleSaveInlineEdit}
+                                                        onKeyDown={e => {
+                                                            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveInlineEdit(); }
+                                                            if (e.key === 'Escape') setInlineEditing(null);
+                                                        }}
+                                                        className="bg-background text-sm min-h-[4rem]" 
+                                                        autoFocus 
+                                                    />
+                                                ) : (
+                                                    currentEntry?.text ? (<p className="whitespace-pre-wrap">{currentEntry.text}</p>) : (<p className="italic opacity-70">{PISTON_PLACEHOLDERS[piston]}</p>)
+                                                )}
                                             </div>
                                             <div className="flex-shrink-0 flex items-center">
                                                 {isResourceLinked ? (
@@ -922,7 +923,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                                     <DropdownMenuPortal>
                                                         <DropdownMenuContent side="right" align="start">
                                                             <DropdownMenuItem onSelect={() => setNewEntryPiston(piston)}><Plus className="mr-2 h-4 w-4"/>New Entry</DropdownMenuItem>
-                                                            {currentEntry && <DropdownMenuItem onSelect={() => handleDeleteEntry(piston)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Current</DropdownMenuItem>}
+                                                            {currentEntry && <DropdownMenuItem onSelect={() => handleDeleteEntry(piston, currentEntry.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Current</DropdownMenuItem>}
                                                             {entries.length > 0 && <DropdownMenuItem onSelect={(e) => handleOpenHistory(e, piston)}><History className="mr-2 h-4 w-4"/>View History</DropdownMenuItem>}
                                                             {currentEntry && (
                                                                 <DropdownMenuItem onSelect={() => onLinkResource({ piston, entryId: currentEntry.id, currentResourceId: currentEntry.linkedResourceId })}>
@@ -954,11 +955,11 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
     );
 };
 
-const TopicPistonView = ({ topicId, onBack, setHistoryPopup, setResourcePopup, onEditEntry, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onEditEntry: (data: { piston: PistonType; entry: PistonEntry; }) => void; onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
+const TopicPistonView = ({ topicId, onBack, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     const { deepWorkDefinitions, mindsetCards } = useAuth();
     const topicDef = deepWorkDefinitions.find(d => d.id === topicId);
     const mindsetDef = mindsetCards.find(c => c.id === topicId);
     const topicName = topicDef?.name || mindsetDef?.title || topicId;
 
-    return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onEditEntry={onEditEntry} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
+    return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
