@@ -19,7 +19,7 @@ import { format } from 'date-fns';
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
 
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
@@ -449,6 +449,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
     const { pistons, setPistons, resources } = useAuth();
     const [newEntryPiston, setNewEntryPiston] = useState<PistonType | null>(null);
     const [newEntryText, setNewEntryText] = useState('');
+    const [linkingResourceFor, setLinkingResourceFor] = useState<{piston: PistonType; entryId: string; currentResourceId?: string;} | null>(null);
     
     const topicPistons = pistons[topicId] || {};
     const simpleTopicName = topicName.startsWith('Health: ') ? pistons.health?.activity : topicName;
@@ -474,14 +475,16 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
         setResourcePopup({ resourceId, x: mainPosition.x - 512 - 20, y: mainPosition.y });
     };
 
-    const handleLinkResource = (piston: PistonType, entryId: string, resourceId: string | null) => {
+    const handleLinkResource = (resourceId: string | null) => {
+        if (!linkingResourceFor) return;
+        const { piston, entryId } = linkingResourceFor;
         setPistons(prev => {
             const topicData = { ...(prev[topicId] || {}) };
             const entries = topicData[piston] || [];
             const updatedEntries = entries.map(entry => {
                 if (entry.id === entryId) {
                     const newEntry = { ...entry };
-                    if (resourceId === 'none') {
+                    if (resourceId === 'none' || resourceId === null) {
                         delete newEntry.linkedResourceId;
                     } else {
                         newEntry.linkedResourceId = resourceId;
@@ -492,9 +495,11 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
             });
             return { ...prev, [topicId]: { ...topicData, [piston]: updatedEntries } };
         });
+        setLinkingResourceFor(null);
     };
 
     return (
+        <>
         <CardContent className="p-4 max-h-[70vh]">
             <ScrollArea className="h-full pr-2">
                 <ul className="space-y-2">
@@ -515,22 +520,9 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                             </div>
                                             <div className="flex-shrink-0 flex items-center">
                                                 {currentEntry && (
-                                                    <Popover>
-                                                        <PopoverTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-6 w-6"><LinkIcon className="h-4 w-4" /></Button>
-                                                        </PopoverTrigger>
-                                                        <PopoverContent className="w-64 p-2" side="right" align="center" sideOffset={60}>
-                                                            <h5 className="text-sm font-medium mb-2 px-2">Link Resource Card</h5>
-                                                            <Select value={currentEntry.linkedResourceId || "none"} onValueChange={(val) => handleLinkResource(piston, currentEntry.id, val)}>
-                                                                <SelectTrigger><SelectValue placeholder="Select a resource..." /></SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="none">-- None --</SelectItem>
-                                                                    {resources.filter(r => r.type === 'card').map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
-                                                                </SelectContent>
-                                                            </Select>
-                                                            {currentEntry.linkedResourceId && <Button variant="link" size="sm" className="w-full justify-start text-destructive" onClick={() => handleLinkResource(piston, currentEntry.id, null)}>Unlink</Button>}
-                                                        </PopoverContent>
-                                                    </Popover>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLinkingResourceFor({piston, entryId: currentEntry.id, currentResourceId: currentEntry.linkedResourceId})}>
+                                                        <LinkIcon className="h-4 w-4" />
+                                                    </Button>
                                                 )}
                                                 {currentEntry?.linkedResourceId && (<Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleOpenResource(e, currentEntry.linkedResourceId!)}><Library className="h-4 w-4 text-primary" /></Button>)}
                                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setNewEntryPiston(piston)}><Plus className="h-4 w-4" /></Button>
@@ -554,5 +546,32 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                 </ul>
             </ScrollArea>
         </CardContent>
+        {linkingResourceFor && (
+            <Dialog open={!!linkingResourceFor} onOpenChange={() => setLinkingResourceFor(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Link Resource to {linkingResourceFor.piston}</DialogTitle>
+                        <DialogDescription>Select an existing resource card to connect to this intention.</DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Select
+                            value={linkingResourceFor.currentResourceId || 'none'}
+                            onValueChange={(val) => handleLinkResource(val)}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select a resource card..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">-- None --</SelectItem>
+                                {resources.filter(r => r.type === 'card').map(r => (
+                                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        )}
+        </>
     );
 };
