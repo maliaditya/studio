@@ -332,6 +332,35 @@ export function PistonsHead() {
                         onClose={handleCloseResource}
                     />
                 )}
+                {editingPistonEntry && (
+                    <Dialog open={!!editingPistonEntry} onOpenChange={() => setEditingPistonEntry(null)}>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Edit {editingPistonEntry.piston} Entry</DialogTitle>
+                            </DialogHeader>
+                            <Textarea 
+                                value={editingPistonEntry.entry.text} 
+                                onChange={e => setEditingPistonEntry(prev => prev ? {...prev, entry: {...prev.entry, text: e.target.value}} : null)}
+                                className="min-h-[120px] text-base"
+                                autoFocus
+                            />
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setEditingPistonEntry(null)}>Cancel</Button>
+                                <Button onClick={() => {
+                                    setPistons(prev => {
+                                        const topicData = { ...(prev[topicId] || {}) };
+                                        const entries = topicData[editingPistonEntry.piston] || [];
+                                        const updatedEntries = entries.map(entry =>
+                                            entry.id === editingPistonEntry.entry.id ? editingPistonEntry.entry : entry
+                                        );
+                                        return { ...prev, [topicId]: { ...topicData, [editingPistonEntry.piston]: updatedEntries } };
+                                    });
+                                    setEditingPistonEntry(null);
+                                }}>Save Changes</Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                )}
             </>
         )}
     </DndContext>
@@ -429,17 +458,6 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
         }
     }, [editingPistonEntry])
 
-    const pistonPlaceholders: Record<PistonType, string> = {
-        'Desire': `What is your desire for ${simpleTopicName}?`,
-        'Curiosity': `What makes you curious about ${simpleTopicName}?`,
-        'Truth-Seeking': `What core truth are you seeking with ${simpleTopicName}?`,
-        'Contribution': `How will ${simpleTopicName} contribute to others?`,
-        'Growth': `How will ${simpleTopicName} help you grow?`,
-        'Expression': `How does ${simpleTopicName} allow you to express yourself?`,
-        'Pleasure': `What is the inherent joy or pleasure in ${simpleTopicName}?`,
-        'Protection': `What does pursuing ${simpleTopicName} protect you from?`
-    };
-
     const handleSaveEdit = () => {
         if (!editingPistonEntry) return;
         const newText = editText.trim();
@@ -536,7 +554,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                             ) : (
                                                 <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start">
                                                     <div className="flex-grow cursor-text pr-2" onClick={() => { if(currentEntry) { onEditEntry({piston, entry: currentEntry}); }}}>
-                                                        {currentEntry?.text ? (<p className="whitespace-pre-wrap">{currentEntry.text}</p>) : (<p className="italic opacity-70">{pistonPlaceholders[piston]}</p>)}
+                                                        {currentEntry?.text ? (<p className="whitespace-pre-wrap">{currentEntry.text}</p>) : (<p className="italic opacity-70">Define your {piston} for {simpleTopicName}</p>)}
                                                     </div>
                                                     <div className="flex-shrink-0 flex items-center">
                                                         {currentEntry && (
@@ -544,9 +562,9 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                                                 <PopoverTrigger asChild>
                                                                     <Button variant="ghost" size="icon" className="h-6 w-6"><LinkIcon className="h-4 w-4" /></Button>
                                                                 </PopoverTrigger>
-                                                                <PopoverContent className="w-64 p-2" side="right" align="center">
+                                                                <PopoverContent className="w-64 p-2" side="right" align="center" sideOffset={20}>
                                                                     <h5 className="text-sm font-medium mb-2 px-2">Link Resource Card</h5>
-                                                                    <Select value={currentEntry.linkedResourceId || ""} onValueChange={(val) => handleLinkResource(piston, currentEntry.id, val)}>
+                                                                    <Select value={currentEntry.linkedResourceId || "none"} onValueChange={(val) => handleLinkResource(piston, currentEntry.id, val)}>
                                                                         <SelectTrigger><SelectValue placeholder="Select a resource..." /></SelectTrigger>
                                                                         <SelectContent>
                                                                             <SelectItem value="none">-- None --</SelectItem>
@@ -580,25 +598,6 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                     </ul>
                 </ScrollArea>
             </CardContent>
-            {editingPistonEntry && (
-                 <Dialog open={!!editingPistonEntry} onOpenChange={() => setEditingPistonEntry(null)}>
-                     <DialogContent>
-                         <DialogHeader>
-                             <DialogTitle>Edit {editingPistonEntry.piston} Entry</DialogTitle>
-                         </DialogHeader>
-                         <Textarea 
-                             value={editText} 
-                             onChange={e => setEditText(e.target.value)}
-                             className="min-h-[120px] text-base"
-                             autoFocus
-                         />
-                         <DialogFooter>
-                             <Button variant="outline" onClick={() => setEditingPistonEntry(null)}>Cancel</Button>
-                             <Button onClick={handleSaveEdit}>Save Changes</Button>
-                         </DialogFooter>
-                     </DialogContent>
-                 </Dialog>
-             )}
         </>
     );
 };
