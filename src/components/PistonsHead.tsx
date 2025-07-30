@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical, PlusCircle } from 'lucide-react';
+import { BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical, PlusCircle, Trash2 } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
@@ -185,7 +185,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate }: {
                 <div className="absolute top-2 right-2 z-20 flex items-center">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={(e) => e.stopPropagation()}>
+                             <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={(e) => e.stopPropagation()}>
                                 <MoreVertical className="h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>
@@ -723,3 +723,6 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
         </CardContent>
     );
 };
+
+
+  
