@@ -590,9 +590,6 @@ export function PistonsHead() {
                     className="z-[60]"
                 >
                     <Card className="w-96 shadow-2xl border-2 border-primary/50 bg-card relative flex flex-col max-h-[90vh]">
-                        <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 right-1.5 z-20" onClick={handleClose}>
-                            <X className="h-4 w-4" />
-                        </Button>
                         <CardHeader 
                             className="p-3 text-center flex-shrink-0"
                         >
@@ -606,6 +603,9 @@ export function PistonsHead() {
                                     {topicName}
                                 </CardTitle>
                             </div>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 right-1.5 z-20" onClick={handleClose}>
+                                <X className="h-4 w-4" />
+                            </Button>
                         </CardHeader>
                         {renderContent()}
                     </Card>
@@ -878,7 +878,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
     };
     
     return (
-        <CardContent className="p-0 flex-grow min-h-0">
+        <CardContent className="flex-grow min-h-0 p-0">
           <ScrollArea className="h-full p-4">
             <ul className="space-y-2">
               {PISTON_NAMES.map(piston => {
