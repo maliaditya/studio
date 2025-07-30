@@ -491,7 +491,7 @@ export function PistonsHead() {
 
     const popupWidth = 512;
     let x;
-
+    
     if (historyPopup) {
         x = position.x - popupWidth - 20;
     } else {
@@ -586,12 +586,12 @@ export function PistonsHead() {
                     style={style}
                     className="z-[60]"
                 >
-                    <Card className="w-96 shadow-2xl border-2 border-primary/50 bg-card relative">
+                    <Card className="w-96 shadow-2xl border-2 border-primary/50 bg-card relative flex flex-col max-h-[85vh]">
                         <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 right-1.5 z-20" onClick={handleClose}>
                             <X className="h-4 w-4" />
                         </Button>
                         <CardHeader 
-                            className="p-3 text-center"
+                            className="p-3 text-center flex-shrink-0"
                         >
                             {currentView !== 'main' && (
                                 <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 left-1.5 z-20" onClick={(e) => { e.stopPropagation(); onBack(); }}>
@@ -875,7 +875,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
     };
     
     return (
-        <CardContent className="p-4 max-h-[70vh]">
+        <CardContent className="p-4 flex-grow min-h-0">
             <ScrollArea className="h-full pr-2">
                 <ul className="space-y-2">
                     {PISTON_NAMES.map(piston => {
@@ -914,7 +914,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                                         <Library className="h-4 w-4 text-primary" />
                                                     </Button>
                                                 ) : currentEntry ? (
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDownCapture={() => onLinkResource({piston, entryId: currentEntry.id, currentResourceId: currentEntry.linkedResourceId})}>
+                                                     <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDownCapture={() => onLinkResource({piston, entryId: currentEntry.id, currentResourceId: currentEntry.linkedResourceId})}>
                                                         <LinkIcon className="h-4 w-4" />
                                                     </Button>
                                                 ) : <div className="w-6 h-6"/> }
