@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, Edit3, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink, Edit3 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -1116,8 +1116,8 @@ function ResourcesPageContent() {
     toast({ title: "Resource Updated", description: `"${editingResource.name}" has been updated.` });
   };
 
-  const getChildFoldersRecursive = (folderId: string): ResourceFolder[] => {
-    let children: ResourceFolder[] = [];
+  const getChildFoldersRecursive = (folderId: string): ResourceFolderType[] => {
+    let children: ResourceFolderType[] = [];
     const directChildren = resourceFolders.filter(f => f.parentId === folderId);
     children.push(...directChildren);
     directChildren.forEach(child => {
@@ -1126,7 +1126,7 @@ function ResourcesPageContent() {
     return children;
   };
   
-  const handleShareFolder = async (folder: ResourceFolder) => {
+  const handleShareFolder = async (folder: ResourceFolderType) => {
     if (!currentUser?.username) {
         toast({ title: 'Error', description: 'You must be logged in to share.', variant: 'destructive' });
         return;
@@ -1433,7 +1433,7 @@ function ResourcesPageContent() {
       let finalResources = [...resources];
 
       if (!existingSubFolder) {
-        const newFolder: ResourceFolder = {
+        const newFolder: ResourceFolderType = {
           id: `folder_${Date.now()}`,
           name: targetCard.name,
           parentId: parentFolderId,
@@ -1552,7 +1552,7 @@ function ResourcesPageContent() {
                             let cardContent: React.ReactNode;
                             
                             if(isCardType) {
-                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event)} onOpenMarkdownModal={onOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} />;
+                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event)} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} />;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                 const isGif = isGifUrl(res.link);
@@ -1930,6 +1930,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
