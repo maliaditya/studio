@@ -15,7 +15,6 @@ import { PistonEntry, PistonType, PistonsData } from '@/types/workout';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { format } from 'date-fns';
 
 
@@ -204,7 +203,7 @@ export function PistonsHead() {
                 className="z-[60]"
             >
                 <Card className="w-96 shadow-2xl border-2 border-primary/50 bg-card relative">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 right-1.5 z-20" onClick={handleClose}>
+                     <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 right-1.5 z-20" onClick={handleClose}>
                         <X className="h-4 w-4" />
                     </Button>
                     <CardHeader 
@@ -212,7 +211,7 @@ export function PistonsHead() {
                         {...attributes} 
                         {...listeners}
                     >
-                         {currentView !== 'main' && (
+                        {currentView !== 'main' && (
                             <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 left-1.5 z-20" onClick={(e) => { e.stopPropagation(); onBack(); }}>
                                 <ChevronLeft className="h-4 w-4" />
                             </Button>
@@ -421,7 +420,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                         </div>
                                     ) : (
                                         <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start">
-                                            <div className="flex-grow" onClick={() => handleStartEdit(piston)}>
+                                            <div className="flex-grow" onDoubleClick={() => handleStartEdit(piston)}>
                                             {currentEntry?.text ? (
                                                 <p className="whitespace-pre-wrap cursor-text">{currentEntry.text}</p>
                                             ) : (
