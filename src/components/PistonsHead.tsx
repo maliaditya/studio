@@ -124,15 +124,19 @@ interface ResourcePopupState {
   resourceId: string;
   x: number;
   y: number;
+  level: number;
+  parentId?: string;
+  width?: number;
 }
 
-const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAudio, setPlayingAudio }: { 
+const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAudio, setPlayingAudio, onOpenNestedPopup }: { 
     popupState: ResourcePopupState; 
     resource: Resource; 
     onClose: (resourceId: string) => void;
     onUpdate: (updatedResource: Resource) => void;
     playingAudio: { id: string; isPlaying: boolean } | null;
     setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
+    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: ResourcePopupState) => void;
 }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `resource-popup-${popupState.resourceId}`,
@@ -145,7 +149,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
         position: 'fixed',
         top: popupState.y,
         left: popupState.x,
-        width: '512px',
+        width: `${popupState.width || 512}px`,
         willChange: 'transform',
     };
 
@@ -202,6 +206,12 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
         setPlayingAudio(null);
         onClose(resource.id);
     }
+    
+    const handleLinkClick = (e: React.MouseEvent, pointResourceId: string) => {
+      e.stopPropagation();
+      onOpenNestedPopup(pointResourceId, e, popupState);
+    };
+
 
     return (
         <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
@@ -250,14 +260,32 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                 <div className="flex-grow min-h-0 overflow-y-auto">
                     <CardContent className="p-3 pt-0">
                         <ul className="space-y-3 text-sm text-muted-foreground pr-2">
-                            {(resource.points || []).map(point => (
-                                <EditableResourcePoint 
-                                    key={point.id}
-                                    point={point}
-                                    onUpdate={(newText) => handleUpdatePoint(point.id, newText)}
-                                    onDelete={() => handleDeletePoint(point.id)}
-                                />
-                            ))}
+                            {(resource.points || []).map(point => {
+                                if (point.type === 'card' && point.resourceId) {
+                                    return (
+                                        <li key={point.id} className="flex items-start gap-3 group/item">
+                                            <ArrowRight className="h-4 w-4 mt-1.5 text-primary/50 flex-shrink-0" />
+                                            <button
+                                                onClick={(e) => handleLinkClick(e, point.resourceId!)}
+                                                className="text-left font-medium text-primary hover:underline"
+                                            >
+                                                {point.text}
+                                            </button>
+                                             <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100 flex-shrink-0" onClick={() => handleDeletePoint(point.id)}>
+                                                <Trash2 className="h-3 w-3"/>
+                                            </Button>
+                                        </li>
+                                    )
+                                }
+                                return (
+                                    <EditableResourcePoint 
+                                        key={point.id}
+                                        point={point}
+                                        onUpdate={(newText) => handleUpdatePoint(point.id, newText)}
+                                        onDelete={() => handleDeletePoint(point.id)}
+                                    />
+                                );
+                            })}
                         </ul>
                     </CardContent>
                 </div>
@@ -356,7 +384,9 @@ export function PistonsHead() {
   
   const [position, setPosition] = useState({ x: 50, y: 50 });
   const [historyPopup, setHistoryPopup] = useState<HistoryPopupState | null>(null);
-  const [resourcePopup, setResourcePopup] = useState<ResourcePopupState | null>(null);
+  
+  const [openResourcePopups, setOpenResourcePopups] = useState<Map<string, ResourcePopupState>>(new Map());
+
   const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -383,11 +413,56 @@ export function PistonsHead() {
   });
   
   const handleCloseHistory = () => setHistoryPopup(null);
+  
+  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: ResourcePopupState) => {
+      setOpenResourcePopups(prev => {
+          const newPopups = new Map(prev);
+          const resource = resources.find(r => r.id === resourceId);
+          if (!resource) return newPopups;
+          
+          const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+          const popupWidth = hasMarkdown ? 896 : 512;
+      
+          let x, y, level, parentId;
+      
+          if (parentPopupState) {
+              level = parentPopupState.level + 1;
+              parentId = parentPopupState.resourceId;
+              x = parentPopupState.x + 40;
+              y = parentPopupState.y + 40;
+          } else {
+              level = 0;
+              parentId = undefined;
+              x = event.clientX;
+              y = event.clientY;
+          }
+          
+          newPopups.set(resourceId, {
+              resourceId, level, x, y, parentId, width: popupWidth
+          });
+          return newPopups;
+      });
+  };
+
   const handleCloseResource = (resourceId: string) => {
-    if (resourcePopup?.resourceId === resourceId) {
-        setPlayingAudio(null);
-        setResourcePopup(null);
-    }
+    setOpenResourcePopups(prev => {
+      const newPopups = new Map(prev);
+      const popupsToDelete = new Set<string>();
+      function findChildren(parentId: string) {
+        popupsToDelete.add(parentId);
+        for (const [id, popup] of newPopups.entries()) {
+          if (popup.parentId === parentId) findChildren(id);
+        }
+      }
+      findChildren(resourceId);
+      for (const id of popupsToDelete) {
+        newPopups.delete(id);
+        if (playingAudio?.id === id) {
+            setPlayingAudio(null);
+        }
+      }
+      return newPopups;
+    });
   };
   
   const handleUpdateResource = (updatedResource: Resource) => {
@@ -411,12 +486,17 @@ export function PistonsHead() {
             return { ...prev, x: Math.min(Math.max(20, newX), window.innerWidth - historyPopupWidth - 20), y: Math.max(20, newY) };
         });
     } else if (id.startsWith('resource-popup-')) {
-        setResourcePopup(prev => {
-            if (!prev) return null;
-            const popupWidth = 512;
-            const newX = prev.x + delta.x;
-            const newY = prev.y + delta.y;
-            return { ...prev, x: Math.min(Math.max(20, newX), window.innerWidth - popupWidth - 20), y: Math.max(20, newY) };
+        setOpenResourcePopups(prev => {
+            const newPopups = new Map(prev);
+            const popupId = id.replace('resource-popup-', '');
+            const popup = newPopups.get(popupId);
+            if(popup) {
+                const popupWidth = popup.width || 512;
+                const newX = popup.x + delta.x;
+                const newY = popup.y + delta.y;
+                newPopups.set(popupId, {...popup, x: newX, y: newY});
+            }
+            return newPopups;
         });
     }
   };
@@ -425,7 +505,7 @@ export function PistonsHead() {
     setIsPistonsHeadOpen(false);
     setHistoryPopup(null);
     setPlayingAudio(null);
-    setResourcePopup(null);
+    setOpenResourcePopups(new Map());
     setTimeout(() => {
         setCurrentView('main');
         setSelectedTopicId(null);
@@ -479,8 +559,9 @@ export function PistonsHead() {
     const popupWidth = 320;
     let x;
   
-    if (resourcePopup) {
-        x = position.x < window.innerWidth / 2 ? resourcePopup.x + 512 + 20 : resourcePopup.x - popupWidth - 20;
+    if (openResourcePopups.size > 0) {
+        const lastPopup = Array.from(openResourcePopups.values()).pop()!;
+        x = position.x < window.innerWidth / 2 ? lastPopup.x + (lastPopup.width || 512) + 20 : lastPopup.x - popupWidth - 20;
     } else {
         x = position.x + 384 + 20;
     }
@@ -505,7 +586,11 @@ export function PistonsHead() {
     if (x < 20) x = position.x + 384 + 20;
     if (x + popupWidth > window.innerWidth) x = position.x - popupWidth - 20;
   
-    setResourcePopup({ resourceId, x, y: Math.max(20, position.y) });
+    setOpenResourcePopups(prev => {
+        const newPopups = new Map(prev);
+        newPopups.set(resourceId, { resourceId, x, y: Math.max(20, position.y), level: 0 });
+        return newPopups;
+    });
   };
 
 
@@ -541,7 +626,7 @@ export function PistonsHead() {
     const commonProps = { 
         onBack: onBack, 
         setHistoryPopup: setHistoryPopup,
-        setResourcePopup: setResourcePopup,
+        setResourcePopup: setOpenResourcePopups,
         onLinkResource: setLinkingResourceFor,
         handleOpenResource,
         handleOpenHistory,
@@ -623,16 +708,18 @@ export function PistonsHead() {
                         }}
                     />
                 )}
-                 {resourcePopup && resources.find(r => r.id === resourcePopup.resourceId) && (
-                    <ResourcePopupCard 
-                        popupState={resourcePopup}
-                        resource={resources.find(r => r.id === resourcePopup.resourceId)!}
-                        onClose={() => handleCloseResource(resourcePopup.resourceId)}
+                 {Array.from(openResourcePopups.values()).map(popupState => (
+                    <ResourcePopupCard
+                        key={popupState.resourceId}
+                        popupState={popupState}
+                        resource={resources.find(r => r.id === popupState.resourceId)!}
+                        onClose={handleCloseResource}
                         onUpdate={handleUpdateResource}
                         playingAudio={playingAudio}
                         setPlayingAudio={setPlayingAudio}
+                        onOpenNestedPopup={handleOpenNestedPopup}
                     />
-                )}
+                 ))}
                  {linkingResourceFor && (
                     <Dialog open={!!linkingResourceFor} onOpenChange={() => setLinkingResourceFor(null)}>
                         <DialogContent>
@@ -679,7 +766,7 @@ const MainPistonView = ({ onSelect }: { onSelect: (view: 'health' | 'wealth' | '
 );
 
 
-const HealthPistonView = ({ onBack, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
+const HealthPistonView = ({ onBack, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     const { pistons, setPistons } = useAuth();
     const [activity, setActivity] = useState(pistons.health?.activity || '');
     const [isEditingActivity, setIsEditingActivity] = useState(!pistons.health?.activity);
@@ -825,7 +912,7 @@ const TopicSelector = ({ onSelect, type, onBack }: { onSelect: (topicId: string,
     )
 }
 
-const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
+const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     const { pistons, setPistons } = useAuth();
     const [newEntryPiston, setNewEntryPiston] = useState<PistonType | null>(null);
     const [newEntryText, setNewEntryText] = useState('');
@@ -882,7 +969,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
     
     return (
       <CardContent className="p-0 flex-grow min-h-0 flex flex-col">
-          <div className="overflow-y-auto p-4 flex-grow">
+          <ScrollArea className="flex-grow p-4">
               <ul className="space-y-2">
                   {PISTON_NAMES.map(piston => {
                       const entries = topicPistons[piston] || [];
@@ -958,12 +1045,12 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                       )
                   })}
               </ul>
-          </div>
+          </ScrollArea>
     </CardContent>
     );
 };
 
-const TopicPistonView = ({ topicId, onBack, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<ResourcePopupState | null>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
+const TopicPistonView = ({ topicId, onBack, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     const { deepWorkDefinitions, mindsetCards } = useAuth();
     const topicDef = deepWorkDefinitions.find(d => d.id === topicId);
     const mindsetDef = mindsetCards.find(c => c.id === topicId);
