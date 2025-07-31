@@ -673,6 +673,7 @@ function ResourcesPageContent() {
     setActiveResourceTabIds,
     selectedResourceFolderId,
     setSelectedResourceFolderId,
+    globalVolume,
   } = useAuth();
   const { toast } = useToast();
   
@@ -740,12 +741,13 @@ function ResourcesPageContent() {
         if (audioEl.src !== resourceToPlay.audioUrl) {
           audioEl.src = resourceToPlay.audioUrl;
         }
+        audioEl.volume = globalVolume;
         audioEl.play().catch(e => console.error("Audio play failed:", e));
       }
     } else {
       audioEl.pause();
     }
-  }, [playingAudio, resources]);
+  }, [playingAudio, resources, globalVolume]);
 
   const handleNextVideo = useCallback(() => {
     setYoutubeModalState(prev => {
@@ -1930,6 +1932,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
