@@ -21,7 +21,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
@@ -727,12 +727,12 @@ const DesireSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, type
     };
 
     return (
-        <CardContent className="p-4">
-            <div className="flex gap-2 mb-4">
+        <CardContent className="p-4 flex-grow min-h-0 flex flex-col">
+            <div className="flex gap-2 mb-4 flex-shrink-0">
                 <Input value={newDesireName} onChange={e => setNewDesireName(e.target.value)} placeholder="Add a new desire..."/>
                 <Button onClick={handleAddDesire}><Plus/></Button>
             </div>
-            <ScrollArea className="h-60">
+            <ScrollArea className="flex-grow min-h-0">
                 <ul className="space-y-2 pr-2">
                     {desires.map(desire => (
                         <li key={desire.id} className="flex items-center justify-between group p-2 rounded-md border bg-muted/20">
@@ -768,12 +768,12 @@ const MindsetSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, typ
     };
 
     return (
-        <CardContent className="p-4">
-            <div className="flex gap-2 mb-4">
+        <CardContent className="p-4 flex-grow min-h-0 flex flex-col">
+            <div className="flex gap-2 mb-4 flex-shrink-0">
                 <Input value={newMindsetName} onChange={e => setNewMindsetName(e.target.value)} placeholder="Add a new mindset..."/>
                 <Button onClick={handleAddMindset}><Plus/></Button>
             </div>
-            <ScrollArea className="h-60">
+            <ScrollArea className="flex-grow min-h-0">
                 <ul className="space-y-2 pr-2">
                     {mindsetCards.map(card => (
                         <li key={card.id} className="flex items-center justify-between group p-2 rounded-md border bg-muted/20">
