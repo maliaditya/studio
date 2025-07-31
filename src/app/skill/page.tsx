@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Textarea } from '@/components/ui/textarea';
 
 function SkillPageContent() {
   const { toast } = useToast();
@@ -103,12 +104,13 @@ function SkillPageContent() {
      setCoreSkills(prev => prev.map(s => s.id === skillId ? { ...s, skillAreas: s.skillAreas.filter(a => a.id !== areaId) } : s));
   };
   
-  const handleAddMicroSkill = (skillId: string, areaId: string) => {
+  const handleAddMicroSkill = (areaId: string) => {
+    if (!selectedSkillId) return;
     const name = newMicroSkillNames[areaId]?.trim();
     if (!name) return;
     const newMicro: MicroSkill = { id: `ms_${Date.now()}`, name };
     setCoreSkills(prev => prev.map(s => {
-        if (s.id === skillId) {
+        if (s.id === selectedSkillId) {
             return { ...s, skillAreas: s.skillAreas.map(a => a.id === areaId ? { ...a, microSkills: [...a.microSkills, newMicro] } : a) };
         }
         return s;
@@ -116,9 +118,10 @@ function SkillPageContent() {
     setNewMicroSkillNames(prev => ({...prev, [areaId]: ''}));
   };
 
-  const handleUpdateMicroSkill = (skillId: string, areaId: string, microId: string, name: string) => {
+  const handleUpdateMicroSkill = (areaId: string, microId: string, name: string) => {
+    if (!selectedSkillId) return;
     setCoreSkills(prev => prev.map(s => {
-        if (s.id === skillId) {
+        if (s.id === selectedSkillId) {
             return { ...s, skillAreas: s.skillAreas.map(a => {
                 if (a.id === areaId) {
                     return { ...a, microSkills: a.microSkills.map(m => m.id === microId ? { ...m, name } : m) };
@@ -130,9 +133,10 @@ function SkillPageContent() {
     }));
   };
   
-  const handleDeleteMicroSkill = (skillId: string, areaId: string, microId: string) => {
+  const handleDeleteMicroSkill = (areaId: string, microId: string) => {
+    if (!selectedSkillId) return;
      setCoreSkills(prev => prev.map(s => {
-        if (s.id === skillId) {
+        if (s.id === selectedSkillId) {
             return { ...s, skillAreas: s.skillAreas.map(a => a.id === areaId ? { ...a, microSkills: a.microSkills.filter(m => m.id !== microId) } : a) };
         }
         return s;
@@ -197,29 +201,29 @@ function SkillPageContent() {
                     const domainCoreSkills = coreSkills.filter(s => s.domainId === domain.id);
                     return (
                         <AccordionItem value={domain.id} key={domain.id}>
-                            <AccordionTrigger>
-                               <div className="flex items-center justify-between w-full group">
-                                 <span>{domain.name}</span>
-                                 <div className="flex items-center opacity-0 group-hover:opacity-100">
-                                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingDomain(domain); }}><Edit className="h-4 w-4"/></Button>
-                                   <AlertDialog>
-                                      <AlertDialogTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                                      </AlertDialogTrigger>
-                                      <AlertDialogContent>
-                                          <AlertDialogHeader>
-                                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                              <AlertDialogDescription>This will permanently delete the "{domain.name}" domain and all its contents.</AlertDialogDescription>
-                                          </AlertDialogHeader>
-                                          <AlertDialogFooter>
-                                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                              <AlertDialogAction onClick={() => handleDeleteDomain(domain.id)}>Delete</AlertDialogAction>
-                                          </AlertDialogFooter>
-                                      </AlertDialogContent>
-                                    </AlertDialog>
-                                 </div>
-                               </div>
-                            </AccordionTrigger>
+                            <div className="flex items-center justify-between w-full group">
+                                <AccordionTrigger className="flex-grow">
+                                  <span>{domain.name}</span>
+                                </AccordionTrigger>
+                                <div className="flex items-center opacity-0 group-hover:opacity-100 ml-2">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingDomain(domain); }}><Edit className="h-4 w-4"/></Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>This will permanently delete the "{domain.name}" domain and all its contents.</AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteDomain(domain.id)}>Delete</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
+                            </div>
                             <AccordionContent>
                                 <div className="space-y-2">
                                     <h4 className="font-semibold text-xs text-muted-foreground px-2">Core Pillars</h4>
@@ -300,16 +304,16 @@ function SkillPageContent() {
                                                   <li key={micro.id} className="flex items-center gap-2 group">
                                                     <span className="h-1.5 w-1.5 rounded-full bg-primary" />
                                                     {editingMicroSkill?.id === micro.id ? (
-                                                        <Input value={editingMicroSkill.name} onChange={e => setEditingMicroSkill({...editingMicroSkill, name: e.target.value})} autoFocus onBlur={() => { handleUpdateMicroSkill(selectedSkillId!, area.id, micro.id, editingMicroSkill.name); setEditingMicroSkill(null); }} className="h-7"/>
+                                                        <Input value={editingMicroSkill.name} onChange={e => setEditingMicroSkill({...editingMicroSkill, name: e.target.value})} autoFocus onBlur={() => { handleUpdateMicroSkill(area.id, micro.id, editingMicroSkill.name); setEditingMicroSkill(null); }} className="h-7"/>
                                                     ) : (
                                                         <span className="flex-grow cursor-pointer" onClick={() => setEditingMicroSkill(micro)}>{micro.name}</span>
                                                     )}
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => handleDeleteMicroSkill(selectedSkillId!, area.id, micro.id)}><Trash2 className="h-3 w-3 text-destructive"/></Button>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => handleDeleteMicroSkill(area.id, micro.id)}><Trash2 className="h-3 w-3 text-destructive"/></Button>
                                                   </li>
                                                 ))}
                                                  <li className="flex items-center gap-2 pt-2 border-t mt-2">
                                                     <Input value={newMicroSkillNames[area.id] || ''} onChange={e => setNewMicroSkillNames(prev => ({...prev, [area.id]: e.target.value}))} placeholder="Add micro-skill..." className="h-8"/>
-                                                    <Button size="sm" className="h-8" onClick={() => handleAddMicroSkill(selectedSkillId!, area.id)}>Add</Button>
+                                                    <Button size="sm" className="h-8" onClick={() => handleAddMicroSkill(area.id)}>Add</Button>
                                                 </li>
                                               </ul>
                                           </CardContent>
