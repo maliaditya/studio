@@ -287,3 +287,29 @@ export interface PistonsCategoryData {
     health?: PistonsData;
     [topicId: string]: PistonsData | undefined; // For wealth, growth, and desire topics
 }
+
+// Skill Page Types
+export interface SkillDomain {
+  id: string;
+  name: string;
+}
+
+export interface CoreSkill {
+  id: string;
+  domainId: string;
+  name: string;
+  type: 'Foundation' | 'Specialization' | 'Professionalism';
+  skillAreas: SkillArea[];
+}
+
+export interface SkillArea {
+  id: string;
+  name: string;
+  purpose: string;
+  microSkills: MicroSkill[];
+}
+
+export interface MicroSkill {
+  id: string;
+  name: string;
+}

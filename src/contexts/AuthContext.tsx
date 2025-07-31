@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -143,6 +143,12 @@ interface AuthContextType {
   pistons: PistonsCategoryData;
   setPistons: React.Dispatch<React.SetStateAction<PistonsCategoryData>>;
   deleteDesire: (desireId: string) => void;
+  
+  // Skill Page
+  skillDomains: SkillDomain[];
+  setSkillDomains: React.Dispatch<React.SetStateAction<SkillDomain[]>>;
+  coreSkills: CoreSkill[];
+  setCoreSkills: React.Dispatch<React.SetStateAction<CoreSkill[]>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -216,6 +222,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Pistons State
   const [isPistonsHeadOpen, setIsPistonsHeadOpen] = useState(false);
   const [pistons, setPistons] = useState<PistonsCategoryData>({});
+
+  // Skill Page State
+  const [skillDomains, setSkillDomains] = useState<SkillDomain[]>([]);
+  const [coreSkills, setCoreSkills] = useState<CoreSkill[]>([]);
 
 
   useEffect(() => {
@@ -306,6 +316,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       // Pistons Data
       try { const d = localStorage.getItem(`pistons_data_${username}`); setPistons(d ? JSON.parse(d) : {}); } catch (e) { setPistons({}); }
+      
+      // Skill Page Data
+      try { const d = loadItem(`skill_domains_${username}`); setSkillDomains(d ? JSON.parse(d) : []); } catch (e) { setSkillDomains([]); }
+      try { const d = loadItem(`core_skills_${username}`); setCoreSkills(d ? JSON.parse(d) : []); } catch (e) { setCoreSkills([]); }
 
 
     } else {
@@ -324,6 +338,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setCanvasLayout({ nodes: [], edges: [] });
       setMindsetCards(DEFAULT_MINDSET_CARDS);
       setPistons({});
+      setSkillDomains([]); setCoreSkills([]);
     }
   }, [currentUser]);
 
@@ -376,6 +391,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       // Pistons
       localStorage.setItem(`pistons_data_${username}`, JSON.stringify(pistons));
+
+      // Skill Page
+      localStorage.setItem(`skill_domains_${username}`, JSON.stringify(skillDomains));
+      localStorage.setItem(`core_skills_${username}`, JSON.stringify(coreSkills));
     }
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
@@ -386,6 +405,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     canvasLayout,
     mindsetCards,
     pistons,
+    skillDomains, coreSkills,
     currentUser, loading
   ]);
 
@@ -546,6 +566,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setMindsetCards(data.mindsetCards || DEFAULT_MINDSET_CARDS);
     
     setPistons(data.pistons || {});
+
+    setSkillDomains(data.skillDomains || []);
+    setCoreSkills(data.coreSkills || []);
   };
   
   const register = async (username: string, password: string) => {
@@ -603,6 +626,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       canvasLayout,
       mindsetCards,
       pistons,
+      skillDomains, coreSkills,
     };
   }
 
@@ -1334,6 +1358,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isPistonsHeadOpen, setIsPistonsHeadOpen,
     pistons, setPistons,
     deleteDesire,
+    skillDomains, setSkillDomains,
+    coreSkills, setCoreSkills,
   };
 
   return (
