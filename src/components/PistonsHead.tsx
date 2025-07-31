@@ -21,7 +21,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogTrigger, AlertDialogFooter } from '@/components/ui/alert-dialog';
 
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
@@ -589,7 +589,7 @@ export function PistonsHead() {
                     style={style}
                     className="z-[60]"
                 >
-                    <Card className="w-96 shadow-2xl border-2 border-primary/50 bg-card relative flex flex-col max-h-[90vh]">
+                    <Card className="w-96 shadow-2xl border-2 border-primary/50 bg-card flex flex-col max-h-[90vh]">
                         <CardHeader 
                             className="p-3 text-center flex-shrink-0"
                         >
@@ -878,7 +878,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
     };
     
     return (
-        <CardContent className="flex-grow min-h-0 overflow-y-auto p-0">
+        <CardContent className="flex-grow min-h-0 overflow-hidden">
             <ScrollArea className="h-full p-4">
                 <ul className="space-y-2">
                     {PISTON_NAMES.map(piston => {
@@ -968,5 +968,3 @@ const TopicPistonView = ({ topicId, onBack, setHistoryPopup, setResourcePopup, o
 
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
-
-    
