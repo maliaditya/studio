@@ -878,8 +878,8 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
     };
     
     return (
-        <CardContent className="p-0 flex flex-col flex-grow min-h-0">
-            <ScrollArea className="h-full p-4">
+        <CardContent className="p-0 flex-grow min-h-0 flex flex-col">
+            <div className="overflow-y-auto p-4 flex-grow">
                 <ul className="space-y-2">
                     {PISTON_NAMES.map(piston => {
                         const entries = topicPistons[piston] || [];
@@ -955,7 +955,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                         )
                     })}
                 </ul>
-            </ScrollArea>
+            </div>
       </CardContent>
     );
 };
@@ -968,5 +968,3 @@ const TopicPistonView = ({ topicId, onBack, setHistoryPopup, setResourcePopup, o
 
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
-
-    
