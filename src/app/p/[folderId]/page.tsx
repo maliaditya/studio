@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -304,7 +305,7 @@ export default function SharedFolderPage() {
     const [selectedFolderId, setSelectedFolderId] = useState<string | null>(folderId);
     const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
 
-    const { setFloatingVideoUrl } = useAuth();
+    const { setFloatingVideoUrl, globalVolume } = useAuth();
     const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
     const [playingAudio, setPlayingAudio] = useState<{ id: string, isPlaying: boolean } | null>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -319,12 +320,13 @@ export default function SharedFolderPage() {
             if (audioEl.src !== resourceToPlay.audioUrl) {
               audioEl.src = resourceToPlay.audioUrl;
             }
+            audioEl.volume = globalVolume;
             audioEl.play().catch(e => console.error("Audio play failed:", e));
           }
         } else {
           audioEl.pause();
         }
-      }, [playingAudio, data?.resources]);
+      }, [playingAudio, data?.resources, globalVolume]);
 
     useEffect(() => {
         if (!folderId) return;
@@ -563,9 +565,9 @@ export default function SharedFolderPage() {
                 if (!parentPopup) return null;
                 
                 const startX = parentPopup.x + (parentPopup.width || 0) / 2;
-                const startY = parentPopup.y + (parentPopup.height || 0) / 2;
+                const startY = parentPopup.y + ((parentPopup.height || 0) / 2);
                 const endX = popup.x + (popup.width || 0) / 2;
-                const endY = popup.y + (popup.height || 0) / 2;
+                const endY = popup.y + ((popup.height || 0) / 2);
                 
                 return (
                 <line 
@@ -584,6 +586,7 @@ export default function SharedFolderPage() {
         </DndContext>
     );
 }
+
 
 
 

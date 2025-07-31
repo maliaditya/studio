@@ -36,6 +36,8 @@ interface AuthContextType {
   setFloatingVideoUrl: React.Dispatch<React.SetStateAction<string | null>>;
   isAudioPlaying: boolean;
   setIsAudioPlaying: React.Dispatch<React.SetStateAction<boolean>>;
+  globalVolume: number;
+  setGlobalVolume: React.Dispatch<React.SetStateAction<number>>;
   
   // Shared health state
   weightLogs: WeightLog[];
@@ -161,6 +163,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [theme, setTheme] = useState('ad-dark');
   const [floatingVideoUrl, setFloatingVideoUrl] = useState<string | null>(null);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const [globalVolume, setGlobalVolume] = useState(0.05);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -1304,6 +1307,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     theme, setTheme,
     floatingVideoUrl, setFloatingVideoUrl,
     isAudioPlaying, setIsAudioPlaying,
+    globalVolume, setGlobalVolume,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule, setSchedule, isAgendaDocked, setIsAgendaDocked, activityDurations, setActivityDurations,
     handleToggleComplete, handleLogLearning, carryForwardTask, scheduleTaskFromMindMap,

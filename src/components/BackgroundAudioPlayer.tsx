@@ -9,9 +9,8 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function BackgroundAudioPlayer() {
-  const { isAudioPlaying, setIsAudioPlaying } = useAuth();
+  const { isAudioPlaying, setIsAudioPlaying, globalVolume, setGlobalVolume } = useAuth();
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [volume, setVolume] = useState(0.05); // Start at 5% volume
 
   // Effect to sync audio element's playing state with component state
   useEffect(() => {
@@ -35,13 +34,13 @@ export function BackgroundAudioPlayer() {
     }
   }, [isAudioPlaying, setIsAudioPlaying]);
 
-  // Effect to sync audio element's volume with component state
+  // Effect to sync audio element's volume with global state
   useEffect(() => {
     const audio = audioRef.current;
     if (audio) {
-      audio.volume = volume;
+      audio.volume = globalVolume;
     }
-  }, [volume]);
+  }, [globalVolume]);
   
   // Effect for component cleanup
   useEffect(() => {
@@ -62,12 +61,12 @@ export function BackgroundAudioPlayer() {
   };
 
   const handleVolumeChange = (newVolume: number[]) => {
-    setVolume(newVolume[0]);
+    setGlobalVolume(newVolume[0]);
   };
   
   const getVolumeIcon = () => {
-    if (volume === 0) return <VolumeX className="h-5 w-5" />;
-    if (volume < 0.5) return <Volume1 className="h-5 w-5" />;
+    if (globalVolume === 0) return <VolumeX className="h-5 w-5" />;
+    if (globalVolume < 0.5) return <Volume1 className="h-5 w-5" />;
     return <Volume2 className="h-5 w-5" />;
   };
 
@@ -93,9 +92,9 @@ export function BackgroundAudioPlayer() {
             </PopoverTrigger>
             <PopoverContent side="top" align="end" className="w-auto p-2">
                 <Slider
-                    defaultValue={[volume]}
+                    defaultValue={[globalVolume]}
                     max={1}
-                    step={0.05}
+                    step={0.01}
                     onValueChange={handleVolumeChange}
                     className="w-32"
                 />
