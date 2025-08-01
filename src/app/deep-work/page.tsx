@@ -566,6 +566,7 @@ function LinkedDeepWorkCard({
     resources,
     setSelectedSubtopic,
     linkedDeepWorkChildIds,
+    onOpenMindMap,
 } : {
     id: string;
     deepworkDef: ExerciseDefinition;
@@ -586,6 +587,7 @@ function LinkedDeepWorkCard({
     resources: Resource[];
     setSelectedSubtopic: (def: ExerciseDefinition | null) => void;
     linkedDeepWorkChildIds: Set<string>;
+    onOpenMindMap: (rootFocusAreaId: string) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
@@ -641,6 +643,9 @@ function LinkedDeepWorkCard({
          <Card className={cn("relative rounded-2xl flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isComplete && "opacity-70 bg-muted/30")}>
             <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => onOpenMindMap(deepworkDef.id)} onMouseDown={(e) => e.stopPropagation()}>
+                    <GitMerge className="h-4 w-4" />
+                </Button>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -794,6 +799,10 @@ function DeepWorkPageContent() {
   const [isCreatingLink, setIsCreatingLink] = useState(false);
 
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+
+  const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
+  const [mindMapRootFocusAreaId, setMindMapRootFocusAreaId] = useState<string | null>(null);
+
 
   const allKnownTopics = useMemo(() => {
     const topicsFromDefs = new Set(deepWorkDefinitions.map(def => def.category));
@@ -1905,6 +1914,7 @@ function DeepWorkPageContent() {
                                               resources={resources}
                                               setSelectedSubtopic={setSelectedSubtopic}
                                               linkedDeepWorkChildIds={linkedDeepWorkChildIds}
+                                              onOpenMindMap={(id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); }}
                                           />
                                         );
                                       })}
@@ -1966,6 +1976,7 @@ function DeepWorkPageContent() {
                                         resources={resources}
                                         setSelectedSubtopic={setSelectedSubtopic}
                                         linkedDeepWorkChildIds={linkedDeepWorkChildIds}
+                                        onOpenMindMap={(id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); }}
                                         />
                                     ))}
                                     </div>
@@ -2111,6 +2122,12 @@ function DeepWorkPageContent() {
               onSizeChange={handleSizeChange}
           />
       ))}
+       <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
+            <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+                <DialogHeader className="sr-only"><DialogTitle>Focus Area Mind Map</DialogTitle></DialogHeader>
+                <MindMapViewer showControls={false} rootFocusAreaId={mindMapRootFocusAreaId} />
+            </DialogContent>
+        </Dialog>
     </DndContext>
   );
 }
