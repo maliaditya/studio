@@ -8,12 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare, BrainCircuit, Blocks, Sprout } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, getISOWeek, isMonday, getYear, addDays, parseISO, differenceInDays } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, DeepWorkTopicMetadata, Resource, ResourceFolder } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, DeepWorkTopicMetadata, Resource, ResourceFolder, SkillArea, SkillDomain, CoreSkill } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { AuthGuard } from '@/components/AuthGuard';
@@ -51,7 +51,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Progress } from '@/components/ui/progress';
 import { FocusAreaProgressModal } from '@/components/FocusAreaProgressModal';
@@ -68,6 +68,7 @@ import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useRouter } from 'next/navigation';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 interface PopupState {
   resourceId: string;
@@ -739,6 +740,8 @@ function DeepWorkPageContent() {
     topicGoals,
     setFloatingVideoUrl,
     setSelectedSubtopic,
+    skillDomains,
+    coreSkills,
   } = useAuth();
 
   const [newTopicName, setNewTopicName] = useState('');
@@ -753,7 +756,6 @@ function DeepWorkPageContent() {
   const [newTopicNameForEdit, setNewTopicNameForEdit] = useState('');
   const [newTopicClassificationForEdit, setNewTopicClassificationForEdit] = useState<'product' | 'service'>('product');
 
-  // State for adding a focus area with a modal
   const [isNewFocusAreaModalOpen, setIsNewFocusAreaModalOpen] = useState(false);
   const [newFocusAreaParentTopic, setNewFocusAreaParentTopic] = useState<string | null>(null);
   const [newFocusAreaData, setNewFocusAreaData] = useState({ name: '', hours: '', minutes: '' });
@@ -787,6 +789,8 @@ function DeepWorkPageContent() {
   const [mindMapRootId, setMindMapRootId] = useState<string | null>(null);
 
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
+
+  const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
 
   const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
       setOpenPopups(prev => {
@@ -992,38 +996,6 @@ function DeepWorkPageContent() {
         return newSet;
     });
   };
-
-  const topicsWithFocusAreas = useMemo(() => {
-    const effectiveFilters = visibilityFilters.size === 0 ? new Set(['intention']) : visibilityFilters;
-
-    const visibleDefinitions = deepWorkDefinitions.filter(def => {
-        const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
-        const isLinkedAsChild = linkedDeepWorkChildIds.has(def.id);
-
-        const isIntention = isParent && !isLinkedAsChild;
-        const isObjective = isParent && isLinkedAsChild;
-        const isAction = !isParent && isLinkedAsChild;
-        const isStandalone = !isParent && !isLinkedAsChild;
-
-        if (effectiveFilters.has('intention') && isIntention) return true;
-        if (effectiveFilters.has('objective') && isObjective) return true;
-        if (effectiveFilters.has('action') && isAction) return true;
-        if (effectiveFilters.has('standalone') && isStandalone) return true;
-        
-        return false;
-    });
-    
-    const grouped: { [key: string]: ExerciseDefinition[] } = {};
-    visibleDefinitions.forEach(def => {
-        if (!grouped[def.category]) {
-            grouped[def.category] = [];
-        }
-        grouped[def.category].push(def);
-    });
-
-    return allKnownTopics.map(topic => [topic, grouped[topic] || []] as [string, ExerciseDefinition[]]);
-  }, [allKnownTopics, deepWorkDefinitions, linkedDeepWorkChildIds, visibilityFilters]);
-
 
   const formatDuration = (minutes: number) => {
     if (minutes === 0) return "0m";
@@ -1300,25 +1272,6 @@ function DeepWorkPageContent() {
       return [...prevLogs, updatedWorkout];
     });
   };
-
-  const handleAddTopic = (e: FormEvent) => {
-    e.preventDefault();
-    if (!newTopicName.trim()) {
-        toast({ title: "Error", description: "Topic name cannot be empty.", variant: "destructive" });
-        return;
-    }
-    const topic = newTopicName.trim();
-    if (allKnownTopics.some(t => t.toLowerCase() === topic.toLowerCase())) {
-        toast({ title: "Error", description: "This topic already exists.", variant: "destructive" });
-        return;
-    }
-    setDeepWorkTopicMetadata(prev => ({
-        ...prev,
-        [topic]: { classification: 'product' }
-    }));
-    setNewTopicName('');
-    toast({ title: "Topic Created", description: `"${topic}" has been added to your library.` });
-  }
   
   const handleOpenNewFocusAreaModal = (topic: string) => {
     setNewFocusAreaParentTopic(topic);
@@ -1350,15 +1303,7 @@ function DeepWorkPageContent() {
     };
 
     setDeepWorkDefinitions(prev => [...prev, newDef]);
-    
-    // Expand the topic to show the new area
-    setExpandedTopics(prev => {
-        const newSet = new Set(prev);
-        newSet.add(newFocusAreaParentTopic);
-        return newSet;
-    });
 
-    // Select the new focus area
     setSelectedFocusArea(newDef);
     setViewMode('library');
 
@@ -1704,42 +1649,13 @@ function DeepWorkPageContent() {
 
 
   const handleStartEditUpskill = (def: ExerciseDefinition) => {
-    setEditingUpskill(def);
-  };
-  
-  const handleSaveUpskillEdit = () => {
-    if (!editedUpskillData || !editingUpskill) return;
-
-    const hours = parseInt(editedUpskillData.estHours || '0', 10);
-    const minutes = parseInt(editedUpskillData.estMinutes || '0', 10);
-    const totalMinutes = hours * 60 + minutes;
-
-    const finalUpskillData: Partial<ExerciseDefinition> = { 
-        ...editedUpskillData,
-        estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined
-    };
-
-    if (finalUpskillData.link !== editingUpskill.link) {
-        finalUpskillData.iconUrl = getFaviconUrl(finalUpskillData.link || '');
-    }
-    setUpskillDefinitions(prev => prev.map(def => def.id === editingUpskill.id ? { ...def, ...finalUpskillData } : def));
-    setEditingUpskill(null);
-    toast({ title: 'Success', description: 'Upskill task updated.' });
+    // This is a simplified handler. Ideally, it would open a modal in the upskill page.
+    router.push('/upskill');
   };
   
   const handleStartEditResource = (res: Resource) => {
-    setEditingResource(res);
-  };
-  
-  const handleSaveResourceEdit = () => {
-    if (!editedResourceData || !editingResource) return;
-    const finalResourceData = { ...editedResourceData };
-    if (finalResourceData.link !== editingResource.link) {
-        finalResourceData.iconUrl = getFaviconUrl(finalResourceData.link || '');
-    }
-    setResources(prev => prev.map(res => res.id === editingResource.id ? { ...res, ...finalResourceData } as Resource : res));
-    setEditingResource(null);
-    toast({ title: 'Success', description: 'Resource updated.' });
+    // This is a simplified handler. Ideally, it would open a modal in the resources page.
+    router.push('/resources');
   };
 
   const handleUnlinkItem = (type: 'upskill' | 'deepwork' | 'resource', idToUnlink: string) => {
@@ -1975,140 +1891,68 @@ function DeepWorkPageContent() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
             
             <aside className="lg:col-span-1 space-y-6">
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between gap-2">
-                      <CardTitle className="flex items-center gap-2 text-lg text-primary">
-                        <Folder /> Topic Library
-                      </CardTitle>
-                      <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <FilterIcon className="h-4 w-4" />
-                              </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                              <DropdownMenuCheckboxItem
-                                  checked={visibilityFilters.has('intention')}
-                                  onCheckedChange={() => handleVisibilityFilterChange('intention')}
-                              >
-                                  <Lightbulb className="mr-2 h-4 w-4 text-amber-500" />
-                                  <span>Intentions</span>
-                              </DropdownMenuCheckboxItem>
-                              <DropdownMenuCheckboxItem
-                                  checked={visibilityFilters.has('objective')}
-                                  onCheckedChange={() => handleVisibilityFilterChange('objective')}
-                              >
-                                  <Flag className="mr-2 h-4 w-4 text-green-500" />
-                                  <span>Objectives</span>
-                              </DropdownMenuCheckboxItem>
-                              <DropdownMenuCheckboxItem
-                                  checked={visibilityFilters.has('action')}
-                                  onCheckedChange={() => handleVisibilityFilterChange('action')}
-                              >
-                                  <Bolt className="mr-2 h-4 w-4 text-blue-500" />
-                                  <span>Actions</span>
-                              </DropdownMenuCheckboxItem>
-                              <DropdownMenuCheckboxItem
-                                  checked={visibilityFilters.has('standalone')}
-                                  onCheckedChange={() => handleVisibilityFilterChange('standalone')}
-                              >
-                                  <Focus className="mr-2 h-4 w-4 text-purple-500" />
-                                  <span>Standalone</span>
-                              </DropdownMenuCheckboxItem>
-                          </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  <CardDescription>Organize your focus areas by topic.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleAddTopic} className="flex gap-2 mb-4">
-                    <Input value={newTopicName} onChange={e => setNewTopicName(e.target.value)} placeholder="New Topic" />
-                    <Button size="icon" type="submit"><PlusCircle className="h-4 w-4" /></Button>
-                  </form>
-                  <div className="space-y-2">
-                    {topicsWithFocusAreas.map(([topic, focusAreas]) => {
-                      const isCollapsed = !expandedTopics.has(topic);
-                      // Hide topics that become empty after filtering, unless they are in the metadata
-                      if (focusAreas.length === 0 && !deepWorkTopicMetadata[topic]) {
-                        return null;
-                      }
-                      return (
-                      <div key={topic}>
-                        <div 
-                          className="group flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer" 
-                          onClick={() => toggleTopicExpansion(topic)}
-                          onContextMenu={(e) => handleContextMenu(e, topic)}
-                        >
-                          <div className="flex items-center gap-2 min-w-0 flex-grow">
-                            <ChevronDown className={cn("h-4 w-4 transition-transform", isCollapsed && "-rotate-90")} />
-                            <Folder className="h-4 w-4 flex-shrink-0 text-primary/80" />
-                            <h4 className="font-semibold text-sm truncate">{topic}</h4>
-                          </div>
-                        </div>
-                        {!isCollapsed && (
-                          <ul className="space-y-1 pl-4 border-l-2 border-muted ml-4">
-                              {focusAreas.sort((a,b) => a.name.localeCompare(b.name)).map(def => {
-                                const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
-                                const isLinkedAsChild = linkedDeepWorkChildIds.has(def.id);
-                                
-                                const isIntention = isParent && !isLinkedAsChild;
-                                const isObjective = isParent && isLinkedAsChild;
-                                const isStandalone = !isParent && !isLinkedAsChild;
-                                const isAction = !isParent && isLinkedAsChild;
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg text-primary">
+                            <BrainCircuit /> Skill Library
+                        </CardTitle>
+                        <CardDescription>Select a skill to create tasks.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Select value={selectedDomainId || ''} onValueChange={setSelectedDomainId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select a Skill Domain..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {skillDomains.map(domain => (
+                                    <SelectItem key={domain.id} value={domain.id}>{domain.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
 
-                                const calculatedEst = calculateTotalEstimate(def);
-                                const estDuration = isParent ? calculatedEst : def.estimatedDuration;
-
-                                return (
-                                  <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted" onContextMenu={(e) => handleFocusAreaContextMenu(e, def)}>
-                                      <>
-                                        <div className="flex items-center gap-2 flex-grow min-w-0">
-                                          {isIntention ? (
-                                            <Lightbulb className="h-4 w-4 flex-shrink-0 text-amber-500" />
-                                          ) : isObjective ? (
-                                            <Flag className="h-4 w-4 flex-shrink-0 text-green-500" />
-                                          ) : isStandalone ? (
-                                            <Focus className="h-4 w-4 flex-shrink-0 text-purple-500" />
-                                          ) : (
-                                            <Bolt className="h-4 w-4 flex-shrink-0 text-blue-500" />
-                                          )}
-                                          <span className="truncate cursor-pointer" onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} title={`View details for ${def.name}`}>{def.name}</span>
-                                          {def.isReadyForBranding && <Share2 className="h-3 w-3 text-primary flex-shrink-0" title="Ready for Branding" />}
-                                          {estDuration && estDuration > 0 && <Badge variant="secondary" className="text-xs ml-auto">{formatDuration(estDuration)}</Badge>}
-                                        </div>
-                                        <div className='hidden items-center flex-shrink-0 group-hover:flex'>
-                                          <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openMindMapFor(def.id)}>
-                                                        <GitMerge className="h-4 w-4" />
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent>View Mind Map</TooltipContent>
-                                            </Tooltip>
-                                            <Tooltip>
-                                              <TooltipTrigger asChild>
-                                                <span tabIndex={isParent ? 0 : -1}>
-                                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => !isParent && handleAddTaskToSession(def)} disabled={isParent}>
-                                                    <PlusCircle className="h-4 w-4" />
-                                                  </Button>
-                                                </span>
-                                              </TooltipTrigger>
-                                              <TooltipContent>{isParent ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent>
-                                            </Tooltip>
-                                          </TooltipProvider>
-                                        </div>
-                                      </>
-                                  </li>
-                                )})}
-                          </ul>
+                        {selectedDomainId && (
+                           <div className="mt-4 space-y-2 max-h-[calc(100vh-30rem)] overflow-y-auto">
+                           <Accordion type="multiple" className="w-full">
+                               {coreSkills.filter(cs => cs.domainId === selectedDomainId).map(coreSkill => (
+                                   <AccordionItem value={coreSkill.id} key={coreSkill.id}>
+                                       <AccordionTrigger className="text-sm font-semibold">
+                                           <div className="flex items-center gap-2">
+                                               {coreSkill.type === 'Foundation' ? <Blocks className="h-4 w-4" /> : coreSkill.type === 'Professionalism' ? <Sprout className="h-4 w-4" /> : <BrainCircuit className="h-4 w-4" />}
+                                               {coreSkill.name}
+                                           </div>
+                                       </AccordionTrigger>
+                                       <AccordionContent>
+                                           <Accordion type="multiple" className="w-full">
+                                               {coreSkill.skillAreas.map(skillArea => (
+                                                   <AccordionItem value={skillArea.id} key={skillArea.id} className="border-b-0">
+                                                       <AccordionTrigger className="text-xs font-medium pl-2 hover:no-underline">
+                                                         {skillArea.name}
+                                                       </AccordionTrigger>
+                                                       <AccordionContent className="pl-4">
+                                                           {skillArea.microSkills.map(microSkill => (
+                                                               <AccordionItem key={microSkill.id} value={microSkill.id} className="border-b-0">
+                                                                   <AccordionTrigger className="text-xs py-2 hover:no-underline font-normal text-muted-foreground">
+                                                                      {microSkill.name}
+                                                                   </AccordionTrigger>
+                                                                   <AccordionContent className="pl-4 pt-2">
+                                                                     <Button className="w-full h-8" variant="outline" onClick={() => handleOpenNewFocusAreaModal(microSkill.name)}>
+                                                                       <PlusCircle className="h-4 w-4 mr-2" /> New Focus Area
+                                                                     </Button>
+                                                                   </AccordionContent>
+                                                               </AccordionItem>
+                                                           ))}
+                                                       </AccordionContent>
+                                                   </AccordionItem>
+                                               ))}
+                                           </Accordion>
+                                       </AccordionContent>
+                                   </AccordionItem>
+                               ))}
+                           </Accordion>
+                       </div>
                         )}
-                      </div>
-                    )})}
-                  </div>
-                </CardContent>
-              </Card>
+                    </CardContent>
+                </Card>
               {selectedFocusArea && (
                   <Card>
                       <CardHeader className="flex flex-row items-center justify-between pb-2">

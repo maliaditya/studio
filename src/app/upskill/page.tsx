@@ -8,12 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, GitMerge, Clock, Unlink, Flashlight, Focus, Frame, Lightbulb, PictureInPicture, GripVertical, Flag, Bolt, Code, MessageSquare } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, GitMerge, Clock, Unlink, Flashlight, Focus, Frame, Lightbulb, PictureInPicture, GripVertical, Flag, Bolt, Code, MessageSquare, BrainCircuit, Blocks, Sprout } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, getISOWeek, isMonday, getYear, parseISO, differenceInDays } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, TopicGoal } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, TopicGoal, SkillDomain, CoreSkill } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { AuthGuard } from '@/components/AuthGuard';
@@ -36,6 +36,7 @@ import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useRouter } from 'next/navigation';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 interface PopupState {
   resourceId: string;
@@ -444,13 +445,13 @@ function UpskillPageContent() {
     upskillDefinitions, setUpskillDefinitions,
     topicGoals, setTopicGoals,
     resources, setResources, resourceFolders,
-    setFloatingVideoUrl
+    setFloatingVideoUrl,
+    skillDomains,
+    coreSkills,
   } = useAuth();
   const router = useRouter();
 
-  const [newTopicName, setNewTopicName] = useState('');
-  const [newTopicGoalType, setNewTopicGoalType] = useState<'pages' | 'hours'>('pages');
-  const [newTopicGoalValue, setNewTopicGoalValue] = useState('');
+  const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
   
   const [editingSubtopic, setEditingSubtopic] = useState<ExerciseDefinition | null>(null);
   const [editedSubtopicData, setEditedSubtopicData] = useState<Partial<ExerciseDefinition> & { estHours?: string; estMinutes?: string }>({});
@@ -501,6 +502,11 @@ function UpskillPageContent() {
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
 
+  const handleOpenNewFocusAreaModal = (topic: string) => {
+    setNewSubtopicParentTopic(topic);
+    setIsNewSubtopicModalOpen(true);
+  };
+  
   const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
       setOpenPopups(prev => {
           const newPopups = new Map(prev);
@@ -658,37 +664,6 @@ function UpskillPageContent() {
     return total;
   }, [upskillDefinitions]);
 
-
-  const topicsWithSubtopics = useMemo(() => {
-    const effectiveFilters = visibilityFilters.size === 0 ? new Set<never>() : visibilityFilters;
-    const visibleDefinitions = upskillDefinitions.filter(def => {
-        if(def.name === 'placeholder') return false;
-        
-        const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-        const isChild = linkedUpskillChildIds.has(def.id);
-
-        const isCuriosity = isParent && !isChild;
-        const isObjective = isParent && isChild;
-        const isVisualization = !isParent && isChild;
-        const isStandalone = !isParent && !isChild;
-
-        if (effectiveFilters.has('curiosity') && isCuriosity) return true;
-        if (effectiveFilters.has('objective') && isObjective) return true;
-        if (effectiveFilters.has('visualization') && isVisualization) return true;
-        if (effectiveFilters.has('standalone') && isStandalone) return true;
-        
-        return false;
-    });
-    
-    const grouped: { [key: string]: ExerciseDefinition[] } = {};
-    visibleDefinitions.forEach(def => {
-        if (!grouped[def.category]) grouped[def.category] = [];
-        grouped[def.category].push(def);
-    });
-
-    return allKnownTopics.map(topic => [topic, grouped[topic] || []] as [string, ExerciseDefinition[]]);
-  }, [allKnownTopics, upskillDefinitions, linkedUpskillChildIds, visibilityFilters]);
-  
   const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefinition) => {
     if (!definition) return 0;
     const visited = new Set<string>();
@@ -820,20 +795,6 @@ function UpskillPageContent() {
     });
   };
 
-  const handleAddTopic = (e: FormEvent) => {
-    e.preventDefault();
-    if (!newTopicName.trim()) { toast({ title: "Error", description: "Topic name cannot be empty.", variant: "destructive" }); return; }
-    const topic = newTopicName.trim();
-    if (topicsWithSubtopics.some(([t]) => t.toLowerCase() === topic.toLowerCase())) { toast({ title: "Error", description: "This topic already exists.", variant: "destructive" }); return; }
-    const goalVal = parseInt(newTopicGoalValue, 10);
-    if (isNaN(goalVal) || goalVal <= 0) { toast({ title: "Invalid Goal", description: "Goal value must be a positive number.", variant: "destructive" }); return; }
-    setTopicGoals(prev => ({ ...prev, [topic]: { goalType: newTopicGoalType, goalValue: goalVal } }));
-    const dummyDef: ExerciseDefinition = { id: `topic_placeholder_${Date.now()}`, name: 'placeholder', category: topic as ExerciseCategory };
-    setUpskillDefinitions(prev => prev.filter(d => d.name !== 'placeholder').concat(dummyDef));
-    setNewTopicName(''); setNewTopicGoalValue('');
-    toast({ title: "Topic Created", description: `"${topic}" has been added.` });
-  };
-
   const handleCreateSubtopic = () => {
     if (!newSubtopicParentTopic || !newSubtopicData.name.trim()) {
         toast({ title: "Error", description: "Name is required.", variant: "destructive" });
@@ -890,13 +851,6 @@ function UpskillPageContent() {
 
   const handleStartEditSubtopic = (def: ExerciseDefinition) => {
     setEditingSubtopic(def);
-    const hours = Math.floor((def.estimatedDuration || 0) / 60);
-    const minutes = (def.estimatedDuration || 0) % 60;
-    setEditedSubtopicData({
-      ...def,
-      estHours: hours > 0 ? String(hours) : '',
-      estMinutes: minutes > 0 ? String(minutes) : ''
-    });
   };
 
   const handleSaveSubtopicEdit = () => {
@@ -1175,7 +1129,6 @@ function UpskillPageContent() {
         return;
     }
     
-    // Ensure both items are direct children of the selected subtopic
     const parentChildrenIds = new Set([
         ...(selectedSubtopic.linkedUpskillIds || []),
         ...(selectedSubtopic.linkedResourceIds || []),
@@ -1185,33 +1138,28 @@ function UpskillPageContent() {
         toast({ title: "Link Error", description: "Can only link sibling items within the same subtopic.", variant: "destructive" });
         return;
     }
-
-    // Determine the type of the dragged and target items
-    const isDraggedUpskill = upskillDefinitions.some(d => d.id === draggedId);
+    
     const isDraggedResource = resources.some(d => d.id === draggedId);
     const isTargetResource = resources.some(d => d.id === targetId);
     
-    // Prevent linking anything to a resource card
     if (isTargetResource) {
         toast({ title: "Invalid Link", description: "Resources cannot be parents. Drag items onto learning tasks instead.", variant: "destructive" });
         return;
     }
   
-    // Update the parent (target) task
     setUpskillDefinitions(prev => prev.map(def => {
         if (def.id === targetId) { // targetDef is always an upskill task
             let updatedDef = { ...def };
-            if (isDraggedUpskill) {
-                updatedDef.linkedUpskillIds = [...(updatedDef.linkedUpskillIds || []), draggedId];
-            } else if (isDraggedResource) {
+            if (isDraggedResource) {
                 updatedDef.linkedResourceIds = [...(updatedDef.linkedResourceIds || []), draggedId];
+            } else { // Dragged an upskill item
+                updatedDef.linkedUpskillIds = [...(updatedDef.linkedUpskillIds || []), draggedId];
             }
             return updatedDef;
         }
         return def;
     }));
     
-    // Remove the dragged item from the main subtopic's list
     const updatedParent = {
         ...selectedSubtopic,
         linkedUpskillIds: (selectedSubtopic.linkedUpskillIds || []).filter(id => id !== draggedId),
@@ -1237,94 +1185,64 @@ function UpskillPageContent() {
             <aside className="lg:col-span-1 space-y-6">
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between gap-2">
-                      <CardTitle className="flex items-center gap-2 text-lg text-primary"><Folder /> Topic Library</CardTitle>
-                      <DropdownMenu>
-                          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><FilterIcon className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                              <DropdownMenuCheckboxItem checked={visibilityFilters.has('curiosity')} onCheckedChange={() => handleVisibilityFilterChange('curiosity')}><Flashlight className="mr-2 h-4 w-4 text-amber-500" /><span>Curiosities</span></DropdownMenuCheckboxItem>
-                              <DropdownMenuCheckboxItem checked={visibilityFilters.has('objective')} onCheckedChange={() => handleVisibilityFilterChange('objective')}><Flag className="mr-2 h-4 w-4 text-green-500" /><span>Objectives</span></DropdownMenuCheckboxItem>
-                              <DropdownMenuCheckboxItem checked={visibilityFilters.has('visualization')} onCheckedChange={() => handleVisibilityFilterChange('visualization')}><Frame className="mr-2 h-4 w-4 text-blue-500" /><span>Visualizations</span></DropdownMenuCheckboxItem>
-                              <DropdownMenuCheckboxItem checked={visibilityFilters.has('standalone')} onCheckedChange={() => handleVisibilityFilterChange('standalone')}><Focus className="mr-2 h-4 w-4 text-purple-500" /><span>Standalone</span></DropdownMenuCheckboxItem>
-                          </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  <CardDescription>Organize your learning tasks by topic.</CardDescription>
+                    <CardTitle className="flex items-center gap-2 text-lg text-primary">
+                        <BrainCircuit /> Skill Library
+                    </CardTitle>
+                    <CardDescription>Select a skill to create tasks.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handleAddTopic} className="space-y-3 p-3 border rounded-md mb-4">
-                      <Input type="text" placeholder="New Topic" value={newTopicName} onChange={(e) => setNewTopicName(e.target.value)} list="topics-datalist" aria-label="New topic name" className="h-10 text-sm" />
-                      <datalist id="topics-datalist">{topicsWithSubtopics.map(([topic]) => <option key={topic} value={topic} />)}</datalist>
-                      <AnimatePresence>
-                        {newTopicName.trim() && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="space-y-3 overflow-hidden"
-                          >
-                            <div>
-                                <Label className="text-xs text-muted-foreground">Set a Goal for this New Topic</Label>
-                                <div className="flex gap-2 items-center mt-1">
-                                    <RadioGroup value={newTopicGoalType} onValueChange={(v) => setNewTopicGoalType(v as 'pages' | 'hours')} className="flex gap-4">
-                                        <div className="flex items-center space-x-2"><RadioGroupItem value="pages" id="type-pages-new" /><Label htmlFor="type-pages-new" className="font-normal">Pages</Label></div>
-                                        <div className="flex items-center space-x-2"><RadioGroupItem value="hours" id="type-hours-new" /><Label htmlFor="type-hours-new" className="font-normal">Hours</Label></div>
-                                    </RadioGroup>
-                                    <Input type="number" placeholder="Total" value={newTopicGoalValue} onChange={(e) => setNewTopicGoalValue(e.target.value)} aria-label="Goal value" className="h-9" />
-                                </div>
-                            </div>
-                            <Button type="submit" size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Add Topic</Button>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                  </form>
-                  <div className="space-y-2 max-h-[calc(100vh-30rem)] overflow-y-auto pr-2">
-                    {topicsWithSubtopics.map(([topic, subtopics]) => {
-                      const isCollapsed = !expandedTopics.has(topic);
-                      if (subtopics.length === 0 && !topicGoals[topic]) return null;
-                      return (
-                      <div key={topic}>
-                        <div className="group flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer" onClick={() => toggleTopicExpansion(topic)} onContextMenu={(e) => handleContextMenu(e, topic)}>
-                          <div className="flex items-center gap-2 min-w-0 flex-grow">
-                            <ChevronDown className={cn("h-4 w-4 transition-transform", isCollapsed && "-rotate-90")} />
-                            <Folder className="h-4 w-4 flex-shrink-0 text-primary/80" />
-                            <div className='truncate'>
-                              <h4 className="font-semibold text-sm truncate">{topic}</h4>
-                              {topicGoals[topic] && <p className="text-xs text-muted-foreground">Goal: {topicGoals[topic].goalValue} {topicGoals[topic].goalType}</p>}
-                            </div>
-                          </div>
-                        </div>
-                        {!isCollapsed && (
-                          <ul className="space-y-1 pl-4 border-l-2 border-muted ml-4">
-                              {subtopics.sort((a,b) => a.name.localeCompare(b.name)).map(def => {
-                                const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-                                const isChild = linkedUpskillChildIds.has(def.id);
-                                const nodeType = isParent && !isChild ? 'Curiosity' : isParent && isChild ? 'Objective' : !isParent && isChild ? 'Visualization' : 'Standalone';
-                                const estDuration = isParent ? calculateTotalEstimate(def) : def.estimatedDuration;
-                                
-                                return (
-                                  <li key={def.id} className="group flex items-center justify-between p-1.5 rounded-md hover:bg-muted" onContextMenu={(e) => handleSubtopicContextMenu(e, def)}>
-                                      <div className="flex items-center gap-2 flex-grow min-w-0">
-                                        {nodeType === 'Curiosity' ? <Flashlight className="h-4 w-4 flex-shrink-0 text-amber-500" />
-                                         : nodeType === 'Objective' ? <Flag className="h-4 w-4 flex-shrink-0 text-green-500" />
-                                         : nodeType === 'Visualization' ? <Frame className="h-4 w-4 flex-shrink-0 text-blue-500" />
-                                         : <Focus className="h-4 w-4 flex-shrink-0 text-purple-500" />}
-                                        <span className="truncate cursor-pointer" onClick={() => { setSelectedSubtopic(def); setViewMode('library'); }}>{def.name}</span>
-                                        {estDuration && estDuration > 0 && <Badge variant="secondary" className="text-xs ml-auto">{formatMinutes(estDuration)}</Badge>}
-                                      </div>
-                                      <div className='hidden items-center flex-shrink-0 group-hover:flex'>
-                                          <TooltipProvider>
-                                            <Tooltip><TooltipTrigger asChild><span tabIndex={nodeType === 'Visualization' ? 0 : -1}><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => nodeType === 'Visualization' && handleAddTaskToSession(def)} disabled={nodeType !== 'Visualization'}><PlusCircle className="h-4 w-4" /></Button></span></TooltipTrigger><TooltipContent>{nodeType === 'Visualization' ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent></Tooltip>
-                                          </TooltipProvider>
-                                      </div>
-                                  </li>
-                                )})}
-                          </ul>
-                        )}
-                      </div>
-                    )})}
-                  </div>
+                    <Select value={selectedDomainId || ''} onValueChange={setSelectedDomainId}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select a Skill Domain..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {skillDomains.map(domain => (
+                                <SelectItem key={domain.id} value={domain.id}>{domain.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    {selectedDomainId && (
+                       <div className="mt-4 space-y-2 max-h-[calc(100vh-30rem)] overflow-y-auto">
+                       <Accordion type="multiple" className="w-full">
+                           {coreSkills.filter(cs => cs.domainId === selectedDomainId).map(coreSkill => (
+                               <AccordionItem value={coreSkill.id} key={coreSkill.id}>
+                                   <AccordionTrigger className="text-sm font-semibold">
+                                       <div className="flex items-center gap-2">
+                                           {coreSkill.type === 'Foundation' ? <Blocks className="h-4 w-4" /> : coreSkill.type === 'Professionalism' ? <Sprout className="h-4 w-4" /> : <BrainCircuit className="h-4 w-4" />}
+                                           {coreSkill.name}
+                                       </div>
+                                   </AccordionTrigger>
+                                   <AccordionContent>
+                                       <Accordion type="multiple" className="w-full">
+                                           {coreSkill.skillAreas.map(skillArea => (
+                                               <AccordionItem value={skillArea.id} key={skillArea.id} className="border-b-0">
+                                                   <AccordionTrigger className="text-xs font-medium pl-2 hover:no-underline">
+                                                     {skillArea.name}
+                                                   </AccordionTrigger>
+                                                   <AccordionContent className="pl-4">
+                                                       {skillArea.microSkills.map(microSkill => (
+                                                           <AccordionItem key={microSkill.id} value={microSkill.id} className="border-b-0">
+                                                               <AccordionTrigger className="text-xs py-2 hover:no-underline font-normal text-muted-foreground">
+                                                                  {microSkill.name}
+                                                               </AccordionTrigger>
+                                                               <AccordionContent className="pl-4 pt-2">
+                                                                 <Button className="w-full h-8" variant="outline" onClick={() => handleOpenNewFocusAreaModal(microSkill.name)}>
+                                                                   <PlusCircle className="h-4 w-4 mr-2" /> New Task
+                                                                 </Button>
+                                                               </AccordionContent>
+                                                           </AccordionItem>
+                                                       ))}
+                                                   </AccordionContent>
+                                               </AccordionItem>
+                                           ))}
+                                       </Accordion>
+                                   </AccordionContent>
+                               </AccordionItem>
+                           ))}
+                       </Accordion>
+                   </div>
+                    )}
                 </CardContent>
               </Card>
               {selectedSubtopic && (
