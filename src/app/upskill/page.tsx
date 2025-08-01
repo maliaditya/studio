@@ -1155,7 +1155,7 @@ function UpskillPageContent() {
                                                                         <Button 
                                                                             variant="ghost" 
                                                                             size="icon" 
-                                                                            className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                                                            className="h-6 w-6 flex-shrink-0"
                                                                             onClick={(e) => { e.stopPropagation(); handleOpenNewSubtopicModal(microSkill.name); }}
                                                                         >
                                                                             <PlusCircle className="h-4 w-4" />
