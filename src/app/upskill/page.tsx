@@ -1086,7 +1086,7 @@ function UpskillPageContent() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
             
             <aside className="lg:col-span-1 space-y-6">
-                <SkillLibrary
+                 <SkillLibrary
                     pageType="upskill"
                     selectedMicroSkill={selectedMicroSkill}
                     onSelectMicroSkill={setSelectedMicroSkill}
