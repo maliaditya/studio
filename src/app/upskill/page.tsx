@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, getISOWeek, isMonday, getYear, parseISO, differenceInDays } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, TopicGoal, SkillDomain, CoreSkill } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, TopicGoal, SkillDomain, CoreSkill, MicroSkill } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { AuthGuard } from '@/components/AuthGuard';
@@ -36,6 +36,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useRouter } from 'next/navigation';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { SkillLibrary } from '@/components/SkillLibrary';
 
 interface PopupState {
   resourceId: string;
@@ -465,8 +466,6 @@ function UpskillPageContent() {
     coreSkills,
   } = useAuth();
   const router = useRouter();
-
-  const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
   
   const [editingSubtopic, setEditingSubtopic] = useState<ExerciseDefinition | null>(null);
   const [editedSubtopicData, setEditedSubtopicData] = useState<Partial<ExerciseDefinition> & { estHours?: string; estMinutes?: string }>({});
@@ -500,10 +499,11 @@ function UpskillPageContent() {
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
 
-  const [selectedMicroSkillName, setSelectedMicroSkillName] = useState<string | null>(null);
+  const [selectedMicroSkill, setSelectedMicroSkill] = useState<MicroSkill | null>(null);
+
 
   const handleOpenNewSubtopicModal = () => {
-    if (!selectedMicroSkillName) {
+    if (!selectedMicroSkill) {
         toast({ title: "Error", description: "Please select a micro-skill first.", variant: "destructive" });
         return;
     }
@@ -739,7 +739,7 @@ function UpskillPageContent() {
   };
 
   const handleCreateSubtopic = () => {
-    if (!selectedMicroSkillName || !newSubtopicData.name.trim()) {
+    if (!selectedMicroSkill || !newSubtopicData.name.trim()) {
         toast({ title: "Error", description: "Name is required.", variant: "destructive" });
         return;
     }
@@ -751,7 +751,7 @@ function UpskillPageContent() {
     const newDef: ExerciseDefinition = { 
         id: `def_${Date.now()}_${Math.random()}`, 
         name: newSubtopicData.name.trim(), 
-        category: selectedMicroSkillName as ExerciseCategory,
+        category: selectedMicroSkill.name as ExerciseCategory,
         description: newSubtopicData.description.trim(),
         link: newSubtopicData.link.trim(),
         iconUrl: getFaviconUrl(newSubtopicData.link.trim()),
@@ -1086,69 +1086,14 @@ function UpskillPageContent() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
             
             <aside className="lg:col-span-1 space-y-6">
-              <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg text-primary">
-                        <BrainCircuit /> Skill Library
-                    </CardTitle>
-                    <CardDescription>Select a skill to create tasks.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Select value={selectedDomainId || ''} onValueChange={setSelectedDomainId}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select a Skill Domain..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {skillDomains.map(domain => (
-                                <SelectItem key={domain.id} value={domain.id}>{domain.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-
-                    {selectedDomainId && (
-                       <div className="mt-4 space-y-2 max-h-[calc(100vh-30rem)] overflow-y-auto">
-                       <Accordion type="multiple" className="w-full">
-                           {coreSkills
-                             .filter(cs => cs.domainId === selectedDomainId && (cs.skillAreas?.length ?? 0) > 0)
-                             .map(coreSkill => (
-                               <AccordionItem value={coreSkill.id} key={coreSkill.id}>
-                                   <AccordionTrigger className="text-sm font-semibold">
-                                       <div className="flex items-center gap-2">
-                                           {coreSkill.type === 'Foundation' ? <Blocks className="h-4 w-4" /> : coreSkill.type === 'Professionalism' ? <Sprout className="h-4 w-4" /> : <BrainCircuit className="h-4 w-4" />}
-                                           {coreSkill.name}
-                                       </div>
-                                   </AccordionTrigger>
-                                   <AccordionContent>
-                                      <Accordion type="multiple" className="w-full">
-                                        {coreSkill.skillAreas.map(skillArea => (
-                                          <AccordionItem value={skillArea.id} key={skillArea.id}>
-                                            <AccordionTrigger className="text-sm font-semibold text-muted-foreground pl-2">{skillArea.name}</AccordionTrigger>
-                                            <AccordionContent className="pl-4">
-                                              {skillArea.microSkills.map(microSkill => (
-                                                <div key={microSkill.id} className="space-y-1 py-1">
-                                                    <button 
-                                                      onClick={() => setSelectedMicroSkillName(microSkill.name)}
-                                                      className={cn(
-                                                        "w-full text-left p-1 rounded-md text-sm font-medium hover:bg-muted",
-                                                        selectedMicroSkillName === microSkill.name && "bg-muted text-primary"
-                                                      )}
-                                                    >
-                                                      {microSkill.name}
-                                                    </button>
-                                                </div>
-                                              ))}
-                                            </AccordionContent>
-                                          </AccordionItem>
-                                        ))}
-                                      </Accordion>
-                                   </AccordionContent>
-                               </AccordionItem>
-                           ))}
-                       </Accordion>
-                   </div>
-                    )}
-                </CardContent>
-              </Card>
+                <SkillLibrary
+                    pageType="upskill"
+                    selectedMicroSkill={selectedMicroSkill}
+                    onSelectMicroSkill={setSelectedMicroSkill}
+                    definitions={upskillDefinitions}
+                    onSelectFocusArea={setSelectedSubtopic}
+                    onOpenNewFocusArea={handleOpenNewSubtopicModal}
+                />
               {selectedSubtopic && (
                   <Card>
                       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -1175,13 +1120,8 @@ function UpskillPageContent() {
             <section aria-labelledby="main-panel-heading" className="lg:col-span-3 space-y-6">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between p-4">
-                        <div className="flex-grow"><CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">{viewMode === 'session' ? <ListChecks /> : <Library />}{viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedMicroSkillName || 'Select a micro-skill'}`}</CardTitle></div>
+                        <div className="flex-grow"><CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">{viewMode === 'session' ? <ListChecks /> : <Library />}{viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedMicroSkill?.name || 'Select a micro-skill'}`}</CardTitle></div>
                         <div className='flex items-center gap-2 flex-shrink-0'>
-                          {viewMode === 'library' && selectedMicroSkillName && (
-                            <Button size="sm" onClick={handleOpenNewSubtopicModal}>
-                                <PlusCircle className="mr-2 h-4 w-4" /> New Task
-                            </Button>
-                           )}
                           <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
                           <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('library')}>Library</Button>
                           <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent></Popover>
@@ -1211,7 +1151,7 @@ function UpskillPageContent() {
                         ) : (
                             <ScrollArea className="h-[calc(100vh-16rem)] pr-2">
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {upskillDefinitions.filter(def => def.category === selectedMicroSkillName).map(def => (
+                                    {upskillDefinitions.filter(def => def.category === selectedMicroSkill?.name).map(def => (
                                         <LinkedUpskillItem
                                             key={def.id}
                                             upskillDef={def}
@@ -1244,7 +1184,7 @@ function UpskillPageContent() {
                 <DialogHeader>
                     <DialogTitle>Create New Task</DialogTitle>
                     <DialogDescription>
-                        This will create a new standalone task under the "{selectedMicroSkillName}" micro-skill.
+                        This will create a new standalone task under the "{selectedMicroSkill?.name}" micro-skill.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">

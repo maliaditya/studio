@@ -1,13 +1,13 @@
 
 "use client";
 
-import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare, BrainCircuit, Blocks, Sprout, Frame } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare, BrainCircuit, Blocks, Sprout } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +68,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useRouter } from 'next/navigation';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { SkillLibrary } from '@/components/SkillLibrary';
+
 
 interface PopupState {
   resourceId: string;
@@ -766,7 +768,6 @@ function DeepWorkPageContent() {
   
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
 
-  const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
   const [progressModalConfig, setProgressModalConfig] = useState<{
@@ -804,7 +805,7 @@ function DeepWorkPageContent() {
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [mindMapRootFocusAreaId, setMindMapRootFocusAreaId] = useState<string | null>(null);
 
-  const [selectedMicroSkillName, setSelectedMicroSkillName] = useState<string | null>(null);
+  const [selectedMicroSkill, setSelectedMicroSkill] = useState<MicroSkill | null>(null);
 
 
   const allKnownTopics = useMemo(() => {
@@ -1055,12 +1056,12 @@ function DeepWorkPageContent() {
   };
 
   const handleCreateFocusArea = () => {
-    if (!selectedMicroSkillName || !newFocusAreaData.name.trim()) {
+    if (!selectedMicroSkill || !newFocusAreaData.name.trim()) {
       toast({ title: "Error", description: "Focus area name cannot be empty.", variant: "destructive" });
       return;
     }
 
-    if (deepWorkDefinitions.some(def => def.name.toLowerCase() === newFocusAreaData.name.trim().toLowerCase() && def.category.toLowerCase() === selectedMicroSkillName.toLowerCase())) {
+    if (deepWorkDefinitions.some(def => def.name.toLowerCase() === newFocusAreaData.name.trim().toLowerCase() && def.category.toLowerCase() === selectedMicroSkill.name.toLowerCase())) {
         toast({ title: "Error", description: "This focus area already exists for this topic.", variant: "destructive" });
         return;
     }
@@ -1072,7 +1073,7 @@ function DeepWorkPageContent() {
     const newDef: ExerciseDefinition = { 
         id: `def_${Date.now()}_${Math.random()}`, 
         name: newFocusAreaData.name.trim(),
-        category: selectedMicroSkillName as ExerciseCategory,
+        category: selectedMicroSkill.name as ExerciseCategory,
         isReadyForBranding: false,
         sharingStatus: { twitter: false, linkedin: false, devto: false },
         estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
@@ -1080,18 +1081,9 @@ function DeepWorkPageContent() {
 
     setDeepWorkDefinitions(prev => [...prev, newDef]);
 
-    if (selectedDomainId) {
-        const selectedDomain = skillDomains.find(d => d.id === selectedDomainId);
-        if (selectedDomain) {
-            const microSkillsInDomain = coreSkills.filter(cs => cs.domainId === selectedDomainId).flatMap(cs => cs.skillAreas).flatMap(sa => sa.microSkills);
-            if (microSkillsInDomain.some(ms => ms.name === selectedMicroSkillName)) {
-            }
-        }
-    }
-
     setNewFocusAreaData({ name: '', hours: '', minutes: '' });
     setIsNewFocusAreaModalOpen(false);
-    toast({ title: "Success", description: `Focus Area "${newDef.name}" added to ${selectedMicroSkillName}.` });
+    toast({ title: "Success", description: `Focus Area "${newDef.name}" added to ${selectedMicroSkill.name}.` });
   };
 
   const handleDeleteExerciseDefinition = (id: string) => {
@@ -1622,69 +1614,20 @@ function DeepWorkPageContent() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
             
             <aside className="lg:col-span-1 space-y-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg text-primary">
-                            <BrainCircuit /> Skill Library
-                        </CardTitle>
-                        <CardDescription>Select a skill to create tasks.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Select value={selectedDomainId || ''} onValueChange={setSelectedDomainId}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a Skill Domain..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {skillDomains.map(domain => (
-                                    <SelectItem key={domain.id} value={domain.id}>{domain.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        {selectedDomainId && (
-                           <div className="mt-4 space-y-2 max-h-[calc(100vh-30rem)] overflow-y-auto">
-                           <Accordion type="multiple" className="w-full">
-                               {coreSkills
-                                 .filter(cs => cs.domainId === selectedDomainId && (cs.skillAreas?.length ?? 0) > 0)
-                                 .map(coreSkill => (
-                                   <AccordionItem value={coreSkill.id} key={coreSkill.id}>
-                                       <AccordionTrigger className="text-sm font-semibold">
-                                           <div className="flex items-center gap-2">
-                                               {coreSkill.type === 'Foundation' ? <Blocks className="h-4 w-4" /> : coreSkill.type === 'Professionalism' ? <Sprout className="h-4 w-4" /> : <BrainCircuit className="h-4 w-4" />}
-                                               {coreSkill.name}
-                                           </div>
-                                       </AccordionTrigger>
-                                       <AccordionContent>
-                                          <Accordion type="multiple" className="w-full">
-                                            {coreSkill.skillAreas.map(skillArea => (
-                                              <AccordionItem value={skillArea.id} key={skillArea.id}>
-                                                <AccordionTrigger className="text-sm font-semibold text-muted-foreground pl-2">{skillArea.name}</AccordionTrigger>
-                                                <AccordionContent className="pl-4">
-                                                  {skillArea.microSkills.map(microSkill => (
-                                                    <div key={microSkill.id} className="space-y-1 py-1">
-                                                      <button 
-                                                        onClick={() => setSelectedMicroSkillName(microSkill.name)}
-                                                        className={cn(
-                                                          "w-full text-left p-1 rounded-md text-sm font-medium hover:bg-muted",
-                                                          selectedMicroSkillName === microSkill.name && "bg-muted text-primary"
-                                                        )}
-                                                      >
-                                                        {microSkill.name}
-                                                      </button>
-                                                    </div>
-                                                  ))}
-                                                </AccordionContent>
-                                              </AccordionItem>
-                                            ))}
-                                          </Accordion>
-                                       </AccordionContent>
-                                   </AccordionItem>
-                               ))}
-                           </Accordion>
-                       </div>
-                        )}
-                    </CardContent>
-                </Card>
+                <SkillLibrary
+                    pageType="deepwork"
+                    selectedMicroSkill={selectedMicroSkill}
+                    onSelectMicroSkill={setSelectedMicroSkill}
+                    definitions={deepWorkDefinitions}
+                    onSelectFocusArea={setSelectedFocusArea}
+                    onOpenNewFocusArea={() => {
+                        if (!selectedMicroSkill) {
+                           toast({ title: "Error", description: "Please select a micro-skill first.", variant: "destructive" });
+                           return;
+                        }
+                        setIsNewFocusAreaModalOpen(true);
+                    }}
+                 />
               {selectedFocusArea && (
                   <Card>
                       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -1744,16 +1687,11 @@ function DeepWorkPageContent() {
                         <div className="flex-grow">
                             <CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">
                                 {viewMode === 'session' ? <ListChecks /> : <Library />}
-                                {viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedMicroSkillName || 'Select a micro-skill'}`}
+                                {viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedMicroSkill?.name || 'Select a micro-skill'}`}
                             </CardTitle>
                         </div>
 
                         <div className='flex items-center gap-2 flex-shrink-0'>
-                           {viewMode === 'library' && selectedMicroSkillName && (
-                              <Button size="sm" onClick={() => setIsNewFocusAreaModalOpen(true)}>
-                                  <PlusCircle className="mr-2 h-4 w-4" /> New Focus Area
-                              </Button>
-                           )}
                           <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
                           <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('library')}>Library</Button>
                           <Popover>
@@ -1794,7 +1732,7 @@ function DeepWorkPageContent() {
                         ) : (
                             <ScrollArea className="h-[calc(100vh-16rem)] pr-2">
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                  {deepWorkDefinitions.filter(def => def.category === selectedMicroSkillName).map(def => (
+                                  {deepWorkDefinitions.filter(def => def.category === selectedMicroSkill?.name).map(def => (
                                       <LinkedDeepWorkCard
                                         key={def.id}
                                         id={def.id}
@@ -1831,7 +1769,7 @@ function DeepWorkPageContent() {
                 <DialogHeader>
                     <DialogTitle>Create New Focus Area</DialogTitle>
                     <DialogDescription>
-                        This will create a new standalone focus area under the "{selectedMicroSkillName}" micro-skill.
+                        This will create a new standalone focus area under the "{selectedMicroSkill?.name}" micro-skill.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
