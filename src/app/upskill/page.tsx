@@ -287,7 +287,7 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
          <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
             <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"><GripVertical className="h-4 w-4" /></Button>
             <TooltipProvider>
-                <Tooltip><TooltipTrigger asChild><span tabIndex={nodeType === 'Visualization' ? 0 : -1}><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); nodeType === 'Visualization' && handleAddTaskToSession(upskillDef); }} disabled={nodeType !== 'Visualization'}><PlusCircle className="h-4 w-4" /></Button></span></TooltipTrigger><TooltipContent>{nodeType === 'Visualization' ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent></Tooltip>
+                <Tooltip><TooltipTrigger asChild><span tabIndex={nodeType === 'Visualization' || nodeType === 'Standalone' ? 0 : -1}><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); (nodeType === 'Visualization' || nodeType === 'Standalone') && handleAddTaskToSession(upskillDef); }} disabled={nodeType !== 'Visualization' && nodeType !== 'Standalone'}><PlusCircle className="h-4 w-4" /></Button></span></TooltipTrigger><TooltipContent>{nodeType === 'Visualization' || nodeType === 'Standalone' ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent></Tooltip>
             </TooltipProvider>
             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setSelectedSubtopic(upskillDef); setViewMode('library'); }}><ArrowRight className="h-4 w-4" /></Button>
             <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => handleViewProgress(upskillDef)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => handleStartEditSubtopic(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem><DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', upskillDef.id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteSubtopic(upskillDef.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
@@ -476,7 +476,7 @@ function UpskillPageContent() {
   
   const [isLoadingPage, setIsLoadingPage] = useState(true);
 
-  const [viewMode, setViewMode] = useState<'session' | 'library'>('session');
+  const [viewMode, setViewMode] = useState<'session' | 'library'>('library');
   
   const [isManageLinksModalOpen, setIsManageLinksModalOpen] = useState(false);
   const [manageLinksConfig, setManageLinksConfig] = useState<{type: 'upskill' | 'resource', parent: ExerciseDefinition} | null>(null);

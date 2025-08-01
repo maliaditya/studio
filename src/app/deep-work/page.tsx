@@ -642,7 +642,7 @@ function LinkedDeepWorkCard({
                         </Button>
                       </span>
                     </TooltipTrigger>
-                    <TooltipContent>{nodeType === 'Action' || nodeType === 'Standalone' ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent>
+                    <TooltipContent>{nodeType === 'Action' || nodeType !== 'Standalone' ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => { setSelectedFocusArea(deepworkDef); setViewMode('library'); }} onMouseDown={(e) => e.stopPropagation()}>
@@ -765,7 +765,7 @@ function DeepWorkPageContent() {
   
   const [isLoadingPage, setIsLoadingPage] = useState(true);
   
-  const [viewMode, setViewMode] = useState<'session' | 'library'>('session');
+  const [viewMode, setViewMode] = useState<'session' | 'library'>('library');
 
   const selectedFocusArea = selectedSubtopic;
   const setSelectedFocusArea = setSelectedSubtopic;
