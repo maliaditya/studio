@@ -599,7 +599,24 @@ function LinkedDeepWorkCard({
     
     const isParent = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 || (deepworkDef.linkedUpskillIds?.length ?? 0) > 0 || (deepworkDef.linkedResourceIds?.length ?? 0) > 0;
     const isChild = linkedDeepWorkChildIds.has(deepworkDef.id);
-    const nodeType = isParent && !isChild ? 'Intention' : isParent && isChild ? 'Objective' : !isParent && isChild ? 'Action' : 'Standalone';
+    
+    const getNodeType = () => {
+        if (isParent) {
+            return isChild ? 'Objective' : 'Intention';
+        }
+        return isChild ? 'Action' : 'Standalone';
+    };
+    const nodeType = getNodeType();
+
+    const getIcon = () => {
+        switch (nodeType) {
+            case 'Intention': return <Lightbulb className="h-5 w-5 text-amber-500 flex-shrink-0" />;
+            case 'Objective': return <Flag className="h-5 w-5 text-green-500 flex-shrink-0" />;
+            case 'Action': return <Bolt className="h-5 w-5 text-blue-500 flex-shrink-0" />;
+            case 'Standalone': return <Focus className="h-5 w-5 text-purple-500 flex-shrink-0" />;
+            default: return <Briefcase className="h-5 w-5 flex-shrink-0" />;
+        }
+    };
 
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
     const estDuration = isParent ? calculatedEstimate : deepworkDef.estimatedDuration;
@@ -661,10 +678,7 @@ function LinkedDeepWorkCard({
             </div>
            <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                {nodeType === 'Intention' ? <Lightbulb className="h-5 w-5 text-amber-500 flex-shrink-0" />
-                  : nodeType === 'Objective' ? <Flag className="h-5 w-5 text-green-500 flex-shrink-0" />
-                  : nodeType === 'Action' ? <Bolt className="h-5 w-5 text-blue-500 flex-shrink-0" />
-                  : <Focus className="h-5 w-5 text-purple-500 flex-shrink-0" />}
+                {getIcon()}
                 <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={deepworkDef.name}>{deepworkDef.name}</span>
                 <Badge variant="outline" className="text-xs">{nodeType}</Badge>
               </CardTitle>
@@ -1672,16 +1686,33 @@ function DeepWorkPageContent() {
                                                                         </div>
                                                                         <AccordionContent className="pl-4 pt-2">
                                                                             <ul className="space-y-1">
-                                                                                {deepWorkDefinitions.filter(def => def.category === microSkill.name).map(def => (
-                                                                                    <li key={def.id}>
-                                                                                        <button 
-                                                                                            onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} 
-                                                                                            className={cn("text-xs w-full text-left p-1 rounded hover:bg-muted", selectedFocusArea?.id === def.id && "bg-muted font-semibold")}
-                                                                                        >
-                                                                                            {def.name}
-                                                                                        </button>
-                                                                                    </li>
-                                                                                ))}
+                                                                                {deepWorkDefinitions.filter(def => def.category === microSkill.name).map(def => {
+                                                                                    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+                                                                                    const isChild = linkedDeepWorkChildIds.has(def.id);
+                                                                                    const nodeType = isParent ? (isChild ? 'Objective' : 'Intention') : (isChild ? 'Action' : 'Standalone');
+
+                                                                                    const getIcon = () => {
+                                                                                        switch (nodeType) {
+                                                                                            case 'Intention': return <Lightbulb className="h-4 w-4 text-amber-500 flex-shrink-0" />;
+                                                                                            case 'Objective': return <Flag className="h-4 w-4 text-green-500 flex-shrink-0" />;
+                                                                                            case 'Action': return <Bolt className="h-4 w-4 text-blue-500 flex-shrink-0" />;
+                                                                                            case 'Standalone': return <Focus className="h-4 w-4 text-purple-500 flex-shrink-0" />;
+                                                                                            default: return <Briefcase className="h-4 w-4 flex-shrink-0" />;
+                                                                                        }
+                                                                                    };
+
+                                                                                    return (
+                                                                                        <li key={def.id}>
+                                                                                            <button 
+                                                                                                onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} 
+                                                                                                className={cn("text-xs w-full text-left p-1 rounded hover:bg-muted flex items-center gap-2", selectedFocusArea?.id === def.id && "bg-muted font-semibold")}
+                                                                                            >
+                                                                                                {getIcon()}
+                                                                                                <span className="truncate">{def.name}</span>
+                                                                                            </button>
+                                                                                        </li>
+                                                                                    )
+                                                                                })}
                                                                             </ul>
                                                                         </AccordionContent>
                                                                     </AccordionItem>

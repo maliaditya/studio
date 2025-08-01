@@ -252,10 +252,23 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
   const isParent = (upskillDef.linkedUpskillIds?.length ?? 0) > 0 || (upskillDef.linkedResourceIds?.length ?? 0) > 0;
   const isChild = linkedUpskillChildIds.has(upskillDef.id);
   
-  const nodeType = isParent && !isChild ? 'Curiosity' 
-                 : isParent && isChild ? 'Objective'
-                 : !isParent && isChild ? 'Visualization' 
-                 : 'Standalone';
+  const getNodeType = () => {
+    if (isParent) {
+      return isChild ? 'Objective' : 'Curiosity';
+    }
+    return isChild ? 'Visualization' : 'Standalone';
+  };
+  const nodeType = getNodeType();
+
+  const getIcon = () => {
+    switch(nodeType) {
+        case 'Curiosity': return <Flashlight className="h-5 w-5 text-amber-500 flex-shrink-0" />;
+        case 'Objective': return <Flag className="h-5 w-5 text-green-500 flex-shrink-0" />;
+        case 'Visualization': return <Frame className="h-5 w-5 text-blue-500 flex-shrink-0" />;
+        case 'Standalone': return <Focus className="h-5 w-5 text-purple-500 flex-shrink-0" />;
+        default: return <BookCopy className="h-5 w-5 flex-shrink-0" />;
+    }
+  };
 
   const loggedMinutes = getUpskillLoggedMinutesRecursive(upskillDef);
   const estDuration = isParent ? calculatedEstimate : upskillDef.estimatedDuration;
@@ -281,10 +294,7 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
         </div>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            {nodeType === 'Curiosity' ? <Flashlight className="h-5 w-5 text-amber-500 flex-shrink-0" />
-            : nodeType === 'Objective' ? <Flag className="h-5 w-5 text-green-500 flex-shrink-0" />
-            : nodeType === 'Visualization' ? <Frame className="h-5 w-5 text-blue-500 flex-shrink-0" />
-            : <Focus className="h-5 w-5 text-purple-500 flex-shrink-0" />}
+            {getIcon()}
             <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={upskillDef.name}>{upskillDef.name}</span>
              <Badge variant="outline" className="text-xs">{nodeType}</Badge>
           </CardTitle>
@@ -1153,16 +1163,33 @@ function UpskillPageContent() {
                                                                     </div>
                                                                     <AccordionContent className="pl-4 pt-2">
                                                                         <ul className="space-y-1">
-                                                                            {upskillDefinitions.filter(def => def.category === microSkill.name).map(def => (
-                                                                                <li key={def.id}>
-                                                                                    <button 
-                                                                                        onClick={() => { setSelectedSubtopic(def); setViewMode('library'); }} 
-                                                                                        className={cn("text-xs w-full text-left p-1 rounded hover:bg-muted", selectedSubtopic?.id === def.id && "bg-muted font-semibold")}
-                                                                                    >
-                                                                                        {def.name}
-                                                                                    </button>
-                                                                                </li>
-                                                                            ))}
+                                                                            {upskillDefinitions.filter(def => def.category === microSkill.name).map(def => {
+                                                                                const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+                                                                                const isChild = linkedUpskillChildIds.has(def.id);
+                                                                                const nodeType = isParent ? (isChild ? 'Objective' : 'Curiosity') : (isChild ? 'Visualization' : 'Standalone');
+
+                                                                                const getIcon = () => {
+                                                                                    switch(nodeType) {
+                                                                                        case 'Curiosity': return <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />;
+                                                                                        case 'Objective': return <Flag className="h-4 w-4 text-green-500 flex-shrink-0" />;
+                                                                                        case 'Visualization': return <Frame className="h-4 w-4 text-blue-500 flex-shrink-0" />;
+                                                                                        case 'Standalone': return <Focus className="h-4 w-4 text-purple-500 flex-shrink-0" />;
+                                                                                        default: return <BookCopy className="h-4 w-4 flex-shrink-0" />;
+                                                                                    }
+                                                                                };
+
+                                                                                return (
+                                                                                    <li key={def.id}>
+                                                                                        <button 
+                                                                                            onClick={() => { setSelectedSubtopic(def); setViewMode('library'); }} 
+                                                                                            className={cn("text-xs w-full text-left p-1 rounded hover:bg-muted flex items-center gap-2", selectedSubtopic?.id === def.id && "bg-muted font-semibold")}
+                                                                                        >
+                                                                                            {getIcon()}
+                                                                                            <span className="truncate">{def.name}</span>
+                                                                                        </button>
+                                                                                    </li>
+                                                                                )
+                                                                            })}
                                                                         </ul>
                                                                     </AccordionContent>
                                                                 </AccordionItem>
