@@ -1664,7 +1664,10 @@ function DeepWorkPageContent() {
                         {selectedDomainId && (
                            <div className="mt-4 space-y-2 max-h-[calc(100vh-30rem)] overflow-y-auto">
                            <Accordion type="multiple" className="w-full">
-                               {coreSkills.filter(cs => cs.domainId === selectedDomainId).map(coreSkill => (
+                               {coreSkills
+                                 .filter(cs => cs.domainId === selectedDomainId)
+                                 .filter(cs => (cs.skillAreas?.length ?? 0) > 0)
+                                 .map(coreSkill => (
                                    <AccordionItem value={coreSkill.id} key={coreSkill.id}>
                                        <AccordionTrigger className="text-sm font-semibold">
                                            <div className="flex items-center gap-2">

@@ -1049,13 +1049,7 @@ function UpskillPageContent() {
     }
     
     const isDraggedResource = resources.some(d => d.id === draggedId);
-    const isTargetResource = resources.some(d => d.id === targetId);
     
-    if (isTargetResource) {
-        toast({ title: "Invalid Link", description: "Resources cannot be parents. Drag items onto learning tasks instead.", variant: "destructive" });
-        return;
-    }
-  
     setUpskillDefinitions(prev => prev.map(def => {
         if (def.id === targetId) { // targetDef is always an upskill task
             let updatedDef = { ...def };
@@ -1128,7 +1122,10 @@ function UpskillPageContent() {
                     {selectedDomainId && (
                        <div className="mt-4 space-y-2 max-h-[calc(100vh-30rem)] overflow-y-auto">
                        <Accordion type="multiple" className="w-full">
-                           {coreSkills.filter(cs => cs.domainId === selectedDomainId).map(coreSkill => (
+                           {coreSkills
+                             .filter(cs => cs.domainId === selectedDomainId)
+                             .filter(cs => (cs.skillAreas?.length ?? 0) > 0)
+                             .map(coreSkill => (
                                <AccordionItem value={coreSkill.id} key={coreSkill.id}>
                                    <AccordionTrigger className="text-sm font-semibold">
                                        <div className="flex items-center gap-2">
