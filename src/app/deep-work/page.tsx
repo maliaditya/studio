@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -569,6 +568,8 @@ function LinkedDeepWorkCard({
     setSelectedSubtopic,
     linkedDeepWorkChildIds,
     onOpenMindMap,
+    getIcon,
+    getNodeType,
 } : {
     id: string;
     deepworkDef: ExerciseDefinition;
@@ -590,6 +591,8 @@ function LinkedDeepWorkCard({
     setSelectedSubtopic: (def: ExerciseDefinition | null) => void;
     linkedDeepWorkChildIds: Set<string>;
     onOpenMindMap: (rootFocusAreaId: string) => void;
+    getIcon: (nodeType: string) => React.ReactNode;
+    getNodeType: (def: ExerciseDefinition, childIds: Set<string>) => string;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
@@ -602,25 +605,7 @@ function LinkedDeepWorkCard({
     };
     
     const isParent = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 || (deepworkDef.linkedUpskillIds?.length ?? 0) > 0 || (deepworkDef.linkedResourceIds?.length ?? 0) > 0;
-    const isChild = linkedDeepWorkChildIds.has(deepworkDef.id);
-    
-    const getNodeType = () => {
-        if (isParent) {
-            return isChild ? 'Objective' : 'Intention';
-        }
-        return isChild ? 'Action' : 'Standalone';
-    };
-    const nodeType = getNodeType();
-
-    const getIcon = () => {
-        switch (nodeType) {
-            case 'Intention': return <Lightbulb className="h-5 w-5 text-amber-500 flex-shrink-0" />;
-            case 'Objective': return <Flag className="h-5 w-5 text-green-500 flex-shrink-0" />;
-            case 'Action': return <Bolt className="h-5 w-5 text-blue-500 flex-shrink-0" />;
-            case 'Standalone': return <Focus className="h-5 w-5 text-purple-500 flex-shrink-0" />;
-            default: return <Briefcase className="h-5 w-5 flex-shrink-0" />;
-        }
-    };
+    const nodeType = getNodeType(deepworkDef, linkedDeepWorkChildIds);
 
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
     const estDuration = isParent ? calculatedEstimate : deepworkDef.estimatedDuration;
@@ -685,7 +670,7 @@ function LinkedDeepWorkCard({
             </div>
            <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                {getIcon()}
+                {getIcon(nodeType)}
                 <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={deepworkDef.name}>{deepworkDef.name}</span>
                 <Badge variant="outline" className="text-xs">{nodeType}</Badge>
               </CardTitle>
@@ -808,6 +793,30 @@ function DeepWorkPageContent() {
 
   const [selectedMicroSkill, setSelectedMicroSkill] = useState<MicroSkill | null>(null);
 
+  const linkedDeepWorkChildIds = useMemo(() => {
+    return new Set<string>(
+        (deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])
+    );
+  }, [deepWorkDefinitions]);
+
+  const getNodeType = useCallback((def: ExerciseDefinition, childIds: Set<string>) => {
+    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+    const isChild = childIds.has(def.id);
+    if (isParent) {
+        return isChild ? 'Objective' : 'Intention';
+    }
+    return isChild ? 'Action' : 'Standalone';
+  }, []);
+
+  const getIcon = useCallback((nodeType: string) => {
+    switch (nodeType) {
+        case 'Intention': return <Lightbulb className="h-5 w-5 text-amber-500 flex-shrink-0" />;
+        case 'Objective': return <Flag className="h-5 w-5 text-green-500 flex-shrink-0" />;
+        case 'Action': return <Bolt className="h-5 w-5 text-blue-500 flex-shrink-0" />;
+        case 'Standalone': return <Focus className="h-5 w-5 text-purple-500 flex-shrink-0" />;
+        default: return <Briefcase className="h-5 w-5 flex-shrink-0" />;
+    }
+  }, []);
 
   const allKnownTopics = useMemo(() => {
     const topicsFromDefs = new Set(deepWorkDefinitions.map(def => def.category));
@@ -1470,11 +1479,6 @@ function DeepWorkPageContent() {
     return visualizations.every(viz => permanentlyLoggedActionIds.has(viz.id));
   }, [upskillDefinitions, permanentlyLoggedActionIds]);
   
-  const linkedDeepWorkChildIds = useMemo(() => {
-    return new Set<string>(
-        (deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])
-    );
-  }, [deepWorkDefinitions]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -1750,7 +1754,7 @@ function DeepWorkPageContent() {
                                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                                         {(selectedFocusArea.linkedDeepWorkIds || []).map(id => {
                                             const def = deepWorkDefinitions.find(d => d.id === id);
-                                            return def ? <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, setSelectedFocusArea, setViewMode, handleToggleReadyForBranding, handleStartEditDefinition, handleUnlinkItem, handleDeleteExerciseDefinition, handleViewProgress, deepWorkDefinitions, formatDuration, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic, linkedDeepWorkChildIds, onOpenMindMap:(id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); } }}/> : null;
+                                            return def ? <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getIcon, getNodeType, getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, setSelectedFocusArea, setViewMode, handleToggleReadyForBranding, handleStartEditDefinition, handleUnlinkItem, handleDeleteExerciseDefinition, handleViewProgress, deepWorkDefinitions, formatDuration, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic, linkedDeepWorkChildIds, onOpenMindMap:(id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); } }}/> : null;
                                         })}
                                         {(selectedFocusArea.linkedUpskillIds || []).map(id => {
                                             const def = upskillDefinitions.find(d => d.id === id);
@@ -1913,4 +1917,3 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
-
