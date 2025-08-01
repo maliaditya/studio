@@ -448,9 +448,13 @@ function UpskillPageContent() {
     setFloatingVideoUrl,
     skillDomains,
     coreSkills,
+    setSelectedSubtopic: setGlobalSelectedSubtopic
   } = useAuth();
   const router = useRouter();
+  const { selectedSubtopic: globalSelectedSubtopic } = useAuth();
+  const [selectedSubtopic, setSelectedSubtopic] = useState<ExerciseDefinition | null>(globalSelectedSubtopic);
 
+  
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
   
   const [editingSubtopic, setEditingSubtopic] = useState<ExerciseDefinition | null>(null);
@@ -478,8 +482,7 @@ function UpskillPageContent() {
   const [showBackupPrompt, setShowBackupPrompt] = useState(false);
 
   const [viewMode, setViewMode] = useState<'session' | 'library'>('session');
-  const [selectedSubtopic, setSelectedSubtopic] = useState<ExerciseDefinition | null>(null);
-
+  
   const [isManageLinksModalOpen, setIsManageLinksModalOpen] = useState(false);
   const [manageLinksConfig, setManageLinksConfig] = useState<{type: 'upskill' | 'resource', parent: ExerciseDefinition} | null>(null);
   const [newLinkedItemName, setNewLinkedItemName] = useState('');
@@ -1172,6 +1175,20 @@ function UpskillPageContent() {
     toast({ title: "Re-linked!", description: `"${draggedDef.name}" is now a sub-task of "${targetDef.name}".` });
   };
 
+  const domainMicroSkills = useMemo(() => {
+    if (!selectedDomainId) return [];
+    return coreSkills
+        .filter(cs => cs.domainId === selectedDomainId)
+        .flatMap(cs => cs.skillAreas)
+        .flatMap(sa => sa.microSkills)
+        .map(ms => ms.name);
+  }, [selectedDomainId, coreSkills]);
+
+  const filteredDefinitions = useMemo(() => {
+    if (!selectedDomainId) return upskillDefinitions;
+    return upskillDefinitions.filter(def => domainMicroSkills.includes(def.category));
+  }, [selectedDomainId, upskillDefinitions, domainMicroSkills]);
+
 
   if (isLoadingPage) {
     return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your upskill data...</p></div>;
@@ -1359,7 +1376,38 @@ function UpskillPageContent() {
                               </div>
                           </ScrollArea>
                         ) : (
-                            <div className="text-center py-10"><p className="text-muted-foreground">Select a subtopic from the library to view its details.</p></div>
+                            <ScrollArea className="h-[calc(100vh-16rem)] pr-2">
+                                {filteredDefinitions.length > 0 ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    {filteredDefinitions.map(def => (
+                                        <LinkedUpskillItem
+                                            key={def.id}
+                                            upskillDef={def}
+                                            handleAddTaskToSession={handleAddTaskToSession}
+                                            setSelectedSubtopic={setSelectedSubtopic}
+                                            setViewMode={setViewMode}
+                                            handleStartEditSubtopic={handleStartEditSubtopic}
+                                            handleUnlinkItem={handleUnlinkItem}
+                                            handleDeleteSubtopic={handleDeleteSubtopic}
+                                            handleViewProgress={handleViewProgress}
+                                            isComplete={isUpskillObjectiveComplete(def.id)}
+                                            getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
+                                            upskillDefinitions={upskillDefinitions}
+                                            resources={resources}
+                                            calculatedEstimate={calculateTotalEstimate(def)}
+                                            setEmbedUrl={setEmbedUrl}
+                                            setFloatingVideoUrl={setFloatingVideoUrl}
+                                            linkedUpskillChildIds={linkedUpskillChildIds}
+                                        />
+                                    ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-10">
+                                    <p className="text-muted-foreground">No tasks found for this domain.</p>
+                                    <p className="text-sm text-muted-foreground/80">Select a domain or create a new task.</p>
+                                    </div>
+                                )}
+                            </ScrollArea>
                         )}
                     </CardContent>
                 </Card>

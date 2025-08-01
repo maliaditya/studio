@@ -1304,8 +1304,18 @@ function DeepWorkPageContent() {
 
     setDeepWorkDefinitions(prev => [...prev, newDef]);
 
-    setSelectedFocusArea(newDef);
-    setViewMode('library');
+    // This part is new, to update the view
+    if (selectedDomainId) {
+        const selectedDomain = skillDomains.find(d => d.id === selectedDomainId);
+        if (selectedDomain) {
+            const microSkillsInDomain = coreSkills.filter(cs => cs.domainId === selectedDomainId).flatMap(cs => cs.skillAreas).flatMap(sa => sa.microSkills);
+            if (microSkillsInDomain.some(ms => ms.name === newFocusAreaParentTopic)) {
+                // The new focus area is part of the currently selected domain, so no view change is needed.
+                // It should appear automatically now with the filtering logic fix.
+            }
+        }
+    }
+
 
     // Reset and close modal
     setNewFocusAreaData({ name: '', hours: '', minutes: '' });
@@ -1875,6 +1885,20 @@ function DeepWorkPageContent() {
         </div>
     );
   };
+
+  const domainMicroSkills = useMemo(() => {
+    if (!selectedDomainId) return [];
+    return coreSkills
+        .filter(cs => cs.domainId === selectedDomainId)
+        .flatMap(cs => cs.skillAreas)
+        .flatMap(sa => sa.microSkills)
+        .map(ms => ms.name);
+  }, [selectedDomainId, coreSkills]);
+
+  const filteredDefinitions = useMemo(() => {
+    if (!selectedDomainId) return deepWorkDefinitions;
+    return deepWorkDefinitions.filter(def => domainMicroSkills.includes(def.category));
+  }, [selectedDomainId, deepWorkDefinitions, domainMicroSkills]);
   
   if (isLoadingPage) {
     return (
@@ -2178,7 +2202,40 @@ function DeepWorkPageContent() {
                               </ScrollArea>
                             
                         ) : (
-                            <div className="text-center py-10"><p className="text-muted-foreground">Select a Focus Area from the library to view its details.</p></div>
+                             <ScrollArea className="h-[calc(100vh-16rem)] pr-2">
+                                {filteredDefinitions.length > 0 ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    {filteredDefinitions.map(def => (
+                                        <LinkedDeepWorkCard
+                                        key={def.id}
+                                        id={def.id}
+                                        deepworkDef={def}
+                                        getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes}
+                                        permanentlyLoggedActionIds={permanentlyLoggedActionIds}
+                                        handleAddTaskToSession={handleAddTaskToSession}
+                                        setSelectedFocusArea={setSelectedFocusArea}
+                                        setViewMode={setViewMode}
+                                        handleToggleReadyForBranding={handleToggleReadyForBranding}
+                                        handleStartEditDefinition={handleStartEditDefinition}
+                                        handleUnlinkItem={handleUnlinkItem}
+                                        handleDeleteExerciseDefinition={handleDeleteExerciseDefinition}
+                                        handleViewProgress={handleViewProgress}
+                                        deepWorkDefinitions={deepWorkDefinitions}
+                                        formatDuration={formatDuration}
+                                        calculatedEstimate={calculateTotalEstimate(def)}
+                                        upskillDefinitions={upskillDefinitions}
+                                        resources={resources}
+                                        setSelectedSubtopic={setSelectedSubtopic}
+                                        />
+                                    ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-10">
+                                    <p className="text-muted-foreground">No focus areas found for this domain.</p>
+                                    <p className="text-sm text-muted-foreground/80">Select a domain or create a new focus area.</p>
+                                    </div>
+                                )}
+                            </ScrollArea>
                         )}
                     </CardContent>
                 </Card>
