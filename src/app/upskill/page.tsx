@@ -1148,32 +1148,32 @@ function UpskillPageContent() {
                                   </div>
                                 )}
                             </div>
-                        ) : (
-                            <ScrollArea className="h-[calc(100vh-16rem)] pr-2">
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {upskillDefinitions.filter(def => def.category === selectedMicroSkill?.name).map(def => (
-                                        <LinkedUpskillItem
-                                            key={def.id}
-                                            upskillDef={def}
-                                            handleAddTaskToSession={handleAddTaskToSession}
-                                            setSelectedSubtopic={setSelectedSubtopic}
-                                            setViewMode={setViewMode}
-                                            handleStartEditSubtopic={handleStartEditSubtopic}
-                                            handleUnlinkItem={handleUnlinkItem}
-                                            handleDeleteSubtopic={handleDeleteSubtopic}
-                                            handleViewProgress={handleViewProgress}
-                                            isComplete={isUpskillObjectiveComplete(def.id)}
-                                            getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
-                                            upskillDefinitions={upskillDefinitions}
-                                            resources={resources}
-                                            calculatedEstimate={calculateTotalEstimate(def)}
-                                            setEmbedUrl={setEmbedUrl}
-                                            setFloatingVideoUrl={setFloatingVideoUrl}
-                                            linkedUpskillChildIds={linkedUpskillChildIds}
-                                        />
-                                    ))}
+                        ) : selectedSubtopic ? (
+                             <div className="space-y-4">
+                                <div className="space-y-1">
+                                    <h3 className="text-xl font-bold">{selectedSubtopic.name}</h3>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}>
+                                            <LinkIcon className="mr-2 h-4 w-4" /> Link Sub-task
+                                        </Button>
+                                        <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)}>
+                                            <Folder className="mr-2 h-4 w-4" /> Link Resource
+                                        </Button>
+                                    </div>
                                 </div>
-                            </ScrollArea>
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    {(selectedSubtopic.linkedUpskillIds || []).map(id => {
+                                        const def = upskillDefinitions.find(d => d.id === id);
+                                        return def ? <LinkedUpskillItem key={id} upskillDef={def} {...{ handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleStartEditSubtopic, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteSubtopic, handleViewProgress, isComplete: isUpskillObjectiveComplete(def.id), getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate: calculateTotalEstimate(def), setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds }} /> : null;
+                                    })}
+                                    {(selectedSubtopic.linkedResourceIds || []).map(id => {
+                                        const resource = resources.find(r => r.id === id);
+                                        return resource ? <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={(type, id) => handleUnlinkItem(type, id)} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} /> : null;
+                                    })}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="text-center py-10 text-muted-foreground">Select a micro-skill from the library to view its tasks.</div>
                         )}
                     </CardContent>
                 </Card>
