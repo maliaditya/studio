@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -763,7 +762,6 @@ function DeepWorkPageContent() {
   } = useAuth();
   
   const [isNewFocusAreaModalOpen, setIsNewFocusAreaModalOpen] = useState(false);
-  const [newFocusAreaParentTopic, setNewFocusAreaParentTopic] = useState<string | null>(null);
   const [newFocusAreaData, setNewFocusAreaData] = useState({ name: '', hours: '', minutes: '' });
   
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
@@ -805,6 +803,8 @@ function DeepWorkPageContent() {
 
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [mindMapRootFocusAreaId, setMindMapRootFocusAreaId] = useState<string | null>(null);
+
+  const [selectedMicroSkillName, setSelectedMicroSkillName] = useState<string | null>(null);
 
 
   const allKnownTopics = useMemo(() => {
@@ -1053,19 +1053,14 @@ function DeepWorkPageContent() {
       return [...prevLogs, updatedWorkout];
     });
   };
-  
-  const handleOpenNewFocusAreaModal = (topic: string) => {
-    setNewFocusAreaParentTopic(topic);
-    setIsNewFocusAreaModalOpen(true);
-  };
 
   const handleCreateFocusArea = () => {
-    if (!newFocusAreaParentTopic || !newFocusAreaData.name.trim()) {
+    if (!selectedMicroSkillName || !newFocusAreaData.name.trim()) {
       toast({ title: "Error", description: "Focus area name cannot be empty.", variant: "destructive" });
       return;
     }
 
-    if (deepWorkDefinitions.some(def => def.name.toLowerCase() === newFocusAreaData.name.trim().toLowerCase() && def.category.toLowerCase() === newFocusAreaParentTopic.toLowerCase())) {
+    if (deepWorkDefinitions.some(def => def.name.toLowerCase() === newFocusAreaData.name.trim().toLowerCase() && def.category.toLowerCase() === selectedMicroSkillName.toLowerCase())) {
         toast({ title: "Error", description: "This focus area already exists for this topic.", variant: "destructive" });
         return;
     }
@@ -1077,7 +1072,7 @@ function DeepWorkPageContent() {
     const newDef: ExerciseDefinition = { 
         id: `def_${Date.now()}_${Math.random()}`, 
         name: newFocusAreaData.name.trim(),
-        category: newFocusAreaParentTopic as ExerciseCategory,
+        category: selectedMicroSkillName as ExerciseCategory,
         isReadyForBranding: false,
         sharingStatus: { twitter: false, linkedin: false, devto: false },
         estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
@@ -1089,15 +1084,14 @@ function DeepWorkPageContent() {
         const selectedDomain = skillDomains.find(d => d.id === selectedDomainId);
         if (selectedDomain) {
             const microSkillsInDomain = coreSkills.filter(cs => cs.domainId === selectedDomainId).flatMap(cs => cs.skillAreas).flatMap(sa => sa.microSkills);
-            if (microSkillsInDomain.some(ms => ms.name === newFocusAreaParentTopic)) {
+            if (microSkillsInDomain.some(ms => ms.name === selectedMicroSkillName)) {
             }
         }
     }
 
     setNewFocusAreaData({ name: '', hours: '', minutes: '' });
     setIsNewFocusAreaModalOpen(false);
-    setNewFocusAreaParentTopic(null);
-    toast({ title: "Success", description: `Focus Area "${newDef.name}" added to ${newFocusAreaParentTopic}.` });
+    toast({ title: "Success", description: `Focus Area "${newDef.name}" added to ${selectedMicroSkillName}.` });
   };
 
   const handleDeleteExerciseDefinition = (id: string) => {
@@ -1612,20 +1606,6 @@ function DeepWorkPageContent() {
         </div>
     );
   };
-
-  const domainMicroSkills = useMemo(() => {
-    if (!selectedDomainId) return [];
-    return coreSkills
-        .filter(cs => cs.domainId === selectedDomainId)
-        .flatMap(cs => cs.skillAreas)
-        .flatMap(sa => sa.microSkills)
-        .map(ms => ms.name);
-  }, [selectedDomainId, coreSkills]);
-
-  const filteredDefinitions = useMemo(() => {
-    if (!selectedDomainId) return deepWorkDefinitions;
-    return deepWorkDefinitions.filter(def => domainMicroSkills.includes(def.category));
-  }, [selectedDomainId, deepWorkDefinitions, domainMicroSkills]);
   
   if (isLoadingPage) {
     return (
@@ -1665,8 +1645,7 @@ function DeepWorkPageContent() {
                            <div className="mt-4 space-y-2 max-h-[calc(100vh-30rem)] overflow-y-auto">
                            <Accordion type="multiple" className="w-full">
                                {coreSkills
-                                 .filter(cs => cs.domainId === selectedDomainId)
-                                 .filter(cs => (cs.skillAreas?.length ?? 0) > 0)
+                                 .filter(cs => cs.domainId === selectedDomainId && (cs.skillAreas?.length ?? 0) > 0)
                                  .map(coreSkill => (
                                    <AccordionItem value={coreSkill.id} key={coreSkill.id}>
                                        <AccordionTrigger className="text-sm font-semibold">
@@ -1683,46 +1662,15 @@ function DeepWorkPageContent() {
                                                 <AccordionContent className="pl-4">
                                                   {skillArea.microSkills.map(microSkill => (
                                                     <div key={microSkill.id} className="space-y-1 py-1">
-                                                      <div className="flex items-center justify-between group">
-                                                        <span className="text-sm font-medium text-muted-foreground/80">{microSkill.name}</span>
-                                                        <Button 
-                                                          variant="ghost" 
-                                                          size="icon" 
-                                                          className="h-6 w-6"
-                                                          onClick={(e) => { e.stopPropagation(); handleOpenNewFocusAreaModal(microSkill.name); }}
-                                                        >
-                                                            <PlusCircle className="h-4 w-4" />
-                                                        </Button>
-                                                      </div>
-                                                      <ul className="space-y-1 pl-2">
-                                                        {deepWorkDefinitions.filter(def => def.category === microSkill.name).map(def => {
-                                                            const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-                                                            const isChild = linkedDeepWorkChildIds.has(def.id);
-                                                            const nodeType = isParent ? (isChild ? 'Objective' : 'Intention') : (isChild ? 'Action' : 'Standalone');
-
-                                                            const getIcon = () => {
-                                                                switch (nodeType) {
-                                                                    case 'Intention': return <Lightbulb className="h-4 w-4 text-amber-500 flex-shrink-0" />;
-                                                                    case 'Objective': return <Flag className="h-4 w-4 text-green-500 flex-shrink-0" />;
-                                                                    case 'Action': return <Bolt className="h-4 w-4 text-blue-500 flex-shrink-0" />;
-                                                                    case 'Standalone': return <Focus className="h-4 w-4 text-purple-500 flex-shrink-0" />;
-                                                                    default: return <Briefcase className="h-4 w-4 flex-shrink-0" />;
-                                                                }
-                                                            };
-
-                                                            return (
-                                                                <li key={def.id}>
-                                                                    <button 
-                                                                        onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} 
-                                                                        className={cn("text-xs w-full text-left p-1 rounded hover:bg-muted flex items-center gap-2", selectedFocusArea?.id === def.id && "bg-muted font-semibold")}
-                                                                    >
-                                                                        {getIcon()}
-                                                                        <span className="truncate">{def.name}</span>
-                                                                    </button>
-                                                                </li>
-                                                            )
-                                                        })}
-                                                      </ul>
+                                                      <button 
+                                                        onClick={() => setSelectedMicroSkillName(microSkill.name)}
+                                                        className={cn(
+                                                          "w-full text-left p-1 rounded-md text-sm font-medium hover:bg-muted",
+                                                          selectedMicroSkillName === microSkill.name && "bg-muted text-primary"
+                                                        )}
+                                                      >
+                                                        {microSkill.name}
+                                                      </button>
                                                     </div>
                                                   ))}
                                                 </AccordionContent>
@@ -1796,16 +1744,18 @@ function DeepWorkPageContent() {
                         <div className="flex-grow">
                             <CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">
                                 {viewMode === 'session' ? <ListChecks /> : <Library />}
-                                {viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedFocusArea?.name || 'Select an item'}`}
+                                {viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedMicroSkillName || 'Select a micro-skill'}`}
                             </CardTitle>
-                            {viewMode === 'library' && selectedFocusArea && (
-                              <CardDescription className="text-xs mt-1">{selectedFocusArea.category}</CardDescription>
-                            )}
                         </div>
 
                         <div className='flex items-center gap-2 flex-shrink-0'>
+                           {viewMode === 'library' && selectedMicroSkillName && (
+                              <Button size="sm" onClick={() => setIsNewFocusAreaModalOpen(true)}>
+                                  <PlusCircle className="mr-2 h-4 w-4" /> New Focus Area
+                              </Button>
+                           )}
                           <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
-                          <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('library')} disabled={!selectedFocusArea}>Library</Button>
+                          <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('library')}>Library</Button>
                           <Popover>
                               <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger>
                               <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent>
@@ -1841,119 +1791,11 @@ function DeepWorkPageContent() {
                                   </div>
                                 )}
                             </div>
-                        ) : selectedFocusArea ? (
-                            
-                              <ScrollArea className="h-[calc(100vh-16rem)] pr-2">
-                                <div className="space-y-6">
-                                  <div className="space-y-3">
-                                    <h3 className="font-semibold flex items-center gap-2"><BookCopy className="h-5 w-5 text-primary" /> Linked Learning</h3>
-                                    <DroppableArea id={`linked-learning-area-${selectedFocusArea.id}`} className="-m-2 p-2">
-                                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                        {(selectedFocusArea.linkedUpskillIds || []).map(id => {
-                                          const upskillDef = upskillDefinitions.find(ud => ud.id === id);
-                                          if (!upskillDef) return null;
-                                          return (
-                                            <LinkedUpskillCard
-                                                key={id}
-                                                id={id}
-                                                upskillDef={upskillDef}
-                                                getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
-                                                isUpskillObjectiveComplete={isUpskillObjectiveComplete}
-                                                setEmbedUrl={setEmbedUrl}
-                                                setFloatingVideoUrl={setFloatingVideoUrl}
-                                                handleViewProgress={handleViewProgress}
-                                                handleStartEditUpskill={handleStartEditUpskill}
-                                                handleUnlinkItem={handleUnlinkItem}
-                                                handleDeleteUpskillDefinition={handleDeleteUpskillDefinition}
-                                                upskillDefinitions={upskillDefinitions}
-                                                formatDuration={formatDuration}
-                                                calculatedEstimate={calculateTotalEstimate(upskillDef)}
-                                                setSelectedSubtopic={setSelectedSubtopic}
-                                                setViewMode={setViewMode}
-                                            />
-                                          )
-                                        })}
-                                        <Card 
-                                            onClick={() => handleOpenManageLinksModal('upskill', selectedFocusArea)}
-                                            className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
-                                        >
-                                            <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                            <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
-                                        </Card>
-                                      </div>
-                                    </DroppableArea>
-                                  </div>
-                                  <div className="space-y-3">
-                                    <h3 className="font-semibold flex items-center gap-2"><LinkIcon className="h-5 w-5 text-primary" /> Linked Work</h3>
-                                    <DroppableArea id={`linked-work-area-${selectedFocusArea.id}`} className="-m-2 p-2">
-                                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                      {(selectedFocusArea.linkedDeepWorkIds || []).map(id => {
-                                        const deepworkDef = deepWorkDefinitions.find(dd => dd.id === id);
-                                        if (!deepworkDef) return null;
-                                        return (
-                                          <LinkedDeepWorkCard 
-                                              key={id}
-                                              id={id}
-                                              deepworkDef={deepworkDef}
-                                              getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes}
-                                              permanentlyLoggedActionIds={permanentlyLoggedActionIds}
-                                              handleAddTaskToSession={handleAddTaskToSession}
-                                              setSelectedFocusArea={setSelectedFocusArea}
-                                              setViewMode={setViewMode}
-                                              handleToggleReadyForBranding={handleToggleReadyForBranding}
-                                              handleStartEditDefinition={handleStartEditDefinition}
-                                              handleUnlinkItem={handleUnlinkItem}
-                                              handleDeleteExerciseDefinition={handleDeleteExerciseDefinition}
-                                              handleViewProgress={handleViewProgress}
-                                              deepWorkDefinitions={deepWorkDefinitions}
-                                              formatDuration={formatDuration}
-                                              calculatedEstimate={calculateTotalEstimate(deepworkDef)}
-                                              upskillDefinitions={upskillDefinitions}
-                                              resources={resources}
-                                              setSelectedSubtopic={setSelectedSubtopic}
-                                              linkedDeepWorkChildIds={linkedDeepWorkChildIds}
-                                              onOpenMindMap={(id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); }}
-                                          />
-                                        );
-                                      })}
-                                      <Card 
-                                          onClick={() => handleOpenManageLinksModal('deepwork', selectedFocusArea)}
-                                          className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
-                                      >
-                                          <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                          <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Focus Area</p>
-                                      </Card>
-                                    </div>
-                                    </DroppableArea>
-                                  </div>
-                                  <div className="space-y-3">
-                                    <h3 className="font-semibold flex items-center gap-2"><Library className="h-5 w-5 text-primary" /> Linked Resources</h3>
-                                    <DroppableArea id={`linked-resource-area-${selectedFocusArea.id}`} className="-m-2 p-2">
-                                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                        {(selectedFocusArea.linkedResourceIds || []).map(id => {
-                                          const resource = resources.find(r => r.id === id);
-                                          if (!resource) return null;
-                                          return <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={handleUnlinkItem} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} />;
-                                        })}
-                                        <Card 
-                                            onClick={() => handleOpenManageLinksModal('resource', selectedFocusArea)}
-                                            className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
-                                        >
-                                            <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                            <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p>
-                                        </Card>
-                                      </div>
-                                    </DroppableArea>
-                                  </div>
-                                </div>
-                              </ScrollArea>
-                            
                         ) : (
-                             <ScrollArea className="h-[calc(100vh-16rem)] pr-2">
-                                {filteredDefinitions.length > 0 ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {filteredDefinitions.map(def => (
-                                        <LinkedDeepWorkCard
+                            <ScrollArea className="h-[calc(100vh-16rem)] pr-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                  {deepWorkDefinitions.filter(def => def.category === selectedMicroSkillName).map(def => (
+                                      <LinkedDeepWorkCard
                                         key={def.id}
                                         id={def.id}
                                         deepworkDef={def}
@@ -1975,15 +1817,9 @@ function DeepWorkPageContent() {
                                         setSelectedSubtopic={setSelectedSubtopic}
                                         linkedDeepWorkChildIds={linkedDeepWorkChildIds}
                                         onOpenMindMap={(id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); }}
-                                        />
-                                    ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-10">
-                                    <p className="text-muted-foreground">No focus areas found for this domain.</p>
-                                    <p className="text-sm text-muted-foreground/80">Select a domain or create a new focus area.</p>
-                                    </div>
-                                )}
+                                      />
+                                  ))}
+                                </div>
                             </ScrollArea>
                         )}
                     </CardContent>
@@ -1995,7 +1831,7 @@ function DeepWorkPageContent() {
                 <DialogHeader>
                     <DialogTitle>Create New Focus Area</DialogTitle>
                     <DialogDescription>
-                        This will create a new standalone focus area under the "{newFocusAreaParentTopic}" micro-skill.
+                        This will create a new standalone focus area under the "{selectedMicroSkillName}" micro-skill.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">

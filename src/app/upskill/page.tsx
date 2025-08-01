@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useRef, useCallback } from 'react';
@@ -496,14 +495,18 @@ function UpskillPageContent() {
   const [isCreatingLink, setIsCreatingLink] = useState(false);
 
   const [isNewSubtopicModalOpen, setIsNewSubtopicModalOpen] = useState(false);
-  const [newSubtopicParentTopic, setNewSubtopicParentTopic] = useState<string | null>(null);
   const [newSubtopicData, setNewSubtopicData] = useState({ name: '', description: '', link: '', hours: '', minutes: '' });
 
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
 
-  const handleOpenNewSubtopicModal = (topic: string) => {
-    setNewSubtopicParentTopic(topic);
+  const [selectedMicroSkillName, setSelectedMicroSkillName] = useState<string | null>(null);
+
+  const handleOpenNewSubtopicModal = () => {
+    if (!selectedMicroSkillName) {
+        toast({ title: "Error", description: "Please select a micro-skill first.", variant: "destructive" });
+        return;
+    }
     setIsNewSubtopicModalOpen(true);
   };
   
@@ -736,7 +739,7 @@ function UpskillPageContent() {
   };
 
   const handleCreateSubtopic = () => {
-    if (!newSubtopicParentTopic || !newSubtopicData.name.trim()) {
+    if (!selectedMicroSkillName || !newSubtopicData.name.trim()) {
         toast({ title: "Error", description: "Name is required.", variant: "destructive" });
         return;
     }
@@ -748,7 +751,7 @@ function UpskillPageContent() {
     const newDef: ExerciseDefinition = { 
         id: `def_${Date.now()}_${Math.random()}`, 
         name: newSubtopicData.name.trim(), 
-        category: newSubtopicParentTopic as ExerciseCategory,
+        category: selectedMicroSkillName as ExerciseCategory,
         description: newSubtopicData.description.trim(),
         link: newSubtopicData.link.trim(),
         iconUrl: getFaviconUrl(newSubtopicData.link.trim()),
@@ -761,8 +764,6 @@ function UpskillPageContent() {
     setNewSubtopicData({ name: '', description: '', link: '', hours: '', minutes: '' });
     
     toast({ title: "Success", description: `Task "${newDef.name}" created.` });
-    setSelectedSubtopic(newDef);
-    setViewMode('library');
   };
 
   const handleDeleteSubtopic = (id: string) => {
@@ -1074,22 +1075,7 @@ function UpskillPageContent() {
   
     toast({ title: "Re-linked!", description: `"${draggedDef.name}" is now a sub-task of "${targetDef.name}".` });
   };
-
-  const domainMicroSkills = useMemo(() => {
-    if (!selectedDomainId) return [];
-    return coreSkills
-        .filter(cs => cs.domainId === selectedDomainId)
-        .flatMap(cs => cs.skillAreas)
-        .flatMap(sa => sa.microSkills)
-        .map(ms => ms.name);
-  }, [selectedDomainId, coreSkills]);
-
-  const filteredDefinitions = useMemo(() => {
-    if (!selectedDomainId) return upskillDefinitions;
-    return upskillDefinitions.filter(def => domainMicroSkills.includes(def.category));
-  }, [selectedDomainId, upskillDefinitions, domainMicroSkills]);
-
-
+  
   if (isLoadingPage) {
     return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your upskill data...</p></div>;
   }
@@ -1123,8 +1109,7 @@ function UpskillPageContent() {
                        <div className="mt-4 space-y-2 max-h-[calc(100vh-30rem)] overflow-y-auto">
                        <Accordion type="multiple" className="w-full">
                            {coreSkills
-                             .filter(cs => cs.domainId === selectedDomainId)
-                             .filter(cs => (cs.skillAreas?.length ?? 0) > 0)
+                             .filter(cs => cs.domainId === selectedDomainId && (cs.skillAreas?.length ?? 0) > 0)
                              .map(coreSkill => (
                                <AccordionItem value={coreSkill.id} key={coreSkill.id}>
                                    <AccordionTrigger className="text-sm font-semibold">
@@ -1141,46 +1126,15 @@ function UpskillPageContent() {
                                             <AccordionContent className="pl-4">
                                               {skillArea.microSkills.map(microSkill => (
                                                 <div key={microSkill.id} className="space-y-1 py-1">
-                                                  <div className="flex items-center justify-between group">
-                                                    <span className="text-sm font-medium text-muted-foreground/80">{microSkill.name}</span>
-                                                    <Button 
-                                                      variant="ghost" 
-                                                      size="icon" 
-                                                      className="h-6 w-6"
-                                                      onClick={(e) => { e.stopPropagation(); handleOpenNewSubtopicModal(microSkill.name); }}
+                                                    <button 
+                                                      onClick={() => setSelectedMicroSkillName(microSkill.name)}
+                                                      className={cn(
+                                                        "w-full text-left p-1 rounded-md text-sm font-medium hover:bg-muted",
+                                                        selectedMicroSkillName === microSkill.name && "bg-muted text-primary"
+                                                      )}
                                                     >
-                                                        <PlusCircle className="h-4 w-4" />
-                                                    </Button>
-                                                  </div>
-                                                  <ul className="space-y-1 pl-2">
-                                                     {upskillDefinitions.filter(def => def.category === microSkill.name).map(def => {
-                                                        const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-                                                        const isChild = linkedUpskillChildIds.has(def.id);
-                                                        const nodeType = isParent ? (isChild ? 'Objective' : 'Curiosity') : (isChild ? 'Visualization' : 'Standalone');
-
-                                                        const getIcon = () => {
-                                                            switch(nodeType) {
-                                                                case 'Curiosity': return <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />;
-                                                                case 'Objective': return <Flag className="h-4 w-4 text-green-500 flex-shrink-0" />;
-                                                                case 'Visualization': return <Frame className="h-4 w-4 text-blue-500 flex-shrink-0" />;
-                                                                case 'Standalone': return <Focus className="h-4 w-4 text-purple-500 flex-shrink-0" />;
-                                                                default: return <BookCopy className="h-4 w-4 flex-shrink-0" />;
-                                                            }
-                                                        };
-
-                                                        return (
-                                                            <li key={def.id}>
-                                                                <button 
-                                                                    onClick={() => { setSelectedSubtopic(def); setViewMode('library'); }} 
-                                                                    className={cn("text-xs w-full text-left p-1 rounded hover:bg-muted flex items-center gap-2", selectedSubtopic?.id === def.id && "bg-muted font-semibold")}
-                                                                >
-                                                                    {getIcon()}
-                                                                    <span className="truncate">{def.name}</span>
-                                                                </button>
-                                                            </li>
-                                                        )
-                                                     })}
-                                                  </ul>
+                                                      {microSkill.name}
+                                                    </button>
                                                 </div>
                                               ))}
                                             </AccordionContent>
@@ -1221,10 +1175,15 @@ function UpskillPageContent() {
             <section aria-labelledby="main-panel-heading" className="lg:col-span-3 space-y-6">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between p-4">
-                        <div className="flex-grow"><CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">{viewMode === 'session' ? <ListChecks /> : <Library />}{viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedSubtopic?.name || 'Select an item'}`}</CardTitle>{viewMode === 'library' && selectedSubtopic && (<CardDescription className="text-xs mt-1">{selectedSubtopic.category}</CardDescription>)}</div>
+                        <div className="flex-grow"><CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">{viewMode === 'session' ? <ListChecks /> : <Library />}{viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedMicroSkillName || 'Select a micro-skill'}`}</CardTitle></div>
                         <div className='flex items-center gap-2 flex-shrink-0'>
+                          {viewMode === 'library' && selectedMicroSkillName && (
+                            <Button size="sm" onClick={handleOpenNewSubtopicModal}>
+                                <PlusCircle className="mr-2 h-4 w-4" /> New Task
+                            </Button>
+                           )}
                           <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
-                          <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('library')} disabled={!selectedSubtopic}>Library</Button>
+                          <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('library')}>Library</Button>
                           <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent></Popover>
                         </div>
                     </CardHeader>
@@ -1249,70 +1208,10 @@ function UpskillPageContent() {
                                   </div>
                                 )}
                             </div>
-                        ) : selectedSubtopic ? (
-                            <ScrollArea className="h-[calc(100vh-16rem)] pr-2">
-                              <div className="space-y-6">
-                                <div className="space-y-3">
-                                  <h3 className="font-semibold flex items-center gap-2"><BookCopy className="h-5 w-5 text-primary" /> Linked Sub-Topics</h3>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {(selectedSubtopic.linkedUpskillIds || []).map(id => {
-                                      const upskillDef = upskillDefinitions.find(ud => ud.id === id);
-                                      if (!upskillDef) return null;
-                                      return (
-                                          <LinkedUpskillItem
-                                              key={id}
-                                              upskillDef={upskillDef}
-                                              handleAddTaskToSession={handleAddTaskToSession}
-                                              setSelectedSubtopic={setSelectedSubtopic}
-                                              setViewMode={setViewMode}
-                                              handleStartEditSubtopic={handleStartEditSubtopic}
-                                              handleUnlinkItem={handleUnlinkItem}
-                                              handleDeleteSubtopic={handleDeleteSubtopic}
-                                              handleViewProgress={handleViewProgress}
-                                              isComplete={isUpskillObjectiveComplete(id)}
-                                              getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
-                                              upskillDefinitions={upskillDefinitions}
-                                              resources={resources}
-                                              calculatedEstimate={calculateTotalEstimate(upskillDef)}
-                                              setEmbedUrl={setEmbedUrl}
-                                              setFloatingVideoUrl={setFloatingVideoUrl}
-                                              linkedUpskillChildIds={linkedUpskillChildIds}
-                                          />
-                                      )
-                                    })}
-                                    <Card 
-                                        onClick={() => selectedSubtopic && handleOpenManageLinksModal('upskill', selectedSubtopic)}
-                                        className="group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
-                                    >
-                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Task</p>
-                                    </Card>
-                                  </div>
-                                </div>
-                                <div className="space-y-3">
-                                  <h3 className="font-semibold flex items-center gap-2"><Library className="h-5 w-5 text-primary" /> Linked Resources</h3>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {(selectedSubtopic.linkedResourceIds || []).map(id => {
-                                      const resource = resources.find(r => r.id === id);
-                                      if (!resource) return null;
-                                      return <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={handleUnlinkItem} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} />;
-                                    })}
-                                    <Card 
-                                        onClick={() => selectedSubtopic && handleOpenManageLinksModal('resource', selectedSubtopic)}
-                                        className="group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[150px] hover:shadow-xl hover:-translate-y-1"
-                                    >
-                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add / Link Resource</p>
-                                    </Card>
-                                  </div>
-                                </div>
-                              </div>
-                          </ScrollArea>
                         ) : (
                             <ScrollArea className="h-[calc(100vh-16rem)] pr-2">
-                                {filteredDefinitions.length > 0 ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {filteredDefinitions.map(def => (
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    {upskillDefinitions.filter(def => def.category === selectedMicroSkillName).map(def => (
                                         <LinkedUpskillItem
                                             key={def.id}
                                             upskillDef={def}
@@ -1333,13 +1232,7 @@ function UpskillPageContent() {
                                             linkedUpskillChildIds={linkedUpskillChildIds}
                                         />
                                     ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-10">
-                                    <p className="text-muted-foreground">No tasks found for this domain.</p>
-                                    <p className="text-sm text-muted-foreground/80">Select a domain or create a new task.</p>
-                                    </div>
-                                )}
+                                </div>
                             </ScrollArea>
                         )}
                     </CardContent>
@@ -1351,7 +1244,7 @@ function UpskillPageContent() {
                 <DialogHeader>
                     <DialogTitle>Create New Task</DialogTitle>
                     <DialogDescription>
-                        This will create a new standalone task under the "{newSubtopicParentTopic}" micro-skill.
+                        This will create a new standalone task under the "{selectedMicroSkillName}" micro-skill.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
