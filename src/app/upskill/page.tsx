@@ -1134,67 +1134,59 @@ function UpskillPageContent() {
                                        </div>
                                    </AccordionTrigger>
                                    <AccordionContent>
-                                       <Accordion type="multiple" className="w-full">
-                                           {coreSkill.skillAreas.map(skillArea => (
-                                               <AccordionItem value={skillArea.id} key={skillArea.id} className="border-b-0">
-                                                   <AccordionTrigger className="text-xs font-medium pl-2 hover:no-underline">
-                                                     {skillArea.name}
-                                                   </AccordionTrigger>
-                                                   <AccordionContent className="pl-4">
-                                                        <Accordion type="multiple" className="w-full">
-                                                            {skillArea.microSkills.map(microSkill => (
-                                                                <AccordionItem key={microSkill.id} value={microSkill.id} className="border-b-0">
-                                                                    <div className="flex items-center group">
-                                                                        <AccordionTrigger className="text-xs py-2 hover:no-underline font-normal text-muted-foreground flex-grow">
-                                                                        {microSkill.name}
-                                                                        </AccordionTrigger>
-                                                                        <Button 
-                                                                            variant="ghost" 
-                                                                            size="icon" 
-                                                                            className="h-6 w-6 flex-shrink-0"
-                                                                            onClick={(e) => { e.stopPropagation(); handleOpenNewSubtopicModal(microSkill.name); }}
-                                                                        >
-                                                                            <PlusCircle className="h-4 w-4" />
-                                                                        </Button>
-                                                                    </div>
-                                                                    <AccordionContent className="pl-4 pt-2">
-                                                                        <ul className="space-y-1">
-                                                                            {upskillDefinitions.filter(def => def.category === microSkill.name).map(def => {
-                                                                                const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-                                                                                const isChild = linkedUpskillChildIds.has(def.id);
-                                                                                const nodeType = isParent ? (isChild ? 'Objective' : 'Curiosity') : (isChild ? 'Visualization' : 'Standalone');
+                                      <div className="space-y-3 pl-2">
+                                        {coreSkill.skillAreas.map(skillArea => (
+                                          <div key={skillArea.id}>
+                                            <h4 className="text-sm font-semibold text-muted-foreground">{skillArea.name}</h4>
+                                            <div className="pl-2 border-l-2 border-muted-foreground/20 space-y-2 mt-2">
+                                              {skillArea.microSkills.map(microSkill => (
+                                                <div key={microSkill.id} className="space-y-1">
+                                                  <div className="flex items-center justify-between group">
+                                                    <span className="text-xs font-medium text-muted-foreground/80">{microSkill.name}</span>
+                                                    <Button 
+                                                      variant="ghost" 
+                                                      size="icon" 
+                                                      className="h-6 w-6"
+                                                      onClick={(e) => { e.stopPropagation(); handleOpenNewSubtopicModal(microSkill.name); }}
+                                                    >
+                                                        <PlusCircle className="h-4 w-4" />
+                                                    </Button>
+                                                  </div>
+                                                  <ul className="space-y-1 pl-2">
+                                                    {upskillDefinitions.filter(def => def.category === microSkill.name).map(def => {
+                                                        const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+                                                        const isChild = linkedUpskillChildIds.has(def.id);
+                                                        const nodeType = isParent ? (isChild ? 'Objective' : 'Curiosity') : (isChild ? 'Visualization' : 'Standalone');
 
-                                                                                const getIcon = () => {
-                                                                                    switch(nodeType) {
-                                                                                        case 'Curiosity': return <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />;
-                                                                                        case 'Objective': return <Flag className="h-4 w-4 text-green-500 flex-shrink-0" />;
-                                                                                        case 'Visualization': return <Frame className="h-4 w-4 text-blue-500 flex-shrink-0" />;
-                                                                                        case 'Standalone': return <Focus className="h-4 w-4 text-purple-500 flex-shrink-0" />;
-                                                                                        default: return <BookCopy className="h-4 w-4 flex-shrink-0" />;
-                                                                                    }
-                                                                                };
+                                                        const getIcon = () => {
+                                                            switch(nodeType) {
+                                                                case 'Curiosity': return <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />;
+                                                                case 'Objective': return <Flag className="h-4 w-4 text-green-500 flex-shrink-0" />;
+                                                                case 'Visualization': return <Frame className="h-4 w-4 text-blue-500 flex-shrink-0" />;
+                                                                case 'Standalone': return <Focus className="h-4 w-4 text-purple-500 flex-shrink-0" />;
+                                                                default: return <BookCopy className="h-4 w-4 flex-shrink-0" />;
+                                                            }
+                                                        };
 
-                                                                                return (
-                                                                                    <li key={def.id}>
-                                                                                        <button 
-                                                                                            onClick={() => { setSelectedSubtopic(def); setViewMode('library'); }} 
-                                                                                            className={cn("text-xs w-full text-left p-1 rounded hover:bg-muted flex items-center gap-2", selectedSubtopic?.id === def.id && "bg-muted font-semibold")}
-                                                                                        >
-                                                                                            {getIcon()}
-                                                                                            <span className="truncate">{def.name}</span>
-                                                                                        </button>
-                                                                                    </li>
-                                                                                )
-                                                                            })}
-                                                                        </ul>
-                                                                    </AccordionContent>
-                                                                </AccordionItem>
-                                                            ))}
-                                                        </Accordion>
-                                                   </AccordionContent>
-                                               </AccordionItem>
-                                           ))}
-                                       </Accordion>
+                                                        return (
+                                                            <li key={def.id}>
+                                                                <button 
+                                                                    onClick={() => { setSelectedSubtopic(def); setViewMode('library'); }} 
+                                                                    className={cn("text-xs w-full text-left p-1 rounded hover:bg-muted flex items-center gap-2", selectedSubtopic?.id === def.id && "bg-muted font-semibold")}
+                                                                >
+                                                                    {getIcon()}
+                                                                    <span className="truncate">{def.name}</span>
+                                                                </button>
+                                                            </li>
+                                                        )
+                                                    })}
+                                                  </ul>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
                                    </AccordionContent>
                                </AccordionItem>
                            ))}
