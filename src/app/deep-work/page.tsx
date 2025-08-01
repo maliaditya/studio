@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -1686,7 +1687,7 @@ function DeepWorkPageContent() {
                     <CardHeader className="flex flex-row items-center justify-between p-4">
                         <div className="flex-grow">
                             <CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">
-                                {viewMode === 'session' ? <ListChecks /> : <Library />}
+                                {viewMode === 'session' ? <ListChecks /> : selectedFocusArea ? getIcon(getNodeType(selectedFocusArea, linkedDeepWorkChildIds)) : <Library />}
                                 {viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedMicroSkill?.name || 'Select a micro-skill'}`}
                             </CardTitle>
                         </div>
@@ -1730,35 +1731,40 @@ function DeepWorkPageContent() {
                                 )}
                             </div>
                         ) : (
-                            <ScrollArea className="h-[calc(100vh-16rem)] pr-2">
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                  {deepWorkDefinitions.filter(def => def.category === selectedMicroSkill?.name).map(def => (
-                                      <LinkedDeepWorkCard
-                                        key={def.id}
-                                        id={def.id}
-                                        deepworkDef={def}
-                                        getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes}
-                                        permanentlyLoggedActionIds={permanentlyLoggedActionIds}
-                                        handleAddTaskToSession={handleAddTaskToSession}
-                                        setSelectedFocusArea={setSelectedFocusArea}
-                                        setViewMode={setViewMode}
-                                        handleToggleReadyForBranding={handleToggleReadyForBranding}
-                                        handleStartEditDefinition={handleStartEditDefinition}
-                                        handleUnlinkItem={handleUnlinkItem}
-                                        handleDeleteExerciseDefinition={handleDeleteExerciseDefinition}
-                                        handleViewProgress={handleViewProgress}
-                                        deepWorkDefinitions={deepWorkDefinitions}
-                                        formatDuration={formatDuration}
-                                        calculatedEstimate={calculateTotalEstimate(def)}
-                                        upskillDefinitions={upskillDefinitions}
-                                        resources={resources}
-                                        setSelectedSubtopic={setSelectedSubtopic}
-                                        linkedDeepWorkChildIds={linkedDeepWorkChildIds}
-                                        onOpenMindMap={(id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); }}
-                                      />
-                                  ))}
-                                </div>
-                            </ScrollArea>
+                           selectedFocusArea ? (
+                                <DroppableArea id={`linked-work-area-${selectedFocusArea.id}`} className="space-y-4">
+                                    <div className="space-y-1">
+                                        <h3 className="text-xl font-bold">{selectedFocusArea.name}</h3>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('deepwork', selectedFocusArea)}>
+                                                <LinkIcon className="mr-2 h-4 w-4" /> Link Focus Area
+                                            </Button>
+                                            <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('upskill', selectedFocusArea)}>
+                                                <BookCopy className="mr-2 h-4 w-4" /> Link Learning
+                                            </Button>
+                                            <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('resource', selectedFocusArea)}>
+                                                <Folder className="mr-2 h-4 w-4" /> Link Resource
+                                            </Button>
+                                        </div>
+                                    </div>
+                                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                        {(selectedFocusArea.linkedDeepWorkIds || []).map(id => {
+                                            const def = deepWorkDefinitions.find(d => d.id === id);
+                                            return def ? <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, setSelectedFocusArea, setViewMode, handleToggleReadyForBranding, handleStartEditDefinition, handleUnlinkItem, handleDeleteExerciseDefinition, handleViewProgress, deepWorkDefinitions, formatDuration, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic, linkedDeepWorkChildIds, onOpenMindMap:(id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); } }}/> : null;
+                                        })}
+                                        {(selectedFocusArea.linkedUpskillIds || []).map(id => {
+                                            const def = upskillDefinitions.find(d => d.id === id);
+                                            return def ? <LinkedUpskillCard key={id} id={id} upskillDef={def} {...{isUpskillObjectiveComplete, getUpskillLoggedMinutesRecursive, setEmbedUrl, setFloatingVideoUrl, handleViewProgress, handleStartEditUpskill, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteUpskillDefinition: (id) => handleDeleteUpskillDefinition(id), upskillDefinitions, formatDuration: formatDuration, calculatedEstimate: calculateTotalEstimate(def), setSelectedSubtopic, setViewMode }} /> : null;
+                                        })}
+                                        {(selectedFocusArea.linkedResourceIds || []).map(id => {
+                                            const resource = resources.find(r => r.id === id);
+                                            return resource ? <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={(type, id) => handleUnlinkItem(type, id)} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} /> : null;
+                                        })}
+                                    </div>
+                                </DroppableArea>
+                            ) : (
+                                <div className="text-center py-10 text-muted-foreground">Select a micro-skill from the library to view its focus areas.</div>
+                            )
                         )}
                     </CardContent>
                 </Card>
@@ -1907,3 +1913,4 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
+
