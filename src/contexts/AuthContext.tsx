@@ -149,6 +149,10 @@ interface AuthContextType {
   setSkillDomains: React.Dispatch<React.SetStateAction<SkillDomain[]>>;
   coreSkills: CoreSkill[];
   setCoreSkills: React.Dispatch<React.SetStateAction<CoreSkill[]>>;
+
+  // New state for selected subtopic/focus area
+  selectedSubtopic: ExerciseDefinition | null;
+  setSelectedSubtopic: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -226,6 +230,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Skill Page State
   const [skillDomains, setSkillDomains] = useState<SkillDomain[]>([]);
   const [coreSkills, setCoreSkills] = useState<CoreSkill[]>([]);
+  
+  // Persisted task state
+  const [selectedSubtopic, setSelectedSubtopic] = useState<ExerciseDefinition | null>(null);
 
 
   useEffect(() => {
@@ -321,6 +328,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`skill_domains_${username}`); setSkillDomains(d ? JSON.parse(d) : []); } catch (e) { setSkillDomains([]); }
       try { const d = loadItem(`core_skills_${username}`); setCoreSkills(d ? JSON.parse(d) : []); } catch (e) { setCoreSkills([]); }
 
+      // Persisted task state
+      try {
+        const d = loadItem(`selected_subtopic_${username}`);
+        if (d) {
+          const storedTopic = JSON.parse(d);
+          // Verify it's a valid definition-like object
+          if (storedTopic && storedTopic.id && storedTopic.name) {
+            setSelectedSubtopic(storedTopic);
+          }
+        }
+      } catch (e) {
+        setSelectedSubtopic(null);
+      }
+
 
     } else {
       // Clear all data on logout
@@ -339,6 +360,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setMindsetCards(DEFAULT_MINDSET_CARDS);
       setPistons({});
       setSkillDomains([]); setCoreSkills([]);
+      setSelectedSubtopic(null);
     }
   }, [currentUser]);
 
@@ -395,6 +417,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Skill Page
       localStorage.setItem(`skill_domains_${username}`, JSON.stringify(skillDomains));
       localStorage.setItem(`core_skills_${username}`, JSON.stringify(coreSkills));
+      
+      // Persisted task state
+      if (selectedSubtopic) localStorage.setItem(`selected_subtopic_${username}`, JSON.stringify(selectedSubtopic)); else localStorage.removeItem(`selected_subtopic_${username}`);
     }
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
@@ -406,7 +431,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     mindsetCards,
     pistons,
     skillDomains, coreSkills,
-    currentUser, loading
+    currentUser, loading, selectedSubtopic
   ]);
 
 
@@ -1360,6 +1385,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     deleteDesire,
     skillDomains, setSkillDomains,
     coreSkills, setCoreSkills,
+    selectedSubtopic, setSelectedSubtopic,
   };
 
   return (

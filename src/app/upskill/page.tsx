@@ -460,13 +460,12 @@ function UpskillPageContent() {
     topicGoals, 
     resources, setResources, resourceFolders,
     setFloatingVideoUrl,
+    selectedSubtopic, 
+    setSelectedSubtopic,
     skillDomains,
     coreSkills,
-    setSelectedSubtopic: setGlobalSelectedSubtopic
   } = useAuth();
   const router = useRouter();
-  const { selectedSubtopic: globalSelectedSubtopic } = useAuth();
-  const [selectedSubtopic, setSelectedSubtopic] = useState<ExerciseDefinition | null>(globalSelectedSubtopic);
 
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
   

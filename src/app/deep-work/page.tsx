@@ -573,7 +573,7 @@ function LinkedDeepWorkCard({
     getDeepWorkLoggedMinutes: (def: ExerciseDefinition) => number;
     permanentlyLoggedActionIds: Set<string>;
     handleAddTaskToSession: (def: ExerciseDefinition) => void;
-    setSelectedFocusArea: (def: ExerciseDefinition) => void;
+    setSelectedFocusArea: (def: ExerciseDefinition | null) => void;
     setViewMode: (mode: 'session' | 'library') => void;
     handleToggleReadyForBranding: (id: string) => void;
     handleStartEditDefinition: (def: ExerciseDefinition) => void;
@@ -756,6 +756,7 @@ function DeepWorkPageContent() {
     resourceFolders,
     topicGoals,
     setFloatingVideoUrl,
+    selectedSubtopic, 
     setSelectedSubtopic,
     skillDomains,
     coreSkills,
@@ -780,7 +781,9 @@ function DeepWorkPageContent() {
   const [isLoadingPage, setIsLoadingPage] = useState(true);
   
   const [viewMode, setViewMode] = useState<'session' | 'library'>('session');
-  const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
+
+  const selectedFocusArea = selectedSubtopic;
+  const setSelectedFocusArea = setSelectedSubtopic;
 
   const [isManageLinksModalOpen, setIsManageLinksModalOpen] = useState(false);
   const [manageLinksConfig, setManageLinksConfig] = useState<{type: 'upskill' | 'deepwork' | 'resource', parent: ExerciseDefinition} | null>(null);
