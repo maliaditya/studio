@@ -3,7 +3,6 @@
 
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,6 +10,8 @@ import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus,
 import { cn } from '@/lib/utils';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition } from '@/types/workout';
 import { AnimatePresence, motion } from 'framer-motion';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
 
 interface SkillLibraryProps {
   pageType: 'deepwork' | 'upskill';
@@ -35,12 +36,9 @@ export function SkillLibrary({
   const [selectedSkillArea, setSelectedSkillArea] = useState<SkillArea | null>(null);
   const [historyStack, setHistoryStack] = useState<any[]>([]);
 
-  const handleDomainSelect = (domainId: string) => {
-    const domain = skillDomains.find(d => d.id === domainId);
-    if (domain) {
+  const handleDomainSelect = (domain: SkillDomain) => {
       setSelectedDomain(domain);
       setHistoryStack([null]);
-    }
   };
 
   const handleCoreSkillClick = (coreSkill: CoreSkill) => {
@@ -108,7 +106,7 @@ export function SkillLibrary({
       return (
         <div className="space-y-2">
           {skillDomains.map(domain => (
-            <Button key={domain.id} variant="outline" className="w-full justify-start" onClick={() => handleDomainSelect(domain.id)}>
+            <Button key={domain.id} variant="outline" className="w-full justify-start" onClick={() => handleDomainSelect(domain)}>
               {domain.name}
             </Button>
           ))}
@@ -117,7 +115,7 @@ export function SkillLibrary({
     }
     
     if (!selectedCoreSkill) {
-      const filteredCoreSkills = coreSkills.filter(cs => cs.domainId === selectedDomain.id && cs.skillAreas.length > 0);
+      const filteredCoreSkills = coreSkills.filter(cs => cs.domainId === selectedDomain.id);
       return (
         <div className="space-y-2">
           {filteredCoreSkills.map(cs => (
@@ -152,7 +150,7 @@ export function SkillLibrary({
                             <div className="flex items-center group">
                                 <AccordionTrigger
                                     className={cn(
-                                        "text-sm font-semibold hover:no-underline py-2 flex-grow",
+                                        "text-base font-semibold hover:no-underline py-2 flex-grow",
                                         selectedMicroSkill?.id === ms.id && "text-primary"
                                     )}
                                     onClick={() => onSelectMicroSkill(ms)}
@@ -203,4 +201,3 @@ export function SkillLibrary({
     </Card>
   );
 }
-
