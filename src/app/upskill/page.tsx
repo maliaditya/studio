@@ -440,10 +440,10 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, onOpenNes
 function UpskillPageContent() {
   const { toast } = useToast();
   const { 
-    currentUser, exportData,
+    currentUser, 
     allUpskillLogs, setAllUpskillLogs,
     upskillDefinitions, setUpskillDefinitions,
-    topicGoals, setTopicGoals,
+    topicGoals, 
     resources, setResources, resourceFolders,
     setFloatingVideoUrl,
     skillDomains,
@@ -454,32 +454,16 @@ function UpskillPageContent() {
   const { selectedSubtopic: globalSelectedSubtopic } = useAuth();
   const [selectedSubtopic, setSelectedSubtopic] = useState<ExerciseDefinition | null>(globalSelectedSubtopic);
 
-  
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
   
   const [editingSubtopic, setEditingSubtopic] = useState<ExerciseDefinition | null>(null);
   const [editedSubtopicData, setEditedSubtopicData] = useState<Partial<ExerciseDefinition> & { estHours?: string; estMinutes?: string }>({});
   
-  const [editingTopicGoal, setEditingTopicGoal] = useState<string | null>(null);
-  const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
-  const [currentGoal, setCurrentGoal] = useState<TopicGoal>({ goalType: 'pages', goalValue: 0 });
-
-  const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
-  
-  const contextMenuRef = useRef<HTMLDivElement>(null);
-  const subtopicContextMenuRef = useRef<HTMLDivElement>(null);
-  
-  const [subtopicContextMenu, setSubtopicContextMenu] = useState<{ mouseX: number; mouseY: number; item: ExerciseDefinition; } | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ mouseX: number; mouseY: number; item: string; } | null>(null);
-
-  const [visibilityFilters, setVisibilityFilters] = useState<Set<'curiosity' | 'objective' | 'visualization' | 'standalone'>>(new Set(['curiosity', 'objective', 'visualization', 'standalone']));
-
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
   const [progressModalConfig, setProgressModalConfig] = useState<{ isOpen: boolean; exercise: ExerciseDefinition | null; }>({ isOpen: false, exercise: null });
   
   const [isLoadingPage, setIsLoadingPage] = useState(true);
-  const [showBackupPrompt, setShowBackupPrompt] = useState(false);
 
   const [viewMode, setViewMode] = useState<'session' | 'library'>('session');
   
@@ -598,19 +582,6 @@ function UpskillPageContent() {
     new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []))
   , [upskillDefinitions]);
 
-  const handleVisibilityFilterChange = (filter: 'curiosity' | 'objective' | 'visualization' | 'standalone') => {
-    setVisibilityFilters(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(filter)) {
-            newSet.delete(filter);
-        } else {
-            newSet.add(filter);
-        }
-        if(newSet.size === 0) return new Set(['curiosity', 'objective', 'visualization', 'standalone']);
-        return newSet;
-    });
-  };
-  
   const isUpskillObjectiveComplete = useCallback((objectiveId: string): boolean => {
     const visited = new Set<string>();
     const visualizationIds = new Set<string>();
@@ -729,57 +700,10 @@ function UpskillPageContent() {
         });
     }
   }, [editingSubtopic]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-        if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as Node)) setContextMenu(null);
-        if (subtopicContextMenuRef.current && !subtopicContextMenuRef.current.contains(event.target as Node)) setSubtopicContextMenu(null);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => { document.removeEventListener('mousedown', handleClickOutside); };
-  }, []);
-
-  const handleContextMenu = (e: React.MouseEvent, topic: string) => {
-    e.preventDefault(); e.stopPropagation(); setSubtopicContextMenu(null);
-    setContextMenu({ mouseX: e.clientX, mouseY: e.clientY, item: topic, });
-  };
-
-  const handleSubtopicContextMenu = (e: React.MouseEvent, item: ExerciseDefinition) => {
-    e.preventDefault(); e.stopPropagation(); setContextMenu(null);
-    setSubtopicContextMenu({ mouseX: e.clientX, mouseY: e.clientY, item: item, });
-  };
-
-  const toggleTopicExpansion = useCallback((topic: string) => {
-    setExpandedTopics(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(topic)) newSet.delete(topic); else newSet.add(topic);
-        return newSet;
-    });
-  }, []);
-
+  
   useEffect(() => {
     setIsLoadingPage(false);
   }, []);
-
-  useEffect(() => {
-    if (!currentUser) return;
-    const today = new Date();
-    const year = getYear(today);
-    const week = getISOWeek(today);
-    const backupPromptKey = `backupPrompt_upskill_${year}-${week}`;
-    if (isMonday(today) && !localStorage.getItem(backupPromptKey)) setShowBackupPrompt(true);
-  }, [currentUser]);
-
-  const markBackupPromptAsHandled = () => {
-    const today = new Date();
-    const year = getYear(today);
-    const week = getISOWeek(today);
-    const backupPromptKey = `backupPrompt_upskill_${year}-${week}`;
-    localStorage.setItem(backupPromptKey, 'true');
-    setShowBackupPrompt(false);
-  };
-
-  const handleBackupConfirm = () => { exportData(); markBackupPromptAsHandled(); };
 
   const currentDatedWorkout = useMemo(() => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -824,15 +748,6 @@ function UpskillPageContent() {
     setNewSubtopicData({ name: '', description: '', link: '', hours: '', minutes: '' });
     
     toast({ title: "Success", description: `Task "${newDef.name}" created.` });
-
-    setExpandedTopics(prev => {
-        const newSet = new Set(prev);
-        if (newSubtopicParentTopic) {
-            newSet.add(newSubtopicParentTopic);
-        }
-        return newSet;
-    });
-
     setSelectedSubtopic(newDef);
     setViewMode('library');
   };
@@ -875,28 +790,6 @@ function UpskillPageContent() {
     if(selectedSubtopic?.id === editingSubtopic.id) setSelectedSubtopic({ ...selectedSubtopic, ...finalData } as ExerciseDefinition);
     toast({ title: "Success", description: `Task updated to "${finalData.name}".` });
     setEditingSubtopic(null);
-  };
-
-  const handleDeleteTopic = () => {
-    if (!topicToDelete) return;
-    setUpskillDefinitions(prev => prev.filter(def => def.category !== topicToDelete));
-    setTopicGoals(prev => { const newGoals = {...prev}; delete newGoals[topicToDelete]; return newGoals; });
-    setAllUpskillLogs(prevLogs => prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.category !== topicToDelete) })));
-    if (selectedSubtopic && selectedSubtopic.category === topicToDelete) { setSelectedSubtopic(null); setViewMode('session'); }
-    toast({ title: "Topic Deleted", description: `Topic "${topicToDelete}" and all its subtopics have been removed.`});
-    setTopicToDelete(null);
-  };
-  
-  const handleStartEditingGoal = (topic: string) => {
-    setEditingTopicGoal(topic);
-    setCurrentGoal(topicGoals[topic] || { goalType: 'pages', goalValue: 0 });
-  };
-
-  const handleSaveGoal = () => {
-    if (!editingTopicGoal) return;
-    setTopicGoals(prev => ({...prev, [editingTopicGoal]: currentGoal }));
-    toast({ title: "Goal Updated", description: `Goal for "${editingTopicGoal}" has been saved.`});
-    setEditingTopicGoal(null);
   };
 
   const handleAddTaskToSession = (definition: ExerciseDefinition) => {
@@ -1196,7 +1089,7 @@ function UpskillPageContent() {
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => { if (contextMenu) setContextMenu(null); if (subtopicContextMenu) setSubtopicContextMenu(null); }}>
+        <div className="container mx-auto p-4 sm:p-6 lg:p-8">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
             
             <aside className="lg:col-span-1 space-y-6">
@@ -1238,18 +1131,39 @@ function UpskillPageContent() {
                                                      {skillArea.name}
                                                    </AccordionTrigger>
                                                    <AccordionContent className="pl-4">
-                                                       {skillArea.microSkills.map(microSkill => (
-                                                           <AccordionItem key={microSkill.id} value={microSkill.id} className="border-b-0">
-                                                               <AccordionTrigger className="text-xs py-2 hover:no-underline font-normal text-muted-foreground">
-                                                                  {microSkill.name}
-                                                               </AccordionTrigger>
-                                                               <AccordionContent className="pl-4 pt-2">
-                                                                 <Button className="w-full h-8" variant="outline" onClick={() => handleOpenNewSubtopicModal(microSkill.name)}>
-                                                                   <PlusCircle className="h-4 w-4 mr-2" /> New Task
-                                                                 </Button>
-                                                               </AccordionContent>
-                                                           </AccordionItem>
-                                                       ))}
+                                                        <Accordion type="multiple" className="w-full">
+                                                            {skillArea.microSkills.map(microSkill => (
+                                                                <AccordionItem key={microSkill.id} value={microSkill.id} className="border-b-0">
+                                                                    <div className="flex items-center group">
+                                                                        <AccordionTrigger className="text-xs py-2 hover:no-underline font-normal text-muted-foreground flex-grow">
+                                                                        {microSkill.name}
+                                                                        </AccordionTrigger>
+                                                                        <Button 
+                                                                            variant="ghost" 
+                                                                            size="icon" 
+                                                                            className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                                                            onClick={(e) => { e.stopPropagation(); handleOpenNewSubtopicModal(microSkill.name); }}
+                                                                        >
+                                                                            <PlusCircle className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </div>
+                                                                    <AccordionContent className="pl-4 pt-2">
+                                                                        <ul className="space-y-1">
+                                                                            {upskillDefinitions.filter(def => def.category === microSkill.name).map(def => (
+                                                                                <li key={def.id}>
+                                                                                    <button 
+                                                                                        onClick={() => { setSelectedSubtopic(def); setViewMode('library'); }} 
+                                                                                        className={cn("text-xs w-full text-left p-1 rounded hover:bg-muted", selectedSubtopic?.id === def.id && "bg-muted font-semibold")}
+                                                                                    >
+                                                                                        {def.name}
+                                                                                    </button>
+                                                                                </li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    </AccordionContent>
+                                                                </AccordionItem>
+                                                            ))}
+                                                        </Accordion>
                                                    </AccordionContent>
                                                </AccordionItem>
                                            ))}
@@ -1537,4 +1451,3 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
-

@@ -731,8 +731,6 @@ function DeepWorkPageContent() {
     allUpskillLogs, setAllUpskillLogs,
     deepWorkDefinitions, setDeepWorkDefinitions,
     upskillDefinitions, setUpskillDefinitions,
-    deepWorkTopicMetadata, setDeepWorkTopicMetadata,
-    updateTopic, deleteTopic,
     resources, setResources,
     resourceFolders,
     topicGoals,
@@ -741,54 +739,56 @@ function DeepWorkPageContent() {
     skillDomains,
     coreSkills,
   } = useAuth();
-
-  const [newTopicName, setNewTopicName] = useState('');
   
-  const [editingDefinition, setEditingDefinition] = useState<ExerciseDefinition | null>(null);
-  const [editingDefinitionName, setEditingDefinitionName] = useState('');
-  const [editingDefinitionHours, setEditingDefinitionHours] = useState('');
-  const [editingDefinitionMinutes, setEditingDefinitionMinutes] = useState('');
-  
-  const [editingTopic, setEditingTopic] = useState<string | null>(null);
-  const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
-  const [newTopicNameForEdit, setNewTopicNameForEdit] = useState('');
-  const [newTopicClassificationForEdit, setNewTopicClassificationForEdit] = useState<'product' | 'service'>('product');
-
   const [isNewFocusAreaModalOpen, setIsNewFocusAreaModalOpen] = useState(false);
   const [newFocusAreaParentTopic, setNewFocusAreaParentTopic] = useState<string | null>(null);
   const [newFocusAreaData, setNewFocusAreaData] = useState({ name: '', hours: '', minutes: '' });
-
-  const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
-
-  // Edit states for linked items
-  const [editingUpskill, setEditingUpskill] = useState<ExerciseDefinition | null>(null);
-  const [editedUpskillData, setEditedUpskillData] = useState<Partial<ExerciseDefinition> & { estHours?: string; estMinutes?: string }>({});
-  const [editingResource, setEditingResource] = useState<Resource | null>(null);
-  const [editedResourceData, setEditedResourceData] = useState<Partial<Resource>>({});
-
-  const contextMenuRef = useRef<HTMLDivElement>(null);
-  const [contextMenu, setContextMenu] = useState<{
-    mouseX: number;
-    mouseY: number;
-    item: string; // The topic name
-  } | null>(null);
-
-  const focusAreaContextMenuRef = useRef<HTMLDivElement>(null);
-  const [focusAreaContextMenu, setFocusAreaContextMenu] = useState<{
-    mouseX: number;
-    mouseY: number;
-    item: ExerciseDefinition;
-  } | null>(null);
-
-  const [visibilityFilters, setVisibilityFilters] = useState<Set<'intention' | 'objective' | 'action' | 'standalone'>>(new Set(['intention', 'objective', 'action', 'standalone']));
-
-  // Mind map modal state
-  const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
-  const [mindMapRootId, setMindMapRootId] = useState<string | null>(null);
-
+  
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
 
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  
+  const [progressModalConfig, setProgressModalConfig] = useState<{
+    isOpen: boolean;
+    exercise: ExerciseDefinition | null;
+    pageType: 'deepwork' | 'upskill';
+  }>({ isOpen: false, exercise: null, pageType: 'deepwork' });
+  const [isFocusAreaProgressModalOpen, setIsFocusAreaProgressModalOpen] = useState(false);
+  
+  const [isLoadingPage, setIsLoadingPage] = useState(true);
+  
+  // New state for right panel view
+  const [viewMode, setViewMode] = useState<'session' | 'library'>('session');
+  const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
+
+  // State for the "Manage Links" functionality
+  const [isManageLinksModalOpen, setIsManageLinksModalOpen] = useState(false);
+  const [manageLinksConfig, setManageLinksConfig] = useState<{type: 'upskill' | 'deepwork' | 'resource', parent: ExerciseDefinition} | null>(null);
+  const [newLinkedItemName, setNewLinkedItemName] = useState('');
+  const [newLinkedItemTopic, setNewLinkedItemTopic] = useState('');
+  const [newLinkedItemDescription, setNewLinkedItemDescription] = useState('');
+  const [newLinkedItemLink, setNewLinkedItemLink] = useState('');
+  const [newLinkedItemHours, setNewLinkedItemHours] = useState('');
+  const [newLinkedItemMinutes, setNewLinkedItemMinutes] = useState('');
+  const [newLinkedItemFolderId, setNewLinkedItemFolderId] = useState('');
+  const [linkSearchTerm, setLinkSearchTerm] = useState('');
+  const [tempLinkedIds, setTempLinkedIds] = useState<string[]>([]);
+  const [linkResourceFolderId, setLinkResourceFolderId] = useState<string>('');
+  const [linkUpskillTopic, setLinkUpskillTopic] = useState('');
+  const [linkDeepWorkTopic, setLinkDeepWorkTopic] = useState('');
+  const [isCreatingLink, setIsCreatingLink] = useState(false);
+
+  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+
+  const allKnownTopics = useMemo(() => {
+    const topicsFromDefs = new Set(deepWorkDefinitions.map(def => def.category));
+    return Array.from(new Set([...topicsFromDefs])).sort();
+  }, [deepWorkDefinitions]);
+
+  const allUpskillTopics = useMemo(() => 
+    Array.from(new Set(upskillDefinitions.map(def => def.category))).sort()
+  , [upskillDefinitions]);
 
   const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
       setOpenPopups(prev => {
@@ -855,146 +855,6 @@ function DeepWorkPageContent() {
       });
   }, []);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-        if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as Node)) {
-            setContextMenu(null);
-        }
-        if (focusAreaContextMenuRef.current && !focusAreaContextMenuRef.current.contains(event.target as Node)) {
-            setFocusAreaContextMenu(null);
-        }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [contextMenuRef, focusAreaContextMenuRef]);
-
-  const handleContextMenu = (e: React.MouseEvent, topic: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setFocusAreaContextMenu(null); // Close other menu
-    setContextMenu({
-      mouseX: e.clientX,
-      mouseY: e.clientY,
-      item: topic,
-    });
-  };
-
-  const handleFocusAreaContextMenu = (e: React.MouseEvent, item: ExerciseDefinition) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setContextMenu(null); // Close other menu
-    setFocusAreaContextMenu({
-        mouseX: e.clientX,
-        mouseY: e.clientY,
-        item: item,
-    });
-  };
-
-  const toggleTopicExpansion = useCallback((topic: string) => {
-    setExpandedTopics(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(topic)) {
-            newSet.delete(topic);
-        } else {
-            newSet.add(topic);
-        }
-        return newSet;
-    });
-  }, []);
-
-  useEffect(() => {
-    if (editingTopic) {
-      setNewTopicNameForEdit(editingTopic);
-      setNewTopicClassificationForEdit(deepWorkTopicMetadata[editingTopic]?.classification || 'product');
-    }
-  }, [editingTopic, deepWorkTopicMetadata]);
-
-  useEffect(() => {
-    if (editingUpskill) {
-      const hours = Math.floor((editingUpskill.estimatedDuration || 0) / 60);
-      const minutes = (editingUpskill.estimatedDuration || 0) % 60;
-      setEditedUpskillData({
-        ...editingUpskill,
-        estHours: hours > 0 ? String(hours) : '',
-        estMinutes: minutes > 0 ? String(minutes) : ''
-      });
-    }
-  }, [editingUpskill]);
-
-  useEffect(() => {
-    if (editingResource) setEditedResourceData(editingResource);
-  }, [editingResource]);
-
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  
-  const [progressModalConfig, setProgressModalConfig] = useState<{
-    isOpen: boolean;
-    exercise: ExerciseDefinition | null;
-    pageType: 'deepwork' | 'upskill';
-  }>({ isOpen: false, exercise: null, pageType: 'deepwork' });
-  const [isFocusAreaProgressModalOpen, setIsFocusAreaProgressModalOpen] = useState(false);
-  const [isFocusAreaTimesheetModalOpen, setIsFocusAreaTimesheetModalOpen] = useState(false);
-  
-  const [isLoadingPage, setIsLoadingPage] = useState(true);
-  
-  const [showBackupPrompt, setShowBackupPrompt] = useState(false);
-
-  // New state for right panel view
-  const [viewMode, setViewMode] = useState<'session' | 'library'>('session');
-  const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
-
-  // State for the "Manage Links" functionality
-  const [isManageLinksModalOpen, setIsManageLinksModalOpen] = useState(false);
-  const [manageLinksConfig, setManageLinksConfig] = useState<{type: 'upskill' | 'deepwork' | 'resource', parent: ExerciseDefinition} | null>(null);
-  const [newLinkedItemName, setNewLinkedItemName] = useState('');
-  const [newLinkedItemTopic, setNewLinkedItemTopic] = useState('');
-  const [newLinkedItemDescription, setNewLinkedItemDescription] = useState('');
-  const [newLinkedItemLink, setNewLinkedItemLink] = useState('');
-  const [newLinkedItemHours, setNewLinkedItemHours] = useState('');
-  const [newLinkedItemMinutes, setNewLinkedItemMinutes] = useState('');
-  const [newLinkedItemFolderId, setNewLinkedItemFolderId] = useState('');
-  const [linkSearchTerm, setLinkSearchTerm] = useState('');
-  const [tempLinkedIds, setTempLinkedIds] = useState<string[]>([]);
-  const [linkResourceFolderId, setLinkResourceFolderId] = useState<string>('');
-  const [linkUpskillTopic, setLinkUpskillTopic] = useState('');
-  const [linkDeepWorkTopic, setLinkDeepWorkTopic] = useState('');
-  const [isCreatingLink, setIsCreatingLink] = useState(false);
-
-  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
-
-  const allKnownTopics = useMemo(() => {
-    const topicsFromDefs = new Set(deepWorkDefinitions.map(def => def.category));
-    const topicsFromMeta = new Set(Object.keys(deepWorkTopicMetadata));
-    return Array.from(new Set([...topicsFromDefs, ...topicsFromMeta])).sort();
-  }, [deepWorkDefinitions, deepWorkTopicMetadata]);
-
-  const allUpskillTopics = useMemo(() => 
-    Array.from(new Set(upskillDefinitions.map(def => def.category))).sort()
-  , [upskillDefinitions]);
-
-  // A memoized set of all focus area IDs that are linked as children.
-  const linkedDeepWorkChildIds = useMemo(() =>
-    new Set<string>(deepWorkDefinitions.flatMap(def => def.linkedDeepWorkIds || []))
-  , [deepWorkDefinitions]);
-  
-  const linkedUpskillChildIds = useMemo(() => 
-    new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []))
-  , [upskillDefinitions]);
-
-  const handleVisibilityFilterChange = (filter: 'intention' | 'objective' | 'action' | 'standalone') => {
-    setVisibilityFilters(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(filter)) {
-            newSet.delete(filter);
-        } else {
-            newSet.add(filter);
-        }
-        return newSet;
-    });
-  };
-
   const formatDuration = (minutes: number) => {
     if (minutes === 0) return "0m";
     const h = Math.floor(minutes / 60);
@@ -1049,8 +909,6 @@ function DeepWorkPageContent() {
     const deepWorkActionIds = new Set<string>();
     const directUpskillLinkIds = new Set<string>(); 
 
-    // 1. Traverse the Deep Work tree to find all leaf nodes (actions)
-    //    and all directly linked upskill items (curiosities).
     function findDeepWorkActionsAndUpskillLinks(nodeId: string) {
         if (visitedDeepWork.has(nodeId)) return;
         visitedDeepWork.add(nodeId);
@@ -1062,16 +920,15 @@ function DeepWorkPageContent() {
         
         const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0;
 
-        if (!isParent) { // It's an Action (leaf node)
+        if (!isParent) {
             deepWorkActionIds.add(node.id);
-        } else { // It's an Intention or Objective, so recurse
+        } else {
             (node.linkedDeepWorkIds || []).forEach(childId => findDeepWorkActionsAndUpskillLinks(childId));
         }
     }
 
     findDeepWorkActionsAndUpskillLinks(definition.id);
 
-    // 2. Calculate total minutes from the deep work actions.
     let totalMinutes = 0;
     if (allDeepWorkLogs) {
         allDeepWorkLogs.forEach(log => {
@@ -1083,8 +940,6 @@ function DeepWorkPageContent() {
         });
     }
 
-    // 3. For each linked upskill 'Curiosity', traverse its own tree to find all
-    //    leaf nodes ('Visualizations') and sum their logged times.
     directUpskillLinkIds.forEach(curiosityId => {
         const curiosityDef = upskillDefinitions.find(d => d.id === curiosityId);
         if(curiosityDef) {
@@ -1134,66 +989,6 @@ function DeepWorkPageContent() {
     return calculateTotalEstimate(selectedFocusArea);
   }, [selectedFocusArea, calculateTotalEstimate]);
 
-  const timesheetData = useMemo(() => {
-    if (!selectedFocusArea) return [];
-
-    const allDefIds = new Set([
-        selectedFocusArea.id,
-        ...(selectedFocusArea.linkedDeepWorkIds || []),
-        ...(selectedFocusArea.linkedUpskillIds || []),
-    ]);
-
-    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-    const defIdToNameMap = new Map(allDefs.map(def => [def.id, def.name]));
-
-    const entries: { date: string; taskName: string; duration: number }[] = [];
-
-    allDeepWorkLogs.forEach(log => {
-        log.exercises.forEach(ex => {
-            if (allDefIds.has(ex.definitionId)) {
-                ex.loggedSets.forEach(set => {
-                    if (set.weight > 0) { // weight is duration for deepwork
-                        entries.push({
-                            date: log.date,
-                            taskName: defIdToNameMap.get(ex.definitionId) || ex.name,
-                            duration: set.weight
-                        });
-                    }
-                });
-            }
-        });
-    });
-
-    allUpskillLogs.forEach(log => {
-        log.exercises.forEach(ex => {
-            if (allDefIds.has(ex.definitionId)) {
-                ex.loggedSets.forEach(set => {
-                    if (set.reps > 0) { // reps is duration for upskill
-                        entries.push({
-                            date: log.date,
-                            taskName: defIdToNameMap.get(ex.definitionId) || ex.name,
-                            duration: set.reps
-                        });
-                    }
-                });
-            }
-        });
-    });
-
-    // Group by date
-    const groupedByDate: Record<string, { taskName: string; duration: number }[]> = {};
-    entries.forEach(entry => {
-        if (!groupedByDate[entry.date]) {
-            groupedByDate[entry.date] = [];
-        }
-        groupedByDate[entry.date].push({ taskName: entry.taskName, duration: entry.duration });
-    });
-
-    return Object.entries(groupedByDate)
-        .map(([date, tasks]) => ({ date, tasks, totalDuration: tasks.reduce((sum, task) => sum + task.duration, 0) }))
-        .sort((a, b) => b.date.localeCompare(a.date)); // Sort by most recent date first
-}, [selectedFocusArea, allDeepWorkLogs, allUpskillLogs, deepWorkDefinitions, upskillDefinitions]);
-
   const permanentlyLoggedActionIds = useMemo(() => {
     const loggedIds = new Set<string>();
     if (!allDeepWorkLogs) return loggedIds;
@@ -1207,48 +1002,10 @@ function DeepWorkPageContent() {
     });
     return loggedIds;
   }, [allDeepWorkLogs]);
-
-  const permanentlyLoggedVisualizationIds = useMemo(() => {
-    const loggedIds = new Set<string>();
-    if (!allUpskillLogs) return loggedIds;
-    allUpskillLogs.forEach(log => {
-      log.exercises.forEach(ex => {
-        if (ex.loggedSets.length > 0) {
-          loggedIds.add(ex.definitionId);
-        }
-      });
-    });
-    return loggedIds;
-  }, [allUpskillLogs]);
-
-
+  
   useEffect(() => {
-    setIsLoadingPage(false); // Data is loaded from context
+    setIsLoadingPage(false);
   }, []);
-
-  useEffect(() => {
-    if (!currentUser) return;
-    const today = new Date();
-    const year = getYear(today);
-    const week = getISOWeek(today);
-    const backupPromptKey = `backupPrompt_deepwork_${year}-${week}`;
-    const hasBeenPrompted = localStorage.getItem(backupPromptKey);
-    if (isMonday(today) && !hasBeenPrompted) setShowBackupPrompt(true);
-  }, [currentUser]);
-
-  const markBackupPromptAsHandled = () => {
-    const today = new Date();
-    const year = getYear(today);
-    const week = getISOWeek(today);
-    const backupPromptKey = `backupPrompt_deepwork_${year}-${week}`;
-    localStorage.setItem(backupPromptKey, 'true');
-    setShowBackupPrompt(false);
-  };
-
-  const handleBackupConfirm = () => {
-    exportData(); 
-    markBackupPromptAsHandled();
-  };
 
   const currentDatedWorkout = useMemo(() => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -1302,26 +1059,20 @@ function DeepWorkPageContent() {
 
     setDeepWorkDefinitions(prev => [...prev, newDef]);
 
-    // This part is new, to update the view
     if (selectedDomainId) {
         const selectedDomain = skillDomains.find(d => d.id === selectedDomainId);
         if (selectedDomain) {
             const microSkillsInDomain = coreSkills.filter(cs => cs.domainId === selectedDomainId).flatMap(cs => cs.skillAreas).flatMap(sa => sa.microSkills);
             if (microSkillsInDomain.some(ms => ms.name === newFocusAreaParentTopic)) {
-                // The new focus area is part of the currently selected domain, so no view change is needed.
-                // It should appear automatically now with the filtering logic fix.
             }
         }
     }
 
-
-    // Reset and close modal
     setNewFocusAreaData({ name: '', hours: '', minutes: '' });
     setIsNewFocusAreaModalOpen(false);
     setNewFocusAreaParentTopic(null);
     toast({ title: "Success", description: `Focus Area "${newDef.name}" added to ${newFocusAreaParentTopic}.` });
   };
-
 
   const handleDeleteExerciseDefinition = (id: string) => {
     const defToDelete = deepWorkDefinitions.find(def => def.id === id);
@@ -1336,31 +1087,7 @@ function DeepWorkPageContent() {
   };
 
   const handleStartEditDefinition = (def: ExerciseDefinition) => {
-    setEditingDefinition(def);
-    setEditingDefinitionName(def.name);
-    const hours = Math.floor((def.estimatedDuration || 0) / 60);
-    const minutes = (def.estimatedDuration || 0) % 60;
-    setEditingDefinitionHours(hours > 0 ? String(hours) : '');
-    setEditingDefinitionMinutes(minutes > 0 ? String(minutes) : '');
-  };
-
-  const handleSaveEditDefinition = () => {
-    if (!editingDefinition || editingDefinitionName.trim() === '') {
-      toast({ title: "Error", description: "Focus Area name cannot be empty.", variant: "destructive" });
-      return;
-    }
-    const hours = parseInt(editingDefinitionHours, 10) || 0;
-    const minutes = parseInt(editingDefinitionMinutes, 10) || 0;
-    const totalMinutes = hours * 60 + minutes;
-
-    const updatedDef = { ...editingDefinition, name: editingDefinitionName.trim(), estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined };
-    setDeepWorkDefinitions(prev => prev.map(def => def.id === editingDefinition.id ? updatedDef : def));
-    setAllDeepWorkLogs(prevLogs => prevLogs.map(log => ({...log, exercises: log.exercises.map(ex => ex.definitionId === editingDefinition.id ? { ...ex, name: updatedDef.name } : ex)})));
-    if(selectedFocusArea?.id === editingDefinition.id) {
-        setSelectedFocusArea(updatedDef);
-    }
-    toast({ title: "Success", description: `Focus Area updated to "${updatedDef.name}".` });
-    setEditingDefinition(null);
+    // This is handled in the library view now, direct edit on card is better UX
   };
 
   const handleToggleReadyForBranding = (definitionId: string) => {
@@ -1380,22 +1107,6 @@ function DeepWorkPageContent() {
       description: `"${def.name}" is now ${!def.isReadyForBranding ? 'marked as ready' : 'no longer ready'} for branding.`
     });
   };
-
-  const handleSaveTopicEdit = () => {
-    if (!editingTopic || !newTopicNameForEdit.trim()) return;
-    updateTopic(editingTopic, newTopicNameForEdit, newTopicClassificationForEdit);
-    setEditingTopic(null);
-  }
-
-  const handleDeleteTopic = () => {
-    if (!topicToDelete) return;
-    deleteTopic(topicToDelete);
-    if (selectedFocusArea && selectedFocusArea.category === topicToDelete) {
-        setSelectedFocusArea(null);
-        setViewMode('session');
-    }
-    setTopicToDelete(null);
-  }
 
   const handleAddTaskToSession = (definition: ExerciseDefinition) => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -1480,7 +1191,6 @@ function DeepWorkPageContent() {
   
     setUpskillDefinitions(prev => prev.filter(def => def.id !== id));
     
-    // Also remove it from any deep work definitions that link to it
     setDeepWorkDefinitions(prevDefs => 
       prevDefs.map(def => ({
         ...def,
@@ -1503,7 +1213,6 @@ function DeepWorkPageContent() {
     } else { // resource
         setTempLinkedIds(parent.linkedResourceIds || []);
     }
-    // Reset form for "Create New" tab
     setNewLinkedItemTopic(parent.category);
     setNewLinkedItemName('');
     setNewLinkedItemDescription('');
@@ -1657,12 +1366,10 @@ function DeepWorkPageContent() {
 
 
   const handleStartEditUpskill = (def: ExerciseDefinition) => {
-    // This is a simplified handler. Ideally, it would open a modal in the upskill page.
     router.push('/upskill');
   };
   
   const handleStartEditResource = (res: Resource) => {
-    // This is a simplified handler. Ideally, it would open a modal in the resources page.
     router.push('/resources');
   };
 
@@ -1718,11 +1425,6 @@ function DeepWorkPageContent() {
     
     return { avgProductiveHours };
   }, [allUpskillLogs, allDeepWorkLogs]);
-
-  const openMindMapFor = (focusAreaId: string) => {
-    setMindMapRootId(focusAreaId);
-    setIsMindMapModalOpen(true);
-  };
   
   const isUpskillObjectiveComplete = useCallback((objectiveId: string): boolean => {
     const visited = new Set<string>();
@@ -1752,24 +1454,21 @@ function DeepWorkPageContent() {
     
     if (visualizations.length === 0) return false;
 
-    return visualizations.every(viz => permanentlyLoggedVisualizationIds.has(viz.id));
-  }, [upskillDefinitions, permanentlyLoggedVisualizationIds]);
+    return visualizations.every(viz => permanentlyLoggedActionIds.has(viz.id));
+  }, [upskillDefinitions, permanentlyLoggedActionIds]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
   
     if (!over) return;
   
-    // Case 1: Promoting a sub-task to a main linked task
     if (typeof active.id === 'string' && active.id.startsWith('subtask-') && typeof over.id === 'string' && over.id.startsWith('linked-work-area')) {
         const [_, childId, __, parentId] = active.id.split('-');
         
-        // Determine if child is deep work or upskill
         const childIsDeepWork = deepWorkDefinitions.some(d => d.id === childId);
         const childIsUpskill = upskillDefinitions.some(d => d.id === childId);
         const childIsResource = resources.some(d => d.id === childId);
   
-        // Remove from old parent (which can be deep work or upskill def)
         setDeepWorkDefinitions(prev => prev.map(def => {
             if (def.id === parentId) {
                 return {
@@ -1792,7 +1491,6 @@ function DeepWorkPageContent() {
             return def;
         }));
   
-        // Add the child to the main selectedFocusArea
         if (selectedFocusArea) {
             let updatedFocusArea: ExerciseDefinition;
             if (childIsDeepWork) {
@@ -1802,7 +1500,7 @@ function DeepWorkPageContent() {
             } else if (childIsResource) {
                  updatedFocusArea = { ...selectedFocusArea, linkedResourceIds: [...(selectedFocusArea.linkedResourceIds || []), childId] }
             } else {
-                return; // should not happen
+                return;
             }
   
             setDeepWorkDefinitions(prev => prev.map(def => def.id === selectedFocusArea.id ? updatedFocusArea : def));
@@ -1812,7 +1510,6 @@ function DeepWorkPageContent() {
         return;
     }
   
-    // Case 2: Linking one main task to another (existing logic)
     if (active.id === over.id) return;
   
     const draggedId = active.id as string;
@@ -1909,7 +1606,7 @@ function DeepWorkPageContent() {
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
-      <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => { if (contextMenu) setContextMenu(null); if (focusAreaContextMenu) setFocusAreaContextMenu(null); }}>
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
             
             <aside className="lg:col-span-1 space-y-6">
@@ -1951,18 +1648,39 @@ function DeepWorkPageContent() {
                                                          {skillArea.name}
                                                        </AccordionTrigger>
                                                        <AccordionContent className="pl-4">
-                                                           {skillArea.microSkills.map(microSkill => (
-                                                               <AccordionItem key={microSkill.id} value={microSkill.id} className="border-b-0">
-                                                                   <AccordionTrigger className="text-xs py-2 hover:no-underline font-normal text-muted-foreground">
-                                                                      {microSkill.name}
-                                                                   </AccordionTrigger>
-                                                                   <AccordionContent className="pl-4 pt-2">
-                                                                     <Button className="w-full h-8" variant="outline" onClick={() => handleOpenNewFocusAreaModal(microSkill.name)}>
-                                                                       <PlusCircle className="h-4 w-4 mr-2" /> New Focus Area
-                                                                     </Button>
-                                                                   </AccordionContent>
-                                                               </AccordionItem>
-                                                           ))}
+                                                            <Accordion type="multiple" className="w-full">
+                                                                {skillArea.microSkills.map(microSkill => (
+                                                                    <AccordionItem key={microSkill.id} value={microSkill.id} className="border-b-0">
+                                                                        <div className="flex items-center group">
+                                                                            <AccordionTrigger className="text-xs py-2 hover:no-underline font-normal text-muted-foreground flex-grow">
+                                                                            {microSkill.name}
+                                                                            </AccordionTrigger>
+                                                                            <Button 
+                                                                                variant="ghost" 
+                                                                                size="icon" 
+                                                                                className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                                                                onClick={(e) => { e.stopPropagation(); handleOpenNewFocusAreaModal(microSkill.name); }}
+                                                                            >
+                                                                                <PlusCircle className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </div>
+                                                                        <AccordionContent className="pl-4 pt-2">
+                                                                            <ul className="space-y-1">
+                                                                                {deepWorkDefinitions.filter(def => def.category === microSkill.name).map(def => (
+                                                                                    <li key={def.id}>
+                                                                                        <button 
+                                                                                            onClick={() => { setSelectedFocusArea(def); setViewMode('library'); }} 
+                                                                                            className={cn("text-xs w-full text-left p-1 rounded hover:bg-muted", selectedFocusArea?.id === def.id && "bg-muted font-semibold")}
+                                                                                        >
+                                                                                            {def.name}
+                                                                                        </button>
+                                                                                    </li>
+                                                                                ))}
+                                                                            </ul>
+                                                                        </AccordionContent>
+                                                                    </AccordionItem>
+                                                                ))}
+                                                            </Accordion>
                                                        </AccordionContent>
                                                    </AccordionItem>
                                                ))}
@@ -2044,21 +1762,6 @@ function DeepWorkPageContent() {
                         <div className='flex items-center gap-2 flex-shrink-0'>
                           <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
                           <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('library')} disabled={!selectedFocusArea}>Library</Button>
-                          {viewMode === 'library' && selectedFocusArea && (
-                              <TooltipProvider>
-                                  <Tooltip>
-                                      <TooltipTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setIsFocusAreaTimesheetModalOpen(true)}>
-                                              <Clock className="h-4 w-4"/>
-                                              <span className="sr-only">View Timesheet</span>
-                                          </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                          <p>View Timesheet</p>
-                                      </TooltipContent>
-                                  </Tooltip>
-                              </TooltipProvider>
-                          )}
                           <Popover>
                               <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger>
                               <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent>
