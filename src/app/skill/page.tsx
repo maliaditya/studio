@@ -150,7 +150,6 @@ function SkillPageContent() {
   const selectedCoreSkill = useMemo(() => coreSkills.find(s => s.id === selectedSkillId), [coreSkills, selectedSkillId]);
 
   const renderCoreSkillPillar = useCallback((skill: CoreSkill) => {
-    if(skill.skillAreas.length === 0) return null;
     let icon;
     switch (skill.type) {
         case 'Foundation': icon = <Blocks className="h-4 w-4"/>; break;
