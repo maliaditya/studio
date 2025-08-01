@@ -565,6 +565,7 @@ function LinkedDeepWorkCard({
     upskillDefinitions,
     resources,
     setSelectedSubtopic,
+    linkedDeepWorkChildIds,
 } : {
     id: string;
     deepworkDef: ExerciseDefinition;
@@ -584,6 +585,7 @@ function LinkedDeepWorkCard({
     upskillDefinitions: ExerciseDefinition[];
     resources: Resource[];
     setSelectedSubtopic: (def: ExerciseDefinition | null) => void;
+    linkedDeepWorkChildIds: Set<string>;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
@@ -594,27 +596,28 @@ function LinkedDeepWorkCard({
         setNodeRef(node);
         setDroppableNodeRef(node);
     };
+    
+    const isParent = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 || (deepworkDef.linkedUpskillIds?.length ?? 0) > 0 || (deepworkDef.linkedResourceIds?.length ?? 0) > 0;
+    const isChild = linkedDeepWorkChildIds.has(deepworkDef.id);
+    const nodeType = isParent && !isChild ? 'Intention' : isParent && isChild ? 'Objective' : !isParent && isChild ? 'Action' : 'Standalone';
 
-    const isObjective = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0;
-    const nodeType = isObjective ? 'Objective' : 'Action';
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
-    const estDuration = isObjective ? calculatedEstimate : deepworkDef.estimatedDuration;
+    const estDuration = isParent ? calculatedEstimate : deepworkDef.estimatedDuration;
     const hasLinkedLearning = (deepworkDef.linkedUpskillIds?.length ?? 0) > 0 || (deepworkDef.linkedResourceIds?.length ?? 0) > 0;
     const router = useRouter();
 
     const isComplete = useMemo(() => {
-        if (!isObjective) return permanentlyLoggedActionIds.has(deepworkDef.id);
+        if (!isParent) return permanentlyLoggedActionIds.has(deepworkDef.id);
         
         const childActionIds = (deepworkDef.linkedDeepWorkIds || []).filter(childId => {
             const childDef = deepWorkDefinitions.find(d => d.id === childId);
-            // Include only final actions (no children of their own)
             return childDef && (childDef.linkedDeepWorkIds?.length ?? 0) === 0;
         });
 
         if (childActionIds.length === 0) return false;
         
         return childActionIds.every(id => permanentlyLoggedActionIds.has(id));
-    }, [deepworkDef, isObjective, permanentlyLoggedActionIds, deepWorkDefinitions]);
+    }, [deepworkDef, isParent, permanentlyLoggedActionIds, deepWorkDefinitions]);
 
     return (
         <div ref={setCombinedRefs} style={style} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-2xl")}>
@@ -624,13 +627,13 @@ function LinkedDeepWorkCard({
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span tabIndex={isObjective ? -1 : 0}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => handleAddTaskToSession(deepworkDef)} disabled={isObjective} onMouseDown={(e) => e.stopPropagation()}>
+                      <span tabIndex={nodeType === 'Action' || nodeType === 'Standalone' ? 0 : -1}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => handleAddTaskToSession(deepworkDef)} disabled={nodeType !== 'Action' && nodeType !== 'Standalone'} onMouseDown={(e) => e.stopPropagation()}>
                           <PlusCircle className="h-4 w-4" />
                         </Button>
                       </span>
                     </TooltipTrigger>
-                    <TooltipContent>{isObjective ? 'Add sub-tasks instead' : 'Add to Session'}</TooltipContent>
+                    <TooltipContent>{nodeType === 'Action' || nodeType === 'Standalone' ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => { setSelectedFocusArea(deepworkDef); setViewMode('library'); }} onMouseDown={(e) => e.stopPropagation()}>
@@ -658,11 +661,10 @@ function LinkedDeepWorkCard({
             </div>
            <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                {isObjective ? (
-                    <Flag className="h-5 w-5 text-green-500 flex-shrink-0" />
-                  ) : (
-                    <Bolt className="h-5 w-5 text-blue-500 flex-shrink-0" />
-                  )}
+                {nodeType === 'Intention' ? <Lightbulb className="h-5 w-5 text-amber-500 flex-shrink-0" />
+                  : nodeType === 'Objective' ? <Flag className="h-5 w-5 text-green-500 flex-shrink-0" />
+                  : nodeType === 'Action' ? <Bolt className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                  : <Focus className="h-5 w-5 text-purple-500 flex-shrink-0" />}
                 <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={deepworkDef.name}>{deepworkDef.name}</span>
                 <Badge variant="outline" className="text-xs">{nodeType}</Badge>
               </CardTitle>
@@ -671,7 +673,7 @@ function LinkedDeepWorkCard({
            <CardContent className="flex-grow">
               {deepworkDef.description ? (
                   <p className="text-sm text-muted-foreground line-clamp-2">{deepworkDef.description}</p>
-              ) : isObjective ? (
+              ) : isParent ? (
                   (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
                           {(deepworkDef.linkedDeepWorkIds || []).map(childId => {
@@ -691,29 +693,29 @@ function LinkedDeepWorkCard({
                               );
                           })}
                       </div>
+                  ) : hasLinkedLearning ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                        {(deepworkDef.linkedUpskillIds || []).map(childId => {
+                            const childDef = upskillDefinitions.find(d => d.id === childId);
+                            if (!childDef) return null;
+                            return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="upskill" onClick={() => { router.push('/upskill'); setSelectedSubtopic(childDef) }} />;
+                        })}
+                         {(deepworkDef.linkedResourceIds || []).map(childId => {
+                            const childDef = resources.find(d => d.id === childId);
+                            if (!childDef) return null;
+                            return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="resource" onClick={() => { router.push('/resources') }}/>;
+                        })}
+                    </div>
                   ) : (
                       <p className="text-sm text-muted-foreground line-clamp-2">This objective has no sub-tasks yet. Link items to it.</p>
                   )
-              ) : hasLinkedLearning ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                    {(deepworkDef.linkedUpskillIds || []).map(childId => {
-                        const childDef = upskillDefinitions.find(d => d.id === childId);
-                        if (!childDef) return null;
-                        return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="upskill" onClick={() => { router.push('/upskill'); setSelectedSubtopic(childDef) }} />;
-                    })}
-                     {(deepworkDef.linkedResourceIds || []).map(childId => {
-                        const childDef = resources.find(d => d.id === childId);
-                        if (!childDef) return null;
-                        return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="resource" onClick={() => { router.push('/resources') }}/>;
-                    })}
-                </div>
               ) : (
                   <p className="text-sm text-muted-foreground line-clamp-2">This is a final action. You can add it to a session to log time.</p>
               )}
             </CardContent>
            <CardFooter className="pt-3 flex items-center justify-end">
               <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                  {estDuration && <Badge variant="outline">{formatDuration(estDuration)}</Badge>}
+                  {estDuration && estDuration > 0 && <Badge variant="outline">{formatDuration(estDuration)}</Badge>}
                   {loggedMinutes > 0 && <Badge variant="secondary">{formatDuration(loggedMinutes)} logged</Badge>}
               </div>
             </CardFooter>
@@ -758,11 +760,9 @@ function DeepWorkPageContent() {
   
   const [isLoadingPage, setIsLoadingPage] = useState(true);
   
-  // New state for right panel view
   const [viewMode, setViewMode] = useState<'session' | 'library'>('session');
   const [selectedFocusArea, setSelectedFocusArea] = useState<ExerciseDefinition | null>(null);
 
-  // State for the "Manage Links" functionality
   const [isManageLinksModalOpen, setIsManageLinksModalOpen] = useState(false);
   const [manageLinksConfig, setManageLinksConfig] = useState<{type: 'upskill' | 'deepwork' | 'resource', parent: ExerciseDefinition} | null>(null);
   const [newLinkedItemName, setNewLinkedItemName] = useState('');
@@ -1406,25 +1406,25 @@ function DeepWorkPageContent() {
     return options;
   }, [resourceFolders]);
   
-  const productivityStats = useMemo(() => {
-    const calculateAverageDuration = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
-        if (!logs) return 0;
-        const dailyDurations: Record<string, number> = {};
-        logs.forEach(log => {
-            const duration = log.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
-            if (duration > 0) { dailyDurations[log.date] = (dailyDurations[log.date] || 0) + duration; }
-        });
-        const daysWithActivity = Object.keys(dailyDurations).length;
-        if (daysWithActivity === 0) return 0;
-        const totalDuration = Object.values(dailyDurations).reduce((sum, d) => sum + d, 0);
-        return totalDuration / daysWithActivity;
-    };
+    const productivityStats = useMemo(() => {
+        const calculateAverageDuration = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
+            if (!logs) return 0;
+            const dailyDurations: Record<string, number> = {};
+            logs.forEach(log => {
+                const duration = log.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
+                if (duration > 0) { dailyDurations[log.date] = (dailyDurations[log.date] || 0) + duration; }
+            });
+            const daysWithActivity = Object.keys(dailyDurations).length;
+            if (daysWithActivity === 0) return 0;
+            const totalDuration = Object.values(dailyDurations).reduce((sum, d) => sum + d, 0);
+            return totalDuration / daysWithActivity;
+        };
 
-    const totalProductiveMinutes = calculateAverageDuration(allUpskillLogs, 'reps') + calculateAverageDuration(allDeepWorkLogs, 'weight');
-    const avgProductiveHours = totalProductiveMinutes / 60;
-    
-    return { avgProductiveHours };
-  }, [allUpskillLogs, allDeepWorkLogs]);
+        const totalProductiveMinutes = calculateAverageDuration(allUpskillLogs, 'reps') + calculateAverageDuration(allDeepWorkLogs, 'weight');
+        const avgProductiveHours = totalProductiveMinutes / 60;
+        
+        return { avgProductiveHours };
+    }, [allUpskillLogs, allDeepWorkLogs]);
   
   const isUpskillObjectiveComplete = useCallback((objectiveId: string): boolean => {
     const visited = new Set<string>();
@@ -1456,6 +1456,12 @@ function DeepWorkPageContent() {
 
     return visualizations.every(viz => permanentlyLoggedActionIds.has(viz.id));
   }, [upskillDefinitions, permanentlyLoggedActionIds]);
+  
+  const linkedDeepWorkChildIds = useMemo(() => {
+    return new Set<string>(
+        (deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])
+    );
+  }, [deepWorkDefinitions]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -1867,6 +1873,7 @@ function DeepWorkPageContent() {
                                               upskillDefinitions={upskillDefinitions}
                                               resources={resources}
                                               setSelectedSubtopic={setSelectedSubtopic}
+                                              linkedDeepWorkChildIds={linkedDeepWorkChildIds}
                                           />
                                         );
                                       })}
@@ -1927,6 +1934,7 @@ function DeepWorkPageContent() {
                                         upskillDefinitions={upskillDefinitions}
                                         resources={resources}
                                         setSelectedSubtopic={setSelectedSubtopic}
+                                        linkedDeepWorkChildIds={linkedDeepWorkChildIds}
                                         />
                                     ))}
                                     </div>

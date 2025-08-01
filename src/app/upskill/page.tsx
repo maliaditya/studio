@@ -251,8 +251,11 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
 
   const isParent = (upskillDef.linkedUpskillIds?.length ?? 0) > 0 || (upskillDef.linkedResourceIds?.length ?? 0) > 0;
   const isChild = linkedUpskillChildIds.has(upskillDef.id);
-
-  const nodeType = isParent && !isChild ? 'Curiosity' : isParent && isChild ? 'Objective' : !isParent && isChild ? 'Visualization' : 'Standalone';
+  
+  const nodeType = isParent && !isChild ? 'Curiosity' 
+                 : isParent && isChild ? 'Objective'
+                 : !isParent && isChild ? 'Visualization' 
+                 : 'Standalone';
 
   const loggedMinutes = getUpskillLoggedMinutesRecursive(upskillDef);
   const estDuration = isParent ? calculatedEstimate : upskillDef.estimatedDuration;
@@ -283,6 +286,7 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
             : nodeType === 'Visualization' ? <Frame className="h-5 w-5 text-blue-500 flex-shrink-0" />
             : <Focus className="h-5 w-5 text-purple-500 flex-shrink-0" />}
             <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={upskillDef.name}>{upskillDef.name}</span>
+             <Badge variant="outline" className="text-xs">{nodeType}</Badge>
           </CardTitle>
           <CardDescription>{upskillDef.category}</CardDescription>
         </CardHeader>
