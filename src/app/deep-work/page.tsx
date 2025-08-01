@@ -1676,15 +1676,15 @@ function DeepWorkPageContent() {
                                            </div>
                                        </AccordionTrigger>
                                        <AccordionContent>
-                                          <div className="space-y-3 pl-2">
+                                          <Accordion type="multiple" className="w-full">
                                             {coreSkill.skillAreas.map(skillArea => (
-                                              <div key={skillArea.id}>
-                                                <h4 className="text-sm font-semibold text-muted-foreground">{skillArea.name}</h4>
-                                                <div className="pl-2 border-l-2 border-muted-foreground/20 space-y-2 mt-2">
+                                              <AccordionItem value={skillArea.id} key={skillArea.id}>
+                                                <AccordionTrigger className="text-sm font-semibold text-muted-foreground pl-2">{skillArea.name}</AccordionTrigger>
+                                                <AccordionContent className="pl-4">
                                                   {skillArea.microSkills.map(microSkill => (
-                                                    <div key={microSkill.id} className="space-y-1">
+                                                    <div key={microSkill.id} className="space-y-1 py-1">
                                                       <div className="flex items-center justify-between group">
-                                                        <span className="text-xs font-medium text-muted-foreground/80">{microSkill.name}</span>
+                                                        <span className="text-sm font-medium text-muted-foreground/80">{microSkill.name}</span>
                                                         <Button 
                                                           variant="ghost" 
                                                           size="icon" 
@@ -1725,10 +1725,10 @@ function DeepWorkPageContent() {
                                                       </ul>
                                                     </div>
                                                   ))}
-                                                </div>
-                                              </div>
+                                                </AccordionContent>
+                                              </AccordionItem>
                                             ))}
-                                          </div>
+                                          </Accordion>
                                        </AccordionContent>
                                    </AccordionItem>
                                ))}
