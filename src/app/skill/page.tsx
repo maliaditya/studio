@@ -9,7 +9,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
-import type { SkillDomain, CoreSkill, SkillArea, MicroSkill } from '@/types/workout';
+import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition } from '@/types/workout';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -26,7 +26,11 @@ import { Textarea } from '@/components/ui/textarea';
 
 function SkillPageContent() {
   const { toast } = useToast();
-  const { skillDomains, setSkillDomains, coreSkills, setCoreSkills } = useAuth();
+  const { 
+    skillDomains, setSkillDomains, 
+    coreSkills, setCoreSkills, 
+    upskillDefinitions, deepWorkDefinitions 
+  } = useAuth();
   
   const [newDomainName, setNewDomainName] = useState('');
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
@@ -146,6 +150,7 @@ function SkillPageContent() {
   const selectedCoreSkill = useMemo(() => coreSkills.find(s => s.id === selectedSkillId), [coreSkills, selectedSkillId]);
 
   const renderCoreSkillPillar = useCallback((skill: CoreSkill) => {
+    if(skill.skillAreas.length === 0) return null;
     let icon;
     switch (skill.type) {
         case 'Foundation': icon = <Blocks className="h-4 w-4"/>; break;
