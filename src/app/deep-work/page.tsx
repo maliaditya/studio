@@ -464,9 +464,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, onOpenNes
            <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
             <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button>
-                </DropdownMenuTrigger>
+                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', resource.id)} className="text-destructive"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
@@ -2241,7 +2239,30 @@ function DeepWorkPageContent() {
                 </Card>
             </section>
           </div>
-          
+          <Dialog open={isNewFocusAreaModalOpen} onOpenChange={setIsNewFocusAreaModalOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Create New Focus Area</DialogTitle>
+                    <DialogDescription>
+                        This will create a new standalone focus area under the "{newFocusAreaParentTopic}" micro-skill.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-1">
+                        <Label htmlFor="new-focus-name">Focus Area Name</Label>
+                        <Input id="new-focus-name" value={newFocusAreaData.name} onChange={(e) => setNewFocusAreaData(d => ({ ...d, name: e.target.value }))} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1"><Label htmlFor="new-focus-hours">Est. Hours</Label><Input type="number" id="new-focus-hours" value={newFocusAreaData.hours} onChange={(e) => setNewFocusAreaData(d => ({ ...d, hours: e.target.value }))} /></div>
+                        <div className="space-y-1"><Label htmlFor="new-focus-mins">Est. Minutes</Label><Input type="number" id="new-focus-mins" value={newFocusAreaData.minutes} onChange={(e) => setNewFocusAreaData(d => ({ ...d, minutes: e.target.value }))} /></div>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsNewFocusAreaModalOpen(false)}>Cancel</Button>
+                    <Button onClick={handleCreateFocusArea}>Create Focus Area</Button>
+                </DialogFooter>
+            </DialogContent>
+          </Dialog>
           {progressModalConfig.isOpen && progressModalConfig.exercise && (
             <ExerciseProgressModal 
               isOpen={progressModalConfig.isOpen} 
