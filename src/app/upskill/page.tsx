@@ -502,7 +502,7 @@ function UpskillPageContent() {
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
 
-  const handleOpenNewFocusAreaModal = (topic: string) => {
+  const handleOpenNewSubtopicModal = (topic: string) => {
     setNewSubtopicParentTopic(topic);
     setIsNewSubtopicModalOpen(true);
   };
@@ -820,7 +820,7 @@ function UpskillPageContent() {
     setIsNewSubtopicModalOpen(false);
     setNewSubtopicData({ name: '', description: '', link: '', hours: '', minutes: '' });
     
-    toast({ title: "Success", description: `Subtopic "${newDef.name}" created.` });
+    toast({ title: "Success", description: `Task "${newDef.name}" created.` });
 
     setExpandedTopics(prev => {
         const newSet = new Set(prev);
@@ -1227,7 +1227,7 @@ function UpskillPageContent() {
                                                                   {microSkill.name}
                                                                </AccordionTrigger>
                                                                <AccordionContent className="pl-4 pt-2">
-                                                                 <Button className="w-full h-8" variant="outline" onClick={() => handleOpenNewFocusAreaModal(microSkill.name)}>
+                                                                 <Button className="w-full h-8" variant="outline" onClick={() => handleOpenNewSubtopicModal(microSkill.name)}>
                                                                    <PlusCircle className="h-4 w-4 mr-2" /> New Task
                                                                  </Button>
                                                                </AccordionContent>
@@ -1365,6 +1365,38 @@ function UpskillPageContent() {
                 </Card>
             </section>
           </div>
+          <Dialog open={isNewSubtopicModalOpen} onOpenChange={setIsNewSubtopicModalOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Create New Task</DialogTitle>
+                    <DialogDescription>
+                        This will create a new standalone task under the "{newSubtopicParentTopic}" micro-skill.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-1">
+                        <Label htmlFor="new-subtopic-name">Task Name</Label>
+                        <Input id="new-subtopic-name" value={newSubtopicData.name} onChange={(e) => setNewSubtopicData(d => ({ ...d, name: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                        <Label htmlFor="new-subtopic-desc">Description (Optional)</Label>
+                        <Textarea id="new-subtopic-desc" value={newSubtopicData.description} onChange={(e) => setNewSubtopicData(d => ({ ...d, description: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                        <Label htmlFor="new-subtopic-link">Link (Optional)</Label>
+                        <Input id="new-subtopic-link" value={newSubtopicData.link} onChange={(e) => setNewSubtopicData(d => ({ ...d, link: e.target.value }))} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1"><Label htmlFor="new-subtopic-hours">Est. Hours</Label><Input type="number" id="new-subtopic-hours" value={newSubtopicData.hours} onChange={(e) => setNewSubtopicData(d => ({ ...d, hours: e.target.value }))} /></div>
+                        <div className="space-y-1"><Label htmlFor="new-subtopic-mins">Est. Minutes</Label><Input type="number" id="new-subtopic-mins" value={newSubtopicData.minutes} onChange={(e) => setNewSubtopicData(d => ({ ...d, minutes: e.target.value }))} /></div>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsNewSubtopicModalOpen(false)}>Cancel</Button>
+                    <Button onClick={handleCreateSubtopic}>Create Task</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
           {progressModalConfig.isOpen && progressModalConfig.exercise && (
             <ExerciseProgressModal isOpen={progressModalConfig.isOpen} onOpenChange={(isOpen) => setProgressModalConfig(prev => ({...prev, isOpen}))} exercise={progressModalConfig.exercise} allWorkoutLogs={allUpskillLogs} pageType="upskill" topicGoals={topicGoals} />
           )}
@@ -1457,3 +1489,4 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
+
