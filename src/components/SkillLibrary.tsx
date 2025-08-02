@@ -55,8 +55,10 @@ export function SkillLibrary({
     } else if (selectedCoreSkill) {
         setSelectedCoreSkill(null);
         setCurrentView('domain');
-    } else if (selectedProject || selectedDomain) {
+    } else if (selectedProject) {
         onSelectProject(null);
+        setCurrentView('root');
+    } else if (selectedDomain) {
         setSelectedDomain(null);
         setCurrentView('root');
     }

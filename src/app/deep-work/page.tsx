@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -748,6 +749,7 @@ function DeepWorkPageContent() {
     skillDomains,
     coreSkills,
     projects,
+    microSkillMap,
   } = useAuth();
   
   const [isNewFocusAreaModalOpen, setIsNewFocusAreaModalOpen] = useState(false);
@@ -800,18 +802,6 @@ function DeepWorkPageContent() {
         (deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])
     );
   }, [deepWorkDefinitions]);
-
-  const microSkillMap = useMemo(() => {
-    const map = new Map<string, MicroSkill>();
-    coreSkills.forEach(cs => {
-        cs.skillAreas.forEach(sa => {
-            sa.microSkills.forEach(ms => {
-                map.set(ms.id, ms);
-            });
-        });
-    });
-    return map;
-  }, [coreSkills]);
 
   const getNodeType = useCallback((def: ExerciseDefinition, childIds: Set<string>) => {
     const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
@@ -1803,7 +1793,7 @@ function DeepWorkPageContent() {
                                             <ul className="list-disc list-inside text-sm text-muted-foreground">
                                                 {feature.linkedSkills.map(link => {
                                                     const skill = microSkillMap.get(link.microSkillId);
-                                                    return <li key={link.microSkillId}>{skill?.name || 'Unknown Skill'}</li>;
+                                                    return <li key={link.microSkillId}>{skill?.microSkillName || 'Unknown Skill'}</li>;
                                                 })}
                                             </ul>
                                         </CardContent>

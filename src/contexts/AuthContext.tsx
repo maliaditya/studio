@@ -2,10 +2,10 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -92,8 +92,6 @@ interface AuthContextType {
 
   deepWorkDefinitions: ExerciseDefinition[];
   setDeepWorkDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
-  deepWorkTopicMetadata: Record<string, DeepWorkTopicMetadata>;
-  setDeepWorkTopicMetadata: React.Dispatch<React.SetStateAction<Record<string, DeepWorkTopicMetadata>>>;
   
   leadGenDefinitions: ExerciseDefinition[];
   setLeadGenDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
@@ -103,8 +101,7 @@ interface AuthContextType {
   offerizationPlans: Record<string, ProductizationPlan>;
   setOfferizationPlans: React.Dispatch<React.SetStateAction<Record<string, ProductizationPlan>>>;
   addFeatureToRelease: (release: Release, topic: string, featureName: string, type: 'product' | 'service') => void;
-  updateTopic: (oldTopicName: string, newTopicName: string, newClassification: 'product' | 'service') => void;
-  deleteTopic: (topic: string) => void;
+  
   copyOffer: (topic: string, offerId: string) => void;
 
   // Resources
@@ -161,6 +158,9 @@ interface AuthContextType {
   setCompanies: React.Dispatch<React.SetStateAction<Company[]>>;
   positions: Position[];
   setPositions: React.Dispatch<React.SetStateAction<Position[]>>;
+
+  // New global map
+  microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -212,7 +212,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [upskillDefinitions, setUpskillDefinitions] = useState<ExerciseDefinition[]>([]);
   const [topicGoals, setTopicGoals] = useState<Record<string, TopicGoal>>({});
   const [deepWorkDefinitions, setDeepWorkDefinitions] = useState<ExerciseDefinition[]>([]);
-  const [deepWorkTopicMetadata, setDeepWorkTopicMetadata] = useState<Record<string, DeepWorkTopicMetadata>>({});
   const [leadGenDefinitions, setLeadGenDefinitions] = useState<ExerciseDefinition[]>(LEAD_GEN_DEFINITIONS);
   const [productizationPlans, setProductizationPlans] = useState<Record<string, ProductizationPlan>>({});
   const [offerizationPlans, setOfferizationPlans] = useState<Record<string, ProductizationPlan>>({});
@@ -246,6 +245,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Persisted task state
   const [selectedSubtopic, setSelectedSubtopic] = useState<ExerciseDefinition | null>(null);
+  
+  const microSkillMap = useMemo(() => {
+    const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>();
+    coreSkills.forEach(coreSkill => {
+      coreSkill.skillAreas.forEach(skillArea => {
+        skillArea.microSkills.forEach(microSkill => {
+          map.set(microSkill.id, {
+            coreSkillName: coreSkill.name,
+            skillAreaName: skillArea.name,
+            microSkillName: microSkill.name
+          });
+        });
+      });
+    });
+    return map;
+  }, [coreSkills]);
 
 
   useEffect(() => {
@@ -297,7 +312,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`upskill_definitions_${username}`); setUpskillDefinitions(d ? JSON.parse(d) : []); } catch (e) { setUpskillDefinitions([]); }
       try { const d = loadItem(`upskill_topic_goals_${username}`); setTopicGoals(d ? JSON.parse(d) : {}); } catch (e) { setTopicGoals({}); }
       try { const d = loadItem(`deepwork_definitions_${username}`); setDeepWorkDefinitions(d ? JSON.parse(d) : []); } catch (e) { setDeepWorkDefinitions([]); }
-      try { const d = loadItem(`deepwork_topic_metadata_${username}`); setDeepWorkTopicMetadata(d ? JSON.parse(d) : {}); } catch (e) { setDeepWorkTopicMetadata({}); }
       try { const d = loadItem(`leadgen_definitions_${username}`); setLeadGenDefinitions(d ? JSON.parse(d) : LEAD_GEN_DEFINITIONS); } catch (e) { setLeadGenDefinitions(LEAD_GEN_DEFINITIONS); }
       try { const d = loadItem(`productization_plans_${username}`); setProductizationPlans(d ? JSON.parse(d) : {}); } catch (e) { setProductizationPlans({}); }
       try { const d = loadItem(`offerization_plans_${username}`); setOfferizationPlans(d ? JSON.parse(d) : {}); } catch (e) { setOfferizationPlans({}); }
@@ -368,7 +382,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setAllUpskillLogs([]); setAllDeepWorkLogs([]); setAllWorkoutLogs([]); setAllBrandingLogs([]); setAllLeadGenLogs([]);
       setWorkoutMode('two-muscle'); setWorkoutPlans(INITIAL_PLANS); setExerciseDefinitions(DEFAULT_EXERCISE_DEFINITIONS);
       setUpskillDefinitions([]); setTopicGoals({});
-      setDeepWorkDefinitions([]); setDeepWorkTopicMetadata({});
+      setDeepWorkDefinitions([]);
       setLeadGenDefinitions(LEAD_GEN_DEFINITIONS);
       setProductizationPlans({});
       setOfferizationPlans({});
@@ -411,7 +425,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`upskill_definitions_${username}`, JSON.stringify(upskillDefinitions));
       localStorage.setItem(`upskill_topic_goals_${username}`, JSON.stringify(topicGoals));
       localStorage.setItem(`deepwork_definitions_${username}`, JSON.stringify(deepWorkDefinitions));
-      localStorage.setItem(`deepwork_topic_metadata_${username}`, JSON.stringify(deepWorkTopicMetadata));
       localStorage.setItem(`leadgen_definitions_${username}`, JSON.stringify(leadGenDefinitions));
       localStorage.setItem(`productization_plans_${username}`, JSON.stringify(productizationPlans));
       localStorage.setItem(`offerization_plans_${username}`, JSON.stringify(offerizationPlans));
@@ -448,7 +461,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
     schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
-    exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, deepWorkTopicMetadata, leadGenDefinitions,
+    exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions,
     productizationPlans, offerizationPlans,
     resources, resourceFolders, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId,
     canvasLayout,
@@ -585,7 +598,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     setDeepWorkDefinitions(data.deepWorkDefinitions || []);
     setAllDeepWorkLogs(data.deepWorkLogs || []);
-    setDeepWorkTopicMetadata(data.deepWorkTopicMetadata || {});
     
     setAllBrandingLogs(data.brandingLogs || []);
 
@@ -667,7 +679,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return {
       exerciseDefinitions, workoutPlans, allWorkoutLogs, workoutMode,
       upskillDefinitions, upskillLogs: allUpskillLogs, upskillTopicGoals: topicGoals,
-      deepWorkDefinitions, deepWorkLogs: allDeepWorkLogs, deepWorkTopicMetadata,
+      deepWorkDefinitions, deepWorkLogs: allDeepWorkLogs,
       brandingLogs,
       leadGenDefinitions, allLeadGenLogs,
       productizationPlans,
@@ -1133,100 +1145,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Feature Added", description: `"${newFeatureDef.name}" was added to the "${release.name}" release.` });
   };
   
-  const updateTopic = (oldTopicName: string, newTopicName: string, newClassification: 'product' | 'service') => {
-    const oldClassification = deepWorkTopicMetadata[oldTopicName]?.classification;
-    const classificationDidChange = oldClassification && oldClassification !== newClassification;
-
-    // Update definitions and logs
-    setDeepWorkDefinitions(prev => prev.map(def => def.category === oldTopicName ? { ...def, category: newTopicName as ExerciseCategory } : def));
-    setAllDeepWorkLogs(prev => prev.map(log => ({ ...log, exercises: log.exercises.map(ex => ex.category === oldTopicName ? { ...ex, category: newTopicName as ExerciseCategory } : ex) })));
-
-    // Update metadata
-    setDeepWorkTopicMetadata(prev => {
-        const newMeta = { ...prev };
-        const topicData = newMeta[oldTopicName] || { classification: oldClassification };
-        delete newMeta[oldTopicName];
-        newMeta[newTopicName] = { ...topicData, classification: newClassification };
-        return newMeta;
-    });
-
-    // Handle plans
-    if (classificationDidChange) {
-        if (oldClassification === 'product') {
-            const planToMove = productizationPlans[oldTopicName];
-            setProductizationPlans(prev => {
-                const newPlans = { ...prev };
-                delete newPlans[oldTopicName];
-                return newPlans;
-            });
-            if(planToMove) setOfferizationPlans(prev => ({ ...prev, [newTopicName]: planToMove }));
-        } else { // service -> product
-            const planToMove = offerizationPlans[oldTopicName];
-            setOfferizationPlans(prev => {
-                const newPlans = { ...prev };
-                delete newPlans[oldTopicName];
-                return newPlans;
-            });
-            if(planToMove) setProductizationPlans(prev => ({ ...prev, [newTopicName]: planToMove }));
-        }
-    } else {
-        const renameKey = (obj: any, oldKey: string, newKey: string) => {
-            const newObj = {...obj};
-            if (oldKey in newObj) {
-                newObj[newKey] = newObj[oldKey];
-                delete newObj[oldKey];
-            }
-            return newObj;
-        }
-
-        if (newClassification === 'product') {
-            setProductizationPlans(prev => renameKey(prev, oldTopicName, newTopicName));
-        } else {
-            setOfferizationPlans(prev => renameKey(prev, oldTopicName, newTopicName));
-        }
-    }
-
-    toast({ title: "Topic Updated", description: `"${oldTopicName}" has been updated to "${newTopicName}".`});
-  };
-
-  const deleteTopic = (topicToDelete: string) => {
-    const focusAreaIdsToDelete = deepWorkDefinitions
-        .filter(def => def.category === topicToDelete)
-        .map(def => def.id);
-
-    setDeepWorkDefinitions(prev => prev.filter(def => def.category !== topicToDelete));
-    
-    setDeepWorkTopicMetadata(prev => {
-        const newMeta = { ...prev };
-        delete newMeta[topicToDelete];
-        return newMeta;
-    });
-
-    setProductizationPlans(prev => {
-        const newPlans = { ...prev };
-        delete newPlans[topicToDelete];
-        return newPlans;
-    });
-    setOfferizationPlans(prev => {
-        const newPlans = { ...prev };
-        delete newPlans[topicToDelete];
-        return newPlans;
-    });
-
-    setAllDeepWorkLogs(prevLogs =>
-        prevLogs.map(log => ({
-            ...log,
-            exercises: log.exercises.filter(ex => !focusAreaIdsToDelete.includes(ex.definitionId))
-        })).filter(log => log.exercises.length > 0)
-    );
-    
-    toast({
-        title: "Topic Deleted",
-        description: `The topic "${topicToDelete}" and all its associated data have been deleted.`,
-        variant: "destructive"
-    });
-  };
-
   const copyOffer = (topic: string, offerId: string) => {
     setOfferizationPlans(prev => {
         const newPlans = { ...prev };
@@ -1392,13 +1310,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs, allLeadGenLogs, setAllLeadGenLogs,
     workoutMode, setWorkoutMode, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
     upskillDefinitions, setUpskillDefinitions, topicGoals, setTopicGoals,
-    deepWorkDefinitions, setDeepWorkDefinitions, deepWorkTopicMetadata, setDeepWorkTopicMetadata,
+    deepWorkDefinitions, setDeepWorkDefinitions,
     leadGenDefinitions, setLeadGenDefinitions,
     productizationPlans, setProductizationPlans,
     offerizationPlans, setOfferizationPlans,
     addFeatureToRelease,
-    updateTopic,
-    deleteTopic,
     copyOffer,
     resourceFolders, setResourceFolders,
     resources, setResources,
@@ -1418,6 +1334,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     companies, setCompanies,
     positions, setPositions,
     selectedSubtopic, setSelectedSubtopic,
+    microSkillMap,
   };
 
   return (

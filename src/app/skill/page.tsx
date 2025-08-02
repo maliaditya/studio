@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -36,7 +37,7 @@ function SkillPageContent() {
     projects, setProjects,
     companies, setCompanies,
     positions, setPositions,
-    upskillDefinitions, deepWorkDefinitions 
+    microSkillMap,
   } = useAuth();
   
   const [newDomainName, setNewDomainName] = useState('');
@@ -314,22 +315,6 @@ function SkillPageContent() {
     if (!selectedDomainId) return [];
     return coreSkills.filter(cs => cs.domainId === selectedDomainId);
   }, [coreSkills, selectedDomainId]);
-  
-  const microSkillPathMap = useMemo(() => {
-    const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string }>();
-    coreSkills.forEach(coreSkill => {
-      coreSkill.skillAreas.forEach(skillArea => {
-        skillArea.microSkills.forEach(microSkill => {
-          map.set(microSkill.id, {
-            coreSkillName: coreSkill.name,
-            skillAreaName: skillArea.name,
-            microSkillName: microSkill.name
-          });
-        });
-      });
-    });
-    return map;
-  }, [coreSkills]);
   
   const handleSelectDomain = (domainId: string) => {
       setSelectedDomainId(domainId);
@@ -651,7 +636,7 @@ function SkillPageContent() {
                                               </div>
                                               <ul className="space-y-1">
                                                 {feature.linkedSkills.map(link => {
-                                                    const skillPath = microSkillPathMap.get(link.microSkillId);
+                                                    const skillPath = microSkillMap.get(link.microSkillId);
                                                     return (
                                                       <li key={link.microSkillId} className="text-sm text-muted-foreground flex items-center group">
                                                         <span className="flex-grow">{skillPath ? `${skillPath.coreSkillName} > ${skillPath.skillAreaName} > ${skillPath.microSkillName}` : 'Unknown Skill'}</span>

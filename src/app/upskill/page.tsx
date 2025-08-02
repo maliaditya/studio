@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -465,6 +466,7 @@ function UpskillPageContent() {
     skillDomains,
     coreSkills,
     projects,
+    microSkillMap,
   } = useAuth();
   const router = useRouter();
   
@@ -502,18 +504,6 @@ function UpskillPageContent() {
 
   const [selectedMicroSkill, setSelectedMicroSkill] = useState<MicroSkill | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-
-  const microSkillMap = useMemo(() => {
-    const map = new Map<string, MicroSkill>();
-    coreSkills.forEach(cs => {
-        cs.skillAreas.forEach(sa => {
-            sa.microSkills.forEach(ms => {
-                map.set(ms.id, ms);
-            });
-        });
-    });
-    return map;
-  }, [coreSkills]);
 
   const handleOpenNewSubtopicModal = () => {
     if (!selectedMicroSkill) {
@@ -1214,7 +1204,7 @@ function UpskillPageContent() {
                                             <ul className="list-disc list-inside text-sm text-muted-foreground">
                                                 {feature.linkedSkills.map(link => {
                                                     const skill = microSkillMap.get(link.microSkillId);
-                                                    return <li key={link.microSkillId}>{skill?.name || 'Unknown Skill'}</li>;
+                                                    return <li key={link.microSkillId}>{skill?.microSkillName || 'Unknown Skill'}</li>;
                                                 })}
                                             </ul>
                                         </CardContent>
