@@ -261,7 +261,7 @@ function SkillPageContent() {
       if (p.id === positionId) {
         const existingProjectIndex = p.projects.findIndex(wp => wp.id === project.id);
         const finalProject: WorkProject = {
-          id: project.id || `wproj_${Date.now()}_${Math.random()}`,
+          id: project.id || `wproj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
           name: project.name,
           description: project.description || '',
           linkedSpecializationId: project.linkedSpecializationId,
@@ -345,6 +345,7 @@ function SkillPageContent() {
         case 'Professionalism': icon = <Sprout className="h-4 w-4"/>; break;
         case 'Specialization': icon = <BrainCircuit className="h-4 w-4"/>; break;
     }
+    
     return (
         <div key={skill.id} className="group flex items-center justify-between p-2 rounded-md hover:bg-muted">
             <button className="flex items-center gap-2 flex-grow min-w-0" onClick={() => handleSelectCoreSkill(skill.id)}>
@@ -634,7 +635,7 @@ function SkillPageContent() {
                                                     const skillPath = microSkillPathMap.get(link.microSkillId);
                                                     return (
                                                       <li key={link.microSkillId} className="text-sm text-muted-foreground">
-                                                        {skillPath ? `${skillPath.coreSkillName} &gt; ${skillPath.skillAreaName} &gt; ${skillPath.microSkillName}` : 'Unknown Skill'}
+                                                        {skillPath ? `${skillPath.coreSkillName} > ${skillPath.skillAreaName} > ${skillPath.microSkillName}` : 'Unknown Skill'}
                                                       </li>
                                                     );
                                                 })}
@@ -828,5 +829,3 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
-
-    
