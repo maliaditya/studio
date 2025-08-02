@@ -770,9 +770,7 @@ function DeepWorkPageContent() {
 
   const selectedFocusArea = selectedSubtopic;
   const setSelectedFocusArea = setSelectedSubtopic;
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-
-
+  
   const [isManageLinksModalOpen, setIsManageLinksModalOpen] = useState(false);
   const [manageLinksConfig, setManageLinksConfig] = useState<{type: 'upskill' | 'deepwork' | 'resource', parent: ExerciseDefinition} | null>(null);
   const [newLinkedItemName, setNewLinkedItemName] = useState('');
@@ -1608,9 +1606,8 @@ function DeepWorkPageContent() {
   };
 
   const handleProjectSelect = (project: Project) => {
-    setSelectedProject(project);
-    setSelectedFocusArea(null);
     setSelectedMicroSkill(null);
+    setSelectedFocusArea(null);
   };
   
   if (isLoadingPage) {
@@ -1641,7 +1638,7 @@ function DeepWorkPageContent() {
                         }
                         setIsNewFocusAreaModalOpen(true);
                     }}
-                    selectedProject={selectedProject}
+                    selectedProject={null} // Pass null, as deep work doesn't use project selection in the same way
                     onSelectProject={handleProjectSelect}
                  />
               {selectedFocusArea && (
@@ -1702,8 +1699,8 @@ function DeepWorkPageContent() {
                     <CardHeader className="flex flex-row items-center justify-between p-4">
                         <div className="flex-grow">
                             <CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">
-                                {viewMode === 'session' ? <ListChecks /> : selectedFocusArea ? getIcon(getNodeType(selectedFocusArea, linkedDeepWorkChildIds)) : selectedProject ? <Briefcase /> : <Library />}
-                                {viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedMicroSkill?.name || selectedProject?.name || 'Select a micro-skill'}`}
+                                {viewMode === 'session' ? <ListChecks /> : selectedFocusArea ? getIcon(getNodeType(selectedFocusArea, linkedDeepWorkChildIds)) : <Library />}
+                                {viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedMicroSkill?.name || 'Select a micro-skill'}`}
                             </CardTitle>
                         </div>
 
@@ -1777,28 +1774,8 @@ function DeepWorkPageContent() {
                                         })}
                                     </div>
                                 </DroppableArea>
-                            ) : selectedProject ? (
-                                <div className="space-y-4">
-                                    <h3 className="text-xl font-bold">{selectedProject.name}</h3>
-                                    <div className="space-y-3">
-                                        {selectedProject.features.map(feature => (
-                                            <Card key={feature.id}>
-                                                <CardHeader className="pb-3"><CardTitle className="text-base">{feature.name}</CardTitle></CardHeader>
-                                                <CardContent>
-                                                    <p className="text-sm font-medium mb-1">Required Skills:</p>
-                                                    <ul className="list-disc list-inside text-sm text-muted-foreground">
-                                                        {feature.linkedSkills.map(link => {
-                                                            const skill = deepWorkDefinitions.find(s => s.id === link.microSkillId);
-                                                            return <li key={link.microSkillId}>{skill?.name || 'Unknown Skill'}</li>
-                                                        })}
-                                                    </ul>
-                                                </CardContent>
-                                            </Card>
-                                        ))}
-                                    </div>
-                                </div>
                             ) : (
-                                <div className="text-center py-10 text-muted-foreground">Select a micro-skill or project from the library to view its focus areas.</div>
+                                <div className="text-center py-10 text-muted-foreground">Select a micro-skill from the library to view its focus areas.</div>
                             )
                         )}
                     </CardContent>

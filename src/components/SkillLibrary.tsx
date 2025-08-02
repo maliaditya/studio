@@ -6,9 +6,9 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building } from 'lucide-react';
+import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building, Folder } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project } from '@/types/workout';
+import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature } from '@/types/workout';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -16,12 +16,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 interface SkillLibraryProps {
   pageType: 'deepwork' | 'upskill';
   selectedMicroSkill: MicroSkill | null;
-  onSelectMicroSkill: (skill: MicroSkill) => void;
+  onSelectMicroSkill: (skill: MicroSkill | null) => void;
   definitions: ExerciseDefinition[];
-  onSelectFocusArea: (def: ExerciseDefinition) => void;
+  onSelectFocusArea: (def: ExerciseDefinition | null) => void;
   onOpenNewFocusArea: () => void;
   selectedProject: Project | null;
-  onSelectProject: (project: Project) => void;
+  onSelectProject: (project: Project | null) => void;
 }
 
 export function SkillLibrary({ 
@@ -35,36 +35,64 @@ export function SkillLibrary({
     onSelectProject,
 }: SkillLibraryProps) {
   const { skillDomains, coreSkills, projects } = useAuth();
+  const [historyStack, setHistoryStack] = useState<any[]>([]);
+
+  const [currentView, setCurrentView] = useState<'root' | 'domain' | 'project' | 'coreSkill' | 'skillArea' | 'feature'>('root');
   const [selectedDomain, setSelectedDomain] = useState<SkillDomain | null>(null);
   const [selectedCoreSkill, setSelectedCoreSkill] = useState<CoreSkill | null>(null);
   const [selectedSkillArea, setSelectedSkillArea] = useState<SkillArea | null>(null);
-  const [historyStack, setHistoryStack] = useState<any[]>([]);
+  const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
 
-  const handleDomainSelect = (domain: SkillDomain) => {
-      setSelectedDomain(domain);
-      setHistoryStack([null]);
-  };
-
-  const handleCoreSkillClick = (coreSkill: CoreSkill) => {
-    setSelectedCoreSkill(coreSkill);
-    setHistoryStack(prev => [...prev, selectedDomain]);
-  };
-  
-  const handleSkillAreaClick = (skillArea: SkillArea) => {
-    setSelectedSkillArea(skillArea);
-    setHistoryStack(prev => [...prev, selectedCoreSkill]);
-  };
-  
   const handleBack = () => {
-    const previousState = historyStack[historyStack.length - 1];
-    setHistoryStack(prev => prev.slice(0, -1));
-
-    if (selectedSkillArea) {
-      setSelectedSkillArea(null);
+    const prevState = historyStack.pop();
+    setHistoryStack([...historyStack]);
+    
+    if (selectedFeature) {
+        setSelectedFeature(null);
+        setCurrentView('project');
+    } else if (selectedSkillArea) {
+        setSelectedSkillArea(null);
+        setCurrentView('coreSkill');
     } else if (selectedCoreSkill) {
-      setSelectedCoreSkill(null);
-    } else if (selectedDomain) {
-      setSelectedDomain(null);
+        setSelectedCoreSkill(null);
+        setCurrentView('domain');
+    } else if (selectedProject || selectedDomain) {
+        setSelectedProject(null);
+        setSelectedDomain(null);
+        setCurrentView('root');
+    }
+  };
+  
+  const handleSelect = (item: any, type: string) => {
+    switch(type) {
+        case 'domain':
+            setSelectedDomain(item);
+            setCurrentView('coreSkill');
+            setHistoryStack([...historyStack, { view: 'root' }]);
+            break;
+        case 'project':
+            onSelectProject(item);
+            setCurrentView('feature');
+            setHistoryStack([...historyStack, { view: 'root' }]);
+            break;
+        case 'coreSkill':
+            setSelectedCoreSkill(item);
+            setCurrentView('skillArea');
+            setHistoryStack([...historyStack, { view: 'domain' }]);
+            break;
+        case 'skillArea':
+            setSelectedSkillArea(item);
+            setCurrentView('root'); // No deeper level, so just set it.
+            break;
+        case 'feature':
+            setSelectedFeature(item);
+            setCurrentView('root'); // No deeper level, so just set it.
+            break;
+        case 'microSkill':
+            onSelectMicroSkill(item);
+            onSelectFocusArea(null);
+            onSelectProject(null);
+            break;
     }
   };
 
@@ -74,19 +102,19 @@ export function SkillLibrary({
   const getDeepWorkIcon = (def: ExerciseDefinition) => {
     const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
     const isChild = linkedDeepWorkChildIds.has(def.id);
-    if (isParent && !isChild) return <Lightbulb className="h-4 w-4 text-amber-500" />;
-    if (isParent && isChild) return <Flag className="h-4 w-4 text-green-500" />;
-    if (!isParent && isChild) return <Bolt className="h-4 w-4 text-blue-500" />;
-    return <Focus className="h-4 w-4 text-purple-500" />;
+    if (isParent && !isChild) return <Lightbulb className="mr-2 h-4 w-4 text-amber-500" />;
+    if (isParent && isChild) return <Flag className="mr-2 h-4 w-4 text-green-500" />;
+    if (!isParent && isChild) return <Bolt className="mr-2 h-4 w-4 text-blue-500" />;
+    return <Focus className="mr-2 h-4 w-4 text-purple-500" />;
   };
 
   const getUpskillIcon = (def: ExerciseDefinition) => {
     const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
     const isChild = linkedUpskillChildIds.has(def.id);
-    if (isParent && !isChild) return <Flashlight className="h-4 w-4 text-amber-500" />;
-    if (isParent && isChild) return <Flag className="h-4 w-4 text-green-500" />;
-    if (!isParent && isChild) return <Frame className="h-4 w-4 text-blue-500" />;
-    return <Focus className="h-4 w-4 text-purple-500" />;
+    if (isParent && !isChild) return <Flashlight className="mr-2 h-4 w-4 text-amber-500" />;
+    if (isParent && isChild) return <Flag className="mr-2 h-4 w-4 text-green-500" />;
+    if (!isParent && isChild) return <Frame className="mr-2 h-4 w-4 text-blue-500" />;
+    return <Focus className="mr-2 h-4 w-4 text-purple-500" />;
   };
   
   const renderHeader = () => {
@@ -94,6 +122,8 @@ export function SkillLibrary({
     if (selectedDomain) title = selectedDomain.name;
     if (selectedCoreSkill) title = selectedCoreSkill.name;
     if (selectedSkillArea) title = selectedSkillArea.name;
+    if (selectedProject) title = selectedProject.name;
+    if (selectedFeature) title = selectedFeature.name;
     
     return (
         <div className="flex items-center gap-2">
@@ -106,59 +136,9 @@ export function SkillLibrary({
   };
   
   const renderContent = () => {
-    if (!selectedDomain) {
-      return (
-        <div className="space-y-2">
-          {skillDomains.map(domain => (
-            <Button key={domain.id} variant="outline" className="w-full justify-start" onClick={() => handleDomainSelect(domain)}>
-              {domain.name}
-            </Button>
-          ))}
-        </div>
-      );
-    }
-    
-    if (!selectedCoreSkill) {
-      const filteredCoreSkills = coreSkills.filter(cs => cs.domainId === selectedDomain.id);
-      const domainProjects = projects.filter(p => p.domainId === selectedDomain.id);
-      return (
-        <div className="space-y-2">
-          <h4 className="font-semibold text-xs text-muted-foreground px-2">Core Pillars</h4>
-          {filteredCoreSkills.map(cs => (
-            <Button key={cs.id} variant="outline" className="w-full justify-start" onClick={() => handleCoreSkillClick(cs)}>
-              {cs.type === 'Foundation' ? <Blocks className="mr-2 h-4 w-4" /> : cs.type === 'Professionalism' ? <Sprout className="mr-2 h-4 w-4" /> : <BrainCircuit className="mr-2 h-4 w-4" />}
-              {cs.name}
-            </Button>
-          ))}
-          {domainProjects.length > 0 && (
-            <>
-              <h4 className="font-semibold text-xs text-muted-foreground px-2 pt-2">Projects</h4>
-              {domainProjects.map(p => (
-                  <Button key={p.id} variant="outline" className="w-full justify-start" onClick={() => onSelectProject(p)}>
-                      <Briefcase className="mr-2 h-4 w-4" />
-                      {p.name}
-                  </Button>
-              ))}
-            </>
-          )}
-        </div>
-      );
-    }
-
-    if (!selectedSkillArea) {
-      return (
-        <div className="space-y-2">
-          {selectedCoreSkill.skillAreas.map(sa => (
-            <Button key={sa.id} variant="outline" className="w-full justify-start" onClick={() => handleSkillAreaClick(sa)}>
-              {sa.name}
-            </Button>
-          ))}
-        </div>
-      );
-    }
-    
-    return (
-        <div className="space-y-2">
+    if (selectedSkillArea) {
+       return (
+         <div className="space-y-1">
             {selectedSkillArea.microSkills.map(ms => {
                  const tasks = definitions.filter(def => def.category === ms.name);
                  return (
@@ -170,7 +150,7 @@ export function SkillLibrary({
                                         "text-base font-semibold hover:no-underline py-2 flex-grow",
                                         selectedMicroSkill?.id === ms.id && "text-primary"
                                     )}
-                                    onClick={() => onSelectMicroSkill(ms)}
+                                    onClick={() => handleSelect(ms, 'microSkill')}
                                 >
                                     {ms.name}
                                 </AccordionTrigger>
@@ -191,7 +171,88 @@ export function SkillLibrary({
                  )
             })}
         </div>
-    );
+       )
+    }
+
+    if (selectedFeature) {
+        return (
+            <div className="space-y-2">
+                {selectedFeature.linkedSkills.map(link => {
+                    const microSkill = coreSkills.flatMap(cs => cs.skillAreas).flatMap(sa => sa.microSkills).find(ms => ms.id === link.microSkillId);
+                    if (!microSkill) return null;
+                    return (
+                         <Button key={microSkill.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(microSkill, 'microSkill')}>
+                            {microSkill.name}
+                         </Button>
+                    )
+                })}
+            </div>
+        )
+    }
+
+    if (selectedCoreSkill) {
+      return (
+        <div className="space-y-2">
+          {selectedCoreSkill.skillAreas.map(sa => (
+            <Button key={sa.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(sa, 'skillArea')}>
+              {sa.name}
+            </Button>
+          ))}
+        </div>
+      );
+    }
+    
+    if (selectedProject) {
+        return (
+             <div className="space-y-2">
+                {selectedProject.features.map(feature => (
+                     <Button key={feature.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(feature, 'feature')}>
+                        {feature.name}
+                     </Button>
+                ))}
+             </div>
+        )
+    }
+
+    if (selectedDomain) {
+        const filteredCoreSkills = coreSkills.filter(cs => cs.domainId === selectedDomain.id);
+        return (
+             <div className="space-y-2">
+                {filteredCoreSkills.map(cs => (
+                    <Button key={cs.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(cs, 'coreSkill')}>
+                        {cs.type === 'Foundation' ? <Blocks className="mr-2 h-4 w-4" /> : cs.type === 'Professionalism' ? <Sprout className="mr-2 h-4 w-4" /> : <BrainCircuit className="mr-2 h-4 w-4" />}
+                        {cs.name}
+                    </Button>
+                ))}
+             </div>
+        )
+    }
+
+    // Root View
+    return (
+        <Accordion type="multiple" className="w-full">
+            <AccordionItem value="skills-domains">
+                <AccordionTrigger>Skills</AccordionTrigger>
+                <AccordionContent>
+                     {skillDomains.map(domain => (
+                        <Button key={domain.id} variant="ghost" className="w-full justify-start" onClick={() => handleSelect(domain, 'domain')}>
+                            {domain.name}
+                        </Button>
+                     ))}
+                </AccordionContent>
+            </AccordionItem>
+             <AccordionItem value="projects">
+                <AccordionTrigger>Projects</AccordionTrigger>
+                <AccordionContent>
+                     {projects.map(project => (
+                        <Button key={project.id} variant="ghost" className="w-full justify-start" onClick={() => handleSelect(project, 'project')}>
+                            {project.name}
+                        </Button>
+                     ))}
+                </AccordionContent>
+            </AccordionItem>
+        </Accordion>
+    )
   };
 
 
@@ -203,7 +264,7 @@ export function SkillLibrary({
         <CardContent>
            <AnimatePresence mode="wait">
              <motion.div
-               key={selectedSkillArea?.id || selectedCoreSkill?.id || selectedDomain?.id || 'root'}
+               key={selectedSkillArea?.id || selectedCoreSkill?.id || selectedDomain?.id || selectedProject?.id || selectedFeature?.id || 'root'}
                initial={{ opacity: 0, x: -20 }}
                animate={{ opacity: 1, x: 0 }}
                exit={{ opacity: 0, x: 20 }}
