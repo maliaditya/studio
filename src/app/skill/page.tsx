@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
-import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject } from '@/types/workout';
+import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ProjectSkillLink } from '@/types/workout';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -208,6 +208,8 @@ function SkillPageContent() {
   };
   
   const handleToggleSkillLink = (feature: Feature, microSkillId: string) => {
+    if (!selectedProject) return;
+    
     const isLinked = feature.linkedSkills.some(l => l.microSkillId === microSkillId);
     let updatedSkills;
     if (isLinked) {
@@ -215,11 +217,29 @@ function SkillPageContent() {
     } else {
         updatedSkills = [...feature.linkedSkills, { featureId: feature.id, microSkillId }];
     }
+    
     setProjects(prev => prev.map(p => {
-        if (p.id === selectedProject?.id) {
+        if (p.id === selectedProject.id) {
             return { ...p, features: p.features.map(f => f.id === feature.id ? { ...f, linkedSkills: updatedSkills } : f) };
         }
         return p;
+    }));
+  };
+  
+  const handleUnlinkSkill = (feature: Feature, link: ProjectSkillLink) => {
+    if (!selectedProject) return;
+    setProjects(prev => prev.map(p => {
+      if (p.id === selectedProject.id) {
+        const newFeatures = p.features.map(f => {
+          if (f.id === feature.id) {
+            const newLinkedSkills = f.linkedSkills.filter(l => l.microSkillId !== link.microSkillId);
+            return { ...f, linkedSkills: newLinkedSkills };
+          }
+          return f;
+        });
+        return { ...p, features: newFeatures };
+      }
+      return p;
     }));
   };
 
@@ -297,8 +317,7 @@ function SkillPageContent() {
   
   const microSkillPathMap = useMemo(() => {
     const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string }>();
-    if (!selectedDomainId) return map;
-    coreSkills.filter(cs => cs.domainId === selectedDomainId).forEach(coreSkill => {
+    coreSkills.forEach(coreSkill => {
       coreSkill.skillAreas.forEach(skillArea => {
         skillArea.microSkills.forEach(microSkill => {
           map.set(microSkill.id, {
@@ -310,7 +329,7 @@ function SkillPageContent() {
       });
     });
     return map;
-  }, [coreSkills, selectedDomainId]);
+  }, [coreSkills]);
   
   const handleSelectDomain = (domainId: string) => {
       setSelectedDomainId(domainId);
@@ -634,8 +653,11 @@ function SkillPageContent() {
                                                 {feature.linkedSkills.map(link => {
                                                     const skillPath = microSkillPathMap.get(link.microSkillId);
                                                     return (
-                                                      <li key={link.microSkillId} className="text-sm text-muted-foreground">
-                                                        {skillPath ? `${skillPath.coreSkillName} > ${skillPath.skillAreaName} > ${skillPath.microSkillName}` : 'Unknown Skill'}
+                                                      <li key={link.microSkillId} className="text-sm text-muted-foreground flex items-center group">
+                                                        <span className="flex-grow">{skillPath ? `${skillPath.coreSkillName} > ${skillPath.skillAreaName} > ${skillPath.microSkillName}` : 'Unknown Skill'}</span>
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => handleUnlinkSkill(feature, link)}>
+                                                          <Unlink className="h-3 w-3 text-destructive" />
+                                                        </Button>
                                                       </li>
                                                     );
                                                 })}
