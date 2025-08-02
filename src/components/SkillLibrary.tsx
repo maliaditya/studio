@@ -37,16 +37,13 @@ export function SkillLibrary({
   const { skillDomains, coreSkills, projects } = useAuth();
   const [historyStack, setHistoryStack] = useState<any[]>([]);
 
-  const [currentView, setCurrentView] = useState<'root' | 'domain' | 'coreSkill' | 'skillArea' | 'feature'>('root');
+  const [currentView, setCurrentView] = useState<'root' | 'domain' | 'coreSkill' | 'skillArea' | 'feature' | 'project'>('root');
   const [selectedDomain, setSelectedDomain] = useState<SkillDomain | null>(null);
   const [selectedCoreSkill, setSelectedCoreSkill] = useState<CoreSkill | null>(null);
   const [selectedSkillArea, setSelectedSkillArea] = useState<SkillArea | null>(null);
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
 
   const handleBack = () => {
-    const prevState = historyStack.pop();
-    setHistoryStack([...historyStack]);
-    
     if (selectedFeature) {
         setSelectedFeature(null);
         setCurrentView('project');
@@ -68,30 +65,24 @@ export function SkillLibrary({
         case 'domain':
             setSelectedDomain(item);
             setCurrentView('coreSkill');
-            setHistoryStack([...historyStack, { view: 'root' }]);
             break;
         case 'project':
             onSelectProject(item);
-            setCurrentView('feature');
-            setHistoryStack([...historyStack, { view: 'root' }]);
+            setCurrentView('project');
             break;
         case 'coreSkill':
             setSelectedCoreSkill(item);
             setCurrentView('skillArea');
-            setHistoryStack([...historyStack, { view: 'domain' }]);
             break;
         case 'skillArea':
             setSelectedSkillArea(item);
-            setCurrentView('root'); // No deeper level, so just set it.
             break;
         case 'feature':
             setSelectedFeature(item);
-            setCurrentView('root'); // No deeper level, so just set it.
             break;
         case 'microSkill':
             onSelectMicroSkill(item);
             onSelectFocusArea(null);
-            onSelectProject(null); // Clear project selection when a micro skill is chosen
             break;
     }
   };
@@ -119,15 +110,15 @@ export function SkillLibrary({
   
   const renderHeader = () => {
     let title = "Library";
-    if (selectedFeature) title = selectedFeature.name;
-    else if (selectedSkillArea) title = selectedSkillArea.name;
-    else if (selectedCoreSkill) title = selectedCoreSkill.name;
-    else if (selectedDomain) title = selectedDomain.name;
+    if(currentView === 'root') title = "Library";
     else if (selectedProject) title = selectedProject.name;
+    else if (selectedDomain) title = selectedDomain.name;
+
+    const showBackButton = currentView !== 'root';
     
     return (
         <div className="flex items-center gap-2">
-            {historyStack.length > 0 && (
+            {showBackButton && (
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleBack}><ArrowLeft className="h-4 w-4" /></Button>
             )}
             <CardTitle className="text-lg text-primary truncate" title={title}>{title}</CardTitle>
@@ -136,60 +127,64 @@ export function SkillLibrary({
   };
   
   const renderContent = () => {
-    if (selectedSkillArea) {
-       return (
-         <div className="space-y-1">
-            {selectedSkillArea.microSkills.map(ms => {
-                 const tasks = definitions.filter(def => def.category === ms.name);
-                 return (
-                    <Accordion key={ms.id} type="single" collapsible>
-                        <AccordionItem value={ms.id}>
-                            <div className="flex items-center group">
-                                <AccordionTrigger
-                                    className={cn(
-                                        "text-base font-semibold hover:no-underline py-2 flex-grow",
-                                        selectedMicroSkill?.id === ms.id && "text-primary"
-                                    )}
-                                    onClick={() => handleSelect(ms, 'microSkill')}
-                                >
-                                    {ms.name}
-                                </AccordionTrigger>
-                                {selectedMicroSkill?.id === ms.id && (
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onOpenNewFocusArea}>
-                                        <PlusCircle className="h-4 w-4 text-green-500" />
-                                    </Button>
-                                )}
-                            </div>
-                            <AccordionContent className="pl-4 space-y-1">
-                                {tasks.map(task => (
-                                    <button key={task.id} onClick={() => onSelectFocusArea(task)} className="w-full text-left p-1 rounded-md text-sm text-muted-foreground hover:bg-muted flex items-center gap-2">
-                                        {pageType === 'deepwork' ? getDeepWorkIcon(task) : getUpskillIcon(task)}
-                                        <span>{task.name}</span>
-                                    </button>
-                                ))}
-                            </AccordionContent>
-                        </AccordionItem>
-                    </Accordion>
-                 )
-            })}
+    if (selectedMicroSkill) {
+      const tasks = definitions.filter(def => def.category === selectedMicroSkill.name);
+      return (
+        <div className="space-y-1">
+           <div className="flex items-center justify-between group">
+              <h3 className="font-semibold text-base py-2">{selectedMicroSkill.name}</h3>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onOpenNewFocusArea}>
+                  <PlusCircle className="h-4 w-4 text-green-500" />
+              </Button>
+            </div>
+            <div className="pl-4 space-y-1">
+                {tasks.map(task => (
+                    <button key={task.id} onClick={() => onSelectFocusArea(task)} className="w-full text-left p-1 rounded-md text-sm text-muted-foreground hover:bg-muted flex items-center gap-2">
+                        {pageType === 'deepwork' ? getDeepWorkIcon(task) : getUpskillIcon(task)}
+                        <span>{task.name}</span>
+                    </button>
+                ))}
+            </div>
         </div>
-       )
+      )
     }
 
     if (selectedFeature) {
+        const linkedMicroSkills = coreSkills.flatMap(cs => cs.skillAreas).flatMap(sa => sa.microSkills).filter(ms => selectedFeature.linkedSkills.some(l => l.microSkillId === ms.id));
         return (
             <div className="space-y-2">
-                {selectedFeature.linkedSkills.map(link => {
-                    const microSkill = coreSkills.flatMap(cs => cs.skillAreas).flatMap(sa => sa.microSkills).find(ms => ms.id === link.microSkillId);
-                    if (!microSkill) return null;
-                    return (
-                         <Button key={microSkill.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(microSkill, 'microSkill')}>
-                            {microSkill.name}
-                         </Button>
-                    )
-                })}
+                 <h3 className="font-semibold text-base py-2">{selectedFeature.name} Skills</h3>
+                {linkedMicroSkills.map(ms => (
+                    <Button key={ms.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(ms, 'microSkill')}>
+                        {ms.name}
+                    </Button>
+                ))}
             </div>
         )
+    }
+
+    if (selectedProject) {
+        return (
+            <div className="space-y-2">
+                {selectedProject.features.map(feature => (
+                    <Button key={feature.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(feature, 'feature')}>
+                        {feature.name}
+                    </Button>
+                ))}
+            </div>
+        )
+    }
+    
+    if (selectedSkillArea) {
+       return (
+         <div className="space-y-2">
+            {selectedSkillArea.microSkills.map(ms => (
+                <Button key={ms.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(ms, 'microSkill')}>
+                    {ms.name}
+                </Button>
+            ))}
+        </div>
+       )
     }
 
     if (selectedCoreSkill) {
@@ -204,18 +199,6 @@ export function SkillLibrary({
       );
     }
     
-    if (selectedProject) {
-        return (
-             <div className="space-y-2">
-                {selectedProject.features.map(feature => (
-                     <Button key={feature.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(feature, 'feature')}>
-                        {feature.name}
-                     </Button>
-                ))}
-             </div>
-        )
-    }
-
     if (selectedDomain) {
         const filteredCoreSkills = coreSkills.filter(cs => cs.domainId === selectedDomain.id);
         return (
@@ -232,7 +215,7 @@ export function SkillLibrary({
 
     // Root View
     return (
-        <Accordion type="multiple" className="w-full">
+        <Accordion type="multiple" className="w-full" defaultValue={['skills-domains', 'projects']}>
             <AccordionItem value="skills-domains">
                 <AccordionTrigger>Skills</AccordionTrigger>
                 <AccordionContent>
@@ -266,7 +249,7 @@ export function SkillLibrary({
         <CardContent>
            <AnimatePresence mode="wait">
              <motion.div
-               key={selectedSkillArea?.id || selectedCoreSkill?.id || selectedDomain?.id || selectedProject?.id || selectedFeature?.id || 'root'}
+               key={currentView + (selectedDomain?.id || '') + (selectedCoreSkill?.id || '') + (selectedSkillArea?.id || '') + (selectedProject?.id || '') + (selectedFeature?.id || '') + (selectedMicroSkill?.id || '')}
                initial={{ opacity: 0, x: -20 }}
                animate={{ opacity: 1, x: 0 }}
                exit={{ opacity: 0, x: 20 }}
