@@ -78,9 +78,10 @@ export interface TopicGoal {
   goalValue: number;
 }
 
-export interface DeepWorkTopicMetadata {
-  classification: 'product' | 'service';
-}
+// This is no longer used and will be removed.
+// export interface DeepWorkTopicMetadata {
+//   classification: 'product' | 'service';
+// }
 
 export interface TopicBrandingInfo {
   brandingStatus?: 'converted' | 'published';
@@ -332,6 +333,10 @@ export interface Project {
   name: string;
   domainId: string;
   features: Feature[];
+  // Re-purposing these from the old system for product planning
+  productType?: string;
+  gapAnalysis?: GapAnalysis;
+  releases?: Release[];
 }
 
 // Professional Experience Types

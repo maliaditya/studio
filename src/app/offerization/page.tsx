@@ -16,7 +16,7 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from '@/hooks/use-toast';
-import type { ExerciseCategory, ExerciseDefinition, GapAnalysis, Offer, ProductizationPlan as OfferizationPlan, Release } from '@/types/workout';
+import type { ExerciseCategory, ExerciseDefinition, GapAnalysis, Offer, ProductizationPlan as OfferizationPlan, Release, MicroSkill, CoreSkill } from '@/types/workout';
 import { offerTypes, GAP_TYPES } from '@/lib/constants';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,7 +27,6 @@ import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogFooter } from '@/components/ui/dialog';
 import { DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -35,74 +34,31 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 function OfferizationPageContent() {
-  const { deepWorkDefinitions, setDeepWorkDefinitions, offerizationPlans, setOfferizationPlans, deepWorkTopicMetadata, updateTopic, deleteTopic, copyOffer } = useAuth();
+  const { coreSkills, setCoreSkills, offerizationPlans, setOfferizationPlans, copyOffer } = useAuth();
   const { toast } = useToast();
-  const [newActionTasks, setNewActionTasks] = useState<Record<string, string>>({});
   
-  // State for project planning
-  const [editingRelease, setEditingRelease] = useState<{ topic: string; release: Partial<Release> } | null>(null);
-  const [selectedReleaseForTask, setSelectedReleaseForTask] = useState<Record<string, string>>({});
+  const [newMicroSkillNames, setNewMicroSkillNames] = useState<Record<string, string>>({});
+  
+  const [editingRelease, setEditingRelease] = useState<{ specializationId: string; release: Partial<Release> } | null>(null);
+  
+  const [editingSpecialization, setEditingSpecialization] = useState<CoreSkill | null>(null);
 
-  const [editingTopic, setEditingTopic] = useState<string | null>(null);
-  const [newTopicName, setNewTopicName] = useState('');
-  const [newTopicClassification, setNewTopicClassification] = useState<'product' | 'service'>('product');
+  const [editingOffer, setEditingOffer] = useState<{ specializationId: string; offer: Partial<Offer> } | null>(null);
+  
+  const specializations = useMemo(() => {
+    return coreSkills.filter(skill => skill.type === 'Specialization');
+  }, [coreSkills]);
 
-  const [editingOffer, setEditingOffer] = useState<{ topic: string; offer: Partial<Offer> } | null>(null);
-
-  useEffect(() => {
-    if (editingTopic) {
-        setNewTopicName(editingTopic);
-        setNewTopicClassification(deepWorkTopicMetadata[editingTopic]?.classification || 'product');
-    }
-  }, [editingTopic, deepWorkTopicMetadata]);
-
-  const handleSaveTopic = () => {
-    if (!editingTopic || !newTopicName.trim()) {
-        toast({ title: "Error", description: "Topic name cannot be empty.", variant: "destructive" });
-        return;
-    }
-    updateTopic(editingTopic, newTopicName.trim(), newTopicClassification);
-    setEditingTopic(null);
-  };
-
-  const topics = useMemo(() => {
-    const topicMap = new Map<string, ExerciseDefinition[]>();
-    (deepWorkDefinitions || []).forEach(def => {
-      if (Array.isArray(def.focusAreaIds)) return;
-      
-      const topic = def.category;
-      if (!topicMap.has(topic)) {
-        topicMap.set(topic, []);
-      }
-      topicMap.get(topic)!.push(def);
-    });
-
-    const topicEntries = Array.from(topicMap.entries());
-
-    const classifiedAndSortedTopics = topicEntries
-      .filter(([topic]) => deepWorkTopicMetadata[topic]?.classification === 'service')
-      .map(([topic, defs]) => {
-        const latestTimestamp = Math.max(
-            ...defs.map(d => parseInt(d.id.split('_')[1], 10) || 0)
-        );
-        return { topic, defs, latestTimestamp };
-      })
-      .sort((a, b) => b.latestTimestamp - a.latestTimestamp)
-      .map(({ topic, defs }) => [topic, defs] as [string, ExerciseDefinition[]]);
-
-    return classifiedAndSortedTopics;
-  }, [deepWorkDefinitions, deepWorkTopicMetadata]);
-
-  const handleOfferTypeChange = (topic: string, offerTypeToAddOrRemove: string) => {
+  const handleOfferTypeChange = (specializationId: string, offerTypeToAddOrRemove: string) => {
     setOfferizationPlans(prev => {
         const newPlans = { ...prev };
-        const currentPlan = newPlans[topic] || {};
+        const currentPlan = newPlans[specializationId] || {};
         const currentOfferTypes = currentPlan.offerTypes || [];
         const newOfferTypes = currentOfferTypes.includes(offerTypeToAddOrRemove)
             ? currentOfferTypes.filter(o => o !== offerTypeToAddOrRemove)
             : [...currentOfferTypes, offerTypeToAddOrRemove];
         
-        newPlans[topic] = {
+        newPlans[specializationId] = {
             ...currentPlan,
             offerTypes: newOfferTypes
         };
@@ -110,71 +66,54 @@ function OfferizationPageContent() {
     });
   };
   
-  const handleActionTaskChange = (topic: string, value: string) => {
-    setNewActionTasks(prev => ({ ...prev, [topic]: value }));
+  const handleMicroSkillChange = (areaId: string, value: string) => {
+    setNewMicroSkillNames(prev => ({ ...prev, [areaId]: value }));
   };
 
-  const handleAddActionTask = (e: React.FormEvent, topic: string) => {
+  const handleAddMicroSkill = (e: React.FormEvent, specializationId: string, areaId: string) => {
     e.preventDefault();
-    const taskName = newActionTasks[topic]?.trim();
-    if (!taskName) {
-        toast({ title: 'Error', description: 'Focus area name cannot be empty.', variant: "destructive" });
+    const name = newMicroSkillNames[areaId]?.trim();
+    if (!name) {
+        toast({ title: 'Error', description: 'Micro-skill name cannot be empty.', variant: "destructive" });
         return;
     }
 
-    if (deepWorkDefinitions.some(def => def.name.toLowerCase() === taskName.toLowerCase() && def.category === topic)) {
-        toast({ title: 'Error', description: 'This focus area already exists for this topic.', variant: "destructive" });
-        return;
-    }
+    setCoreSkills(prev => prev.map(s => {
+        if (s.id === specializationId) {
+            return {
+                ...s,
+                skillAreas: s.skillAreas.map(area => {
+                    if (area.id === areaId) {
+                        return { ...area, microSkills: [...area.microSkills, { id: `ms_${Date.now()}`, name }] };
+                    }
+                    return area;
+                })
+            };
+        }
+        return s;
+    }));
 
-    const newDef: ExerciseDefinition = {
-        id: `def_${Date.now()}_${Math.random()}`,
-        name: taskName,
-        category: topic as ExerciseCategory,
-    };
-
-    setDeepWorkDefinitions(prev => [...prev, newDef]);
-
-    const releaseId = selectedReleaseForTask[topic];
-    if (releaseId) {
-        setOfferizationPlans(prev => {
-            const newPlans = { ...prev };
-            const currentPlan = newPlans[topic];
-            if (currentPlan && currentPlan.releases) {
-                const releaseIndex = currentPlan.releases.findIndex(r => r.id === releaseId);
-                if (releaseIndex > -1) {
-                    const release = currentPlan.releases[releaseIndex];
-                    const focusAreaIds = Array.from(new Set(release.focusAreaIds || []));
-                    focusAreaIds.push(newDef.id);
-                    release.focusAreaIds = focusAreaIds;
-                }
-            }
-            return newPlans;
-        });
-    }
-
-    setNewActionTasks(prev => ({ ...prev, [topic]: '' }));
-    setSelectedReleaseForTask(prev => ({...prev, [topic]: ''}));
-    toast({ title: 'Focus Area Added', description: `"${taskName}" is now in your Deep Work library and linked to the project if selected.` });
+    setNewMicroSkillNames(prev => ({ ...prev, [areaId]: '' }));
+    toast({ title: 'Micro-Skill Added', description: `"${name}" has been added.` });
   };
 
-  const handleGapAnalysisChange = (topic: string, field: keyof GapAnalysis, value: string) => {
+  const handleGapAnalysisChange = (specializationId: string, field: keyof GapAnalysis, value: string) => {
     setOfferizationPlans(prev => ({
       ...prev,
-      [topic]: {
-        ...(prev[topic] || {}),
+      [specializationId]: {
+        ...(prev[specializationId] || {}),
         gapAnalysis: {
-          ...(prev[topic]?.gapAnalysis || { gapTypes: [], whatYouCanFill: '', coreSolution: '', outcomeGoal: '' }),
+          ...(prev[specializationId]?.gapAnalysis || { gapTypes: [], whatYouCanFill: '', coreSolution: '', outcomeGoal: '' }),
           [field]: value
         }
       }
     }));
   };
 
-  const handleGapTypeChange = (topic: string, gapToAddOrRemove: string) => {
+  const handleGapTypeChange = (specializationId: string, gapToAddOrRemove: string) => {
     setOfferizationPlans(prev => {
         const newPlans = { ...prev };
-        const currentPlan = newPlans[topic] || {};
+        const currentPlan = newPlans[specializationId] || {};
         const currentGapAnalysis = currentPlan.gapAnalysis || { gapTypes: [], whatYouCanFill: '', coreSolution: '', outcomeGoal: '' };
         
         const currentGapTypes = currentGapAnalysis.gapTypes || [];
@@ -182,7 +121,7 @@ function OfferizationPageContent() {
             ? currentGapTypes.filter(g => g !== gapToAddOrRemove)
             : [...currentGapTypes, gapToAddOrRemove];
             
-        newPlans[topic] = {
+        newPlans[specializationId] = {
             ...currentPlan,
             gapAnalysis: {
                 ...currentGapAnalysis,
@@ -193,9 +132,9 @@ function OfferizationPageContent() {
     });
   };
 
-  const handleStartEditingRelease = (topic: string, release?: Release) => {
+  const handleStartEditingRelease = (specializationId: string, release?: Release) => {
     setEditingRelease({
-        topic,
+        specializationId,
         release: release ? { ...release } : { id: `release_${Date.now()}_${Math.random()}`, name: '', description: '', launchDate: format(new Date(), 'yyyy-MM-dd'), focusAreaIds: [] }
     });
   };
@@ -213,13 +152,13 @@ function OfferizationPageContent() {
     });
   };
 
-  const handleToggleFocusAreaInRelease = (focusAreaId: string) => {
+  const handleToggleFocusAreaInRelease = (microSkillId: string) => {
      setEditingRelease(current => {
         if (!current) return null;
         const currentIds = current.release.focusAreaIds || [];
-        const newIds = currentIds.includes(focusAreaId)
-            ? currentIds.filter(id => id !== focusAreaId)
-            : [...currentIds, focusAreaId];
+        const newIds = currentIds.includes(microSkillId)
+            ? currentIds.filter(id => id !== microSkillId)
+            : [...currentIds, microSkillId];
         return {
             ...current,
             release: { ...current.release, focusAreaIds: newIds }
@@ -229,7 +168,7 @@ function OfferizationPageContent() {
 
   const handleSaveRelease = () => {
     if (!editingRelease) return;
-    const { topic, release } = editingRelease;
+    const { specializationId, release } = editingRelease;
     if (!release.name?.trim()) {
       toast({ title: "Error", description: "Project name cannot be empty.", variant: "destructive" });
       return;
@@ -237,20 +176,18 @@ function OfferizationPageContent() {
 
     setOfferizationPlans(prev => {
         const newPlans = { ...prev };
-        const currentPlan = newPlans[topic] || {};
+        const currentPlan = newPlans[specializationId] || {};
         const existingReleases = currentPlan.releases || [];
         
         const releaseIndex = existingReleases.findIndex(r => r.id === release.id);
 
         if (releaseIndex > -1) {
-            // Update existing release
             existingReleases[releaseIndex] = release as Release;
         } else {
-            // Add new release
             existingReleases.push(release as Release);
         }
 
-        newPlans[topic] = { ...currentPlan, releases: existingReleases.sort((a,b) => new Date(a.launchDate).getTime() - new Date(b.launchDate).getTime()) };
+        newPlans[specializationId] = { ...currentPlan, releases: existingReleases.sort((a,b) => new Date(a.launchDate).getTime() - new Date(b.launchDate).getTime()) };
         return newPlans;
     });
 
@@ -258,23 +195,23 @@ function OfferizationPageContent() {
     setEditingRelease(null);
   };
 
-  const handleDeleteRelease = (topic: string, releaseId: string) => {
+  const handleDeleteRelease = (specializationId: string, releaseId: string) => {
      setOfferizationPlans(prev => {
         const newPlans = { ...prev };
-        const currentPlan = newPlans[topic];
+        const currentPlan = newPlans[specializationId];
         if (!currentPlan || !currentPlan.releases) return prev;
 
         currentPlan.releases = currentPlan.releases.filter(r => r.id !== releaseId);
-        newPlans[topic] = currentPlan;
+        newPlans[specializationId] = currentPlan;
         
         return newPlans;
     });
     toast({ title: "Project Deleted", description: "The project has been removed from your plan.", variant: "destructive" });
   };
   
-  const handleStartEditingOffer = (topic: string, offer?: Offer) => {
+  const handleStartEditingOffer = (specializationId: string, offer?: Offer) => {
     setEditingOffer({
-        topic,
+        specializationId,
         offer: offer ? { ...offer } : { 
             id: `offer_${Date.now()}_${Math.random()}`, 
             name: '', 
@@ -304,7 +241,7 @@ function OfferizationPageContent() {
 
   const handleSaveOffer = () => {
     if (!editingOffer) return;
-    const { topic, offer } = editingOffer;
+    const { specializationId, offer } = editingOffer;
     if (!offer.name?.trim()) {
       toast({ title: "Error", description: "Offer name cannot be empty.", variant: "destructive" });
       return;
@@ -312,20 +249,18 @@ function OfferizationPageContent() {
 
     setOfferizationPlans(prev => {
         const newPlans = { ...prev };
-        const currentPlan = newPlans[topic] || {};
+        const currentPlan = newPlans[specializationId] || {};
         const existingOffers = currentPlan.offers || [];
         
         const offerIndex = existingOffers.findIndex(o => o.id === offer.id);
 
         if (offerIndex > -1) {
-            // Update existing offer
             existingOffers[offerIndex] = offer as Offer;
         } else {
-            // Add new offer
             existingOffers.push(offer as Offer);
         }
 
-        newPlans[topic] = { ...currentPlan, offers: existingOffers };
+        newPlans[specializationId] = { ...currentPlan, offers: existingOffers };
         return newPlans;
     });
 
@@ -333,14 +268,14 @@ function OfferizationPageContent() {
     setEditingOffer(null);
   };
 
-  const handleDeleteOffer = (topic: string, offerId: string) => {
+  const handleDeleteOffer = (specializationId: string, offerId: string) => {
      setOfferizationPlans(prev => {
         const newPlans = { ...prev };
-        const currentPlan = newPlans[topic];
+        const currentPlan = newPlans[specializationId];
         if (!currentPlan || !currentPlan.offers) return prev;
 
         currentPlan.offers = currentPlan.offers.filter(o => o.id !== offerId);
-        newPlans[topic] = currentPlan;
+        newPlans[specializationId] = currentPlan;
         
         return newPlans;
     });
@@ -348,9 +283,10 @@ function OfferizationPageContent() {
   };
 
 
-  const renderProjectForm = (topic: string, focusAreas: ExerciseDefinition[]) => {
-    if (!editingRelease || editingRelease.topic !== topic) return null;
+  const renderProjectForm = (specialization: CoreSkill) => {
+    if (!editingRelease || editingRelease.specializationId !== specialization.id) return null;
     const { release } = editingRelease;
+    const allMicroSkills = specialization.skillAreas.flatMap(area => area.microSkills);
     
     return (
       <Card className="mt-4 bg-muted/50">
@@ -381,16 +317,16 @@ function OfferizationPageContent() {
             <Textarea id="release-desc" value={release.description || ''} onChange={(e) => handleUpdateEditingRelease('description', e.target.value)} placeholder="What is the goal of this project?"/>
           </div>
           <div>
-            <Label>Included Focus Areas</Label>
+            <Label>Included Micro-Skills</Label>
             <div className="space-y-2 mt-2 rounded-md border p-3 max-h-48 overflow-y-auto">
-              {focusAreas.map(fa => (
-                <div key={fa.id} className="flex items-center space-x-2">
+              {allMicroSkills.map(ms => (
+                <div key={ms.id} className="flex items-center space-x-2">
                   <Checkbox 
-                    id={`fa-${fa.id}`} 
-                    checked={(release.focusAreaIds || []).includes(fa.id)}
-                    onCheckedChange={() => handleToggleFocusAreaInRelease(fa.id)}
+                    id={`ms-${ms.id}`} 
+                    checked={(release.focusAreaIds || []).includes(ms.id)}
+                    onCheckedChange={() => handleToggleFocusAreaInRelease(ms.id)}
                   />
-                  <Label htmlFor={`fa-${fa.id}`} className="font-normal">{fa.name}</Label>
+                  <Label htmlFor={`ms-${ms.id}`} className="font-normal">{ms.name}</Label>
                 </div>
               ))}
             </div>
@@ -412,66 +348,48 @@ function OfferizationPageContent() {
             Offerization
           </h1>
           <p className="mt-4 text-lg text-muted-foreground">
-            Turn your deep work topics into valuable services and offers.
+            Turn your specializations into valuable services and offers.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {topics.map(([topic, focusAreas]) => {
-            const plan = offerizationPlans[topic] || {};
+          {specializations.map((spec) => {
+            const plan = offerizationPlans[spec.id] || {};
             const selectedOfferTypes = plan.offerTypes || [];
             const gapAnalysis = plan.gapAnalysis;
             const releases = plan.releases || [];
             const offers = plan.offers || [];
 
-            const focusAreaMap = new Map(focusAreas.map(fa => [fa.id, fa.name]));
+            const microSkillMap = new Map(spec.skillAreas.flatMap(area => area.microSkills).map(ms => [ms.id, ms.name]));
             
             return (
-                <Card key={topic} className="flex flex-col">
+                <Card key={spec.id} className="flex flex-col">
                 <CardHeader>
                     <div className="flex justify-between items-start">
                         <CardTitle className="flex items-center gap-3">
                             <Briefcase className="h-5 w-5 text-primary"/>
-                            {topic}
+                            {spec.name}
                         </CardTitle>
-                         <div className="flex items-center">
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingTopic(topic)}>
-                                <Edit className="h-4 w-4" />
-                            </Button>
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        This action cannot be undone. This will permanently delete the topic "{topic}" and all of its associated data, including focus areas, logged sessions, and project plans.
-                                    </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => deleteTopic(topic)}>
-                                        Delete
-                                    </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        </div>
                     </div>
-                    <CardDescription>{focusAreas.length} focus area(s)</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow space-y-4">
                   <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
-                    <AccordionItem value="item-1">
-                      <AccordionTrigger>Focus Areas</AccordionTrigger>
-                      <AccordionContent>
-                        <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                            {focusAreas.map(fa => <li key={fa.id}>{fa.name}</li>)}
-                        </ul>
-                      </AccordionContent>
+                     <AccordionItem value="item-1">
+                       <AccordionTrigger>Micro-Skills</AccordionTrigger>
+                       <AccordionContent>
+                          {spec.skillAreas.map(area => (
+                              <div key={area.id} className="mb-2">
+                                  <h4 className="font-semibold text-sm text-muted-foreground">{area.name}</h4>
+                                  <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground pl-2">
+                                      {area.microSkills.map(ms => <li key={ms.id}>{ms.name}</li>)}
+                                  </ul>
+                                  <form onSubmit={(e) => handleAddMicroSkill(e, spec.id, area.id)} className="flex items-center gap-2 mt-2">
+                                      <Input value={newMicroSkillNames[area.id] || ''} onChange={(e) => handleMicroSkillChange(area.id, e.target.value)} placeholder="Add new micro-skill..." className="h-8"/>
+                                      <Button size="sm" className="h-8">Add</Button>
+                                  </form>
+                              </div>
+                          ))}
+                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="item-2">
                        <AccordionTrigger>Offer Type</AccordionTrigger>
@@ -490,7 +408,7 @@ function OfferizationPageContent() {
                                               <DropdownMenuCheckboxItem
                                                   key={item.name}
                                                   checked={selectedOfferTypes.includes(item.name)}
-                                                  onCheckedChange={() => handleOfferTypeChange(topic, item.name)}
+                                                  onCheckedChange={() => handleOfferTypeChange(spec.id, item.name)}
                                               >
                                                   {item.name}
                                               </DropdownMenuCheckboxItem>
@@ -522,7 +440,7 @@ function OfferizationPageContent() {
                            <AccordionContent className="space-y-4">
                               <p className="text-xs text-muted-foreground">Answer these questions to define your offer strategy.</p>
                               <div>
-                                  <Label htmlFor={`gapType-${topic}`} className="text-sm">Gap Type</Label>
+                                  <Label htmlFor={`gapType-${spec.id}`} className="text-sm">Gap Type</Label>
                                   <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
                                           <Button variant="outline" className="w-full justify-start text-left font-normal">
@@ -539,7 +457,7 @@ function OfferizationPageContent() {
                                                       <DropdownMenuCheckboxItem
                                                           key={item.name}
                                                           checked={(gapAnalysis?.gapTypes || []).includes(item.name)}
-                                                          onCheckedChange={() => handleGapTypeChange(topic, item.name)}
+                                                          onCheckedChange={() => handleGapTypeChange(spec.id, item.name)}
                                                       >
                                                           {item.name}
                                                       </DropdownMenuCheckboxItem>
@@ -550,16 +468,16 @@ function OfferizationPageContent() {
                                   </DropdownMenu>
                               </div>
                               <div>
-                                  <Label htmlFor={`fill-${topic}`} className="text-sm">What You Can Fill</Label>
-                                  <Textarea id={`fill-${topic}`} value={gapAnalysis?.whatYouCanFill || ''} onChange={(e) => handleGapAnalysisChange(topic, 'whatYouCanFill', e.target.value)} placeholder="How can you specifically address this gap?" />
+                                  <Label htmlFor={`fill-${spec.id}`} className="text-sm">What You Can Fill</Label>
+                                  <Textarea id={`fill-${spec.id}`} value={gapAnalysis?.whatYouCanFill || ''} onChange={(e) => handleGapAnalysisChange(spec.id, 'whatYouCanFill', e.target.value)} placeholder="How can you specifically address this gap?" />
                               </div>
                               <div>
-                                  <Label htmlFor={`solution-${topic}`} className="text-sm">Core Solution / Offer</Label>
-                                  <Textarea id={`solution-${topic}`} value={gapAnalysis?.coreSolution || ''} onChange={(e) => handleGapAnalysisChange(topic, 'coreSolution', e.target.value)} placeholder="What is the core service or offer?" />
+                                  <Label htmlFor={`solution-${spec.id}`} className="text-sm">Core Solution / Offer</Label>
+                                  <Textarea id={`solution-${spec.id}`} value={gapAnalysis?.coreSolution || ''} onChange={(e) => handleGapAnalysisChange(spec.id, 'coreSolution', e.target.value)} placeholder="What is the core service or offer?" />
                               </div>
                               <div>
-                                  <Label htmlFor={`goal-${topic}`} className="text-sm">Outcome Goal</Label>
-                                  <Textarea id={`goal-${topic}`} value={gapAnalysis?.outcomeGoal || ''} onChange={(e) => handleGapAnalysisChange(topic, 'outcomeGoal', e.target.value)} placeholder="What is the desired result?" />
+                                  <Label htmlFor={`goal-${spec.id}`} className="text-sm">Outcome Goal</Label>
+                                  <Textarea id={`goal-${spec.id}`} value={gapAnalysis?.outcomeGoal || ''} onChange={(e) => handleGapAnalysisChange(spec.id, 'outcomeGoal', e.target.value)} placeholder="What is the desired result?" />
                               </div>
                            </AccordionContent>
                         </AccordionItem>
@@ -575,7 +493,7 @@ function OfferizationPageContent() {
                                         <CardDescription>{format(parseISO(release.launchDate), 'PPP')}</CardDescription>
                                     </div>
                                     <div className="flex items-center">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleStartEditingRelease(topic, release)}><Edit className="h-4 w-4"/></Button>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleStartEditingRelease(spec.id, release)}><Edit className="h-4 w-4"/></Button>
                                         <AlertDialog>
                                         <AlertDialogTrigger asChild>
                                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button>
@@ -587,7 +505,7 @@ function OfferizationPageContent() {
                                             </AlertDialogHeader>
                                             <AlertDialogFooter>
                                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => handleDeleteRelease(topic, release.id)}>Delete</AlertDialogAction>
+                                            <AlertDialogAction onClick={() => handleDeleteRelease(spec.id, release.id)}>Delete</AlertDialogAction>
                                             </AlertDialogFooter>
                                         </AlertDialogContent>
                                         </AlertDialog>
@@ -596,18 +514,18 @@ function OfferizationPageContent() {
                                 </CardHeader>
                                 <CardContent className="p-3 text-sm">
                                     {release.description && <p className="mb-2 text-muted-foreground">{release.description}</p>}
-                                    <p className="font-medium text-foreground">Focus Areas:</p>
+                                    <p className="font-medium text-foreground">Micro-Skills:</p>
                                     <ul className="list-disc list-inside text-muted-foreground">
                                     {(release.focusAreaIds || []).map((id, index) => (
-                                        <li key={`${id}-${index}`}>{focusAreaMap.get(id) || 'Unknown Focus Area'}</li>
+                                        <li key={`${id}-${index}`}>{microSkillMap.get(id) || 'Unknown Micro-Skill'}</li>
                                     ))}
                                     </ul>
                                 </CardContent>
                                 </Card>
                             ))}
 
-                            {editingRelease?.topic === topic ? renderProjectForm(topic, focusAreas) : (
-                                <Button className="w-full mt-2" variant="outline" onClick={() => handleStartEditingRelease(topic)}>
+                            {editingRelease?.specializationId === spec.id ? renderProjectForm(spec) : (
+                                <Button className="w-full mt-2" variant="outline" onClick={() => handleStartEditingRelease(spec.id)}>
                                     <PlusCircle className="mr-2 h-4 w-4" /> Add Project
                                 </Button>
                             )}
@@ -622,10 +540,10 @@ function OfferizationPageContent() {
                                             <div className="flex justify-between items-start">
                                                 <CardTitle className="text-base">{offer.name}</CardTitle>
                                                 <div className="flex items-center">
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copyOffer(topic, offer.id)}>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copyOffer(spec.id, offer.id)}>
                                                         <Copy className="h-4 w-4" />
                                                     </Button>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleStartEditingOffer(topic, offer)}><Edit className="h-4 w-4" /></Button>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleStartEditingOffer(spec.id, offer)}><Edit className="h-4 w-4" /></Button>
                                                     <AlertDialog>
                                                         <AlertDialogTrigger asChild>
                                                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4" /></Button>
@@ -637,7 +555,7 @@ function OfferizationPageContent() {
                                                             </AlertDialogHeader>
                                                             <AlertDialogFooter>
                                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                <AlertDialogAction onClick={() => handleDeleteOffer(topic, offer.id)}>Delete</AlertDialogAction>
+                                                                <AlertDialogAction onClick={() => handleDeleteOffer(spec.id, offer.id)}>Delete</AlertDialogAction>
                                                             </AlertDialogFooter>
                                                         </AlertDialogContent>
                                                     </AlertDialog>
@@ -647,7 +565,7 @@ function OfferizationPageContent() {
                                         </CardHeader>
                                     </Card>
                                 ))}
-                                <Button className="w-full mt-2" variant="outline" onClick={() => handleStartEditingOffer(topic)}>
+                                <Button className="w-full mt-2" variant="outline" onClick={() => handleStartEditingOffer(spec.id)}>
                                     <PlusCircle className="mr-2 h-4 w-4" /> Add New Offer
                                 </Button>
                             </AccordionContent>
@@ -655,85 +573,12 @@ function OfferizationPageContent() {
                       </>
                      )}
                   </Accordion>
-
-                  {selectedOfferTypes.length > 0 && (
-                    <div>
-                        <Separator className="my-4"/>
-                        <div>
-                            <h4 className="font-semibold text-foreground mb-2">Add Focus Area</h4>
-                            <form onSubmit={(e) => handleAddActionTask(e, topic)} className="space-y-2">
-                               <div className="flex items-center gap-2">
-                                  <Input 
-                                      placeholder="New focus area for this offer..."
-                                      value={newActionTasks[topic] || ''}
-                                      onChange={(e) => handleActionTaskChange(topic, e.target.value)}
-                                  />
-                                  <Button type="submit" size="icon" className="flex-shrink-0">
-                                      <PlusCircle className="h-5 w-5"/>
-                                  </Button>
-                               </div>
-                               {releases.length > 0 && (
-                                <div>
-                                    <Label htmlFor={`release-select-${topic}`} className="text-xs">Add to Project (Optional)</Label>
-                                    <Select 
-                                        value={selectedReleaseForTask[topic] || ''} 
-                                        onValueChange={(value) => setSelectedReleaseForTask(prev => ({...prev, [topic]: value}))}
-                                    >
-                                        <SelectTrigger id={`release-select-${topic}`}>
-                                            <SelectValue placeholder="Select a project..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {releases.map(r => (
-                                                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                               )}
-                            </form>
-                            <p className="text-xs text-muted-foreground mt-2">
-                                Added focus areas will appear in your Deep Work library under the "{topic}" topic.
-                            </p>
-                        </div>
-                    </div>
-                  )}
                 </CardContent>
                 </Card>
             )
           })}
         </div>
       </div>
-      <Dialog open={!!editingTopic} onOpenChange={(isOpen) => !isOpen && setEditingTopic(null)}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Edit Topic</DialogTitle>
-                <DialogDescription>Rename the topic or change its classification. This will affect all associated focus areas and plans.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                    <Label htmlFor="topic-name">Topic Name</Label>
-                    <Input id="topic-name" value={newTopicName} onChange={(e) => setNewTopicName(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                    <Label>Classification</Label>
-                    <RadioGroup value={newTopicClassification} onValueChange={(v) => setNewTopicClassification(v as 'product' | 'service')} className="flex gap-4 pt-1">
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="product" id="class-product" />
-                            <Label htmlFor="class-product" className="font-normal">Product</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="service" id="class-service" />
-                            <Label htmlFor="class-service" className="font-normal">Service</Label>
-                        </div>
-                    </RadioGroup>
-                </div>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setEditingTopic(null)}>Cancel</Button>
-                <Button onClick={handleSaveTopic}>Save Changes</Button>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
       
       {editingOffer && (
         <Dialog open={!!editingOffer} onOpenChange={(isOpen) => !isOpen && setEditingOffer(null)}>
