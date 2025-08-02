@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -7,10 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, FolderOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
-import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ProjectSkillLink } from '@/types/workout';
+import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, Project, Feature, Company, Position, WorkProject, ProjectSkillLink } from '@/types/workout';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -28,6 +27,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 
 function SkillPageContent() {
   const { toast } = useToast();
@@ -38,6 +38,8 @@ function SkillPageContent() {
     companies, setCompanies,
     positions, setPositions,
     microSkillMap,
+    upskillDefinitions,
+    deepWorkDefinitions,
   } = useAuth();
   
   const [newDomainName, setNewDomainName] = useState('');
@@ -209,6 +211,7 @@ function SkillPageContent() {
   };
   
   const handleToggleSkillLink = (feature: Feature, microSkillId: string) => {
+    const selectedProject = projects.find(p => p.features.some(f => f.id === feature.id));
     if (!selectedProject) return;
     
     const isLinked = feature.linkedSkills.some(l => l.microSkillId === microSkillId);
@@ -228,6 +231,7 @@ function SkillPageContent() {
   };
   
   const handleUnlinkSkill = (feature: Feature, link: ProjectSkillLink) => {
+    const selectedProject = projects.find(p => p.features.some(f => f.id === feature.id));
     if (!selectedProject) return;
     setProjects(prev => prev.map(p => {
       if (p.id === selectedProject.id) {
@@ -384,6 +388,23 @@ function SkillPageContent() {
     return coreSkills.filter(skill => skill.type === 'Specialization');
   }, [coreSkills]);
 
+  const projectsBySkill = useMemo(() => {
+    const map = new Map<string, Project[]>();
+    projects.forEach(project => {
+        project.features.forEach(feature => {
+            feature.linkedSkills.forEach(link => {
+                if (!map.has(link.microSkillId)) {
+                    map.set(link.microSkillId, []);
+                }
+                // Avoid adding duplicate projects
+                if (!map.get(link.microSkillId)!.some(p => p.id === project.id)) {
+                    map.get(link.microSkillId)!.push(project);
+                }
+            });
+        });
+    });
+    return map;
+  }, [projects]);
 
   return (
     <>
@@ -509,70 +530,68 @@ function SkillPageContent() {
                           <Input value={newSkillAreaNames[selectedSkillId!] || ''} onChange={e => setNewSkillAreaNames(prev => ({...prev, [selectedSkillId!]: e.target.value}))} placeholder="New Skill Area Name" />
                           <Button onClick={() => handleAddSkillArea(selectedSkillId!)}>Add Skill Area</Button>
                       </div>
-                      <Accordion type="multiple" className="w-full space-y-2">
+                       <Accordion type="multiple" className="w-full space-y-2">
                           {selectedCoreSkill.skillAreas.map(area => (
-                              <Card key={area.id}>
-                                  <AccordionItem value={area.id} className="border-b-0">
-                                      <CardHeader className="p-3">
-                                          <div className="flex items-center justify-between w-full">
-                                            <AccordionTrigger className="hover:no-underline p-0 flex-grow">
-                                                <div className="flex items-center gap-2">
-                                                    <BrainCircuit className="h-5 w-5 text-primary"/>
-                                                    {editingArea?.id === area.id ? (
-                                                        <Input value={editingArea.name} onChange={e => setEditingArea({...editingArea, name: e.target.value})} autoFocus onBlur={() => { handleUpdateSkillArea(selectedSkillId!, area.id, editingArea.name, editingArea.purpose); setEditingArea(null); }} className="h-8 font-semibold"/>
-                                                    ) : (
-                                                        <span className="font-semibold text-lg">{area.name}</span>
-                                                    )}
-                                                </div>
-                                            </AccordionTrigger>
-                                            <div className="flex items-center">
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingArea(area)}><Edit className="h-4 w-4"/></Button>
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive"/></Button></AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                        <AlertDialogHeader>
-                                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                            <AlertDialogDescription>This will delete the "{area.name}" skill area and all its micro-skills.</AlertDialogDescription>
-                                                        </AlertDialogHeader>
-                                                        <AlertDialogFooter>
-                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                            <AlertDialogAction onClick={() => handleDeleteSkillArea(selectedSkillId!, area.id)}>Delete</AlertDialogAction>
-                                                        </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
+                            <Card key={area.id}>
+                              <AccordionItem value={area.id} className="border-b-0">
+                                <CardHeader className="p-3">
+                                  <div className="flex items-center justify-between w-full">
+                                    <AccordionTrigger className="hover:no-underline p-0 flex-grow">
+                                      <div className="flex items-center gap-2">
+                                        <FolderOpen className="h-5 w-5 text-primary"/>
+                                        <span className="font-semibold text-lg">{area.name}</span>
+                                      </div>
+                                    </AccordionTrigger>
+                                  </div>
+                                </CardHeader>
+                                <AccordionContent className="px-3 pb-3">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {area.microSkills.map(micro => {
+                                      const learningTasks = upskillDefinitions.filter(def => def.category === micro.name);
+                                      const deepWorkTasks = deepWorkDefinitions.filter(def => def.category === micro.name);
+                                      const linkedProjects = projectsBySkill.get(micro.id) || [];
+                                      return (
+                                        <Card key={micro.id} className="flex flex-col">
+                                          <CardHeader className="p-3">
+                                            <CardTitle className="text-base">{micro.name}</CardTitle>
+                                          </CardHeader>
+                                          <CardContent className="p-3 flex-grow space-y-3">
+                                            <div>
+                                              <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><BookCopy className="h-3 w-3"/>Learning Tasks</h4>
+                                              {learningTasks.length > 0 ? (
+                                                  <ul className="list-disc list-inside text-xs space-y-0.5">
+                                                      {learningTasks.map(t => <li key={t.id}>{t.name}</li>)}
+                                                  </ul>
+                                              ) : <p className="text-xs text-muted-foreground italic">None</p>}
                                             </div>
-                                          </div>
-                                           {editingArea?.id === area.id ? (
-                                             <Input value={editingArea.purpose} onChange={e => setEditingArea({...editingArea, purpose: e.target.value})} onBlur={() => { handleUpdateSkillArea(selectedSkillId!, area.id, editingArea.name, editingArea.purpose); setEditingArea(null); }} placeholder="Purpose..." className="h-8 text-sm mt-1"/>
-                                           ) : (
-                                              <CardDescription className="pt-1">{area.purpose || 'No purpose defined.'}</CardDescription>
-                                           )}
-                                      </CardHeader>
-                                      <AccordionContent className="px-3 pb-3">
-                                          <CardContent className="p-4 bg-muted/50 rounded-md">
-                                              <ul className="space-y-2">
-                                                {(area.microSkills || []).map(micro => (
-                                                  <li key={micro.id} className="flex items-center gap-2 group">
-                                                    <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                                                    {editingMicroSkill?.id === micro.id ? (
-                                                        <Input value={editingMicroSkill.name} onChange={e => setEditingMicroSkill({...editingMicroSkill, name: e.target.value})} autoFocus onBlur={() => { handleUpdateMicroSkill(area.id, micro.id, editingMicroSkill.name); setEditingMicroSkill(null); }} className="h-7"/>
-                                                    ) : (
-                                                        <span className="flex-grow cursor-pointer" onClick={() => setEditingMicroSkill(micro)}>{micro.name}</span>
-                                                    )}
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => handleDeleteMicroSkill(area.id, micro.id)}><Trash2 className="h-3 w-3 text-destructive"/></Button>
-                                                  </li>
-                                                ))}
-                                                 <li className="flex items-center gap-2 pt-2 border-t mt-2">
-                                                    <Input value={newMicroSkillNames[area.id] || ''} onChange={e => setNewMicroSkillNames(prev => ({...prev, [area.id]: e.target.value}))} placeholder="Add micro-skill..." className="h-8"/>
-                                                    <Button size="sm" className="h-8" onClick={() => handleAddMicroSkill(area.id)}>Add</Button>
-                                                </li>
-                                              </ul>
+                                            <Separator />
+                                            <div>
+                                              <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><Briefcase className="h-3 w-3"/>Deep Work Tasks</h4>
+                                               {deepWorkTasks.length > 0 ? (
+                                                  <ul className="list-disc list-inside text-xs space-y-0.5">
+                                                      {deepWorkTasks.map(t => <li key={t.id}>{t.name}</li>)}
+                                                  </ul>
+                                              ) : <p className="text-xs text-muted-foreground italic">None</p>}
+                                            </div>
+                                            <Separator />
+                                            <div>
+                                              <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><Sprout className="h-3 w-3"/>Project Usage</h4>
+                                               {linkedProjects.length > 0 ? (
+                                                  <ul className="list-disc list-inside text-xs space-y-0.5">
+                                                      {linkedProjects.map(p => <li key={p.id}>{p.name}</li>)}
+                                                  </ul>
+                                              ) : <p className="text-xs text-muted-foreground italic">Not used</p>}
+                                            </div>
                                           </CardContent>
-                                      </AccordionContent>
-                                  </AccordionItem>
-                              </Card>
+                                        </Card>
+                                      )
+                                    })}
+                                  </div>
+                                </AccordionContent>
+                              </AccordionItem>
+                            </Card>
                           ))}
-                      </Accordion>
+                       </Accordion>
                   </div>
               ) : selectedProject ? (
                   <div className="space-y-4">
@@ -836,3 +855,4 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
+
