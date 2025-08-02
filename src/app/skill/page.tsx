@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, FolderOpen } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, FolderOpen, GitMerge, Workflow } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, Project, Feature, Company, Position, WorkProject, ProjectSkillLink, ExerciseDefinition } from '@/types/workout';
@@ -59,6 +59,8 @@ function SkillPageContent() {
   const [newSkillAreaNames, setNewSkillAreaNames] = useState<Record<string, string>>({});
   
   const [editingArea, setEditingArea] = useState<SkillArea | null>(null);
+  const [addingMicroSkillTo, setAddingMicroSkillTo] = useState<string | null>(null);
+  const [newMicroSkillName, setNewMicroSkillName] = useState('');
   
   // Project state
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -147,8 +149,8 @@ function SkillPageContent() {
      setCoreSkills(prev => prev.map(s => s.id === skillId ? { ...s, skillAreas: s.skillAreas.filter(a => a.id !== areaId) } : s));
   };
   
-  const handleAddMicroSkill = (coreSkillId: string, areaId: string, name: string) => {
-    if (!name.trim()) {
+  const handleAddMicroSkill = (coreSkillId: string, areaId: string) => {
+    if (!newMicroSkillName.trim()) {
         toast({ title: 'Error', description: 'Micro-skill name cannot be empty.', variant: "destructive" });
         return;
     }
@@ -157,7 +159,7 @@ function SkillPageContent() {
       if (s.id === coreSkillId) {
         const newSkillAreas = s.skillAreas.map(area => {
           if (area.id === areaId) {
-            const newMicroSkill = { id: `ms_${Date.now()}`, name: name.trim() };
+            const newMicroSkill = { id: `ms_${Date.now()}`, name: newMicroSkillName.trim() };
             return { ...area, microSkills: [...area.microSkills, newMicroSkill] };
           }
           return area;
@@ -167,7 +169,9 @@ function SkillPageContent() {
       return s;
     }));
   
-    toast({ title: 'Micro-Skill Added', description: `"${name}" has been added.` });
+    toast({ title: 'Micro-Skill Added', description: `"${newMicroSkillName}" has been added.` });
+    setNewMicroSkillName('');
+    setAddingMicroSkillTo(null);
   };
 
 
@@ -552,9 +556,24 @@ function SkillPageContent() {
                                         <span className="font-semibold text-lg">{area.name}</span>
                                       </div>
                                     </AccordionTrigger>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setAddingMicroSkillTo(area.id)}><Plus className="h-4 w-4"/></Button>
                                   </div>
                                 </CardHeader>
                                 <AccordionContent className="px-3 pb-3">
+                                  {addingMicroSkillTo === area.id && (
+                                    <div className="flex items-center gap-2 mb-4 p-2 border rounded-md">
+                                        <Input
+                                            value={newMicroSkillName}
+                                            onChange={(e) => setNewMicroSkillName(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleAddMicroSkill(selectedCoreSkill!.id, area.id)}
+                                            placeholder="New micro-skill name..."
+                                            className="h-8"
+                                            autoFocus
+                                        />
+                                        <Button size="sm" onClick={() => handleAddMicroSkill(selectedCoreSkill!.id, area.id)}>Save</Button>
+                                        <Button size="sm" variant="ghost" onClick={() => { setNewMicroSkillName(''); setAddingMicroSkillTo(null); }}>Cancel</Button>
+                                    </div>
+                                  )}
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {area.microSkills.map(micro => {
                                       const filteredIntentions = intentions.filter(def => def.category === micro.name);
