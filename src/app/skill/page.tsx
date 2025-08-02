@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -556,7 +557,11 @@ function SkillPageContent() {
                                         <span className="font-semibold text-lg">{area.name}</span>
                                       </div>
                                     </AccordionTrigger>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setAddingMicroSkillTo(area.id)}><Plus className="h-4 w-4"/></Button>
+                                    <div className="flex items-center">
+                                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setAddingMicroSkillTo(area.id); }}>
+                                        <Plus className="h-4 w-4"/>
+                                      </Button>
+                                    </div>
                                   </div>
                                 </CardHeader>
                                 <AccordionContent className="px-3 pb-3">
@@ -576,44 +581,44 @@ function SkillPageContent() {
                                   )}
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {area.microSkills.map(micro => {
-                                      const filteredIntentions = intentions.filter(def => def.category === micro.name);
-                                      const filteredCuriosities = curiosities.filter(def => def.category === micro.name);
-                                      const linkedProjects = projectsBySkill.get(micro.id) || [];
-                                      return (
-                                        <Card key={micro.id} className="flex flex-col">
-                                          <CardHeader className="p-3">
-                                            <CardTitle className="text-base">{micro.name}</CardTitle>
-                                          </CardHeader>
-                                          <CardContent className="p-3 flex-grow space-y-3">
-                                            <div>
-                                              <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><BookCopy className="h-3 w-3"/>Curiosities</h4>
-                                              {filteredCuriosities.length > 0 ? (
-                                                  <ul className="list-disc list-inside text-xs space-y-0.5">
-                                                      {filteredCuriosities.map(t => <li key={t.id} className="cursor-pointer hover:text-primary" onClick={() => setSelectedIntention(t)}>{t.name}</li>)}
-                                                  </ul>
-                                              ) : <p className="text-xs text-muted-foreground italic">None</p>}
-                                            </div>
-                                            <Separator />
-                                            <div>
-                                              <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><Briefcase className="h-3 w-3"/>Intentions</h4>
-                                               {filteredIntentions.length > 0 ? (
-                                                  <ul className="list-disc list-inside text-xs space-y-0.5">
-                                                      {filteredIntentions.map(t => <li key={t.id} className="cursor-pointer hover:text-primary" onClick={() => setSelectedIntention(t)}>{t.name}</li>)}
-                                                  </ul>
-                                              ) : <p className="text-xs text-muted-foreground italic">None</p>}
-                                            </div>
-                                            <Separator />
-                                            <div>
-                                              <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><Sprout className="h-3 w-3"/>Project Usage</h4>
-                                               {linkedProjects.length > 0 ? (
-                                                  <ul className="list-disc list-inside text-xs space-y-0.5">
-                                                      {linkedProjects.map(p => <li key={p.id}>{p.name}</li>)}
-                                                  </ul>
-                                              ) : <p className="text-xs text-muted-foreground italic">Not used</p>}
-                                            </div>
-                                          </CardContent>
-                                        </Card>
-                                      )
+                                        const filteredIntentions = intentions.filter(def => def.category === micro.name);
+                                        const filteredCuriosities = curiosities.filter(def => def.category === micro.name);
+                                        const linkedProjects = projectsBySkill.get(micro.id) || [];
+                                        return (
+                                            <Card key={micro.id} className="flex flex-col">
+                                            <CardHeader className="p-3">
+                                                <CardTitle className="text-base">{micro.name}</CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="p-3 flex-grow space-y-3">
+                                                <div>
+                                                <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><BookCopy className="h-3 w-3"/>Curiosities</h4>
+                                                {filteredCuriosities.length > 0 ? (
+                                                    <ul className="list-disc list-inside text-xs space-y-0.5">
+                                                        {filteredCuriosities.map(t => <li key={t.id} className="cursor-pointer hover:text-primary" onClick={() => setSelectedIntention(t)}>{t.name}</li>)}
+                                                    </ul>
+                                                ) : <p className="text-xs text-muted-foreground italic">None</p>}
+                                                </div>
+                                                <Separator />
+                                                <div>
+                                                <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><Briefcase className="h-3 w-3"/>Intentions</h4>
+                                                {filteredIntentions.length > 0 ? (
+                                                    <ul className="list-disc list-inside text-xs space-y-0.5">
+                                                        {filteredIntentions.map(t => <li key={t.id} className="cursor-pointer hover:text-primary" onClick={() => setSelectedIntention(t)}>{t.name}</li>)}
+                                                    </ul>
+                                                ) : <p className="text-xs text-muted-foreground italic">None</p>}
+                                                </div>
+                                                <Separator />
+                                                <div>
+                                                <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><Sprout className="h-3 w-3"/>Project Usage</h4>
+                                                {linkedProjects.length > 0 ? (
+                                                    <ul className="list-disc list-inside text-xs space-y-0.5">
+                                                        {linkedProjects.map(p => <li key={p.id}>{p.name}</li>)}
+                                                    </ul>
+                                                ) : <p className="text-xs text-muted-foreground italic">Not used</p>}
+                                                </div>
+                                            </CardContent>
+                                            </Card>
+                                        )
                                     })}
                                   </div>
                                 </AccordionContent>
