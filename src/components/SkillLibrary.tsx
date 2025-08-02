@@ -35,8 +35,7 @@ export function SkillLibrary({
     onSelectProject,
 }: SkillLibraryProps) {
   const { skillDomains, coreSkills, projects } = useAuth();
-  const [historyStack, setHistoryStack] = useState<any[]>([]);
-
+  
   const [currentView, setCurrentView] = useState<'root' | 'domain' | 'coreSkill' | 'skillArea' | 'feature' | 'project'>('root');
   const [selectedDomain, setSelectedDomain] = useState<SkillDomain | null>(null);
   const [selectedCoreSkill, setSelectedCoreSkill] = useState<CoreSkill | null>(null);
@@ -64,7 +63,7 @@ export function SkillLibrary({
     switch(type) {
         case 'domain':
             setSelectedDomain(item);
-            setCurrentView('coreSkill');
+            setCurrentView('domain');
             break;
         case 'project':
             onSelectProject(item);
@@ -72,13 +71,15 @@ export function SkillLibrary({
             break;
         case 'coreSkill':
             setSelectedCoreSkill(item);
-            setCurrentView('skillArea');
+            setCurrentView('coreSkill');
             break;
         case 'skillArea':
             setSelectedSkillArea(item);
+            setCurrentView('skillArea');
             break;
         case 'feature':
             setSelectedFeature(item);
+            setCurrentView('feature');
             break;
         case 'microSkill':
             onSelectMicroSkill(item);
@@ -110,7 +111,9 @@ export function SkillLibrary({
   
   const renderHeader = () => {
     let title = "Library";
-    if(currentView === 'root') title = "Library";
+    if (selectedFeature) title = selectedFeature.name;
+    else if (selectedSkillArea) title = selectedSkillArea.name;
+    else if (selectedCoreSkill) title = selectedCoreSkill.name;
     else if (selectedProject) title = selectedProject.name;
     else if (selectedDomain) title = selectedDomain.name;
 
@@ -149,11 +152,10 @@ export function SkillLibrary({
       )
     }
 
-    if (selectedFeature) {
-        const linkedMicroSkills = coreSkills.flatMap(cs => cs.skillAreas).flatMap(sa => sa.microSkills).filter(ms => selectedFeature.linkedSkills.some(l => l.microSkillId === ms.id));
+    if (currentView === 'feature') {
+        const linkedMicroSkills = coreSkills.flatMap(cs => cs.skillAreas).flatMap(sa => sa.microSkills).filter(ms => selectedFeature?.linkedSkills.some(l => l.microSkillId === ms.id));
         return (
             <div className="space-y-2">
-                 <h3 className="font-semibold text-base py-2">{selectedFeature.name} Skills</h3>
                 {linkedMicroSkills.map(ms => (
                     <Button key={ms.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(ms, 'microSkill')}>
                         {ms.name}
@@ -163,10 +165,10 @@ export function SkillLibrary({
         )
     }
 
-    if (selectedProject) {
+    if (currentView === 'project') {
         return (
             <div className="space-y-2">
-                {selectedProject.features.map(feature => (
+                {selectedProject?.features.map(feature => (
                     <Button key={feature.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(feature, 'feature')}>
                         {feature.name}
                     </Button>
@@ -175,10 +177,10 @@ export function SkillLibrary({
         )
     }
     
-    if (selectedSkillArea) {
+    if (currentView === 'skillArea') {
        return (
          <div className="space-y-2">
-            {selectedSkillArea.microSkills.map(ms => (
+            {selectedSkillArea?.microSkills.map(ms => (
                 <Button key={ms.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(ms, 'microSkill')}>
                     {ms.name}
                 </Button>
@@ -187,10 +189,10 @@ export function SkillLibrary({
        )
     }
 
-    if (selectedCoreSkill) {
+    if (currentView === 'coreSkill') {
       return (
         <div className="space-y-2">
-          {selectedCoreSkill.skillAreas.map(sa => (
+          {selectedCoreSkill?.skillAreas.map(sa => (
             <Button key={sa.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(sa, 'skillArea')}>
               {sa.name}
             </Button>
@@ -199,8 +201,8 @@ export function SkillLibrary({
       );
     }
     
-    if (selectedDomain) {
-        const filteredCoreSkills = coreSkills.filter(cs => cs.domainId === selectedDomain.id);
+    if (currentView === 'domain') {
+        const filteredCoreSkills = coreSkills.filter(cs => cs.domainId === selectedDomain?.id);
         return (
              <div className="space-y-2">
                 {filteredCoreSkills.map(cs => (
