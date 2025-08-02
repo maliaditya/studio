@@ -28,6 +28,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { useRouter } from 'next/navigation';
+import { MindMapViewer } from '@/components/MindMapViewer';
+import { IntentionDetailModal } from '@/components/IntentionDetailModal';
 
 function SkillPageContent() {
   const { toast } = useToast();
@@ -42,6 +45,8 @@ function SkillPageContent() {
     deepWorkDefinitions,
   } = useAuth();
   
+  const router = useRouter();
+
   const [newDomainName, setNewDomainName] = useState('');
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
@@ -51,10 +56,8 @@ function SkillPageContent() {
 
   const [newSpecializationNames, setNewSpecializationNames] = useState<Record<string, string>>({});
   const [newSkillAreaNames, setNewSkillAreaNames] = useState<Record<string, string>>({});
-  const [newMicroSkillNames, setNewMicroSkillNames] = useState<Record<string, string>>({});
-
+  
   const [editingArea, setEditingArea] = useState<SkillArea | null>(null);
-  const [editingMicroSkill, setEditingMicroSkill] = useState<MicroSkill | null>(null);
   
   // Project state
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -71,6 +74,9 @@ function SkillPageContent() {
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
   const [newPositionTitle, setNewPositionTitle] = useState<Record<string, string>>({});
   const [editingWorkProject, setEditingWorkProject] = useState<{ positionId: string; project: Partial<WorkProject> } | null>(null);
+
+  // State for the modal
+  const [selectedIntention, setSelectedIntention] = useState<ExerciseDefinition | null>(null);
 
 
   const handleAddDomain = (e: React.FormEvent) => {
@@ -139,46 +145,7 @@ function SkillPageContent() {
   const handleDeleteSkillArea = (skillId: string, areaId: string) => {
      setCoreSkills(prev => prev.map(s => s.id === skillId ? { ...s, skillAreas: s.skillAreas.filter(a => a.id !== areaId) } : s));
   };
-  
-  const handleAddMicroSkill = (areaId: string) => {
-    if (!selectedSkillId) return;
-    const name = newMicroSkillNames[areaId]?.trim();
-    if (!name) return;
-    const newMicro: MicroSkill = { id: `ms_${Date.now()}`, name };
-    setCoreSkills(prev => prev.map(s => {
-        if (s.id === selectedSkillId) {
-            return { ...s, skillAreas: s.skillAreas.map(a => a.id === areaId ? { ...a, microSkills: [...a.microSkills, newMicro] } : a) };
-        }
-        return s;
-    }));
-    setNewMicroSkillNames(prev => ({...prev, [areaId]: ''}));
-  };
 
-  const handleUpdateMicroSkill = (areaId: string, microId: string, name: string) => {
-    if (!selectedSkillId) return;
-    setCoreSkills(prev => prev.map(s => {
-        if (s.id === selectedSkillId) {
-            return { ...s, skillAreas: s.skillAreas.map(a => {
-                if (a.id === areaId) {
-                    return { ...a, microSkills: a.microSkills.map(m => m.id === microId ? { ...m, name } : m) };
-                }
-                return a;
-            })};
-        }
-        return s;
-    }));
-  };
-  
-  const handleDeleteMicroSkill = (areaId: string, microId: string) => {
-    if (!selectedSkillId) return;
-     setCoreSkills(prev => prev.map(s => {
-        if (s.id === selectedSkillId) {
-            return { ...s, skillAreas: s.skillAreas.map(a => a.id === areaId ? { ...a, microSkills: a.microSkills.filter(m => m.id !== microId) } : a) };
-        }
-        return s;
-    }));
-  };
-  
   const handleAddProject = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProjectName.trim() || !selectedDomainId) return;
@@ -578,7 +545,7 @@ function SkillPageContent() {
                                               <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><BookCopy className="h-3 w-3"/>Curiosities</h4>
                                               {filteredCuriosities.length > 0 ? (
                                                   <ul className="list-disc list-inside text-xs space-y-0.5">
-                                                      {filteredCuriosities.map(t => <li key={t.id}>{t.name}</li>)}
+                                                      {filteredCuriosities.map(t => <li key={t.id} className="cursor-pointer hover:text-primary" onClick={() => setSelectedIntention(t)}>{t.name}</li>)}
                                                   </ul>
                                               ) : <p className="text-xs text-muted-foreground italic">None</p>}
                                             </div>
@@ -587,7 +554,7 @@ function SkillPageContent() {
                                               <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><Briefcase className="h-3 w-3"/>Intentions</h4>
                                                {filteredIntentions.length > 0 ? (
                                                   <ul className="list-disc list-inside text-xs space-y-0.5">
-                                                      {filteredIntentions.map(t => <li key={t.id}>{t.name}</li>)}
+                                                      {filteredIntentions.map(t => <li key={t.id} className="cursor-pointer hover:text-primary" onClick={() => setSelectedIntention(t)}>{t.name}</li>)}
                                                   </ul>
                                               ) : <p className="text-xs text-muted-foreground italic">None</p>}
                                             </div>
@@ -861,6 +828,11 @@ function SkillPageContent() {
             </div>
         </div>
        )}
+       <IntentionDetailModal
+          isOpen={!!selectedIntention}
+          onOpenChange={(isOpen) => !isOpen && setSelectedIntention(null)}
+          intention={selectedIntention}
+       />
     </div>
     </>
   );

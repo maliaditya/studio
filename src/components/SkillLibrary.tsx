@@ -6,11 +6,12 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building, Folder } from 'lucide-react';
+import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building, Folder, Workflow } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature } from '@/types/workout';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from './ui/input';
 
 
 interface SkillLibraryProps {
@@ -42,10 +43,41 @@ export function SkillLibrary({
   const [selectedSkillArea, setSelectedSkillArea] = useState<SkillArea | null>(null);
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
 
+  // New state for adding micro-skills
+  const [newMicroSkillNames, setNewMicroSkillNames] = useState<Record<string, string>>({});
+  
+  const handleMicroSkillChange = (areaId: string, value: string) => {
+    setNewMicroSkillNames(prev => ({ ...prev, [areaId]: value }));
+  };
+
+  const handleAddMicroSkill = (e: React.FormEvent, areaId: string) => {
+    e.preventDefault();
+    const { coreSkills, setCoreSkills } = useAuth();
+    const name = newMicroSkillNames[areaId]?.trim();
+    if (!name || !selectedCoreSkill) {
+      return;
+    }
+  
+    setCoreSkills(prev => prev.map(s => {
+      if (s.id === selectedCoreSkill.id) {
+        const newSkillAreas = s.skillAreas.map(area => {
+          if (area.id === areaId) {
+            const newMicroSkill = { id: `ms_${Date.now()}`, name };
+            return { ...area, microSkills: [...area.microSkills, newMicroSkill] };
+          }
+          return area;
+        });
+        return { ...s, skillAreas: newSkillAreas };
+      }
+      return s;
+    }));
+  
+    setNewMicroSkillNames(prev => ({ ...prev, [areaId]: '' }));
+  };
+
   const handleBack = () => {
     if (selectedMicroSkill) {
         onSelectMicroSkill(null);
-        // We are now back at the skill area view, no need to change currentView
     } else if (selectedFeature) {
         setSelectedFeature(null);
         setCurrentView('project');
@@ -141,18 +173,18 @@ export function SkillLibrary({
       return (
         <div className="space-y-1">
            <div className="flex items-center justify-between group">
-              <h3 className="font-semibold text-base py-2">{selectedMicroSkill.name}</h3>
+              <h3 className="font-semibold text-base py-2 flex items-center gap-2"><Activity className="h-4 w-4"/>Micro-Skill: {selectedMicroSkill.name}</h3>
               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onOpenNewFocusArea}>
                   <PlusCircle className="h-4 w-4 text-green-500" />
               </Button>
             </div>
             <div className="pl-4 space-y-1">
-                {tasks.map(task => (
+                {tasks.length > 0 ? tasks.map(task => (
                     <button key={task.id} onClick={() => onSelectFocusArea(task)} className="w-full text-left p-1 rounded-md text-sm text-muted-foreground hover:bg-muted flex items-center gap-2">
                         {pageType === 'deepwork' ? getDeepWorkIcon(task) : getUpskillIcon(task)}
                         <span>{task.name}</span>
                     </button>
-                ))}
+                )) : <p className="text-xs text-muted-foreground text-center py-2">No tasks for this skill yet.</p>}
             </div>
         </div>
       )
@@ -164,6 +196,7 @@ export function SkillLibrary({
             <div className="space-y-2">
                 {linkedMicroSkills.map(ms => (
                     <Button key={ms.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(ms, 'microSkill')}>
+                        <Activity className="mr-2 h-4 w-4"/>
                         {ms.name}
                     </Button>
                 ))}
@@ -176,6 +209,7 @@ export function SkillLibrary({
             <div className="space-y-2">
                 {selectedProject.features.map(feature => (
                     <Button key={feature.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(feature, 'feature')}>
+                        <Workflow className="mr-2 h-4 w-4"/>
                         {feature.name}
                     </Button>
                 ))}
@@ -185,12 +219,24 @@ export function SkillLibrary({
     
     if (currentView === 'skillArea' && selectedSkillArea) {
        return (
-         <div className="space-y-2">
+        <div className="space-y-2">
             {selectedSkillArea.microSkills.map(ms => (
                 <Button key={ms.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(ms, 'microSkill')}>
+                    <Activity className="mr-2 h-4 w-4"/>
                     {ms.name}
                 </Button>
             ))}
+             <form onSubmit={(e) => handleAddMicroSkill(e, selectedSkillArea.id)} className="flex items-center gap-2 mt-2 pt-2 border-t">
+                <Input 
+                    value={newMicroSkillNames[selectedSkillArea.id] || ''} 
+                    onChange={(e) => handleMicroSkillChange(selectedSkillArea.id, e.target.value)} 
+                    placeholder="New micro-skill..." 
+                    className="h-8"
+                />
+                <Button size="icon" type="submit" className="h-8 w-8 shrink-0">
+                    <PlusCircle className="h-4 w-4" />
+                </Button>
+            </form>
         </div>
        )
     }
@@ -200,6 +246,7 @@ export function SkillLibrary({
         <div className="space-y-2">
           {selectedCoreSkill.skillAreas.map(sa => (
             <Button key={sa.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(sa, 'skillArea')}>
+                <Folder className="mr-2 h-4 w-4"/>
               {sa.name}
             </Button>
           ))}
