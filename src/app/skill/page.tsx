@@ -31,6 +31,7 @@ import { Separator } from '@/components/ui/separator';
 import { useRouter } from 'next/navigation';
 import { MindMapViewer } from '@/components/MindMapViewer';
 import { IntentionDetailModal } from '@/components/IntentionDetailModal';
+import { SkillLibrary } from '@/components/SkillLibrary';
 
 function SkillPageContent() {
   const { toast } = useToast();
@@ -145,6 +146,30 @@ function SkillPageContent() {
   const handleDeleteSkillArea = (skillId: string, areaId: string) => {
      setCoreSkills(prev => prev.map(s => s.id === skillId ? { ...s, skillAreas: s.skillAreas.filter(a => a.id !== areaId) } : s));
   };
+  
+  const handleAddMicroSkill = (coreSkillId: string, areaId: string, name: string) => {
+    if (!name.trim()) {
+        toast({ title: 'Error', description: 'Micro-skill name cannot be empty.', variant: "destructive" });
+        return;
+    }
+  
+    setCoreSkills(prev => prev.map(s => {
+      if (s.id === coreSkillId) {
+        const newSkillAreas = s.skillAreas.map(area => {
+          if (area.id === areaId) {
+            const newMicroSkill = { id: `ms_${Date.now()}`, name: name.trim() };
+            return { ...area, microSkills: [...area.microSkills, newMicroSkill] };
+          }
+          return area;
+        });
+        return { ...s, skillAreas: newSkillAreas };
+      }
+      return s;
+    }));
+  
+    toast({ title: 'Micro-Skill Added', description: `"${name}" has been added.` });
+  };
+
 
   const handleAddProject = (e: React.FormEvent) => {
     e.preventDefault();

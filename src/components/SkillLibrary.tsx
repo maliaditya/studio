@@ -23,6 +23,7 @@ interface SkillLibraryProps {
   onOpenNewFocusArea: () => void;
   selectedProject: Project | null;
   onSelectProject: (project: Project | null) => void;
+  handleAddMicroSkill: (coreSkillId: string, areaId: string, name: string) => void;
 }
 
 export function SkillLibrary({ 
@@ -34,6 +35,7 @@ export function SkillLibrary({
     onOpenNewFocusArea,
     selectedProject,
     onSelectProject,
+    handleAddMicroSkill,
 }: SkillLibraryProps) {
   const { skillDomains, coreSkills, projects } = useAuth();
   
@@ -50,30 +52,15 @@ export function SkillLibrary({
     setNewMicroSkillNames(prev => ({ ...prev, [areaId]: value }));
   };
 
-  const handleAddMicroSkill = (e: React.FormEvent, areaId: string) => {
+  const handleAddMicroSkillSubmit = (e: React.FormEvent, areaId: string) => {
     e.preventDefault();
-    const { coreSkills, setCoreSkills } = useAuth();
-    const name = newMicroSkillNames[areaId]?.trim();
-    if (!name || !selectedCoreSkill) {
-      return;
+    const name = newMicroSkillNames[areaId] || '';
+    if (name.trim() && selectedCoreSkill) {
+        handleAddMicroSkill(selectedCoreSkill.id, areaId, name);
+        setNewMicroSkillNames(prev => ({ ...prev, [areaId]: '' }));
     }
-  
-    setCoreSkills(prev => prev.map(s => {
-      if (s.id === selectedCoreSkill.id) {
-        const newSkillAreas = s.skillAreas.map(area => {
-          if (area.id === areaId) {
-            const newMicroSkill = { id: `ms_${Date.now()}`, name };
-            return { ...area, microSkills: [...area.microSkills, newMicroSkill] };
-          }
-          return area;
-        });
-        return { ...s, skillAreas: newSkillAreas };
-      }
-      return s;
-    }));
-  
-    setNewMicroSkillNames(prev => ({ ...prev, [areaId]: '' }));
   };
+
 
   const handleBack = () => {
     if (selectedMicroSkill) {
@@ -226,12 +213,17 @@ export function SkillLibrary({
                     {ms.name}
                 </Button>
             ))}
-             <form onSubmit={(e) => handleAddMicroSkill(e, selectedSkillArea.id)} className="flex items-center gap-2 mt-2 pt-2 border-t">
+             <form onSubmit={(e) => handleAddMicroSkillSubmit(e, selectedSkillArea.id)} className="flex items-center gap-2 mt-2 pt-2 border-t">
                 <Input 
                     value={newMicroSkillNames[selectedSkillArea.id] || ''} 
                     onChange={(e) => handleMicroSkillChange(selectedSkillArea.id, e.target.value)} 
                     placeholder="New micro-skill..." 
                     className="h-8"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAddMicroSkillSubmit(e, selectedSkillArea.id);
+                      }
+                    }}
                 />
                 <Button size="icon" type="submit" className="h-8 w-8 shrink-0">
                     <PlusCircle className="h-4 w-4" />
