@@ -9,7 +9,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, FolderOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
-import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, Project, Feature, Company, Position, WorkProject, ProjectSkillLink } from '@/types/workout';
+import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, Project, Feature, Company, Position, WorkProject, ProjectSkillLink, ExerciseDefinition } from '@/types/workout';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -405,6 +405,24 @@ function SkillPageContent() {
     });
     return map;
   }, [projects]);
+  
+  const intentions = useMemo(() => {
+      const linkedDeepWorkChildIds = new Set<string>(deepWorkDefinitions.flatMap(def => def.linkedDeepWorkIds || []));
+      return deepWorkDefinitions.filter(def => {
+          const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+          const isChild = linkedDeepWorkChildIds.has(def.id);
+          return isParent && !isChild;
+      });
+  }, [deepWorkDefinitions]);
+
+  const curiosities = useMemo(() => {
+      const linkedUpskillChildIds = new Set<string>(upskillDefinitions.flatMap(def => def.linkedUpskillIds || []));
+      return upskillDefinitions.filter(def => {
+          const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+          const isChild = linkedUpskillChildIds.has(def.id);
+          return isParent && !isChild;
+      });
+  }, [upskillDefinitions]);
 
   return (
     <>
@@ -547,8 +565,8 @@ function SkillPageContent() {
                                 <AccordionContent className="px-3 pb-3">
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {area.microSkills.map(micro => {
-                                      const learningTasks = upskillDefinitions.filter(def => def.category === micro.name);
-                                      const deepWorkTasks = deepWorkDefinitions.filter(def => def.category === micro.name);
+                                      const filteredIntentions = intentions.filter(def => def.category === micro.name);
+                                      const filteredCuriosities = curiosities.filter(def => def.category === micro.name);
                                       const linkedProjects = projectsBySkill.get(micro.id) || [];
                                       return (
                                         <Card key={micro.id} className="flex flex-col">
@@ -557,19 +575,19 @@ function SkillPageContent() {
                                           </CardHeader>
                                           <CardContent className="p-3 flex-grow space-y-3">
                                             <div>
-                                              <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><BookCopy className="h-3 w-3"/>Learning Tasks</h4>
-                                              {learningTasks.length > 0 ? (
+                                              <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><BookCopy className="h-3 w-3"/>Curiosities</h4>
+                                              {filteredCuriosities.length > 0 ? (
                                                   <ul className="list-disc list-inside text-xs space-y-0.5">
-                                                      {learningTasks.map(t => <li key={t.id}>{t.name}</li>)}
+                                                      {filteredCuriosities.map(t => <li key={t.id}>{t.name}</li>)}
                                                   </ul>
                                               ) : <p className="text-xs text-muted-foreground italic">None</p>}
                                             </div>
                                             <Separator />
                                             <div>
-                                              <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><Briefcase className="h-3 w-3"/>Deep Work Tasks</h4>
-                                               {deepWorkTasks.length > 0 ? (
+                                              <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><Briefcase className="h-3 w-3"/>Intentions</h4>
+                                               {filteredIntentions.length > 0 ? (
                                                   <ul className="list-disc list-inside text-xs space-y-0.5">
-                                                      {deepWorkTasks.map(t => <li key={t.id}>{t.name}</li>)}
+                                                      {filteredIntentions.map(t => <li key={t.id}>{t.name}</li>)}
                                                   </ul>
                                               ) : <p className="text-xs text-muted-foreground italic">None</p>}
                                             </div>
@@ -855,4 +873,3 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
-
