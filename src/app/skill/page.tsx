@@ -211,6 +211,11 @@ function SkillPageContent() {
   const selectedCoreSkill = useMemo(() => coreSkills.find(s => s.id === selectedSkillId), [coreSkills, selectedSkillId]);
   const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
 
+  const coreSkillsInDomain = useMemo(() => {
+    if (!selectedDomainId) return [];
+    return coreSkills.filter(cs => cs.domainId === selectedDomainId);
+  }, [coreSkills, selectedDomainId]);
+  
   const allMicroSkillsInDomain = useMemo(() => {
     if (!selectedDomainId) return [];
     return coreSkills
@@ -461,13 +466,29 @@ function SkillPageContent() {
                                                                 <h4 className="font-medium leading-none">Link skills to "{feature.name}"</h4>
                                                                 <p className="text-sm text-muted-foreground">Select required micro-skills from the domain.</p>
                                                             </div>
-                                                            <div className="h-48 overflow-y-auto space-y-2 pr-2">
-                                                                {allMicroSkillsInDomain.map(ms => (
-                                                                    <div key={ms.id} className="flex items-center space-x-2">
-                                                                        <Checkbox id={`link-${feature.id}-${ms.id}`} checked={feature.linkedSkills.some(l => l.microSkillId === ms.id)} onCheckedChange={() => handleToggleSkillLink(feature, ms.id)} />
-                                                                        <Label htmlFor={`link-${feature.id}-${ms.id}`}>{ms.name}</Label>
-                                                                    </div>
-                                                                ))}
+                                                            <div className="h-64 overflow-y-auto space-y-2 pr-2">
+                                                                <Accordion type="multiple" className="w-full">
+                                                                    {coreSkillsInDomain.map(coreSkill => (
+                                                                        <AccordionItem value={coreSkill.id} key={coreSkill.id}>
+                                                                            <AccordionTrigger>{coreSkill.name}</AccordionTrigger>
+                                                                            <AccordionContent>
+                                                                                {coreSkill.skillAreas.map(area => (
+                                                                                    <div key={area.id} className="ml-2 mt-2">
+                                                                                        <h5 className="font-semibold text-xs mb-1">{area.name}</h5>
+                                                                                        <div className="pl-2 space-y-1">
+                                                                                            {area.microSkills.map(ms => (
+                                                                                                <div key={ms.id} className="flex items-center space-x-2">
+                                                                                                    <Checkbox id={`link-${feature.id}-${ms.id}`} checked={feature.linkedSkills.some(l => l.microSkillId === ms.id)} onCheckedChange={() => handleToggleSkillLink(feature, ms.id)} />
+                                                                                                    <Label htmlFor={`link-${feature.id}-${ms.id}`} className="font-normal text-sm">{ms.name}</Label>
+                                                                                                </div>
+                                                                                            ))}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </AccordionContent>
+                                                                        </AccordionItem>
+                                                                    ))}
+                                                                </Accordion>
                                                             </div>
                                                         </div>
                                                     </PopoverContent>
