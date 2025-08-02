@@ -793,6 +793,7 @@ function DeepWorkPageContent() {
   const [mindMapRootFocusAreaId, setMindMapRootFocusAreaId] = useState<string | null>(null);
 
   const [selectedMicroSkill, setSelectedMicroSkill] = useState<MicroSkill | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   const linkedDeepWorkChildIds = useMemo(() => {
     return new Set<string>(
@@ -1605,7 +1606,8 @@ function DeepWorkPageContent() {
     );
   };
 
-  const handleProjectSelect = (project: Project) => {
+  const handleProjectSelect = (project: Project | null) => {
+    setSelectedProject(project);
     setSelectedMicroSkill(null);
     setSelectedFocusArea(null);
   };
@@ -1617,6 +1619,12 @@ function DeepWorkPageContent() {
         <p className="text-muted-foreground">Loading your deep work data...</p>
       </div>
     );
+  }
+
+  const getLibraryTitle = () => {
+    if (selectedProject) return selectedProject.name;
+    if (selectedMicroSkill) return selectedMicroSkill.name;
+    return 'Library';
   }
 
   return (
@@ -1638,7 +1646,7 @@ function DeepWorkPageContent() {
                         }
                         setIsNewFocusAreaModalOpen(true);
                     }}
-                    selectedProject={null} // Pass null, as deep work doesn't use project selection in the same way
+                    selectedProject={selectedProject} 
                     onSelectProject={handleProjectSelect}
                  />
               {selectedFocusArea && (
@@ -1700,7 +1708,7 @@ function DeepWorkPageContent() {
                         <div className="flex-grow">
                             <CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">
                                 {viewMode === 'session' ? <ListChecks /> : selectedFocusArea ? getIcon(getNodeType(selectedFocusArea, linkedDeepWorkChildIds)) : <Library />}
-                                {viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedMicroSkill?.name || 'Select a micro-skill'}`}
+                                {viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : getLibraryTitle()}
                             </CardTitle>
                         </div>
 
@@ -1742,41 +1750,56 @@ function DeepWorkPageContent() {
                                   </div>
                                 )}
                             </div>
+                        ) : selectedFocusArea ? (
+                            <DroppableArea id={`linked-work-area-${selectedFocusArea.id}`} className="space-y-4">
+                                <div className="space-y-1">
+                                    <h3 className="text-xl font-bold">{selectedFocusArea.name}</h3>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('deepwork', selectedFocusArea)}>
+                                            <LinkIcon className="mr-2 h-4 w-4" /> Link Focus Area
+                                        </Button>
+                                        <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('upskill', selectedFocusArea)}>
+                                            <BookCopy className="mr-2 h-4 w-4" /> Link Learning
+                                        </Button>
+                                        <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('resource', selectedFocusArea)}>
+                                            <Folder className="mr-2 h-4 w-4" /> Link Resource
+                                        </Button>
+                                    </div>
+                                </div>
+                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    {(selectedFocusArea.linkedDeepWorkIds || []).map(id => {
+                                        const def = deepWorkDefinitions.find(d => d.id === id);
+                                        return def ? <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getIcon, getNodeType, getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, setSelectedFocusArea, setViewMode, handleToggleReadyForBranding, handleStartEditDefinition, handleUnlinkItem, handleDeleteExerciseDefinition, handleViewProgress, deepWorkDefinitions, formatDuration, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic, linkedDeepWorkChildIds, onOpenMindMap:(id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); } }}/> : null;
+                                    })}
+                                    {(selectedFocusArea.linkedUpskillIds || []).map(id => {
+                                        const def = upskillDefinitions.find(d => d.id === id);
+                                        return def ? <LinkedUpskillCard key={id} id={id} upskillDef={def} {...{isUpskillObjectiveComplete, getUpskillLoggedMinutesRecursive, setEmbedUrl, setFloatingVideoUrl, handleViewProgress, handleStartEditUpskill, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteUpskillDefinition: (id) => handleDeleteUpskillDefinition(id), upskillDefinitions, formatDuration: formatDuration, calculatedEstimate: calculateTotalEstimate(def), setSelectedSubtopic, setViewMode }} /> : null;
+                                    })}
+                                    {(selectedFocusArea.linkedResourceIds || []).map(id => {
+                                        const resource = resources.find(r => r.id === id);
+                                        return resource ? <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={(type, id) => handleUnlinkItem(type, id)} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} /> : null;
+                                    })}
+                                </div>
+                            </DroppableArea>
+                          ) : selectedProject ? (
+                            <div className="space-y-4">
+                                {selectedProject.features.map(feature => (
+                                    <Card key={feature.id}>
+                                        <CardHeader className="pb-3"><CardTitle className="text-base">{feature.name}</CardTitle></CardHeader>
+                                        <CardContent>
+                                            <p className="text-sm font-medium mb-1">Required Skills:</p>
+                                            <ul className="list-disc list-inside text-sm text-muted-foreground">
+                                                {feature.linkedSkills.map(link => {
+                                                    const skill = upskillDefinitions.find(s => s.id === link.microSkillId);
+                                                    return <li key={link.microSkillId}>{skill?.name || 'Unknown Skill'}</li>;
+                                                })}
+                                            </ul>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
                         ) : (
-                           selectedFocusArea ? (
-                                <DroppableArea id={`linked-work-area-${selectedFocusArea.id}`} className="space-y-4">
-                                    <div className="space-y-1">
-                                        <h3 className="text-xl font-bold">{selectedFocusArea.name}</h3>
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('deepwork', selectedFocusArea)}>
-                                                <LinkIcon className="mr-2 h-4 w-4" /> Link Focus Area
-                                            </Button>
-                                            <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('upskill', selectedFocusArea)}>
-                                                <BookCopy className="mr-2 h-4 w-4" /> Link Learning
-                                            </Button>
-                                            <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('resource', selectedFocusArea)}>
-                                                <Folder className="mr-2 h-4 w-4" /> Link Resource
-                                            </Button>
-                                        </div>
-                                    </div>
-                                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                        {(selectedFocusArea.linkedDeepWorkIds || []).map(id => {
-                                            const def = deepWorkDefinitions.find(d => d.id === id);
-                                            return def ? <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getIcon, getNodeType, getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, setSelectedFocusArea, setViewMode, handleToggleReadyForBranding, handleStartEditDefinition, handleUnlinkItem, handleDeleteExerciseDefinition, handleViewProgress, deepWorkDefinitions, formatDuration, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic, linkedDeepWorkChildIds, onOpenMindMap:(id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); } }}/> : null;
-                                        })}
-                                        {(selectedFocusArea.linkedUpskillIds || []).map(id => {
-                                            const def = upskillDefinitions.find(d => d.id === id);
-                                            return def ? <LinkedUpskillCard key={id} id={id} upskillDef={def} {...{isUpskillObjectiveComplete, getUpskillLoggedMinutesRecursive, setEmbedUrl, setFloatingVideoUrl, handleViewProgress, handleStartEditUpskill, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteUpskillDefinition: (id) => handleDeleteUpskillDefinition(id), upskillDefinitions, formatDuration: formatDuration, calculatedEstimate: calculateTotalEstimate(def), setSelectedSubtopic, setViewMode }} /> : null;
-                                        })}
-                                        {(selectedFocusArea.linkedResourceIds || []).map(id => {
-                                            const resource = resources.find(r => r.id === id);
-                                            return resource ? <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={(type, id) => handleUnlinkItem(type, id)} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} /> : null;
-                                        })}
-                                    </div>
-                                </DroppableArea>
-                            ) : (
-                                <div className="text-center py-10 text-muted-foreground">Select a micro-skill from the library to view its focus areas.</div>
-                            )
+                          <div className="text-center py-10 text-muted-foreground">Select a micro-skill or project from the library to view its focus areas.</div>
                         )}
                     </CardContent>
                 </Card>

@@ -36,7 +36,7 @@ export function SkillLibrary({
 }: SkillLibraryProps) {
   const { skillDomains, coreSkills, projects } = useAuth();
   
-  const [currentView, setCurrentView] = useState<'root' | 'domain' | 'coreSkill' | 'skillArea' | 'feature' | 'project'>('root');
+  const [currentView, setCurrentView] = useState<'root' | 'domain' | 'coreSkill' | 'skillArea' | 'project' | 'feature'>('root');
   const [selectedDomain, setSelectedDomain] = useState<SkillDomain | null>(null);
   const [selectedCoreSkill, setSelectedCoreSkill] = useState<CoreSkill | null>(null);
   const [selectedSkillArea, setSelectedSkillArea] = useState<SkillArea | null>(null);
@@ -46,6 +46,9 @@ export function SkillLibrary({
     if (selectedFeature) {
         setSelectedFeature(null);
         setCurrentView('project');
+    } else if (selectedMicroSkill) {
+        onSelectMicroSkill(null);
+        setCurrentView('skillArea');
     } else if (selectedSkillArea) {
         setSelectedSkillArea(null);
         setCurrentView('coreSkill');
@@ -112,12 +115,13 @@ export function SkillLibrary({
   const renderHeader = () => {
     let title = "Library";
     if (selectedFeature) title = selectedFeature.name;
+    else if (selectedMicroSkill) title = selectedMicroSkill.name;
     else if (selectedSkillArea) title = selectedSkillArea.name;
     else if (selectedCoreSkill) title = selectedCoreSkill.name;
     else if (selectedProject) title = selectedProject.name;
     else if (selectedDomain) title = selectedDomain.name;
 
-    const showBackButton = currentView !== 'root';
+    const showBackButton = currentView !== 'root' || selectedMicroSkill !== null;
     
     return (
         <div className="flex items-center gap-2">
