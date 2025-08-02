@@ -261,7 +261,7 @@ function SkillPageContent() {
       if (p.id === positionId) {
         const existingProjectIndex = p.projects.findIndex(wp => wp.id === project.id);
         const finalProject: WorkProject = {
-          id: project.id || `wproj_${Date.now()}`,
+          id: project.id || `wproj_${Date.now()}_${Math.random()}`,
           name: project.name,
           description: project.description || '',
           linkedSpecializationId: project.linkedSpecializationId,
@@ -387,7 +387,7 @@ function SkillPageContent() {
         <aside className="lg:col-span-1 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Skill & Experience Library</CardTitle>
+              <CardTitle>Skill &amp; Experience Library</CardTitle>
               <CardDescription>Define domains, skills, projects, and work history.</CardDescription>
             </CardHeader>
             <CardContent>
@@ -634,7 +634,7 @@ function SkillPageContent() {
                                                     const skillPath = microSkillPathMap.get(link.microSkillId);
                                                     return (
                                                       <li key={link.microSkillId} className="text-sm text-muted-foreground">
-                                                        {skillPath ? `${skillPath.coreSkillName} > ${skillPath.skillAreaName} > ${skillPath.microSkillName}` : 'Unknown Skill'}
+                                                        {skillPath ? `${skillPath.coreSkillName} &gt; ${skillPath.skillAreaName} &gt; ${skillPath.microSkillName}` : 'Unknown Skill'}
                                                       </li>
                                                     );
                                                 })}
@@ -828,3 +828,5 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
+
+    
