@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -155,6 +155,12 @@ interface AuthContextType {
   // New state for selected subtopic/focus area
   selectedSubtopic: ExerciseDefinition | null;
   setSelectedSubtopic: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
+
+  // Professional Experience
+  companies: Company[];
+  setCompanies: React.Dispatch<React.SetStateAction<Company[]>>;
+  positions: Position[];
+  setPositions: React.Dispatch<React.SetStateAction<Position[]>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -228,12 +234,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Pistons State
   const [isPistonsHeadOpen, setIsPistonsHeadOpen] = useState(false);
   const [pistons, setPistons] = useState<PistonsCategoryData>({});
-
+  
   // Skill Page State
   const [skillDomains, setSkillDomains] = useState<SkillDomain[]>([]);
   const [coreSkills, setCoreSkills] = useState<CoreSkill[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   
+  // Professional Experience State
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
+
   // Persisted task state
   const [selectedSubtopic, setSelectedSubtopic] = useState<ExerciseDefinition | null>(null);
 
@@ -332,6 +342,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`core_skills_${username}`); setCoreSkills(d ? JSON.parse(d) : []); } catch (e) { setCoreSkills([]); }
       try { const d = loadItem(`projects_${username}`); setProjects(d ? JSON.parse(d) : []); } catch (e) { setProjects([]); }
 
+      // Professional Experience Data
+      try { const d = loadItem(`companies_${username}`); setCompanies(d ? JSON.parse(d) : []); } catch (e) { setCompanies([]); }
+      try { const d = loadItem(`positions_${username}`); setPositions(d ? JSON.parse(d) : []); } catch (e) { setPositions([]); }
+
       // Persisted task state
       try {
         const d = loadItem(`selected_subtopic_${username}`);
@@ -364,6 +378,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setMindsetCards(DEFAULT_MINDSET_CARDS);
       setPistons({});
       setSkillDomains([]); setCoreSkills([]); setProjects([]);
+      setCompanies([]); setPositions([]);
       setSelectedSubtopic(null);
     }
   }, [currentUser]);
@@ -422,6 +437,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`skill_domains_${username}`, JSON.stringify(skillDomains));
       localStorage.setItem(`core_skills_${username}`, JSON.stringify(coreSkills));
       localStorage.setItem(`projects_${username}`, JSON.stringify(projects));
+
+      // Professional Experience
+      localStorage.setItem(`companies_${username}`, JSON.stringify(companies));
+      localStorage.setItem(`positions_${username}`, JSON.stringify(positions));
       
       // Persisted task state
       if (selectedSubtopic) localStorage.setItem(`selected_subtopic_${username}`, JSON.stringify(selectedSubtopic)); else localStorage.removeItem(`selected_subtopic_${username}`);
@@ -436,6 +455,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     mindsetCards,
     pistons,
     skillDomains, coreSkills, projects,
+    companies, positions,
     currentUser, loading, selectedSubtopic
   ]);
 
@@ -600,6 +620,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSkillDomains(data.skillDomains || []);
     setCoreSkills(data.coreSkills || []);
     setProjects(data.projects || []);
+    setCompanies(data.companies || []);
+    setPositions(data.positions || []);
   };
   
   const register = async (username: string, password: string) => {
@@ -658,6 +680,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       mindsetCards,
       pistons,
       skillDomains, coreSkills, projects,
+      companies, positions,
     };
   }
 
@@ -1392,6 +1415,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     skillDomains, setSkillDomains,
     coreSkills, setCoreSkills,
     projects, setProjects,
+    companies, setCompanies,
+    positions, setPositions,
     selectedSubtopic, setSelectedSubtopic,
   };
 

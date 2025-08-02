@@ -333,3 +333,23 @@ export interface Project {
   domainId: string;
   features: Feature[];
 }
+
+// Professional Experience Types
+export interface Company {
+    id: string;
+    name: string;
+}
+
+export interface WorkProject {
+    id: string;
+    name: string;
+    description: string;
+    linkedSpecializationId: string; // ID of a CoreSkill with type 'Specialization'
+}
+
+export interface Position {
+    id: string;
+    companyId: string;
+    title: string;
+    projects: WorkProject[];
+}
