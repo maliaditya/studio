@@ -12,7 +12,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, getISOWeek, isMonday, getYear, parseISO, differenceInDays } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, TopicGoal, SkillDomain, CoreSkill, MicroSkill } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, TopicGoal, SkillDomain, CoreSkill, MicroSkill, Project } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { AuthGuard } from '@/components/AuthGuard';
@@ -464,6 +464,7 @@ function UpskillPageContent() {
     setSelectedSubtopic,
     skillDomains,
     coreSkills,
+    projects,
   } = useAuth();
   const router = useRouter();
   
@@ -500,6 +501,7 @@ function UpskillPageContent() {
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
 
   const [selectedMicroSkill, setSelectedMicroSkill] = useState<MicroSkill | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
 
   const handleOpenNewSubtopicModal = () => {
@@ -1075,6 +1077,12 @@ function UpskillPageContent() {
   
     toast({ title: "Re-linked!", description: `"${draggedDef.name}" is now a sub-task of "${targetDef.name}".` });
   };
+
+  const handleProjectSelect = (project: Project) => {
+    setSelectedProject(project);
+    setSelectedSubtopic(null);
+    setSelectedMicroSkill(null);
+  };
   
   if (isLoadingPage) {
     return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your upskill data...</p></div>;
@@ -1093,6 +1101,8 @@ function UpskillPageContent() {
                     definitions={upskillDefinitions}
                     onSelectFocusArea={setSelectedSubtopic}
                     onOpenNewFocusArea={handleOpenNewSubtopicModal}
+                    selectedProject={selectedProject}
+                    onSelectProject={handleProjectSelect}
                 />
               {selectedSubtopic && (
                   <Card>
@@ -1120,7 +1130,7 @@ function UpskillPageContent() {
             <section aria-labelledby="main-panel-heading" className="lg:col-span-3 space-y-6">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between p-4">
-                        <div className="flex-grow"><CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">{viewMode === 'session' ? <ListChecks /> : <Library />}{viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedMicroSkill?.name || 'Select a micro-skill'}`}</CardTitle></div>
+                        <div className="flex-grow"><CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">{viewMode === 'session' ? <ListChecks /> : <Library />}{viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : `Library: ${selectedMicroSkill?.name || selectedProject?.name || 'Select a micro-skill'}`}</CardTitle></div>
                         <div className='flex items-center gap-2 flex-shrink-0'>
                           <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
                           <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('library')}>Library</Button>
@@ -1172,8 +1182,28 @@ function UpskillPageContent() {
                                     })}
                                 </div>
                             </div>
+                        ) : selectedProject ? (
+                          <div className="space-y-4">
+                              <h3 className="text-xl font-bold">{selectedProject.name}</h3>
+                              <div className="space-y-3">
+                                  {selectedProject.features.map(feature => (
+                                      <Card key={feature.id}>
+                                          <CardHeader className="pb-3"><CardTitle className="text-base">{feature.name}</CardTitle></CardHeader>
+                                          <CardContent>
+                                              <p className="text-sm font-medium mb-1">Required Skills:</p>
+                                              <ul className="list-disc list-inside text-sm text-muted-foreground">
+                                                  {feature.linkedSkills.map(link => {
+                                                      const skill = upskillDefinitions.find(s => s.id === link.microSkillId);
+                                                      return <li key={link.microSkillId}>{skill?.name || 'Unknown Skill'}</li>
+                                                  })}
+                                              </ul>
+                                          </CardContent>
+                                      </Card>
+                                  ))}
+                              </div>
+                          </div>
                         ) : (
-                            <div className="text-center py-10 text-muted-foreground">Select a micro-skill from the library to view its tasks.</div>
+                            <div className="text-center py-10 text-muted-foreground">Select a micro-skill or project from the library to view its tasks.</div>
                         )}
                     </CardContent>
                 </Card>

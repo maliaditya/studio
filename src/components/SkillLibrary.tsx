@@ -6,9 +6,9 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft } from 'lucide-react';
+import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition } from '@/types/workout';
+import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project } from '@/types/workout';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -20,6 +20,8 @@ interface SkillLibraryProps {
   definitions: ExerciseDefinition[];
   onSelectFocusArea: (def: ExerciseDefinition) => void;
   onOpenNewFocusArea: () => void;
+  selectedProject: Project | null;
+  onSelectProject: (project: Project) => void;
 }
 
 export function SkillLibrary({ 
@@ -29,8 +31,10 @@ export function SkillLibrary({
     definitions,
     onSelectFocusArea,
     onOpenNewFocusArea,
+    selectedProject,
+    onSelectProject,
 }: SkillLibraryProps) {
-  const { skillDomains, coreSkills } = useAuth();
+  const { skillDomains, coreSkills, projects } = useAuth();
   const [selectedDomain, setSelectedDomain] = useState<SkillDomain | null>(null);
   const [selectedCoreSkill, setSelectedCoreSkill] = useState<CoreSkill | null>(null);
   const [selectedSkillArea, setSelectedSkillArea] = useState<SkillArea | null>(null);
@@ -86,7 +90,7 @@ export function SkillLibrary({
   };
   
   const renderHeader = () => {
-    let title = "Skill Library";
+    let title = "Library";
     if (selectedDomain) title = selectedDomain.name;
     if (selectedCoreSkill) title = selectedCoreSkill.name;
     if (selectedSkillArea) title = selectedSkillArea.name;
@@ -116,14 +120,27 @@ export function SkillLibrary({
     
     if (!selectedCoreSkill) {
       const filteredCoreSkills = coreSkills.filter(cs => cs.domainId === selectedDomain.id);
+      const domainProjects = projects.filter(p => p.domainId === selectedDomain.id);
       return (
         <div className="space-y-2">
+          <h4 className="font-semibold text-xs text-muted-foreground px-2">Core Pillars</h4>
           {filteredCoreSkills.map(cs => (
             <Button key={cs.id} variant="outline" className="w-full justify-start" onClick={() => handleCoreSkillClick(cs)}>
               {cs.type === 'Foundation' ? <Blocks className="mr-2 h-4 w-4" /> : cs.type === 'Professionalism' ? <Sprout className="mr-2 h-4 w-4" /> : <BrainCircuit className="mr-2 h-4 w-4" />}
               {cs.name}
             </Button>
           ))}
+          {domainProjects.length > 0 && (
+            <>
+              <h4 className="font-semibold text-xs text-muted-foreground px-2 pt-2">Projects</h4>
+              {domainProjects.map(p => (
+                  <Button key={p.id} variant="outline" className="w-full justify-start" onClick={() => onSelectProject(p)}>
+                      <Briefcase className="mr-2 h-4 w-4" />
+                      {p.name}
+                  </Button>
+              ))}
+            </>
+          )}
         </div>
       );
     }
