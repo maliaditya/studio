@@ -472,19 +472,21 @@ function SkillPageContent() {
                                                                         <AccordionItem value={coreSkill.id} key={coreSkill.id}>
                                                                             <AccordionTrigger>{coreSkill.name}</AccordionTrigger>
                                                                             <AccordionContent>
+                                                                              <Accordion type="multiple" className="w-full pl-2">
                                                                                 {coreSkill.skillAreas.map(area => (
-                                                                                    <div key={area.id} className="ml-2 mt-2">
-                                                                                        <h5 className="font-semibold text-xs mb-1">{area.name}</h5>
-                                                                                        <div className="pl-2 space-y-1">
-                                                                                            {area.microSkills.map(ms => (
-                                                                                                <div key={ms.id} className="flex items-center space-x-2">
-                                                                                                    <Checkbox id={`link-${feature.id}-${ms.id}`} checked={feature.linkedSkills.some(l => l.microSkillId === ms.id)} onCheckedChange={() => handleToggleSkillLink(feature, ms.id)} />
-                                                                                                    <Label htmlFor={`link-${feature.id}-${ms.id}`} className="font-normal text-sm">{ms.name}</Label>
-                                                                                                </div>
-                                                                                            ))}
+                                                                                   <AccordionItem value={area.id} key={area.id}>
+                                                                                    <AccordionTrigger className="text-xs">{area.name}</AccordionTrigger>
+                                                                                    <AccordionContent className="pl-4 pt-2 space-y-2">
+                                                                                      {area.microSkills.map(ms => (
+                                                                                        <div key={ms.id} className="flex items-center space-x-2">
+                                                                                            <Checkbox id={`link-${feature.id}-${ms.id}`} checked={feature.linkedSkills.some(l => l.microSkillId === ms.id)} onCheckedChange={() => handleToggleSkillLink(feature, ms.id)} />
+                                                                                            <Label htmlFor={`link-${feature.id}-${ms.id}`} className="font-normal text-sm">{ms.name}</Label>
                                                                                         </div>
-                                                                                    </div>
+                                                                                      ))}
+                                                                                    </AccordionContent>
+                                                                                   </AccordionItem>
                                                                                 ))}
+                                                                              </Accordion>
                                                                             </AccordionContent>
                                                                         </AccordionItem>
                                                                     ))}
