@@ -216,12 +216,21 @@ function SkillPageContent() {
     return coreSkills.filter(cs => cs.domainId === selectedDomainId);
   }, [coreSkills, selectedDomainId]);
   
-  const allMicroSkillsInDomain = useMemo(() => {
-    if (!selectedDomainId) return [];
-    return coreSkills
-        .filter(cs => cs.domainId === selectedDomainId)
-        .flatMap(cs => cs.skillAreas)
-        .flatMap(sa => sa.microSkills);
+  const microSkillPathMap = useMemo(() => {
+    const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string }>();
+    if (!selectedDomainId) return map;
+    coreSkills.filter(cs => cs.domainId === selectedDomainId).forEach(coreSkill => {
+      coreSkill.skillAreas.forEach(skillArea => {
+        skillArea.microSkills.forEach(microSkill => {
+          map.set(microSkill.id, {
+            coreSkillName: coreSkill.name,
+            skillAreaName: skillArea.name,
+            microSkillName: microSkill.name
+          });
+        });
+      });
+    });
+    return map;
   }, [coreSkills, selectedDomainId]);
   
   const handleSelectDomain = (domainId: string) => {
@@ -498,8 +507,12 @@ function SkillPageContent() {
                                               </div>
                                               <ul className="space-y-1">
                                                 {feature.linkedSkills.map(link => {
-                                                    const skill = allMicroSkillsInDomain.find(s => s.id === link.microSkillId);
-                                                    return <li key={link.microSkillId} className="text-sm text-muted-foreground">{skill?.name || 'Unknown Skill'}</li>
+                                                    const skillPath = microSkillPathMap.get(link.microSkillId);
+                                                    return (
+                                                      <li key={link.microSkillId} className="text-sm text-muted-foreground">
+                                                        {skillPath ? `${skillPath.coreSkillName} > ${skillPath.skillAreaName} > ${skillPath.microSkillName}` : 'Unknown Skill'}
+                                                      </li>
+                                                    );
                                                 })}
                                               </ul>
                                           </div>
