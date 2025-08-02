@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
-import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition } from '@/types/workout';
+import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature } from '@/types/workout';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -23,12 +23,16 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 function SkillPageContent() {
   const { toast } = useToast();
   const { 
     skillDomains, setSkillDomains, 
     coreSkills, setCoreSkills, 
+    projects, setProjects,
     upskillDefinitions, deepWorkDefinitions 
   } = useAuth();
   
@@ -45,6 +49,14 @@ function SkillPageContent() {
 
   const [editingArea, setEditingArea] = useState<SkillArea | null>(null);
   const [editingMicroSkill, setEditingMicroSkill] = useState<MicroSkill | null>(null);
+  
+  // Project state
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newFeatureNames, setNewFeatureNames] = useState<Record<string, string>>({});
+  
+  const [linkingSkillsForFeature, setLinkingSkillsForFeature] = useState<Feature | null>(null);
 
   const handleAddDomain = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,9 +76,11 @@ function SkillPageContent() {
   const handleDeleteDomain = (domainId: string) => {
     setSkillDomains(prev => prev.filter(d => d.id !== domainId));
     setCoreSkills(prev => prev.filter(s => s.domainId !== domainId));
+    setProjects(prev => prev.filter(p => p.domainId !== domainId));
     if (selectedDomainId === domainId) {
         setSelectedDomainId(null);
         setSelectedSkillId(null);
+        setSelectedProjectId(null);
     }
   };
 
@@ -146,8 +160,80 @@ function SkillPageContent() {
         return s;
     }));
   };
+  
+  const handleAddProject = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProjectName.trim() || !selectedDomainId) return;
+    const newProject: Project = { id: `proj_${Date.now()}`, name: newProjectName.trim(), domainId: selectedDomainId, features: [] };
+    setProjects(prev => [...prev, newProject]);
+    setNewProjectName('');
+    setSelectedProjectId(newProject.id);
+  };
+  
+  const handleDeleteProject = (projectId: string) => {
+    setProjects(prev => prev.filter(p => p.id !== projectId));
+    if (selectedProjectId === projectId) setSelectedProjectId(null);
+  };
+
+  const handleAddFeature = (projectId: string) => {
+    const name = newFeatureNames[projectId]?.trim();
+    if (!name) return;
+    const newFeature: Feature = { id: `feat_${Date.now()}`, name, linkedSkills: [] };
+    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, features: [...p.features, newFeature] } : p));
+    setNewFeatureNames(prev => ({ ...prev, [projectId]: '' }));
+  };
+
+  const handleDeleteFeature = (projectId: string, featureId: string) => {
+    setProjects(prev => prev.map(p => {
+        if (p.id === projectId) {
+            return { ...p, features: p.features.filter(f => f.id !== featureId) };
+        }
+        return p;
+    }));
+  };
+  
+  const handleToggleSkillLink = (feature: Feature, microSkillId: string) => {
+    const isLinked = feature.linkedSkills.some(l => l.microSkillId === microSkillId);
+    let updatedSkills;
+    if (isLinked) {
+        updatedSkills = feature.linkedSkills.filter(l => l.microSkillId !== microSkillId);
+    } else {
+        updatedSkills = [...feature.linkedSkills, { featureId: feature.id, microSkillId }];
+    }
+    setProjects(prev => prev.map(p => {
+        if (p.id === selectedProject?.id) {
+            return { ...p, features: p.features.map(f => f.id === feature.id ? { ...f, linkedSkills: updatedSkills } : f) };
+        }
+        return p;
+    }));
+  };
 
   const selectedCoreSkill = useMemo(() => coreSkills.find(s => s.id === selectedSkillId), [coreSkills, selectedSkillId]);
+  const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
+
+  const allMicroSkillsInDomain = useMemo(() => {
+    if (!selectedDomainId) return [];
+    return coreSkills
+        .filter(cs => cs.domainId === selectedDomainId)
+        .flatMap(cs => cs.skillAreas)
+        .flatMap(sa => sa.microSkills);
+  }, [coreSkills, selectedDomainId]);
+  
+  const handleSelectDomain = (domainId: string) => {
+      setSelectedDomainId(domainId);
+      setSelectedSkillId(null);
+      setSelectedProjectId(null);
+  };
+
+  const handleSelectCoreSkill = (skillId: string) => {
+    setSelectedSkillId(skillId);
+    setSelectedProjectId(null);
+  }
+
+  const handleSelectProject = (projectId: string) => {
+    setSelectedProjectId(projectId);
+    setSelectedSkillId(null);
+  }
 
   const renderCoreSkillPillar = useCallback((skill: CoreSkill) => {
     let icon;
@@ -158,7 +244,7 @@ function SkillPageContent() {
     }
     return (
         <div key={skill.id} className="group flex items-center justify-between p-2 rounded-md hover:bg-muted">
-            <button className="flex items-center gap-2 flex-grow min-w-0" onClick={() => setSelectedSkillId(skill.id)}>
+            <button className="flex items-center gap-2 flex-grow min-w-0" onClick={() => handleSelectCoreSkill(skill.id)}>
                 {icon}
                 <span className={`text-sm ${selectedSkillId === skill.id ? 'font-semibold text-primary' : ''}`}>{skill.name}</span>
             </button>
@@ -184,25 +270,27 @@ function SkillPageContent() {
             )}
         </div>
     )
-  }, [selectedSkillId, coreSkills, handleDeleteCoreSkill]);
+  }, [selectedSkillId, handleDeleteCoreSkill]);
 
   return (
+    <>
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         <aside className="lg:col-span-1 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Skill Library</CardTitle>
-              <CardDescription>Define your high-level domains and core skills.</CardDescription>
+              <CardTitle>Skill & Project Library</CardTitle>
+              <CardDescription>Define domains, skills, and projects.</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleAddDomain} className="flex gap-2 mb-4">
                 <Input value={newDomainName} onChange={e => setNewDomainName(e.target.value)} placeholder="New Domain" />
                 <Button size="icon" type="submit"><PlusCircle className="h-4 w-4" /></Button>
               </form>
-              <Accordion type="single" collapsible className="w-full" value={selectedDomainId || ''} onValueChange={setSelectedDomainId}>
+              <Accordion type="single" collapsible className="w-full" value={selectedDomainId || ''} onValueChange={handleSelectDomain}>
                 {skillDomains.map(domain => {
                     const domainCoreSkills = coreSkills.filter(s => s.domainId === domain.id);
+                    const domainProjects = projects.filter(p => p.domainId === domain.id);
                     return (
                         <AccordionItem value={domain.id} key={domain.id}>
                             <div className="flex items-center justify-between w-full group">
@@ -231,13 +319,29 @@ function SkillPageContent() {
                             <AccordionContent>
                                 <div className="space-y-2">
                                     <h4 className="font-semibold text-xs text-muted-foreground px-2">Core Pillars</h4>
-                                    {domainCoreSkills.filter(s => s.type === 'Foundation').map(renderCoreSkillPillar)}
-                                    {domainCoreSkills.filter(s => s.type === 'Professionalism').map(renderCoreSkillPillar)}
+                                    {domainCoreSkills.filter(s => s.type !== 'Specialization').map(renderCoreSkillPillar)}
                                     <h4 className="font-semibold text-xs text-muted-foreground px-2 pt-2">Specializations</h4>
                                     {domainCoreSkills.filter(s => s.type === 'Specialization').map(renderCoreSkillPillar)}
                                     <div className="flex gap-2 pt-2">
                                       <Input placeholder="New Specialization" value={newSpecializationNames[domain.id] || ''} onChange={e => setNewSpecializationNames(prev => ({...prev, [domain.id]: e.target.value}))}/>
                                       <Button size="icon" onClick={() => handleAddSpecialization(domain.id)}><PlusCircle className="h-4 w-4"/></Button>
+                                    </div>
+                                    <h4 className="font-semibold text-xs text-muted-foreground px-2 pt-4">Projects</h4>
+                                    {domainProjects.map(p => (
+                                        <div key={p.id} className="group flex items-center justify-between p-2 rounded-md hover:bg-muted">
+                                          <button className="flex items-center gap-2 flex-grow min-w-0" onClick={() => handleSelectProject(p.id)}>
+                                            <Briefcase className="h-4 w-4" />
+                                            <span className={`text-sm ${selectedProjectId === p.id ? 'font-semibold text-primary' : ''}`}>{p.name}</span>
+                                          </button>
+                                          <div className="flex items-center opacity-0 group-hover:opacity-100">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingProject(p)}><Edit className="h-4 w-4"/></Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteProject(p.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                          </div>
+                                        </div>
+                                    ))}
+                                     <div className="flex gap-2 pt-2">
+                                      <Input placeholder="New Project" value={newProjectName} onChange={e => setNewProjectName(e.target.value)}/>
+                                      <Button size="icon" onClick={handleAddProject}><PlusCircle className="h-4 w-4"/></Button>
                                     </div>
                                 </div>
                             </AccordionContent>
@@ -252,8 +356,8 @@ function SkillPageContent() {
         <main className="lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle>Skill Breakdown</CardTitle>
-              <CardDescription>{selectedCoreSkill ? `Viewing skill areas for "${selectedCoreSkill.name}"` : 'Select a core skill from the library to see its breakdown.'}</CardDescription>
+              <CardTitle>Details</CardTitle>
+              <CardDescription>{selectedCoreSkill ? `Viewing skill areas for "${selectedCoreSkill.name}"` : selectedProject ? `Viewing features for "${selectedProject.name}"` : 'Select an item from the library.'}</CardDescription>
             </CardHeader>
             <CardContent>
               {selectedCoreSkill ? (
@@ -263,7 +367,7 @@ function SkillPageContent() {
                           <Button onClick={() => handleAddSkillArea(selectedSkillId!)}>Add Skill Area</Button>
                       </div>
                       <Accordion type="multiple" className="w-full space-y-2">
-                          {(selectedCoreSkill.skillAreas || []).map(area => (
+                          {selectedCoreSkill.skillAreas.map(area => (
                               <Card key={area.id}>
                                   <AccordionItem value={area.id} className="border-b-0">
                                       <CardHeader className="p-3">
@@ -327,8 +431,63 @@ function SkillPageContent() {
                           ))}
                       </Accordion>
                   </div>
+              ) : selectedProject ? (
+                  <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                          <Input value={newFeatureNames[selectedProjectId!] || ''} onChange={e => setNewFeatureNames(prev => ({ ...prev, [selectedProjectId!]: e.target.value }))} placeholder="New Feature Name" />
+                          <Button onClick={() => handleAddFeature(selectedProjectId!)}>Add Feature</Button>
+                      </div>
+                      <Accordion type="multiple" className="w-full space-y-2">
+                          {selectedProject.features.map(feature => (
+                              <Card key={feature.id}>
+                                  <AccordionItem value={feature.id} className="border-b-0">
+                                      <CardHeader className="p-3">
+                                          <div className="flex items-center justify-between w-full">
+                                              <AccordionTrigger className="hover:no-underline p-0 flex-grow font-semibold text-lg">{feature.name}</AccordionTrigger>
+                                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteFeature(selectedProjectId!, feature.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                          </div>
+                                      </CardHeader>
+                                      <AccordionContent className="px-3 pb-3">
+                                          <div className="p-4 bg-muted/50 rounded-md">
+                                              <div className="flex justify-between items-center mb-2">
+                                                <h4 className="font-semibold">Linked Skills</h4>
+                                                <Popover onOpenChange={(open) => !open && setLinkingSkillsForFeature(null)}>
+                                                    <PopoverTrigger asChild>
+                                                        <Button variant="outline" size="sm" onClick={() => setLinkingSkillsForFeature(feature)}>Link Skills</Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-80">
+                                                        <div className="grid gap-4">
+                                                            <div className="space-y-2">
+                                                                <h4 className="font-medium leading-none">Link skills to "{feature.name}"</h4>
+                                                                <p className="text-sm text-muted-foreground">Select required micro-skills from the domain.</p>
+                                                            </div>
+                                                            <div className="h-48 overflow-y-auto space-y-2 pr-2">
+                                                                {allMicroSkillsInDomain.map(ms => (
+                                                                    <div key={ms.id} className="flex items-center space-x-2">
+                                                                        <Checkbox id={`link-${feature.id}-${ms.id}`} checked={feature.linkedSkills.some(l => l.microSkillId === ms.id)} onCheckedChange={() => handleToggleSkillLink(feature, ms.id)} />
+                                                                        <Label htmlFor={`link-${feature.id}-${ms.id}`}>{ms.name}</Label>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </PopoverContent>
+                                                </Popover>
+                                              </div>
+                                              <ul className="space-y-1">
+                                                {feature.linkedSkills.map(link => {
+                                                    const skill = allMicroSkillsInDomain.find(s => s.id === link.microSkillId);
+                                                    return <li key={link.microSkillId} className="text-sm text-muted-foreground">{skill?.name || 'Unknown Skill'}</li>
+                                                })}
+                                              </ul>
+                                          </div>
+                                      </AccordionContent>
+                                  </AccordionItem>
+                              </Card>
+                          ))}
+                      </Accordion>
+                  </div>
               ) : (
-                <div className="text-center py-10 text-muted-foreground">Select a skill to see its breakdown.</div>
+                <div className="text-center py-10 text-muted-foreground">Select an item to see its breakdown.</div>
               )}
             </CardContent>
           </Card>
@@ -366,7 +525,24 @@ function SkillPageContent() {
             </div>
         </div>
        )}
+        {editingProject && (
+         <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setEditingProject(null)}>
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" onClick={(e) => e.stopPropagation()}>
+                <Card className="w-96">
+                    <CardHeader><CardTitle>Rename Project</CardTitle></CardHeader>
+                    <CardContent>
+                        <Input value={editingProject.name} onChange={(e) => setEditingProject({ ...editingProject, name: e.target.value })} autoFocus/>
+                    </CardContent>
+                    <CardFooter className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={() => setEditingProject(null)}>Cancel</Button>
+                        <Button onClick={() => { setProjects(prev => prev.map(p => p.id === editingProject.id ? editingProject : p)); setEditingProject(null); }}>Save</Button>
+                    </CardFooter>
+                </Card>
+            </div>
+        </div>
+       )}
     </div>
+    </>
   );
 }
 
