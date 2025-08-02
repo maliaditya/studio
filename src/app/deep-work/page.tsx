@@ -801,6 +801,18 @@ function DeepWorkPageContent() {
     );
   }, [deepWorkDefinitions]);
 
+  const microSkillMap = useMemo(() => {
+    const map = new Map<string, MicroSkill>();
+    coreSkills.forEach(cs => {
+        cs.skillAreas.forEach(sa => {
+            sa.microSkills.forEach(ms => {
+                map.set(ms.id, ms);
+            });
+        });
+    });
+    return map;
+  }, [coreSkills]);
+
   const getNodeType = useCallback((def: ExerciseDefinition, childIds: Set<string>) => {
     const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
     const isChild = childIds.has(def.id);
@@ -1790,7 +1802,7 @@ function DeepWorkPageContent() {
                                             <p className="text-sm font-medium mb-1">Required Skills:</p>
                                             <ul className="list-disc list-inside text-sm text-muted-foreground">
                                                 {feature.linkedSkills.map(link => {
-                                                    const skill = upskillDefinitions.find(s => s.id === link.microSkillId);
+                                                    const skill = microSkillMap.get(link.microSkillId);
                                                     return <li key={link.microSkillId}>{skill?.name || 'Unknown Skill'}</li>;
                                                 })}
                                             </ul>
