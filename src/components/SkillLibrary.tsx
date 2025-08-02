@@ -37,7 +37,7 @@ export function SkillLibrary({
   const { skillDomains, coreSkills, projects } = useAuth();
   const [historyStack, setHistoryStack] = useState<any[]>([]);
 
-  const [currentView, setCurrentView] = useState<'root' | 'domain' | 'project' | 'coreSkill' | 'skillArea' | 'feature'>('root');
+  const [currentView, setCurrentView] = useState<'root' | 'domain' | 'coreSkill' | 'skillArea' | 'feature'>('root');
   const [selectedDomain, setSelectedDomain] = useState<SkillDomain | null>(null);
   const [selectedCoreSkill, setSelectedCoreSkill] = useState<CoreSkill | null>(null);
   const [selectedSkillArea, setSelectedSkillArea] = useState<SkillArea | null>(null);
@@ -91,7 +91,7 @@ export function SkillLibrary({
         case 'microSkill':
             onSelectMicroSkill(item);
             onSelectFocusArea(null);
-            onSelectProject(null);
+            onSelectProject(null); // Clear project selection when a micro skill is chosen
             break;
     }
   };
@@ -119,11 +119,11 @@ export function SkillLibrary({
   
   const renderHeader = () => {
     let title = "Library";
-    if (selectedDomain) title = selectedDomain.name;
-    if (selectedCoreSkill) title = selectedCoreSkill.name;
-    if (selectedSkillArea) title = selectedSkillArea.name;
-    if (selectedProject) title = selectedProject.name;
     if (selectedFeature) title = selectedFeature.name;
+    else if (selectedSkillArea) title = selectedSkillArea.name;
+    else if (selectedCoreSkill) title = selectedCoreSkill.name;
+    else if (selectedDomain) title = selectedDomain.name;
+    else if (selectedProject) title = selectedProject.name;
     
     return (
         <div className="flex items-center gap-2">
@@ -154,9 +154,11 @@ export function SkillLibrary({
                                 >
                                     {ms.name}
                                 </AccordionTrigger>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100" onClick={onOpenNewFocusArea}>
-                                    <PlusCircle className="h-4 w-4 text-green-500" />
-                                </Button>
+                                {selectedMicroSkill?.id === ms.id && (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onOpenNewFocusArea}>
+                                        <PlusCircle className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                )}
                             </div>
                             <AccordionContent className="pl-4 space-y-1">
                                 {tasks.map(task => (
