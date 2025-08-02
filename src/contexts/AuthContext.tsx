@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -149,6 +149,8 @@ interface AuthContextType {
   setSkillDomains: React.Dispatch<React.SetStateAction<SkillDomain[]>>;
   coreSkills: CoreSkill[];
   setCoreSkills: React.Dispatch<React.SetStateAction<CoreSkill[]>>;
+  projects: Project[];
+  setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
 
   // New state for selected subtopic/focus area
   selectedSubtopic: ExerciseDefinition | null;
@@ -222,7 +224,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Mindset State
   const [mindsetCards, setMindsetCards] = useState<MindsetCard[]>(DEFAULT_MINDSET_CARDS);
-
+  
   // Pistons State
   const [isPistonsHeadOpen, setIsPistonsHeadOpen] = useState(false);
   const [pistons, setPistons] = useState<PistonsCategoryData>({});
@@ -230,6 +232,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Skill Page State
   const [skillDomains, setSkillDomains] = useState<SkillDomain[]>([]);
   const [coreSkills, setCoreSkills] = useState<CoreSkill[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   
   // Persisted task state
   const [selectedSubtopic, setSelectedSubtopic] = useState<ExerciseDefinition | null>(null);
@@ -327,6 +330,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Skill Page Data
       try { const d = loadItem(`skill_domains_${username}`); setSkillDomains(d ? JSON.parse(d) : []); } catch (e) { setSkillDomains([]); }
       try { const d = loadItem(`core_skills_${username}`); setCoreSkills(d ? JSON.parse(d) : []); } catch (e) { setCoreSkills([]); }
+      try { const d = loadItem(`projects_${username}`); setProjects(d ? JSON.parse(d) : []); } catch (e) { setProjects([]); }
 
       // Persisted task state
       try {
@@ -359,7 +363,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setCanvasLayout({ nodes: [], edges: [] });
       setMindsetCards(DEFAULT_MINDSET_CARDS);
       setPistons({});
-      setSkillDomains([]); setCoreSkills([]);
+      setSkillDomains([]); setCoreSkills([]); setProjects([]);
       setSelectedSubtopic(null);
     }
   }, [currentUser]);
@@ -417,6 +421,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Skill Page
       localStorage.setItem(`skill_domains_${username}`, JSON.stringify(skillDomains));
       localStorage.setItem(`core_skills_${username}`, JSON.stringify(coreSkills));
+      localStorage.setItem(`projects_${username}`, JSON.stringify(projects));
       
       // Persisted task state
       if (selectedSubtopic) localStorage.setItem(`selected_subtopic_${username}`, JSON.stringify(selectedSubtopic)); else localStorage.removeItem(`selected_subtopic_${username}`);
@@ -430,7 +435,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     canvasLayout,
     mindsetCards,
     pistons,
-    skillDomains, coreSkills,
+    skillDomains, coreSkills, projects,
     currentUser, loading, selectedSubtopic
   ]);
 
@@ -594,6 +599,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setSkillDomains(data.skillDomains || []);
     setCoreSkills(data.coreSkills || []);
+    setProjects(data.projects || []);
   };
   
   const register = async (username: string, password: string) => {
@@ -651,7 +657,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       canvasLayout,
       mindsetCards,
       pistons,
-      skillDomains, coreSkills,
+      skillDomains, coreSkills, projects,
     };
   }
 
@@ -1385,6 +1391,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     deleteDesire,
     skillDomains, setSkillDomains,
     coreSkills, setCoreSkills,
+    projects, setProjects,
     selectedSubtopic, setSelectedSubtopic,
   };
 

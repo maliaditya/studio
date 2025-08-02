@@ -1,4 +1,5 @@
 
+
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -312,4 +313,23 @@ export interface SkillArea {
 export interface MicroSkill {
   id: string;
   name: string;
+}
+
+// Project Skill Linking
+export interface ProjectSkillLink {
+  featureId: string;
+  microSkillId: string;
+}
+
+export interface Feature {
+  id: string;
+  name: string;
+  linkedSkills: ProjectSkillLink[];
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  domainId: string;
+  features: Feature[];
 }
