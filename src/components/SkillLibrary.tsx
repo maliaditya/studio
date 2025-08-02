@@ -43,12 +43,12 @@ export function SkillLibrary({
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
 
   const handleBack = () => {
-    if (selectedFeature) {
+    if (selectedMicroSkill) {
+        onSelectMicroSkill(null);
+        // We are now back at the skill area view, no need to change currentView
+    } else if (selectedFeature) {
         setSelectedFeature(null);
         setCurrentView('project');
-    } else if (selectedMicroSkill) {
-        onSelectMicroSkill(null);
-        setCurrentView('skillArea');
     } else if (selectedSkillArea) {
         setSelectedSkillArea(null);
         setCurrentView('coreSkill');
@@ -158,7 +158,7 @@ export function SkillLibrary({
       )
     }
 
-    if (currentView === 'feature') {
+    if (currentView === 'feature' && selectedFeature) {
         const linkedMicroSkills = coreSkills.flatMap(cs => cs.skillAreas).flatMap(sa => sa.microSkills).filter(ms => selectedFeature?.linkedSkills.some(l => l.microSkillId === ms.id));
         return (
             <div className="space-y-2">
@@ -171,10 +171,10 @@ export function SkillLibrary({
         )
     }
 
-    if (currentView === 'project') {
+    if (currentView === 'project' && selectedProject) {
         return (
             <div className="space-y-2">
-                {selectedProject?.features.map(feature => (
+                {selectedProject.features.map(feature => (
                     <Button key={feature.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(feature, 'feature')}>
                         {feature.name}
                     </Button>
@@ -183,10 +183,10 @@ export function SkillLibrary({
         )
     }
     
-    if (currentView === 'skillArea') {
+    if (currentView === 'skillArea' && selectedSkillArea) {
        return (
          <div className="space-y-2">
-            {selectedSkillArea?.microSkills.map(ms => (
+            {selectedSkillArea.microSkills.map(ms => (
                 <Button key={ms.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(ms, 'microSkill')}>
                     {ms.name}
                 </Button>
@@ -195,10 +195,10 @@ export function SkillLibrary({
        )
     }
 
-    if (currentView === 'coreSkill') {
+    if (currentView === 'coreSkill' && selectedCoreSkill) {
       return (
         <div className="space-y-2">
-          {selectedCoreSkill?.skillAreas.map(sa => (
+          {selectedCoreSkill.skillAreas.map(sa => (
             <Button key={sa.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(sa, 'skillArea')}>
               {sa.name}
             </Button>
@@ -207,7 +207,7 @@ export function SkillLibrary({
       );
     }
     
-    if (currentView === 'domain') {
+    if (currentView === 'domain' && selectedDomain) {
         const filteredCoreSkills = coreSkills.filter(cs => cs.domainId === selectedDomain?.id);
         return (
              <div className="space-y-2">
