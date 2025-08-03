@@ -445,6 +445,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     const [linkCardPopoverOpen, setLinkCardPopoverOpen] = useState(false);
     const [linkedCardId, setLinkedCardId] = useState<string>('');
     const audioInputRef = useRef<HTMLInputElement>(null);
+    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
     const handleUpdateTitle = (newTitle: string) => {
         onUpdate({ ...resource, name: newTitle });
@@ -500,6 +501,19 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
             return { id: resource.id, isPlaying: true };
         });
     };
+    
+    const handleDragEnd = (event: DragEndEvent) => {
+        setActivePointId(null);
+        const { active, over } = event;
+        if (active.id !== over?.id) {
+            const oldIndex = (resource.points || []).findIndex(p => p.id === active.id);
+            const newIndex = (resource.points || []).findIndex(p => p.id === over?.id);
+            if (oldIndex !== -1 && newIndex !== -1) {
+                const updatedPoints = arrayMove(resource.points!, oldIndex, newIndex);
+                onUpdate({ ...resource, points: updatedPoints });
+            }
+        }
+    };
 
     return (
         <Card className={cn("flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl", linkingFromId === resource.id && "ring-2 ring-primary", linkingFromId && linkingFromId !== resource.id && "cursor-pointer hover:ring-2 hover:ring-primary/50")}>
@@ -548,30 +562,32 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
             <CardContent className="flex-grow min-h-0">
               <div className={cn(hasMarkdownContent ? 'h-[450px]' : '')}>
                 <ScrollArea className="h-full">
-                    <SortableContext items={(resource.points || []).map(p => p.id)}>
-                        <ul className="space-y-3 pr-3">
-                            {(resource.points || []).map((point) => (
-                                <SortablePoint 
-                                    key={point.id} 
-                                    point={point} 
-                                    resource={resource}
-                                    onUpdate={onUpdate}
-                                    onDelete={handleDeletePoint}
-                                    setFloatingVideoUrl={setFloatingVideoUrl}
-                                    onOpenNestedPopup={onOpenNestedPopup}
-                                    onOpenMarkdownModal={onOpenMarkdownModal}
-                                />
-                            ))}
-                        </ul>
-                    </SortableContext>
-                    <DragOverlay>
-                        {activePointId && resource.points?.find(p => p.id === activePointId) ? (
-                            <div className="bg-card p-2 rounded-md shadow-lg opacity-80 flex items-start gap-3">
-                                <GripVertical className="h-4 w-4 text-muted-foreground/50" />
-                                {resource.points.find(p => p.id === activePointId)?.text}
-                            </div>
-                        ) : null}
-                    </DragOverlay>
+                    <DndContext sensors={sensors} onDragStart={(e) => setActivePointId(e.active.id.toString())} onDragEnd={handleDragEnd}>
+                        <SortableContext items={(resource.points || []).map(p => p.id)}>
+                            <ul className="space-y-3 pr-3">
+                                {(resource.points || []).map((point) => (
+                                    <SortablePoint 
+                                        key={point.id} 
+                                        point={point} 
+                                        resource={resource}
+                                        onUpdate={onUpdate}
+                                        onDelete={handleDeletePoint}
+                                        setFloatingVideoUrl={setFloatingVideoUrl}
+                                        onOpenNestedPopup={onOpenNestedPopup}
+                                        onOpenMarkdownModal={onOpenMarkdownModal}
+                                    />
+                                ))}
+                            </ul>
+                        </SortableContext>
+                        <DragOverlay>
+                            {activePointId && resource.points?.find(p => p.id === activePointId) ? (
+                                <div className="bg-card p-2 rounded-md shadow-lg opacity-80 flex items-start gap-3 w-64">
+                                    <GripVertical className="h-4 w-4 text-muted-foreground/50" />
+                                    {resource.points.find(p => p.id === activePointId)?.text}
+                                </div>
+                            ) : null}
+                        </DragOverlay>
+                    </DndContext>
                 </ScrollArea>
               </div>
             </CardContent>
@@ -592,7 +608,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                            </div>
                         </PopoverContent>
                     </Popover>
-                    <Popover open={linkCardPopoverOpen} onOpenChange={setLinkCardPopoverOpen}>
+                    <Popover>
                         <PopoverTrigger asChild>
                              <Button variant="outline" size="sm" className="w-full">
                                 <LinkIcon className="mr-2 h-4 w-4" /> Link Card
@@ -1310,64 +1326,49 @@ function ResourcesPageContent() {
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null);
     const { active, over, delta } = event;
-
+  
     if (active.id.toString().startsWith('popup-')) {
-        const resourceId = (active.id as string).replace('popup-', '');
-        setOpenPopups(prev => {
-            const newPopups = new Map(prev);
-            const popup = newPopups.get(resourceId);
-            if (popup) {
-                newPopups.set(resourceId, {
-                    ...popup,
-                    x: popup.x + delta.x,
-                    y: popup.y + delta.y,
-                });
-            }
-            return newPopups;
-        });
-        return;
-    }
-
-    if (!over) return;
-    
-    // Handle card reordering or moving to a folder
-    if (active.data.current?.type === 'card' || active.data.current?.type === 'point') {
-      const activeId = active.id.toString();
-      const overId = over.id.toString();
-      
-      // Reordering points within a card
-      if (active.data.current?.type === 'point') {
-        const resource = resources.find(r => r.points?.some(p => p.id === activeId));
-        if (resource && resource.points && over.data.current?.type === 'point') {
-          const oldIndex = resource.points.findIndex(p => p.id === activeId);
-          const newIndex = resource.points.findIndex(p => p.id === overId);
-          if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-            const updatedPoints = arrayMove(resource.points, oldIndex, newIndex);
-            handleUpdateResource({ ...resource, points: updatedPoints });
-          }
+      const resourceId = (active.id as string).replace('popup-', '');
+      setOpenPopups(prev => {
+        const newPopups = new Map(prev);
+        const popup = newPopups.get(resourceId);
+        if (popup) {
+          newPopups.set(resourceId, {
+            ...popup,
+            x: popup.x + delta.x,
+            y: popup.y + delta.y,
+          });
         }
-        return;
-      }
-      
-      // Moving a card to a folder
-      if (over.data.current?.type === 'folder') {
-        const resourceId = activeId;
-        const folderId = overId;
+        return newPopups;
+      });
+      return;
+    }
+  
+    if (!over) return;
+  
+    if (active.data.current?.type === 'card' && over.data.current?.type === 'folder') {
+      const resourceId = active.id.toString();
+      const folderId = over.id.toString();
+      if (resources.find(r => r.id === resourceId)?.folderId !== folderId) {
         setResources(prev => prev.map(r => r.id === resourceId ? { ...r, folderId: folderId } : r));
         toast({ title: "Resource Moved", description: `Moved resource to a new folder.` });
-        return;
       }
-
-      // Reordering cards within the same folder
+      return;
+    }
+  
+    if (active.data.current?.type === 'card' && over.data.current?.type === 'card') {
+      const activeId = active.id.toString();
+      const overId = over.id.toString();
       const activeResource = resources.find(r => r.id === activeId);
       const overResource = resources.find(r => r.id === overId);
       if (activeResource && overResource && activeResource.folderId === overResource.folderId) {
-          const oldIndex = resources.findIndex(item => item.id === activeId);
-          const newIndex = resources.findIndex(item => item.id === overId);
-          if (oldIndex !== newIndex) {
-              setResources(items => arrayMove(items, oldIndex, newIndex));
-          }
+        const oldIndex = resources.findIndex(item => item.id === activeId);
+        const newIndex = resources.findIndex(item => item.id === overId);
+        if (oldIndex !== newIndex) {
+          setResources(items => arrayMove(items, oldIndex, newIndex));
+        }
       }
+      return;
     }
   };
   
