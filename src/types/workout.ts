@@ -211,7 +211,7 @@ export interface GapAnalysis {
 export interface ResourcePoint {
   id: string;
   text: string;
-  type?: 'text' | 'youtube' | 'obsidian' | 'card' | 'code' | 'markdown';
+  type?: 'text' | 'youtube' | 'obsidian' | 'card' | 'code' | 'markdown' | 'link';
   url?: string;
   resourceId?: string; // ID of the linked Resource card
 }

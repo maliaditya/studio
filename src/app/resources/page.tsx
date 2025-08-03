@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -395,6 +396,8 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
                     <div onClick={() => setIsEditing(true)} className="w-full cursor-pointer bg-muted/50 p-3 rounded-md prose dark:prose-invert prose-sm">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
                     </div>
+                ) : point.type === 'link' ? (
+                    <Button variant="link" className="p-0 h-auto font-normal text-left" onClick={() => setFloatingVideoUrl(point.text)}>{point.text}</Button>
                 ) : (
                     <span onClick={() => setIsEditing(true)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/\n/g, '<br />') || '<span class="text-muted-foreground italic">New step...</span>' }} />
                 )}
@@ -595,6 +598,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                                 <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('text')}><MessageSquare className="mr-2 h-4 w-4" />Text</Button>
                                 <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('markdown')}><MessageSquare className="mr-2 h-4 w-4" />Markdown</Button>
                                 <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('code')}><Code className="mr-2 h-4 w-4" />Code</Button>
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('link')}><LinkIcon className="mr-2 h-4 w-4" />Link</Button>
                            </div>
                         </PopoverContent>
                     </Popover>
@@ -1379,7 +1383,7 @@ function ResourcesPageContent() {
         const newPopups = new Map(prev);
         const popup = newPopups.get(resourceId);
         if (popup) {
-            newPopups.set(resourceId, {
+            newPopups.set(popupId, {
                 ...popup,
                 ...newSize
             });
@@ -1932,6 +1936,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
