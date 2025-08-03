@@ -1480,7 +1480,6 @@ function ResourcesPageContent() {
     <audio ref={audioRef} onEnded={() => setPlayingAudio(null)} />
     <DndContext 
         sensors={sensors}
-        onDragStart={(e) => {}}
         onDragEnd={handleDragEndMain}
     >
         <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
@@ -1934,14 +1933,3 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
-
-
-
-
-
-
-
-
-
-
-
