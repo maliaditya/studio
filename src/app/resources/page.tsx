@@ -391,15 +391,15 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
                         <iframe src={point.url} title={resource.name} frameBorder="0" allowFullScreen className="w-full h-full"></iframe>
                     </div>
                 ) : point.type === 'code' ? (
-                    <pre onClick={() => setIsEditing(true)} className="w-full cursor-pointer bg-muted/50 p-3 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text || <span className="text-muted-foreground italic">New step...</span>}</pre>
+                    <pre onDoubleClick={() => setIsEditing(true)} className="w-full cursor-pointer bg-muted/50 p-3 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text || <span className="text-muted-foreground italic">New step...</span>}</pre>
                 ) : point.type === 'markdown' ? (
-                    <div onClick={() => setIsEditing(true)} className="w-full cursor-pointer bg-muted/50 p-3 rounded-md prose dark:prose-invert prose-sm">
+                    <div onDoubleClick={() => setIsEditing(true)} className="w-full cursor-pointer bg-muted/50 p-3 rounded-md prose dark:prose-invert prose-sm">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
                     </div>
                 ) : point.type === 'link' ? (
-                    <Button variant="link" className="p-0 h-auto font-normal text-left" onClick={() => setFloatingVideoUrl(point.text)}>{point.text}</Button>
+                     <span onDoubleClick={() => setIsEditing(true)} className="flex-grow cursor-pointer text-primary hover:underline" onClick={() => setFloatingVideoUrl(point.text)}>{point.text || <span className="text-muted-foreground italic">New link...</span>}</span>
                 ) : (
-                    <span onClick={() => setIsEditing(true)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/\n/g, '<br />') || '<span class="text-muted-foreground italic">New step...</span>' }} />
+                    <span onDoubleClick={() => setIsEditing(true)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/\n/g, '<br />') || '<span class="text-muted-foreground italic">New step...</span>' }} />
                 )}
             </div>
             <div className="flex flex-col items-center flex-shrink-0">
@@ -1383,7 +1383,7 @@ function ResourcesPageContent() {
         const newPopups = new Map(prev);
         const popup = newPopups.get(resourceId);
         if (popup) {
-            newPopups.set(popupId, {
+            newPopups.set(popup.resourceId, {
                 ...popup,
                 ...newSize
             });
@@ -1936,6 +1936,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
