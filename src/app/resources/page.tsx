@@ -397,7 +397,9 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
                     </div>
                 ) : point.type === 'link' ? (
-                     <span onDoubleClick={() => setIsEditing(true)} className="flex-grow cursor-pointer text-primary hover:underline" onClick={() => setFloatingVideoUrl(point.text)}>{point.text || <span className="text-muted-foreground italic">New link...</span>}</span>
+                     <div onDoubleClick={() => setIsEditing(true)} className="flex-grow cursor-pointer text-primary hover:underline">
+                        <span className="truncate">{point.text || <span className="text-muted-foreground italic">New link...</span>}</span>
+                    </div>
                 ) : (
                     <span onDoubleClick={() => setIsEditing(true)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/\n/g, '<br />') || '<span class="text-muted-foreground italic">New step...</span>' }} />
                 )}
@@ -1122,8 +1124,8 @@ function ResourcesPageContent() {
     toast({ title: "Resource Updated", description: `"${editingResource.name}" has been updated.` });
   };
 
-  const getChildFoldersRecursive = (folderId: string): ResourceFolderType[] => {
-    let children: ResourceFolderType[] = [];
+  const getChildFoldersRecursive = (folderId: string): ResourceFolder[] => {
+    let children: ResourceFolder[] = [];
     const directChildren = resourceFolders.filter(f => f.parentId === folderId);
     children.push(...directChildren);
     directChildren.forEach(child => {
@@ -1132,7 +1134,7 @@ function ResourcesPageContent() {
     return children;
   };
   
-  const handleShareFolder = async (folder: ResourceFolderType) => {
+  const handleShareFolder = async (folder: ResourceFolder) => {
     if (!currentUser?.username) {
         toast({ title: 'Error', description: 'You must be logged in to share.', variant: 'destructive' });
         return;
@@ -1149,15 +1151,7 @@ function ResourcesPageContent() {
                 folder, 
                 allResources: resources, // Send all resources to the backend
                 childFolders, 
-                username: currentUser.username,
-                profile: {
-                    displayName: currentUser.displayName,
-                    email: currentUser.email,
-                    phone: currentUser.phone,
-                    linkedinLink: currentUser.linkedinLink,
-                    githubLink: currentUser.githubLink,
-                    portfolioLink: currentUser.portfolioLink,
-                }
+                username: currentUser.username
             }),
         });
         const result = await response.json();
@@ -1439,7 +1433,7 @@ function ResourcesPageContent() {
       let finalResources = [...resources];
 
       if (!existingSubFolder) {
-        const newFolder: ResourceFolderType = {
+        const newFolder: ResourceFolder = {
           id: `folder_${Date.now()}`,
           name: targetCard.name,
           parentId: parentFolderId,
@@ -1936,6 +1930,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
