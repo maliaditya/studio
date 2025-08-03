@@ -224,6 +224,7 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
                                     <li key={point.id} className="flex items-start gap-2">
                                         {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
                                         point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                        point.type === 'link' ? <LinkIcon className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
                                         <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
                                         }
                                         {point.type === 'card' && point.resourceId ? (
@@ -239,6 +240,10 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
                                             </div>
                                         ) : point.type === 'code' ? (
                                             <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                                        ) : point.type === 'link' ? (
+                                            <div className="flex-grow min-w-0">
+                                                <span className="truncate cursor-pointer text-primary hover:underline" title={point.text}>{point.text}</span>
+                                            </div>
                                         ) : (
                                             <span className="break-words w-full" title={point.text}>{point.text}</span>
                                         )}
@@ -397,8 +402,10 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
                     </div>
                 ) : point.type === 'link' ? (
-                     <div onDoubleClick={() => setIsEditing(true)} className="flex-grow cursor-pointer text-primary hover:underline">
-                        <span className="truncate">{point.text || <span className="text-muted-foreground italic">New link...</span>}</span>
+                     <div onDoubleClick={() => setIsEditing(true)} className="flex-grow min-w-0">
+                        <span className="truncate cursor-pointer text-primary hover:underline" title={point.text}>
+                            {point.text || <span className="text-muted-foreground italic">New link...</span>}
+                        </span>
                     </div>
                 ) : (
                     <span onDoubleClick={() => setIsEditing(true)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/\n/g, '<br />') || '<span class="text-muted-foreground italic">New step...</span>' }} />
@@ -470,6 +477,8 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
         const updatedPoints = (resource.points || []).filter(p => p.id !== pointId);
         onUpdate({ ...resource, points: updatedPoints });
     };
+    
+    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
     const handleDragEnd = (event: DragEndEvent) => {
         setActivePointId(null);
@@ -554,6 +563,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
               <div className={cn(hasMarkdownContent ? 'h-[450px]' : '')}>
                 <ScrollArea className="h-full">
                     <DndContext 
+                        sensors={sensors}
                         onDragStart={e => setActivePointId(e.active.id as string)}
                         onDragEnd={handleDragEnd}
                     >
@@ -564,7 +574,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                                         key={point.id} 
                                         point={point} 
                                         resource={resource}
-                                        onUpdate={handleUpdateResource}
+                                        onUpdate={onUpdate}
                                         onDelete={handleDeletePoint}
                                         setFloatingVideoUrl={setFloatingVideoUrl}
                                         onOpenNestedPopup={onOpenNestedPopup}
@@ -574,10 +584,10 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                             </ul>
                         </SortableContext>
                         <DragOverlay>
-                            {activePointId ? (
+                            {activePointId && resource.points?.find(p => p.id === activePointId) ? (
                                 <div className="bg-card p-2 rounded-md shadow-lg opacity-80 flex items-start gap-3">
                                     <GripVertical className="h-4 w-4 text-muted-foreground/50" />
-                                    {resource.points?.find(p => p.id === activePointId)?.text}
+                                    {resource.points.find(p => p.id === activePointId)?.text}
                                 </div>
                             ) : null}
                         </DragOverlay>
@@ -734,7 +744,7 @@ function ResourcesPageContent() {
   
   const [linkingFromId, setLinkingFromId] = useState<string | null>(null);
   
-  const sensors = useSensors(useSensor(PointerSensor));
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
 
   useEffect(() => {
@@ -1931,6 +1941,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
