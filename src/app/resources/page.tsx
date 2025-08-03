@@ -121,63 +121,23 @@ interface ResourcePopupProps {
   onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
   onClose: (resourceId: string) => void;
   onSizeChange: (resourceId: string, newSize: { width: number; height: number }) => void;
-  playingAudio: { id: string; isPlaying: boolean } | null;
-  setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
+  setFloatingVideoUrl: (url: string | null) => void;
 }
 
-const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClose, onSizeChange, playingAudio, setPlayingAudio }: ResourcePopupProps) => {
-    const { resourceId, level, x, y, width } = popupState;
-    const resource = allResources.find(r => r.id === resourceId);
+const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClose, onSizeChange, setFloatingVideoUrl }: ResourcePopupProps) => {
+    const resource = allResources.find(r => r.id === popupState.resourceId);
     const cardRef = useRef<HTMLDivElement>(null);
 
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
-        id: `popup-${resourceId}`,
+        id: `popup-${popupState.resourceId}`,
     });
-    
-    const [isResizing, setIsResizing] = useState(false);
-    const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
-
-    const handleResizeMouseDown = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        setIsResizing(true);
-        setResizeStart({ x: e.clientX, y: e.clientY, width: width || 512, height: 0 });
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-        if (isResizing) {
-            const dx = e.clientX - resizeStart.x;
-            onSizeChange(resourceId, {
-                width: Math.max(320, resizeStart.width + dx),
-                height: 0
-            });
-        }
-    };
-
-    const handleMouseUp = () => {
-        setIsResizing(false);
-    };
-
-    useEffect(() => {
-        if (isResizing) {
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('mouseup', handleMouseUp);
-        } else {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [isResizing, resizeStart, onSizeChange]);
-
 
     const style: React.CSSProperties = {
         position: 'fixed',
-        top: y,
-        left: x,
+        top: popupState.y,
+        left: popupState.x,
+        width: `${popupState.width}px`,
         willChange: 'transform',
-        width: `${width}px`,
     };
 
     if (transform) {
@@ -190,82 +150,67 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
       e.stopPropagation();
       onOpenNestedPopup(pointResourceId, e, popupState);
     };
-    
-    const togglePlayAudio = () => {
-        setPlayingAudio(prev => {
-            if (prev?.id === resource.id && prev.isPlaying) {
-                return { ...prev, isPlaying: false };
-            }
-            return { id: resource.id, isPlaying: true };
-        });
-    };
 
     return (
         <div ref={setNodeRef} style={style} {...attributes} className="z-[60]">
             <Card ref={cardRef} className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col">
                 <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
-                    <div className="flex justify-between items-center">
-                        <CardTitle className="text-base flex items-center gap-2">
-                            <Library className="h-4 w-4" />
-                            <span className="truncate">{resource.name}</span>
-                        </CardTitle>
-                        {resource.audioUrl && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onClick={togglePlayAudio}>
-                                {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
-                            </Button>
-                        )}
-                    </div>
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <Library className="h-4 w-4" />
+                        <span className="truncate">{resource.name}</span>
+                    </CardTitle>
                 </CardHeader>
-                <div className="flex-grow min-h-0">
-                    <ScrollArea className="h-full">
-                        <CardContent className="p-3 pt-0">
-                            <ul className="space-y-2 text-sm text-muted-foreground pr-2">
-                                {(resource.points || []).map(point => (
-                                    <li key={point.id} className="flex items-start gap-2">
-                                        {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                        point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                        point.type === 'link' ? <LinkIcon className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                        <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
-                                        }
-                                        {point.type === 'card' && point.resourceId ? (
-                                            <button
-                                                onClick={(e) => handleLinkClick(e, point.resourceId!)}
-                                                className="text-left font-medium text-primary hover:underline"
+                <div className="flex-grow min-h-0 overflow-y-auto">
+                    <CardContent className="p-3 pt-0">
+                        <ul className="space-y-2 text-sm text-muted-foreground pr-2">
+                            {(resource.points || []).map(point => (
+                                <li key={point.id} className="flex items-start gap-2">
+                                    {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                    point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                    point.type === 'link' ? <LinkIcon className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                    <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
+                                    }
+                                    {point.type === 'card' && point.resourceId ? (
+                                        <button
+                                            onClick={(e) => handleLinkClick(e, point.resourceId!)}
+                                            className="text-left font-medium text-primary hover:underline"
+                                        >
+                                            {point.text}
+                                        </button>
+                                    ) : point.type === 'markdown' ? (
+                                        <div className="w-full prose dark:prose-invert prose-sm">
+                                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                        </div>
+                                    ) : point.type === 'code' ? (
+                                         <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                                    ) : point.type === 'link' ? (
+                                        <div className="flex-grow min-w-0">
+                                            <button 
+                                                className="text-left font-medium text-primary hover:underline truncate"
+                                                onClick={() => point.text && setFloatingVideoUrl(point.text)}
+                                                title={point.text}
                                             >
-                                                {point.text}
+                                                {point.displayText || point.text || <span className="text-muted-foreground italic">New link...</span>}
                                             </button>
-                                        ) : point.type === 'markdown' ? (
-                                            <div className="w-full prose dark:prose-invert prose-sm">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
-                                            </div>
-                                        ) : point.type === 'code' ? (
-                                            <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
-                                        ) : point.type === 'link' ? (
-                                            <div className="flex-grow min-w-0">
-                                                <span className="truncate cursor-pointer text-primary hover:underline" title={point.text}>{point.text}</span>
-                                            </div>
-                                        ) : (
-                                            <span className="break-words w-full" title={point.text}>{point.text}</span>
-                                        )}
-                                    </li>
-                                ))}
-                            </ul>
-                        </CardContent>
-                    </ScrollArea>
+                                        </div>
+                                    ) : (
+                                        <span className="break-words w-full" title={point.text}>{point.text}</span>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    </CardContent>
                 </div>
                 <CardFooter className="p-2 flex justify-end flex-shrink-0 relative">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onClose(resource.id); }}>
                         <X className="h-4 w-4" />
                     </Button>
-                    <div
-                        onMouseDown={handleResizeMouseDown}
-                        className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize z-10"
-                    />
                 </CardFooter>
             </Card>
         </div>
     );
 };
+
 
 const LinkDropZone = ({ resourceId, linkingFromId }: { resourceId: string; linkingFromId: string | null; }) => {
     const { isOver, setNodeRef } = useDroppable({
@@ -316,7 +261,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
     onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
 }) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id, data: { type: 'point', sortable: { containerId: resource.id } } });
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id });
 
     const [isEditing, setIsEditing] = useState(point.text === 'New step...');
     const [editText, setEditText] = useState(point.text);
@@ -402,7 +347,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
                     </div>
                 ) : point.type === 'link' ? (
-                     <div onDoubleClick={() => setIsEditing(true)} className="flex-grow min-w-0">
+                     <div className="flex-grow min-w-0">
                         <span className="truncate cursor-pointer text-primary hover:underline" title={point.text}>
                             {point.text || <span className="text-muted-foreground italic">New link...</span>}
                         </span>
@@ -500,8 +445,6 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
         });
     };
 
-    const sensors = useSensors(useSensor(PointerSensor));
-
     const handleDragEnd = (event: DragEndEvent) => {
       const { active, over } = event;
       if (!over || active.id === over.id) return;
@@ -561,7 +504,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
             <CardContent className="flex-grow min-h-0">
               <div className={cn(hasMarkdownContent ? 'h-[450px]' : '')}>
                 <ScrollArea className="h-full">
-                    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+                    <DndContext onDragEnd={handleDragEnd}>
                         <SortableContext items={(resource.points || []).map(p => p.id)}>
                             <ul className="space-y-3 pr-3">
                                 {(resource.points || []).map((point) => (
@@ -599,7 +542,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                            </div>
                         </PopoverContent>
                     </Popover>
-                    <Popover>
+                    <Popover open={linkCardPopoverOpen} onOpenChange={setLinkCardPopoverOpen}>
                         <PopoverTrigger asChild>
                              <Button variant="outline" size="sm" className="w-full">
                                 <LinkIcon className="mr-2 h-4 w-4" /> Link Card
@@ -710,7 +653,7 @@ function ResourcesPageContent() {
   
   const [addResourceType, setAddResourceType] = useState<'link' | 'card'>('link');
 
-  const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
+  const [openPopups, setOpenPopups] = useState<Map<string, ResourcePopupState>>(new Map());
   
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
@@ -1315,62 +1258,47 @@ function ResourcesPageContent() {
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-      setActiveId(null);
-      const { active, over, delta } = event;
-  
-      if (!over) return;
-  
-      if (active.id.toString().startsWith('popup-')) {
-          const resourceId = (active.id as string).replace('popup-', '');
-          setOpenPopups(prev => {
-              const newPopups = new Map(prev);
-              const popup = newPopups.get(resourceId);
-              if (popup) {
-                  newPopups.set(resourceId, {
-                      ...popup,
-                      x: popup.x + delta.x,
-                      y: popup.y + delta.y,
-                  });
-              }
-              return newPopups;
-          });
-          return;
-      }
-      
-      const activeContainerId = active.data.current?.sortable?.containerId;
-      const overContainerId = over.data.current?.sortable?.containerId;
+    setActiveId(null);
+    const { active, over } = event;
 
-      if (active.id !== over.id && activeContainerId === overContainerId) {
-          setResources((prevResources) => {
-            const resourceIndex = prevResources.findIndex(r => r.id === activeContainerId);
-            if (resourceIndex === -1) return prevResources;
+    if (!over) return;
+    
+    // Handle reordering points within a card
+    const activeIsPoint = active.data.current?.type === 'point';
+    const overIsPoint = over.data.current?.type === 'point';
 
-            const resource = prevResources[resourceIndex];
-            const oldIndex = (resource.points || []).findIndex(p => p.id === active.id);
-            const newIndex = (resource.points || []).findIndex(p => p.id === over.id);
-            
-            if (oldIndex !== -1 && newIndex !== -1) {
-                const newPoints = arrayMove(resource.points!, oldIndex, newIndex);
-                const updatedResource = { ...resource, points: newPoints };
-                
-                const newResources = [...prevResources];
-                newResources[resourceIndex] = updatedResource;
-                return newResources;
+    if (active.id !== over.id && activeIsPoint && overIsPoint) {
+        const activeContainerId = active.data.current?.sortable?.containerId;
+        const overContainerId = over.data.current?.sortable?.containerId;
+
+        if (activeContainerId === overContainerId) {
+            const resourceIndex = resources.findIndex(r => r.id === activeContainerId);
+            if (resourceIndex !== -1) {
+                const resource = resources[resourceIndex];
+                const oldIndex = (resource.points || []).findIndex(p => p.id === active.id);
+                const newIndex = (resource.points || []).findIndex(p => p.id === over.id);
+
+                if (oldIndex !== -1 && newIndex !== -1) {
+                    const reorderedPoints = arrayMove(resource.points!, oldIndex, newIndex);
+                    const updatedResources = [...resources];
+                    updatedResources[resourceIndex] = { ...resource, points: reorderedPoints };
+                    setResources(updatedResources);
+                }
             }
-            return prevResources;
-        });
-          return;
-      }
-  
-      if (active.data.current?.type === 'card' && over.data.current?.type === 'folder') {
-          const resourceId = active.id.toString();
-          const folderId = over.id.toString();
-          if (resources.find(r => r.id === resourceId)?.folderId !== folderId) {
-              setResources(prev => prev.map(r => r.id === resourceId ? { ...r, folderId: folderId } : r));
-              toast({ title: "Resource Moved", description: `Moved resource to a new folder.` });
-          }
-          return;
-      }
+        }
+        return;
+    }
+
+    // Handle dropping a card onto a folder
+    if (active.data.current?.type === 'card' && over.data.current?.type === 'folder') {
+        const resourceId = active.id.toString();
+        const folderId = over.id.toString();
+        if (resources.find(r => r.id === resourceId)?.folderId !== folderId) {
+            setResources(prev => prev.map(r => r.id === resourceId ? { ...r, folderId: folderId } : r));
+            toast({ title: "Resource Moved", description: `Moved resource to a new folder.` });
+        }
+        return;
+    }
   };
   
   const handleOpenMarkdownModal = (resourceId: string, pointId: string) => {
@@ -1676,7 +1604,6 @@ function ResourcesPageContent() {
             </main>
         </div>
         </div>
-    </DndContext>
         {Array.from(openPopups.values()).map((popupState) => {
             const resource = resources.find(r => r.id === popupState.resourceId);
             if (!resource) return null;
@@ -1688,8 +1615,7 @@ function ResourcesPageContent() {
                     onOpenNestedPopup={handleOpenNestedPopup}
                     onClose={handleClosePopup}
                     onSizeChange={handleSizeChange}
-                    playingAudio={playingAudio}
-                    setPlayingAudio={setPlayingAudio}
+                    setFloatingVideoUrl={setFloatingVideoUrl}
                 />
             )
         })}
@@ -1719,7 +1645,7 @@ function ResourcesPageContent() {
             )
           })}
         </svg>
-    
+    </DndContext>
         {contextMenu && (
             <div ref={contextMenuRef} style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }} className="fixed z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => e.stopPropagation()}>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { togglePinFolder(contextMenu.item.id); setContextMenu(null); }}>
@@ -1952,4 +1878,5 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
