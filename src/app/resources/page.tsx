@@ -437,7 +437,6 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
 
     const [linkCardPopoverOpen, setLinkCardPopoverOpen] = useState(false);
     const [linkedCardId, setLinkedCardId] = useState<string>('');
-    const sensors = useSensors(useSensor(PointerSensor));
     const audioInputRef = useRef<HTMLInputElement>(null);
 
     const handleUpdateTitle = (newTitle: string) => {
@@ -555,7 +554,6 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
               <div className={cn(hasMarkdownContent ? 'h-[450px]' : '')}>
                 <ScrollArea className="h-full">
                     <DndContext 
-                        sensors={sensors}
                         onDragStart={e => setActivePointId(e.active.id as string)}
                         onDragEnd={handleDragEnd}
                     >
@@ -566,7 +564,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                                         key={point.id} 
                                         point={point} 
                                         resource={resource}
-                                        onUpdate={onUpdate}
+                                        onUpdate={handleUpdateResource}
                                         onDelete={handleDeletePoint}
                                         setFloatingVideoUrl={setFloatingVideoUrl}
                                         onOpenNestedPopup={onOpenNestedPopup}
@@ -735,6 +733,8 @@ function ResourcesPageContent() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
   const [linkingFromId, setLinkingFromId] = useState<string | null>(null);
+  
+  const sensors = useSensors(useSensor(PointerSensor));
 
 
   useEffect(() => {
@@ -1319,9 +1319,6 @@ function ResourcesPageContent() {
     });
   };
 
-
-  const sensors = useSensors(useSensor(PointerSensor));
-
   const handleDragEndMain = (event: DragEndEvent) => {
     const { active, over, delta } = event;
     const activeId = active.id as string;
@@ -1658,18 +1655,22 @@ function ResourcesPageContent() {
         </div>
         </div>
 
-        {Array.from(openPopups.values()).map((popupState) => (
-            <ResourcePopupCard
-                key={popupState.resourceId}
-                popupState={popupState}
-                allResources={resources}
-                onOpenNestedPopup={handleOpenNestedPopup}
-                onClose={handleClosePopup}
-                onSizeChange={handleSizeChange}
-                playingAudio={playingAudio}
-                setPlayingAudio={setPlayingAudio}
-            />
-        ))}
+        {Array.from(openPopups.values()).map((popupState) => {
+            const resource = resources.find(r => r.id === popupState.resourceId);
+            if (!resource) return null;
+            return (
+                <ResourcePopupCard
+                    key={popupState.resourceId}
+                    popupState={popupState}
+                    allResources={resources}
+                    onOpenNestedPopup={handleOpenNestedPopup}
+                    onClose={handleClosePopup}
+                    onSizeChange={handleSizeChange}
+                    playingAudio={playingAudio}
+                    setPlayingAudio={setPlayingAudio}
+                />
+            )
+        })}
 
         <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
           {Array.from(openPopups.values()).map(popup => {
@@ -1930,6 +1931,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
