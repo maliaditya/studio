@@ -632,13 +632,13 @@ export function PistonsHead() {
       case 'health':
         return <HealthPistonView {...commonProps} />;
       case 'projects':
-        return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={topicNameDisplay} {...commonProps} /> : <ProjectSelector onSelect={handleTopicSelect} onBack={onBack} />;
+        return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Project'} {...commonProps} /> : <ProjectSelector onSelect={handleTopicSelect} onBack={onBack} />;
       case 'specializations':
-         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={topicNameDisplay} {...commonProps} /> : <SpecializationSelector onSelect={handleTopicSelect} onBack={onBack} />;
+         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Skill'} {...commonProps} /> : <SpecializationSelector onSelect={handleTopicSelect} onBack={onBack} />;
       case 'desires':
-         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={topicNameDisplay} {...commonProps} /> : <DesireSelector onSelect={(id, name) => handleTopicSelect(id, name)} onBack={onBack} />;
+         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Desire'} {...commonProps} /> : <DesireSelector onSelect={handleTopicSelect} onBack={onBack} />;
       case 'mindset':
-         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={topicNameDisplay} {...commonProps} /> : <MindsetSelector onSelect={(id, name) => handleTopicSelect(id, name)} onBack={onBack} />;
+         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Mindset'} {...commonProps} /> : <MindsetSelector onSelect={handleTopicSelect} onBack={onBack} />;
       default:
         return <MainPistonView onSelect={handleViewChange} />;
     }
