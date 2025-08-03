@@ -563,7 +563,7 @@ export function PistonsHead() {
         const lastPopup = Array.from(openResourcePopups.values()).pop()!;
         x = position.x < window.innerWidth / 2 ? lastPopup.x + (lastPopup.width || 512) + 20 : lastPopup.x - popupWidth - 20;
     } else {
-        x = position.x + 384 + 20;
+      x = position.x + 384 + 20;
     }
 
     if (x < 20) x = position.x + 384 + 20;
@@ -708,18 +708,24 @@ export function PistonsHead() {
                         }}
                     />
                 )}
-                 {Array.from(openResourcePopups.values()).map(popupState => (
-                    <ResourcePopupCard
-                        key={popupState.resourceId}
-                        popupState={popupState}
-                        resource={resources.find(r => r.id === popupState.resourceId)!}
-                        onClose={handleCloseResource}
-                        onUpdate={handleUpdateResource}
-                        playingAudio={playingAudio}
-                        setPlayingAudio={setPlayingAudio}
-                        onOpenNestedPopup={handleOpenNestedPopup}
-                    />
-                 ))}
+                 {Array.from(openResourcePopups.values()).map(popupState => {
+                    const resource = resources.find(r => r.id === popupState.resourceId);
+                    if (!resource) {
+                        return null; // Don't render if resource is not found
+                    }
+                    return (
+                        <ResourcePopupCard
+                            key={popupState.resourceId}
+                            popupState={popupState}
+                            resource={resource}
+                            onClose={handleCloseResource}
+                            onUpdate={handleUpdateResource}
+                            playingAudio={playingAudio}
+                            setPlayingAudio={setPlayingAudio}
+                            onOpenNestedPopup={handleOpenNestedPopup}
+                        />
+                    );
+                 })}
                  {linkingResourceFor && (
                     <Dialog open={!!linkingResourceFor} onOpenChange={() => setLinkingResourceFor(null)}>
                         <DialogContent>
