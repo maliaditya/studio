@@ -287,7 +287,7 @@ const LinkDropZone = ({ resourceId, linkingFromId }: { resourceId: string; linki
 };
 
 const SortableResourceCard = ({ children, item, className, linkingFromId }: { children: React.ReactNode; item: Resource; className?: string; linkingFromId: string | null; }) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id, data: { type: 'card', item } });
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -311,21 +311,21 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
     point: ResourcePoint;
     resource: Resource;
     onUpdate: (resource: Resource) => void;
-    onDelete: (resourceId: string) => void;
+    onDelete: (pointId: string) => void;
     setFloatingVideoUrl: (url: string | null) => void;
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
     onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
 }) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id });
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id, data: { type: 'point', point } });
 
-    const [isEditing, setIsEditing] = useState(false);
+    const [isEditing, setIsEditing] = useState(point.text === 'New step...');
     const [editText, setEditText] = useState(point.text);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
-        opacity: isDragging ? 0 : 1,
+        zIndex: isDragging ? 10 : 'auto',
     };
     
     const handleSave = () => {
@@ -382,7 +382,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
     }
 
     return (
-        <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
+        <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item bg-card">
             <button {...attributes} {...listeners} className="cursor-grab p-1"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
             <div className="flex-grow">
                 {isEditing ? (
@@ -445,20 +445,6 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     const [linkCardPopoverOpen, setLinkCardPopoverOpen] = useState(false);
     const [linkedCardId, setLinkedCardId] = useState<string>('');
     const audioInputRef = useRef<HTMLInputElement>(null);
-    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
-
-    const handleDragEnd = (event: DragEndEvent) => {
-        setActivePointId(null);
-        const { active, over } = event;
-        if (over && active.id !== over.id) {
-          const oldIndex = (resource.points || []).findIndex(p => p.id === active.id);
-          const newIndex = (resource.points || []).findIndex(p => p.id === over.id);
-          if (oldIndex > -1 && newIndex > -1) {
-            const newPoints = arrayMove(resource.points || [], oldIndex, newIndex);
-            onUpdate({ ...resource, points: newPoints });
-          }
-        }
-    };
 
     const handleUpdateTitle = (newTitle: string) => {
         onUpdate({ ...resource, name: newTitle });
@@ -562,36 +548,30 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
             <CardContent className="flex-grow min-h-0">
               <div className={cn(hasMarkdownContent ? 'h-[450px]' : '')}>
                 <ScrollArea className="h-full">
-                    <DndContext 
-                        sensors={sensors}
-                        onDragStart={e => setActivePointId(e.active.id as string)}
-                        onDragEnd={handleDragEnd}
-                    >
-                        <SortableContext items={(resource.points || []).map(p => p.id)}>
-                            <ul className="space-y-3 pr-3">
-                                {(resource.points || []).map((point) => (
-                                    <SortablePoint 
-                                        key={point.id} 
-                                        point={point} 
-                                        resource={resource}
-                                        onUpdate={onUpdate}
-                                        onDelete={handleDeletePoint}
-                                        setFloatingVideoUrl={setFloatingVideoUrl}
-                                        onOpenNestedPopup={onOpenNestedPopup}
-                                        onOpenMarkdownModal={onOpenMarkdownModal}
-                                    />
-                                ))}
-                            </ul>
-                        </SortableContext>
-                        <DragOverlay>
-                            {activePointId && resource.points?.find(p => p.id === activePointId) ? (
-                                <div className="bg-card p-2 rounded-md shadow-lg opacity-80 flex items-start gap-3">
-                                    <GripVertical className="h-4 w-4 text-muted-foreground/50" />
-                                    {resource.points.find(p => p.id === activePointId)?.text}
-                                </div>
-                            ) : null}
-                        </DragOverlay>
-                    </DndContext>
+                    <SortableContext items={(resource.points || []).map(p => p.id)}>
+                        <ul className="space-y-3 pr-3">
+                            {(resource.points || []).map((point) => (
+                                <SortablePoint 
+                                    key={point.id} 
+                                    point={point} 
+                                    resource={resource}
+                                    onUpdate={onUpdate}
+                                    onDelete={handleDeletePoint}
+                                    setFloatingVideoUrl={setFloatingVideoUrl}
+                                    onOpenNestedPopup={onOpenNestedPopup}
+                                    onOpenMarkdownModal={onOpenMarkdownModal}
+                                />
+                            ))}
+                        </ul>
+                    </SortableContext>
+                    <DragOverlay>
+                        {activePointId && resource.points?.find(p => p.id === activePointId) ? (
+                            <div className="bg-card p-2 rounded-md shadow-lg opacity-80 flex items-start gap-3">
+                                <GripVertical className="h-4 w-4 text-muted-foreground/50" />
+                                {resource.points.find(p => p.id === activePointId)?.text}
+                            </div>
+                        ) : null}
+                    </DragOverlay>
                 </ScrollArea>
               </div>
             </CardContent>
@@ -740,8 +720,9 @@ function ResourcesPageContent() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
   const [linkingFromId, setLinkingFromId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
 
   useEffect(() => {
@@ -1326,9 +1307,10 @@ function ResourcesPageContent() {
     });
   };
 
-  const handleDragEndMain = (event: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null);
     const { active, over, delta } = event;
-    
+
     if (active.id.toString().startsWith('popup-')) {
         const resourceId = (active.id as string).replace('popup-', '');
         setOpenPopups(prev => {
@@ -1345,26 +1327,47 @@ function ResourcesPageContent() {
         });
         return;
     }
-    
+
     if (!over) return;
     
-    const activeIsResource = active.id.toString().startsWith('res_');
-    const overIsFolder = over.data.current?.type === 'folder';
-
-    if (activeIsResource && overIsFolder) {
-        const resourceId = active.id;
-        const folderId = over.id as string;
+    // Handle card reordering or moving to a folder
+    if (active.data.current?.type === 'card' || active.data.current?.type === 'point') {
+      const activeId = active.id.toString();
+      const overId = over.id.toString();
+      
+      // Reordering points within a card
+      if (active.data.current?.type === 'point') {
+        const resource = resources.find(r => r.points?.some(p => p.id === activeId));
+        if (resource && resource.points && over.data.current?.type === 'point') {
+          const oldIndex = resource.points.findIndex(p => p.id === activeId);
+          const newIndex = resource.points.findIndex(p => p.id === overId);
+          if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+            const updatedPoints = arrayMove(resource.points, oldIndex, newIndex);
+            handleUpdateResource({ ...resource, points: updatedPoints });
+          }
+        }
+        return;
+      }
+      
+      // Moving a card to a folder
+      if (over.data.current?.type === 'folder') {
+        const resourceId = activeId;
+        const folderId = overId;
         setResources(prev => prev.map(r => r.id === resourceId ? { ...r, folderId: folderId } : r));
         toast({ title: "Resource Moved", description: `Moved resource to a new folder.` });
         return;
-    }
+      }
 
-    if (active.id !== over.id) {
-        setResources(items => {
-            const oldIndex = items.findIndex(item => item.id === active.id);
-            const newIndex = items.findIndex(item => item.id === over.id);
-            return arrayMove(items, oldIndex, newIndex);
-        });
+      // Reordering cards within the same folder
+      const activeResource = resources.find(r => r.id === activeId);
+      const overResource = resources.find(r => r.id === overId);
+      if (activeResource && overResource && activeResource.folderId === overResource.folderId) {
+          const oldIndex = resources.findIndex(item => item.id === activeId);
+          const newIndex = resources.findIndex(item => item.id === overId);
+          if (oldIndex !== newIndex) {
+              setResources(items => arrayMove(items, oldIndex, newIndex));
+          }
+      }
     }
   };
   
@@ -1480,7 +1483,8 @@ function ResourcesPageContent() {
     <audio ref={audioRef} onEnded={() => setPlayingAudio(null)} />
     <DndContext 
         sensors={sensors}
-        onDragEnd={handleDragEndMain}
+        onDragStart={(e) => setActiveId(e.active.id.toString())}
+        onDragEnd={handleDragEnd}
     >
         <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
@@ -1652,6 +1656,20 @@ function ResourcesPageContent() {
                             )}
                     </div>
                 </SortableContext>
+                <DragOverlay>
+                  {activeId && activeId.startsWith('res_') ? (
+                    <div className="w-48">
+                        <Card className="shadow-2xl">
+                            <CardHeader><CardTitle className="text-base">{resources.find(r=>r.id===activeId)?.name}</CardTitle></CardHeader>
+                        </Card>
+                    </div>
+                  ) : activeId && activeId.startsWith('point_') ? (
+                     <div className="bg-card p-2 rounded-md shadow-lg opacity-80 flex items-start gap-3 w-64">
+                        <GripVertical className="h-4 w-4 text-muted-foreground/50" />
+                        {resources.flatMap(r => r.points || []).find(p => p.id === activeId)?.text}
+                    </div>
+                  ) : null}
+                </DragOverlay>
                 </div>
             </main>
         </div>
