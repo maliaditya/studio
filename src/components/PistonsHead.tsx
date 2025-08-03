@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -377,7 +378,8 @@ export function PistonsHead() {
     mindsetCards, addMindsetCard, 
     deleteDesire, deleteMindsetCard,
     globalVolume,
-    skillDomains, coreSkills, projects
+    skillDomains, coreSkills, projects,
+    pistonsInitialState,
   } = useAuth();
   const [currentView, setCurrentView] = useState<'main' | 'health' | 'projects' | 'specializations' | 'desires' | 'mindset'>('main');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
@@ -390,6 +392,20 @@ export function PistonsHead() {
 
   const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (isPistonsHeadOpen && pistonsInitialState) {
+        setCurrentView(pistonsInitialState.view);
+        if (pistonsInitialState.topicId && pistonsInitialState.topicName) {
+            setSelectedTopicId(pistonsInitialState.topicId);
+            setSelectedTopicName(pistonsInitialState.topicName);
+        }
+    } else if (!isPistonsHeadOpen) {
+        setCurrentView('main');
+        setSelectedTopicId(null);
+        setSelectedTopicName(null);
+    }
+  }, [isPistonsHeadOpen, pistonsInitialState]);
 
   useEffect(() => {
     const audioEl = audioRef.current;

@@ -16,6 +16,11 @@ import { format, addDays, parseISO, subDays } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS } from '@/lib/constants';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
+interface PistonsInitialState {
+  view: 'main' | 'health' | 'projects' | 'specializations' | 'desires' | 'mindset';
+  topicId?: string;
+  topicName?: string;
+}
 
 interface AuthContextType {
   currentUser: LocalUser | null;
@@ -139,6 +144,8 @@ interface AuthContextType {
   setIsPistonsHeadOpen: React.Dispatch<React.SetStateAction<boolean>>;
   pistons: PistonsCategoryData;
   setPistons: React.Dispatch<React.SetStateAction<PistonsCategoryData>>;
+  pistonsInitialState: PistonsInitialState | null;
+  openPistonsFor: (initialState: PistonsInitialState) => void;
   deleteDesire: (desireId: string) => void;
   
   // Skill Page
@@ -233,6 +240,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Pistons State
   const [isPistonsHeadOpen, setIsPistonsHeadOpen] = useState(false);
   const [pistons, setPistons] = useState<PistonsCategoryData>({});
+  const [pistonsInitialState, setPistonsInitialState] = useState<PistonsInitialState | null>(null);
   
   // Skill Page State
   const [skillDomains, setSkillDomains] = useState<SkillDomain[]>([]);
@@ -1296,6 +1304,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setMindsetCards(prev => prev.filter(card => card.id !== cardId));
   };
 
+  const openPistonsFor = (initialState: PistonsInitialState) => {
+    setPistonsInitialState(initialState);
+    setIsPistonsHeadOpen(true);
+  };
+
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -1327,6 +1340,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     mindsetCards, setMindsetCards, addMindsetCard, deleteMindsetCard,
     isPistonsHeadOpen, setIsPistonsHeadOpen,
     pistons, setPistons,
+    pistonsInitialState, openPistonsFor,
     deleteDesire,
     skillDomains, setSkillDomains,
     coreSkills, setCoreSkills,

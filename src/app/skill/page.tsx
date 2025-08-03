@@ -45,6 +45,7 @@ function SkillPageContent() {
     microSkillMap,
     upskillDefinitions,
     deepWorkDefinitions,
+    openPistonsFor,
   } = useAuth();
   
   const router = useRouter();
@@ -586,8 +587,11 @@ function SkillPageContent() {
                                         const linkedProjects = projectsBySkill.get(micro.id) || [];
                                         return (
                                             <Card key={micro.id} className="flex flex-col">
-                                            <CardHeader className="p-3">
+                                            <CardHeader className="p-3 flex flex-row items-center justify-between">
                                                 <CardTitle className="text-base">{micro.name}</CardTitle>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openPistonsFor({view: 'specializations', topicId: micro.name, topicName: micro.name})}>
+                                                    <BrainCircuit className="h-4 w-4" />
+                                                </Button>
                                             </CardHeader>
                                             <CardContent className="p-3 flex-grow space-y-3">
                                                 <div>
@@ -640,7 +644,12 @@ function SkillPageContent() {
                                       <CardHeader className="p-3">
                                           <div className="flex items-center justify-between w-full">
                                               <AccordionTrigger className="hover:no-underline p-0 flex-grow font-semibold text-lg">{feature.name}</AccordionTrigger>
-                                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteFeature(selectedProjectId!, feature.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                              <div className="flex items-center">
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openPistonsFor({view: 'projects', topicId: feature.id, topicName: feature.name})}>
+                                                    <BrainCircuit className="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteFeature(selectedProjectId!, feature.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                              </div>
                                           </div>
                                       </CardHeader>
                                       <AccordionContent className="px-3 pb-3">
@@ -879,7 +888,7 @@ function SkillPageContent() {
        )}
        <IntentionDetailModal
           isOpen={!!selectedIntention}
-          onOpenChange={(isOpen) => !isOpen && setSelectedIntention(null)}
+          onOpenChange={() => setSelectedIntention(null)}
           intention={selectedIntention}
        />
     </div>
