@@ -362,7 +362,9 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete }: { point: ResourceP
                 ) : point.type === 'code' ? (
                     <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
                 ) : point.type === 'link' ? (
-                    <span className="flex-grow cursor-pointer text-primary hover:underline truncate" title={point.text} onClick={() => point.text && setFloatingVideoUrl(point.text)}>{point.text || <span className="text-muted-foreground italic">New link...</span>}</span>
+                     <div className="flex-grow min-w-0">
+                        <span className="cursor-pointer text-primary hover:underline truncate" title={point.text} onClick={() => point.text && setFloatingVideoUrl(point.text)}>{point.text || <span className="text-muted-foreground italic">New link...</span>}</span>
+                    </div>
                 ) : (
                     <p className="whitespace-pre-wrap break-words">{point.text}</p>
                 )}
@@ -478,10 +480,10 @@ export function PistonsHead() {
       }
       findChildren(resourceId);
       for (const id of popupsToDelete) {
-        newPopups.delete(id);
         if (playingAudio?.id === id) {
             setPlayingAudio(null);
         }
+        newPopups.delete(id);
       }
       return newPopups;
     });
@@ -592,6 +594,13 @@ export function PistonsHead() {
   
   const handleOpenResource = (e: React.MouseEvent, resourceId: string) => {
     e.stopPropagation();
+    
+    const resource = resources.find(r => r.id === resourceId);
+    if (!resource) {
+        console.warn(`Resource with ID ${resourceId} not found.`);
+        return;
+    }
+
     const popupWidth = 512;
     let x;
   
@@ -606,7 +615,7 @@ export function PistonsHead() {
   
     setOpenResourcePopups(prev => {
         const newPopups = new Map(prev);
-        newPopups.set(resourceId, { resourceId, x, y: Math.max(20, position.y), level: 0 });
+        newPopups.set(resourceId, { resourceId, x, y: Math.max(20, position.y), level: 0, width: popupWidth });
         return newPopups;
     });
   };
@@ -920,10 +929,13 @@ const ProjectSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, nam
 
     return (
         <CardContent className="p-4">
-            <h3 className="text-lg font-semibold text-center mb-2">{selectedProject ? `Select a Feature in ${selectedProject.name}` : 'Select a Project'}</h3>
+            <div className="flex items-center mb-2">
+                {selectedProject && <Button variant="ghost" size="icon" className="h-7 w-7 mr-1" onClick={() => setSelectedProject(null)}><ArrowLeft className="h-4 w-4" /></Button>}
+                <h3 className="text-lg font-semibold text-center flex-grow">{selectedProject ? `Select Feature` : 'Select Project'}</h3>
+            </div>
+            
             {selectedProject ? (
                 <ul className="space-y-2">
-                    <Button variant="ghost" onClick={() => setSelectedProject(null)} className="w-full justify-start mb-2"><ArrowLeft className="mr-2 h-4 w-4"/>Back to Projects</Button>
                     {selectedProject.features.map(feature => (
                         <li key={feature.id}>
                             <Button variant="outline" className="w-full justify-start" onClick={() => onSelect(feature.id, feature.name)}><Workflow className="mr-2 h-4 w-4"/>{feature.name}</Button>
@@ -957,9 +969,20 @@ const SpecializationSelector = ({ onSelect, onBack }: { onSelect: (topicId: stri
         else onBack();
     };
 
+    const getTitle = () => {
+        if (step === 3) return selectedSkillArea?.name || "Select Micro-Skill";
+        if (step === 2) return selectedSpecialization?.name || "Select Skill Area";
+        if (step === 1) return selectedDomain?.name || "Select Specialization";
+        return "Select Domain";
+    }
+
     return (
         <CardContent className="p-4">
-            {step > 0 && <Button variant="ghost" onClick={handleBack} className="w-full justify-start mb-2"><ArrowLeft className="mr-2 h-4 w-4"/>Back</Button>}
+            <div className="flex items-center mb-2">
+                {step > 0 && <Button variant="ghost" size="icon" className="h-7 w-7 mr-1" onClick={handleBack}><ArrowLeft className="h-4 w-4" /></Button>}
+                <h3 className="text-lg font-semibold text-center flex-grow">{getTitle()}</h3>
+            </div>
+
             {step === 0 && (
                 <ul className="space-y-2">
                     {skillDomains.map(domain => <li key={domain.id}><Button variant="outline" className="w-full justify-start" onClick={() => { setSelectedDomain(domain); setStep(1); }}><Folder className="mr-2 h-4 w-4"/>{domain.name}</Button></li>)}
@@ -1125,5 +1148,6 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
+
 
 
