@@ -129,7 +129,7 @@ interface ResourcePopupState {
   width?: number;
 }
 
-const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAudio, setPlayingAudio, onOpenNestedPopup }: { 
+const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAudio, setPlayingAudio, onOpenNestedPopup, onEditLinkText }: { 
     popupState: ResourcePopupState; 
     resource: Resource; 
     onClose: (resourceId: string) => void;
@@ -137,6 +137,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
     playingAudio: { id: string; isPlaying: boolean } | null;
     setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: ResourcePopupState) => void;
+    onEditLinkText: (point: ResourcePoint) => void;
 }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `resource-popup-${popupState.resourceId}`,
@@ -283,6 +284,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                                         point={point}
                                         onUpdate={(newText) => handleUpdatePoint(point.id, newText)}
                                         onDelete={() => handleDeletePoint(point.id)}
+                                        onEditLinkText={onEditLinkText}
                                     />
                                 );
                             })}
@@ -311,7 +313,12 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
     );
 };
 
-const EditableResourcePoint = ({ point, onUpdate, onDelete }: { point: ResourcePoint, onUpdate: (text: string) => void, onDelete: () => void }) => {
+const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: { 
+    point: ResourcePoint, 
+    onUpdate: (text: string) => void, 
+    onDelete: () => void,
+    onEditLinkText: (point: ResourcePoint) => void 
+}) => {
     const { setFloatingVideoUrl } = useAuth();
     const [isEditing, setIsEditing] = useState(point.text === 'New step...');
     const [editText, setEditText] = useState(point.text);
@@ -363,7 +370,14 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete }: { point: ResourceP
                     <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
                 ) : point.type === 'link' ? (
                      <div className="flex-grow min-w-0">
-                        <span className="cursor-pointer text-primary hover:underline truncate" title={point.text} onClick={() => point.text && setFloatingVideoUrl(point.text)}>{point.text || <span className="text-muted-foreground italic">New link...</span>}</span>
+                        <span 
+                            className="cursor-pointer text-primary hover:underline truncate" 
+                            title={point.text} 
+                            onClick={() => point.text && setFloatingVideoUrl(point.text)}
+                            onContextMenu={(e) => { e.preventDefault(); onEditLinkText(point); }}
+                        >
+                            {point.displayText || point.text || <span className="text-muted-foreground italic">New link...</span>}
+                        </span>
                     </div>
                 ) : (
                     <p className="whitespace-pre-wrap break-words">{point.text}</p>
@@ -399,6 +413,9 @@ export function PistonsHead() {
 
   const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const [linkTextDialog, setLinkTextDialog] = useState<{ point: ResourcePoint, resourceId: string } | null>(null);
+  const [currentDisplayText, setCurrentDisplayText] = useState('');
 
   useEffect(() => {
     if (isPistonsHeadOpen && pistonsInitialState) {
@@ -493,6 +510,34 @@ export function PistonsHead() {
     setResources(prev =>
       prev.map(res => res.id === updatedResource.id ? updatedResource : res)
     );
+  };
+  
+  const handleEditLinkText = (point: ResourcePoint) => {
+      const resource = Array.from(openResourcePopups.values()).map(p => resources.find(r => r.id === p.resourceId)).find(r => r?.points?.some(p => p.id === point.id));
+      if (!resource) return;
+      setCurrentDisplayText(point.displayText || '');
+      setLinkTextDialog({ point, resourceId: resource.id });
+  };
+  
+  const handleSaveLinkText = () => {
+    if (!linkTextDialog) return;
+    const { point, resourceId } = linkTextDialog;
+    
+    setResources(prev => prev.map(res => {
+        if (res.id === resourceId) {
+            const updatedPoints = (res.points || []).map(p => {
+                if (p.id === point.id) {
+                    return { ...p, displayText: currentDisplayText.trim() };
+                }
+                return p;
+            });
+            return { ...res, points: updatedPoints };
+        }
+        return res;
+    }));
+    
+    setLinkTextDialog(null);
+    setCurrentDisplayText('');
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -751,6 +796,7 @@ export function PistonsHead() {
                             playingAudio={playingAudio}
                             setPlayingAudio={setPlayingAudio}
                             onOpenNestedPopup={handleOpenNestedPopup}
+                            onEditLinkText={handleEditLinkText}
                         />
                     );
                  })}
@@ -777,6 +823,31 @@ export function PistonsHead() {
                                     </SelectContent>
                                 </Select>
                             </div>
+                        </DialogContent>
+                    </Dialog>
+                )}
+                {linkTextDialog && (
+                    <Dialog open={!!linkTextDialog} onOpenChange={() => setLinkTextDialog(null)}>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Set Display Text</DialogTitle>
+                                <DialogDescription>Set the text that will be displayed for this link.</DialogDescription>
+                            </DialogHeader>
+                            <div className="py-4">
+                                <Label htmlFor="display-text-input">Display Text</Label>
+                                <Input
+                                    id="display-text-input"
+                                    value={currentDisplayText}
+                                    onChange={(e) => setCurrentDisplayText(e.target.value)}
+                                    placeholder="Enter display text..."
+                                    autoFocus
+                                />
+                                <p className="text-xs text-muted-foreground mt-2">URL: <span className="font-mono text-xs truncate">{linkTextDialog.point.text}</span></p>
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setLinkTextDialog(null)}>Cancel</Button>
+                                <Button onClick={handleSaveLinkText}>Save</Button>
+                            </DialogFooter>
                         </DialogContent>
                     </Dialog>
                 )}
@@ -1148,6 +1219,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
+
 
 
 

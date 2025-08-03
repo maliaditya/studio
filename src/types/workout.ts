@@ -214,6 +214,7 @@ export interface ResourcePoint {
   type?: 'text' | 'youtube' | 'obsidian' | 'card' | 'code' | 'markdown' | 'link';
   url?: string;
   resourceId?: string; // ID of the linked Resource card
+  displayText?: string; // Optional display text for links
 }
 export interface Resource {
   id: string;
