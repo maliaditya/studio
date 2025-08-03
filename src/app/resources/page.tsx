@@ -445,6 +445,20 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     const [linkCardPopoverOpen, setLinkCardPopoverOpen] = useState(false);
     const [linkedCardId, setLinkedCardId] = useState<string>('');
     const audioInputRef = useRef<HTMLInputElement>(null);
+    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        setActivePointId(null);
+        const { active, over } = event;
+        if (over && active.id !== over.id) {
+          const oldIndex = (resource.points || []).findIndex(p => p.id === active.id);
+          const newIndex = (resource.points || []).findIndex(p => p.id === over.id);
+          if (oldIndex > -1 && newIndex > -1) {
+            const newPoints = arrayMove(resource.points || [], oldIndex, newIndex);
+            onUpdate({ ...resource, points: newPoints });
+          }
+        }
+    };
 
     const handleUpdateTitle = (newTitle: string) => {
         onUpdate({ ...resource, name: newTitle });
@@ -476,20 +490,6 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     const handleDeletePoint = (pointId: string) => {
         const updatedPoints = (resource.points || []).filter(p => p.id !== pointId);
         onUpdate({ ...resource, points: updatedPoints });
-    };
-    
-    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
-
-    const handleDragEnd = (event: DragEndEvent) => {
-        setActivePointId(null);
-        if (event.over && event.active.id !== event.over.id) {
-          const oldIndex = (resource.points || []).findIndex(p => p.id === event.active.id);
-          const newIndex = (resource.points || []).findIndex(p => p.id === event.over!.id);
-          if (oldIndex > -1 && newIndex > -1) {
-            const newPoints = arrayMove(resource.points || [], oldIndex, newIndex);
-            onUpdate({ ...resource, points: newPoints });
-          }
-        }
     };
     
     const hasMarkdownContent = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
@@ -724,9 +724,6 @@ function ResourcesPageContent() {
   const [addResourceType, setAddResourceType] = useState<'link' | 'card'>('link');
 
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
-  const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  
-  const [activeId, setActiveId] = useState<string | null>(null);
   
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
@@ -1331,12 +1328,9 @@ function ResourcesPageContent() {
 
   const handleDragEndMain = (event: DragEndEvent) => {
     const { active, over, delta } = event;
-    const activeId = active.id as string;
     
-    setActiveId(null);
-
-    if (activeId.startsWith('popup-')) {
-        const resourceId = activeId.replace('popup-', '');
+    if (active.id.toString().startsWith('popup-')) {
+        const resourceId = (active.id as string).replace('popup-', '');
         setOpenPopups(prev => {
             const newPopups = new Map(prev);
             const popup = newPopups.get(resourceId);
@@ -1349,7 +1343,6 @@ function ResourcesPageContent() {
             }
             return newPopups;
         });
-        setActiveDragId(null);
         return;
     }
     
@@ -1487,7 +1480,7 @@ function ResourcesPageContent() {
     <audio ref={audioRef} onEnded={() => setPlayingAudio(null)} />
     <DndContext 
         sensors={sensors}
-        onDragStart={(e) => setActiveId(e.active.id as string)}
+        onDragStart={(e) => {}}
         onDragEnd={handleDragEndMain}
     >
         <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
@@ -1941,6 +1934,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
