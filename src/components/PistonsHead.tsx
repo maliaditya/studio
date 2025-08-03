@@ -301,6 +301,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                                 <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('text')}><MessageSquare className="mr-2 h-4 w-4" />Text</Button>
                                 <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('markdown')}><MessageSquare className="mr-2 h-4 w-4" />Markdown</Button>
                                 <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('code')}><Code className="mr-2 h-4 w-4" />Code</Button>
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('link')}><LinkIcon className="mr-2 h-4 w-4" />Link</Button>
                            </div>
                         </PopoverContent>
                     </Popover>
@@ -311,6 +312,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
 };
 
 const EditableResourcePoint = ({ point, onUpdate, onDelete }: { point: ResourcePoint, onUpdate: (text: string) => void, onDelete: () => void }) => {
+    const { setFloatingVideoUrl } = useAuth();
     const [isEditing, setIsEditing] = useState(point.text === 'New step...');
     const [editText, setEditText] = useState(point.text);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -342,6 +344,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete }: { point: ResourceP
         <li className="flex items-start gap-3 group/item">
             {point.type === 'code' ? <Code className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
             point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
+            point.type === 'link' ? <LinkIcon className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
             <ArrowRight className="h-4 w-4 mt-1.5 text-primary/50 flex-shrink-0" />
             }
              <div className="flex-grow min-w-0" onDoubleClick={() => !isEditing && setIsEditing(true)}>
@@ -358,6 +361,8 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete }: { point: ResourceP
                     <div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text}</ReactMarkdown></div>
                 ) : point.type === 'code' ? (
                     <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                ) : point.type === 'link' ? (
+                    <span className="flex-grow cursor-pointer text-primary hover:underline truncate" title={point.text} onClick={() => point.text && setFloatingVideoUrl(point.text)}>{point.text || <span className="text-muted-foreground italic">New link...</span>}</span>
                 ) : (
                     <p className="whitespace-pre-wrap break-words">{point.text}</p>
                 )}
@@ -1120,3 +1125,5 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
+
+
