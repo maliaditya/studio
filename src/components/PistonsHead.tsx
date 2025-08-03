@@ -1,18 +1,16 @@
-
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { Brain, BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical, PlusCircle, Trash2, Play, Pause, ChevronRight as ChevronRightIcon } from 'lucide-react';
+import { Brain, BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical, PlusCircle, Trash2, Play, Pause, ChevronRight as ChevronRightIcon, Workflow, Folder } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
-import { PistonEntry, PistonType, PistonsData, Resource, ResourcePoint, ExerciseDefinition, MindsetCard } from '@/types/workout';
+import { PistonEntry, PistonType, PistonsData, Resource, ResourcePoint, ExerciseDefinition, MindsetCard, SkillDomain, CoreSkill, Project, Feature, SkillArea, MicroSkill } from '@/types/workout';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
@@ -378,9 +376,11 @@ export function PistonsHead() {
     mindsetCards, addMindsetCard, 
     deleteDesire, deleteMindsetCard,
     globalVolume,
+    skillDomains, coreSkills, projects
   } = useAuth();
-  const [currentView, setCurrentView] = useState<'main' | 'health' | 'wealth' | 'growth' | 'desires' | 'mindset'>('main');
+  const [currentView, setCurrentView] = useState<'main' | 'health' | 'projects' | 'specializations' | 'desires' | 'mindset'>('main');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [selectedTopicName, setSelectedTopicName] = useState<string | null>(null);
   
   const [position, setPosition] = useState({ x: 50, y: 50 });
   const [historyPopup, setHistoryPopup] = useState<HistoryPopupState | null>(null);
@@ -512,42 +512,38 @@ export function PistonsHead() {
     }, 300);
   };
   
-  const handleViewChange = (newView: 'main' | 'health' | 'wealth' | 'growth' | 'desires' | 'mindset') => {
+  const handleViewChange = (newView: 'main' | 'health' | 'projects' | 'specializations' | 'desires' | 'mindset') => {
     setCurrentView(newView);
   };
   
-  const handleTopicSelect = (topicId: string, type: 'wealth' | 'growth' | 'desires' | 'mindset') => {
+  const handleTopicSelect = (topicId: string, name: string) => {
       setSelectedTopicId(topicId);
-      setCurrentView(type);
+      setSelectedTopicName(name);
   }
 
   const onBack = () => {
     if (selectedTopicId) {
         setSelectedTopicId(null);
+        setSelectedTopicName(null);
     } else {
         setCurrentView('main');
     }
   };
   
-  const getTopicName = (view: 'main' | 'health' | 'wealth' | 'growth' | 'desires' | 'mindset') => {
-    if (selectedTopicId) {
-        if (view === 'mindset') {
-            const card = mindsetCards.find(c => c.id === selectedTopicId);
-            return card?.title || 'Selected Mindset';
-        }
-        const def = deepWorkDefinitions.find(d => d.id === selectedTopicId);
-        return def?.name || "Selected Topic";
+  const getTopicName = () => {
+    if (selectedTopicName) {
+        return selectedTopicName;
     }
-    switch (view) {
+    switch (currentView) {
       case 'health': return `Health: ${pistons.health?.activity || 'Activity'}`;
-      case 'wealth': return `Select Wealth Topic`;
-      case 'growth': return `Select Growth Topic`;
+      case 'projects': return `Select a Project Feature`;
+      case 'specializations': return `Select a Micro-Skill`;
       case 'desires': return `Select a Desire`;
       case 'mindset': return `Select a Mindset`;
       default: return 'Pistons of Intention';
     }
   };
-  const topicName = getTopicName(currentView);
+  const topicNameDisplay = getTopicName();
 
   const handleOpenHistory = (e: React.MouseEvent, piston: PistonType) => {
     e.stopPropagation();
@@ -634,14 +630,14 @@ export function PistonsHead() {
     switch (currentView) {
       case 'health':
         return <HealthPistonView {...commonProps} />;
-      case 'wealth':
-        return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} {...commonProps} /> : <TopicSelector onSelect={handleTopicSelect} type="wealth" onBack={onBack} />;
-      case 'growth':
-         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} {...commonProps} /> : <TopicSelector onSelect={handleTopicSelect} type="growth" onBack={onBack} />;
+      case 'projects':
+        return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={topicNameDisplay} {...commonProps} /> : <ProjectSelector onSelect={handleTopicSelect} onBack={onBack} />;
+      case 'specializations':
+         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={topicNameDisplay} {...commonProps} /> : <SpecializationSelector onSelect={handleTopicSelect} onBack={onBack} />;
       case 'desires':
-         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} {...commonProps} /> : <DesireSelector onSelect={handleTopicSelect} onBack={onBack} />;
+         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={topicNameDisplay} {...commonProps} /> : <DesireSelector onSelect={(id, name) => handleTopicSelect(id, name)} onBack={onBack} />;
       case 'mindset':
-         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} {...commonProps} /> : <MindsetSelector onSelect={handleTopicSelect} onBack={onBack} />;
+         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={topicNameDisplay} {...commonProps} /> : <MindsetSelector onSelect={(id, name) => handleTopicSelect(id, name)} onBack={onBack} />;
       default:
         return <MainPistonView onSelect={handleViewChange} />;
     }
@@ -687,8 +683,8 @@ export function PistonsHead() {
                                 </Button>
                             )}
                             <div className="w-full text-center cursor-grab active:cursor-grabbing flex justify-center" {...attributes} {...listeners}>
-                                <CardTitle className="text-base truncate px-8" title={topicName as string}>
-                                    {topicName}
+                                <CardTitle className="text-base truncate px-8" title={topicNameDisplay as string}>
+                                    {topicNameDisplay}
                                 </CardTitle>
                             </div>
                             <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 right-1.5 z-20" onClick={handleClose}>
@@ -758,13 +754,13 @@ export function PistonsHead() {
   );
 }
 
-const MainPistonView = ({ onSelect }: { onSelect: (view: 'health' | 'wealth' | 'growth' | 'desires' | 'mindset') => void }) => (
+const MainPistonView = ({ onSelect }: { onSelect: (view: 'health' | 'projects' | 'specializations' | 'desires' | 'mindset') => void }) => (
     <CardContent className="p-4">
         <p className="text-muted-foreground text-center mb-4 text-sm">Select a category to define your core motivations.</p>
         <div className="grid grid-cols-2 gap-4">
             <Button onClick={() => onSelect('health')} variant="outline" className="flex-col h-20"><Heart className="h-6 w-6 text-red-500 mb-1"/>Health</Button>
-            <Button onClick={() => onSelect('wealth')} variant="outline" className="flex-col h-20"><Briefcase className="h-6 w-6 text-green-500 mb-1"/>Wealth</Button>
-            <Button onClick={() => onSelect('growth')} variant="outline" className="flex-col h-20"><TrendingUp className="h-6 w-6 text-blue-500 mb-1"/>Growth</Button>
+            <Button onClick={() => onSelect('projects')} variant="outline" className="flex-col h-20"><Briefcase className="h-6 w-6 text-green-500 mb-1"/>Projects</Button>
+            <Button onClick={() => onSelect('specializations')} variant="outline" className="flex-col h-20"><BrainCircuit className="h-6 w-6 text-blue-500 mb-1"/>Specializations</Button>
             <Button onClick={() => onSelect('desires')} variant="outline" className="flex-col h-20"><Target className="h-6 w-6 text-purple-500 mb-1"/>Desires</Button>
             <Button onClick={() => onSelect('mindset')} variant="outline" className="flex-col h-20 col-span-2"><Brain className="h-6 w-6 text-primary mb-1"/>Mindset</Button>
         </div>
@@ -805,7 +801,7 @@ const HealthPistonView = ({ onBack, setHistoryPopup, setResourcePopup, onLinkRes
     return <PistonEditorView topicId="health" topicName={`Health: ${activity}`} onBack={onBack} onEditTopicName={() => setIsEditingActivity(true)} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
 
-const DesireSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, type: 'desires') => void, onBack: () => void }) => {
+const DesireSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, name: string) => void, onBack: () => void }) => {
     const { deepWorkDefinitions, setDeepWorkDefinitions, deleteDesire } = useAuth();
     const [newDesireName, setNewDesireName] = useState('');
     
@@ -832,7 +828,7 @@ const DesireSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, type
                 <ul className="space-y-2 pr-2">
                     {desires.map(desire => (
                         <li key={desire.id} className="flex items-center justify-between group p-2 rounded-md border bg-muted/20">
-                            <button onClick={() => onSelect(desire.id, 'desires')} className="flex items-center justify-between w-full text-left group">
+                            <button onClick={() => onSelect(desire.id, desire.name)} className="flex items-center justify-between w-full text-left group">
                                 <span className="font-medium group-hover:text-primary transition-colors">{desire.name}</span>
                                 <ChevronRightIcon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors"/>
                             </button>
@@ -853,7 +849,7 @@ const DesireSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, type
     );
 };
 
-const MindsetSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, type: 'mindset') => void, onBack: () => void }) => {
+const MindsetSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, name: string) => void, onBack: () => void }) => {
     const { mindsetCards, addMindsetCard, deleteMindsetCard } = useAuth();
     const [newMindsetName, setNewMindsetName] = useState('');
     
@@ -873,7 +869,7 @@ const MindsetSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, typ
                 <ul className="space-y-2 pr-2">
                     {mindsetCards.map(card => (
                         <li key={card.id} className="flex items-center justify-between group p-2 rounded-md border bg-muted/20">
-                             <button onClick={() => onSelect(card.id, 'mindset')} className="flex items-center justify-between w-full text-left group">
+                             <button onClick={() => onSelect(card.id, card.title)} className="flex items-center justify-between w-full text-left group">
                                 <span className="font-medium group-hover:text-primary transition-colors">{card.title}</span>
                                 <ChevronRightIcon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors"/>
                             </button>
@@ -895,28 +891,75 @@ const MindsetSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, typ
 };
 
 
-const TopicSelector = ({ onSelect, type, onBack }: { onSelect: (topicId: string, type: 'wealth' | 'growth') => void, type: 'wealth' | 'growth', onBack: () => void }) => {
-    const { deepWorkDefinitions, upskillDefinitions } = useAuth();
-    const source = type === 'wealth' ? deepWorkDefinitions : upskillDefinitions;
-    const topics = [...new Set(source.filter(def => def.category !== 'Desire').map(def => def.category))];
+const ProjectSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, name: string) => void, onBack: () => void }) => {
+    const { projects } = useAuth();
+    const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
     return (
         <CardContent className="p-4">
-            <h3 className="text-lg font-semibold text-center mb-2">Select a Topic</h3>
-            <p className="text-muted-foreground text-center mb-4">Choose a {type} topic to define its core motivations.</p>
-            <Select onValueChange={(value) => onSelect(value, type)}>
-                <SelectTrigger>
-                    <SelectValue placeholder="Select a topic..." />
-                </SelectTrigger>
-                <SelectContent>
-                    {topics.map(topic => (
-                        <SelectItem key={topic} value={topic}>{topic}</SelectItem>
+            <h3 className="text-lg font-semibold text-center mb-2">{selectedProject ? `Select a Feature in ${selectedProject.name}` : 'Select a Project'}</h3>
+            {selectedProject ? (
+                <ul className="space-y-2">
+                    <Button variant="ghost" onClick={() => setSelectedProject(null)} className="w-full justify-start mb-2"><ArrowLeft className="mr-2 h-4 w-4"/>Back to Projects</Button>
+                    {selectedProject.features.map(feature => (
+                        <li key={feature.id}>
+                            <Button variant="outline" className="w-full justify-start" onClick={() => onSelect(feature.id, feature.name)}><Workflow className="mr-2 h-4 w-4"/>{feature.name}</Button>
+                        </li>
                     ))}
-                </SelectContent>
-            </Select>
+                </ul>
+            ) : (
+                <ul className="space-y-2">
+                    {projects.map(project => (
+                        <li key={project.id}>
+                            <Button variant="outline" className="w-full justify-start" onClick={() => setSelectedProject(project)}><Briefcase className="mr-2 h-4 w-4"/>{project.name}</Button>
+                        </li>
+                    ))}
+                </ul>
+            )}
         </CardContent>
     )
 }
+
+const SpecializationSelector = ({ onSelect, onBack }: { onSelect: (topicId: string, name: string) => void, onBack: () => void }) => {
+    const { skillDomains, coreSkills } = useAuth();
+    const [step, setStep] = useState(0); // 0: domain, 1: specialization, 2: skill area, 3: micro-skill
+    const [selectedDomain, setSelectedDomain] = useState<SkillDomain | null>(null);
+    const [selectedSpecialization, setSelectedSpecialization] = useState<CoreSkill | null>(null);
+    const [selectedSkillArea, setSelectedSkillArea] = useState<SkillArea | null>(null);
+
+    const specializations = coreSkills.filter(cs => cs.domainId === selectedDomain?.id && cs.type === 'Specialization');
+    
+    const handleBack = () => {
+        if (step > 0) setStep(step - 1);
+        else onBack();
+    };
+
+    return (
+        <CardContent className="p-4">
+            {step > 0 && <Button variant="ghost" onClick={handleBack} className="w-full justify-start mb-2"><ArrowLeft className="mr-2 h-4 w-4"/>Back</Button>}
+            {step === 0 && (
+                <ul className="space-y-2">
+                    {skillDomains.map(domain => <li key={domain.id}><Button variant="outline" className="w-full justify-start" onClick={() => { setSelectedDomain(domain); setStep(1); }}><Folder className="mr-2 h-4 w-4"/>{domain.name}</Button></li>)}
+                </ul>
+            )}
+            {step === 1 && selectedDomain && (
+                <ul className="space-y-2">
+                    {specializations.map(spec => <li key={spec.id}><Button variant="outline" className="w-full justify-start" onClick={() => { setSelectedSpecialization(spec); setStep(2); }}><BrainCircuit className="mr-2 h-4 w-4"/>{spec.name}</Button></li>)}
+                </ul>
+            )}
+            {step === 2 && selectedSpecialization && (
+                <ul className="space-y-2">
+                    {selectedSpecialization.skillAreas.map(area => <li key={area.id}><Button variant="outline" className="w-full justify-start" onClick={() => { setSelectedSkillArea(area); setStep(3); }}><Folder className="mr-2 h-4 w-4"/>{area.name}</Button></li>)}
+                </ul>
+            )}
+             {step === 3 && selectedSkillArea && (
+                <ul className="space-y-2">
+                    {selectedSkillArea.microSkills.map(micro => <li key={micro.id}><Button variant="outline" className="w-full justify-start" onClick={() => onSelect(micro.name, micro.name)}><TrendingUp className="mr-2 h-4 w-4"/>{micro.name}</Button></li>)}
+                </ul>
+            )}
+        </CardContent>
+    );
+};
 
 const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     const { pistons, setPistons } = useAuth();
@@ -1056,11 +1099,6 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
     );
 };
 
-const TopicPistonView = ({ topicId, onBack, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
-    const { deepWorkDefinitions, mindsetCards } = useAuth();
-    const topicDef = deepWorkDefinitions.find(d => d.id === topicId);
-    const mindsetDef = mindsetCards.find(c => c.id === topicId);
-    const topicName = topicDef?.name || mindsetDef?.title || topicId;
-
+const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
