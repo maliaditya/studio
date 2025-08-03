@@ -500,6 +500,20 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
         });
     };
 
+    const sensors = useSensors(useSensor(PointerSensor));
+
+    const handleDragEnd = (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+      const oldIndex = (resource.points || []).findIndex(p => p.id === active.id);
+      const newIndex = (resource.points || []).findIndex(p => p.id === over.id);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newPoints = arrayMove(resource.points!, oldIndex, newIndex);
+        onUpdate({ ...resource, points: newPoints });
+      }
+    };
+
+
     return (
         <Card className={cn("flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl", linkingFromId === resource.id && "ring-2 ring-primary", linkingFromId && linkingFromId !== resource.id && "cursor-pointer hover:ring-2 hover:ring-primary/50")}>
              <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
@@ -547,15 +561,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
             <CardContent className="flex-grow min-h-0">
               <div className={cn(hasMarkdownContent ? 'h-[450px]' : '')}>
                 <ScrollArea className="h-full">
-                    <DndContext onDragEnd={(e) => {
-                        const { active, over } = e;
-                        if (active.id === over?.id) return;
-                        const oldIndex = (resource.points || []).findIndex(p => p.id === active.id);
-                        const newIndex = (resource.points || []).findIndex(p => p.id === over?.id);
-                        if (oldIndex !== -1 && newIndex !== -1) {
-                            onUpdate({ ...resource, points: arrayMove(resource.points!, oldIndex, newIndex) });
-                        }
-                    }}>
+                    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
                         <SortableContext items={(resource.points || []).map(p => p.id)}>
                             <ul className="space-y-3 pr-3">
                                 {(resource.points || []).map((point) => (
@@ -1309,65 +1315,62 @@ function ResourcesPageContent() {
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    setActiveId(null);
-    const { active, over, delta } = event;
+      setActiveId(null);
+      const { active, over, delta } = event;
+  
+      if (!over) return;
+  
+      if (active.id.toString().startsWith('popup-')) {
+          const resourceId = (active.id as string).replace('popup-', '');
+          setOpenPopups(prev => {
+              const newPopups = new Map(prev);
+              const popup = newPopups.get(resourceId);
+              if (popup) {
+                  newPopups.set(resourceId, {
+                      ...popup,
+                      x: popup.x + delta.x,
+                      y: popup.y + delta.y,
+                  });
+              }
+              return newPopups;
+          });
+          return;
+      }
+      
+      const activeContainerId = active.data.current?.sortable?.containerId;
+      const overContainerId = over.data.current?.sortable?.containerId;
 
-    if (active.id.toString().startsWith('popup-')) {
-        const resourceId = (active.id as string).replace('popup-', '');
-        setOpenPopups(prev => {
-            const newPopups = new Map(prev);
-            const popup = newPopups.get(resourceId);
-            if (popup) {
-                newPopups.set(resourceId, {
-                    ...popup,
-                    x: popup.x + delta.x,
-                    y: popup.y + delta.y,
-                });
-            }
-            return newPopups;
-        });
-        return;
-    }
+      if (active.id !== over.id && activeContainerId === overContainerId) {
+          setResources((prevResources) => {
+            const resourceIndex = prevResources.findIndex(r => r.id === activeContainerId);
+            if (resourceIndex === -1) return prevResources;
 
-    if (!over) return;
-    
-    if (active.id !== over.id) {
-        // Handle point reordering within a card
-        const activeContainerId = active.data.current?.sortable?.containerId;
-        const overContainerId = over.data.current?.sortable?.containerId;
-        
-        if (activeContainerId && overContainerId && activeContainerId === overContainerId) {
-            setResources((prevResources) => {
-                const resourceIndex = prevResources.findIndex(r => r.id === activeContainerId);
-                if (resourceIndex === -1) return prevResources;
-
-                const resource = prevResources[resourceIndex];
-                const oldIndex = (resource.points || []).findIndex(p => p.id === active.id);
-                const newIndex = (resource.points || []).findIndex(p => p.id === over.id);
+            const resource = prevResources[resourceIndex];
+            const oldIndex = (resource.points || []).findIndex(p => p.id === active.id);
+            const newIndex = (resource.points || []).findIndex(p => p.id === over.id);
+            
+            if (oldIndex !== -1 && newIndex !== -1) {
+                const newPoints = arrayMove(resource.points!, oldIndex, newIndex);
+                const updatedResource = { ...resource, points: newPoints };
                 
-                if (oldIndex !== -1 && newIndex !== -1) {
-                    const newPoints = arrayMove(resource.points!, oldIndex, newIndex);
-                    const updatedResource = { ...resource, points: newPoints };
-                    const newResources = [...prevResources];
-                    newResources[resourceIndex] = updatedResource;
-                    return newResources;
-                }
-                return prevResources;
-            });
-            return;
-        }
-
-        // Handle card dragging to a folder
-        if (active.data.current?.type === 'card' && over.data.current?.type === 'folder') {
-            const resourceId = active.id.toString();
-            const folderId = over.id.toString();
-            if (resources.find(r => r.id === resourceId)?.folderId !== folderId) {
-                setResources(prev => prev.map(r => r.id === resourceId ? { ...r, folderId: folderId } : r));
-                toast({ title: "Resource Moved", description: `Moved resource to a new folder.` });
+                const newResources = [...prevResources];
+                newResources[resourceIndex] = updatedResource;
+                return newResources;
             }
-            return;
-        }
-    }
+            return prevResources;
+        });
+          return;
+      }
+  
+      if (active.data.current?.type === 'card' && over.data.current?.type === 'folder') {
+          const resourceId = active.id.toString();
+          const folderId = over.id.toString();
+          if (resources.find(r => r.id === resourceId)?.folderId !== folderId) {
+              setResources(prev => prev.map(r => r.id === resourceId ? { ...r, folderId: folderId } : r));
+              toast({ title: "Resource Moved", description: `Moved resource to a new folder.` });
+          }
+          return;
+      }
   };
   
   const handleOpenMarkdownModal = (resourceId: string, pointId: string) => {
@@ -1480,10 +1483,10 @@ function ResourcesPageContent() {
   return (
     <>
     <audio ref={audioRef} onEnded={() => setPlayingAudio(null)} />
-    <DndContext 
-        sensors={sensors}
-        onDragStart={(e) => setActiveId(e.active.id.toString())}
-        onDragEnd={handleDragEnd}
+    <DndContext
+      sensors={sensors}
+      onDragStart={(e) => setActiveId(e.active.id.toString())}
+      onDragEnd={handleDragEnd}
     >
         <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
@@ -1673,7 +1676,7 @@ function ResourcesPageContent() {
             </main>
         </div>
         </div>
-
+    </DndContext>
         {Array.from(openPopups.values()).map((popupState) => {
             const resource = resources.find(r => r.id === popupState.resourceId);
             if (!resource) return null;
