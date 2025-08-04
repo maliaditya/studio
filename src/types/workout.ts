@@ -273,7 +273,7 @@ export interface MindsetCard {
 }
 
 // Pistons of Intention
-export type PistonType = 'Desire' | 'Curiosity' | 'Truth-Seeking' | 'Contribution' | 'Growth' | 'Expression' | 'Pleasure' | 'Protection';
+export type PistonType = 'Stabilizer' | 'Fire' | 'Explorer' | 'Clarity' | 'Bridge';
 
 export interface PistonEntry {
     id: string;

@@ -215,15 +215,7 @@ export const DEFAULT_MINDSET_CARDS: MindsetCard[] = [
       title: "Visualization to Action",
       icon: 'BrainCircuit',
       points: [
-        { id: 'p1_1', text: "Breathe in, out — 5 times" },
-        { id: 'p1_2', text: "Activate PFC" },
-        { id: 'p1_3', text: "Visualize task: no judgment, no labels" },
-        { id: 'p1_4', text: "Say: “See clearly, not judge quickly”" },
-        { id: 'p1_5', text: "Visualize effort, form, breath" },
-        { id: 'p1_6', text: "Ask: “Can I do 1 rep, 1 line with control?”" },
-        { id: 'p1_7', text: "Act: Full focus, match visualization" },
-        { id: 'p1_8', text: "You’re the observer, not the doer" },
-        { id: 'p1_9', text: "Start" },
+        { id: 'p1_1', text: 'New step' }
       ]
     },
     {
@@ -231,12 +223,7 @@ export const DEFAULT_MINDSET_CARDS: MindsetCard[] = [
       title: "Mental Checkpoint",
       icon: 'CheckSquare',
       points: [
-        { id: 'p2_1', text: "Spot it: “What image just flashed before action?”" },
-        { id: 'p2_2', text: "Label it: [[Judgmental]]? [[Mastery]]? [[Shame]]? [[Ego]]? Wish or reality?" },
-        { id: 'p2_3', text: "Question it: “Is this true?” “Is it helping?” “Am I rushing?” “Will this keep tomorrow intact — and bring fulfillment now?”" },
-        { id: 'p2_4', text: "Replace it: Visualize from grounded self" },
-        { id: 'p2_5', text: "Detach: You are not your body" },
-        { id: 'p2_6', text: "Don’t chase completion. Chase comprehension. *Finishing isn’t winning if nothing sticks.*" }
+        { id: 'p2_1', text: 'New step' }
       ]
     },
     {
@@ -244,13 +231,7 @@ export const DEFAULT_MINDSET_CARDS: MindsetCard[] = [
       title: "Devotion Mode",
       icon: 'Zap',
       points: [
-        { id: 'p3_1', text: "Every sub-action is deliberate" },
-        { id: 'p3_2', text: "No time wasted" },
-        { id: 'p3_3', text: "Fully in the task — not above, not beside" },
-        { id: 'p3_4', text: "No judgment, no past/future" },
-        { id: 'p3_5', text: "Just you — merged with the motion" },
-        { id: 'p3_6', text: "No gap between intent and action" },
-        { id: 'p3_7', text: "No ego, no inner audience" }
+        { id: 'p3_1', text: 'New step' }
       ]
     }
 ];

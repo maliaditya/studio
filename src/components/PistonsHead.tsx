@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { Brain, BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical, PlusCircle, Trash2, Play, Pause, ChevronRight as ChevronRightIcon, Workflow, Folder, ArrowLeft } from 'lucide-react';
+import { Brain, BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical, PlusCircle, Trash2, Play, Pause, ChevronRight as ChevronRightIcon, Workflow, Folder, ArrowLeft, Anchor, Flame, Compass, Sun, GitBranch } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
@@ -26,30 +26,23 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
-    'Desire': <Target className="h-5 w-5 text-red-500" />,
-    'Curiosity': <Search className="h-5 w-5 text-sky-500" />,
-    'Truth-Seeking': <HandHeart className="h-5 w-5 text-purple-500" />,
-    'Contribution': <Sprout className="h-5 w-5 text-green-500" />,
-    'Growth': <TrendingUp className="h-5 w-5 text-blue-500" />,
-    'Expression': <Mic className="h-5 w-5 text-pink-500" />,
-    'Pleasure': <Smile className="h-5 w-5 text-yellow-500" />,
-    'Protection': <Shield className="h-5 w-5 text-gray-500" />,
+    'Stabilizer': <Anchor className="h-5 w-5 text-purple-500" />,
+    'Fire': <Flame className="h-5 w-5 text-red-500" />,
+    'Explorer': <Compass className="h-5 w-5 text-sky-500" />,
+    'Clarity': <Sun className="h-5 w-5 text-yellow-500" />,
+    'Bridge': <GitBranch className="h-5 w-5 text-green-500" />,
 };
 
 const PISTON_PLACEHOLDERS: Record<PistonType, string> = {
-    'Desire': 'What is the ultimate outcome I want from [topic]?',
-    'Curiosity': 'What am I curious about regarding [topic]?',
-    'Truth-Seeking': 'What is the core truth I need to accept about [topic]?',
-    'Contribution': 'How will [topic] help others? Who am I serving?',
-    'Growth': 'How will working on [topic] make me better?',
-    'Expression': 'What do I want to create or say about [topic]?',
-    'Pleasure': 'What will I enjoy about the process of working on [topic]?',
-    'Protection': 'What risks am I mitigating by focusing on [topic]?',
+    'Stabilizer': 'Grounds you in sufficiency. No grasping.',
+    'Fire': 'Ignites action from soul, not ego.',
+    'Explorer': 'Opens new paths without needing safety.',
+    'Clarity': 'Cuts illusion; brings light to the shadows.',
+    'Bridge': 'Connects self to others; dissolves division.',
 };
 
 const PISTON_NAMES: PistonType[] = [
-  'Desire', 'Curiosity', 'Truth-Seeking', 'Contribution', 
-  'Growth', 'Expression', 'Pleasure', 'Protection'
+  'Stabilizer', 'Fire', 'Explorer', 'Clarity', 'Bridge'
 ];
 
 interface HistoryPopupState {
@@ -1129,8 +1122,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
     };
     
     const getPlaceholderText = (piston: PistonType) => {
-        const defaultPlaceholder = PISTON_PLACEHOLDERS[piston];
-        return defaultPlaceholder.replace('[topic]', `"${topicName}"`);
+        return PISTON_PLACEHOLDERS[piston];
     };
     
     return (
@@ -1219,6 +1211,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
+
 
 
 
