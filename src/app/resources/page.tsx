@@ -117,16 +117,13 @@ interface PopupState {
 
 interface ResourcePopupProps {
   popupState: PopupState;
-  allResources: Resource[];
-  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
   onClose: (resourceId: string) => void;
-  onSizeChange: (resourceId: string, newSize: { width: number; height: number }) => void;
-  setFloatingVideoUrl: (url: string | null) => void;
 }
 
-const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClose, onSizeChange, setFloatingVideoUrl }: ResourcePopupProps) => {
-    const resource = allResources.find(r => r.id === popupState.resourceId);
-    const cardRef = useRef<HTMLDivElement>(null);
+const ResourcePopupCard = ({ popupState, onClose }: ResourcePopupProps) => {
+    const { resources, setResources, setFloatingVideoUrl, setPinnedFolderIds, setActiveResourceTabIds, setSelectedResourceFolderId } = useAuth();
+    
+    const resource = resources.find(r => r.id === popupState.resourceId);
 
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `popup-${popupState.resourceId}`,
@@ -136,7 +133,7 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
         position: 'fixed',
         top: popupState.y,
         left: popupState.x,
-        width: `${popupState.width}px`,
+        width: `${popupState.width || 512}px`,
         willChange: 'transform',
     };
 
@@ -146,66 +143,35 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
 
     if (!resource) return null;
 
-    const handleLinkClick = (e: React.MouseEvent, pointResourceId: string) => {
-      e.stopPropagation();
-      onOpenNestedPopup(pointResourceId, e, popupState);
-    };
-
     return (
         <div ref={setNodeRef} style={style} {...attributes} className="z-[60]">
-            <Card ref={cardRef} className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col">
-                <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
-                    <CardTitle className="text-base flex items-center gap-2">
-                        <Library className="h-4 w-4" />
-                        <span className="truncate">{resource.name}</span>
-                    </CardTitle>
-                </CardHeader>
-                <div className="flex-grow min-h-0 overflow-y-auto">
-                    <CardContent className="p-3 pt-0">
-                        <ul className="space-y-2 text-sm text-muted-foreground pr-2">
-                            {(resource.points || []).map(point => (
-                                <li key={point.id} className="flex items-start gap-2">
-                                    {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                    point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                     point.type === 'link' ? <LinkIcon className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                    <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
-                                    }
-                                    {point.type === 'card' && point.resourceId ? (
-                                        <button
-                                            onClick={(e) => handleLinkClick(e, point.resourceId!)}
-                                            className="text-left font-medium text-primary hover:underline"
-                                        >
-                                            {point.text}
-                                        </button>
-                                    ) : point.type === 'markdown' ? (
-                                        <div className="w-full prose dark:prose-invert prose-sm">
-                                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
-                                        </div>
-                                    ) : point.type === 'code' ? (
-                                         <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
-                                    ) : point.type === 'link' ? (
-                                        <div className="flex-grow min-w-0">
-                                            <button 
-                                                className="text-left font-medium text-primary hover:underline truncate"
-                                                onClick={() => point.text && setFloatingVideoUrl(point.text)}
-                                                title={point.text}
-                                            >
-                                                {point.displayText || point.text || <span className="text-muted-foreground italic">New link...</span>}
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <span className="break-words w-full" title={point.text}>{point.text}</span>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    </CardContent>
-                </div>
-                <CardFooter className="p-2 flex justify-end flex-shrink-0 relative">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onClose(resource.id); }}>
-                        <X className="h-4 w-4" />
-                    </Button>
-                </CardFooter>
+            <Card className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col relative">
+                <div 
+                    className="absolute top-0 left-0 h-10 w-full cursor-grab active:cursor-grabbing z-10" 
+                    onPointerDownCapture={listeners.onPointerDown}
+                    onTouchStartCapture={listeners.onTouchStart}
+                />
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="absolute top-2 right-2 h-7 w-7 z-20" 
+                    onClick={(e) => { e.stopPropagation(); onClose(resource.id); }}
+                >
+                    <X className="h-4 w-4" />
+                </Button>
+                <ResourceCard 
+                    resource={resource}
+                    onUpdate={(updated) => setResources(prev => prev.map(r => r.id === updated.id ? updated : r))}
+                    onDelete={() => { /* Deleting from popup might be complex, handle carefully */ }}
+                    setFloatingVideoUrl={setFloatingVideoUrl}
+                    onOpenNestedPopup={() => {}}
+                    onOpenMarkdownModal={() => {}}
+                    playingAudio={null} // Simplified for now
+                    setPlayingAudio={() => {}}
+                    onLinkClick={() => {}}
+                    linkingFromId={null}
+                    isPopup={true}
+                />
             </Card>
         </div>
     );
@@ -371,7 +337,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
 };
 
 
-const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId }: { 
+const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false }: { 
     resource: Resource; 
     onUpdate: (resource: Resource) => void; 
     onDelete: (resourceId: string) => void; 
@@ -382,6 +348,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
     onLinkClick: (resourceId: string) => void;
     linkingFromId: string | null;
+    isPopup?: boolean;
 }) => {
     const { resources } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
@@ -472,33 +439,35 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                             </CardTitle>
                         )}
                    </div>
-                   <div className="flex items-center">
-                        {hasMarkdownContent && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onOpenMarkdownModal(resource.id, '')}>
-                                <Expand className="h-4 w-4" />
-                            </Button>
-                        )}
-                        {resource.audioUrl && (
-                             <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={togglePlayAudio}>
-                                {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
-                            </Button>
-                        )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onLinkClick(resource.id)}>
-                            <LinkIcon className="h-4 w-4" />
-                        </Button>
-                       <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 -mr-2 -mt-1">
-                                    <MoreVertical className="h-4 w-4" />
+                   {!isPopup && (
+                        <div className="flex items-center">
+                            {hasMarkdownContent && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onOpenMarkdownModal(resource.id, '')}>
+                                    <Expand className="h-4 w-4" />
                                 </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem onSelect={() => setEditingTitle(true)}>Edit Title</DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => audioInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />Upload Audio</DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => onDelete(resource.id)} className="text-destructive">Delete Card</DropdownMenuItem>
-                            </DropdownMenuContent>
-                       </DropdownMenu>
-                   </div>
+                            )}
+                            {resource.audioUrl && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={togglePlayAudio}>
+                                    {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
+                                </Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onLinkClick(resource.id)}>
+                                <LinkIcon className="h-4 w-4" />
+                            </Button>
+                        <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 -mr-2 -mt-1">
+                                        <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onSelect={() => setEditingTitle(true)}>Edit Title</DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => audioInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />Upload Audio</DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => onDelete(resource.id)} className="text-destructive">Delete Card</DropdownMenuItem>
+                                </DropdownMenuContent>
+                        </DropdownMenu>
+                        </div>
+                   )}
                 </div>
             </CardHeader>
             <CardContent className="flex-grow min-h-0">
@@ -653,7 +622,7 @@ function ResourcesPageContent() {
   
   const [addResourceType, setAddResourceType] = useState<'link' | 'card'>('link');
 
-  const [openPopups, setOpenPopups] = useState<Map<string, ResourcePopupState>>(new Map());
+  const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
   
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
@@ -1260,8 +1229,8 @@ function ResourcesPageContent() {
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null);
     const { active, over, delta } = event;
-
-    // Handle popup dragging
+    
+    // Popup card dragging
     if (active.id.toString().startsWith('popup-')) {
         setOpenPopups(prev => {
             const newPopups = new Map(prev);
@@ -1276,21 +1245,21 @@ function ResourcesPageContent() {
     }
 
     if (!over) return;
-
-    // Handle reordering cards
+    
+    // Resource card dragging
     if (active.data.current?.type === 'card' && over.data.current?.type) {
         const activeCard = resources.find(r => r.id === active.id);
         const overId = over.id.toString();
         const overCard = resources.find(r => r.id === overId);
         
-        // Logic to move a card to a different folder
+        // Moving to a different folder
         if (over.data.current.type === 'folder' && activeCard && activeCard.folderId !== overId) {
             setResources(prev => prev.map(r => r.id === active.id ? { ...r, folderId: overId } : r));
             toast({ title: "Resource Moved", description: `Moved to a new folder.` });
             return;
         }
 
-        // Logic to reorder cards within the same folder
+        // Reordering within the same folder
         if (overCard && activeCard && activeCard.folderId === overCard.folderId && active.id !== over.id) {
             const oldIndex = resources.findIndex(r => r.id === active.id);
             const newIndex = resources.findIndex(r => r.id === over.id);
@@ -1307,20 +1276,6 @@ function ResourcesPageContent() {
       setMarkdownModalState({ isOpen: true, resourceId, pointId });
   };
   
-  const handleSizeChange = useCallback((resourceId: string, newSize: { width: number; height: number }) => {
-    setOpenPopups(prev => {
-        const newPopups = new Map(prev);
-        const popup = newPopups.get(resourceId);
-        if (popup) {
-            newPopups.set(popup.resourceId, {
-                ...popup,
-                ...newSize
-            });
-        }
-        return newPopups;
-    });
-  }, []);
-
   const currentMarkdownResource = resources.find(r => r.id === markdownModalState.resourceId);
 
   const sortedTabs = useMemo(() => {
@@ -1487,7 +1442,7 @@ function ResourcesPageContent() {
                             let cardContent: React.ReactNode;
                             
                             if(isCardType) {
-                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event)} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} />;
+                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} />;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                 const isGif = isGifUrl(res.link);
@@ -1606,21 +1561,13 @@ function ResourcesPageContent() {
             </main>
         </div>
         </div>
-        {Array.from(openPopups.values()).map((popupState) => {
-            const resource = resources.find(r => r.id === popupState.resourceId);
-            if (!resource) return null;
-            return (
-                <ResourcePopupCard
-                    key={popupState.resourceId}
-                    popupState={popupState}
-                    allResources={resources}
-                    onOpenNestedPopup={handleOpenNestedPopup}
-                    onClose={handleClosePopup}
-                    onSizeChange={handleSizeChange}
-                    setFloatingVideoUrl={setFloatingVideoUrl}
-                />
-            )
-        })}
+        {Array.from(openPopups.values()).map((popupState) => (
+            <ResourcePopupCard
+                key={popupState.resourceId}
+                popupState={popupState}
+                onClose={handleClosePopup}
+            />
+        ))}
 
         <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
           {Array.from(openPopups.values()).map(popup => {
@@ -1880,6 +1827,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
