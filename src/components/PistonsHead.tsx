@@ -1146,7 +1146,9 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                   <span className="mt-1">{PISTON_ICONS[piston]}</span>
                                   <div className="flex-grow min-w-0">
                                       <h4 className="font-semibold text-sm">{PISTON_FULL_NAMES[piston]}</h4>
-                                      <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start group">
+                                      <p className="text-xs text-muted-foreground italic mb-2">{getPlaceholderText(piston)}</p>
+                                      
+                                      <div className="text-sm min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start group">
                                           {editingEntryId === currentEntry?.id ? (
                                               <Textarea 
                                                   value={editedEntryText} 
@@ -1161,9 +1163,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                               />
                                           ) : (
                                               <div className="flex-grow min-w-0 pr-2 break-words" onDoubleClick={() => currentEntry && handleStartEditing(currentEntry)}>
-                                                  <p className="whitespace-pre-wrap">
-                                                      {currentEntry?.text || <span className="italic opacity-70">{getPlaceholderText(piston)}</span>}
-                                                  </p>
+                                                  {currentEntry?.text && <p className="whitespace-pre-wrap">{currentEntry.text}</p>}
                                               </div>
                                           )}
                                           <div className="flex-shrink-0 flex items-center">
@@ -1210,6 +1210,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; currentResourceId?: string; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
+
 
 
 
