@@ -128,7 +128,7 @@ interface ResourcePopupProps {
 
 const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAudio, setPlayingAudio, onOpenNestedPopup, onEditLinkText }: ResourcePopupProps) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
-        id: `resource-popup-${popupState.resourceId}`,
+        id: `popup-${popupState.resourceId}`,
     });
     
     const [editingTitle, setEditingTitle] = useState(false);
@@ -213,8 +213,8 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                     <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
                 </div>
                 
-                <div className="absolute top-1 right-1 z-20 flex items-center">
-                     {resource.audioUrl ? (
+                 <div className="absolute top-2 right-2 z-20 flex items-center">
+                    {resource.audioUrl ? (
                         <>
                            <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={togglePlayAudio}>
                                 {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
@@ -689,7 +689,7 @@ function ResourcesPageContent() {
   
   const [addResourceType, setAddResourceType] = useState<'link' | 'card'>('link');
 
-  const [openPopups, setOpenPopups] = useState<Map<string, ResourcePopupState>>(new Map());
+  const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
   
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
