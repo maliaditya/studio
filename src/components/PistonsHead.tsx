@@ -667,29 +667,26 @@ export function PistonsHead() {
   };
 
 
-  const [linkingResourceFor, setLinkingResourceFor] = useState<{piston: PistonType; entryId: string; currentResourceId?: string;} | null>(null);
+  const [linkingResourceFor, setLinkingResourceFor] = useState<{piston: PistonType; currentResourceId?: string;} | null>(null);
 
   const handleLinkResource = (resourceId: string | null) => {
     if (!linkingResourceFor) return;
-    const { piston, entryId } = linkingResourceFor;
+    const { piston } = linkingResourceFor;
+    
     setPistons(prev => {
         const topicKey = selectedTopicId || (currentView === 'health' ? 'health' : '');
         if (!topicKey) return prev;
+        
         const topicData = { ...(prev[topicKey] || {}) };
-        const entries = topicData[piston] || [];
-        const updatedEntries = entries.map(entry => {
-            if (entry.id === entryId) {
-                const newEntry = { ...entry };
-                if (resourceId === 'none' || resourceId === null) {
-                    delete newEntry.linkedResourceId;
-                } else {
-                    newEntry.linkedResourceId = resourceId;
-                }
-                return newEntry;
-            }
-            return entry;
-        });
-        return { ...prev, [topicKey]: { ...topicData, [piston]: updatedEntries } };
+        const linkedIds = { ...(topicData.linkedResourceIds || {}) };
+
+        if (resourceId === 'none' || resourceId === null) {
+            delete linkedIds[piston];
+        } else {
+            linkedIds[piston] = resourceId;
+        }
+
+        return { ...prev, [topicKey]: { ...topicData, linkedResourceIds: linkedIds } };
     });
     setLinkingResourceFor(null);
   };
@@ -806,7 +803,7 @@ export function PistonsHead() {
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>Link Resource to {linkingResourceFor.piston}</DialogTitle>
-                                <DialogDescription>Select an existing resource card to connect to this intention.</DialogDescription>
+                                <DialogDescription>Select an existing resource card to connect to this piston.</DialogDescription>
                             </DialogHeader>
                             <div className="py-4">
                                 <Select
@@ -872,7 +869,7 @@ const MainPistonView = ({ onSelect }: { onSelect: (view: 'health' | 'projects' |
 );
 
 
-const HealthPistonView = ({ onBack, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
+const HealthPistonView = ({ onBack, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { onBack: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; currentResourceId?: string; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     const { pistons, setPistons } = useAuth();
     const [activity, setActivity] = useState(pistons.health?.activity || '');
     const [isEditingActivity, setIsEditingActivity] = useState(!pistons.health?.activity);
@@ -1079,7 +1076,7 @@ const SpecializationSelector = ({ onSelect, onBack }: { onSelect: (topicId: stri
     );
 };
 
-const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
+const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; currentResourceId?: string; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     const { pistons, setPistons } = useAuth();
     const [newEntryPiston, setNewEntryPiston] = useState<PistonType | null>(null);
     const [newEntryText, setNewEntryText] = useState('');
@@ -1141,7 +1138,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                       const entries = topicPistons[piston] || [];
                       const currentEntry = entries[0];
                       const isAddingNewToThisPiston = newEntryPiston === piston;
-                      const isResourceLinked = !!currentEntry?.linkedResourceId;
+                      const isResourceLinked = !!topicPistons.linkedResourceIds?.[piston];
                       
                       return (
                           <li key={piston} className="p-2 rounded-lg bg-muted/30">
@@ -1171,25 +1168,19 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                           )}
                                           <div className="flex-shrink-0 flex items-center">
                                               {isResourceLinked ? (
-                                                  <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDownCapture={(e) => handleOpenResource(e, currentEntry.linkedResourceId!)}>
+                                                  <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDownCapture={(e) => handleOpenResource(e, topicPistons.linkedResourceIds![piston]!)}>
                                                       <Library className="h-4 w-4 text-primary" />
                                                   </Button>
-                                              ) : currentEntry ? (
-                                                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDownCapture={() => onLinkResource({piston, entryId: currentEntry.id, currentResourceId: currentEntry.linkedResourceId})}>
-                                                      <LinkIcon className="h-4 w-4" />
-                                                  </Button>
-                                              ) : <div className="w-6 h-6"/> }
+                                              ) : null }
                                                   <DropdownMenu>
                                                   <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
                                                   <DropdownMenuPortal>
                                                       <DropdownMenuContent side="right" align="start" sideOffset={5}>
                                                           <DropdownMenuItem onSelect={() => setNewEntryPiston(piston)}><Plus className="mr-2 h-4 w-4"/>New Entry</DropdownMenuItem>
                                                           {entries.length > 0 && <DropdownMenuItem onSelect={(e) => handleOpenHistory(e, piston)}><History className="mr-2 h-4 w-4"/>View History</DropdownMenuItem>}
-                                                          {currentEntry && (
-                                                              <DropdownMenuItem onSelect={() => onLinkResource({ piston, entryId: currentEntry.id, currentResourceId: currentEntry.linkedResourceId })}>
-                                                                  <LinkIcon className="mr-2 h-4 w-4"/> {isResourceLinked ? 'Change Resource' : 'Link Resource'}
-                                                              </DropdownMenuItem>
-                                                          )}
+                                                           <DropdownMenuItem onSelect={() => onLinkResource({ piston, currentResourceId: topicPistons.linkedResourceIds?.[piston] })}>
+                                                              <LinkIcon className="mr-2 h-4 w-4"/> {isResourceLinked ? 'Change Resource' : 'Link Resource'}
+                                                          </DropdownMenuItem>
                                                           {currentEntry && <DropdownMenuItem onSelect={() => handleDeleteEntry(piston, currentEntry.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Current</DropdownMenuItem>}
                                                       </DropdownMenuContent>
                                                   </DropdownMenuPortal>
@@ -1216,9 +1207,10 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
     );
 };
 
-const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
+const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; currentResourceId?: string; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
+
 
 
 

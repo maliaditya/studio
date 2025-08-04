@@ -279,12 +279,14 @@ export interface PistonEntry {
     id: string;
     text: string;
     timestamp: number;
-    linkedResourceId?: string;
 }
 
 export type PistonState = PistonEntry[];
 
-export type PistonsData = Partial<Record<PistonType, PistonState> & { activity?: string }>;
+export type PistonsData = Partial<Record<PistonType, PistonState> & {
+    activity?: string;
+    linkedResourceIds?: Partial<Record<PistonType, string>>;
+}>;
 
 export interface PistonsCategoryData {
     health?: PistonsData;
