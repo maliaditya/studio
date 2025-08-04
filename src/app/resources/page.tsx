@@ -127,12 +127,16 @@ interface ResourcePopupProps {
 }
 
 const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAudio, setPlayingAudio, onOpenNestedPopup, onEditLinkText }: ResourcePopupProps) => {
+    const { resources } = useAuth();
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `popup-${popupState.resourceId}`,
     });
     
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
+    const [linkCardPopoverOpen, setLinkCardPopoverOpen] = useState(false);
+    const [linkedCardId, setLinkedCardId] = useState<string>('');
+
 
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -176,6 +180,23 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
         const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: 'New step...', type };
         const updatedPoints = [...(resource.points || []), newPoint];
         onUpdate({ ...resource, points: updatedPoints });
+    };
+
+    const handleAddCardLinkPoint = () => {
+        if (!linkedCardId) return;
+        const linkedCard = resources.find(r => r.id === linkedCardId);
+        if (!linkedCard) return;
+
+        const newPoint: ResourcePoint = {
+            id: `point_${Date.now()}`,
+            type: 'card',
+            text: linkedCard.name,
+            resourceId: linkedCardId
+        };
+        const updatedPoints = [...(resource.points || []), newPoint];
+        onUpdate({ ...resource, points: updatedPoints });
+        setLinkCardPopoverOpen(false);
+        setLinkedCardId('');
     };
 
     const handleUpdatePoint = (pointId: string, newText: string) => {
@@ -285,7 +306,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                         </ul>
                     </CardContent>
                 </div>
-                 <CardFooter className="p-2">
+                 <CardFooter className="p-2 flex gap-2">
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button variant="outline" size="sm" className="w-full">
@@ -298,6 +319,32 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                                 <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('markdown')}><MessageSquare className="mr-2 h-4 w-4" />Markdown</Button>
                                 <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('code')}><Code className="mr-2 h-4 w-4" />Code</Button>
                                 <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('link')}><LinkIcon className="mr-2 h-4 w-4" />Link</Button>
+                           </div>
+                        </PopoverContent>
+                    </Popover>
+                    <Popover open={linkCardPopoverOpen} onOpenChange={setLinkCardPopoverOpen}>
+                        <PopoverTrigger asChild>
+                             <Button variant="outline" size="sm" className="w-full">
+                                <LinkIcon className="mr-2 h-4 w-4" /> Link Card
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80">
+                           <div className="grid gap-4">
+                               <div className="space-y-2">
+                                   <h4 className="font-medium leading-none">Link Card</h4>
+                                   <p className="text-sm text-muted-foreground">Select an existing card to link as a step.</p>
+                               </div>
+                                <div className="space-y-2">
+                                    <Select value={linkedCardId} onValueChange={setLinkedCardId}>
+                                        <SelectTrigger><SelectValue placeholder="Select a card..."/></SelectTrigger>
+                                        <SelectContent>
+                                            {resources.filter(r => r.type === 'card' && r.id !== resource.id).map(r => (
+                                                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <Button onClick={handleAddCardLinkPoint} disabled={!linkedCardId} className="w-full">Link Card</Button>
+                                </div>
                            </div>
                         </PopoverContent>
                     </Popover>
@@ -2034,4 +2081,5 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
