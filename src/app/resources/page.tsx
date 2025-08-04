@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -125,12 +126,10 @@ interface ResourcePopupProps {
 }
 
 const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAudio, setPlayingAudio, onOpenNestedPopup, onEditLinkText }: ResourcePopupProps) => {
-    const { setFloatingVideoUrl } = useAuth();
-    
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `popup-${popupState.resourceId}`,
     });
-
+    
     const style: React.CSSProperties = {
         position: 'fixed',
         top: popupState.y,
@@ -149,15 +148,25 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
         e.stopPropagation();
         onClose(resource.id);
     }
-
+    
     return (
-        <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
-            <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col relative">
+        <div ref={setNodeRef} style={style} className="z-[70]">
+            <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col relative max-h-[80vh]">
+                <div 
+                    className="absolute top-2 left-2 z-20 cursor-grab active:cursor-grabbing p-1" 
+                    {...listeners} {...attributes}
+                >
+                    <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
+                </div>
+                <div className="absolute top-1 right-1 z-20">
+                     <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={handleClose}>
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
                 <ResourceCard 
                     resource={resource}
                     onUpdate={onUpdate}
                     onDelete={() => { /* Deleting from popup might be complex, handle carefully */ }}
-                    setFloatingVideoUrl={setFloatingVideoUrl}
                     onOpenNestedPopup={(resourceId, e) => onOpenNestedPopup(resourceId, e, popupState)}
                     onOpenMarkdownModal={() => {}}
                     playingAudio={playingAudio}
@@ -214,12 +223,11 @@ const SortableResourceCard = ({ children, item, className, linkingFromId }: { ch
 };
 
 
-const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUrl, onOpenNestedPopup, onOpenMarkdownModal, onEditLinkText }: {
+const SortablePoint = ({ point, resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, onEditLinkText }: {
     point: ResourcePoint;
     resource: Resource;
     onUpdate: (resource: Resource) => void;
     onDelete: (pointId: string) => void;
-    setFloatingVideoUrl: (url: string | null) => void;
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
     onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
     onEditLinkText: (point: ResourcePoint) => void;
@@ -260,7 +268,6 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
                     onUpdate({ ...resource, points: updatedPoints });
                 }}
                 onDelete={() => onDelete(point.id)}
-                setFloatingVideoUrl={setFloatingVideoUrl}
                 onEditLinkText={onEditLinkText}
             />
         </div>
@@ -268,11 +275,10 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
 };
 
 
-const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText, onClosePopup }: { 
+const ResourceCard = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText, onClosePopup }: { 
     resource: Resource; 
     onUpdate: (resource: Resource) => void; 
     onDelete: (resourceId: string) => void; 
-    setFloatingVideoUrl: (url: string | null) => void; 
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void; 
     onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
     playingAudio: { id: string; isPlaying: boolean } | null;
@@ -283,7 +289,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     onEditLinkText: (point: ResourcePoint) => void;
     onClosePopup?: (e: React.MouseEvent | React.PointerEvent) => void;
 }) => {
-    const { resources } = useAuth();
+    const { resources, setFloatingVideoUrl } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
     
     const [linkCardPopoverOpen, setLinkCardPopoverOpen] = useState(false);
@@ -417,7 +423,6 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                                         resource={resource}
                                         onUpdate={onUpdate}
                                         onDelete={handleDeletePoint}
-                                        setFloatingVideoUrl={setFloatingVideoUrl}
                                         onOpenNestedPopup={onOpenNestedPopup}
                                         onOpenMarkdownModal={onOpenMarkdownModal}
                                         onEditLinkText={onEditLinkText}
@@ -557,7 +562,7 @@ function ResourcesPageContent() {
   
   const [addResourceType, setAddResourceType] = useState<'link' | 'card'>('link');
 
-  const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
+  const [openPopups, setOpenPopups] = useState<Map<string, ResourcePopupState>>(new Map());
   
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
@@ -1167,8 +1172,7 @@ function ResourcesPageContent() {
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null);
     const { active, over, delta } = event;
-    
-    // Popup card dragging
+
     if (active.id.toString().startsWith('popup-')) {
         setOpenPopups(prev => {
             const newPopups = new Map(prev);
@@ -1184,20 +1188,17 @@ function ResourcesPageContent() {
 
     if (!over) return;
     
-    // Resource card dragging
     if (active.data.current?.type === 'card' && over.data.current?.type) {
         const activeCard = resources.find(r => r.id === active.id);
         const overId = over.id.toString();
-        const overCard = resources.find(r => r.id === overId);
         
-        // Moving to a different folder
         if (over.data.current.type === 'folder' && activeCard && activeCard.folderId !== overId) {
             setResources(prev => prev.map(r => r.id === active.id ? { ...r, folderId: overId } : r));
             toast({ title: "Resource Moved", description: `Moved to a new folder.` });
             return;
         }
 
-        // Reordering within the same folder
+        const overCard = resources.find(r => r.id === overId);
         if (overCard && activeCard && activeCard.folderId === overCard.folderId && active.id !== over.id) {
             const oldIndex = resources.findIndex(r => r.id === active.id);
             const newIndex = resources.findIndex(r => r.id === over.id);
@@ -1411,7 +1412,7 @@ function ResourcesPageContent() {
                             let cardContent: React.ReactNode;
                             
                             if(isCardType) {
-                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} />;
+                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} />;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                 const isGif = isGifUrl(res.link);
@@ -1826,13 +1827,13 @@ function ResourcesPageContent() {
   );
 }
 
-const EditableResourcePoint = ({ point, onUpdate, onDelete, setFloatingVideoUrl, onEditLinkText }: { 
+const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: { 
     point: ResourcePoint, 
     onUpdate: (text: string) => void, 
     onDelete: () => void,
-    setFloatingVideoUrl: (url: string | null) => void;
-    onEditLinkText: (point: ResourcePoint) => void;
+    onEditLinkText: (point: ResourcePoint) => void 
 }) => {
+    const { setFloatingVideoUrl } = useAuth();
     const [isEditing, setIsEditing] = useState(point.text === 'New step...');
     const [editText, setEditText] = useState(point.text);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
