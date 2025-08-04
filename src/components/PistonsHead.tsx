@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { Brain, BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical, PlusCircle, Trash2, Play, Pause, ChevronRight as ChevronRightIcon, Workflow, Folder, ArrowLeft, Anchor, Flame, Compass, Sun, GitBranch } from 'lucide-react';
+import { Brain, BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical, PlusCircle, Trash2, Play, Pause, ChevronRight as ChevronRightIcon, Workflow, Folder, ArrowLeft, Anchor, Flame, Compass, Sun, GitBranch, Info } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
@@ -52,6 +52,51 @@ const PISTON_FULL_NAMES: Record<PistonType, string> = {
     'Clarity': 'Clarity (Truth-Seeking)',
     'Bridge': 'Bridge (Compassion)',
 };
+
+const PISTON_DETAILS: Record<PistonType, {
+    needs: string;
+    virtue: string;
+    egoPattern: string;
+    negates: string;
+    why: string;
+}> = {
+    'Explorer': { // Curiosity
+        needs: "Growth, Variety",
+        virtue: "Innocence",
+        egoPattern: "Cunningness, Control",
+        negates: "Certainty, Protection",
+        why: "You welcome the unknown"
+    },
+    'Clarity': { // Truth-Seeking
+        needs: "Growth, Contribution, Certainty",
+        virtue: "Truth",
+        egoPattern: "Illusion, Self-Deception",
+        negates: "Illusion, Egoic Significance",
+        why: "You crave reality, not image"
+    },
+    'Bridge': { // Compassion
+        needs: "Contribution, Love",
+        virtue: "Compassion",
+        egoPattern: "Cruelty, Indifference",
+        negates: "Competition, Cruelty, Separation",
+        why: "You act from love" // Modified for clarity
+    },
+    'Stabilizer': { // Gratitude
+        needs: "Contribution, Love",
+        virtue: "Forgiveness, Contentment",
+        egoPattern: "Anger, Discontent, Resentment",
+        negates: "Desire, Pleasure",
+        why: "You already feel whole"
+    },
+    'Fire': { // Inspiration
+        needs: "Growth, Contribution",
+        virtue: "Contentment, Innocence",
+        egoPattern: "Desire, Jealousy, Manipulation",
+        negates: "Egoic Expression, Desire",
+        why: "You're lit from within"
+    }
+};
+
 
 interface HistoryPopupState {
     piston: PistonType;
@@ -1126,10 +1171,6 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
         });
     };
     
-    const getPlaceholderText = (piston: PistonType) => {
-        return PISTON_PLACEHOLDERS[piston];
-    };
-    
     return (
       <CardContent className="p-0 flex-grow min-h-0 flex flex-col">
           <ScrollArea className="flex-grow p-4">
@@ -1139,14 +1180,37 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                       const currentEntry = entries[0];
                       const isAddingNewToThisPiston = newEntryPiston === piston;
                       const isResourceLinked = !!topicPistons.linkedResourceIds?.[piston];
+                      const details = PISTON_DETAILS[piston];
                       
                       return (
                           <li key={piston} className="p-2 rounded-lg bg-muted/30">
                               <div className="flex items-start gap-3">
                                   <span className="mt-1">{PISTON_ICONS[piston]}</span>
                                   <div className="flex-grow min-w-0">
-                                      <h4 className="font-semibold text-sm">{PISTON_FULL_NAMES[piston]}</h4>
-                                      <p className="text-xs text-muted-foreground italic mb-2">{getPlaceholderText(piston)}</p>
+                                      <div className="flex justify-between items-center">
+                                         <h4 className="font-semibold text-sm">{PISTON_FULL_NAMES[piston]}</h4>
+                                         <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6"><Info className="h-4 w-4"/></Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-80">
+                                                <div className="grid gap-4">
+                                                    <div className="space-y-2">
+                                                        <h4 className="font-medium leading-none">{PISTON_FULL_NAMES[piston]}</h4>
+                                                        <p className="text-sm text-muted-foreground">{PISTON_PLACEHOLDERS[piston]}</p>
+                                                    </div>
+                                                    <div className="text-sm space-y-2">
+                                                        <p><strong>Fuels:</strong> {details.needs}</p>
+                                                        <p><strong>Virtue:</strong> {details.virtue}</p>
+                                                        <p><strong>Opposes:</strong> {details.egoPattern}</p>
+                                                        <p><strong>Negates:</strong> {details.negates}</p>
+                                                        <p><strong>Why:</strong> {details.why}</p>
+                                                    </div>
+                                                </div>
+                                            </PopoverContent>
+                                         </Popover>
+                                      </div>
+                                      <p className="text-xs text-muted-foreground italic mb-2">{PISTON_PLACEHOLDERS[piston]}</p>
                                       
                                       <div className="text-sm min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start group">
                                           {editingEntryId === currentEntry?.id ? (
@@ -1210,6 +1274,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; currentResourceId?: string; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
+
 
 
 
