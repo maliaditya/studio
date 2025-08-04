@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -147,7 +145,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
 
     if (!resource) return null;
     
-    const handleClose = (e: React.PointerEvent) => {
+    const handleClose = (e: React.MouseEvent | React.PointerEvent) => {
         e.stopPropagation();
         onClose(resource.id);
     }
@@ -155,12 +153,6 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
     return (
         <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
             <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col relative">
-                <div className="absolute top-2 left-2 z-20 cursor-grab active:cursor-grabbing p-1" {...listeners}>
-                    <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
-                </div>
-                <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 z-20" onPointerDown={handleClose}>
-                    <X className="h-4 w-4" />
-                </Button>
                 <ResourceCard 
                     resource={resource}
                     onUpdate={onUpdate}
@@ -174,6 +166,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                     linkingFromId={null}
                     isPopup={true}
                     onEditLinkText={onEditLinkText}
+                    onClosePopup={handleClose}
                 />
             </Card>
         </div>
@@ -221,7 +214,7 @@ const SortableResourceCard = ({ children, item, className, linkingFromId }: { ch
 };
 
 
-const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUrl, onOpenNestedPopup, onOpenMarkdownModal }: {
+const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUrl, onOpenNestedPopup, onOpenMarkdownModal, onEditLinkText }: {
     point: ResourcePoint;
     resource: Resource;
     onUpdate: (resource: Resource) => void;
@@ -229,12 +222,9 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
     setFloatingVideoUrl: (url: string | null) => void;
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
     onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
+    onEditLinkText: (point: ResourcePoint) => void;
 }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id });
-
-    const [isEditing, setIsEditing] = useState(point.text === 'New step...');
-    const [editText, setEditText] = useState(point.text);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -242,41 +232,6 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
         zIndex: isDragging ? 10 : 'auto',
     };
     
-    const handleSave = () => {
-        if (editText.trim() === '') {
-            onDelete(point.id);
-        } else {
-             const updatedPoints = (resource.points || []).map(p => p.id === point.id ? { ...p, text: editText } : p);
-             onUpdate({ ...resource, points: updatedPoints });
-        }
-        setIsEditing(false);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSave();
-        }
-        if (e.key === 'Escape') {
-            setIsEditing(false);
-            setEditText(point.text);
-        }
-    };
-    
-    useEffect(() => {
-        if (isEditing && textareaRef.current) {
-            textareaRef.current.focus();
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-        }
-    }, [isEditing]);
-    
-    const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setEditText(e.target.value);
-        e.target.style.height = 'auto';
-        e.target.style.height = `${e.target.scrollHeight}px`;
-    }
-
     if (point.type === 'card' && point.resourceId) {
         return (
             <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
@@ -298,49 +253,22 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
     return (
         <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item bg-card">
             <button {...attributes} {...listeners} className="cursor-grab p-1"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
-            <div className="flex-grow">
-                {isEditing ? (
-                    <Textarea ref={textareaRef} value={editText} onChange={handleTextareaChange} onBlur={handleSave} onKeyDown={handleKeyDown} placeholder="New step..." className={cn("text-sm", (point.type === 'code' || point.type === 'markdown') && "font-mono text-xs")} rows={1}/>
-                ) : point.type === 'youtube' && point.url ? (
-                    <div className="w-full aspect-video rounded-md overflow-hidden border">
-                        <iframe src={point.url} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
-                    </div>
-                ) : point.type === 'obsidian' && point.url ? (
-                    <div className="w-full aspect-[4/3] rounded-md overflow-hidden border">
-                        <iframe src={point.url} title={resource.name} frameBorder="0" allowFullScreen className="w-full h-full"></iframe>
-                    </div>
-                ) : point.type === 'code' ? (
-                    <pre onDoubleClick={() => setIsEditing(true)} className="w-full cursor-pointer bg-muted/50 p-3 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text || <span className="text-muted-foreground italic">New step...</span>}</pre>
-                ) : point.type === 'markdown' ? (
-                    <div onDoubleClick={() => setIsEditing(true)} className="w-full cursor-pointer bg-muted/50 p-3 rounded-md prose dark:prose-invert prose-sm">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
-                    </div>
-                ) : point.type === 'link' ? (
-                     <div className="flex-grow min-w-0">
-                        <span className="truncate cursor-pointer text-primary hover:underline" title={point.text}>
-                            {point.text || <span className="text-muted-foreground italic">New link...</span>}
-                        </span>
-                    </div>
-                ) : (
-                    <span onDoubleClick={() => setIsEditing(true)} className="flex-grow cursor-pointer" dangerouslySetInnerHTML={{ __html: point.text.replace(/\n/g, '<br />') || '<span class="text-muted-foreground italic">New step...</span>' }} />
-                )}
-            </div>
-            <div className="flex flex-col items-center flex-shrink-0">
-                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={() => onDelete(point.id)}>
-                    <Trash2 className="h-3 w-3"/>
-                </Button>
-                {(point.type === 'youtube' || point.type === 'obsidian') && (
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground opacity-0 group-hover/item:opacity-100" onClick={() => setFloatingVideoUrl(point.text)}>
-                        <PictureInPicture className="h-3 w-3"/>
-                    </Button>
-                )}
-            </div>
+             <EditableResourcePoint 
+                point={point}
+                onUpdate={(newText) => {
+                    const updatedPoints = (resource.points || []).map(p => p.id === point.id ? { ...p, text: newText } : p);
+                    onUpdate({ ...resource, points: updatedPoints });
+                }}
+                onDelete={() => onDelete(point.id)}
+                setFloatingVideoUrl={setFloatingVideoUrl}
+                onEditLinkText={onEditLinkText}
+            />
         </div>
     );
 };
 
 
-const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText }: { 
+const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText, onClosePopup }: { 
     resource: Resource; 
     onUpdate: (resource: Resource) => void; 
     onDelete: (resourceId: string) => void; 
@@ -352,7 +280,8 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     onLinkClick: (resourceId: string) => void;
     linkingFromId: string | null;
     isPopup?: boolean;
-    onEditLinkText?: (point: ResourcePoint) => void;
+    onEditLinkText: (point: ResourcePoint) => void;
+    onClosePopup?: (e: React.MouseEvent | React.PointerEvent) => void;
 }) => {
     const { resources } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
@@ -378,8 +307,8 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
 
         const newPoint: ResourcePoint = {
             id: `point_${Date.now()}`,
-            text: linkedCard.name,
             type: 'card',
+            text: linkedCard.name,
             resourceId: linkedCardId
         };
         const updatedPoints = [...(resource.points || []), newPoint];
@@ -407,7 +336,8 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
         }
     };
     
-    const togglePlayAudio = () => {
+    const togglePlayAudio = (e: React.MouseEvent | React.PointerEvent) => {
+        e.stopPropagation();
         setPlayingAudio(prev => {
             if (prev?.id === resource.id && prev.isPlaying) {
                 return { ...prev, isPlaying: false };
@@ -450,7 +380,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                             </Button>
                         )}
                         {resource.audioUrl && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={togglePlayAudio}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onPointerDownCapture={togglePlayAudio}>
                                 {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
                             </Button>
                         )}
@@ -490,6 +420,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                                         setFloatingVideoUrl={setFloatingVideoUrl}
                                         onOpenNestedPopup={onOpenNestedPopup}
                                         onOpenMarkdownModal={onOpenMarkdownModal}
+                                        onEditLinkText={onEditLinkText}
                                     />
                                 ))}
                             </ul>
@@ -1223,6 +1154,9 @@ function ResourcesPageContent() {
       findChildren(resourceId);
   
       for (const id of popupsToDelete) {
+        if (playingAudio?.id === id) {
+            setPlayingAudio(null);
+        }
         newPopups.delete(id);
       }
   
@@ -1368,6 +1302,37 @@ function ResourcesPageContent() {
     }
   };
 
+  const [linkTextDialog, setLinkTextDialog] = useState<{ point: ResourcePoint, resourceId: string } | null>(null);
+  const [currentDisplayText, setCurrentDisplayText] = useState('');
+
+  const handleEditLinkText = (point: ResourcePoint) => {
+    const resource = resources.find(r => r.points?.some(p => p.id === point.id));
+    if (!resource) return;
+    setCurrentDisplayText(point.displayText || '');
+    setLinkTextDialog({ point, resourceId: resource.id });
+  };
+  
+  const handleSaveLinkText = () => {
+      if (!linkTextDialog) return;
+      const { point, resourceId } = linkTextDialog;
+      
+      setResources(prev => prev.map(res => {
+          if (res.id === resourceId) {
+              const updatedPoints = (res.points || []).map(p => {
+                  if (p.id === point.id) {
+                      return { ...p, displayText: currentDisplayText.trim() };
+                  }
+                  return p;
+              });
+              return { ...res, points: updatedPoints };
+          }
+          return res;
+      }));
+      
+      setLinkTextDialog(null);
+      setCurrentDisplayText('');
+  };
+
 
   return (
     <>
@@ -1446,7 +1411,7 @@ function ResourcesPageContent() {
                             let cardContent: React.ReactNode;
                             
                             if(isCardType) {
-                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} />;
+                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} setFloatingVideoUrl={setFloatingVideoUrl} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} />;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                 const isGif = isGifUrl(res.link);
@@ -1578,7 +1543,7 @@ function ResourcesPageContent() {
                     playingAudio={playingAudio}
                     setPlayingAudio={setPlayingAudio}
                     onOpenNestedPopup={handleOpenNestedPopup}
-                    onEditLinkText={() => {}}
+                    onEditLinkText={handleEditLinkText}
                 />
             );
         })}
@@ -1834,17 +1799,110 @@ function ResourcesPageContent() {
               </div>
           </DialogContent>
         </Dialog>
+        <Dialog open={!!linkTextDialog} onOpenChange={() => setLinkTextDialog(null)}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Set Display Text</DialogTitle>
+                    <DialogDescription>Set the text that will be displayed for this link.</DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <Label htmlFor="display-text-input">Display Text</Label>
+                    <Input
+                        id="display-text-input"
+                        value={currentDisplayText}
+                        onChange={(e) => setCurrentDisplayText(e.target.value)}
+                        placeholder="Enter display text..."
+                        autoFocus
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">URL: <span className="font-mono text-xs truncate">{linkTextDialog?.point.text}</span></p>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setLinkTextDialog(null)}>Cancel</Button>
+                    <Button onClick={handleSaveLinkText}>Save</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </>
   );
+}
+
+const EditableResourcePoint = ({ point, onUpdate, onDelete, setFloatingVideoUrl, onEditLinkText }: { 
+    point: ResourcePoint, 
+    onUpdate: (text: string) => void, 
+    onDelete: () => void,
+    setFloatingVideoUrl: (url: string | null) => void;
+    onEditLinkText: (point: ResourcePoint) => void;
+}) => {
+    const [isEditing, setIsEditing] = useState(point.text === 'New step...');
+    const [editText, setEditText] = useState(point.text);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    const handleSave = () => {
+        if (editText.trim() === '') {
+            onDelete();
+        } else {
+             onUpdate(editText);
+        }
+        setIsEditing(false);
+    };
+
+    useEffect(() => {
+        if (isEditing && textareaRef.current) {
+            textareaRef.current.focus();
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+    }, [isEditing]);
+    
+    const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setEditText(e.target.value);
+        e.target.style.height = 'auto';
+        e.target.style.height = `${e.target.scrollHeight}px`;
+    }
+
+    return (
+        <li className="flex items-start gap-3 group/item">
+            {point.type === 'code' ? <Code className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
+            point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
+            point.type === 'link' ? <LinkIcon className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
+            <ArrowRight className="h-4 w-4 mt-1.5 text-primary/50 flex-shrink-0" />
+            }
+             <div className="flex-grow min-w-0" onDoubleClick={() => !isEditing && setIsEditing(true)}>
+                {isEditing ? (
+                    <Textarea 
+                        ref={textareaRef} 
+                        value={editText} 
+                        onChange={handleTextareaChange} 
+                        onBlur={handleSave} 
+                        className="text-sm" 
+                        rows={1}
+                    />
+                ) : point.type === 'markdown' ? (
+                    <div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text}</ReactMarkdown></div>
+                ) : point.type === 'code' ? (
+                    <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                ) : point.type === 'link' ? (
+                     <div className="flex-grow min-w-0">
+                        <span 
+                            className="cursor-pointer text-primary hover:underline truncate" 
+                            title={point.text} 
+                            onClick={() => point.text && setFloatingVideoUrl(point.text)}
+                            onContextMenu={(e) => { e.preventDefault(); onEditLinkText(point); }}
+                        >
+                            {point.displayText || point.text || <span className="text-muted-foreground italic">New link...</span>}
+                        </span>
+                    </div>
+                ) : (
+                    <p className="whitespace-pre-wrap break-words">{point.text}</p>
+                )}
+            </div>
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100 flex-shrink-0" onClick={onDelete}>
+                <Trash2 className="h-3 w-3"/>
+            </Button>
+        </li>
+    );
 }
 
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
-
-
-
-
-
-
-
