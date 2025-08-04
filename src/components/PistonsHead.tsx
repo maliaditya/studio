@@ -45,6 +45,14 @@ const PISTON_NAMES: PistonType[] = [
   'Stabilizer', 'Fire', 'Explorer', 'Clarity', 'Bridge'
 ];
 
+const PISTON_FULL_NAMES: Record<PistonType, string> = {
+    'Stabilizer': 'Stabilizer (Gratitude)',
+    'Fire': 'Fire (Inspiration)',
+    'Explorer': 'Explorer (Curiosity)',
+    'Clarity': 'Clarity (Truth-Seeking)',
+    'Bridge': 'Bridge (Compassion)',
+};
+
 interface HistoryPopupState {
     piston: PistonType;
     x: number;
@@ -79,7 +87,7 @@ const HistoryPopupCard = ({ popupState, entries, onClose, onEdit }: {
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2 flex-grow">
                            {PISTON_ICONS[popupState.piston]} 
-                           <CardTitle className="text-base">{popupState.piston} History</CardTitle>
+                           <CardTitle className="text-base">{PISTON_FULL_NAMES[popupState.piston]} History</CardTitle>
                         </div>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={onClose}>
                             <X className="h-4 w-4" />
@@ -623,7 +631,7 @@ export function PistonsHead() {
     } else {
       x = position.x + 384 + 20;
     }
-
+  
     if (x < 20) x = position.x + 384 + 20;
     if (x + popupWidth > window.innerWidth) x = position.x - popupWidth - 20;
   
@@ -1140,7 +1148,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                               <div className="flex items-start gap-3">
                                   <span className="mt-1">{PISTON_ICONS[piston]}</span>
                                   <div className="flex-grow min-w-0">
-                                      <h4 className="font-semibold text-sm">{piston}</h4>
+                                      <h4 className="font-semibold text-sm">{PISTON_FULL_NAMES[piston]}</h4>
                                       <div className="text-sm text-muted-foreground min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start group">
                                           {editingEntryId === currentEntry?.id ? (
                                               <Textarea 
@@ -1211,6 +1219,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; entryId: string; currentResourceId?: string | undefined; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} />;
 };
+
 
 
 
