@@ -122,7 +122,7 @@ interface ResourcePopupProps {
   onUpdate: (updatedResource: Resource) => void;
   playingAudio: { id: string; isPlaying: boolean } | null;
   setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
-  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: ResourcePopupState) => void;
+  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
   onEditLinkText: (point: ResourcePoint) => void;
 }
 
@@ -146,22 +146,19 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
     }
 
     if (!resource) return null;
+    
+    const handleClose = (e: React.PointerEvent) => {
+        e.stopPropagation();
+        onClose(resource.id);
+    }
 
     return (
-        <div ref={setNodeRef} style={style} className="z-[60]">
-            <Card className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col relative">
-                <div 
-                    className="absolute top-2 left-2 z-20 cursor-grab active:cursor-grabbing p-1" 
-                    {...attributes} {...listeners}
-                >
+        <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
+            <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col relative">
+                <div className="absolute top-2 left-2 z-20 cursor-grab active:cursor-grabbing p-1" {...listeners}>
                     <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
                 </div>
-                 <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="absolute top-2 right-2 h-7 w-7 z-20" 
-                    onClick={(e) => { e.stopPropagation(); onClose(resource.id); }}
-                >
+                <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 z-20" onPointerDown={handleClose}>
                     <X className="h-4 w-4" />
                 </Button>
                 <ResourceCard 
@@ -169,7 +166,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                     onUpdate={onUpdate}
                     onDelete={() => { /* Deleting from popup might be complex, handle carefully */ }}
                     setFloatingVideoUrl={setFloatingVideoUrl}
-                    onOpenNestedPopup={onOpenNestedPopup}
+                    onOpenNestedPopup={(resourceId, e) => onOpenNestedPopup(resourceId, e, popupState)}
                     onOpenMarkdownModal={() => {}}
                     playingAudio={playingAudio}
                     setPlayingAudio={setPlayingAudio}
@@ -446,35 +443,35 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
                             </CardTitle>
                         )}
                    </div>
-                   {!isPopup && (
-                        <div className="flex items-center">
-                            {hasMarkdownContent && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onOpenMarkdownModal(resource.id, '')}>
-                                    <Expand className="h-4 w-4" />
-                                </Button>
-                            )}
-                            {resource.audioUrl && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={togglePlayAudio}>
-                                    {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
-                                </Button>
-                            )}
+                   <div className="flex items-center">
+                        {hasMarkdownContent && !isPopup && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onOpenMarkdownModal(resource.id, '')}>
+                                <Expand className="h-4 w-4" />
+                            </Button>
+                        )}
+                        {resource.audioUrl && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={togglePlayAudio}>
+                                {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
+                            </Button>
+                        )}
+                        {!isPopup && (
                             <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onLinkClick(resource.id)}>
                                 <LinkIcon className="h-4 w-4" />
                             </Button>
-                        <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 -mr-2 -mt-1">
-                                        <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onSelect={() => setEditingTitle(true)}>Edit Title</DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={() => audioInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />Upload Audio</DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={() => onDelete(resource.id)} className="text-destructive">Delete Card</DropdownMenuItem>
-                                </DropdownMenuContent>
-                        </DropdownMenu>
-                        </div>
-                   )}
+                        )}
+                    <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 -mr-2 -mt-1">
+                                    <MoreVertical className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => setEditingTitle(true)}>Edit Title</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => audioInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />Upload Audio</DropdownMenuItem>
+                                {!isPopup && <DropdownMenuItem onSelect={() => onDelete(resource.id)} className="text-destructive">Delete Card</DropdownMenuItem>}
+                            </DropdownMenuContent>
+                    </DropdownMenu>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent className="flex-grow min-h-0">
@@ -1844,6 +1841,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
