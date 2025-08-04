@@ -117,14 +117,18 @@ interface PopupState {
 
 interface ResourcePopupProps {
   popupState: PopupState;
+  resource: Resource;
   onClose: (resourceId: string) => void;
+  onUpdate: (updatedResource: Resource) => void;
+  playingAudio: { id: string; isPlaying: boolean } | null;
+  setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
+  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: ResourcePopupState) => void;
+  onEditLinkText: (point: ResourcePoint) => void;
 }
 
-const ResourcePopupCard = ({ popupState, onClose }: ResourcePopupProps) => {
-    const { resources, setResources, setFloatingVideoUrl, setPinnedFolderIds, setActiveResourceTabIds, setSelectedResourceFolderId } = useAuth();
+const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAudio, setPlayingAudio, onOpenNestedPopup, onEditLinkText }: ResourcePopupProps) => {
+    const { setFloatingVideoUrl } = useAuth();
     
-    const resource = resources.find(r => r.id === popupState.resourceId);
-
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `popup-${popupState.resourceId}`,
     });
@@ -144,14 +148,15 @@ const ResourcePopupCard = ({ popupState, onClose }: ResourcePopupProps) => {
     if (!resource) return null;
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes} className="z-[60]">
+        <div ref={setNodeRef} style={style} className="z-[60]">
             <Card className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col relative">
                 <div 
-                    className="absolute top-0 left-0 h-10 w-full cursor-grab active:cursor-grabbing z-10" 
-                    onPointerDownCapture={listeners.onPointerDown}
-                    onTouchStartCapture={listeners.onTouchStart}
-                />
-                <Button 
+                    className="absolute top-2 left-2 z-20 cursor-grab active:cursor-grabbing p-1" 
+                    {...attributes} {...listeners}
+                >
+                    <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
+                </div>
+                 <Button 
                     variant="ghost" 
                     size="icon" 
                     className="absolute top-2 right-2 h-7 w-7 z-20" 
@@ -161,16 +166,17 @@ const ResourcePopupCard = ({ popupState, onClose }: ResourcePopupProps) => {
                 </Button>
                 <ResourceCard 
                     resource={resource}
-                    onUpdate={(updated) => setResources(prev => prev.map(r => r.id === updated.id ? updated : r))}
+                    onUpdate={onUpdate}
                     onDelete={() => { /* Deleting from popup might be complex, handle carefully */ }}
                     setFloatingVideoUrl={setFloatingVideoUrl}
-                    onOpenNestedPopup={() => {}}
+                    onOpenNestedPopup={onOpenNestedPopup}
                     onOpenMarkdownModal={() => {}}
-                    playingAudio={null} // Simplified for now
-                    setPlayingAudio={() => {}}
+                    playingAudio={playingAudio}
+                    setPlayingAudio={setPlayingAudio}
                     onLinkClick={() => {}}
                     linkingFromId={null}
                     isPopup={true}
+                    onEditLinkText={onEditLinkText}
                 />
             </Card>
         </div>
@@ -337,7 +343,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, setFloatingVideoUr
 };
 
 
-const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false }: { 
+const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText }: { 
     resource: Resource; 
     onUpdate: (resource: Resource) => void; 
     onDelete: (resourceId: string) => void; 
@@ -349,6 +355,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     onLinkClick: (resourceId: string) => void;
     linkingFromId: string | null;
     isPopup?: boolean;
+    onEditLinkText?: (point: ResourcePoint) => void;
 }) => {
     const { resources } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
@@ -1561,13 +1568,23 @@ function ResourcesPageContent() {
             </main>
         </div>
         </div>
-        {Array.from(openPopups.values()).map((popupState) => (
-            <ResourcePopupCard
-                key={popupState.resourceId}
-                popupState={popupState}
-                onClose={handleClosePopup}
-            />
-        ))}
+        {Array.from(openPopups.values()).map((popupState) => {
+            const resource = resources.find(r => r.id === popupState.resourceId);
+            if (!resource) return null;
+            return (
+                <ResourcePopupCard
+                    key={popupState.resourceId}
+                    popupState={popupState}
+                    resource={resource}
+                    onClose={handleClosePopup}
+                    onUpdate={handleUpdateResource}
+                    playingAudio={playingAudio}
+                    setPlayingAudio={setPlayingAudio}
+                    onOpenNestedPopup={handleOpenNestedPopup}
+                    onEditLinkText={() => {}}
+                />
+            );
+        })}
 
         <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
           {Array.from(openPopups.values()).map(popup => {
@@ -1827,6 +1844,7 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 

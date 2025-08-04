@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -310,10 +311,11 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
             <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
             <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative">
                 <div 
-                    className="absolute top-0 left-0 h-10 w-full cursor-grab active:cursor-grabbing z-10" 
-                    onPointerDownCapture={listeners.onPointerDown}
-                    onTouchStartCapture={listeners.onTouchStart}
-                />
+                    className="absolute top-2 left-2 z-20 cursor-grab active:cursor-grabbing p-1" 
+                    {...listeners}
+                >
+                    <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
+                </div>
                 
                  <div className="absolute top-2 right-2 z-20 flex items-center">
                     {resource.audioUrl ? (
