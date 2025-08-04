@@ -222,19 +222,23 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
       onOpenNestedPopup(pointResourceId, e, popupState);
     };
 
+    const handlePointDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+        const oldIndex = (resource.points || []).findIndex(p => p.id === active.id);
+        const newIndex = (resource.points || []).findIndex(p => p.id === over.id);
+        if (oldIndex !== -1 && newIndex !== -1) {
+          const newPoints = arrayMove(resource.points!, oldIndex, newIndex);
+          onUpdate({ ...resource, points: newPoints });
+        }
+    };
+
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
+        <div ref={setNodeRef} style={style} className="z-[70]">
             <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
             <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative">
-                <div 
-                    className="absolute top-2 left-2 z-20 cursor-grab active:cursor-grabbing p-1" 
-                    {...listeners}
-                >
-                    <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
-                </div>
-                
-                 <div className="absolute top-2 right-2 z-20 flex items-center">
+                <div className="absolute top-2 right-2 z-20 flex items-center">
                     {resource.audioUrl ? (
                         <>
                            <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={togglePlayAudio}>
@@ -254,7 +258,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                     </Button>
                 </div>
 
-                <CardHeader className="p-3 pt-8 relative flex-shrink-0 text-center">
+                <CardHeader className="p-3 pt-8 relative flex-shrink-0 text-center cursor-grab active:cursor-grabbing" {...attributes} {...listeners}>
                     <div className="flex items-center justify-center gap-2">
                         <Library className="h-4 w-4" />
                         {editingTitle ? (
@@ -275,35 +279,22 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                 </CardHeader>
                 <div className="flex-grow min-h-0 overflow-y-auto">
                     <CardContent className="p-3 pt-0">
-                        <ul className="space-y-3 text-sm text-muted-foreground pr-2">
-                            {(resource.points || []).map(point => {
-                                if (point.type === 'card' && point.resourceId) {
-                                    return (
-                                        <li key={point.id} className="flex items-start gap-3 group/item">
-                                            <ArrowRight className="h-4 w-4 mt-1.5 text-primary/50 flex-shrink-0" />
-                                            <button
-                                                onClick={(e) => handleLinkClick(e, point.resourceId!)}
-                                                className="text-left font-medium text-primary hover:underline"
-                                            >
-                                                {point.text}
-                                            </button>
-                                             <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100 flex-shrink-0" onClick={() => handleDeletePoint(point.id)}>
-                                                <Trash2 className="h-3 w-3"/>
-                                            </Button>
-                                        </li>
-                                    )
-                                }
-                                return (
-                                    <EditableResourcePoint 
-                                        key={point.id}
-                                        point={point}
-                                        onUpdate={(newText) => handleUpdatePoint(point.id, newText)}
-                                        onDelete={() => handleDeletePoint(point.id)}
-                                        onEditLinkText={onEditLinkText}
-                                    />
-                                );
-                            })}
-                        </ul>
+                         <DndContext onDragEnd={handlePointDragEnd}>
+                            <SortableContext items={(resource.points || []).map(p => p.id)}>
+                                <ul className="space-y-3 text-sm text-muted-foreground pr-2">
+                                    {(resource.points || []).map(point => (
+                                        <SortablePointInPopup
+                                            key={point.id}
+                                            point={point}
+                                            onUpdate={(newText) => handleUpdatePoint(point.id, newText)}
+                                            onDelete={() => handleDeletePoint(point.id)}
+                                            onEditLinkText={onEditLinkText}
+                                            onOpenNestedPopup={handleLinkClick}
+                                        />
+                                    ))}
+                                </ul>
+                            </SortableContext>
+                        </DndContext>
                     </CardContent>
                 </div>
                  <CardFooter className="p-2 flex gap-2">
@@ -441,6 +432,55 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, onOpenNestedPopup,
                         onUpdate({ ...resource, points: updatedPoints });
                     }}
                     onDelete={() => onDelete(point.id)}
+                    onEditLinkText={onEditLinkText}
+                />
+            </div>
+        </div>
+    );
+};
+
+
+const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText }: {
+    point: ResourcePoint;
+    onUpdate: (text: string) => void;
+    onDelete: () => void;
+    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
+    onEditLinkText: (point: ResourcePoint) => void;
+}) => {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 10 : 'auto',
+    };
+    
+    if (point.type === 'card' && point.resourceId) {
+        return (
+            <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
+                <button {...attributes} {...listeners} className="cursor-grab p-1"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
+                <div 
+                    onClick={(e) => onOpenNestedPopup(point.resourceId!, e)}
+                    className="flex items-start gap-3 flex-grow cursor-pointer p-2 rounded-md hover:bg-muted/50 border border-dashed"
+                >
+                    <Library className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
+                    <span className="font-medium text-foreground">{point.text}</span>
+                </div>
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={onDelete}>
+                    <Trash2 className="h-3 w-3"/>
+                </Button>
+            </div>
+        )
+    }
+
+    return (
+        <div ref={setNodeRef} style={style} className="relative bg-card">
+            <div className="flex items-start gap-3 group/item">
+                <button {...attributes} {...listeners} className="cursor-grab p-1 pt-2.5"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
+                 <EditableResourcePoint 
+                    point={point}
+                    onUpdate={onUpdate}
+                    onDelete={onDelete}
                     onEditLinkText={onEditLinkText}
                 />
             </div>
@@ -2081,5 +2121,6 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
