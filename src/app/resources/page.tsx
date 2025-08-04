@@ -167,7 +167,7 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
                                 <li key={point.id} className="flex items-start gap-2">
                                     {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
                                     point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                    point.type === 'link' ? <LinkIcon className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                     point.type === 'link' ? <LinkIcon className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
                                     <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
                                     }
                                     {point.type === 'card' && point.resourceId ? (
@@ -395,7 +395,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, setFloatingVideoUrl, onOpe
     };
 
     const handleAddPoint = (type: ResourcePoint['type']) => {
-        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: '', type };
+        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: 'New step...', type };
         const updatedPoints = [...(resource.points || []), newPoint];
         onUpdate({ ...resource, points: updatedPoints });
     };
@@ -1259,45 +1259,47 @@ function ResourcesPageContent() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null);
-    const { active, over } = event;
+    const { active, over, delta } = event;
 
-    if (!over) return;
-    
-    // Handle reordering points within a card
-    const activeIsPoint = active.data.current?.type === 'point';
-    const overIsPoint = over.data.current?.type === 'point';
-
-    if (active.id !== over.id && activeIsPoint && overIsPoint) {
-        const activeContainerId = active.data.current?.sortable?.containerId;
-        const overContainerId = over.data.current?.sortable?.containerId;
-
-        if (activeContainerId === overContainerId) {
-            const resourceIndex = resources.findIndex(r => r.id === activeContainerId);
-            if (resourceIndex !== -1) {
-                const resource = resources[resourceIndex];
-                const oldIndex = (resource.points || []).findIndex(p => p.id === active.id);
-                const newIndex = (resource.points || []).findIndex(p => p.id === over.id);
-
-                if (oldIndex !== -1 && newIndex !== -1) {
-                    const reorderedPoints = arrayMove(resource.points!, oldIndex, newIndex);
-                    const updatedResources = [...resources];
-                    updatedResources[resourceIndex] = { ...resource, points: reorderedPoints };
-                    setResources(updatedResources);
-                }
+    // Handle popup dragging
+    if (active.id.toString().startsWith('popup-')) {
+        setOpenPopups(prev => {
+            const newPopups = new Map(prev);
+            const popupId = active.id.toString().replace('popup-', '');
+            const popup = newPopups.get(popupId);
+            if (popup) {
+                newPopups.set(popupId, { ...popup, x: popup.x + delta.x, y: popup.y + delta.y });
             }
-        }
+            return newPopups;
+        });
         return;
     }
 
-    // Handle dropping a card onto a folder
-    if (active.data.current?.type === 'card' && over.data.current?.type === 'folder') {
-        const resourceId = active.id.toString();
-        const folderId = over.id.toString();
-        if (resources.find(r => r.id === resourceId)?.folderId !== folderId) {
-            setResources(prev => prev.map(r => r.id === resourceId ? { ...r, folderId: folderId } : r));
-            toast({ title: "Resource Moved", description: `Moved resource to a new folder.` });
+    if (!over) return;
+
+    // Handle reordering cards
+    if (active.data.current?.type === 'card' && over.data.current?.type) {
+        const activeCard = resources.find(r => r.id === active.id);
+        const overId = over.id.toString();
+        const overCard = resources.find(r => r.id === overId);
+        
+        // Logic to move a card to a different folder
+        if (over.data.current.type === 'folder' && activeCard && activeCard.folderId !== overId) {
+            setResources(prev => prev.map(r => r.id === active.id ? { ...r, folderId: overId } : r));
+            toast({ title: "Resource Moved", description: `Moved to a new folder.` });
+            return;
         }
-        return;
+
+        // Logic to reorder cards within the same folder
+        if (overCard && activeCard && activeCard.folderId === overCard.folderId && active.id !== over.id) {
+            const oldIndex = resources.findIndex(r => r.id === active.id);
+            const newIndex = resources.findIndex(r => r.id === over.id);
+
+            if (oldIndex !== -1 && newIndex !== -1) {
+                setResources(prev => arrayMove(prev, oldIndex, newIndex));
+            }
+            return;
+        }
     }
   };
   
@@ -1878,5 +1880,6 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
