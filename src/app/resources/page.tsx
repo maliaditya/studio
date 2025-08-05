@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -296,7 +295,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                                             onUpdate={(newText) => handleUpdatePoint(point.id, newText)}
                                             onDelete={() => handleDeletePoint(point.id)}
                                             onEditLinkText={onEditLinkText}
-                                            onOpenNestedPopup={handleLinkClick}
+                                            onOpenNestedPopup={(e) => handleLinkClick(e, point.resourceId!)}
                                         />
                                     ))}
                                 </ul>
@@ -402,7 +401,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, onOpenNestedPopup,
     onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
     onEditLinkText: (point: ResourcePoint) => void;
 }) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id });
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id, data: { type: 'card', item } });
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -451,7 +450,7 @@ const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, on
     point: ResourcePoint;
     onUpdate: (text: string) => void;
     onDelete: () => void;
-    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
+    onOpenNestedPopup: (event: React.MouseEvent) => void;
     onEditLinkText: (point: ResourcePoint) => void;
 }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id });
@@ -467,7 +466,7 @@ const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, on
             <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
                 <button {...attributes} {...listeners} className="cursor-grab p-1"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
                 <div 
-                    onClick={(e) => onOpenNestedPopup(point.resourceId!, e)}
+                    onClick={(e) => onOpenNestedPopup(e)}
                     className="flex items-start gap-3 flex-grow cursor-pointer p-2 rounded-md hover:bg-muted/50 border border-dashed"
                 >
                     <Library className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
@@ -2128,7 +2127,4 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
-
-
-
 
