@@ -56,47 +56,59 @@ const PISTON_FULL_NAMES: Record<PistonType, string> = {
 const PISTON_DETAILS: Record<PistonType, {
     why: string;
     negates: string[];
+    fuels: string[];
+    virtues: string[];
     comparisons: { ego: string; virtue: string; }[];
     conclusion: string;
 }> = {
-    'Stabilizer': { 
+    'Stabilizer': { // This is Gratitude
         why: "When you're grateful, you already feel full.",
         negates: ["Desire", "Pleasure"],
+        fuels: ["Contribution", "Love"],
+        virtues: ["Forgiveness", "Contentment"],
         comparisons: [
             { ego: "“I need more.”", virtue: "“This is already enough.”" },
             { ego: "“Comfort will make me happy.”", virtue: "“Joy is already here, in this moment.”" }
         ],
         conclusion: "It dissolves craving and the illusion of lack. You stop chasing highs because you're grounded in contentment."
     },
-    'Fire': { 
+    'Fire': { // This is Inspiration
         why: "You stop performing for attention and start creating from alignment.",
         negates: ["Egoic Expression", "Status-based Desire"],
+        fuels: ["Growth", "Contribution"],
+        virtues: ["Contentment", "Innocence"],
         comparisons: [
             { ego: "“Look at me.”", virtue: "“Look at what’s flowing through me.”" },
             { ego: "“I want to be famous/successful.”", virtue: "“This creation is worthy — even if unseen.”" }
         ],
         conclusion: "It replaces external validation with internal ignition."
     },
-    'Explorer': {
+    'Explorer': { // This is Curiosity
         why: "Certainty says: “Stay safe, stay sure.” Curiosity thrives in not knowing, allowing real learning and growth.",
         negates: ["Certainty-seeking", "Protection"],
+        fuels: ["Growth", "Variety"],
+        virtues: ["Innocence"],
         comparisons: [
             { ego: "“Don’t go there, it’s risky.”", virtue: "“Let’s see what’s behind this discomfort.”" }
         ],
         conclusion: "You don’t need control — because you trust the process of discovery."
     },
-    'Clarity': { 
+    'Clarity': { // This is Truth-Seeking
         why: "You no longer need protection mechanisms (lies, manipulation, image control).",
         negates: ["Illusion", "Egoic Significance", "Fear-based Expression"],
+        fuels: ["Growth", "Contribution", "Certainty"],
+        virtues: ["Truth"],
         comparisons: [
             { ego: "“Let’s hide the uncomfortable.”", virtue: "“Let’s look at it.”" },
             { ego: "Expression (egoic) wants to impress.", virtue: "Truth wants to express what is, even if it's raw or humbling." }
         ],
         conclusion: "You don't need approval — you need clarity."
     },
-    'Bridge': { 
+    'Bridge': { // This is Compassion
         why: "It replaces the separation illusion with unity — removing the fuel of ego-driven engines.",
         negates: ["Competition", "Significance", "Cruelty"],
+        fuels: ["Contribution", "Love"],
+        virtues: ["Compassion"],
         comparisons: [
             { ego: "“I’m better than you.”", virtue: "“You and I are the same.”" },
             { ego: "“Win at all costs.”", virtue: "“Let’s grow together.”" },
@@ -212,10 +224,24 @@ const DetailsPopupCard = ({ popupState, onClose }: { popupState: HistoryPopupSta
                         <div className="text-sm space-y-4">
                             <p className="italic text-muted-foreground">{details.why}</p>
                             
-                            <div className="space-y-1">
-                                <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Negates:</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {details.negates.map(item => <Badge key={item} variant="secondary">{item}</Badge>)}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Negates:</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {details.negates.map(item => <Badge key={item} variant="secondary">{item}</Badge>)}
+                                    </div>
+                                </div>
+                                 <div className="space-y-1">
+                                    <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Fuels Needs:</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {details.fuels.map(item => <Badge key={item} variant="secondary">{item}</Badge>)}
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Virtues:</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {details.virtues.map(item => <Badge key={item} variant="secondary">{item}</Badge>)}
+                                    </div>
                                 </div>
                             </div>
 
@@ -1376,5 +1402,3 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setDetailsPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory, handleOpenDetails }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setDetailsPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; currentResourceId?: string; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; handleOpenDetails: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setDetailsPopup={setDetailsPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} handleOpenDetails={handleOpenDetails} />;
 };
-
-    
