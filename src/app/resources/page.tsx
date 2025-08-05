@@ -115,6 +115,48 @@ interface PopupState {
   width?: number;
 }
 
+const EditableField = ({ field, label, resource, onUpdate }: { field: keyof Resource, label: string, resource: Resource, onUpdate: (updatedResource: Resource) => void }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [text, setText] = useState(resource[field] as string || '');
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    useEffect(() => {
+        if (isEditing && textareaRef.current) {
+            textareaRef.current.focus();
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+    }, [isEditing]);
+
+    const handleSave = () => {
+        setIsEditing(false);
+        onUpdate({ ...resource, [field]: text });
+    };
+
+    return (
+        <div>
+            <Label className="text-xs font-semibold uppercase text-muted-foreground">{label}</Label>
+            {isEditing ? (
+                <Textarea 
+                    ref={textareaRef}
+                    value={text} 
+                    onChange={e => setText(e.target.value)}
+                    onBlur={handleSave}
+                    className="text-sm mt-1"
+                    rows={1}
+                />
+            ) : (
+                <p 
+                    className="text-sm text-foreground mt-1 p-2 rounded-md min-h-[40px] whitespace-pre-wrap"
+                    onDoubleClick={() => setIsEditing(true)}
+                >
+                    {resource[field] as string || <span className="text-muted-foreground italic">Double-click to edit...</span>}
+                </p>
+            )}
+        </div>
+    );
+};
+
 interface ResourcePopupProps {
   popupState: PopupState;
   resource: Resource;
@@ -268,7 +310,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
 
                 <CardHeader className="p-3 pt-8 relative flex-shrink-0 text-center">
                     <div className="flex items-center justify-center gap-2">
-                        <Library className="h-4 w-4" />
+                        {resource.type === 'habit' ? <Zap className="h-4 w-4" /> : <Library className="h-4 w-4" />}
                         {editingTitle ? (
                             <Input 
                                 value={resource.name} 
@@ -287,6 +329,14 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                 </CardHeader>
                 <div className="flex-grow min-h-0 overflow-y-auto">
                     <CardContent className="p-3 pt-0">
+                        {resource.type === 'habit' ? (
+                            <div className="space-y-4">
+                                <EditableField field="trigger" label="Trigger" resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="response" label="Response" resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="reward" label="Reward" resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="newResponse" label="New Response" resource={resource} onUpdate={onUpdate} />
+                            </div>
+                        ) : (
                          <DndContext onDragEnd={handlePointDragEnd}>
                             <SortableContext items={(resource.points || []).map(p => p.id)}>
                                 <ul className="space-y-3 text-sm text-muted-foreground pr-2">
@@ -304,8 +354,10 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                                 </ul>
                             </SortableContext>
                         </DndContext>
+                       )}
                     </CardContent>
                 </div>
+                {resource.type !== 'habit' && (
                  <CardFooter className="p-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Popover>
                         <PopoverTrigger asChild>
@@ -349,6 +401,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                         </PopoverContent>
                     </Popover>
                  </CardFooter>
+                )}
             </Card>
         </div>
     );
@@ -631,6 +684,11 @@ const ResourceCard = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenM
                     </DropdownMenu>
                     </div>
                 </div>
+                {resource.createdAt && (
+                    <CardDescription className="text-xs pt-1">
+                        Created: {format(parseISO(resource.createdAt), 'MMM d, yyyy')}
+                    </CardDescription>
+                )}
             </CardHeader>
             <CardContent className="flex-grow min-h-0">
               <div className={cn(hasMarkdownContent ? 'h-[450px]' : '')}>
@@ -715,52 +773,6 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
     linkingFromId: string | null;
 }) => {
     const [editingTitle, setEditingTitle] = useState(false);
-    
-    const handleUpdateField = (field: keyof Resource, value: string) => {
-        onUpdate({ ...resource, [field]: value });
-    };
-
-    const EditableField = ({ field, label }: { field: keyof Resource, label: string }) => {
-        const [isEditing, setIsEditing] = useState(false);
-        const [text, setText] = useState(resource[field] as string || '');
-        const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-        useEffect(() => {
-            if (isEditing && textareaRef.current) {
-                textareaRef.current.focus();
-                textareaRef.current.style.height = 'auto';
-                textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-            }
-        }, [isEditing]);
-
-        const handleSave = () => {
-            setIsEditing(false);
-            handleUpdateField(field, text);
-        };
-
-        return (
-            <div>
-                <Label className="text-xs font-semibold uppercase text-muted-foreground">{label}</Label>
-                {isEditing ? (
-                    <Textarea 
-                        ref={textareaRef}
-                        value={text} 
-                        onChange={e => setText(e.target.value)}
-                        onBlur={handleSave}
-                        className="text-sm mt-1"
-                        rows={1}
-                    />
-                ) : (
-                    <p 
-                        className="text-sm text-foreground mt-1 p-2 rounded-md min-h-[40px] whitespace-pre-wrap"
-                        onDoubleClick={() => setIsEditing(true)}
-                    >
-                        {resource[field] as string || <span className="text-muted-foreground italic">Double-click to edit...</span>}
-                    </p>
-                )}
-            </div>
-        );
-    };
 
     return (
         <Card className={cn("flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl", linkingFromId === resource.id && "ring-2 ring-primary", linkingFromId && linkingFromId !== resource.id && "cursor-pointer hover:ring-2 hover:ring-primary/50")}>
@@ -789,12 +801,17 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
                         </DropdownMenu>
                     </div>
                 </div>
+                 {resource.createdAt && (
+                    <CardDescription className="text-xs pt-1">
+                        Created: {format(parseISO(resource.createdAt), 'MMM d, yyyy')}
+                    </CardDescription>
+                )}
             </CardHeader>
             <CardContent className="space-y-4">
-                <EditableField field="trigger" label="Trigger" />
-                <EditableField field="response" label="Response" />
-                <EditableField field="reward" label="Reward" />
-                <EditableField field="newResponse" label="New Response" />
+                <EditableField field="trigger" label="Trigger" resource={resource} onUpdate={onUpdate} />
+                <EditableField field="response" label="Response" resource={resource} onUpdate={onUpdate} />
+                <EditableField field="reward" label="Reward" resource={resource} onUpdate={onUpdate} />
+                <EditableField field="newResponse" label="New Response" resource={resource} onUpdate={onUpdate} />
             </CardContent>
         </Card>
     );
@@ -879,7 +896,7 @@ function ResourcesPageContent() {
   
   const [addResourceType, setAddResourceType] = useState<'link' | 'card' | 'habit'>('link');
 
-  const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
+  const [openPopups, setOpenPopups] = useState<Map<string, ResourcePopupState>>(new Map());
   
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
@@ -1426,7 +1443,7 @@ function ResourcesPageContent() {
     );
   }, [resourceFolders, editingFolder, selectedResourceFolderId, collapsedFolders, handleSelectFolder, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder, toggleFolderCollapse]);
 
-  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
+  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: ResourcePopupState) => {
     setOpenPopups(prev => {
         const newPopups = new Map(prev);
         const resource = resources.find(r => r.id === resourceId);
@@ -1688,6 +1705,7 @@ function ResourcesPageContent() {
         type: 'card',
         points: [],
         icon: 'Library',
+        createdAt: new Date().toISOString(),
     };
     
     // Update the original point to link to the new card
@@ -1819,6 +1837,10 @@ function ResourcesPageContent() {
                                             (youtubeEmbedUrl || (isGif && res.linkedResourceId)) && "cursor-pointer"
                                         )}
                                     >
+                                        <CardHeader className="flex-row items-center gap-3 p-4 space-y-0">
+                                            {res.iconUrl ? <Image src={res.iconUrl} alt="" width={16} height={16} className="flex-shrink-0" unoptimized/> : <Globe className="h-4 w-4 flex-shrink-0"/>}
+                                            <CardTitle className="text-base truncate flex-grow" title={res.name}>{res.name}</CardTitle>
+                                        </CardHeader>
                                         <div className="absolute top-2 right-2 z-30 flex items-center gap-1">
                                             {res.githubLink && (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><a href={res.githubLink} target="_blank" rel="noopener noreferrer"><Github className="h-4 w-4"/></a></Button>)}
                                             {res.demoLink && (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><a href={res.demoLink} target="_blank" rel="noopener noreferrer"><Globe className="h-4 w-4"/></a></Button>)}
@@ -1828,35 +1850,24 @@ function ResourcesPageContent() {
                                         </div>
                                         {imageEmbedUrl ? (
                                             <>
-                                                <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl relative">
+                                                <div className="aspect-video w-full bg-black overflow-hidden relative">
                                                     <Image src={imageEmbedUrl} alt={res.name} layout="fill" objectFit="contain" data-ai-hint="illustration" />
                                                 </div>
-                                                <div className="p-4 flex-grow"><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div>
                                             </>
                                         ) : isGif ? (
                                             <>
-                                                <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl relative">
+                                                <div className="aspect-video w-full bg-black overflow-hidden relative">
                                                     <Image src={res.link!} alt={res.name} layout="fill" objectFit="contain" data-ai-hint="illustration" />
                                                 </div>
-                                                <div className="p-4 flex-grow"><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div>
                                             </>
                                         ) : youtubeEmbedUrl ? (
                                             <div className="h-full flex flex-col">
-                                                <div className="aspect-video w-full bg-black overflow-hidden rounded-t-3xl">
+                                                <div className="aspect-video w-full bg-black overflow-hidden">
                                                    <iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                                                 </div>
-                                                <div className="p-4 flex-grow"><div className="flex items-start justify-between gap-2"><div className="flex-grow min-w-0"><div className="flex items-center gap-2"><Youtube className="h-5 w-5 flex-shrink-0 text-red-500" /><p className="text-base font-bold truncate" title={res.name}>{res.name}</p></div></div></div></div>
                                             </div>
                                         ) : isObsidianUrlLink && res.link ? (
                                             <div className="flex flex-col h-full">
-                                                <div className="p-3 border-b flex items-start justify-between">
-                                                    <div className="flex-grow min-w-0">
-                                                        <div className="flex items-center gap-2">
-                                                            {res.iconUrl ? <Image src={res.iconUrl} alt="" width={16} height={16} className="rounded-sm flex-shrink-0" unoptimized/> : <Globe className="h-4 w-4 flex-shrink-0" />}
-                                                            <p className="text-sm font-bold truncate" title={res.name}>{res.name}</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
                                                 <div className="flex-grow min-h-0 aspect-[4/3]">
                                                     <iframe src={res.link} title={res.name} frameBorder="0" className="w-full h-full" />
                                                 </div>
@@ -1938,7 +1949,7 @@ function ResourcesPageContent() {
             if (!parentPopup) return null;
             
             const startX = parentPopup.x + (popup.width || 0) / 2;
-            const startY = parentPopup.y + ((parentPopup.height || 0) / 2);
+            const startY = parentPopup.y + ((popup.height || 0) / 2);
             const endX = popup.x + (popup.width || 0) / 2;
             const endY = popup.y + ((popup.height || 0) / 2);
             
@@ -2290,3 +2301,4 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
