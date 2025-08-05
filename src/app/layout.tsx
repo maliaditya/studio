@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import type { Metadata } from 'next';
@@ -22,7 +23,7 @@ import React from 'react';
 // Metadata needs to be in a server component, moving to a new AppWrapper client component
 
 function AppWrapper({ children }: { children: React.ReactNode }) {
-  const { isPistonsHeadOpen, setIsPistonsHeadOpen } = useAuth();
+  const { isPistonsHeadOpen, setIsPistonsHeadOpen, openPopups, ResourcePopup } = useAuth();
 
   return (
     <>
@@ -38,6 +39,9 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <Toaster />
       <BackgroundAudioPlayer />
       <FloatingVideoPlayer />
+      {Array.from(openPopups.keys()).map(key => (
+          <ResourcePopup key={key} resourceId={key} />
+      ))}
     </>
   );
 }

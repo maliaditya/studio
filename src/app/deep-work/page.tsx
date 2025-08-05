@@ -72,96 +72,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { SkillLibrary } from '@/components/SkillLibrary';
 
 
-interface PopupState {
-  resourceId: string;
-  level: number;
-  x: number;
-  y: number;
-  parentId?: string;
-  width?: number;
-  height?: number;
-}
-
-const ResourcePopupCard = ({ popupState, onOpenNestedPopup, onClose, onSizeChange }: {
-    popupState: PopupState;
-    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
-    onClose: (resourceId: string) => void;
-    onSizeChange: (resourceId: string, newSize: { width: number; height: number }) => void;
-}) => {
-    const { resources } = useAuth();
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({
-        id: `popup-${popupState.resourceId}`,
-    });
-
-    const style: React.CSSProperties = {
-        position: 'fixed',
-        top: popupState.y,
-        left: popupState.x,
-        width: `${popupState.width}px`,
-        willChange: 'transform',
-    };
-
-    if (transform) {
-        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
-    }
-
-    const resource = resources.find(r => r.id === popupState.resourceId);
-    if (!resource) return null;
-
-    const handleLinkClick = (e: React.MouseEvent, pointResourceId: string) => {
-        e.stopPropagation();
-        onOpenNestedPopup(pointResourceId, e, popupState);
-    };
-
-    return (
-        <div ref={setNodeRef} style={style} {...attributes} className="z-[60]">
-            <Card className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col">
-                <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
-                    <CardTitle className="text-base flex items-center gap-2">
-                        <Library className="h-4 w-4" />
-                        <span className="truncate">{resource.name}</span>
-                    </CardTitle>
-                </CardHeader>
-                <div className="flex-grow min-h-0 overflow-y-auto">
-                    <CardContent className="p-3 pt-0">
-                        <ul className="space-y-2 text-sm text-muted-foreground pr-2">
-                            {(resource.points || []).map(point => (
-                                <li key={point.id} className="flex items-start gap-2">
-                                    {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                    point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                    <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
-                                    }
-                                    {point.type === 'card' && point.resourceId ? (
-                                        <button
-                                            onClick={(e) => handleLinkClick(e, point.resourceId!)}
-                                            className="text-left font-medium text-primary hover:underline"
-                                        >
-                                            {point.text}
-                                        </button>
-                                    ) : point.type === 'markdown' ? (
-                                        <div className="w-full prose dark:prose-invert prose-sm">
-                                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
-                                        </div>
-                                    ) : point.type === 'code' ? (
-                                         <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
-                                    ) : (
-                                        <span className="break-words w-full" title={point.text}>{point.text}</span>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    </CardContent>
-                </div>
-                <CardFooter className="p-2 flex justify-end flex-shrink-0 relative">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onClose(resource.id); }}>
-                        <X className="h-4 w-4" />
-                    </Button>
-                </CardFooter>
-            </Card>
-        </div>
-    );
-};
-
 const getFaviconUrl = (link: string): string | undefined => {
   try {
     let url = link;
@@ -437,11 +347,11 @@ function LinkedUpskillCard({
     )
 }
 
-function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, onOpenNestedPopup, handleStartEditResource }: {
+function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpenNestedPopup, handleStartEditResource }: {
   resource: Resource;
   handleUnlinkItem: (type: 'upskill' | 'deepwork' | 'resource', id: string) => void;
   setEmbedUrl: (url: string | null) => void;
-  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
+  handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
   handleStartEditResource: (resource: Resource) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: resource.id });
@@ -462,7 +372,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, onOpenNes
     const hasMarkdownContent = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
     return (
       <div ref={setCombinedRefs} style={style} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
-        <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl", hasMarkdownContent ? 'md:col-span-2 xl:col-span-3' : '')}>
+        <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl", hasMarkdownContent ? 'md:col-span-2 xl:col-span-3' : '')} onClick={(e) => handleOpenNestedPopup(resource.id, e)}>
            <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
             <DropdownMenu>
@@ -487,7 +397,10 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, onOpenNes
                           {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />}
                           {point.type === 'card' && point.resourceId ? (
                             <button
-                              onClick={(e) => onOpenNestedPopup(point.resourceId!, e)}
+                              onClick={(e) => {
+                                  e.stopPropagation(); // Prevent card's onClick from firing
+                                  handleOpenNestedPopup(point.resourceId!, e);
+                              }}
                               className="text-left font-medium text-primary hover:underline"
                             >
                               {point.text}
@@ -750,13 +663,12 @@ function DeepWorkPageContent() {
     coreSkills,
     projects,
     microSkillMap,
+    handleOpenNestedPopup,
   } = useAuth();
   
   const [isNewFocusAreaModalOpen, setIsNewFocusAreaModalOpen] = useState(false);
   const [newFocusAreaData, setNewFocusAreaData] = useState({ name: '', hours: '', minutes: '' });
   
-  const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
-
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
   const [progressModalConfig, setProgressModalConfig] = useState<{
@@ -830,71 +742,6 @@ function DeepWorkPageContent() {
   const allUpskillTopics = useMemo(() => 
     Array.from(new Set(upskillDefinitions.map(def => def.category))).sort()
   , [upskillDefinitions]);
-
-  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
-      setOpenPopups(prev => {
-          const newPopups = new Map(prev);
-          const resource = resources.find(r => r.id === resourceId);
-          if (!resource) return newPopups;
-          
-          const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
-          const popupWidth = hasMarkdown ? 896 : 512;
-      
-          let x, y, level, parentId;
-      
-          if (parentPopupState) {
-              level = parentPopupState.level + 1;
-              parentId = parentPopupState.resourceId;
-              x = parentPopupState.x + 40;
-              y = parentPopupState.y + 40;
-          } else {
-              level = 0;
-              parentId = undefined;
-              if (hasMarkdown) {
-                  x = window.innerWidth / 2 - popupWidth / 2;
-                  y = window.innerHeight / 2 - Math.min(window.innerHeight * 0.7, 700) / 2;
-              } else {
-                  x = event.clientX;
-                  y = event.clientY;
-              }
-          }
-          
-          newPopups.set(resourceId, {
-              resourceId, level, x, y, parentId, width: popupWidth
-          });
-          return newPopups;
-      });
-  };
-  
-  const handleClosePopup = (resourceId: string) => {
-      setOpenPopups(prev => {
-        const newPopups = new Map(prev);
-        const popupsToDelete = new Set<string>();
-        function findChildren(parentId: string) {
-          popupsToDelete.add(parentId);
-          for (const [id, popup] of newPopups.entries()) {
-            if (popup.parentId === parentId) findChildren(id);
-          }
-        }
-        findChildren(resourceId);
-        for (const id of popupsToDelete) newPopups.delete(id);
-        return newPopups;
-      });
-  };
-
-  const handleSizeChange = useCallback((resourceId: string, newSize: { width: number; height: number }) => {
-      setOpenPopups(prev => {
-          const newPopups = new Map(prev);
-          const popup = newPopups.get(resourceId);
-          if (popup) {
-              newPopups.set(resourceId, {
-                  ...popup,
-                  ...newSize
-              });
-          }
-          return newPopups;
-      });
-  }, []);
 
   const formatDuration = (minutes: number) => {
     if (minutes === 0) return "0m";
@@ -1779,7 +1626,7 @@ function DeepWorkPageContent() {
                                     })}
                                     {(selectedFocusArea.linkedResourceIds || []).map(id => {
                                         const resource = resources.find(r => r.id === id);
-                                        return resource ? <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={(type, id) => handleUnlinkItem(type, id)} setEmbedUrl={setEmbedUrl} onOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} /> : null;
+                                        return resource ? <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={(type, id) => handleUnlinkItem(type, id)} setEmbedUrl={setEmbedUrl} handleOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} /> : null;
                                     })}
                                 </div>
                             </DroppableArea>
@@ -1927,22 +1774,13 @@ function DeepWorkPageContent() {
               </Dialog>
           )}
 
-        </div>
-      {Array.from(openPopups.values()).map((popupState) => (
-          <ResourcePopupCard
-              key={popupState.resourceId}
-              popupState={popupState}
-              onOpenNestedPopup={handleOpenNestedPopup}
-              onClose={handleClosePopup}
-              onSizeChange={handleSizeChange}
-          />
-      ))}
        <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
             <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                 <DialogHeader className="sr-only"><DialogTitle>Focus Area Mind Map</DialogTitle></DialogHeader>
                 <MindMapViewer showControls={false} rootFocusAreaId={mindMapRootFocusAreaId} />
             </DialogContent>
         </Dialog>
+    </div>
     </DndContext>
   );
 }

@@ -247,6 +247,16 @@ export interface ResourceFolder {
   icon?: string; // Optional: for root folders or special folders
 }
 
+export interface PopupState {
+    resourceId: string;
+    level: number;
+    x: number;
+    y: number;
+    parentId?: string;
+    width?: number;
+    height?: number;
+}
+
 // Canvas Types
 export interface CanvasNode {
   id: string; // This will be the definitionId

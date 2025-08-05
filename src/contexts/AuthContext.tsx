@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -120,6 +120,11 @@ interface AuthContextType {
   setActiveResourceTabIds: React.Dispatch<React.SetStateAction<string[]>>;
   selectedResourceFolderId: string | null;
   setSelectedResourceFolderId: React.Dispatch<React.SetStateAction<string | null>>;
+  
+  // Resource Popups
+  openPopups: Map<string, PopupState>;
+  handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => void;
+  handleClosePopup: (resourceId: string) => void;
 
 
   // Workout Log Handlers
@@ -230,6 +235,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [activeResourceTabIds, setActiveResourceTabIds] = useState<string[]>([]);
   const [selectedResourceFolderId, setSelectedResourceFolderId] = useState<string | null>(null);
 
+  // Resource Popups
+  const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
 
   // Canvas State
   const [canvasLayout, setCanvasLayout] = useState<CanvasLayout>({ nodes: [], edges: [] });
@@ -1308,6 +1315,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setPistonsInitialState(initialState);
     setIsPistonsHeadOpen(true);
   };
+  
+  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
+    const resource = resources.find(r => r.id === resourceId);
+    if (!resource) return;
+
+    setOpenPopups(prev => {
+      const newPopups = new Map(prev);
+      const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+      const popupWidth = hasMarkdown ? 896 : 512;
+  
+      let x, y, level, parentId;
+  
+      if (parentPopupState) {
+        level = parentPopupState.level + 1;
+        parentId = parentPopupState.resourceId;
+        x = parentPopupState.x + 40;
+        y = parentPopupState.y + 40;
+      } else {
+        level = 0;
+        parentId = undefined;
+        x = event.clientX;
+        y = event.clientY;
+      }
+      
+      newPopups.set(resourceId, { resourceId, level, x, y, parentId, width: popupWidth });
+      return newPopups;
+    });
+  };
+
+  const handleClosePopup = (resourceId: string) => {
+    setOpenPopups(prev => {
+      const newPopups = new Map(prev);
+      const popupsToDelete = new Set<string>();
+      function findChildren(parentId: string) {
+        popupsToDelete.add(parentId);
+        for (const [id, popup] of newPopups.entries()) {
+          if (popup.parentId === parentId) findChildren(id);
+        }
+      }
+      findChildren(resourceId);
+      for (const id of popupsToDelete) {
+        if (playingAudio?.id === id) setPlayingAudio(null);
+        newPopups.delete(id);
+      }
+      return newPopups;
+    });
+  };
 
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
@@ -1334,6 +1388,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pinnedFolderIds, setPinnedFolderIds,
     activeResourceTabIds, setActiveResourceTabIds,
     selectedResourceFolderId, setSelectedResourceFolderId,
+    openPopups, handleOpenNestedPopup, handleClosePopup,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,
