@@ -237,15 +237,15 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
     return (
         <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
             <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
-            <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative">
+            <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative group">
                 <div 
-                    className="absolute top-2 left-2 z-20 cursor-grab active:cursor-grabbing p-1"
+                    className="absolute top-2 left-2 z-20 p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
                     {...listeners}
                 >
                     <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
                 </div>
                 
-                 <div className="absolute top-2 right-2 z-20 flex items-center">
+                 <div className="absolute top-2 right-2 z-20 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                     {resource.audioUrl ? (
                         <>
                            <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={togglePlayAudio}>
@@ -402,7 +402,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, onOpenNestedPopup,
     onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
     onEditLinkText: (point: ResourcePoint) => void;
 }) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id, data: { type: 'card', item: point } });
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id, data: { type: 'point', item: point } });
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -2128,5 +2128,6 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
