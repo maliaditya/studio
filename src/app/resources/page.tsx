@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink, Edit3, Blocks, Zap } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink, Edit3, Blocks, Zap, Search } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -895,7 +895,7 @@ function ResourcesPageContent() {
   const [newFolderName, setNewFolderName] = useState('');
   const [newResourceName, setNewResourceName] = useState('');
   const [newResourceLink, setNewResourceLink] = useState('');
-
+  
   const [editingFolder, setEditingFolder] = useState<ResourceFolder | null>(null);
   const [newlyCreatedFolderId, setNewlyCreatedFolderId] = useState<string | null>(null);
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
@@ -942,6 +942,8 @@ function ResourcesPageContent() {
   
   const [linkingFromId, setLinkingFromId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  
+  const [searchTerm, setSearchTerm] = useState('');
   
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -1120,9 +1122,18 @@ function ResourcesPageContent() {
   }, [contextMenuRef]);
 
   const filteredResources = useMemo(() => {
-    if (!selectedResourceFolderId) return [];
-    return resources.filter(r => r.folderId === selectedResourceFolderId);
-  }, [resources, selectedResourceFolderId]);
+    let resourcesToFilter = resources;
+    if (searchTerm && !selectedResourceFolderId) {
+        return resourcesToFilter.filter(r => r.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    }
+    if (selectedResourceFolderId) {
+        resourcesToFilter = resourcesToFilter.filter(r => r.folderId === selectedResourceFolderId);
+    }
+    if (searchTerm) {
+        resourcesToFilter = resourcesToFilter.filter(r => r.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    }
+    return resourcesToFilter;
+  }, [resources, selectedResourceFolderId, searchTerm]);
   
   const handleAddFolder = (e: FormEvent) => {
     e.preventDefault();
@@ -1401,8 +1412,29 @@ function ResourcesPageContent() {
     return options;
   }, [resourceFolders]);
 
+  const filteredFolders = useMemo(() => {
+    if (!searchTerm) {
+        return resourceFolders;
+    }
+    const lowercasedTerm = searchTerm.toLowerCase();
+    const matchingFolderIds = new Set(
+        resourceFolders.filter(f => f.name.toLowerCase().includes(lowercasedTerm)).map(f => f.id)
+    );
+
+    // Add all parents of matching folders
+    matchingFolderIds.forEach(id => {
+        let currentFolder = resourceFolders.find(f => f.id === id);
+        while (currentFolder && currentFolder.parentId) {
+            matchingFolderIds.add(currentFolder.parentId);
+            currentFolder = resourceFolders.find(f => f.id === currentFolder.parentId);
+        }
+    });
+
+    return resourceFolders.filter(f => matchingFolderIds.has(f.id));
+  }, [searchTerm, resourceFolders]);
+
   const renderSidebarFolders = useCallback((parentId: string | null, level: number) => {
-    const foldersToRender = resourceFolders
+    const foldersToRender = filteredFolders
         .filter(f => f.parentId === parentId)
         .sort((a, b) => {
             const aIsPinned = pinnedFolderIds.has(a.id);
@@ -1443,7 +1475,7 @@ function ResourcesPageContent() {
                                 className={cn("flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer group transition-colors", selectedResourceFolderId === folder.id && "bg-accent font-semibold")}
                             >
                                 {pinnedFolderIds.has(folder.id) && <Pin className="h-3 w-3 text-primary flex-shrink-0" />}
-                                <ChevronDown className={cn("h-4 w-4 transition-transform", collapsedFolders.has(folder.id) && "-rotate-90", resourceFolders.every(f => f.parentId !== folder.id) && "invisible")} />
+                                <ChevronDown className={cn("h-4 w-4 transition-transform", (collapsedFolders.has(folder.id) && !searchTerm) && "-rotate-90", resourceFolders.every(f => f.parentId !== folder.id) && "invisible")} />
                                 <Folder className="h-4 w-4"/>
                                 <span className='flex-grow truncate'>{folder.name}</span>
                                 <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleShareFolder(folder); }}>
@@ -1467,12 +1499,12 @@ function ResourcesPageContent() {
                         </DraggableFolder>
                     </DroppableFolder>
                 )}
-                {!collapsedFolders.has(folder.id) && renderSidebarFolders(folder.id, level + 1)}
+                {(!collapsedFolders.has(folder.id) || searchTerm) && renderSidebarFolders(folder.id, level + 1)}
             </li>
         ))}
       </ul>
     );
-  }, [resourceFolders, editingFolder, selectedResourceFolderId, collapsedFolders, handleSelectFolder, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder, toggleFolderCollapse, activeId]);
+  }, [filteredFolders, editingFolder, selectedResourceFolderId, collapsedFolders, handleSelectFolder, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder, toggleFolderCollapse, activeId, searchTerm]);
 
   const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
     setOpenPopups(prev => {
@@ -1805,11 +1837,20 @@ function ResourcesPageContent() {
                 </div>
                 </CardHeader>
                 <CardContent>
-                <form onSubmit={handleAddFolder} className="flex gap-2 mb-4">
-                    <Input value={newFolderName} onChange={e => setNewFolderName(e.target.value)} placeholder="New Root Folder" />
-                    <Button size="icon" type="submit"><PlusCircle className="h-4 w-4" /></Button>
-                </form>
-                {renderSidebarFolders(null, 0)}
+                    <div className="relative mb-4">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input 
+                            value={searchTerm} 
+                            onChange={e => setSearchTerm(e.target.value)} 
+                            placeholder="Search folders & cards..."
+                            className="pl-10"
+                        />
+                    </div>
+                    <form onSubmit={handleAddFolder} className="flex gap-2 mb-4">
+                        <Input value={newFolderName} onChange={e => setNewFolderName(e.target.value)} placeholder="New Root Folder" />
+                        <Button size="icon" type="submit"><PlusCircle className="h-4 w-4" /></Button>
+                    </form>
+                    {renderSidebarFolders(null, 0)}
                 </CardContent>
             </Card>
             </aside>
@@ -1848,9 +1889,9 @@ function ResourcesPageContent() {
                 </div>
                 <div>
                 <h2 className="text-2xl font-bold mb-4">
-                    {selectedResourceFolderId
+                    {selectedResourceFolderId && !searchTerm
                     ? resourceFolders.find(f => f.id === selectedResourceFolderId)?.name
-                    : 'Select a folder to view resources'}
+                    : searchTerm ? `Search results for "${searchTerm}"` : 'Select a folder'}
                 </h2>
                 
                 <SortableContext items={filteredResources.map(r => r.id)}>
@@ -1950,7 +1991,7 @@ function ResourcesPageContent() {
                             }
                              return <SortableResourceCard key={res.id} item={res} className={cardClassName} linkingFromId={linkingFromId}>{cardContent}</SortableResourceCard>;
                         })}
-                        {selectedResourceFolderId && (
+                        {selectedResourceFolderId && !searchTerm && (
                             <Card 
                                 onClick={() => setIsAdding(true)}
                                 className="rounded-3xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[220px] hover:shadow-xl hover:-translate-y-1"
