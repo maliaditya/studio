@@ -39,8 +39,8 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <Toaster />
       <BackgroundAudioPlayer />
       <FloatingVideoPlayer />
-      {Array.from(openPopups.keys()).map(key => (
-          <ResourcePopup key={key} resourceId={key} />
+      {ResourcePopup && Array.from(openPopups.values()).map(popupState => (
+        <ResourcePopup key={popupState.resourceId} popupState={popupState} />
       ))}
     </>
   );

@@ -2,10 +2,10 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -16,10 +16,26 @@ import { format, addDays, parseISO, subDays } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS } from '@/lib/constants';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause } from 'lucide-react';
+import { DndContext, useDraggable } from '@dnd-kit/core';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { PlusCircle, Link as LinkIcon } from 'lucide-react';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+
+
 interface PistonsInitialState {
   view: 'main' | 'health' | 'projects' | 'specializations' | 'desires' | 'mindset';
   topicId?: string;
   topicName?: string;
+}
+
+interface ResourcePopupProps {
+  popupState: PopupState;
 }
 
 interface AuthContextType {
@@ -125,6 +141,7 @@ interface AuthContextType {
   openPopups: Map<string, PopupState>;
   handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => void;
   handleClosePopup: (resourceId: string) => void;
+  ResourcePopup?: React.FC<ResourcePopupProps>;
 
 
   // Workout Log Handlers
@@ -265,7 +282,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>();
     coreSkills.forEach(coreSkill => {
       coreSkill.skillAreas.forEach(skillArea => {
-        skillArea.microSkills.forEach(microSkill => {
+        microSkill.microSkills.forEach(microSkill => {
           map.set(microSkill.id, {
             coreSkillName: coreSkill.name,
             skillAreaName: skillArea.name,
@@ -1317,30 +1334,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
-    const resource = resources.find(r => r.id === resourceId);
-    if (!resource) return;
-
     setOpenPopups(prev => {
-      const newPopups = new Map(prev);
-      const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
-      const popupWidth = hasMarkdown ? 896 : 512;
-  
-      let x, y, level, parentId;
-  
-      if (parentPopupState) {
-        level = parentPopupState.level + 1;
-        parentId = parentPopupState.resourceId;
-        x = parentPopupState.x + 40;
-        y = parentPopupState.y + 40;
-      } else {
-        level = 0;
-        parentId = undefined;
-        x = event.clientX;
-        y = event.clientY;
-      }
-      
-      newPopups.set(resourceId, { resourceId, level, x, y, parentId, width: popupWidth });
-      return newPopups;
+        const newPopups = new Map(prev);
+        const resource = resources.find(r => r.id === resourceId);
+        if (!resource) return newPopups;
+        
+        const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+        const popupWidth = hasMarkdown ? 896 : 512;
+    
+        let x, y, level, parentId;
+    
+        if (parentPopupState) {
+            level = parentPopupState.level + 1;
+            parentId = parentPopupState.resourceId;
+            x = parentPopupState.x + 40;
+            y = parentPopupState.y + 40;
+        } else {
+            level = 0;
+            parentId = undefined;
+            if (hasMarkdown) {
+                // Center large popups
+                x = window.innerWidth / 2 - popupWidth / 2;
+                y = window.innerHeight / 2 - Math.min(window.innerHeight * 0.7, 700) / 2;
+            } else {
+                x = event.clientX;
+                y = event.clientY;
+            }
+        }
+        
+        newPopups.set(resourceId, {
+            resourceId, level, x, y, parentId, width: popupWidth
+        });
+        return newPopups;
     });
   };
 
@@ -1362,6 +1387,103 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return newPopups;
     });
   };
+
+  const ResourcePopup: React.FC<ResourcePopupProps> = useCallback(({ popupState }) => {
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `popup-${popupState.resourceId}` });
+    const [audioUrl, setAudioUrl] = useState('');
+    const audioInputRef = useRef<HTMLInputElement>(null);
+
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: popupState.y,
+        left: popupState.x,
+        width: `${popupState.width || 512}px`,
+        willChange: 'transform',
+    };
+    if (transform) {
+        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
+    }
+
+    const resource = resources.find(r => r.id === popupState.resourceId);
+    if (!resource) return null;
+
+    const handleUpdateResourceInPopup = (updatedResource: Resource) => {
+        setResources(prev => prev.map(res => res.id === updatedResource.id ? updatedResource : res));
+    };
+
+    const handleAddPoint = (type: ResourcePoint['type']) => {
+        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: 'New step...', type };
+        const updatedPoints = [...(resource.points || []), newPoint];
+        handleUpdateResourceInPopup({ ...resource, points: updatedPoints });
+    };
+
+    const handleUpdatePoint = (pointId: string, newText: string) => {
+        const updatedPoints = (resource.points || []).map(p =>
+            p.id === pointId ? { ...p, text: newText } : p
+        );
+        handleUpdateResourceInPopup({ ...resource, points: updatedPoints });
+    };
+
+    const handleDeletePoint = (pointId: string) => {
+        const updatedPoints = (resource.points || []).filter(p => p.id !== pointId);
+        handleUpdateResourceInPopup({ ...resource, points: updatedPoints });
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} {...attributes}>
+             <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col">
+                <CardHeader className="p-3 relative cursor-grab" {...listeners}>
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-base flex items-center gap-2">
+                           <Library className="h-4 w-4" /> <span className="truncate">{resource.name}</span>
+                        </CardTitle>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleClosePopup(popupState.resourceId)}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </CardHeader>
+                <div className="flex-grow min-h-0 overflow-y-auto">
+                    <CardContent className="p-3 pt-0">
+                        <ul className="space-y-2 text-sm text-muted-foreground pr-2">
+                            {(resource.points || []).map(point => (
+                                <li key={point.id} className="flex items-start gap-2">
+                                    {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5" /> : point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5" /> : <ArrowRight className="h-4 w-4 mt-0.5" />}
+                                    {point.type === 'card' && point.resourceId ? (
+                                        <button onClick={(e) => { e.stopPropagation(); handleOpenNestedPopup(point.resourceId!, e, popupState); }} className="text-left font-medium text-primary hover:underline">{point.text}</button>
+                                    ) : point.type === 'markdown' ? (
+                                        <div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown></div>
+                                    ) : point.type === 'code' ? (
+                                         <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono">{point.text}</pre>
+                                    ) : (
+                                        <span className="break-words">{point.text}</span>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    </CardContent>
+                </div>
+                <CardFooter className="p-2">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="w-full">
+                                <PlusCircle className="mr-2 h-4 w-4" /> Add Step
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-48 p-1">
+                           <div className="space-y-1">
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('text')}><MessageSquare className="mr-2 h-4 w-4" />Text</Button>
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('markdown')}><MessageSquare className="mr-2 h-4 w-4" />Markdown</Button>
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('code')}><Code className="mr-2 h-4 w-4" />Code</Button>
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('link')}><LinkIcon className="mr-2 h-4 w-4" />Link</Button>
+                           </div>
+                        </PopoverContent>
+                    </Popover>
+                 </CardFooter>
+            </Card>
+        </div>
+    );
+}, [resources, setResources]);
+
 
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
@@ -1389,6 +1511,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     activeResourceTabIds, setActiveResourceTabIds,
     selectedResourceFolderId, setSelectedResourceFolderId,
     openPopups, handleOpenNestedPopup, handleClosePopup,
+    ResourcePopup,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,
