@@ -282,7 +282,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>();
     coreSkills.forEach(coreSkill => {
       coreSkill.skillAreas.forEach(skillArea => {
-        microSkill.microSkills.forEach(microSkill => {
+        skillArea.microSkills.forEach(microSkill => {
           map.set(microSkill.id, {
             coreSkillName: coreSkill.name,
             skillAreaName: skillArea.name,
@@ -1543,3 +1543,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
