@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -8,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink, Edit3, Blocks } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink, Edit3, Blocks, Zap } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -283,11 +284,6 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                             </CardTitle>
                         )}
                     </div>
-                    {resource.createdAt && (
-                        <CardDescription className="text-xs pt-1">
-                            Created on {format(parseISO(resource.createdAt), 'MMM d, yyyy')}
-                        </CardDescription>
-                    )}
                 </CardHeader>
                 <div className="flex-grow min-h-0 overflow-y-auto">
                     <CardContent className="p-3 pt-0">
@@ -391,7 +387,7 @@ const SortableResourceCard = ({ children, item, className, linkingFromId }: { ch
         <div ref={setNodeRef} style={style} className={cn(className)}>
           <div className="relative group/sortable h-full">
             <button {...attributes} {...listeners} className="absolute -top-2 -left-2 z-10 p-1 bg-muted rounded-full cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
-            {item.type === 'card' && <LinkDropZone resourceId={item.id} linkingFromId={linkingFromId} />}
+            {(item.type === 'card' || item.type === 'habit') && <LinkDropZone resourceId={item.id} linkingFromId={linkingFromId} />}
             {children}
           </div>
         </div>
@@ -635,11 +631,6 @@ const ResourceCard = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenM
                     </DropdownMenu>
                     </div>
                 </div>
-                 {resource.createdAt && (
-                  <CardDescription className="text-xs pt-1">
-                    Created on {format(parseISO(resource.createdAt), 'MMM d, yyyy')}
-                  </CardDescription>
-                )}
             </CardHeader>
             <CardContent className="flex-grow min-h-0">
               <div className={cn(hasMarkdownContent ? 'h-[450px]' : '')}>
@@ -700,7 +691,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenM
                                     <Select value={linkedCardId} onValueChange={setLinkedCardId}>
                                         <SelectTrigger><SelectValue placeholder="Select a card..."/></SelectTrigger>
                                         <SelectContent>
-                                            {resources.filter(r => r.type === 'card' && r.id !== resource.id).map(r => (
+                                            {resources.filter(r => (r.type === 'card' || r.type === 'habit') && r.id !== resource.id).map(r => (
                                                 <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                                             ))}
                                         </SelectContent>
@@ -712,6 +703,99 @@ const ResourceCard = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenM
                     </Popover>
                  </div>
             </CardFooter>
+        </Card>
+    );
+};
+
+const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingFromId }: {
+    resource: Resource; 
+    onUpdate: (resource: Resource) => void; 
+    onDelete: (resourceId: string) => void;
+    onLinkClick: (resourceId: string) => void;
+    linkingFromId: string | null;
+}) => {
+    const [editingTitle, setEditingTitle] = useState(false);
+    
+    const handleUpdateField = (field: keyof Resource, value: string) => {
+        onUpdate({ ...resource, [field]: value });
+    };
+
+    const EditableField = ({ field, label }: { field: keyof Resource, label: string }) => {
+        const [isEditing, setIsEditing] = useState(false);
+        const [text, setText] = useState(resource[field] as string || '');
+        const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+        useEffect(() => {
+            if (isEditing && textareaRef.current) {
+                textareaRef.current.focus();
+                textareaRef.current.style.height = 'auto';
+                textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+            }
+        }, [isEditing]);
+
+        const handleSave = () => {
+            setIsEditing(false);
+            handleUpdateField(field, text);
+        };
+
+        return (
+            <div>
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">{label}</Label>
+                {isEditing ? (
+                    <Textarea 
+                        ref={textareaRef}
+                        value={text} 
+                        onChange={e => setText(e.target.value)}
+                        onBlur={handleSave}
+                        className="text-sm mt-1"
+                        rows={1}
+                    />
+                ) : (
+                    <p 
+                        className="text-sm text-foreground mt-1 p-2 rounded-md min-h-[40px] whitespace-pre-wrap"
+                        onDoubleClick={() => setIsEditing(true)}
+                    >
+                        {resource[field] as string || <span className="text-muted-foreground italic">Double-click to edit...</span>}
+                    </p>
+                )}
+            </div>
+        );
+    };
+
+    return (
+        <Card className={cn("flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl", linkingFromId === resource.id && "ring-2 ring-primary", linkingFromId && linkingFromId !== resource.id && "cursor-pointer hover:ring-2 hover:ring-primary/50")}>
+            <CardHeader>
+                <div className="flex justify-between items-start gap-2">
+                    <div className="flex items-center gap-2 flex-grow min-w-0">
+                        {editingTitle ? (
+                            <Input value={resource.name} onChange={(e) => onUpdate({...resource, name: e.target.value})} onBlur={() => setEditingTitle(false)} autoFocus className="text-lg font-semibold h-9" />
+                        ) : (
+                            <CardTitle className="flex items-center gap-3 text-lg cursor-pointer" onClick={() => setEditingTitle(true)}>
+                                <span className="text-primary"><Zap className="h-5 w-5" /></span>
+                                <span className="truncate">{resource.name}</span>
+                            </CardTitle>
+                        )}
+                    </div>
+                     <div className="flex items-center">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onLinkClick(resource.id)}>
+                            <LinkIcon className="h-4 w-4" />
+                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 -mr-2 -mt-1"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => setEditingTitle(true)}>Edit Title</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => onDelete(resource.id)} className="text-destructive">Delete Card</DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <EditableField field="trigger" label="Trigger" />
+                <EditableField field="response" label="Response" />
+                <EditableField field="reward" label="Reward" />
+                <EditableField field="newResponse" label="New Response" />
+            </CardContent>
         </Card>
     );
 };
@@ -793,7 +877,7 @@ function ResourcesPageContent() {
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [mindMapRootFolderId, setMindMapRootFolderId] = useState<string | null>(null);
   
-  const [addResourceType, setAddResourceType] = useState<'link' | 'card'>('link');
+  const [addResourceType, setAddResourceType] = useState<'link' | 'card' | 'habit'>('link');
 
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
   
@@ -1092,17 +1176,17 @@ function ResourcesPageContent() {
       toast({ title: "Error", description: "Resource link is required for a link type.", variant: "destructive" });
       return;
     }
-    if (addResourceType === 'card' && !newResourceName.trim()) {
-      toast({ title: "Error", description: "Name is required for a card type.", variant: "destructive" });
+    if ((addResourceType === 'card' || addResourceType === 'habit') && !newResourceName.trim()) {
+      toast({ title: "Error", description: "Name is required for a card or habit type.", variant: "destructive" });
       return;
     }
 
-    if (addResourceType === 'card') {
+    if (addResourceType === 'card' || addResourceType === 'habit') {
         const newRes: Resource = {
             id: `res_${Date.now()}`,
             name: newResourceName.trim(),
             folderId: selectedResourceFolderId,
-            type: 'card',
+            type: addResourceType,
             points: [],
             icon: 'Library',
             createdAt: new Date().toISOString(),
@@ -1110,7 +1194,7 @@ function ResourcesPageContent() {
         setResources(prev => [...prev, newRes]);
         setNewResourceName('');
         setIsAdding(false);
-        toast({ title: "Resource Card Added", description: `"${newRes.name}" has been saved.`});
+        toast({ title: `Resource ${addResourceType === 'card' ? 'Card' : 'Habit'} Added`, description: `"${newRes.name}" has been saved.`});
         return;
     }
 
@@ -1466,8 +1550,8 @@ function ResourcesPageContent() {
   const handleLinkClick = (resourceId: string) => {
     if (linkingFromId === null) {
       const sourceCard = resources.find(r => r.id === resourceId);
-      if (sourceCard?.type !== 'card') {
-        toast({ title: "Invalid Source", description: "You can only start a link from a 'Card' type resource.", variant: "destructive" });
+      if (sourceCard?.type !== 'card' && sourceCard?.type !== 'habit') {
+        toast({ title: "Invalid Source", description: "You can only start a link from a 'Card' or 'Habit' type resource.", variant: "destructive" });
         return;
       }
       setLinkingFromId(resourceId);
@@ -1482,8 +1566,8 @@ function ResourcesPageContent() {
       const sourceCard = resources.find(r => r.id === linkingFromId);
       const targetCard = resources.find(r => r.id === resourceId);
 
-      if (!sourceCard || !targetCard || targetCard.type !== 'card') {
-        toast({ title: "Invalid Link", description: "The target must also be a 'Card' type resource.", variant: "destructive" });
+      if (!sourceCard || !targetCard || (targetCard.type !== 'card' && targetCard.type !== 'habit')) {
+        toast({ title: "Invalid Link", description: "The target must also be a 'Card' or 'Habit' type resource.", variant: "destructive" });
         setLinkingFromId(null);
         return;
       }
@@ -1604,7 +1688,6 @@ function ResourcesPageContent() {
         type: 'card',
         points: [],
         icon: 'Library',
-        createdAt: new Date().toISOString(),
     };
     
     // Update the original point to link to the new card
@@ -1700,12 +1783,16 @@ function ResourcesPageContent() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                         {filteredResources.map(res => {
                              const isCardType = res.type === 'card';
+                             const isHabitType = res.type === 'habit';
                              const hasMarkdownContent = isCardType && (res.points || []).some(p => p.type === 'markdown' || p.type === 'code');
                              const cardClassName = hasMarkdownContent ? "lg:col-span-3" : "";
  
                             let cardContent: React.ReactNode;
                             
-                            if(isCardType) {
+                            if (isHabitType) {
+                                cardContent = <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} />
+                            }
+                            else if(isCardType) {
                                 cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
@@ -2021,28 +2108,20 @@ function ResourcesPageContent() {
                 <DialogHeader>
                 <DialogTitle>Add New Resource</DialogTitle>
                 </DialogHeader>
-                <Tabs value={addResourceType} onValueChange={(v) => setAddResourceType(v as 'link' | 'card')} className="w-full mt-2 mb-4">
-                    <TabsList className="grid w-full grid-cols-2">
+                <Tabs value={addResourceType} onValueChange={(v) => setAddResourceType(v as 'link' | 'card' | 'habit')} className="w-full mt-2 mb-4">
+                    <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="link">Link</TabsTrigger>
                         <TabsTrigger value="card">Card</TabsTrigger>
+                        <TabsTrigger value="habit">Habit</TabsTrigger>
                     </TabsList>
                     <TabsContent value="link" className="pt-4">
-                        <Input
-                            autoFocus
-                            placeholder="https://example.com"
-                            value={newResourceLink}
-                            onChange={(e) => setNewResourceLink(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddResource()}
-                        />
+                        <Input autoFocus placeholder="https://example.com" value={newResourceLink} onChange={(e) => setNewResourceLink(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddResource()} />
                     </TabsContent>
                     <TabsContent value="card" className="pt-4">
-                        <Input
-                            autoFocus
-                            placeholder="New card name..."
-                            value={newResourceName}
-                            onChange={(e) => setNewResourceName(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddResource()}
-                        />
+                        <Input autoFocus placeholder="New card name..." value={newResourceName} onChange={(e) => setNewResourceName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddResource()} />
+                    </TabsContent>
+                    <TabsContent value="habit" className="pt-4">
+                        <Input autoFocus placeholder="New habit name..." value={newResourceName} onChange={(e) => setNewResourceName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddResource()} />
                     </TabsContent>
                 </Tabs>
                 <DialogFooter>

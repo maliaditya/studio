@@ -220,7 +220,7 @@ export interface Resource {
   id: string;
   name: string;
   folderId: string;
-  type: 'link' | 'card';
+  type: 'link' | 'card' | 'habit';
   createdAt?: string;
   // For 'link' type
   link?: string;
@@ -233,6 +233,11 @@ export interface Resource {
   // For 'card' type
   points?: ResourcePoint[];
   icon?: string;
+  // For 'habit' type
+  trigger?: string;
+  response?: string;
+  reward?: string;
+  newResponse?: string;
 }
 
 export interface ResourceFolder {
