@@ -304,7 +304,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                         </DndContext>
                     </CardContent>
                 </div>
-                 <CardFooter className="p-2 flex gap-2">
+                 <CardFooter className="p-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button variant="outline" size="sm" className="w-full">
@@ -413,7 +413,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, onOpenNestedPopup,
     if (point.type === 'card' && point.resourceId) {
         return (
             <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
-                <button {...attributes} {...listeners} className="cursor-grab p-1"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
+                <button {...attributes} {...listeners} className="cursor-grab p-1 opacity-0 group-hover/item:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
                 <div 
                     onClick={(e) => onOpenNestedPopup(point.resourceId!, e)}
                     className="flex items-start gap-3 flex-grow cursor-pointer p-2 rounded-md hover:bg-muted/50 border border-dashed"
@@ -431,7 +431,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, onOpenNestedPopup,
     return (
         <div ref={setNodeRef} style={style} className="relative bg-card">
             <div className="flex items-start gap-3 group/item">
-                <button {...attributes} {...listeners} className="cursor-grab p-1 pt-2.5"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
+                 <button {...attributes} {...listeners} className="cursor-grab p-1 pt-2.5 opacity-0 group-hover/item:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
                  <EditableResourcePoint 
                     point={point}
                     onUpdate={(newText) => {
@@ -655,8 +655,8 @@ const ResourceCard = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenM
                 </ScrollArea>
               </div>
             </CardContent>
-            <CardContent className="pt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                 <div className="flex gap-2">
+            <CardFooter className="p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                 <div className="flex gap-2 w-full">
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button variant="outline" size="sm" className="w-full">
@@ -699,7 +699,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenM
                         </PopoverContent>
                     </Popover>
                  </div>
-            </CardContent>
+            </CardFooter>
         </Card>
     );
 };
@@ -2072,14 +2072,14 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: {
         if (isEditing && textareaRef.current) {
             textareaRef.current.focus();
             textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+            textareaRef.current.style.height = `${'textareaRef.current.scrollHeight'}px`;
         }
     }, [isEditing]);
     
     const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setEditText(e.target.value);
         e.target.style.height = 'auto';
-        e.target.style.height = `${e.target.scrollHeight}px`;
+        e.target.style.height = `${'e.target.scrollHeight'}px`;
     }
 
     return (
@@ -2115,7 +2115,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: {
                         </span>
                     </div>
                 ) : (
-                    <p className="whitespace-pre-wrap break-words">{point.text}</p>
+                    <p className="whitespace-pre-wrap">{point.text}</p>
                 )}
             </div>
             <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100 flex-shrink-0" onClick={onDelete}>
@@ -2128,6 +2128,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
