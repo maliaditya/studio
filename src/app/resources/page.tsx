@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -124,9 +123,10 @@ interface ResourcePopupProps {
   setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
   onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
   onEditLinkText: (point: ResourcePoint) => void;
+  onConvertToCard: (point: ResourcePoint) => void;
 }
 
-const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAudio, setPlayingAudio, onOpenNestedPopup, onEditLinkText }: ResourcePopupProps) => {
+const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAudio, setPlayingAudio, onOpenNestedPopup, onEditLinkText, onConvertToCard }: ResourcePopupProps) => {
     const { resources } = useAuth();
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `popup-${popupState.resourceId}`,
@@ -297,6 +297,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                                             onDelete={() => handleDeletePoint(point.id)}
                                             onOpenNestedPopup={(e: React.MouseEvent) => handleLinkClick(e, point.resourceId!)}
                                             onEditLinkText={onEditLinkText}
+                                            onConvertToCard={() => onConvertToCard(point)}
                                         />
                                     ))}
                                 </ul>
@@ -393,15 +394,13 @@ const SortableResourceCard = ({ children, item, className, linkingFromId }: { ch
 };
 
 
-const SortablePoint = ({ point, resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, onEditLinkText, onConvertToCard }: {
+const SortablePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText }: {
     point: ResourcePoint;
-    resource: Resource;
-    onUpdate: (resource: Resource) => void;
-    onDelete: (pointId: string) => void;
-    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
-    onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
-    onEditLinkText: (point: ResourcePoint) => void;
     onConvertToCard: (point: ResourcePoint) => void;
+    onUpdate: (updatedText: string) => void;
+    onDelete: () => void;
+    onOpenNestedPopup: (event: React.MouseEvent) => void;
+    onEditLinkText: (point: ResourcePoint) => void;
 }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id, data: { type: 'point', item: point } });
 
@@ -413,48 +412,48 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, onOpenNestedPopup,
     
     if (point.type === 'card' && point.resourceId) {
         return (
-            <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
-                <button {...attributes} {...listeners} className="cursor-grab p-1 opacity-0 group-hover/item:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
+            <div ref={setNodeRef} style={style} className="relative flex items-center gap-3 group/item">
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-full flex items-center justify-center">
+                    <button {...attributes} {...listeners} className="cursor-grab p-1 opacity-0 group-hover/item:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
+                </div>
                 <div 
-                    onClick={(e) => onOpenNestedPopup(point.resourceId!, e)}
-                    className="flex items-start gap-3 flex-grow cursor-pointer p-2 rounded-md hover:bg-muted/50 border border-dashed"
+                    onClick={onOpenNestedPopup}
+                    className="flex items-start gap-3 flex-grow cursor-pointer p-2 pl-8 rounded-md hover:bg-muted/50 border border-dashed"
                 >
                     <Library className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
                     <span className="font-medium text-foreground">{point.text}</span>
                 </div>
-                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={() => onDelete(point.id)}>
-                    <Trash2 className="h-3 w-3"/>
-                </Button>
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-full flex items-center justify-center">
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={onDelete}>
+                        <Trash2 className="h-3 w-3"/>
+                    </Button>
+                </div>
             </div>
         )
     }
 
     return (
         <div ref={setNodeRef} style={style} className="relative bg-card">
-            <div className="flex items-start gap-3 group/item">
-                 <button {...listeners} {...attributes} className="cursor-grab p-1 pt-2.5 opacity-0 group-hover/item:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
-                 <EditableResourcePoint 
-                    point={point}
-                    onUpdate={(newText) => {
-                        const updatedPoints = (resource.points || []).map(p => p.id === point.id ? { ...p, text: newText } : p);
-                        onUpdate({ ...resource, points: updatedPoints });
-                    }}
-                    onDelete={() => onDelete(point.id)}
-                    onEditLinkText={onEditLinkText}
-                    onConvertToCard={() => onConvertToCard(point)}
-                />
-            </div>
+            <EditableResourcePoint 
+                point={point}
+                onUpdate={onUpdate}
+                onDelete={onDelete}
+                onEditLinkText={onEditLinkText}
+                onConvertToCard={() => onConvertToCard(point)}
+                dragHandle={{ attributes, listeners }}
+            />
         </div>
     );
 };
 
 
-const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText }: {
+const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText, onConvertToCard }: {
     point: ResourcePoint;
     onUpdate: (text: string) => void;
     onDelete: () => void;
     onOpenNestedPopup: (event: React.MouseEvent) => void;
     onEditLinkText: (point: ResourcePoint) => void;
+    onConvertToCard: (point: ResourcePoint) => void;
 }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id });
 
@@ -469,7 +468,7 @@ const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, on
             <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
                 <button {...attributes} {...listeners} className="cursor-grab p-1"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
                 <div 
-                    onClick={(e) => onOpenNestedPopup(e)}
+                    onClick={onOpenNestedPopup}
                     className="flex items-start gap-3 flex-grow cursor-pointer p-2 rounded-md hover:bg-muted/50 border border-dashed"
                 >
                     <Library className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
@@ -484,16 +483,14 @@ const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, on
 
     return (
         <div ref={setNodeRef} style={style} className="relative bg-card">
-            <div className="flex items-start gap-3 group/item">
-                <button {...attributes} {...listeners} className="cursor-grab p-1 pt-2.5"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
-                 <EditableResourcePoint 
-                    point={point}
-                    onUpdate={onUpdate}
-                    onDelete={onDelete}
-                    onEditLinkText={onEditLinkText}
-                    onConvertToCard={() => {}} // This should not be callable from a popup
-                />
-            </div>
+            <EditableResourcePoint 
+                point={point}
+                onUpdate={onUpdate}
+                onDelete={onDelete}
+                onEditLinkText={onEditLinkText}
+                onConvertToCard={onConvertToCard}
+                dragHandle={{ attributes, listeners }}
+            />
         </div>
     );
 };
@@ -650,10 +647,12 @@ const ResourceCard = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenM
                                     <SortablePoint 
                                         key={point.id} 
                                         point={point} 
-                                        resource={resource}
-                                        onUpdate={onUpdate}
-                                        onDelete={handleDeletePoint}
-                                        onOpenNestedPopup={onOpenNestedPopup}
+                                        onUpdate={(newText) => {
+                                            const updatedPoints = (resource.points || []).map(p => p.id === point.id ? { ...p, text: newText } : p);
+                                            onUpdate({ ...resource, points: updatedPoints });
+                                        }}
+                                        onDelete={() => handleDeletePoint(point.id)}
+                                        onOpenNestedPopup={(e: React.MouseEvent) => onOpenNestedPopup(point.resourceId!, e)}
                                         onOpenMarkdownModal={onOpenMarkdownModal}
                                         onEditLinkText={onEditLinkText}
                                         onConvertToCard={onConvertToCard}
@@ -1048,6 +1047,7 @@ function ResourcesPageContent() {
       id: `folder_${Date.now()}`,
       name: "New Folder",
       parentId: parentFolder.id,
+      icon: 'Folder',
     };
     setResourceFolders(prev => [...prev, newFolder]);
     setEditingFolder(newFolder);
@@ -1499,6 +1499,7 @@ function ResourcesPageContent() {
           id: `folder_${Date.now()}`,
           name: targetCard.name,
           parentId: parentFolderId,
+          icon: 'Folder',
         };
         finalFolders.push(newFolder);
         subFolderId = newFolder.id;
@@ -1513,7 +1514,7 @@ function ResourcesPageContent() {
                 id: `point_${Date.now()}`,
                 type: 'card',
                 text: sourceCard.name,
-                resourceId: sourceCard.id,
+                resourceId: sourceCard.id
             };
             return { ...r, points: [...(r.points || []), newPoint] };
         }
@@ -1584,6 +1585,7 @@ function ResourcesPageContent() {
         id: `folder_${Date.now()}`,
         name: parentResource.name,
         parentId: parentFolderId,
+        icon: 'Folder',
       };
       finalFolders.push(newSubFolder);
       subFolderId = newSubFolder.id;
@@ -1834,6 +1836,7 @@ function ResourcesPageContent() {
                     setPlayingAudio={setPlayingAudio}
                     onOpenNestedPopup={handleOpenNestedPopup}
                     onEditLinkText={handleEditLinkText}
+                    onConvertToCard={handleConvertToCard}
                 />
             );
         })}
@@ -2116,12 +2119,13 @@ function ResourcesPageContent() {
   );
 }
 
-const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onConvertToCard }: { 
+const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onConvertToCard, dragHandle }: { 
     point: ResourcePoint, 
     onUpdate: (text: string) => void, 
     onDelete: () => void,
     onEditLinkText: (point: ResourcePoint) => void;
     onConvertToCard: () => void;
+    dragHandle?: { attributes: any; listeners: any };
 }) => {
     const { setFloatingVideoUrl } = useAuth();
     const [isEditing, setIsEditing] = useState(point.text === 'New step...');
@@ -2153,12 +2157,11 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
 
     return (
         <li className="relative flex items-start gap-3 group/item w-full">
-            {point.type === 'code' ? <Code className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
-            point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
-            point.type === 'link' ? <LinkIcon className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
-            <ArrowRight className="h-4 w-4 mt-1.5 text-primary/50 flex-shrink-0" />
-            }
-             <div className="flex-grow min-w-0" onDoubleClick={() => !isEditing && setIsEditing(true)}>
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity" {...dragHandle?.attributes} {...dragHandle?.listeners}>
+                <GripVertical className="h-4 w-4 text-muted-foreground/50" />
+            </div>
+            
+            <div className="flex-grow min-w-0 pl-8 pr-8" onDoubleClick={() => !isEditing && setIsEditing(true)}>
                 {isEditing ? (
                     <Textarea 
                         ref={textareaRef} 
@@ -2173,7 +2176,8 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
                 ) : point.type === 'code' ? (
                     <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
                 ) : point.type === 'link' ? (
-                     <div className="flex-grow min-w-0">
+                     <div className="flex-grow min-w-0 flex items-center gap-2">
+                        {point.text && <Image src={getFaviconUrl(point.text)!} alt="" width={16} height={16} className="flex-shrink-0"/>}
                         <span 
                             className="cursor-pointer text-primary hover:underline truncate" 
                             title={point.text} 
@@ -2187,13 +2191,13 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
                     <p className="whitespace-pre-wrap text-muted-foreground">{point.text}</p>
                 )}
             </div>
-            <div className="flex items-center flex-shrink-0">
-                {point.type === 'text' && (
-                     <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground opacity-0 group-hover/item:opacity-100" onClick={onConvertToCard}>
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity">
+                 {point.type === 'text' && (
+                     <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" onClick={onConvertToCard}>
                         <Blocks className="h-3 w-3"/>
                     </Button>
                 )}
-                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={onDelete}>
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={onDelete}>
                     <Trash2 className="h-3 w-3"/>
                 </Button>
             </div>
@@ -2204,12 +2208,3 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
-
-
-
-
-
-
-
-
-
