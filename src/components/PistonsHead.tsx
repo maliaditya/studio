@@ -22,7 +22,7 @@ import remarkGfm from 'remark-gfm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Badge } from './ui/badge';
+import { Badge } from '@/components/ui/badge';
 
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
@@ -61,7 +61,7 @@ const PISTON_DETAILS: Record<PistonType, {
     comparisons: { ego: string; virtue: string; }[];
     conclusion: string;
 }> = {
-    'Stabilizer': { // This is Gratitude
+    'Stabilizer': {
         why: "When you're grateful, you already feel full.",
         negates: ["Desire", "Pleasure"],
         fuels: ["Contribution", "Love"],
@@ -72,7 +72,7 @@ const PISTON_DETAILS: Record<PistonType, {
         ],
         conclusion: "It dissolves craving and the illusion of lack. You stop chasing highs because you're grounded in contentment."
     },
-    'Fire': { // This is Inspiration
+    'Fire': {
         why: "You stop performing for attention and start creating from alignment.",
         negates: ["Egoic Expression", "Status-based Desire"],
         fuels: ["Growth", "Contribution"],
@@ -83,17 +83,18 @@ const PISTON_DETAILS: Record<PistonType, {
         ],
         conclusion: "It replaces external validation with internal ignition."
     },
-    'Explorer': { // This is Curiosity
+    'Explorer': {
         why: "Certainty says: “Stay safe, stay sure.” Curiosity thrives in not knowing, allowing real learning and growth.",
         negates: ["Certainty-seeking", "Protection"],
         fuels: ["Growth", "Variety"],
         virtues: ["Innocence"],
         comparisons: [
-            { ego: "“Don’t go there, it’s risky.”", virtue: "“Let’s see what’s behind this discomfort.”" }
+            { ego: "“Don’t go there, it’s risky.”", virtue: "“Let’s see what’s behind this discomfort.”" },
+            { ego: "Certainty says: “Stay safe, stay sure.”", virtue: "Curiosity thrives in not knowing, allowing real learning and growth." }
         ],
         conclusion: "You don’t need control — because you trust the process of discovery."
     },
-    'Clarity': { // This is Truth-Seeking
+    'Clarity': {
         why: "You no longer need protection mechanisms (lies, manipulation, image control).",
         negates: ["Illusion", "Egoic Significance", "Fear-based Expression"],
         fuels: ["Growth", "Contribution", "Certainty"],
@@ -104,7 +105,7 @@ const PISTON_DETAILS: Record<PistonType, {
         ],
         conclusion: "You don't need approval — you need clarity."
     },
-    'Bridge': { // This is Compassion
+    'Bridge': {
         why: "It replaces the separation illusion with unity — removing the fuel of ego-driven engines.",
         negates: ["Competition", "Significance", "Cruelty"],
         fuels: ["Contribution", "Love"],
@@ -143,7 +144,7 @@ const HistoryPopupCard = ({ popupState, entries, onClose, onEdit }: {
     };
 
     if (transform) {
-        style.transform = `translate3d(${'transform.x'}px, ${'transform.y'}px, 0)`;
+        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
 
     return (
@@ -200,7 +201,7 @@ const DetailsPopupCard = ({ popupState, onClose }: { popupState: HistoryPopupSta
     };
 
     if (transform) {
-        style.transform = `translate3d(${'transform.x'}px, ${'transform.y'}px, 0)`;
+        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
     
     const details = PISTON_DETAILS[popupState.piston];
@@ -220,7 +221,7 @@ const DetailsPopupCard = ({ popupState, onClose }: { popupState: HistoryPopupSta
                     </div>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
-                    <ScrollArea className="h-72 pr-4">
+                    <ScrollArea className="h-96 pr-4">
                         <div className="text-sm space-y-4">
                             <p className="italic text-muted-foreground">{details.why}</p>
                             
@@ -305,7 +306,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
     };
 
     if (transform) {
-        style.transform = `translate3d(${'transform.x'}px, ${'transform.y'}px, 0)`;
+        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
     
     const handleAudioUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -488,14 +489,14 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: {
         if (isEditing && textareaRef.current) {
             textareaRef.current.focus();
             textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = `${'textareaRef.current.scrollHeight'}px`;
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
         }
     }, [isEditing]);
     
     const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setEditText(e.target.value);
         e.target.style.height = 'auto';
-        e.target.style.height = `${'e.target.scrollHeight'}px`;
+        e.target.style.height = `${e.target.scrollHeight}px`;
     }
 
     return (
@@ -579,7 +580,6 @@ export function PistonsHead() {
     } else if (!isPistonsHeadOpen) {
         setCurrentView('main');
         setSelectedTopicId(null);
-        setSelectedTopicName(null);
     }
   }, [isPistonsHeadOpen, pistonsInitialState]);
 
@@ -827,7 +827,7 @@ export function PistonsHead() {
     
     const resource = resources.find(r => r.id === resourceId);
     if (!resource) {
-        console.warn(`Resource with ID ${'resourceId'} not found.`);
+        console.warn(`Resource with ID ${resourceId} not found.`);
         return;
     }
 
@@ -897,7 +897,7 @@ export function PistonsHead() {
       case 'desires':
          return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Desire'} {...commonProps} /> : <DesireSelector onSelect={handleTopicSelect} onBack={onBack} />;
       case 'mindset':
-         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Mindset'} {...commonProps} /> : <MindsetSelector onSelect={handleTopicSelect} onBack={onBack} />;
+         return selectedTopicId ? <TopicPistonView topicId={selectedTopicName} topicName={selectedTopicName || 'Mindset'} {...commonProps} /> : <MindsetSelector onSelect={handleTopicSelect} onBack={onBack} />;
       default:
         return <MainPistonView onSelect={handleViewChange} />;
     }
@@ -907,7 +907,7 @@ export function PistonsHead() {
     position: 'fixed',
     top: position.y,
     left: position.x,
-    transform: transform ? `translate3d(${'transform.x'}px, ${'transform.y'}px, 0)` : `translate3d(0px, 0px, 0)`,
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : `translate3d(0px, 0px, 0)`,
     willChange: 'transform',
   };
 
@@ -1402,3 +1402,5 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setDetailsPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory, handleOpenDetails }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setDetailsPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; currentResourceId?: string; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; handleOpenDetails: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setDetailsPopup={setDetailsPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} handleOpenDetails={handleOpenDetails} />;
 };
+
+    
