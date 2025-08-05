@@ -235,10 +235,17 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
 
 
     return (
-        <div ref={setNodeRef} style={style} className="z-[70]">
+        <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
             <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
             <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative">
-                <div className="absolute top-2 right-2 z-20 flex items-center">
+                <div 
+                    className="absolute top-2 left-2 z-20 cursor-grab active:cursor-grabbing p-1"
+                    {...listeners}
+                >
+                    <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
+                </div>
+                
+                 <div className="absolute top-2 right-2 z-20 flex items-center">
                     {resource.audioUrl ? (
                         <>
                            <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={togglePlayAudio}>
@@ -258,7 +265,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                     </Button>
                 </div>
 
-                <CardHeader className="p-3 pt-8 relative flex-shrink-0 text-center cursor-grab active:cursor-grabbing" {...attributes} {...listeners}>
+                <CardHeader className="p-3 pt-8 relative flex-shrink-0 text-center">
                     <div className="flex items-center justify-center gap-2">
                         <Library className="h-4 w-4" />
                         {editingTitle ? (
@@ -776,7 +783,7 @@ function ResourcesPageContent() {
   
   const [addResourceType, setAddResourceType] = useState<'link' | 'card'>('link');
 
-  const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
+  const [openPopups, setOpenPopups] = useState<Map<string, ResourcePopupState>>(new Map());
   
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
@@ -1320,7 +1327,7 @@ function ResourcesPageContent() {
     );
   }, [resourceFolders, editingFolder, selectedResourceFolderId, collapsedFolders, handleSelectFolder, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder, toggleFolderCollapse]);
 
-  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
+  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: ResourcePopupState) => {
     setOpenPopups(prev => {
         const newPopups = new Map(prev);
         const resource = resources.find(r => r.id === resourceId);
@@ -2121,6 +2128,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
