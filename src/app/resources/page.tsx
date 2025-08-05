@@ -283,6 +283,11 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                             </CardTitle>
                         )}
                     </div>
+                    {resource.createdAt && (
+                        <CardDescription className="text-xs pt-1">
+                            Created on {format(parseISO(resource.createdAt), 'MMM d, yyyy')}
+                        </CardDescription>
+                    )}
                 </CardHeader>
                 <div className="flex-grow min-h-0 overflow-y-auto">
                     <CardContent className="p-3 pt-0">
@@ -406,7 +411,6 @@ const SortablePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNeste
 
     const style = {
         transform: CSS.Transform.toString(transform),
-        transition,
         zIndex: isDragging ? 10 : 'auto',
     };
     
@@ -653,7 +657,6 @@ const ResourceCard = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenM
                                         }}
                                         onDelete={() => handleDeletePoint(point.id)}
                                         onOpenNestedPopup={(e: React.MouseEvent) => onOpenNestedPopup(point.resourceId!, e)}
-                                        onOpenMarkdownModal={onOpenMarkdownModal}
                                         onEditLinkText={onEditLinkText}
                                         onConvertToCard={onConvertToCard}
                                     />
