@@ -178,10 +178,6 @@ interface AuthContextType {
   projects: Project[];
   setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
 
-  // New state for selected subtopic/focus area
-  selectedSubtopic: ExerciseDefinition | null;
-  setSelectedSubtopic: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
-
   // Professional Experience
   companies: Company[];
   setCompanies: React.Dispatch<React.SetStateAction<Company[]>>;
@@ -190,6 +186,10 @@ interface AuthContextType {
 
   // New global map
   microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>;
+
+  // New state for selected subtopic/focus area
+  selectedSubtopic: ExerciseDefinition | null;
+  setSelectedSubtopic: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -254,6 +254,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Resource Popups
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
+  const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  
+  useEffect(() => {
+    const audioEl = audioRef.current;
+    if (!audioEl) return;
+
+    if (playingAudio?.isPlaying) {
+      const resourceToPlay = resources.find(r => r.id === playingAudio.id);
+      if (resourceToPlay?.audioUrl) {
+        if (audioEl.src !== resourceToPlay.audioUrl) {
+          audioEl.src = resourceToPlay.audioUrl;
+        }
+        audioEl.volume = globalVolume;
+        audioEl.play().catch(e => console.error("Audio play failed:", e));
+      }
+    } else {
+      audioEl.pause();
+    }
+  }, [playingAudio, resources, globalVolume]);
 
   // Canvas State
   const [canvasLayout, setCanvasLayout] = useState<CanvasLayout>({ nodes: [], edges: [] });
@@ -1390,9 +1410,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const ResourcePopup: React.FC<ResourcePopupProps> = useCallback(({ popupState }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `popup-${popupState.resourceId}` });
-    const [audioUrl, setAudioUrl] = useState('');
-    const audioInputRef = useRef<HTMLInputElement>(null);
-
+    
     const style: React.CSSProperties = {
         position: 'fixed',
         top: popupState.y,
@@ -1410,22 +1428,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const handleUpdateResourceInPopup = (updatedResource: Resource) => {
         setResources(prev => prev.map(res => res.id === updatedResource.id ? updatedResource : res));
     };
-
+    
     const handleAddPoint = (type: ResourcePoint['type']) => {
         const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: 'New step...', type };
         const updatedPoints = [...(resource.points || []), newPoint];
-        handleUpdateResourceInPopup({ ...resource, points: updatedPoints });
-    };
-
-    const handleUpdatePoint = (pointId: string, newText: string) => {
-        const updatedPoints = (resource.points || []).map(p =>
-            p.id === pointId ? { ...p, text: newText } : p
-        );
-        handleUpdateResourceInPopup({ ...resource, points: updatedPoints });
-    };
-
-    const handleDeletePoint = (pointId: string) => {
-        const updatedPoints = (resource.points || []).filter(p => p.id !== pointId);
         handleUpdateResourceInPopup({ ...resource, points: updatedPoints });
     };
 
@@ -1482,7 +1488,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             </Card>
         </div>
     );
-}, [resources, setResources]);
+  }, [resources, setResources, handleClosePopup, handleOpenNestedPopup]);
 
 
   const value: AuthContextType = {
@@ -1543,4 +1549,5 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
 
