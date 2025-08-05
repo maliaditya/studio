@@ -221,6 +221,7 @@ export interface Resource {
   name: string;
   folderId: string;
   type: 'link' | 'card';
+  createdAt?: string;
   // For 'link' type
   link?: string;
   description?: string;

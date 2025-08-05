@@ -6,7 +6,7 @@ import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } f
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink, Edit3, Blocks } from 'lucide-react';
@@ -29,6 +29,7 @@ import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { format, parseISO } from 'date-fns';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -633,6 +634,11 @@ const ResourceCard = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenM
                     </DropdownMenu>
                     </div>
                 </div>
+                 {resource.createdAt && (
+                  <CardDescription className="text-xs pt-1">
+                    Created on {format(parseISO(resource.createdAt), 'MMM d, yyyy')}
+                  </CardDescription>
+                )}
             </CardHeader>
             <CardContent className="flex-grow min-h-0">
               <div className={cn(hasMarkdownContent ? 'h-[450px]' : '')}>
@@ -1095,7 +1101,8 @@ function ResourcesPageContent() {
             folderId: selectedResourceFolderId,
             type: 'card',
             points: [],
-            icon: 'Library'
+            icon: 'Library',
+            createdAt: new Date().toISOString(),
         };
         setResources(prev => [...prev, newRes]);
         setNewResourceName('');
@@ -1130,7 +1137,8 @@ function ResourcesPageContent() {
           description: result.description || '',
           folderId: selectedResourceFolderId,
           iconUrl: getFaviconUrl(fullLink),
-          type: 'link'
+          type: 'link',
+          createdAt: new Date().toISOString(),
       };
       setResources(prev => [...prev, newRes]);
       setNewResourceLink('');
@@ -1570,7 +1578,8 @@ function ResourcesPageContent() {
         folderId: parentResource.folderId,
         type: 'card',
         points: [],
-        icon: 'Library'
+        icon: 'Library',
+        createdAt: new Date().toISOString(),
     };
     
     // Update the original point to link to the new card
@@ -2122,7 +2131,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
     }
 
     return (
-        <li className="relative flex items-start gap-3 text-muted-foreground group/item w-full">
+        <li className="relative flex items-start gap-3 group/item w-full">
             {point.type === 'code' ? <Code className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
             point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
             point.type === 'link' ? <LinkIcon className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
@@ -2154,7 +2163,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
                         </span>
                     </div>
                 ) : (
-                    <p className="whitespace-pre-wrap">{point.text}</p>
+                    <p className="whitespace-pre-wrap text-muted-foreground">{point.text}</p>
                 )}
             </div>
             <div className="flex items-center flex-shrink-0">
@@ -2174,6 +2183,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
