@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink, Edit3 } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink, Edit3, Blocks } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -238,10 +238,10 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
             <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
             <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative group">
                 <div 
-                    className="absolute top-2 left-2 z-20 p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                    className="absolute top-2 left-2 z-20 p-1 cursor-grab active:cursor-grabbing"
                     {...listeners}
                 >
-                    <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
+                    <GripVertical className="h-5 w-5 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity"/>
                 </div>
                 
                  <div className="absolute top-2 right-2 z-20 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -392,7 +392,7 @@ const SortableResourceCard = ({ children, item, className, linkingFromId }: { ch
 };
 
 
-const SortablePoint = ({ point, resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, onEditLinkText }: {
+const SortablePoint = ({ point, resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, onEditLinkText, onConvertToCard }: {
     point: ResourcePoint;
     resource: Resource;
     onUpdate: (resource: Resource) => void;
@@ -400,6 +400,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, onOpenNestedPopup,
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
     onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
     onEditLinkText: (point: ResourcePoint) => void;
+    onConvertToCard: (point: ResourcePoint) => void;
 }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id, data: { type: 'point', item: point } });
 
@@ -430,7 +431,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, onOpenNestedPopup,
     return (
         <div ref={setNodeRef} style={style} className="relative bg-card">
             <div className="flex items-start gap-3 group/item">
-                 <button {...attributes} {...listeners} className="cursor-grab p-1 pt-2.5 opacity-0 group-hover/item:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
+                 <button {...listeners} {...attributes} className="cursor-grab p-1 pt-2.5 opacity-0 group-hover/item:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
                  <EditableResourcePoint 
                     point={point}
                     onUpdate={(newText) => {
@@ -439,6 +440,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, onOpenNestedPopup,
                     }}
                     onDelete={() => onDelete(point.id)}
                     onEditLinkText={onEditLinkText}
+                    onConvertToCard={() => onConvertToCard(point)}
                 />
             </div>
         </div>
@@ -488,6 +490,7 @@ const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, on
                     onUpdate={onUpdate}
                     onDelete={onDelete}
                     onEditLinkText={onEditLinkText}
+                    onConvertToCard={() => {}} // This should not be callable from a popup
                 />
             </div>
         </div>
@@ -495,7 +498,7 @@ const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, on
 };
 
 
-const ResourceCard = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText, onClosePopup }: { 
+const ResourceCard = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText, onClosePopup, onConvertToCard }: { 
     resource: Resource; 
     onUpdate: (resource: Resource) => void; 
     onDelete: (resourceId: string) => void; 
@@ -508,6 +511,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenM
     isPopup?: boolean;
     onEditLinkText: (point: ResourcePoint) => void;
     onClosePopup?: (e: React.MouseEvent | React.PointerEvent) => void;
+    onConvertToCard: (point: ResourcePoint) => void;
 }) => {
     const { resources, setFloatingVideoUrl } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
@@ -646,6 +650,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenM
                                         onOpenNestedPopup={onOpenNestedPopup}
                                         onOpenMarkdownModal={onOpenMarkdownModal}
                                         onEditLinkText={onEditLinkText}
+                                        onConvertToCard={onConvertToCard}
                                     />
                                 ))}
                             </ul>
@@ -1554,6 +1559,40 @@ function ResourcesPageContent() {
       setCurrentDisplayText('');
   };
 
+  const handleConvertToCard = (point: ResourcePoint) => {
+    const parentResource = resources.find(r => r.points?.some(p => p.id === point.id));
+    if (!parentResource) return;
+
+    // Create a new resource card
+    const newCard: Resource = {
+        id: `res_${Date.now()}`,
+        name: point.text,
+        folderId: parentResource.folderId,
+        type: 'card',
+        points: [],
+        icon: 'Library'
+    };
+    
+    // Update the original point to link to the new card
+    const updatedPoints = (parentResource.points || []).map(p => {
+        if (p.id === point.id) {
+            return {
+                ...p,
+                type: 'card' as const,
+                resourceId: newCard.id
+            };
+        }
+        return p;
+    });
+    
+    const updatedParentResource = { ...parentResource, points: updatedPoints };
+
+    // Update state
+    setResources(prev => [...prev.map(r => r.id === parentResource.id ? updatedParentResource : r), newCard]);
+
+    toast({ title: "Converted to Card", description: `A new card "${newCard.name}" has been created and linked.` });
+  };
+
 
   return (
     <>
@@ -1632,7 +1671,7 @@ function ResourcesPageContent() {
                             let cardContent: React.ReactNode;
                             
                             if(isCardType) {
-                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} />;
+                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                 const isGif = isGifUrl(res.link);
@@ -1775,7 +1814,7 @@ function ResourcesPageContent() {
             const parentPopup = openPopups.get(popup.parentId);
             if (!parentPopup) return null;
             
-            const startX = parentPopup.x + (parentPopup.width || 0) / 2;
+            const startX = parentPopup.x + (popup.width || 0) / 2;
             const startY = parentPopup.y + ((parentPopup.height || 0) / 2);
             const endX = popup.x + (popup.width || 0) / 2;
             const endY = popup.y + ((popup.height || 0) / 2);
@@ -2047,11 +2086,12 @@ function ResourcesPageContent() {
   );
 }
 
-const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: { 
+const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onConvertToCard }: { 
     point: ResourcePoint, 
     onUpdate: (text: string) => void, 
     onDelete: () => void,
-    onEditLinkText: (point: ResourcePoint) => void 
+    onEditLinkText: (point: ResourcePoint) => void;
+    onConvertToCard: () => void;
 }) => {
     const { setFloatingVideoUrl } = useAuth();
     const [isEditing, setIsEditing] = useState(point.text === 'New step...');
@@ -2117,9 +2157,16 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: {
                     <p className="whitespace-pre-wrap">{point.text}</p>
                 )}
             </div>
-            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100 flex-shrink-0" onClick={onDelete}>
-                <Trash2 className="h-3 w-3"/>
-            </Button>
+            <div className="flex items-center flex-shrink-0">
+                {point.type === 'text' && (
+                     <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground opacity-0 group-hover/item:opacity-100" onClick={onConvertToCard}>
+                        <Blocks className="h-3 w-3"/>
+                    </Button>
+                )}
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={onDelete}>
+                    <Trash2 className="h-3 w-3"/>
+                </Button>
+            </div>
         </li>
     );
 }
@@ -2127,6 +2174,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
