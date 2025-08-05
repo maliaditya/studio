@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -401,7 +402,7 @@ const SortablePoint = ({ point, resource, onUpdate, onDelete, onOpenNestedPopup,
     onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
     onEditLinkText: (point: ResourcePoint) => void;
 }) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id, data: { type: 'card', item } });
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id, data: { type: 'card', item: point } });
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -2127,4 +2128,5 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
