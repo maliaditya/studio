@@ -46,54 +46,63 @@ const PISTON_NAMES: PistonType[] = [
 ];
 
 const PISTON_FULL_NAMES: Record<PistonType, string> = {
-    'Stabilizer': 'Stabilizer (Gratitude)',
-    'Fire': 'Fire (Inspiration)',
-    'Explorer': 'Explorer (Curiosity)',
-    'Clarity': 'Clarity (Truth-Seeking)',
-    'Bridge': 'Bridge (Compassion)',
+    'Stabilizer': 'Gratitude',
+    'Fire': 'Inspiration',
+    'Explorer': 'Curiosity',
+    'Clarity': 'Truth-Seeking',
+    'Bridge': 'Compassion',
 };
 
 const PISTON_DETAILS: Record<PistonType, {
-    needs: string;
-    virtue: string;
-    egoPattern: string;
-    negates: string;
     why: string;
+    negates: string[];
+    comparisons: { ego: string; virtue: string; }[];
+    conclusion: string;
 }> = {
-    'Explorer': { // Curiosity
-        needs: "Growth, Variety",
-        virtue: "Innocence",
-        egoPattern: "Cunningness, Control",
-        negates: "Certainty, Protection",
-        why: "You welcome the unknown"
-    },
-    'Clarity': { // Truth-Seeking
-        needs: "Growth, Contribution, Certainty",
-        virtue: "Truth",
-        egoPattern: "Illusion, Self-Deception",
-        negates: "Illusion, Egoic Significance",
-        why: "You crave reality, not image"
-    },
-    'Bridge': { // Compassion
-        needs: "Contribution, Love",
-        virtue: "Compassion",
-        egoPattern: "Cruelty, Indifference",
-        negates: "Competition, Cruelty, Separation",
-        why: "You act from love"
-    },
     'Stabilizer': { // Gratitude
-        needs: "Contribution, Love",
-        virtue: "Forgiveness, Contentment",
-        egoPattern: "Anger, Discontent, Resentment",
-        negates: "Desire, Pleasure",
-        why: "You already feel whole"
+        why: "When you're grateful, you already feel full.",
+        negates: ["Desire", "Pleasure"],
+        comparisons: [
+            { ego: "“I need more.”", virtue: "“This is already enough.”" },
+            { ego: "“Comfort will make me happy.”", virtue: "“Joy is already here, in this moment.”" }
+        ],
+        conclusion: "It dissolves craving and the illusion of lack. You stop chasing highs because you're grounded in contentment."
     },
     'Fire': { // Inspiration
-        needs: "Growth, Contribution",
-        virtue: "Contentment, Innocence",
-        egoPattern: "Desire, Jealousy, Manipulation",
-        negates: "Egoic Expression, Desire",
-        why: "You're lit from within"
+        why: "You stop performing for attention and start creating from alignment.",
+        negates: ["Egoic Expression", "Status-based Desire"],
+        comparisons: [
+            { ego: "“Look at me.”", virtue: "“Look at what’s flowing through me.”" },
+            { ego: "“I want to be famous/successful.”", virtue: "“This creation is worthy — even if unseen.”" }
+        ],
+        conclusion: "It replaces external validation with internal ignition."
+    },
+    'Explorer': { // Curiosity
+        why: "Certainty says: “Stay safe, stay sure.” Curiosity thrives in not knowing, allowing real learning and growth.",
+        negates: ["Certainty-seeking", "Protection"],
+        comparisons: [
+            { ego: "“Don’t go there, it’s risky.”", virtue: "“Let’s see what’s behind this discomfort.”" }
+        ],
+        conclusion: "You don’t need control — because you trust the process of discovery."
+    },
+    'Clarity': { // Truth-Seeking
+        why: "You no longer need protection mechanisms (lies, manipulation, image control).",
+        negates: ["Illusion", "Egoic Significance", "Fear-based Expression"],
+        comparisons: [
+            { ego: "“Let’s hide the uncomfortable.”", virtue: "“Let’s look at it.”" },
+            { ego: "Expression (egoic) wants to impress.", virtue: "Truth wants to express what is, even if it's raw or humbling." }
+        ],
+        conclusion: "You don't need approval — you need clarity."
+    },
+    'Bridge': { // Compassion
+        why: "It replaces the separation illusion with unity — removing the fuel of ego-driven engines.",
+        negates: ["Competition", "Significance", "Cruelty"],
+        comparisons: [
+            { ego: "“I’m better than you.”", virtue: "“You and I are the same.”" },
+            { ego: "“Win at all costs.”", virtue: "“Let’s grow together.”" },
+            { ego: "“You deserve your pain.”", virtue: "“Your pain is mine too.”" }
+        ],
+        conclusion: "It replaces the separation illusion with unity — removing the fuel of ego-driven engines."
     }
 };
 
@@ -186,7 +195,7 @@ const DetailsPopupCard = ({ popupState, onClose }: { popupState: HistoryPopupSta
 
     return (
         <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
-            <Card className="w-80 shadow-2xl border-2 border-primary/30 bg-card">
+            <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
                  <CardHeader className="p-3 relative cursor-grab" {...listeners}>
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2 flex-grow">
@@ -198,14 +207,37 @@ const DetailsPopupCard = ({ popupState, onClose }: { popupState: HistoryPopupSta
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent className="p-3 pt-0">
-                    <div className="text-sm space-y-2">
-                        <p><strong>Fuels:</strong> {details.needs}</p>
-                        <p><strong>Virtue:</strong> {details.virtue}</p>
-                        <p><strong>Opposes:</strong> {details.egoPattern}</p>
-                        <p><strong>Negates:</strong> {details.negates}</p>
-                        <p><strong>Why:</strong> {details.why}</p>
-                    </div>
+                <CardContent className="p-4 pt-0">
+                    <ScrollArea className="h-72 pr-4">
+                        <div className="text-sm space-y-4">
+                            <p className="italic text-muted-foreground">{details.why}</p>
+                            
+                            <div className="space-y-1">
+                                <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Negates:</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {details.negates.map(item => <Badge key={item} variant="secondary">{item}</Badge>)}
+                                </div>
+                            </div>
+
+                            {details.comparisons.map((comp, index) => (
+                                <div key={index} className="grid grid-cols-[auto,1fr] items-start gap-x-3 text-xs">
+                                    <div className="text-right text-muted-foreground">{comp.ego.startsWith("“") ? "Ego says:" : comp.ego}</div>
+                                    <div className="font-medium text-foreground">{comp.ego.startsWith("“") ? comp.ego : comp.virtue}</div>
+                                    
+                                    {comp.ego.startsWith("“") && (
+                                        <>
+                                            <div className="text-right text-muted-foreground">{PISTON_FULL_NAMES[popupState.piston]} says:</div>
+                                            <div className="font-medium text-foreground">{comp.virtue}</div>
+                                        </>
+                                    )}
+                                </div>
+                            ))}
+
+                            <div className="pt-2">
+                                <p className="font-semibold text-primary">👉 {details.conclusion}</p>
+                            </div>
+                        </div>
+                    </ScrollArea>
                 </CardContent>
             </Card>
         </div>
@@ -749,7 +781,7 @@ export function PistonsHead() {
       return;
     }
     
-    const popupWidth = 320;
+    const popupWidth = 384; // increased width
     let x;
   
     if (historyPopup) {
