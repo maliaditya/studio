@@ -234,10 +234,10 @@ export interface Resource {
   points?: ResourcePoint[];
   icon?: string;
   // For 'habit' type
-  trigger?: string;
-  response?: string;
+  trigger?: { action?: string; feeling?: string; };
+  response?: { visualize?: string; action?: string; };
   reward?: string;
-  newResponse?: string;
+  newResponse?: { visualize?: string; action?: string; };
 }
 
 export interface ResourceFolder {

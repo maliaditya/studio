@@ -115,9 +115,17 @@ interface PopupState {
   width?: number;
 }
 
-const EditableField = ({ field, label, resource, onUpdate }: { field: keyof Resource, label: string, resource: Resource, onUpdate: (updatedResource: Resource) => void }) => {
+const EditableField = ({ field, subField, label, resource, onUpdate }: { field: keyof Resource, subField?: string, label: string, resource: Resource, onUpdate: (updatedResource: Resource) => void }) => {
     const [isEditing, setIsEditing] = useState(false);
-    const [text, setText] = useState(resource[field] as string || '');
+    
+    let initialValue = '';
+    if (subField && typeof resource[field] === 'object' && resource[field] !== null) {
+      initialValue = (resource[field] as any)[subField] || '';
+    } else {
+      initialValue = (resource[field] as string) || '';
+    }
+
+    const [text, setText] = useState(initialValue);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {
@@ -130,7 +138,13 @@ const EditableField = ({ field, label, resource, onUpdate }: { field: keyof Reso
 
     const handleSave = () => {
         setIsEditing(false);
-        onUpdate({ ...resource, [field]: text });
+        let updatedResource = { ...resource };
+        if (subField) {
+            updatedResource[field] = { ...(updatedResource[field] as object), [subField]: text };
+        } else {
+            updatedResource[field] = text as any;
+        }
+        onUpdate(updatedResource);
     };
 
     return (
@@ -150,7 +164,7 @@ const EditableField = ({ field, label, resource, onUpdate }: { field: keyof Reso
                     className="text-sm text-foreground mt-1 p-2 rounded-md min-h-[40px] whitespace-pre-wrap"
                     onDoubleClick={() => setIsEditing(true)}
                 >
-                    {resource[field] as string || <span className="text-muted-foreground italic">Double-click to edit...</span>}
+                    {text || <span className="text-muted-foreground italic">Double-click to edit...</span>}
                 </p>
             )}
         </div>
@@ -326,15 +340,23 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                             </CardTitle>
                         )}
                     </div>
+                     {resource.createdAt && (
+                        <CardDescription className="text-xs pt-1">
+                            Created: {format(parseISO(resource.createdAt), 'MMM d, yyyy')}
+                        </CardDescription>
+                    )}
                 </CardHeader>
                 <div className="flex-grow min-h-0 overflow-y-auto">
                     <CardContent className="p-3 pt-0">
                         {resource.type === 'habit' ? (
                             <div className="space-y-4">
-                                <EditableField field="trigger" label="Trigger" resource={resource} onUpdate={onUpdate} />
-                                <EditableField field="response" label="Response" resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="trigger" subField="action" label="Trigger (Action)" resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="trigger" subField="feeling" label="Trigger (Feeling)" resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="response" subField="visualize" label="Response (Visualize)" resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="response" subField="action" label="Response (Action)" resource={resource} onUpdate={onUpdate} />
                                 <EditableField field="reward" label="Reward" resource={resource} onUpdate={onUpdate} />
-                                <EditableField field="newResponse" label="New Response" resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="newResponse" subField="visualize" label="New Response (Visualize)" resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="newResponse" subField="action" label="New Response (Action)" resource={resource} onUpdate={onUpdate} />
                             </div>
                         ) : (
                          <DndContext onDragEnd={handlePointDragEnd}>
@@ -390,7 +412,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                                     <Select value={linkedCardId} onValueChange={setLinkedCardId}>
                                         <SelectTrigger><SelectValue placeholder="Select a card..."/></SelectTrigger>
                                         <SelectContent>
-                                            {resources.filter(r => r.type === 'card' && r.id !== resource.id).map(r => (
+                                            {resources.filter(r => (r.type === 'card' || r.type === 'habit') && r.id !== resource.id).map(r => (
                                                 <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                                             ))}
                                         </SelectContent>
@@ -808,10 +830,13 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
                 )}
             </CardHeader>
             <CardContent className="space-y-4">
-                <EditableField field="trigger" label="Trigger" resource={resource} onUpdate={onUpdate} />
-                <EditableField field="response" label="Response" resource={resource} onUpdate={onUpdate} />
+                <EditableField field="trigger" subField="action" label="Trigger (Action)" resource={resource} onUpdate={onUpdate} />
+                <EditableField field="trigger" subField="feeling" label="Trigger (Feeling)" resource={resource} onUpdate={onUpdate} />
+                <EditableField field="response" subField="visualize" label="Response (Visualize)" resource={resource} onUpdate={onUpdate} />
+                <EditableField field="response" subField="action" label="Response (Action)" resource={resource} onUpdate={onUpdate} />
                 <EditableField field="reward" label="Reward" resource={resource} onUpdate={onUpdate} />
-                <EditableField field="newResponse" label="New Response" resource={resource} onUpdate={onUpdate} />
+                <EditableField field="newResponse" subField="visualize" label="New Response (Visualize)" resource={resource} onUpdate={onUpdate} />
+                <EditableField field="newResponse" subField="action" label="New Response (Action)" resource={resource} onUpdate={onUpdate} />
             </CardContent>
         </Card>
     );
@@ -896,7 +921,7 @@ function ResourcesPageContent() {
   
   const [addResourceType, setAddResourceType] = useState<'link' | 'card' | 'habit'>('link');
 
-  const [openPopups, setOpenPopups] = useState<Map<string, ResourcePopupState>>(new Map());
+  const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
   
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
@@ -1443,7 +1468,7 @@ function ResourcesPageContent() {
     );
   }, [resourceFolders, editingFolder, selectedResourceFolderId, collapsedFolders, handleSelectFolder, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder, toggleFolderCollapse]);
 
-  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: ResourcePopupState) => {
+  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
     setOpenPopups(prev => {
         const newPopups = new Map(prev);
         const resource = resources.find(r => r.id === resourceId);
@@ -2301,4 +2326,3 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
-
