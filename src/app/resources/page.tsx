@@ -112,7 +112,6 @@ interface PopupState {
   y: number;
   parentId?: string;
   width?: number;
-  height?: number;
 }
 
 interface ResourcePopupProps {
@@ -2083,7 +2082,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: {
     }
 
     return (
-        <li className="flex items-start gap-3 group/item">
+        <li className="relative flex items-start gap-3 text-muted-foreground group/item w-full">
             {point.type === 'code' ? <Code className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
             point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
             point.type === 'link' ? <LinkIcon className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
@@ -2128,6 +2127,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
