@@ -842,31 +842,34 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
     );
 };
 
-interface DroppableFolderProps {
-    folder: ResourceFolder;
-    children: React.ReactNode;
-    onClick: () => void;
-    onContextMenu: (e: React.MouseEvent) => void;
-    className?: string;
-}
+const DraggableFolder = ({ folder, children, isDragging, ...props }: { folder: ResourceFolder, children: React.ReactNode, isDragging: boolean } & React.HTMLAttributes<HTMLDivElement>) => {
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({
+        id: folder.id,
+        data: { type: 'folder' }
+    });
   
-const DroppableFolder = ({ folder, children, onClick, onContextMenu, className }: DroppableFolderProps) => {
+    const style = transform ? {
+      transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+      zIndex: 1000,
+    } : undefined;
+  
+    return (
+        <div ref={setNodeRef} style={style} className={cn(isDragging && "opacity-50")}>
+            <div {...attributes} {...listeners} {...props}>
+                {children}
+            </div>
+        </div>
+    );
+  };
+  
+const DroppableFolder = ({ folder, children, ...props }: { folder: ResourceFolder, children: React.ReactNode } & React.HTMLAttributes<HTMLDivElement>) => {
     const { isOver, setNodeRef } = useDroppable({
         id: folder.id,
         data: { type: 'folder' }
     });
 
     return (
-        <div 
-            ref={setNodeRef}
-            onClick={onClick}
-            onContextMenu={onContextMenu}
-            className={cn(
-                "flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer group transition-colors", 
-                isOver && "bg-primary/10 ring-2 ring-primary",
-                className
-            )}
-        >
+        <div ref={setNodeRef} {...props} className={cn(isOver && "bg-primary/10 ring-1 ring-primary")}>
             {children}
         </div>
     );
@@ -1432,33 +1435,36 @@ function ResourcesPageContent() {
                         />
                     </div>
                 ) : (
-                    <DroppableFolder
-                      folder={folder}
-                      onClick={() => { handleSelectFolder(folder.id); toggleFolderCollapse(folder.id); }}
-                      onContextMenu={(e) => handleContextMenu(e, folder)}
-                      className={cn(selectedResourceFolderId === folder.id && "bg-accent font-semibold")}
-                    >
-                      {pinnedFolderIds.has(folder.id) && <Pin className="h-3 w-3 text-primary flex-shrink-0" />}
-                      <ChevronDown className={cn("h-4 w-4 transition-transform", collapsedFolders.has(folder.id) && "-rotate-90", resourceFolders.every(f => f.parentId !== folder.id) && "invisible")} />
-                      <Folder className="h-4 w-4"/>
-                      <span className='flex-grow truncate'>{folder.name}</span>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleShareFolder(folder); }}>
-                          <Share className="h-4 w-4" />
-                          <span className="sr-only">Share {folder.name}</span>
-                      </Button>
-                      <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => {
-                              e.stopPropagation();
-                              setMindMapRootFolderId(folder.id);
-                              setIsMindMapModalOpen(true);
-                          }}
-                      >
-                          <GitMerge className="h-4 w-4" />
-                          <span className="sr-only">View Mind Map for {folder.name}</span>
-                      </Button>
+                    <DroppableFolder folder={folder}>
+                        <DraggableFolder folder={folder} isDragging={activeId === folder.id}>
+                            <div
+                                onClick={() => { handleSelectFolder(folder.id); toggleFolderCollapse(folder.id); }}
+                                onContextMenu={(e) => handleContextMenu(e, folder)}
+                                className={cn("flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer group transition-colors", selectedResourceFolderId === folder.id && "bg-accent font-semibold")}
+                            >
+                                {pinnedFolderIds.has(folder.id) && <Pin className="h-3 w-3 text-primary flex-shrink-0" />}
+                                <ChevronDown className={cn("h-4 w-4 transition-transform", collapsedFolders.has(folder.id) && "-rotate-90", resourceFolders.every(f => f.parentId !== folder.id) && "invisible")} />
+                                <Folder className="h-4 w-4"/>
+                                <span className='flex-grow truncate'>{folder.name}</span>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleShareFolder(folder); }}>
+                                    <Share className="h-4 w-4" />
+                                    <span className="sr-only">Share {folder.name}</span>
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setMindMapRootFolderId(folder.id);
+                                        setIsMindMapModalOpen(true);
+                                    }}
+                                >
+                                    <GitMerge className="h-4 w-4" />
+                                    <span className="sr-only">View Mind Map for {folder.name}</span>
+                                </Button>
+                            </div>
+                        </DraggableFolder>
                     </DroppableFolder>
                 )}
                 {!collapsedFolders.has(folder.id) && renderSidebarFolders(folder.id, level + 1)}
@@ -1466,7 +1472,7 @@ function ResourcesPageContent() {
         ))}
       </ul>
     );
-  }, [resourceFolders, editingFolder, selectedResourceFolderId, collapsedFolders, handleSelectFolder, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder, toggleFolderCollapse]);
+  }, [resourceFolders, editingFolder, selectedResourceFolderId, collapsedFolders, handleSelectFolder, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder, toggleFolderCollapse, activeId]);
 
   const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
     setOpenPopups(prev => {
@@ -1531,6 +1537,13 @@ function ResourcesPageContent() {
     });
   };
 
+  const isDescendant = (childId: string, parentId: string): boolean => {
+    if (childId === parentId) return true;
+    const parentFolder = resourceFolders.find(f => f.id === childId);
+    if (!parentFolder || !parentFolder.parentId) return false;
+    return isDescendant(parentFolder.parentId, parentId);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null);
     const { active, over, delta } = event;
@@ -1550,6 +1563,24 @@ function ResourcesPageContent() {
 
     if (!over) return;
     
+    if (active.data.current?.type === 'folder' && over.data.current?.type === 'folder') {
+        const draggedFolderId = active.id as string;
+        const targetFolderId = over.id as string;
+        
+        if (draggedFolderId !== targetFolderId && !isDescendant(targetFolderId, draggedFolderId)) {
+            setResourceFolders(prev => prev.map(f => f.id === draggedFolderId ? { ...f, parentId: targetFolderId } : f));
+            setCollapsedFolders(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(targetFolderId);
+                return newSet;
+            });
+            toast({ title: "Folder Moved", description: "Folder moved successfully." });
+        } else if (isDescendant(targetFolderId, draggedFolderId)) {
+            toast({ title: "Invalid Move", description: "Cannot move a folder into its own descendant.", variant: "destructive" });
+        }
+        return;
+    }
+
     if (active.data.current?.type === 'card' && over.data.current?.type) {
         const activeCard = resources.find(r => r.id === active.id);
         const overId = over.id.toString();
@@ -1942,6 +1973,15 @@ function ResourcesPageContent() {
                         <GripVertical className="h-4 w-4 text-muted-foreground/50" />
                         {resources.flatMap(r => r.points || []).find(p => p.id === activeId)?.text}
                     </div>
+                  ) : activeId && activeId.startsWith('cat_') ? (
+                    <div className="w-48">
+                        <Card className="shadow-2xl p-2 bg-primary/10">
+                           <div className="flex items-center gap-2">
+                                <Folder className="h-4 w-4" />
+                                <p className="font-semibold text-sm">{resourceFolders.find(f => f.id === activeId)?.name}</p>
+                           </div>
+                        </Card>
+                    </div>
                   ) : null}
                 </DragOverlay>
                 </div>
@@ -1973,21 +2013,28 @@ function ResourcesPageContent() {
             const parentPopup = openPopups.get(popup.parentId);
             if (!parentPopup) return null;
             
-            const startX = parentPopup.x + (popup.width || 0) / 2;
-            const startY = parentPopup.y + ((popup.height || 0) / 2);
-            const endX = popup.x + (popup.width || 0) / 2;
-            const endY = popup.y + ((popup.height || 0) / 2);
+            const startX = popup.x + (popup.width || 0) / 2;
+            const startY = popup.y + 20;
+            const endX = parentPopup.x + (parentPopup.width || 0) / 2;
+            const endY = parentPopup.y + 20;
+
+            const dx = endX - startX;
+            const dy = endY - startY;
+            const controlPointX1 = startX + dx / 4;
+            const controlPointY1 = startY - Math.abs(dx)/4;
+            const controlPointX2 = endX - dx / 4;
+            const controlPointY2 = endY + Math.abs(dx)/4;
             
+            const d = `M ${startX},${startY} C ${controlPointX1},${startY} ${controlPointX2},${endY} ${endX},${endY}`;
+
             return (
-              <line 
+              <path 
                 key={`${popup.parentId}-${popup.resourceId}`}
-                x1={startX} 
-                y1={startY} 
-                x2={endX} 
-                y2={endY} 
+                d={d}
                 stroke="hsl(var(--primary))" 
                 strokeWidth="2"
                 strokeOpacity="0.5"
+                fill="none"
               />
             )
           })}
