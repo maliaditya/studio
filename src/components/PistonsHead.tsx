@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -23,6 +22,7 @@ import remarkGfm from 'remark-gfm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Badge } from './ui/badge';
 
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
@@ -59,7 +59,7 @@ const PISTON_DETAILS: Record<PistonType, {
     comparisons: { ego: string; virtue: string; }[];
     conclusion: string;
 }> = {
-    'Stabilizer': { // Gratitude
+    'Stabilizer': { 
         why: "When you're grateful, you already feel full.",
         negates: ["Desire", "Pleasure"],
         comparisons: [
@@ -68,7 +68,7 @@ const PISTON_DETAILS: Record<PistonType, {
         ],
         conclusion: "It dissolves craving and the illusion of lack. You stop chasing highs because you're grounded in contentment."
     },
-    'Fire': { // Inspiration
+    'Fire': { 
         why: "You stop performing for attention and start creating from alignment.",
         negates: ["Egoic Expression", "Status-based Desire"],
         comparisons: [
@@ -77,7 +77,7 @@ const PISTON_DETAILS: Record<PistonType, {
         ],
         conclusion: "It replaces external validation with internal ignition."
     },
-    'Explorer': { // Curiosity
+    'Explorer': {
         why: "Certainty says: “Stay safe, stay sure.” Curiosity thrives in not knowing, allowing real learning and growth.",
         negates: ["Certainty-seeking", "Protection"],
         comparisons: [
@@ -85,7 +85,7 @@ const PISTON_DETAILS: Record<PistonType, {
         ],
         conclusion: "You don’t need control — because you trust the process of discovery."
     },
-    'Clarity': { // Truth-Seeking
+    'Clarity': { 
         why: "You no longer need protection mechanisms (lies, manipulation, image control).",
         negates: ["Illusion", "Egoic Significance", "Fear-based Expression"],
         comparisons: [
@@ -94,7 +94,7 @@ const PISTON_DETAILS: Record<PistonType, {
         ],
         conclusion: "You don't need approval — you need clarity."
     },
-    'Bridge': { // Compassion
+    'Bridge': { 
         why: "It replaces the separation illusion with unity — removing the fuel of ego-driven engines.",
         negates: ["Competition", "Significance", "Cruelty"],
         comparisons: [
@@ -1376,3 +1376,5 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setDetailsPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory, handleOpenDetails }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setDetailsPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; currentResourceId?: string; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; handleOpenDetails: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setDetailsPopup={setDetailsPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} handleOpenDetails={handleOpenDetails} />;
 };
+
+    
