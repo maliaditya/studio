@@ -239,10 +239,10 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
             <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
             <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative group">
                 <div 
-                    className="absolute top-2 left-2 z-20 p-1 cursor-grab active:cursor-grabbing"
+                    className="absolute top-2 left-2 z-20 p-1 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
                     {...listeners}
                 >
-                    <GripVertical className="h-5 w-5 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity"/>
+                    <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
                 </div>
                 
                  <div className="absolute top-2 right-2 z-20 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -295,8 +295,8 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                                             point={point}
                                             onUpdate={(newText) => handleUpdatePoint(point.id, newText)}
                                             onDelete={() => handleDeletePoint(point.id)}
+                                            onOpenNestedPopup={(e: React.MouseEvent) => handleLinkClick(e, point.resourceId!)}
                                             onEditLinkText={onEditLinkText}
-                                            onOpenNestedPopup={(e) => handleLinkClick(e, point.resourceId!)}
                                         />
                                     ))}
                                 </ul>
@@ -1571,11 +1571,31 @@ function ResourcesPageContent() {
     const parentResource = resources.find(r => r.points?.some(p => p.id === point.id));
     if (!parentResource) return;
 
-    // Create a new resource card
+    let finalFolders = [...resourceFolders];
+    const parentFolderId = parentResource.folderId;
+    let subFolderId: string;
+
+    // Check if a sub-folder named after the parent card already exists
+    let subFolder = finalFolders.find(f => f.parentId === parentFolderId && f.name === parentResource.name);
+
+    if (!subFolder) {
+      // If not, create it
+      const newSubFolder: ResourceFolder = {
+        id: `folder_${Date.now()}`,
+        name: parentResource.name,
+        parentId: parentFolderId,
+      };
+      finalFolders.push(newSubFolder);
+      subFolderId = newSubFolder.id;
+    } else {
+      subFolderId = subFolder.id;
+    }
+
+    // Create a new resource card in the determined sub-folder
     const newCard: Resource = {
         id: `res_${Date.now()}`,
         name: point.text,
-        folderId: parentResource.folderId,
+        folderId: subFolderId,
         type: 'card',
         points: [],
         icon: 'Library',
@@ -1597,6 +1617,7 @@ function ResourcesPageContent() {
     const updatedParentResource = { ...parentResource, points: updatedPoints };
 
     // Update state
+    setResourceFolders(finalFolders);
     setResources(prev => [...prev.map(r => r.id === parentResource.id ? updatedParentResource : r), newCard]);
 
     toast({ title: "Converted to Card", description: `A new card "${newCard.name}" has been created and linked.` });
@@ -2120,14 +2141,14 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
         if (isEditing && textareaRef.current) {
             textareaRef.current.focus();
             textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = `${'textareaRef.current.scrollHeight'}px`;
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
         }
     }, [isEditing]);
     
     const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setEditText(e.target.value);
         e.target.style.height = 'auto';
-        e.target.style.height = `${'e.target.scrollHeight'}px`;
+        e.target.style.height = `${e.target.scrollHeight}px`;
     }
 
     return (
@@ -2183,6 +2204,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
