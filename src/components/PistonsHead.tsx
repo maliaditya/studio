@@ -11,7 +11,7 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
-import { PistonEntry, PistonType, PistonsData, Resource, ResourcePoint, ExerciseDefinition, MindsetCard, SkillDomain, CoreSkill, Project, Feature, SkillArea, MicroSkill } from '@/types/workout';
+import { PistonEntry, PistonType, PistonsData, Resource, ResourcePoint, ExerciseDefinition, MindsetCard, SkillDomain, CoreSkill, Project, Feature, Company, Position, WorkProject } from '@/types/workout';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
@@ -60,6 +60,10 @@ const PISTON_DETAILS: Record<PistonType, {
     virtues: string[];
     comparisons: { ego: string; virtue: string; }[];
     conclusion: string;
+    biochemical: {
+        linked: string;
+        details: string[];
+    }
 }> = {
     'Stabilizer': {
         why: "When you're grateful, you already feel full.",
@@ -70,7 +74,16 @@ const PISTON_DETAILS: Record<PistonType, {
             { ego: "“I need more.”", virtue: "“This is already enough.”" },
             { ego: "“Comfort will make me happy.”", virtue: "“Joy is already here, in this moment.”" }
         ],
-        conclusion: "It dissolves craving and the illusion of lack. You stop chasing highs because you're grounded in contentment."
+        conclusion: "It dissolves craving and the illusion of lack. You stop chasing highs because you're grounded in contentment.",
+        biochemical: {
+            linked: "Serotonin + GABA",
+            details: [
+                "Gratitude boosts serotonin (peace, sufficiency).",
+                "It also increases GABA, calming the nervous system.",
+                "That’s why gratitude grounds you, removes grasping.",
+                "Gratitude is a spiritual expression of biochemical balance."
+            ]
+        }
     },
     'Fire': {
         why: "You stop performing for attention and start creating from alignment.",
@@ -81,7 +94,17 @@ const PISTON_DETAILS: Record<PistonType, {
             { ego: "“Look at me.”", virtue: "“Look at what’s flowing through me.”" },
             { ego: "“I want to be famous/successful.”", virtue: "“This creation is worthy — even if unseen.”" }
         ],
-        conclusion: "It replaces external validation with internal ignition."
+        conclusion: "It replaces external validation with internal ignition.",
+        biochemical: {
+            linked: "Dopamine + Acetylcholine + Testosterone",
+            details: [
+                "Inspiration sparks dopamine (energy/motivation),",
+                "Acetylcholine helps focus on new ideas,",
+                "Testosterone may rise slightly with bold vision.",
+                "It’s like dopamine but not from ego — from the soul.",
+                "That’s why you feel driven but pure."
+            ]
+        }
     },
     'Explorer': {
         why: "Certainty says: “Stay safe, stay sure.” Curiosity thrives in not knowing, allowing real learning and growth.",
@@ -92,7 +115,16 @@ const PISTON_DETAILS: Record<PistonType, {
             { ego: "“Don’t go there, it’s risky.”", virtue: "“Let’s see what’s behind this discomfort.”" },
             { ego: "Certainty says: “Stay safe, stay sure.”", virtue: "Curiosity thrives in not knowing, allowing real learning and growth." }
         ],
-        conclusion: "You don’t need control — because you trust the process of discovery."
+        conclusion: "You don’t need control — because you trust the process of discovery.",
+        biochemical: {
+            linked: "Dopamine + Acetylcholine",
+            details: [
+                "Curiosity = safe, controlled dopamine seeking.",
+                "Acetylcholine helps in exploring and learning.",
+                "It creates a “mental explorer mode” → playful energy without needing full safety.",
+                "Curiosity is dopamine without addiction."
+            ]
+        }
     },
     'Clarity': {
         why: "You no longer need protection mechanisms (lies, manipulation, image control).",
@@ -103,7 +135,16 @@ const PISTON_DETAILS: Record<PistonType, {
             { ego: "“Let’s hide the uncomfortable.”", virtue: "“Let’s look at it.”" },
             { ego: "Expression (egoic) wants to impress.", virtue: "Truth wants to express what is, even if it's raw or humbling." }
         ],
-        conclusion: "You don't need approval — you need clarity."
+        conclusion: "You don't need approval — you need clarity.",
+        biochemical: {
+            linked: "Cortisol suppression + High Acetylcholine",
+            details: [
+                "Seeking truth requires mental silence, not fear.",
+                "Low cortisol enables openness.",
+                "Acetylcholine supports pattern recognition and insight.",
+                "When fear drops, you’re no longer blinded — you can see."
+            ]
+        }
     },
     'Bridge': {
         why: "It replaces the separation illusion with unity — removing the fuel of ego-driven engines.",
@@ -115,7 +156,16 @@ const PISTON_DETAILS: Record<PistonType, {
             { ego: "“Win at all costs.”", virtue: "“Let’s grow together.”" },
             { ego: "“You deserve your pain.”", virtue: "“Your pain is mine too.”" }
         ],
-        conclusion: "It replaces the separation illusion with unity — removing the fuel of ego-driven engines."
+        conclusion: "It replaces the separation illusion with unity — removing the fuel of ego-driven engines.",
+        biochemical: {
+            linked: "Oxytocin + Serotonin + GABA",
+            details: [
+                "Oxytocin = trust, bonding",
+                "GABA = emotional calm",
+                "Serotonin = higher mood, openness",
+                "Compassion is neurochemical alignment with others."
+            ]
+        }
     }
 };
 
@@ -238,12 +288,19 @@ const DetailsPopupCard = ({ popupState, onClose }: { popupState: HistoryPopupSta
                                         {details.fuels.map(item => <Badge key={item} variant="secondary">{item}</Badge>)}
                                     </div>
                                 </div>
-                                <div className="space-y-1">
+                                <div className="space-y-1 col-span-2">
                                     <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Virtues:</p>
                                     <div className="flex flex-wrap gap-1.5">
                                         {details.virtues.map(item => <Badge key={item} variant="secondary">{item}</Badge>)}
                                     </div>
                                 </div>
+                            </div>
+                            
+                            <div className="space-y-1">
+                                <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Biochemical Links: <span className="font-normal normal-case text-primary">{details.biochemical.linked}</span></p>
+                                <ul className="list-disc list-inside text-muted-foreground text-xs space-y-1">
+                                    {details.biochemical.details.map((item, index) => <li key={index}>{item}</li>)}
+                                </ul>
                             </div>
 
                             {details.comparisons.map((comp, index) => (
@@ -1402,5 +1459,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setDetailsPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory, handleOpenDetails }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setDetailsPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; currentResourceId?: string; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; handleOpenDetails: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setDetailsPopup={setDetailsPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} handleOpenDetails={handleOpenDetails} />;
 };
+
+    
 
     
