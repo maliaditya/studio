@@ -189,9 +189,9 @@ export function SkillLibrary({
                             autoFocus
                           />
                         ) : (
-                          <button onClick={() => onSelectFocusArea(task)} onDoubleClick={() => handleStartEditing(task)} className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground hover:bg-muted flex items-center gap-2">
+                          <button onClick={() => onSelectFocusArea(task)} onDoubleClick={() => handleStartEditing(task)} className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground hover:bg-muted flex items-center gap-2 min-w-0">
                               {pageType === 'deepwork' ? getDeepWorkIcon(task) : getUpskillIcon(task)}
-                              <span>{task.name}</span>
+                              <span className="truncate" title={task.name}>{task.name}</span>
                           </button>
                         )}
                         <AlertDialog>
