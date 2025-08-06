@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { Brain, BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical, PlusCircle, Trash2, Play, Pause, ChevronRight as ChevronRightIcon, Workflow, Folder, ArrowLeft, Anchor, Flame, Compass, Sun, GitBranch, Info } from 'lucide-react';
@@ -85,7 +85,7 @@ const PISTON_DETAILS: Record<PistonType, {
             ]
         }
     },
-    'Inspiration': {
+    'Fire': {
         why: "You stop performing for attention and start creating from alignment. My father showed me what’s possible, not with words — but with action, pain, and persistence.",
         negates: ["Egoic Expression", "Status-based Desire"],
         fuels: ["Growth", "Contribution"],
@@ -146,7 +146,7 @@ const PISTON_DETAILS: Record<PistonType, {
             ]
         }
     },
-    'Compassion': {
+    'Bridge': {
         why: "It replaces the separation illusion with unity — removing the fuel of ego-driven engines.",
         negates: ["Competition", "Significance", "Cruelty"],
         fuels: ["Contribution", "Love"],
@@ -1459,9 +1459,6 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
 const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setDetailsPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory, handleOpenDetails }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setDetailsPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; currentResourceId?: string; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; handleOpenDetails: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setDetailsPopup={setDetailsPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} handleOpenDetails={handleOpenDetails} />;
 };
-
     
 
     
-
-
