@@ -163,7 +163,7 @@ const DraggableSubtaskItem: React.FC<{
         >
           <span {...listeners} {...attributes} className="cursor-grab pr-1"> - </span>
           <span onClick={onClick} className="cursor-pointer hover:text-foreground">
-             {childName}
+             {childName.length > 25 ? `${childName.substring(0, 25)}...` : childName}
           </span>
         </div>
     );
@@ -268,7 +268,18 @@ function LinkedUpskillCard({
                             <div className="flex-grow min-w-0">
                                 <div className="flex items-center gap-2">
                                     <Youtube className="h-5 w-5 flex-shrink-0 text-red-500" />
-                                    <p className={cn("text-base font-bold truncate", isComplete && "line-through text-muted-foreground")} title={upskillDef.name}>{upskillDef.name}</p>
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <p className={cn("text-base font-bold truncate", isComplete && "line-through text-muted-foreground")} title={upskillDef.name}>
+                                                    {upskillDef.name.length > 25 ? `${upskillDef.name.substring(0, 25)}...` : upskillDef.name}
+                                                </p>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>{upskillDef.name}</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
                                 </div>
                                 <CardDescription className="text-xs">{upskillDef.category}</CardDescription>
                             </div>
@@ -325,7 +336,18 @@ function LinkedUpskillCard({
                             ) : (
                                 <CardTitle className="text-base flex items-center gap-2 cursor-pointer" onClick={() => setIsEditingName(true)}>
                                     <Flashlight className="h-5 w-5 text-amber-500 flex-shrink-0" />
-                                    <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={upskillDef.name}>{upskillDef.name}</span>
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={upskillDef.name}>
+                                                    {upskillDef.name.length > 25 ? `${upskillDef.name.substring(0, 25)}...` : upskillDef.name}
+                                                </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>{upskillDef.name}</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
                                 </CardTitle>
                             )}
                             <CardDescription>{upskillDef.category}</CardDescription>
@@ -384,7 +406,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
   
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: transform ? 100 : 'auto', } : undefined;
 
-  const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
+  const youtubeEmbedUrl = resource.link ? getYouTubeEmbedUrl(resource.link) : null;
   const isSpecialEmbed = resource.link ? (isNotionUrl(resource.link) || isObsidianUrl(resource.link)) : false;
   const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? resource.link : null);
 
@@ -406,7 +428,18 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
           <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                   <Library className="h-5 w-5 text-primary" />
-                  <span className="truncate" title={resource.name}>{resource.name}</span>
+                  <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span className="truncate" title={resource.name}>
+                                {resource.name.length > 25 ? `${resource.name.substring(0, 25)}...` : resource.name}
+                            </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>{resource.name}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
               </CardTitle>
           </CardHeader>
           <CardContent className="flex-grow min-h-0">
@@ -626,7 +659,18 @@ function LinkedDeepWorkCard({
               ) : (
                 <CardTitle className="text-base flex items-center gap-2 cursor-pointer" onClick={() => setIsEditingName(true)}>
                   {getIcon(nodeType)}
-                  <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={deepworkDef.name}>{deepworkDef.name}</span>
+                  <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={deepworkDef.name}>
+                                {deepworkDef.name.length > 25 ? `${deepworkDef.name.substring(0, 25)}...` : deepworkDef.name}
+                            </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>{deepworkDef.name}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   <Badge variant="outline" className="text-xs">{nodeType}</Badge>
                 </CardTitle>
               )}

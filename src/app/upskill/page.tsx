@@ -125,7 +125,7 @@ const DraggableSubtaskItem: React.FC<{
         >
           <span {...listeners} {...attributes} className="cursor-grab pr-1"> - </span>
           <span onClick={onClick} className="cursor-pointer hover:text-foreground">
-             {childName}
+             {childName.length > 25 ? `${childName.substring(0, 25)}...` : childName}
           </span>
         </div>
     );
@@ -227,11 +227,22 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
                         autoFocus
                     />
                 ) : (
-                    <CardTitle className="text-base flex items-center gap-2 cursor-pointer" onClick={() => setIsEditingName(true)}>
-                        <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={upskillDef.name}>{upskillDef.name}</span>
+                    <CardTitle className="text-base flex items-center gap-2 cursor-pointer min-w-0" onClick={() => setIsEditingName(true)}>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={upskillDef.name}>
+                                        {upskillDef.name.length > 25 ? `${upskillDef.name.substring(0, 25)}...` : upskillDef.name}
+                                    </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>{upskillDef.name}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                     </CardTitle>
                 )}
-                 <Badge variant="outline" className="text-xs">{nodeType}</Badge>
+                 <Badge variant="outline" className="text-xs flex-shrink-0">{nodeType}</Badge>
             </div>
             <CardDescription>{upskillDef.category}</CardDescription>
         </CardHeader>
@@ -313,7 +324,18 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
           <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                   <Library className="h-5 w-5 text-primary" />
-                  <span className="truncate" title={resource.name}>{resource.name}</span>
+                  <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                           <span className="truncate" title={resource.name}>
+                                {resource.name.length > 25 ? `${resource.name.substring(0, 25)}...` : resource.name}
+                            </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>{resource.name}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
               </CardTitle>
           </CardHeader>
           <CardContent className="flex-grow min-h-0">
