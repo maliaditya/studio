@@ -957,6 +957,7 @@ function UpskillPageContent() {
                     onOpenNewFocusArea={handleOpenNewSubtopicModal}
                     selectedProject={selectedProject}
                     onSelectProject={handleProjectSelect}
+                    onDeleteFocusArea={handleDeleteSubtopic}
                 />
               {selectedSubtopic && (
                   <Card>

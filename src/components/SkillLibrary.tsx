@@ -6,12 +6,23 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building, Folder, Workflow } from 'lucide-react';
+import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building, Folder, Workflow, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature } from '@/types/workout';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from './ui/input';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 
 interface SkillLibraryProps {
@@ -23,7 +34,7 @@ interface SkillLibraryProps {
   onOpenNewFocusArea: () => void;
   selectedProject: Project | null;
   onSelectProject: (project: Project | null) => void;
-  handleAddMicroSkill: (coreSkillId: string, areaId: string, name: string) => void;
+  onDeleteFocusArea: (defId: string) => void;
 }
 
 export function SkillLibrary({ 
@@ -35,7 +46,7 @@ export function SkillLibrary({
     onOpenNewFocusArea,
     selectedProject,
     onSelectProject,
-    handleAddMicroSkill,
+    onDeleteFocusArea,
 }: SkillLibraryProps) {
   const { skillDomains, coreSkills, projects } = useAuth();
   
@@ -44,22 +55,6 @@ export function SkillLibrary({
   const [selectedCoreSkill, setSelectedCoreSkill] = useState<CoreSkill | null>(null);
   const [selectedSkillArea, setSelectedSkillArea] = useState<SkillArea | null>(null);
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
-
-  // New state for adding micro-skills
-  const [newMicroSkillNames, setNewMicroSkillNames] = useState<Record<string, string>>({});
-  
-  const handleMicroSkillChange = (areaId: string, value: string) => {
-    setNewMicroSkillNames(prev => ({ ...prev, [areaId]: value }));
-  };
-
-  const handleAddMicroSkillSubmit = (e: React.FormEvent, areaId: string) => {
-    e.preventDefault();
-    const name = newMicroSkillNames[areaId] || '';
-    if (name.trim() && selectedCoreSkill) {
-        handleAddMicroSkill(selectedCoreSkill.id, areaId, name);
-        setNewMicroSkillNames(prev => ({ ...prev, [areaId]: '' }));
-    }
-  };
 
 
   const handleBack = () => {
@@ -167,10 +162,29 @@ export function SkillLibrary({
             </div>
             <div className="pl-4 space-y-1">
                 {tasks.length > 0 ? tasks.map(task => (
-                    <button key={task.id} onClick={() => onSelectFocusArea(task)} className="w-full text-left p-1 rounded-md text-sm text-muted-foreground hover:bg-muted flex items-center gap-2">
-                        {pageType === 'deepwork' ? getDeepWorkIcon(task) : getUpskillIcon(task)}
-                        <span>{task.name}</span>
-                    </button>
+                    <div key={task.id} className="flex items-center justify-between group/task">
+                        <button onClick={() => onSelectFocusArea(task)} className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground hover:bg-muted flex items-center gap-2">
+                            {pageType === 'deepwork' ? getDeepWorkIcon(task) : getUpskillIcon(task)}
+                            <span>{task.name}</span>
+                        </button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0 opacity-0 group-hover/task:opacity-100">
+                                    <Trash2 className="h-3 w-3 text-destructive" />
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>This will permanently delete the task "{task.name}". This action cannot be undone.</AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => onDeleteFocusArea(task.id)}>Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </div>
                 )) : <p className="text-xs text-muted-foreground text-center py-2">No tasks for this skill yet.</p>}
             </div>
         </div>
@@ -213,22 +227,6 @@ export function SkillLibrary({
                     {ms.name}
                 </Button>
             ))}
-             <form onSubmit={(e) => handleAddMicroSkillSubmit(e, selectedSkillArea.id)} className="flex items-center gap-2 mt-2 pt-2 border-t">
-                <Input 
-                    value={newMicroSkillNames[selectedSkillArea.id] || ''} 
-                    onChange={(e) => handleMicroSkillChange(selectedSkillArea.id, e.target.value)} 
-                    placeholder="New micro-skill..." 
-                    className="h-8"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleAddMicroSkillSubmit(e, selectedSkillArea.id);
-                      }
-                    }}
-                />
-                <Button size="icon" type="submit" className="h-8 w-8 shrink-0">
-                    <PlusCircle className="h-4 w-4" />
-                </Button>
-            </form>
         </div>
        )
     }

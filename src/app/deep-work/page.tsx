@@ -648,7 +648,6 @@ function DeepWorkPageContent() {
   const { toast } = useToast();
   const { 
     currentUser, 
-    exportData,
     allDeepWorkLogs, setAllDeepWorkLogs,
     allUpskillLogs, setAllUpskillLogs,
     deepWorkDefinitions, setDeepWorkDefinitions,
@@ -1497,6 +1496,7 @@ function DeepWorkPageContent() {
                     }}
                     selectedProject={selectedProject} 
                     onSelectProject={handleProjectSelect}
+                    onDeleteFocusArea={handleDeleteExerciseDefinition}
                  />
               {selectedFocusArea && (
                   <Card>
