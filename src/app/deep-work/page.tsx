@@ -178,7 +178,6 @@ function LinkedUpskillCard({
     setEmbedUrl,
     setFloatingVideoUrl,
     handleViewProgress,
-    handleStartEditUpskill,
     handleUnlinkItem,
     handleDeleteUpskillDefinition,
     upskillDefinitions,
@@ -186,6 +185,7 @@ function LinkedUpskillCard({
     calculatedEstimate,
     setSelectedSubtopic,
     setViewMode,
+    onUpdateName,
 } : {
     id: string;
     upskillDef: ExerciseDefinition;
@@ -194,7 +194,6 @@ function LinkedUpskillCard({
     setEmbedUrl: (url: string | null) => void;
     setFloatingVideoUrl: (url: string | null) => void;
     handleViewProgress: (def: ExerciseDefinition, type: 'deepwork' | 'upskill') => void;
-    handleStartEditUpskill: (def: ExerciseDefinition) => void;
     handleUnlinkItem: (type: 'upskill' | 'deepwork' | 'resource', id: string) => void;
     handleDeleteUpskillDefinition: (id: string) => void;
     upskillDefinitions: ExerciseDefinition[];
@@ -202,15 +201,28 @@ function LinkedUpskillCard({
     calculatedEstimate: number;
     setSelectedSubtopic: (def: ExerciseDefinition | null) => void;
     setViewMode: (mode: 'session' | 'library') => void;
+    onUpdateName: (id: string, newName: string) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
     
     const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: transform ? 100 : 'auto', } : undefined;
 
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [currentName, setCurrentName] = useState(upskillDef.name);
+
     const setCombinedRefs = (node: HTMLElement | null) => {
         setNodeRef(node);
         setDroppableNodeRef(node);
+    };
+
+    const handleNameSave = () => {
+      if (currentName.trim()) {
+        onUpdateName(upskillDef.id, currentName.trim());
+      } else {
+        setCurrentName(upskillDef.name); // Revert if empty
+      }
+      setIsEditingName(false);
     };
 
     const youtubeEmbedUrl = upskillDef.link ? getYouTubeEmbedUrl(upskillDef.link) : null;
@@ -244,7 +256,6 @@ function LinkedUpskillCard({
                                 <DropdownMenuContent align="end" onMouseDown={(e) => e.stopPropagation()}>
                                     <DropdownMenuItem onSelect={() => handleViewProgress(upskillDef, 'upskill')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
                                     <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
                                     <DropdownMenuItem onSelect={() => handleDeleteUpskillDefinition(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
                                 </DropdownMenuContent>
@@ -297,18 +308,28 @@ function LinkedUpskillCard({
                                 <DropdownMenuContent align="end" onMouseDown={(e) => e.stopPropagation()}>
                                     <DropdownMenuItem onSelect={() => handleViewProgress(upskillDef, 'upskill')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem onSelect={() => handleStartEditUpskill(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
                                     <DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
                                     <DropdownMenuItem onSelect={() => handleDeleteUpskillDefinition(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </div>
                         <CardHeader className="pb-3">
-                          <CardTitle className="text-base flex items-center gap-2">
-                            <Flashlight className="h-5 w-5 text-amber-500 flex-shrink-0" />
-                            <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={upskillDef.name}>{upskillDef.name}</span>
-                          </CardTitle>
-                          <CardDescription>{upskillDef.category}</CardDescription>
+                            {isEditingName ? (
+                                <Input 
+                                    value={currentName} 
+                                    onChange={(e) => setCurrentName(e.target.value)} 
+                                    onBlur={handleNameSave} 
+                                    onKeyDown={(e) => e.key === 'Enter' && handleNameSave()}
+                                    className="text-base font-semibold h-8"
+                                    autoFocus
+                                />
+                            ) : (
+                                <CardTitle className="text-base flex items-center gap-2 cursor-pointer" onClick={() => setIsEditingName(true)}>
+                                    <Flashlight className="h-5 w-5 text-amber-500 flex-shrink-0" />
+                                    <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={upskillDef.name}>{upskillDef.name}</span>
+                                </CardTitle>
+                            )}
+                            <CardDescription>{upskillDef.category}</CardDescription>
                         </CardHeader>
                         <CardContent className="flex-grow">
                             {(upskillDef.linkedUpskillIds?.length ?? 0) > 0 ? (
@@ -470,7 +491,6 @@ function LinkedDeepWorkCard({
     setSelectedFocusArea,
     setViewMode,
     handleToggleReadyForBranding,
-    handleStartEditDefinition,
     handleUnlinkItem,
     handleDeleteExerciseDefinition,
     handleViewProgress,
@@ -484,6 +504,7 @@ function LinkedDeepWorkCard({
     onOpenMindMap,
     getIcon,
     getNodeType,
+    onUpdateName
 } : {
     id: string;
     deepworkDef: ExerciseDefinition;
@@ -493,7 +514,6 @@ function LinkedDeepWorkCard({
     setSelectedFocusArea: (def: ExerciseDefinition | null) => void;
     setViewMode: (mode: 'session' | 'library') => void;
     handleToggleReadyForBranding: (id: string) => void;
-    handleStartEditDefinition: (def: ExerciseDefinition) => void;
     handleUnlinkItem: (type: 'upskill' | 'deepwork' | 'resource', id: string) => void;
     handleDeleteExerciseDefinition: (id: string) => void;
     handleViewProgress: (def: ExerciseDefinition, type: 'deepwork' | 'upskill') => void;
@@ -507,15 +527,28 @@ function LinkedDeepWorkCard({
     onOpenMindMap: (rootFocusAreaId: string) => void;
     getIcon: (nodeType: string) => React.ReactNode;
     getNodeType: (def: ExerciseDefinition, childIds: Set<string>) => string;
+    onUpdateName: (id: string, newName: string) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
+    
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [currentName, setCurrentName] = useState(deepworkDef.name);
     
     const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: transform ? 100 : 'auto', } : undefined;
 
     const setCombinedRefs = (node: HTMLElement | null) => {
         setNodeRef(node);
         setDroppableNodeRef(node);
+    };
+
+    const handleNameSave = () => {
+      if (currentName.trim()) {
+        onUpdateName(deepworkDef.id, currentName.trim());
+      } else {
+        setCurrentName(deepworkDef.name); // Revert if empty
+      }
+      setIsEditingName(false);
     };
     
     const isParent = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 || (deepworkDef.linkedUpskillIds?.length ?? 0) > 0 || (deepworkDef.linkedResourceIds?.length ?? 0) > 0;
@@ -576,18 +609,28 @@ function LinkedDeepWorkCard({
                             <span>Ready for Branding</span>
                         </DropdownMenuCheckboxItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onSelect={() => handleStartEditDefinition(deepworkDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => handleUnlinkItem('deepwork', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(deepworkDef.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                {getIcon(nodeType)}
-                <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={deepworkDef.name}>{deepworkDef.name}</span>
-                <Badge variant="outline" className="text-xs">{nodeType}</Badge>
-              </CardTitle>
+              {isEditingName ? (
+                <Input 
+                    value={currentName} 
+                    onChange={(e) => setCurrentName(e.target.value)} 
+                    onBlur={handleNameSave} 
+                    onKeyDown={(e) => e.key === 'Enter' && handleNameSave()}
+                    className="text-base font-semibold h-8"
+                    autoFocus
+                />
+              ) : (
+                <CardTitle className="text-base flex items-center gap-2 cursor-pointer" onClick={() => setIsEditingName(true)}>
+                  {getIcon(nodeType)}
+                  <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={deepworkDef.name}>{deepworkDef.name}</span>
+                  <Badge variant="outline" className="text-xs">{nodeType}</Badge>
+                </CardTitle>
+              )}
               <CardDescription>{deepworkDef.category}</CardDescription>
            </CardHeader>
            <CardContent className="flex-grow">
@@ -958,8 +1001,16 @@ function DeepWorkPageContent() {
     toast({ title: "Success", description: `Focus Area "${defToDelete.name}" removed.` });
   };
 
-  const handleStartEditDefinition = (def: ExerciseDefinition) => {
-    // This is handled in the library view now, direct edit on card is better UX
+  const handleUpdateDefinitionName = (id: string, newName: string) => {
+    setDeepWorkDefinitions(prev => prev.map(def => 
+        def.id === id ? { ...def, name: newName } : def
+    ));
+    setAllDeepWorkLogs(prevLogs => prevLogs.map(log => ({
+        ...log,
+        exercises: log.exercises.map(ex => 
+            ex.definitionId === id ? { ...ex, name: newName } : ex
+        )
+    })));
   };
 
   const handleToggleReadyForBranding = (definitionId: string) => {
@@ -1237,10 +1288,6 @@ function DeepWorkPageContent() {
 }, [manageLinksConfig, upskillDefinitions, deepWorkDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkUpskillTopic, linkDeepWorkTopic]);
 
 
-  const handleStartEditUpskill = (def: ExerciseDefinition) => {
-    router.push('/upskill');
-  };
-  
   const handleStartEditResource = (res: Resource) => {
     router.push('/resources');
   };
@@ -1618,11 +1665,11 @@ function DeepWorkPageContent() {
                                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                                     {(selectedFocusArea.linkedDeepWorkIds || []).map(id => {
                                         const def = deepWorkDefinitions.find(d => d.id === id);
-                                        return def ? <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getIcon, getNodeType, getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, setSelectedFocusArea, setViewMode, handleToggleReadyForBranding, handleStartEditDefinition, handleUnlinkItem, handleDeleteExerciseDefinition, handleViewProgress, deepWorkDefinitions, formatDuration, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic, linkedDeepWorkChildIds, onOpenMindMap:(id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); } }}/> : null;
+                                        return def ? <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getIcon, getNodeType, getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, setSelectedFocusArea, setViewMode, handleToggleReadyForBranding, handleUnlinkItem, handleDeleteExerciseDefinition, handleViewProgress, deepWorkDefinitions, formatDuration, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic, linkedDeepWorkChildIds, onOpenMindMap:(id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); }, onUpdateName: handleUpdateDefinitionName }}/> : null;
                                     })}
                                     {(selectedFocusArea.linkedUpskillIds || []).map(id => {
                                         const def = upskillDefinitions.find(d => d.id === id);
-                                        return def ? <LinkedUpskillCard key={id} id={id} upskillDef={def} {...{isUpskillObjectiveComplete, getUpskillLoggedMinutesRecursive, setEmbedUrl, setFloatingVideoUrl, handleViewProgress, handleStartEditUpskill, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteUpskillDefinition: (id) => handleDeleteUpskillDefinition(id), upskillDefinitions, formatDuration: formatDuration, calculatedEstimate: calculateTotalEstimate(def), setSelectedSubtopic, setViewMode }} /> : null;
+                                        return def ? <LinkedUpskillCard key={id} id={id} upskillDef={def} {...{isUpskillObjectiveComplete, getUpskillLoggedMinutesRecursive, setEmbedUrl, setFloatingVideoUrl, handleViewProgress, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteUpskillDefinition: (id) => handleDeleteUpskillDefinition(id), upskillDefinitions, formatDuration: formatDuration, calculatedEstimate: calculateTotalEstimate(def), setSelectedSubtopic, setViewMode, onUpdateName: () => {} }} /> : null;
                                     })}
                                     {(selectedFocusArea.linkedResourceIds || []).map(id => {
                                         const resource = resources.find(r => r.id === id);
