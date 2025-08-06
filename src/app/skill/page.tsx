@@ -46,6 +46,11 @@ function SkillPageContent() {
     upskillDefinitions,
     deepWorkDefinitions,
     openPistonsFor,
+    handleUpdateSkillArea,
+    handleDeleteSkillArea,
+    handleAddMicroSkill,
+    handleUpdateMicroSkill,
+    handleDeleteMicroSkill,
   } = useAuth();
   
   const router = useRouter();
@@ -60,9 +65,10 @@ function SkillPageContent() {
   const [newSpecializationNames, setNewSpecializationNames] = useState<Record<string, string>>({});
   const [newSkillAreaNames, setNewSkillAreaNames] = useState<Record<string, string>>({});
   
-  const [editingArea, setEditingArea] = useState<SkillArea | null>(null);
+  const [editingArea, setEditingArea] = useState<{skillId: string, area: SkillArea} | null>(null);
   const [addingMicroSkillTo, setAddingMicroSkillTo] = useState<string | null>(null);
   const [newMicroSkillName, setNewMicroSkillName] = useState('');
+  const [editingMicroSkill, setEditingMicroSkill] = useState<{skillId: string, areaId: string, microSkill: MicroSkill} | null>(null);
   
   // Project state
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -137,45 +143,6 @@ function SkillPageContent() {
     setCoreSkills(prev => prev.map(s => s.id === skillId ? { ...s, skillAreas: [...s.skillAreas, newArea] } : s));
     setNewSkillAreaNames(prev => ({...prev, [skillId]: ''}));
   };
-
-  const handleUpdateSkillArea = (skillId: string, areaId: string, name: string, purpose: string) => {
-    setCoreSkills(prev => prev.map(s => {
-        if (s.id === skillId) {
-            return { ...s, skillAreas: s.skillAreas.map(a => a.id === areaId ? { ...a, name, purpose } : a) };
-        }
-        return s;
-    }));
-  };
-  
-  const handleDeleteSkillArea = (skillId: string, areaId: string) => {
-     setCoreSkills(prev => prev.map(s => s.id === skillId ? { ...s, skillAreas: s.skillAreas.filter(a => a.id !== areaId) } : s));
-  };
-  
-  const handleAddMicroSkill = (coreSkillId: string, areaId: string) => {
-    if (!newMicroSkillName.trim()) {
-        toast({ title: 'Error', description: 'Micro-skill name cannot be empty.', variant: "destructive" });
-        return;
-    }
-  
-    setCoreSkills(prev => prev.map(s => {
-      if (s.id === coreSkillId) {
-        const newSkillAreas = s.skillAreas.map(area => {
-          if (area.id === areaId) {
-            const newMicroSkill = { id: `ms_${Date.now()}`, name: newMicroSkillName.trim() };
-            return { ...area, microSkills: [...area.microSkills, newMicroSkill] };
-          }
-          return area;
-        });
-        return { ...s, skillAreas: newSkillAreas };
-      }
-      return s;
-    }));
-  
-    toast({ title: 'Micro-Skill Added', description: `"${newMicroSkillName}" has been added.` });
-    setNewMicroSkillName('');
-    setAddingMicroSkillTo(null);
-  };
-
 
   const handleAddProject = (e: React.FormEvent) => {
     e.preventDefault();
@@ -559,71 +526,88 @@ function SkillPageContent() {
                                       </div>
                                     </AccordionTrigger>
                                     <div className="flex items-center">
-                                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setAddingMicroSkillTo(area.id); }}>
-                                        <Plus className="h-4 w-4"/>
-                                      </Button>
+                                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingArea({skillId: selectedCoreSkill.id, area}); }}><Edit className="h-4 w-4"/></Button>
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive"/></Button></AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Delete "{area.name}"?</AlertDialogTitle>
+                                                <AlertDialogDescription>This will permanently delete the skill area and all its micro-skills.</AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => handleDeleteSkillArea(selectedCoreSkill.id, area.id)}>Delete</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
                                     </div>
                                   </div>
                                 </CardHeader>
                                 <AccordionContent className="px-3 pb-3">
-                                  {addingMicroSkillTo === area.id && (
-                                    <div className="flex items-center gap-2 mb-4 p-2 border rounded-md">
-                                        <Input
-                                            value={newMicroSkillName}
-                                            onChange={(e) => setNewMicroSkillName(e.target.value)}
-                                            onKeyDown={(e) => e.key === 'Enter' && handleAddMicroSkill(selectedCoreSkill!.id, area.id)}
-                                            placeholder="New micro-skill name..."
-                                            className="h-8"
-                                            autoFocus
-                                        />
-                                        <Button size="sm" onClick={() => handleAddMicroSkill(selectedCoreSkill!.id, area.id)}>Save</Button>
-                                        <Button size="sm" variant="ghost" onClick={() => { setNewMicroSkillName(''); setAddingMicroSkillTo(null); }}>Cancel</Button>
-                                    </div>
-                                  )}
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {area.microSkills.map(micro => {
                                         const filteredIntentions = intentions.filter(def => def.category === micro.name);
                                         const filteredCuriosities = curiosities.filter(def => def.category === micro.name);
                                         const linkedProjects = projectsBySkill.get(micro.id) || [];
                                         return (
-                                            <Card key={micro.id} className="flex flex-col">
-                                            <CardHeader className="p-3 flex flex-row items-center justify-between">
-                                                <CardTitle className="text-base">{micro.name}</CardTitle>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openPistonsFor({view: 'specializations', topicId: micro.name, topicName: micro.name})}>
-                                                    <BrainCircuit className="h-4 w-4" />
-                                                </Button>
-                                            </CardHeader>
-                                            <CardContent className="p-3 flex-grow space-y-3">
-                                                <div>
-                                                <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><BookCopy className="h-3 w-3"/>Curiosities</h4>
-                                                {filteredCuriosities.length > 0 ? (
-                                                    <ul className="list-disc list-inside text-xs space-y-0.5">
-                                                        {filteredCuriosities.map(t => <li key={t.id} className="cursor-pointer hover:text-primary" onClick={() => setSelectedIntention(t)}>{t.name}</li>)}
-                                                    </ul>
-                                                ) : <p className="text-xs text-muted-foreground italic">None</p>}
-                                                </div>
-                                                <Separator />
-                                                <div>
-                                                <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><Briefcase className="h-3 w-3"/>Intentions</h4>
-                                                {filteredIntentions.length > 0 ? (
-                                                    <ul className="list-disc list-inside text-xs space-y-0.5">
-                                                        {filteredIntentions.map(t => <li key={t.id} className="cursor-pointer hover:text-primary" onClick={() => setSelectedIntention(t)}>{t.name}</li>)}
-                                                    </ul>
-                                                ) : <p className="text-xs text-muted-foreground italic">None</p>}
-                                                </div>
-                                                <Separator />
-                                                <div>
-                                                <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><Sprout className="h-3 w-3"/>Project Usage</h4>
-                                                {linkedProjects.length > 0 ? (
-                                                    <ul className="list-disc list-inside text-xs space-y-0.5">
-                                                        {linkedProjects.map(p => <li key={p.id}>{p.name}</li>)}
-                                                    </ul>
-                                                ) : <p className="text-xs text-muted-foreground italic">Not used</p>}
-                                                </div>
-                                            </CardContent>
+                                            <Card key={micro.id} className="flex flex-col group/item">
+                                                <CardHeader className="p-3 flex flex-row items-center justify-between">
+                                                    <CardTitle className="text-base">{micro.name}</CardTitle>
+                                                    <div className="flex items-center opacity-0 group-hover/item:opacity-100">
+                                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingMicroSkill({skillId: selectedCoreSkill.id, areaId: area.id, microSkill: micro})}><Edit className="h-4 w-4"/></Button>
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive"/></Button></AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader><AlertDialogTitle>Delete "{micro.name}"?</AlertDialogTitle></AlertDialogHeader>
+                                                                <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteMicroSkill(selectedCoreSkill.id, area.id, micro.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent className="p-3 flex-grow space-y-3">
+                                                    <div>
+                                                    <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><BookCopy className="h-3 w-3"/>Curiosities</h4>
+                                                    {filteredCuriosities.length > 0 ? (
+                                                        <ul className="list-disc list-inside text-xs space-y-0.5">
+                                                            {filteredCuriosities.map(t => <li key={t.id} className="cursor-pointer hover:text-primary" onClick={() => setSelectedIntention(t)}>{t.name}</li>)}
+                                                        </ul>
+                                                    ) : <p className="text-xs text-muted-foreground italic">None</p>}
+                                                    </div>
+                                                    <Separator />
+                                                    <div>
+                                                    <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><Briefcase className="h-3 w-3"/>Intentions</h4>
+                                                    {filteredIntentions.length > 0 ? (
+                                                        <ul className="list-disc list-inside text-xs space-y-0.5">
+                                                            {filteredIntentions.map(t => <li key={t.id} className="cursor-pointer hover:text-primary" onClick={() => setSelectedIntention(t)}>{t.name}</li>)}
+                                                        </ul>
+                                                    ) : <p className="text-xs text-muted-foreground italic">None</p>}
+                                                    </div>
+                                                    <Separator />
+                                                    <div>
+                                                    <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><Sprout className="h-3 w-3"/>Project Usage</h4>
+                                                    {linkedProjects.length > 0 ? (
+                                                        <ul className="list-disc list-inside text-xs space-y-0.5">
+                                                            {linkedProjects.map(p => <li key={p.id}>{p.name}</li>)}
+                                                        </ul>
+                                                    ) : <p className="text-xs text-muted-foreground italic">Not used</p>}
+                                                    </div>
+                                                </CardContent>
                                             </Card>
                                         )
                                     })}
+                                     <Card className="flex flex-col items-center justify-center border-dashed min-h-[12rem] hover:border-primary hover:bg-muted/50 transition-colors">
+                                        <form onSubmit={(e) => handleAddMicroSkill(e, selectedCoreSkill.id, area.id)} className="flex items-center gap-2 mt-2 pt-2 w-full p-4">
+                                            <Input
+                                                value={newMicroSkillNames[area.id] || ''}
+                                                onChange={e => setNewMicroSkillNames(prev => ({...prev, [area.id]: e.target.value}))}
+                                                placeholder="Add new micro-skill..."
+                                                className="h-8"
+                                            />
+                                            <Button size="icon" type="submit" className="h-8 w-8 shrink-0">
+                                                <PlusCircle className="h-4 w-4" />
+                                            </Button>
+                                        </form>
+                                     </Card>
                                   </div>
                                 </AccordionContent>
                               </AccordionItem>
@@ -804,6 +788,45 @@ function SkillPageContent() {
             </div>
         </div>
        )}
+       {editingArea && (
+        <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setEditingArea(null)}>
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" onClick={(e) => e.stopPropagation()}>
+                <Card className="w-96">
+                    <CardHeader><CardTitle>Edit Skill Area</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                        <div>
+                            <Label htmlFor="area-name">Name</Label>
+                            <Input id="area-name" value={editingArea.area.name} onChange={(e) => setEditingArea(prev => prev ? {...prev, area: {...prev.area, name: e.target.value}} : null)} />
+                        </div>
+                        <div>
+                            <Label htmlFor="area-purpose">Purpose</Label>
+                            <Textarea id="area-purpose" value={editingArea.area.purpose} onChange={(e) => setEditingArea(prev => prev ? {...prev, area: {...prev.area, purpose: e.target.value}} : null)} />
+                        </div>
+                    </CardContent>
+                    <CardFooter className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={() => setEditingArea(null)}>Cancel</Button>
+                        <Button onClick={() => { handleUpdateSkillArea(editingArea.skillId, editingArea.area.id, editingArea.area.name, editingArea.area.purpose); setEditingArea(null); }}>Save</Button>
+                    </CardFooter>
+                </Card>
+            </div>
+        </div>
+       )}
+       {editingMicroSkill && (
+         <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setEditingMicroSkill(null)}>
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" onClick={(e) => e.stopPropagation()}>
+                <Card className="w-96">
+                    <CardHeader><CardTitle>Rename Micro-Skill</CardTitle></CardHeader>
+                    <CardContent>
+                        <Input value={editingMicroSkill.microSkill.name} onChange={(e) => setEditingMicroSkill(prev => prev ? {...prev, microSkill: {...prev.microSkill, name: e.target.value}} : null)} autoFocus/>
+                    </CardContent>
+                    <CardFooter className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={() => setEditingMicroSkill(null)}>Cancel</Button>
+                        <Button onClick={() => { handleUpdateMicroSkill(editingMicroSkill.skillId, editingMicroSkill.areaId, editingMicroSkill.microSkill.id, editingMicroSkill.microSkill.name); setEditingMicroSkill(null); }}>Save</Button>
+                    </CardFooter>
+                </Card>
+            </div>
+        </div>
+       )}
         {editingProject && (
          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setEditingProject(null)}>
             <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" onClick={(e) => e.stopPropagation()}>
@@ -903,3 +926,4 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
+

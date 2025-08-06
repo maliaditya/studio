@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, DeepWorkTopicMetadata, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -177,6 +177,11 @@ interface AuthContextType {
   setCoreSkills: React.Dispatch<React.SetStateAction<CoreSkill[]>>;
   projects: Project[];
   setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
+  handleUpdateSkillArea: (skillId: string, areaId: string, name: string, purpose: string) => void;
+  handleDeleteSkillArea: (skillId: string, areaId: string) => void;
+  handleAddMicroSkill: (coreSkillId: string, areaId: string, name: string) => void;
+  handleUpdateMicroSkill: (coreSkillId: string, areaId: string, microSkillId: string, name: string) => void;
+  handleDeleteMicroSkill: (coreSkillId: string, areaId: string, microSkillId: string) => void;
 
   // Professional Experience
   companies: Company[];
@@ -1408,6 +1413,65 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const handleUpdateSkillArea = (skillId: string, areaId: string, name: string, purpose: string) => {
+    setCoreSkills(prev => prev.map(s => {
+        if (s.id === skillId) {
+            return { ...s, skillAreas: s.skillAreas.map(a => a.id === areaId ? { ...a, name, purpose } : a) };
+        }
+        return s;
+    }));
+  };
+  
+  const handleDeleteSkillArea = (skillId: string, areaId: string) => {
+     setCoreSkills(prev => prev.map(s => s.id === skillId ? { ...s, skillAreas: s.skillAreas.filter(a => a.id !== areaId) } : s));
+  };
+  
+  const handleAddMicroSkill = (coreSkillId: string, areaId: string, name: string) => {
+    if (!name.trim()) { toast({ title: 'Error', description: 'Micro-skill name cannot be empty.', variant: "destructive" }); return; }
+    setCoreSkills(prev => prev.map(s => {
+      if (s.id === coreSkillId) {
+        return { ...s, skillAreas: s.skillAreas.map(area => {
+            if (area.id === areaId) {
+                const newMicroSkill = { id: `ms_${Date.now()}`, name: name.trim() };
+                return { ...area, microSkills: [...area.microSkills, newMicroSkill] };
+            }
+            return area;
+        }) };
+      }
+      return s;
+    }));
+    toast({ title: 'Micro-Skill Added' });
+  };
+  
+  const handleUpdateMicroSkill = (coreSkillId: string, areaId: string, microSkillId: string, name: string) => {
+    setCoreSkills(prev => prev.map(s => {
+        if (s.id === coreSkillId) {
+            return { ...s, skillAreas: s.skillAreas.map(area => {
+                if (area.id === areaId) {
+                    return { ...area, microSkills: area.microSkills.map(ms => ms.id === microSkillId ? {...ms, name} : ms) };
+                }
+                return area;
+            }) };
+        }
+        return s;
+    }));
+  };
+  
+  const handleDeleteMicroSkill = (coreSkillId: string, areaId: string, microSkillId: string) => {
+    setCoreSkills(prev => prev.map(s => {
+        if (s.id === coreSkillId) {
+            return { ...s, skillAreas: s.skillAreas.map(area => {
+                if (area.id === areaId) {
+                    return { ...area, microSkills: area.microSkills.filter(ms => ms.id !== microSkillId) };
+                }
+                return area;
+            }) };
+        }
+        return s;
+    }));
+  };
+
+
   const ResourcePopup: React.FC<ResourcePopupProps> = useCallback(({ popupState }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `popup-${popupState.resourceId}` });
     
@@ -1529,6 +1593,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     skillDomains, setSkillDomains,
     coreSkills, setCoreSkills,
     projects, setProjects,
+    handleUpdateSkillArea,
+    handleDeleteSkillArea,
+    handleAddMicroSkill,
+    handleUpdateMicroSkill,
+    handleDeleteMicroSkill,
     companies, setCompanies,
     positions, setPositions,
     selectedSubtopic, setSelectedSubtopic,
@@ -1549,5 +1618,6 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
 
 
