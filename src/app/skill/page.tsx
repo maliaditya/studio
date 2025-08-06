@@ -35,7 +35,7 @@ import { IntentionDetailModal } from '@/components/IntentionDetailModal';
 import { SkillLibrary } from '@/components/SkillLibrary';
 
 function SkillPageContent() {
-  const { toast } = useToast();
+  const { toast } = useAuth();
   const { 
     skillDomains, setSkillDomains, 
     coreSkills, setCoreSkills, 
@@ -64,6 +64,7 @@ function SkillPageContent() {
 
   const [newSpecializationNames, setNewSpecializationNames] = useState<Record<string, string>>({});
   const [newSkillAreaNames, setNewSkillAreaNames] = useState<Record<string, string>>({});
+  const [newMicroSkillNames, setNewMicroSkillNames] = useState<Record<string, string>>({});
   
   const [editingArea, setEditingArea] = useState<{skillId: string, area: SkillArea} | null>(null);
   const [addingMicroSkillTo, setAddingMicroSkillTo] = useState<string | null>(null);
@@ -596,7 +597,11 @@ function SkillPageContent() {
                                         )
                                     })}
                                      <Card className="flex flex-col items-center justify-center border-dashed min-h-[12rem] hover:border-primary hover:bg-muted/50 transition-colors">
-                                        <form onSubmit={(e) => handleAddMicroSkill(e, selectedCoreSkill.id, area.id)} className="flex items-center gap-2 mt-2 pt-2 w-full p-4">
+                                        <form onSubmit={(e) => {
+                                            e.preventDefault();
+                                            handleAddMicroSkill(selectedCoreSkill.id, area.id, newMicroSkillNames[area.id] || '');
+                                            setNewMicroSkillNames(prev => ({ ...prev, [area.id]: '' }));
+                                        }} className="flex items-center gap-2 mt-2 pt-2 w-full p-4">
                                             <Input
                                                 value={newMicroSkillNames[area.id] || ''}
                                                 onChange={e => setNewMicroSkillNames(prev => ({...prev, [area.id]: e.target.value}))}
@@ -926,4 +931,3 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
-
