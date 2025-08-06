@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -206,8 +207,8 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
     <div ref={setCombinedRefs} style={style} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
       <Card className={cn("relative group transition-all duration-300 hover:shadow-xl", isComplete && "opacity-70 bg-muted/30")}>
         <div className="absolute inset-0 z-0" onMouseDown={(e) => isDragging && e.stopPropagation()}/>
-         <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
-            <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"><GripVertical className="h-4 w-4" /></Button>
+         <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
             <TooltipProvider>
                 <Tooltip><TooltipTrigger asChild><span tabIndex={nodeType === 'Visualization' || nodeType === 'Standalone' ? 0 : -1}><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); (nodeType === 'Visualization' || nodeType === 'Standalone') && handleAddTaskToSession(upskillDef); }} disabled={nodeType !== 'Visualization' && nodeType !== 'Standalone'}><PlusCircle className="h-4 w-4" /></Button></span></TooltipTrigger><TooltipContent>{nodeType === 'Visualization' || nodeType === 'Standalone' ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent></Tooltip>
             </TooltipProvider>
@@ -327,7 +328,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
                   <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                           <span className="truncate" title={resource.name}>
+                            <span className="truncate" title={resource.name}>
                                 {resource.name.length > 25 ? `${resource.name.substring(0, 25)}...` : resource.name}
                             </span>
                         </TooltipTrigger>
@@ -368,8 +369,8 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
   return (
     <div ref={setCombinedRefs} style={style} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
         <Card className="relative group transition-all duration-300 hover:shadow-xl">
-            <div {...listeners} {...attributes} className="absolute inset-0 z-0"/>
             <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
                 {embedLinkForModal ? (
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setEmbedUrl(embedLinkForModal)}><Expand className="h-4 w-4" /></Button>
                 ) : (
