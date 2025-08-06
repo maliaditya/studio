@@ -162,7 +162,11 @@ export type Activity = {
   slot: string;
 };
 
-export type DailySchedule = Record<string, Activity[]>; // Slot name -> Array of Activities
+export interface DailySchedule {
+  purpose?: string;
+  [slotName: string]: Activity[] | string | undefined;
+}
+
 export type FullSchedule = Record<string, DailySchedule>; // Date key -> DailySchedule
 
 // Productization Plan types

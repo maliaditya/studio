@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -77,6 +77,8 @@ interface AuthContextType {
   // Global Schedule & Agenda State
   schedule: FullSchedule;
   setSchedule: React.Dispatch<React.SetStateAction<FullSchedule>>;
+  dailyPurposes: Record<string, string>;
+  setDailyPurposes: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   isAgendaDocked: boolean;
   setIsAgendaDocked: React.Dispatch<React.SetStateAction<boolean>>;
   activityDurations: Record<string, string>;
@@ -231,6 +233,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Schedule & Logs
   const [schedule, setSchedule] = useState<FullSchedule>({});
+  const [dailyPurposes, setDailyPurposes] = useState<Record<string, string>>({});
   const [isAgendaDocked, setIsAgendaDocked] = useState(true);
   const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
   const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
@@ -355,6 +358,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Schedule & Logs
       try { const d = localStorage.getItem(`lifeos_schedule_${username}`); setSchedule(d ? JSON.parse(d) : {}); } catch (e) { setSchedule({}); }
+      try { const d = localStorage.getItem(`lifeos_daily_purposes_${username}`); setDailyPurposes(d ? JSON.parse(d) : {}); } catch (e) { setDailyPurposes({}); }
       try { const d = localStorage.getItem(`upskill_logs_${username}`); setAllUpskillLogs(d ? JSON.parse(d) : []); } catch (e) { setAllUpskillLogs([]); }
       try { const d = localStorage.getItem(`deepwork_logs_${username}`); setAllDeepWorkLogs(d ? JSON.parse(d) : []); } catch (e) { setAllDeepWorkLogs([]); }
       try { const d = localStorage.getItem(`allWorkoutLogs_${username}`); setAllWorkoutLogs(d ? JSON.parse(d) : []); } catch (e) { setAllWorkoutLogs([]); }
@@ -398,6 +402,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`activeResourceTabIds_${username}`); setActiveResourceTabIds(d ? JSON.parse(d) : []); } catch (e) { setActiveResourceTabIds([]); }
       const storedSelectedFolder = loadItem(`selectedResourceFolderId_${username}`, false);
       setSelectedResourceFolderId(storedSelectedFolder || null);
+
       
       // Canvas Data
       try { const d = localStorage.getItem(`canvas_layout_${username}`); setCanvasLayout(d ? JSON.parse(d) : { nodes: [], edges: [] }); } catch (e) { setCanvasLayout({ nodes: [], edges: [] }); }
@@ -435,7 +440,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } else {
       // Clear all data on logout
       setWeightLogs([]); setGoalWeight(null); setHeight(null); setDateOfBirth(null); setGender(null); setDietPlan([]);
-      setSchedule({});
+      setSchedule({}); setDailyPurposes({});
       setAllUpskillLogs([]); setAllDeepWorkLogs([]); setAllWorkoutLogs([]); setAllBrandingLogs([]); setAllLeadGenLogs([]);
       setWorkoutMode('two-muscle'); setWorkoutPlans(INITIAL_PLANS); setExerciseDefinitions(DEFAULT_EXERCISE_DEFINITIONS);
       setUpskillDefinitions([]); setTopicGoals({});
@@ -469,6 +474,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       // Schedule & Logs
       localStorage.setItem(`lifeos_schedule_${username}`, JSON.stringify(schedule));
+      localStorage.setItem(`lifeos_daily_purposes_${username}`, JSON.stringify(dailyPurposes));
       localStorage.setItem(`upskill_logs_${username}`, JSON.stringify(allUpskillLogs));
       localStorage.setItem(`deepwork_logs_${username}`, JSON.stringify(allDeepWorkLogs));
       localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(allWorkoutLogs));
@@ -517,7 +523,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
-    schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
+    schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
     exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions,
     productizationPlans, offerizationPlans,
     resources, resourceFolders, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId,
@@ -665,6 +671,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setOfferizationPlans(data.offerizationPlans || {});
 
     setSchedule(data.schedule || {});
+    setDailyPurposes(data.dailyPurposes || {});
 
     setDietPlan(data.dietPlan || []);
     setWeightLogs(data.weightLogs || []);
@@ -742,6 +749,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       productizationPlans,
       offerizationPlans,
       schedule,
+      dailyPurposes,
       dietPlan, weightLogs, goalWeight, height, dateOfBirth, gender,
       resources: resourcesToSave, resourceFolders, pinnedFolderIds: Array.from(pinnedFolderIds),
       activeResourceTabIds, selectedResourceFolderId,
@@ -1564,7 +1572,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isAudioPlaying, setIsAudioPlaying,
     globalVolume, setGlobalVolume,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
-    schedule, setSchedule, isAgendaDocked, setIsAgendaDocked, activityDurations, setActivityDurations,
+    schedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations, setActivityDurations,
     handleToggleComplete, handleLogLearning, carryForwardTask, scheduleTaskFromMindMap,
     allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs, allLeadGenLogs, setAllLeadGenLogs,
     workoutMode, setWorkoutMode, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
@@ -1618,6 +1626,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-
-
-

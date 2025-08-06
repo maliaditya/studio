@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -176,8 +177,20 @@ export function TodaysScheduleCard({
   onStartLeadGenLog,
   onToggleComplete,
 }: TodaysScheduleCardProps) {
-  const { carryForwardTask, openPistonsFor } = useAuth();
+  const { carryForwardTask, dailyPurposes, setDailyPurposes } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
+  
+  const [purposeText, setPurposeText] = useState(dailyPurposes[dayKey] || '');
+  const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
+
+  useEffect(() => {
+    setPurposeText(dailyPurposes[dayKey] || '');
+  }, [dailyPurposes, dayKey]);
+
+  const handleSavePurpose = () => {
+    setDailyPurposes(prev => ({...prev, [dayKey]: purposeText}));
+    setPurposePopoverOpen(false);
+  };
 
   const todaysSchedule = React.useMemo(() => {
     return schedule[dayKey] || {};
@@ -292,7 +305,32 @@ export function TodaysScheduleCard({
                 </span>
               )}
             </div>
-            {isAgendaDocked && <CardDescription className="text-xs mt-1">A sequential view of your scheduled activities.</CardDescription>}
+            {isAgendaDocked && (
+                <div className="flex items-center gap-2 mt-1">
+                    <Popover open={purposePopoverOpen} onOpenChange={setPurposePopoverOpen}>
+                        <PopoverTrigger asChild>
+                            <button className="flex items-center gap-2 text-left cursor-pointer group">
+                                <BrainCircuit className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                <CardDescription className="text-xs group-hover:text-foreground transition-colors truncate" title={purposeText}>
+                                    {purposeText || "Click to set a daily purpose..."}
+                                </CardDescription>
+                            </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80">
+                            <div className="grid gap-4">
+                                <div className="space-y-2">
+                                    <h4 className="font-medium leading-none">Daily Purpose</h4>
+                                    <p className="text-sm text-muted-foreground">Set your main intention for today.</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <Input value={purposeText} onChange={(e) => setPurposeText(e.target.value)} />
+                                    <Button onClick={handleSavePurpose} className="w-full">Save Purpose</Button>
+                                </div>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+                </div>
+            )}
           </div>
           <div className="flex items-center">
             <Popover>
@@ -340,10 +378,6 @@ export function TodaysScheduleCard({
                 )}
               </PopoverContent>
             </Popover>
-            <Button variant="ghost" size="icon" onClick={() => openPistonsFor({ view: 'main' })} className="h-8 w-8">
-                <BrainCircuit className="h-4 w-4" />
-                <span className="sr-only">Open Purpose Pistons</span>
-            </Button>
             <Button variant="ghost" size="icon" onClick={onToggleDock} className="h-8 w-8">
               {isAgendaDocked ? <Move className="h-4 w-4" /> : <Dock className="h-4 w-4" />}
             </Button>
