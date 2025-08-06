@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 interface SkillLibraryProps {
@@ -189,9 +190,24 @@ export function SkillLibrary({
                             autoFocus
                           />
                         ) : (
-                          <button onClick={() => onSelectFocusArea(task)} onDoubleClick={() => handleStartEditing(task)} className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground hover:bg-muted flex items-center gap-2 min-w-0">
-                              {pageType === 'deepwork' ? getDeepWorkIcon(task) : getUpskillIcon(task)}
-                              <span className="truncate" title={task.name}>{task.name}</span>
+                          <button
+                            onDoubleClick={() => handleStartEditing(task)}
+                            onClick={() => onSelectFocusArea(task)}
+                            className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground hover:bg-muted flex items-center gap-2 min-w-0"
+                          >
+                            {pageType === 'deepwork' ? getDeepWorkIcon(task) : getUpskillIcon(task)}
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span className="truncate" title={task.name}>
+                                            {task.name.length > 25 ? `${task.name.substring(0, 25)}...` : task.name}
+                                        </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>{task.name}</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
                           </button>
                         )}
                         <AlertDialog>
