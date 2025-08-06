@@ -31,10 +31,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <MatrixBackground />
       <ClothBackground />
       <Header />
-      <PistonsHead 
-        isPistonsHeadOpen={isPistonsHeadOpen}
-        setIsPistonsHeadOpen={setIsPistonsHeadOpen}
-      />
+      <PistonsHead />
       <main>{children}</main>
       <Toaster />
       <BackgroundAudioPlayer />

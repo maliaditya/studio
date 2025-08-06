@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule } from '@/types/workout';
 import {
-  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle
+  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
@@ -176,7 +176,7 @@ export function TodaysScheduleCard({
   onStartLeadGenLog,
   onToggleComplete,
 }: TodaysScheduleCardProps) {
-  const { carryForwardTask } = useAuth();
+  const { carryForwardTask, openPistonsFor } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
 
   const todaysSchedule = React.useMemo(() => {
@@ -340,6 +340,10 @@ export function TodaysScheduleCard({
                 )}
               </PopoverContent>
             </Popover>
+            <Button variant="ghost" size="icon" onClick={() => openPistonsFor({ view: 'main' })} className="h-8 w-8">
+                <BrainCircuit className="h-4 w-4" />
+                <span className="sr-only">Open Purpose Pistons</span>
+            </Button>
             <Button variant="ghost" size="icon" onClick={onToggleDock} className="h-8 w-8">
               {isAgendaDocked ? <Move className="h-4 w-4" /> : <Dock className="h-4 w-4" />}
             </Button>
