@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
@@ -60,6 +61,31 @@ export function SkillLibrary({
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
   const [editingFocusAreaId, setEditingFocusAreaId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  
+  const [expandedItems, setExpandedItems] = useState<string[]>(['skills-domains', 'projects']);
+
+  const { currentUser } = useAuth();
+  const expandedItemsKey = React.useMemo(() => currentUser ? `lifeos_expanded_sidebar_${pageType}_${currentUser.username}` : null, [currentUser, pageType]);
+
+  useEffect(() => {
+    if (expandedItemsKey) {
+        try {
+            const stored = localStorage.getItem(expandedItemsKey);
+            if (stored) {
+                setExpandedItems(JSON.parse(stored));
+            }
+        } catch (e) {
+            console.error("Failed to parse expanded items state from localStorage", e);
+        }
+    }
+  }, [expandedItemsKey]);
+
+  const handleExpansionChange = (value: string[]) => {
+    setExpandedItems(value);
+    if (expandedItemsKey) {
+      localStorage.setItem(expandedItemsKey, JSON.stringify(value));
+    }
+  };
 
 
   const handleBack = () => {
@@ -303,7 +329,7 @@ export function SkillLibrary({
 
     // Root View
     return (
-        <Accordion type="multiple" className="w-full" defaultValue={['skills-domains', 'projects']}>
+        <Accordion type="multiple" className="w-full" value={expandedItems} onValueChange={handleExpansionChange}>
             <AccordionItem value="skills-domains">
                 <AccordionTrigger>Skills</AccordionTrigger>
                 <AccordionContent>

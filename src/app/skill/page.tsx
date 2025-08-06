@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
@@ -35,8 +35,9 @@ import { IntentionDetailModal } from '@/components/IntentionDetailModal';
 import { SkillLibrary } from '@/components/SkillLibrary';
 
 function SkillPageContent() {
-  const { toast } = useAuth();
+  const { toast } = useToast();
   const { 
+    currentUser,
     skillDomains, setSkillDomains, 
     coreSkills, setCoreSkills, 
     projects, setProjects,
@@ -89,6 +90,29 @@ function SkillPageContent() {
 
   // State for the modal
   const [selectedIntention, setSelectedIntention] = useState<ExerciseDefinition | null>(null);
+
+  const [expandedDomains, setExpandedDomains] = useState<string[]>([]);
+  const expandedDomainsKey = useMemo(() => currentUser ? `lifeos_expanded_skill_domains_${currentUser.username}` : null, [currentUser]);
+  
+  useEffect(() => {
+    if (expandedDomainsKey) {
+        try {
+            const stored = localStorage.getItem(expandedDomainsKey);
+            if (stored) {
+                setExpandedDomains(JSON.parse(stored));
+            }
+        } catch (e) {
+            console.error("Failed to parse expanded domains state from localStorage", e);
+        }
+    }
+  }, [expandedDomainsKey]);
+
+  const handleDomainExpansionChange = (value: string[]) => {
+    setExpandedDomains(value);
+    if (expandedDomainsKey) {
+      localStorage.setItem(expandedDomainsKey, JSON.stringify(value));
+    }
+  };
 
 
   const handleAddDomain = (e: React.FormEvent) => {
@@ -401,7 +425,7 @@ function SkillPageContent() {
               <CardDescription>Define domains, skills, projects, and work history.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Accordion type="multiple" className="w-full">
+              <Accordion type="multiple" className="w-full" value={expandedDomains} onValueChange={handleDomainExpansionChange}>
                 <AccordionItem value="skills">
                   <AccordionTrigger>Skills &amp; Projects</AccordionTrigger>
                   <AccordionContent>
