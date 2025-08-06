@@ -132,12 +132,11 @@ const DraggableSubtaskItem: React.FC<{
     );
 };
 
-function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleStartEditSubtopic, handleUnlinkItem, handleDeleteSubtopic, handleViewProgress, isComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate, setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds }: {
+function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleUnlinkItem, handleDeleteSubtopic, handleViewProgress, isComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate, setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName }: {
   upskillDef: ExerciseDefinition;
   handleAddTaskToSession: (def: ExerciseDefinition) => void;
   setSelectedSubtopic: (def: ExerciseDefinition | null) => void;
   setViewMode: (mode: 'session' | 'library') => void;
-  handleStartEditSubtopic: (def: ExerciseDefinition) => void;
   handleUnlinkItem: (type: 'upskill' | 'resource', id: string) => void;
   handleDeleteSubtopic: (id: string) => void;
   handleViewProgress: (def: ExerciseDefinition) => void;
@@ -149,10 +148,13 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
   setEmbedUrl: (url: string | null) => void;
   setFloatingVideoUrl: (url: string | null) => void;
   linkedUpskillChildIds: Set<string>;
+  onUpdateName: (id: string, newName: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: upskillDef.id });
   const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: upskillDef.id });
   const router = useRouter();
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [currentName, setCurrentName] = useState(upskillDef.name);
 
   const setCombinedRefs = (node: HTMLElement | null) => {
     setNodeRef(node);
@@ -192,6 +194,15 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
     return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim();
   };
 
+  const handleNameSave = () => {
+    if (currentName.trim()) {
+      onUpdateName(upskillDef.id, currentName.trim());
+    } else {
+      setCurrentName(upskillDef.name); // Revert if empty
+    }
+    setIsEditingName(false);
+  };
+
   return (
     <div ref={setCombinedRefs} style={style} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
       <Card className={cn("relative group transition-all duration-300 hover:shadow-xl", isComplete && "opacity-70 bg-muted/30")}>
@@ -202,15 +213,28 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
                 <Tooltip><TooltipTrigger asChild><span tabIndex={nodeType === 'Visualization' || nodeType === 'Standalone' ? 0 : -1}><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); (nodeType === 'Visualization' || nodeType === 'Standalone') && handleAddTaskToSession(upskillDef); }} disabled={nodeType !== 'Visualization' && nodeType !== 'Standalone'}><PlusCircle className="h-4 w-4" /></Button></span></TooltipTrigger><TooltipContent>{nodeType === 'Visualization' || nodeType === 'Standalone' ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent></Tooltip>
             </TooltipProvider>
             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setSelectedSubtopic(upskillDef); setViewMode('library'); }}><ArrowRight className="h-4 w-4" /></Button>
-            <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => handleViewProgress(upskillDef)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => handleStartEditSubtopic(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem><DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', upskillDef.id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteSubtopic(upskillDef.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+            <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => handleViewProgress(upskillDef)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', upskillDef.id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteSubtopic(upskillDef.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
         </div>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            {getIcon()}
-            <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={upskillDef.name}>{upskillDef.name}</span>
-             <Badge variant="outline" className="text-xs">{nodeType}</Badge>
-          </CardTitle>
-          <CardDescription>{upskillDef.category}</CardDescription>
+            <div className="flex items-center gap-2">
+                {getIcon()}
+                {isEditingName ? (
+                    <Input 
+                        value={currentName}
+                        onChange={(e) => setCurrentName(e.target.value)}
+                        onBlur={handleNameSave}
+                        onKeyDown={(e) => e.key === 'Enter' && handleNameSave()}
+                        className="text-base font-semibold h-8 flex-grow"
+                        autoFocus
+                    />
+                ) : (
+                    <CardTitle className="text-base flex items-center gap-2 cursor-pointer" onClick={() => setIsEditingName(true)}>
+                        <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={upskillDef.name}>{upskillDef.name}</span>
+                    </CardTitle>
+                )}
+                 <Badge variant="outline" className="text-xs">{nodeType}</Badge>
+            </div>
+            <CardDescription>{upskillDef.category}</CardDescription>
         </CardHeader>
         <CardContent className="min-h-[50px]">
             {isParent ? (
@@ -365,7 +389,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
 }
 
 function UpskillPageContent() {
-  const { toast } = useAuth();
+  const { toast } = useToast();
   const { 
     currentUser, 
     allUpskillLogs, setAllUpskillLogs,
@@ -631,8 +655,16 @@ function UpskillPageContent() {
     toast({ title: "Success", description: `Task "${defToDelete.name}" removed.` });
   };
 
-  const handleStartEditSubtopic = (def: ExerciseDefinition) => {
-    setEditingSubtopic(def);
+  const handleUpdateSubtopicName = (id: string, newName: string) => {
+    setUpskillDefinitions(prev => prev.map(def => 
+        def.id === id ? { ...def, name: newName } : def
+    ));
+    setAllUpskillLogs(prevLogs => prevLogs.map(log => ({
+        ...log,
+        exercises: log.exercises.map(ex => 
+            ex.definitionId === id ? { ...ex, name: newName } : ex
+        )
+    })));
   };
 
   const handleSaveSubtopicEdit = () => {
@@ -1034,7 +1066,7 @@ function UpskillPageContent() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                                     {(selectedSubtopic.linkedUpskillIds || []).map(id => {
                                         const def = upskillDefinitions.find(d => d.id === id);
-                                        return def ? <LinkedUpskillItem key={id} upskillDef={def} {...{ handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleStartEditSubtopic, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteSubtopic, handleViewProgress, isComplete: isUpskillObjectiveComplete(def.id), getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate: calculateTotalEstimate(def), setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds }} /> : null;
+                                        return def ? <LinkedUpskillItem key={id} upskillDef={def} {...{ handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteSubtopic, handleViewProgress, isComplete: isUpskillObjectiveComplete(def.id), getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate: calculateTotalEstimate(def), setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName: handleUpdateSubtopicName }} /> : null;
                                     })}
                                     {(selectedSubtopic.linkedResourceIds || []).map(id => {
                                         const resource = resources.find(r => r.id === id);
