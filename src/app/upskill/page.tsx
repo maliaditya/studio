@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -934,7 +933,7 @@ function UpskillPageContent() {
     const isDraggedResource = resources.some(d => d.id === draggedId);
     
     setUpskillDefinitions(prev => prev.map(def => {
-        if (def.id === targetId) { // targetDef is always an upskill task
+        if (def.id === targetId) {
             let updatedDef = { ...def };
             if (isDraggedResource) {
                 updatedDef.linkedResourceIds = [...(updatedDef.linkedResourceIds || []), draggedId];
@@ -990,6 +989,7 @@ function UpskillPageContent() {
                     selectedProject={selectedProject}
                     onSelectProject={handleProjectSelect}
                     onDeleteFocusArea={handleDeleteSubtopic}
+                    onUpdateFocusAreaName={handleUpdateSubtopicName}
                 />
               {selectedSubtopic && (
                   <Card>

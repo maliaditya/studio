@@ -35,6 +35,7 @@ interface SkillLibraryProps {
   selectedProject: Project | null;
   onSelectProject: (project: Project | null) => void;
   onDeleteFocusArea: (defId: string) => void;
+  onUpdateFocusAreaName: (defId: string, newName: string) => void;
 }
 
 export function SkillLibrary({ 
@@ -47,6 +48,7 @@ export function SkillLibrary({
     selectedProject,
     onSelectProject,
     onDeleteFocusArea,
+    onUpdateFocusAreaName,
 }: SkillLibraryProps) {
   const { skillDomains, coreSkills, projects } = useAuth();
   
@@ -55,6 +57,8 @@ export function SkillLibrary({
   const [selectedCoreSkill, setSelectedCoreSkill] = useState<CoreSkill | null>(null);
   const [selectedSkillArea, setSelectedSkillArea] = useState<SkillArea | null>(null);
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
+  const [editingFocusAreaId, setEditingFocusAreaId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
 
 
   const handleBack = () => {
@@ -105,6 +109,18 @@ export function SkillLibrary({
             onSelectFocusArea(null);
             break;
     }
+  };
+
+  const handleStartEditing = (def: ExerciseDefinition) => {
+    setEditingFocusAreaId(def.id);
+    setEditingName(def.name);
+  };
+  
+  const handleSaveName = () => {
+    if (editingFocusAreaId && editingName.trim()) {
+      onUpdateFocusAreaName(editingFocusAreaId, editingName.trim());
+    }
+    setEditingFocusAreaId(null);
   };
 
   const linkedDeepWorkChildIds = React.useMemo(() => new Set<string>((definitions || []).flatMap(def => def.linkedDeepWorkIds || [])), [definitions]);
@@ -163,10 +179,21 @@ export function SkillLibrary({
             <div className="pl-4 space-y-1">
                 {tasks.length > 0 ? tasks.map(task => (
                     <div key={task.id} className="flex items-center justify-between group/task">
-                        <button onClick={() => onSelectFocusArea(task)} className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground hover:bg-muted flex items-center gap-2">
-                            {pageType === 'deepwork' ? getDeepWorkIcon(task) : getUpskillIcon(task)}
-                            <span>{task.name}</span>
-                        </button>
+                        {editingFocusAreaId === task.id ? (
+                          <Input
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            onBlur={handleSaveName}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                            className="h-8"
+                            autoFocus
+                          />
+                        ) : (
+                          <button onClick={() => onSelectFocusArea(task)} onDoubleClick={() => handleStartEditing(task)} className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground hover:bg-muted flex items-center gap-2">
+                              {pageType === 'deepwork' ? getDeepWorkIcon(task) : getUpskillIcon(task)}
+                              <span>{task.name}</span>
+                          </button>
+                        )}
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0 opacity-0 group-hover/task:opacity-100">

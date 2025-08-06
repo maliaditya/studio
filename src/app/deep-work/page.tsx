@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -1544,6 +1543,7 @@ function DeepWorkPageContent() {
                     selectedProject={selectedProject} 
                     onSelectProject={handleProjectSelect}
                     onDeleteFocusArea={handleDeleteExerciseDefinition}
+                    onUpdateFocusAreaName={handleUpdateDefinitionName}
                  />
               {selectedFocusArea && (
                   <Card>
