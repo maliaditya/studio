@@ -271,7 +271,7 @@ const DetailsPopupCard = ({ popupState, onClose }: { popupState: HistoryPopupSta
                     </div>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
-                    <ScrollArea className="h-[60vh] pr-4">
+                    <ScrollArea className="max-h-[70vh] pr-4">
                         <div className="text-sm space-y-4">
                             <p className="italic text-muted-foreground">{details.why}</p>
                             
@@ -1463,3 +1463,4 @@ const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHisto
     
 
     
+
