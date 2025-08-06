@@ -85,8 +85,8 @@ const PISTON_DETAILS: Record<PistonType, {
             ]
         }
     },
-    'Fire': {
-        why: "You stop performing for attention and start creating from alignment.",
+    'Inspiration': {
+        why: "You stop performing for attention and start creating from alignment. My father showed me what’s possible, not with words — but with action, pain, and persistence.",
         negates: ["Egoic Expression", "Status-based Desire"],
         fuels: ["Growth", "Contribution"],
         virtues: ["Contentment", "Innocence"],
@@ -146,7 +146,7 @@ const PISTON_DETAILS: Record<PistonType, {
             ]
         }
     },
-    'Bridge': {
+    'Compassion': {
         why: "It replaces the separation illusion with unity — removing the fuel of ego-driven engines.",
         negates: ["Competition", "Significance", "Cruelty"],
         fuels: ["Contribution", "Love"],
@@ -271,7 +271,7 @@ const DetailsPopupCard = ({ popupState, onClose }: { popupState: HistoryPopupSta
                     </div>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
-                    <ScrollArea className="max-h-[70vh] pr-4">
+                    <ScrollArea className="max-h-[80vh] pr-4">
                         <div className="text-sm space-y-4">
                             <p className="italic text-muted-foreground">{details.why}</p>
                             
@@ -1463,4 +1463,5 @@ const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHisto
     
 
     
+
 
