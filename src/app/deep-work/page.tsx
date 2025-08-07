@@ -229,6 +229,7 @@ function LinkedDeepWorkCard({
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
     const [isEditingName, setIsEditingName] = useState(false);
     const [currentName, setCurrentName] = useState(deepworkDef.name);
+    const router = useRouter();
 
     const setCombinedRefs = (node: HTMLElement | null) => {
         setNodeRef(node);
@@ -270,19 +271,6 @@ function LinkedDeepWorkCard({
                             <DropdownMenuItem onSelect={() => onOpenMindMap(deepworkDef.id)}><GitMerge className="mr-2 h-4 w-4"/>View Mind Map</DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => handleViewProgress(deepworkDef, 'deepwork')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
                             {isAction && <DropdownMenuItem onSelect={() => handleToggleReadyForBranding(deepworkDef.id)}><Checkbox className="mr-2" checked={!!deepworkDef.isReadyForBranding} /><span>Mark as Ready for Branding</span></DropdownMenuItem>}
-                            {nodeType === 'Intention' && (
-                                <DropdownMenuSub>
-                                    <DropdownMenuSubTrigger><LinkIcon className="mr-2 h-4 w-4" />Link Project</DropdownMenuSubTrigger>
-                                    <DropdownMenuPortal>
-                                        <DropdownMenuSubContent>
-                                            {projectsInDomain.map(proj => (
-                                                <DropdownMenuCheckboxItem key={proj.id} checked={deepworkDef.linkedProjectId === proj.id} onSelect={() => onLinkProject(deepworkDef.id, deepworkDef.linkedProjectId === proj.id ? null : proj.id)}>{proj.name}</DropdownMenuCheckboxItem>
-                                            ))}
-                                            {projectsInDomain.length === 0 && <DropdownMenuItem disabled>No projects in this domain</DropdownMenuItem>}
-                                        </DropdownMenuSubContent>
-                                    </DropdownMenuPortal>
-                                </DropdownMenuSub>
-                            )}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onSelect={() => handleUnlinkItem('deepwork', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
@@ -693,6 +681,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
 
 function DeepWorkPageContent() {
   const { toast } = useToast();
+  const router = useRouter();
   const { 
     currentUser, 
     allDeepWorkLogs, setAllDeepWorkLogs,
@@ -1543,6 +1532,9 @@ function DeepWorkPageContent() {
     if (selectedMicroSkill) return selectedMicroSkill.name;
     return 'Library';
   }
+  
+  const selectedFocusAreaIsIntention = selectedFocusArea && getNodeType(selectedFocusArea, linkedDeepWorkChildIds) === 'Intention';
+  const projectsInSelectedDomain = selectedFocusArea ? (getDomainForCategory(selectedFocusArea.category) ? projects.filter(p => p.domainId === getDomainForCategory(selectedFocusArea.category)!.id) : []) : [];
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
@@ -1687,6 +1679,23 @@ function DeepWorkPageContent() {
                                         <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('resource', selectedFocusArea)}>
                                             <Folder className="mr-2 h-4 w-4" /> Link Resource
                                         </Button>
+                                         {selectedFocusAreaIsIntention && (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button size="sm" variant="outline">
+                                                        <Briefcase className="mr-2 h-4 w-4" /> Link Project
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent>
+                                                    <DropdownMenuItem onSelect={() => handleLinkProject(selectedFocusArea.id, null)}>None</DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    {projectsInSelectedDomain.map(proj => (
+                                                        <DropdownMenuCheckboxItem key={proj.id} checked={selectedFocusArea.linkedProjectId === proj.id} onSelect={() => handleLinkProject(selectedFocusArea.id, selectedFocusArea.linkedProjectId === proj.id ? null : proj.id)}>{proj.name}</DropdownMenuCheckboxItem>
+                                                    ))}
+                                                    {projectsInSelectedDomain.length === 0 && <DropdownMenuItem disabled>No projects in this domain</DropdownMenuItem>}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        )}
                                     </div>
                                 </div>
                                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

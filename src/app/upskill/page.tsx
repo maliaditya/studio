@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, GitMerge, Clock, Unlink, Flashlight, Focus, Frame, Lightbulb, PictureInPicture, GripVertical, Flag, Bolt, Code, MessageSquare, BrainCircuit, Blocks, Sprout } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronDown, CalendarIcon, TrendingUp, Loader2, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, GitMerge, Clock, Unlink, Flashlight, Focus, Frame, Lightbulb, PictureInPicture, GripVertical, Flag, Bolt, Code, MessageSquare, BrainCircuit, Blocks, Sprout, Briefcase } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -219,19 +219,6 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
             </TooltipProvider>
             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setSelectedSubtopic(upskillDef); setViewMode('library'); }}><ArrowRight className="h-4 w-4" /></Button>
             <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => handleViewProgress(upskillDef)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
-            {nodeType === 'Curiosity' && (
-                <DropdownMenuSub>
-                    <DropdownMenuSubTrigger><LinkIcon className="mr-2 h-4 w-4" />Link Project</DropdownMenuSubTrigger>
-                    <DropdownMenuPortal>
-                        <DropdownMenuSubContent>
-                            {projectsInDomain.map(proj => (
-                                <DropdownMenuCheckboxItem key={proj.id} checked={upskillDef.linkedProjectId === proj.id} onSelect={() => onLinkProject(upskillDef.id, upskillDef.linkedProjectId === proj.id ? null : proj.id)}>{proj.name}</DropdownMenuCheckboxItem>
-                            ))}
-                            {projectsInDomain.length === 0 && <DropdownMenuItem disabled>No projects in this domain</DropdownMenuItem>}
-                        </DropdownMenuSubContent>
-                    </DropdownMenuPortal>
-                </DropdownMenuSub>
-            )}
             <DropdownMenuSeparator /><DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', upskillDef.id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteSubtopic(upskillDef.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
         </div>
         <CardHeader className="pb-3">
@@ -1040,6 +1027,10 @@ function UpskillPageContent() {
     if (selectedMicroSkill) return selectedMicroSkill.name;
     return 'Library';
   }
+  
+  const selectedUpskillTaskIsCuriosity = selectedUpskillTask && (getDomainForCategory(selectedUpskillTask.category) !== null);
+  const projectsInSelectedDomain = selectedUpskillTask ? (getDomainForCategory(selectedUpskillTask.category) ? projects.filter(p => p.domainId === getDomainForCategory(selectedUpskillTask.category)!.id) : []) : [];
+
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
@@ -1133,6 +1124,23 @@ function UpskillPageContent() {
                                         <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('resource', selectedUpskillTask)}>
                                             <Folder className="mr-2 h-4 w-4" /> Link Resource
                                         </Button>
+                                        {selectedUpskillTaskIsCuriosity && (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button size="sm" variant="outline">
+                                                        <Briefcase className="mr-2 h-4 w-4" /> Link Project
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent>
+                                                    <DropdownMenuItem onSelect={() => handleLinkProject(selectedUpskillTask.id, null)}>None</DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    {projectsInSelectedDomain.map(proj => (
+                                                        <DropdownMenuCheckboxItem key={proj.id} checked={selectedUpskillTask.linkedProjectId === proj.id} onSelect={() => handleLinkProject(selectedUpskillTask.id, selectedUpskillTask.linkedProjectId === proj.id ? null : proj.id)}>{proj.name}</DropdownMenuCheckboxItem>
+                                                    ))}
+                                                    {projectsInSelectedDomain.length === 0 && <DropdownMenuItem disabled>No projects in this domain</DropdownMenuItem>}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
