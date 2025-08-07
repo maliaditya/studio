@@ -1130,7 +1130,7 @@ export function PistonsHead() {
                 )}
                  <Popover open={!!schedulePopover} onOpenChange={() => setSchedulePopover(null)}>
                     <PopoverTrigger asChild>
-                        <div style={{ position: 'fixed', top: schedulePopover?.y, left: schedulePopover?.x }} />
+                        <div style={{ position: 'fixed', top: schedulePopover?.anchor?.getBoundingClientRect().top, left: schedulePopover?.anchor?.getBoundingClientRect().left }} />
                     </PopoverTrigger>
                     <PopoverContent className="w-80">
                         <div className="grid gap-4">
@@ -1552,10 +1552,11 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
     );
 };
 
-const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setDetailsPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory, handleOpenDetails }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setDetailsPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; currentResourceId?: string; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; handleOpenDetails: (e: React.MouseEvent, piston: PistonType) => void; }) => {
+const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setDetailsPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory, handleOpenDetails }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setDetailsPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType | EmotionalState; currentResourceId?: string; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType | EmotionalState) => void; handleOpenDetails: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     return <PistonEditorView topicId={topicId} topicName={topicName} onBack={onBack} setHistoryPopup={setHistoryPopup} setDetailsPopup={setDetailsPopup} setResourcePopup={setResourcePopup} onLinkResource={onLinkResource} handleOpenResource={handleOpenResource} handleOpenHistory={handleOpenHistory} handleOpenDetails={handleOpenDetails} />;
 };
     
 
     
+
 
