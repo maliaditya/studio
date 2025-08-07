@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from './ui/scroll-area';
-import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink, Briefcase, BookCopy, ArrowLeft, Frame, Code, MessageSquare } from 'lucide-react';
+import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink, Briefcase, BookCopy, ArrowLeft, Frame, Code, MessageSquare, ArrowRight } from 'lucide-react';
 import type { ExerciseDefinition, Resource } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
@@ -155,8 +155,10 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, linkedUp
                                                      <ul className="space-y-2 text-muted-foreground pr-2">
                                                         {(item.points || []).map(point => (
                                                             <li key={point.id} className="flex items-start gap-2">
-                                                                {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5" /> : <MessageSquare className="h-4 w-4 mt-0.5" />}
-                                                                {point.type === 'code' ? (
+                                                                {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5" /> : point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5" /> : <ArrowRight className="h-4 w-4 mt-0.5" />}
+                                                                {point.type === 'card' && point.resourceId ? (
+                                                                    <button onClick={(e) => { e.stopPropagation(); const subItem = resources.find(r => r.id === point.resourceId); if(subItem) handleDrillDown(subItem as any); }} className="text-left font-medium text-primary hover:underline">{point.text}</button>
+                                                                ) : point.type === 'code' ? (
                                                                     <pre className="w-full bg-muted/50 p-1 rounded-sm text-xs font-mono whitespace-pre-wrap break-words">{point.text}</pre>
                                                                 ) : (
                                                                     <div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown></div>

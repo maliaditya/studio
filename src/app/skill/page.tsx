@@ -503,13 +503,13 @@ function SkillPageContent() {
             </CardHeader>
             <CardContent>
               {selectedProject ? (
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {Array.from(linkedTasksByCoreSkill.entries()).map(([coreSkillName, data]) => (
                       <Card key={coreSkillName}>
                         <CardHeader>
                           <CardTitle className="text-lg">{coreSkillName}</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="space-y-2">
                             {Array.from(data.microSkills.entries()).map(([microSkillName, tasks]) => (
                                 <Card key={microSkillName}>
                                     <CardHeader className="p-3">
