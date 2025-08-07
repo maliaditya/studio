@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -10,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from './ui/scroll-area';
-import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink, Briefcase, BookCopy, ArrowLeft } from 'lucide-react';
+import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink, Briefcase, BookCopy, ArrowLeft, Frame } from 'lucide-react';
 import type { ExerciseDefinition, Resource } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
@@ -24,7 +22,7 @@ interface IntentionDetailModalProps {
 }
 
 export function IntentionDetailModal({ isOpen, onOpenChange, intention }: IntentionDetailModalProps) {
-  const { deepWorkDefinitions, upskillDefinitions, resources } = useAuth();
+  const { deepWorkDefinitions, upskillDefinitions, resources, linkedUpskillChildIds } = useAuth();
   const [navigationStack, setNavigationStack] = useState<ExerciseDefinition[]>([]);
 
   useEffect(() => {
@@ -63,6 +61,18 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
   const handleGoBack = () => {
     setNavigationStack(prev => prev.slice(0, prev.length - 1));
   };
+  
+  const getIcon = (item: ExerciseDefinition) => {
+    const isUpskill = upskillDefinitions.some(d => d.id === item.id);
+    if (isUpskill) {
+        const isParent = (item.linkedUpskillIds?.length ?? 0) > 0 || (item.linkedResourceIds?.length ?? 0) > 0;
+        const isChild = linkedUpskillChildIds.has(item.id);
+        if (isParent && !isChild) return <Flashlight className="h-4 w-4 text-amber-500" />; // Curiosity
+        if (!isParent && isChild) return <Frame className="h-4 w-4 text-blue-500" />; // Visualization
+        return <BookCopy className="h-4 w-4 text-amber-500" />;
+    }
+    return <Lightbulb className="h-4 w-4 text-green-500" />;
+  };
 
 
   if (!currentItem) return null;
@@ -89,7 +99,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                                     <Card key={item.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleDrillDown(item)}>
                                       <CardHeader>
                                         <CardTitle className="text-base flex items-center gap-2">
-                                            <Lightbulb className="h-4 w-4 text-green-500" />
+                                            {getIcon(item)}
                                             {item.name}
                                         </CardTitle>
                                         <CardDescription>{item.category}</CardDescription>
@@ -107,7 +117,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
                                     <Card key={item.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleDrillDown(item)}>
                                       <CardHeader>
                                           <CardTitle className="text-base flex items-center gap-2">
-                                            <Flashlight className="h-4 w-4 text-amber-500" />
+                                            {getIcon(item)}
                                             {item.name}
                                           </CardTitle>
                                           <CardDescription>{item.category}</CardDescription>
@@ -143,4 +153,3 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
     </Dialog>
   );
 }
-
