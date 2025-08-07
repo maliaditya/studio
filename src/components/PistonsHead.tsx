@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -831,7 +832,10 @@ export function PistonsHead() {
   }
 
   const onBack = () => {
-    if (currentView === 'negative-thoughts') {
+    if (currentView === 'negative-thoughts' && selectedTopicId) {
+        setSelectedTopicId(null);
+        setSelectedTopicName(null);
+    } else if (currentView === 'negative-thoughts') {
         setCurrentView('thoughts');
     } else if (selectedTopicId) {
         setSelectedTopicId(null);
@@ -985,7 +989,11 @@ export function PistonsHead() {
       case 'desires': return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Desire'} {...commonProps} /> : <DesireSelector onSelect={handleTopicSelect} onBack={onBack} />;
       case 'mindset': return selectedTopicId ? <TopicPistonView topicId={selectedTopicName} topicName={selectedTopicName || 'Mindset'} {...commonProps} /> : <MindsetSelector onSelect={handleTopicSelect} onBack={onBack} />;
       case 'thoughts': return <ThoughtsView onSelect={(type) => setCurrentView(type === 'Positive' ? 'positive-thoughts' : 'negative-thoughts')} />;
-      case 'negative-thoughts': return <NegativeThoughtsView onSelect={(state) => handleTopicSelect(`thought_${state}`, state)} onSchedule={(e, state) => setSchedulePopover({ piston: state, anchor: e.currentTarget })}/>;
+      case 'negative-thoughts':
+        if (selectedTopicId) {
+            return <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Thought'} {...commonProps} />;
+        }
+        return <NegativeThoughtsView onSelect={(state) => handleTopicSelect(`thought_${state}`, state)} onSchedule={(e, state) => setSchedulePopover({ piston: state, anchor: e.currentTarget })}/>;
       default: return <MainPistonView onSelect={handleViewChange} />;
     }
   };
@@ -1024,7 +1032,7 @@ export function PistonsHead() {
                         <CardHeader 
                             className="p-3 text-center flex-shrink-0"
                         >
-                            {currentView !== 'main' && (
+                            {(currentView !== 'main' || selectedTopicId) && (
                                 <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-1.5 left-1.5 z-20" onClick={(e) => { e.stopPropagation(); onBack(); }}>
                                     <ChevronLeft className="h-4 w-4" />
                                 </Button>
@@ -1558,6 +1566,7 @@ const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHisto
     
 
     
+
 
 
 
