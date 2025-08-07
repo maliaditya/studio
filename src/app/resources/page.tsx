@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -2276,7 +2277,7 @@ function ResourcesPageContent() {
         </Dialog>
         
         <Dialog open={modelModalState.isOpen} onOpenChange={(isOpen) => setModelModalState({ ...modelModalState, isOpen })}>
-            <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
+            <DialogContent className="max-w-6xl h-[80vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle>3D Model Viewer</DialogTitle>
                 </DialogHeader>
