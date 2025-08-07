@@ -35,7 +35,7 @@ import { IntentionDetailModal } from '@/components/IntentionDetailModal';
 import { SkillLibrary } from '@/components/SkillLibrary';
 
 function SkillPageContent() {
-  const { toast } = useToast();
+  const { toast } = useAuth();
   const { 
     currentUser,
     skillDomains, setSkillDomains, 
@@ -91,26 +91,28 @@ function SkillPageContent() {
   // State for the modal
   const [selectedIntention, setSelectedIntention] = useState<ExerciseDefinition | null>(null);
 
-  const [expandedDomains, setExpandedDomains] = useState<string[]>([]);
-  const expandedDomainsKey = useMemo(() => currentUser ? `lifeos_expanded_skill_domains_${currentUser.username}` : null, [currentUser]);
+  const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const expandedItemsKey = useMemo(() => currentUser ? `lifeos_expanded_sidebar_${currentUser.username}` : null, [currentUser]);
   
   useEffect(() => {
-    if (expandedDomainsKey) {
+    if (expandedItemsKey) {
         try {
-            const stored = localStorage.getItem(expandedDomainsKey);
+            const stored = localStorage.getItem(expandedItemsKey);
             if (stored) {
-                setExpandedDomains(JSON.parse(stored));
+                setExpandedItems(JSON.parse(stored));
+            } else {
+                setExpandedItems(['skills-domains', 'projects', 'professional-experience']);
             }
         } catch (e) {
-            console.error("Failed to parse expanded domains state from localStorage", e);
+            console.error("Failed to parse expanded items state from localStorage", e);
         }
     }
-  }, [expandedDomainsKey]);
+  }, [expandedItemsKey]);
 
-  const handleDomainExpansionChange = (value: string[]) => {
-    setExpandedDomains(value);
-    if (expandedDomainsKey) {
-      localStorage.setItem(expandedDomainsKey, JSON.stringify(value));
+  const handleExpansionChange = (value: string[]) => {
+    setExpandedItems(value);
+    if (expandedItemsKey) {
+      localStorage.setItem(expandedItemsKey, JSON.stringify(value));
     }
   };
 
@@ -425,8 +427,8 @@ function SkillPageContent() {
               <CardDescription>Define domains, skills, projects, and work history.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Accordion type="multiple" className="w-full" value={expandedDomains} onValueChange={handleDomainExpansionChange}>
-                <AccordionItem value="skills">
+              <Accordion type="multiple" className="w-full" value={expandedItems} onValueChange={handleExpansionChange}>
+                <AccordionItem value="skills-domains">
                   <AccordionTrigger>Skills &amp; Projects</AccordionTrigger>
                   <AccordionContent>
                       <form onSubmit={handleAddDomain} className="flex gap-2 my-2">
@@ -497,7 +499,7 @@ function SkillPageContent() {
                       </Accordion>
                   </AccordionContent>
                 </AccordionItem>
-                <AccordionItem value="experience">
+                <AccordionItem value="professional-experience">
                     <AccordionTrigger>Professional Experience</AccordionTrigger>
                     <AccordionContent>
                         <form onSubmit={handleAddCompany} className="flex gap-2 my-2">

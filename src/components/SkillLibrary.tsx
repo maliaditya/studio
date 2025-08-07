@@ -64,10 +64,10 @@ export function SkillLibrary({
   const [editingFocusAreaId, setEditingFocusAreaId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   
-  const [expandedItems, setExpandedItems] = useState<string[]>(['skills-domains', 'projects']);
+  const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
   const { currentUser } = useAuth();
-  const expandedItemsKey = React.useMemo(() => currentUser ? `lifeos_expanded_sidebar_${pageType}_${currentUser.username}` : null, [currentUser, pageType]);
+  const expandedItemsKey = React.useMemo(() => currentUser ? `lifeos_expanded_sidebar_${currentUser.username}` : null, [currentUser]);
 
   useEffect(() => {
     if (expandedItemsKey) {
@@ -75,6 +75,8 @@ export function SkillLibrary({
             const stored = localStorage.getItem(expandedItemsKey);
             if (stored) {
                 setExpandedItems(JSON.parse(stored));
+            } else {
+                 setExpandedItems(['skills-domains', 'projects']);
             }
         } catch (e) {
             console.error("Failed to parse expanded items state from localStorage", e);
