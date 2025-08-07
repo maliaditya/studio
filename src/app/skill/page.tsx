@@ -10,7 +10,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
-import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ActivityType, DailySchedule } from '@/types/workout';
+import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ActivityType, DailySchedule, ProjectSkillLink } from '@/types/workout';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -33,9 +33,10 @@ import { useRouter } from 'next/navigation';
 import { MindMapViewer } from '@/components/MindMapViewer';
 import { IntentionDetailModal } from '@/components/IntentionDetailModal';
 import { SkillLibrary } from '@/components/SkillLibrary';
+import { Badge } from '@/components/ui/badge';
 
 function SkillPageContent() {
-  const { toast } = useAuth();
+  const { toast } = useToast();
   const { 
     skillDomains, setSkillDomains, 
     coreSkills, setCoreSkills, 
@@ -497,7 +498,7 @@ function SkillPageContent() {
         <main className="lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle>Details</CardTitle>
+              <CardTitle>{selectedProject ? selectedProject.name : 'Details'}</CardTitle>
               <CardDescription>{selectedCoreSkill ? `Viewing skill areas for "${selectedCoreSkill.name}"` : selectedProject ? `Viewing linked tasks for "${selectedProject.name}"` : selectedCompanyId ? `Viewing positions for "${companies.find(c => c.id === selectedCompanyId)?.name}"` : 'Select an item from the library.'}</CardDescription>
             </CardHeader>
             <CardContent>
@@ -509,27 +510,31 @@ function SkillPageContent() {
                                   <CardTitle className="text-base">{coreSkillName}</CardTitle>
                               </CardHeader>
                               <CardContent className="space-y-2 p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                                  {Array.from(data.microSkills.entries()).map(([microSkillName, tasks]) => (
-                                      <Card key={microSkillName} className="w-full">
-                                          <CardHeader className="p-3">
-                                              <CardTitle className="text-sm">{microSkillName}</CardTitle>
-                                          </CardHeader>
-                                          <CardContent className="p-3 pt-0">
-                                              <ul className="text-sm space-y-1">
-                                                  {tasks.map(task => (
-                                                  <li key={task.id} className="flex items-center gap-2 hover:bg-muted/50 p-1 rounded-md cursor-pointer" onClick={() => setSelectedIntention(task)}>
-                                                      {upskillDefinitions.some(d => d.id === task.id) ? (
-                                                          <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                                                      ) : (
-                                                          <Lightbulb className="h-4 w-4 text-green-500 flex-shrink-0" />
-                                                      )}
-                                                      <span className="text-muted-foreground truncate" title={task.name}>{task.name}</span>
-                                                  </li>
-                                                  ))}
-                                              </ul>
-                                          </CardContent>
-                                      </Card>
-                                  ))}
+                                  {Array.from(data.microSkills.entries()).map(([microSkillName, tasks]) => {
+                                      const parentCoreSkill = coreSkills.find(cs => cs.name === coreSkillName);
+                                      return (
+                                        <Card key={microSkillName} className="w-full">
+                                            <CardHeader className="p-3">
+                                                <CardTitle className="text-sm">{microSkillName}</CardTitle>
+                                                {parentCoreSkill && <Badge variant="outline" className="mt-1">{parentCoreSkill.name}</Badge>}
+                                            </CardHeader>
+                                            <CardContent className="p-3 pt-0">
+                                                <ul className="text-sm space-y-1">
+                                                    {tasks.map(task => (
+                                                    <li key={task.id} className="flex items-center gap-2 hover:bg-muted/50 p-1 rounded-md cursor-pointer" onClick={() => setSelectedIntention(task)}>
+                                                        {upskillDefinitions.some(d => d.id === task.id) ? (
+                                                            <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                                                        ) : (
+                                                            <Lightbulb className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                                        )}
+                                                        <span className="text-muted-foreground truncate" title={task.name}>{task.name}</span>
+                                                    </li>
+                                                    ))}
+                                                </ul>
+                                            </CardContent>
+                                        </Card>
+                                      )
+                                  })}
                               </CardContent>
                           </Card>
                       ))}
@@ -781,3 +786,4 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
+
