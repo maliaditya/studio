@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -54,7 +53,7 @@ export function SkillLibrary({
     onUpdateFocusAreaName,
     onOpenMindMap,
 }: SkillLibraryProps) {
-  const { skillDomains, coreSkills, projects, expandedItems, handleExpansionChange } = useAuth();
+  const { skillDomains, coreSkills, projects, expandedItems, handleExpansionChange, upskillDefinitions, deepWorkDefinitions } = useAuth();
   
   const [currentView, setCurrentView] = useState<'root' | 'domain' | 'coreSkill' | 'skillArea' | 'project' | 'feature'>('root');
   const [selectedDomain, setSelectedDomain] = useState<SkillDomain | null>(null);
@@ -126,25 +125,43 @@ export function SkillLibrary({
     setEditingFocusAreaId(null);
   };
 
-  const linkedDeepWorkChildIds = React.useMemo(() => new Set<string>((definitions || []).flatMap(def => def.linkedDeepWorkIds || [])), [definitions]);
-  const linkedUpskillChildIds = React.useMemo(() => new Set<string>((definitions || []).flatMap(def => def.linkedUpskillIds || [])), [definitions]);
+  const linkedDeepWorkChildIds = React.useMemo(() => new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])), [deepWorkDefinitions]);
+  const linkedUpskillChildIds = React.useMemo(() => new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || [])), [upskillDefinitions]);
 
-  const getDeepWorkIcon = (def: ExerciseDefinition) => {
+  const getDeepWorkNodeType = (def: ExerciseDefinition) => {
     const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
     const isChild = linkedDeepWorkChildIds.has(def.id);
-    if (isParent && !isChild) return <Lightbulb className="mr-2 h-4 w-4 text-amber-500" />;
-    if (isParent && isChild) return <Flag className="mr-2 h-4 w-4 text-green-500" />;
-    if (!isParent && isChild) return <Bolt className="mr-2 h-4 w-4 text-blue-500" />;
-    return <Focus className="mr-2 h-4 w-4 text-purple-500" />;
+    if (isParent) return isChild ? 'Objective' : 'Intention';
+    return isChild ? 'Action' : 'Standalone';
+  };
+  
+  const getUpskillNodeType = (def: ExerciseDefinition) => {
+    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+    const isChild = linkedUpskillChildIds.has(def.id);
+    if (isParent) return isChild ? 'Objective' : 'Curiosity';
+    return isChild ? 'Visualization' : 'Standalone';
+  };
+
+  const getDeepWorkIcon = (def: ExerciseDefinition) => {
+    const nodeType = getDeepWorkNodeType(def);
+    switch (nodeType) {
+        case 'Intention': return <Lightbulb className="mr-2 h-4 w-4 text-amber-500" />;
+        case 'Objective': return <Flag className="mr-2 h-4 w-4 text-green-500" />;
+        case 'Action': return <Bolt className="mr-2 h-4 w-4 text-blue-500" />;
+        case 'Standalone': return <Focus className="mr-2 h-4 w-4 text-purple-500" />;
+        default: return <Briefcase className="mr-2 h-4 w-4" />;
+    }
   };
 
   const getUpskillIcon = (def: ExerciseDefinition) => {
-    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-    const isChild = linkedUpskillChildIds.has(def.id);
-    if (isParent && !isChild) return <Flashlight className="mr-2 h-4 w-4 text-amber-500" />;
-    if (isParent && isChild) return <Flag className="mr-2 h-4 w-4 text-green-500" />;
-    if (!isParent && isChild) return <Frame className="mr-2 h-4 w-4 text-blue-500" />;
-    return <Focus className="mr-2 h-4 w-4 text-purple-500" />;
+    const nodeType = getUpskillNodeType(def);
+    switch (nodeType) {
+        case 'Curiosity': return <Flashlight className="mr-2 h-4 w-4 text-amber-500" />;
+        case 'Objective': return <Flag className="mr-2 h-4 w-4 text-green-500" />;
+        case 'Visualization': return <Frame className="mr-2 h-4 w-4 text-blue-500" />;
+        case 'Standalone': return <Focus className="mr-2 h-4 w-4 text-purple-500" />;
+        default: return <BookCopy className="mr-2 h-4 w-4" />;
+    }
   };
   
   const renderHeader = () => {
@@ -170,7 +187,13 @@ export function SkillLibrary({
   
   const renderContent = () => {
     if (selectedMicroSkill) {
-      const tasks = definitions.filter(def => def.category === selectedMicroSkill.name);
+      const allTasks = definitions.filter(def => def.category === selectedMicroSkill.name);
+      
+      const filteredTasks = allTasks.filter(task => {
+        const nodeType = pageType === 'deepwork' ? getDeepWorkNodeType(task) : getUpskillNodeType(task);
+        return ['Intention', 'Curiosity', 'Standalone'].includes(nodeType);
+      });
+      
       return (
         <div className="space-y-1">
            <div className="flex items-center justify-between group">
@@ -180,7 +203,7 @@ export function SkillLibrary({
               </Button>
             </div>
             <div className="pl-4 space-y-1">
-                {tasks.length > 0 ? tasks.map(task => (
+                {filteredTasks.length > 0 ? filteredTasks.map(task => (
                     <div key={task.id} className="flex items-center justify-between group/task">
                         {editingFocusAreaId === task.id ? (
                           <Input
@@ -235,7 +258,7 @@ export function SkillLibrary({
                             </AlertDialog>
                         </div>
                     </div>
-                )) : <p className="text-xs text-muted-foreground text-center py-2">No tasks for this skill yet.</p>}
+                )) : <p className="text-xs text-muted-foreground text-center py-2">No top-level tasks for this skill yet.</p>}
             </div>
         </div>
       )
