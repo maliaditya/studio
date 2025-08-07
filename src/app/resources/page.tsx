@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -943,7 +944,8 @@ function ResourcesPageContent() {
   const [activeId, setActiveId] = useState<string | null>(null);
   
   const [searchTerm, setSearchTerm] = useState('');
-  
+  const [modelModalState, setModelModalState] = useState<{ isOpen: boolean; modelUrl: string | null }>({ isOpen: false, modelUrl: null });
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
 
@@ -1935,15 +1937,20 @@ function ResourcesPageContent() {
                             if (isModelType) {
                                 cardContent = (
                                     <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl h-full">
-                                        <CardHeader>
+                                        <CardHeader className="p-3">
                                             <div className="flex justify-between items-start gap-2">
-                                                <CardTitle className="flex items-center gap-3 text-lg">
-                                                    <span className="text-primary"><View className="h-5 w-5" /></span>
+                                                <CardTitle className="flex items-center gap-2 text-sm">
+                                                    <span className="text-primary"><View className="h-4 w-4" /></span>
                                                     <span className="truncate">{res.name}</span>
                                                 </CardTitle>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 -mt-1" onClick={() => handleDeleteResource(res)}>
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                                </Button>
+                                                <div className="flex items-center">
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setModelModalState({ isOpen: true, modelUrl: res.modelUrl || null })}>
+                                                        <Expand className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteResource(res)}>
+                                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </CardHeader>
                                         <CardContent className="flex-grow flex items-center justify-center bg-black/10 dark:bg-black/20 aspect-video">
@@ -2266,6 +2273,23 @@ function ResourcesPageContent() {
               )}
             </div>
           </DialogContent>
+        </Dialog>
+        
+        <Dialog open={modelModalState.isOpen} onOpenChange={(isOpen) => setModelModalState({ ...modelModalState, isOpen })}>
+            <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
+                <DialogHeader>
+                    <DialogTitle>3D Model Viewer</DialogTitle>
+                </DialogHeader>
+                <div className="flex-grow min-h-0">
+                    {modelModalState.modelUrl ? (
+                        <ModelViewer modelUrl={modelModalState.modelUrl} />
+                    ) : (
+                        <div className="flex items-center justify-center h-full text-muted-foreground">
+                            No model to display.
+                        </div>
+                    )}
+                </div>
+            </DialogContent>
         </Dialog>
 
 
