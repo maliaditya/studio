@@ -97,6 +97,7 @@ export function SkillLibrary({
             onSelectMicroSkill(item);
             break;
         case 'project':
+            onSelectProject(item);
             setSelectedProjectId(item.id);
             break;
     }
@@ -351,7 +352,7 @@ export function SkillLibrary({
         <CardContent>
            <AnimatePresence mode="wait">
              <motion.div
-               key={currentView + (selectedDomain?.id || '') + (selectedCoreSkill?.id || '') + (selectedProject?.id || '') + (selectedMicroSkill?.id || '')}
+               key={(selectedDomain?.id || '') + (selectedCoreSkill?.id || '') + (selectedProject?.id || '') + (selectedMicroSkill?.id || '')}
                initial={{ opacity: 0, x: -20 }}
                animate={{ opacity: 1, x: 0 }}
                exit={{ opacity: 0, x: 20 }}
@@ -366,5 +367,3 @@ export function SkillLibrary({
     </Card>
   );
 }
-
-    
