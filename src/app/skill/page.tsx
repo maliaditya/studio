@@ -37,7 +37,6 @@ import { SkillLibrary } from '@/components/SkillLibrary';
 function SkillPageContent() {
   const { toast } = useToast();
   const { 
-    currentUser,
     skillDomains, setSkillDomains, 
     coreSkills, setCoreSkills, 
     projects, setProjects,
@@ -54,13 +53,15 @@ function SkillPageContent() {
     handleDeleteMicroSkill,
     expandedItems,
     handleExpansionChange,
+    selectedDomainId, setSelectedDomainId,
+    selectedSkillId, setSelectedSkillId,
+    selectedProjectId, setSelectedProjectId,
+    selectedCompanyId, setSelectedCompanyId,
   } = useAuth();
   
   const router = useRouter();
 
   const [newDomainName, setNewDomainName] = useState('');
-  const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
-  const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
   
   const [editingDomain, setEditingDomain] = useState<SkillDomain | null>(null);
   const [editingSkill, setEditingSkill] = useState<CoreSkill | null>(null);
@@ -75,7 +76,6 @@ function SkillPageContent() {
   const [editingMicroSkill, setEditingMicroSkill] = useState<{skillId: string, areaId: string, microSkill: MicroSkill} | null>(null);
   
   // Project state
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [newProjectName, setNewProjectName] = useState('');
   const [newFeatureNames, setNewFeatureNames] = useState<Record<string, string>>({});
@@ -83,7 +83,6 @@ function SkillPageContent() {
   const [linkingSkillsForFeature, setLinkingSkillsForFeature] = useState<Feature | null>(null);
 
   // Professional Experience state
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [newCompanyName, setNewCompanyName] = useState('');
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);

@@ -197,6 +197,19 @@ interface AuthContextType {
   // New state for selected subtopic/focus area
   selectedSubtopic: ExerciseDefinition | null;
   setSelectedSubtopic: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
+
+  // Sidebar persistence
+  expandedItems: string[];
+  handleExpansionChange: (value: string[]) => void;
+  selectedDomainId: string | null;
+  setSelectedDomainId: React.Dispatch<React.SetStateAction<string | null>>;
+  selectedSkillId: string | null;
+  setSelectedSkillId: React.Dispatch<React.SetStateAction<string | null>>;
+  selectedProjectId: string | null;
+  setSelectedProjectId: React.Dispatch<React.SetStateAction<string | null>>;
+  selectedCompanyId: string | null;
+  setSelectedCompanyId: React.Dispatch<React.SetStateAction<string | null>>;
+
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -265,6 +278,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
+  // Sidebar State
+  const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
+  const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+
+
   useEffect(() => {
     const audioEl = audioRef.current;
     if (!audioEl) return;
@@ -435,7 +456,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (e) {
         setSelectedSubtopic(null);
       }
-
+      
+      // Sidebar Persistence
+      try { const d = loadItem(`expanded_items_${username}`); setExpandedItems(d ? JSON.parse(d) : []); } catch (e) { setExpandedItems([]); }
+      const storedDomain = loadItem(`selected_domain_${username}`, false); setSelectedDomainId(storedDomain || null);
+      const storedSkill = loadItem(`selected_skill_${username}`, false); setSelectedSkillId(storedSkill || null);
+      const storedProject = loadItem(`selected_project_${username}`, false); setSelectedProjectId(storedProject || null);
+      const storedCompany = loadItem(`selected_company_${username}`, false); setSelectedCompanyId(storedCompany || null);
 
     } else {
       // Clear all data on logout
@@ -456,6 +483,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSkillDomains([]); setCoreSkills([]); setProjects([]);
       setCompanies([]); setPositions([]);
       setSelectedSubtopic(null);
+      setExpandedItems([]); setSelectedDomainId(null); setSelectedSkillId(null); setSelectedProjectId(null); setSelectedCompanyId(null);
     }
   }, [currentUser]);
 
@@ -520,6 +548,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       // Persisted task state
       if (selectedSubtopic) localStorage.setItem(`selected_subtopic_${username}`, JSON.stringify(selectedSubtopic)); else localStorage.removeItem(`selected_subtopic_${username}`);
+      
+      // Sidebar Persistence
+      localStorage.setItem(`expanded_items_${username}`, JSON.stringify(expandedItems));
+      if (selectedDomainId) localStorage.setItem(`selected_domain_${username}`, selectedDomainId); else localStorage.removeItem(`selected_domain_${username}`);
+      if (selectedSkillId) localStorage.setItem(`selected_skill_${username}`, selectedSkillId); else localStorage.removeItem(`selected_skill_${username}`);
+      if (selectedProjectId) localStorage.setItem(`selected_project_${username}`, selectedProjectId); else localStorage.removeItem(`selected_project_${username}`);
+      if (selectedCompanyId) localStorage.setItem(`selected_company_${username}`, selectedCompanyId); else localStorage.removeItem(`selected_company_${username}`);
     }
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
@@ -532,7 +567,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pistons,
     skillDomains, coreSkills, projects,
     companies, positions,
-    currentUser, loading, selectedSubtopic
+    currentUser, loading, selectedSubtopic,
+    expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId
   ]);
 
 
@@ -758,6 +794,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       pistons,
       skillDomains, coreSkills, projects,
       companies, positions,
+      // Sidebar persistence
+      expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId
     };
   }
 
@@ -1479,6 +1517,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
+  const handleExpansionChange = useCallback((value: string[]) => {
+    setExpandedItems(value);
+  }, []);
 
   const ResourcePopup: React.FC<ResourcePopupProps> = useCallback(({ popupState }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `popup-${popupState.resourceId}` });
@@ -1610,6 +1651,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     positions, setPositions,
     selectedSubtopic, setSelectedSubtopic,
     microSkillMap,
+    expandedItems, handleExpansionChange,
+    selectedDomainId, setSelectedDomainId,
+    selectedSkillId, setSelectedSkillId,
+    selectedProjectId, setSelectedProjectId,
+    selectedCompanyId, setSelectedCompanyId,
   };
 
   return (
