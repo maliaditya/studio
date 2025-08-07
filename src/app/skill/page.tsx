@@ -35,7 +35,7 @@ import { IntentionDetailModal } from '@/components/IntentionDetailModal';
 import { SkillLibrary } from '@/components/SkillLibrary';
 
 function SkillPageContent() {
-  const { toast } = useAuth();
+  const { toast } = useToast();
   const { 
     currentUser,
     skillDomains, setSkillDomains, 
@@ -52,6 +52,8 @@ function SkillPageContent() {
     handleAddMicroSkill,
     handleUpdateMicroSkill,
     handleDeleteMicroSkill,
+    expandedItems,
+    handleExpansionChange,
   } = useAuth();
   
   const router = useRouter();
@@ -90,31 +92,6 @@ function SkillPageContent() {
 
   // State for the modal
   const [selectedIntention, setSelectedIntention] = useState<ExerciseDefinition | null>(null);
-
-  const [expandedItems, setExpandedItems] = useState<string[]>([]);
-  const expandedItemsKey = useMemo(() => currentUser ? `lifeos_expanded_sidebar_${currentUser.username}` : null, [currentUser]);
-  
-  useEffect(() => {
-    if (expandedItemsKey) {
-        try {
-            const stored = localStorage.getItem(expandedItemsKey);
-            if (stored) {
-                setExpandedItems(JSON.parse(stored));
-            } else {
-                setExpandedItems(['skills-domains', 'projects', 'professional-experience']);
-            }
-        } catch (e) {
-            console.error("Failed to parse expanded items state from localStorage", e);
-        }
-    }
-  }, [expandedItemsKey]);
-
-  const handleExpansionChange = (value: string[]) => {
-    setExpandedItems(value);
-    if (expandedItemsKey) {
-      localStorage.setItem(expandedItemsKey, JSON.stringify(value));
-    }
-  };
 
 
   const handleAddDomain = (e: React.FormEvent) => {

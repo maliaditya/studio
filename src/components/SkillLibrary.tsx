@@ -54,7 +54,7 @@ export function SkillLibrary({
     onUpdateFocusAreaName,
     onOpenMindMap,
 }: SkillLibraryProps) {
-  const { skillDomains, coreSkills, projects } = useAuth();
+  const { skillDomains, coreSkills, projects, expandedItems, handleExpansionChange } = useAuth();
   
   const [currentView, setCurrentView] = useState<'root' | 'domain' | 'coreSkill' | 'skillArea' | 'project' | 'feature'>('root');
   const [selectedDomain, setSelectedDomain] = useState<SkillDomain | null>(null);
@@ -63,34 +63,6 @@ export function SkillLibrary({
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
   const [editingFocusAreaId, setEditingFocusAreaId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
-  
-  const [expandedItems, setExpandedItems] = useState<string[]>([]);
-
-  const { currentUser } = useAuth();
-  const expandedItemsKey = React.useMemo(() => currentUser ? `lifeos_expanded_sidebar_${currentUser.username}` : null, [currentUser]);
-
-  useEffect(() => {
-    if (expandedItemsKey) {
-        try {
-            const stored = localStorage.getItem(expandedItemsKey);
-            if (stored) {
-                setExpandedItems(JSON.parse(stored));
-            } else {
-                 setExpandedItems(['skills-domains', 'projects']);
-            }
-        } catch (e) {
-            console.error("Failed to parse expanded items state from localStorage", e);
-        }
-    }
-  }, [expandedItemsKey]);
-
-  const handleExpansionChange = (value: string[]) => {
-    setExpandedItems(value);
-    if (expandedItemsKey) {
-      localStorage.setItem(expandedItemsKey, JSON.stringify(value));
-    }
-  };
-
 
   const handleBack = () => {
     if (selectedMicroSkill) {
