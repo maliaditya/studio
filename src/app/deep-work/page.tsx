@@ -25,6 +25,10 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuCheckboxItem,
+  DropdownMenuPortal,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -193,6 +197,8 @@ function LinkedDeepWorkCard({
     linkedDeepWorkChildIds,
     onOpenMindMap,
     onUpdateName,
+    projectsInDomain,
+    onLinkProject
 }: {
     id: string;
     deepworkDef: ExerciseDefinition;
@@ -216,6 +222,8 @@ function LinkedDeepWorkCard({
     linkedDeepWorkChildIds: Set<string>;
     onOpenMindMap: (id: string) => void;
     onUpdateName: (id: string, newName: string) => void;
+    projectsInDomain: Project[];
+    onLinkProject: (intentionId: string, projectId: string | null) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
@@ -244,6 +252,8 @@ function LinkedDeepWorkCard({
         setIsEditingName(false);
     };
 
+    const linkedProject = deepworkDef.linkedProjectId ? projectsInDomain.find(p => p.id === deepworkDef.linkedProjectId) : null;
+
     return (
         <div ref={setCombinedRefs} style={style} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
             <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isComplete && "opacity-70 bg-muted/30")}>
@@ -260,6 +270,19 @@ function LinkedDeepWorkCard({
                             <DropdownMenuItem onSelect={() => onOpenMindMap(deepworkDef.id)}><GitMerge className="mr-2 h-4 w-4"/>View Mind Map</DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => handleViewProgress(deepworkDef, 'deepwork')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
                             {isAction && <DropdownMenuItem onSelect={() => handleToggleReadyForBranding(deepworkDef.id)}><Checkbox className="mr-2" checked={!!deepworkDef.isReadyForBranding} /><span>Mark as Ready for Branding</span></DropdownMenuItem>}
+                            {nodeType === 'Intention' && (
+                                <DropdownMenuSub>
+                                    <DropdownMenuSubTrigger><LinkIcon className="mr-2 h-4 w-4" />Link Project</DropdownMenuSubTrigger>
+                                    <DropdownMenuPortal>
+                                        <DropdownMenuSubContent>
+                                            {projectsInDomain.map(proj => (
+                                                <DropdownMenuCheckboxItem key={proj.id} checked={deepworkDef.linkedProjectId === proj.id} onSelect={() => onLinkProject(deepworkDef.id, deepworkDef.linkedProjectId === proj.id ? null : proj.id)}>{proj.name}</DropdownMenuCheckboxItem>
+                                            ))}
+                                            {projectsInDomain.length === 0 && <DropdownMenuItem disabled>No projects in this domain</DropdownMenuItem>}
+                                        </DropdownMenuSubContent>
+                                    </DropdownMenuPortal>
+                                </DropdownMenuSub>
+                            )}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onSelect={() => handleUnlinkItem('deepwork', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
@@ -282,7 +305,13 @@ function LinkedDeepWorkCard({
                         )}
                         <Badge variant="outline" className="text-xs flex-shrink-0">{nodeType}</Badge>
                     </div>
-                    <CardDescription>{deepworkDef.category}</CardDescription>
+                    {linkedProject ? (
+                        <CardDescription>
+                            Project: <span className="font-semibold text-foreground">{linkedProject.name}</span>
+                        </CardDescription>
+                    ) : (
+                        <CardDescription>{deepworkDef.category}</CardDescription>
+                    )}
                 </CardHeader>
                 <CardContent className="flex-grow">
                     {isParent ? (
@@ -1481,6 +1510,24 @@ function DeepWorkPageContent() {
     setSelectedMicroSkill(null);
     setSelectedFocusArea(null);
   };
+
+  const getDomainForCategory = useCallback((category: string) => {
+    const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === category);
+    if (!microSkill) return null;
+    const coreSkill = coreSkills.find(cs => cs.name === microSkill.coreSkillName);
+    if (!coreSkill) return null;
+    return skillDomains.find(sd => sd.id === coreSkill.domainId);
+  }, [microSkillMap, coreSkills, skillDomains]);
+
+  const handleLinkProject = useCallback((intentionId: string, projectId: string | null) => {
+      setDeepWorkDefinitions(prev =>
+          prev.map(def =>
+              def.id === intentionId
+                  ? { ...def, linkedProjectId: projectId || undefined }
+                  : def
+          )
+      );
+  }, [setDeepWorkDefinitions]);
   
   if (isLoadingPage) {
     return (
@@ -1645,7 +1692,10 @@ function DeepWorkPageContent() {
                                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                                     {(selectedFocusArea.linkedDeepWorkIds || []).map(id => {
                                         const def = deepWorkDefinitions.find(d => d.id === id);
-                                        return def ? <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getIcon, getNodeType, getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, setSelectedFocusArea, setViewMode, handleToggleReadyForBranding, handleUnlinkItem, handleDeleteExerciseDefinition, handleViewProgress, deepWorkDefinitions, formatDuration, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic: (def) => setSelectedFocusArea(def), linkedDeepWorkChildIds, onOpenMindMap:(id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); }, onUpdateName: handleUpdateDefinitionName }}/> : null;
+                                        if (!def) return null;
+                                        const domain = getDomainForCategory(def.category);
+                                        const projectsInDomain = domain ? projects.filter(p => p.domainId === domain.id) : [];
+                                        return <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getIcon, getNodeType, getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, setSelectedFocusArea, setViewMode, handleToggleReadyForBranding, handleUnlinkItem, handleDeleteExerciseDefinition, handleViewProgress, deepWorkDefinitions, formatDuration, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic: (def) => setSelectedFocusArea(def), linkedDeepWorkChildIds, onOpenMindMap:(id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); }, onUpdateName: handleUpdateDefinitionName, projectsInDomain, onLinkProject: handleLinkProject }}/>;
                                     })}
                                     {(selectedFocusArea.linkedUpskillIds || []).map(id => {
                                         const def = upskillDefinitions.find(d => d.id === id);

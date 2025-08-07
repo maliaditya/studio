@@ -18,7 +18,7 @@ import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuCheckboxItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
@@ -133,7 +133,7 @@ const DraggableSubtaskItem: React.FC<{
     );
 };
 
-function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleUnlinkItem, handleDeleteSubtopic, handleViewProgress, isComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate, setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName }: {
+function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleUnlinkItem, handleDeleteSubtopic, handleViewProgress, isComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate, setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName, projectsInDomain, onLinkProject }: {
   upskillDef: ExerciseDefinition;
   handleAddTaskToSession: (def: ExerciseDefinition) => void;
   setSelectedSubtopic: (def: ExerciseDefinition | null) => void;
@@ -150,6 +150,8 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
   setFloatingVideoUrl: (url: string | null) => void;
   linkedUpskillChildIds: Set<string>;
   onUpdateName: (id: string, newName: string) => void;
+  projectsInDomain: Project[];
+  onLinkProject: (curiosityId: string, projectId: string | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: upskillDef.id });
   const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: upskillDef.id });
@@ -203,6 +205,8 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
     }
     setIsEditingName(false);
   };
+  
+  const linkedProject = upskillDef.linkedProjectId ? projectsInDomain.find(p => p.id === upskillDef.linkedProjectId) : null;
 
   return (
     <div ref={setCombinedRefs} style={style} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
@@ -214,7 +218,21 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
                 <Tooltip><TooltipTrigger asChild><span tabIndex={nodeType === 'Visualization' || nodeType === 'Standalone' ? 0 : -1}><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); (nodeType === 'Visualization' || nodeType === 'Standalone') && handleAddTaskToSession(upskillDef); }} disabled={nodeType !== 'Visualization' && nodeType !== 'Standalone'}><PlusCircle className="h-4 w-4" /></Button></span></TooltipTrigger><TooltipContent>{nodeType === 'Visualization' || nodeType === 'Standalone' ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent></Tooltip>
             </TooltipProvider>
             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setSelectedSubtopic(upskillDef); setViewMode('library'); }}><ArrowRight className="h-4 w-4" /></Button>
-            <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => handleViewProgress(upskillDef)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', upskillDef.id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteSubtopic(upskillDef.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+            <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => handleViewProgress(upskillDef)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+            {nodeType === 'Curiosity' && (
+                <DropdownMenuSub>
+                    <DropdownMenuSubTrigger><LinkIcon className="mr-2 h-4 w-4" />Link Project</DropdownMenuSubTrigger>
+                    <DropdownMenuPortal>
+                        <DropdownMenuSubContent>
+                            {projectsInDomain.map(proj => (
+                                <DropdownMenuCheckboxItem key={proj.id} checked={upskillDef.linkedProjectId === proj.id} onSelect={() => onLinkProject(upskillDef.id, upskillDef.linkedProjectId === proj.id ? null : proj.id)}>{proj.name}</DropdownMenuCheckboxItem>
+                            ))}
+                            {projectsInDomain.length === 0 && <DropdownMenuItem disabled>No projects in this domain</DropdownMenuItem>}
+                        </DropdownMenuSubContent>
+                    </DropdownMenuPortal>
+                </DropdownMenuSub>
+            )}
+            <DropdownMenuSeparator /><DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', upskillDef.id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteSubtopic(upskillDef.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
         </div>
         <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
@@ -246,7 +264,13 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
                 )}
                  <Badge variant="outline" className="text-xs flex-shrink-0">{nodeType}</Badge>
             </div>
-            <CardDescription>{upskillDef.category}</CardDescription>
+            {linkedProject ? (
+                <CardDescription>
+                    Project: <span className="font-semibold text-foreground">{linkedProject.name}</span>
+                </CardDescription>
+            ) : (
+                <CardDescription>{upskillDef.category}</CardDescription>
+            )}
         </CardHeader>
         <CardContent className="min-h-[50px]">
             {isParent ? (
@@ -989,6 +1013,24 @@ function UpskillPageContent() {
     setSelectedMicroSkill(null);
   };
   
+  const getDomainForCategory = useCallback((category: string) => {
+    const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === category);
+    if (!microSkill) return null;
+    const coreSkill = coreSkills.find(cs => cs.name === microSkill.coreSkillName);
+    if (!coreSkill) return null;
+    return skillDomains.find(sd => sd.id === coreSkill.domainId);
+  }, [microSkillMap, coreSkills, skillDomains]);
+
+  const handleLinkProject = useCallback((curiosityId: string, projectId: string | null) => {
+    setUpskillDefinitions(prev =>
+        prev.map(def =>
+            def.id === curiosityId
+                ? { ...def, linkedProjectId: projectId || undefined }
+                : def
+        )
+    );
+  }, [setUpskillDefinitions]);
+
   if (isLoadingPage) {
     return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your upskill data...</p></div>;
   }
@@ -1096,7 +1138,10 @@ function UpskillPageContent() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                                     {(selectedUpskillTask.linkedUpskillIds || []).map(id => {
                                         const def = upskillDefinitions.find(d => d.id === id);
-                                        return def ? <LinkedUpskillItem key={id} upskillDef={def} {...{ handleAddTaskToSession, setSelectedSubtopic: setSelectedUpskillTask, setViewMode, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteSubtopic, handleViewProgress, isComplete: isUpskillObjectiveComplete(def.id), getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate: calculateTotalEstimate(def), setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName: handleUpdateSubtopicName }} /> : null;
+                                        if (!def) return null;
+                                        const domain = getDomainForCategory(def.category);
+                                        const projectsInDomain = domain ? projects.filter(p => p.domainId === domain.id) : [];
+                                        return <LinkedUpskillItem key={id} upskillDef={def} {...{ handleAddTaskToSession, setSelectedSubtopic: setSelectedUpskillTask, setViewMode, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteSubtopic, handleViewProgress, isComplete: isUpskillObjectiveComplete(def.id), getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate: calculateTotalEstimate(def), setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName: handleUpdateSubtopicName, projectsInDomain, onLinkProject: handleLinkProject }} />;
                                     })}
                                     {(selectedUpskillTask.linkedResourceIds || []).map(id => {
                                         const resource = resources.find(r => r.id === id);
