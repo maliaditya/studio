@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -1955,7 +1953,7 @@ function ResourcesPageContent() {
                                 );
                             }
                             else if (isHabitType) {
-                                cardContent = <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} />
+                                cardContent = <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} />;
                             }
                             else if(isCardType) {
                                 cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
@@ -1984,9 +1982,9 @@ function ResourcesPageContent() {
                                             (youtubeEmbedUrl || (isGif && res.linkedResourceId)) && "cursor-pointer"
                                         )}
                                     >
-                                        <CardHeader className="flex-row items-center gap-3 p-4 space-y-0">
+                                        <CardHeader className="flex-row items-center gap-3 p-3 space-y-0">
                                             {res.iconUrl ? <Image src={res.iconUrl} alt="" width={16} height={16} className="flex-shrink-0" unoptimized/> : <Globe className="h-4 w-4 flex-shrink-0"/>}
-                                            <CardTitle className="text-base truncate flex-grow" title={res.name}>{res.name}</CardTitle>
+                                            <CardTitle className="text-sm truncate flex-grow" title={res.name}>{res.name}</CardTitle>
                                         </CardHeader>
                                         <div className="absolute top-2 right-2 z-30 flex items-center gap-1">
                                             {res.githubLink && (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><a href={res.githubLink} target="_blank" rel="noopener noreferrer"><Github className="h-4 w-4"/></a></Button>)}
@@ -2024,9 +2022,9 @@ function ResourcesPageContent() {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="p-5 flex flex-col flex-grow">
+                                            <div className="p-4 flex flex-col flex-grow">
                                                 <a href={res.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline mt-1">{res.link}</a>
-                                                <p className="text-sm text-muted-foreground mt-3 line-clamp-2 flex-grow min-h-[60px]">{res.description || 'No description available.'}</p>
+                                                <p className="text-sm text-muted-foreground mt-3 line-clamp-2 flex-grow min-h-[40px]">{res.description || 'No description available.'}</p>
                                                 <div className="mt-auto pt-4 flex items-center gap-2">
                                                     <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
                                                     {res.link && (
