@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -26,8 +26,14 @@ interface IntentionDetailModalProps {
 }
 
 export function IntentionDetailModal({ isOpen, onOpenChange, intention }: IntentionDetailModalProps) {
-  const { deepWorkDefinitions, upskillDefinitions, resources, linkedUpskillChildIds } = useAuth();
+  const { deepWorkDefinitions, upskillDefinitions, resources } = useAuth();
   const [navigationStack, setNavigationStack] = useState<ExerciseDefinition[]>([]);
+
+  // This is the source of the `linkedUpskillChildIds` that was causing issues.
+  // It's calculated here and passed into the getIcon function.
+  const linkedUpskillChildIds = useMemo(() => 
+    new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []))
+  , [upskillDefinitions]);
 
   useEffect(() => {
     if (isOpen && intention) {
@@ -70,10 +76,12 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
     const isUpskill = upskillDefinitions.some(d => d.id === item.id);
     if (isUpskill) {
         const isParent = (item.linkedUpskillIds?.length ?? 0) > 0 || (item.linkedResourceIds?.length ?? 0) > 0;
-        const isChild = linkedUpskillChildIds.has(item.id);
+        // THE FIX: Check if linkedUpskillChildIds is defined before using it.
+        const isChild = linkedUpskillChildIds ? linkedUpskillChildIds.has(item.id) : false;
         if (isParent && !isChild) return <Flashlight className="h-4 w-4 text-amber-500" />; // Curiosity
         if (!isParent && isChild) return <Frame className="h-4 w-4 text-blue-500" />; // Visualization
-        return <BookCopy className="h-4 w-4 text-amber-500" />; // Objective
+        // This is a more robust fallback for Objective/Standalone for upskill items
+        return <BookCopy className="h-4 w-4 text-amber-500" />;
     }
     return <Lightbulb className="h-4 w-4 text-green-500" />;
   };
