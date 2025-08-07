@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -355,32 +356,34 @@ function SkillPageContent() {
     return coreSkills.filter(skill => skill.type === 'Specialization');
   }, [coreSkills]);
 
-  const linkedTasksByProject = useMemo(() => {
-    if (!selectedProject) return {};
+  const linkedTasksByCoreSkill = useMemo(() => {
+    if (!selectedProject) return new Map();
 
     const intentionsAndCuriosities = [...deepWorkDefinitions, ...upskillDefinitions];
-    
     const linkedItems = intentionsAndCuriosities.filter(item => item.linkedProjectId === selectedProject.id);
 
-    const microSkillIdsInProject = new Set(selectedProject.features.flatMap(f => f.linkedSkills.map(l => l.microSkillId)));
+    // Group by Core Skill, then Micro Skill
+    const grouped = new Map<string, { coreSkillName: string, microSkills: Map<string, ExerciseDefinition[]> }>();
 
-    const grouped = linkedItems.reduce((acc, item) => {
-      const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === item.category);
-      if (!microSkill) return acc;
+    linkedItems.forEach(item => {
+        const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === item.category);
+        if (microSkillInfo) {
+            const { coreSkillName, microSkillName } = microSkillInfo;
 
-      const microSkillDef = coreSkills.flatMap(cs => cs.skillAreas).flatMap(sa => sa.microSkills).find(ms => ms.name === microSkill.microSkillName);
-      if (!microSkillDef || !microSkillIdsInProject.has(microSkillDef.id)) return acc;
+            if (!grouped.has(coreSkillName)) {
+                grouped.set(coreSkillName, { coreSkillName, microSkills: new Map() });
+            }
 
-      if (!acc[microSkill.microSkillName]) {
-        acc[microSkill.microSkillName] = [];
-      }
-      acc[microSkill.microSkillName].push(item);
-      return acc;
-    }, {} as Record<string, ExerciseDefinition[]>);
+            const coreSkillGroup = grouped.get(coreSkillName)!;
+            if (!coreSkillGroup.microSkills.has(microSkillName)) {
+                coreSkillGroup.microSkills.set(microSkillName, []);
+            }
+            coreSkillGroup.microSkills.get(microSkillName)!.push(item);
+        }
+    });
 
     return grouped;
-  }, [selectedProject, deepWorkDefinitions, upskillDefinitions, microSkillMap, coreSkills]);
-
+  }, [selectedProject, deepWorkDefinitions, upskillDefinitions, microSkillMap]);
 
   return (
     <>
@@ -501,32 +504,38 @@ function SkillPageContent() {
             </CardHeader>
             <CardContent>
               {selectedProject ? (
-                  <div className="space-y-6">
-                    {Object.keys(linkedTasksByProject).length > 0 ? (
-                      Object.entries(linkedTasksByProject).map(([microSkillName, tasks]) => (
-                        <Card key={microSkillName}>
-                          <CardHeader className="pb-3">
-                            <CardTitle className="text-base">{microSkillName}</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <ul className="list-disc list-inside text-sm space-y-1">
-                              {tasks.map(task => (
-                                <li key={task.id} className="flex items-center gap-2">
-                                  {upskillDefinitions.some(d => d.id === task.id) ? (
-                                    <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                                  ) : (
-                                    <Lightbulb className="h-4 w-4 text-green-500 flex-shrink-0" />
-                                  )}
-                                  <span className="text-muted-foreground">{task.name}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </CardContent>
+                  <div className="space-y-4">
+                    {Array.from(linkedTasksByCoreSkill.entries()).map(([coreSkillName, data]) => (
+                        <Card key={coreSkillName}>
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-base">{coreSkillName}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <Accordion type="multiple" className="w-full">
+                                    {Array.from(data.microSkills.entries()).map(([microSkillName, tasks]) => (
+                                        <AccordionItem value={microSkillName} key={microSkillName}>
+                                            <AccordionTrigger>{microSkillName}</AccordionTrigger>
+                                            <AccordionContent>
+                                                <ul className="list-disc list-inside text-sm space-y-1 pl-2">
+                                                    {tasks.map(task => (
+                                                        <li key={task.id} className="flex items-center gap-2">
+                                                        {upskillDefinitions.some(d => d.id === task.id) ? (
+                                                            <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                                                        ) : (
+                                                            <Lightbulb className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                                        )}
+                                                        <span className="text-muted-foreground">{task.name}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                    ))}
+                                </Accordion>
+                            </CardContent>
                         </Card>
-                      ))
-                    ) : (
-                      <p className="text-center text-muted-foreground">No Intentions or Curiosities linked to this project yet.</p>
-                    )}
+                    ))}
+                    {linkedTasksByCoreSkill.size === 0 && <p className="text-center text-muted-foreground">No Intentions or Curiosities linked to this project yet.</p>}
                   </div>
               ) : selectedCoreSkill ? (
                   <div className="space-y-4">
