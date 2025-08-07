@@ -510,27 +510,27 @@ function SkillPageContent() {
                           <CardTitle className="text-lg">{coreSkillName}</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                          {Array.from(data.microSkills.entries()).map(([microSkillName, tasks]) => (
-                            <Card key={microSkillName}>
-                              <CardHeader className="p-3">
-                                <CardTitle className="text-base">{microSkillName}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="p-3 pt-0">
-                                <ul className="text-sm space-y-1">
-                                  {tasks.map(task => (
-                                    <li key={task.id} className="flex items-center gap-2 hover:bg-muted/50 p-1 rounded-md cursor-pointer" onClick={() => setSelectedIntention(task)}>
-                                      {upskillDefinitions.some(d => d.id === task.id) ? (
-                                          <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                                      ) : (
-                                          <Lightbulb className="h-4 w-4 text-green-500 flex-shrink-0" />
-                                      )}
-                                      <span className="text-muted-foreground truncate" title={task.name}>{task.name}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </CardContent>
-                            </Card>
-                          ))}
+                            {Array.from(data.microSkills.entries()).map(([microSkillName, tasks]) => (
+                                <Card key={microSkillName}>
+                                    <CardHeader className="p-3">
+                                        <CardTitle className="text-base">{microSkillName}</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-3 pt-0">
+                                        <ul className="text-sm space-y-1">
+                                            {tasks.map(task => (
+                                            <li key={task.id} className="flex items-center gap-2 hover:bg-muted/50 p-1 rounded-md cursor-pointer" onClick={() => setSelectedIntention(task)}>
+                                                {upskillDefinitions.some(d => d.id === task.id) ? (
+                                                    <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                                                ) : (
+                                                    <Lightbulb className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                                )}
+                                                <span className="text-muted-foreground truncate" title={task.name}>{task.name}</span>
+                                            </li>
+                                            ))}
+                                        </ul>
+                                    </CardContent>
+                                </Card>
+                            ))}
                         </CardContent>
                       </Card>
                     ))}

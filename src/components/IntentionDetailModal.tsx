@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -12,7 +13,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink, Briefcase, BookCopy, ArrowLeft, Frame } from 'lucide-react';
 import type { ExerciseDefinition, Resource } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
+import { Card, CardHeader, CardTitle, CardDescription } from './ui/card';
 import Image from 'next/image';
 import { Button } from './ui/button';
 
@@ -124,6 +125,13 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, linkedUp
                                           </CardTitle>
                                           <CardDescription>{item.category}</CardDescription>
                                       </CardHeader>
+                                      {item.linkedResourceIds && item.linkedResourceIds.length > 0 && (
+                                        <CardContent className="pt-2">
+                                            <div className="text-xs text-muted-foreground">
+                                                {item.linkedResourceIds.length} resource(s) linked.
+                                            </div>
+                                        </CardContent>
+                                      )}
                                     </Card>
                                 ))}
                             </div>
