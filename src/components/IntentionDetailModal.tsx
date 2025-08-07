@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,11 +10,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from './ui/scroll-area';
-import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink } from 'lucide-react';
+import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink, Briefcase, BookCopy, ArrowLeft } from 'lucide-react';
 import type { ExerciseDefinition, Resource } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import Image from 'next/image';
+import { Button } from './ui/button';
 
 interface IntentionDetailModalProps {
   isOpen: boolean;
@@ -24,52 +25,94 @@ interface IntentionDetailModalProps {
 
 export function IntentionDetailModal({ isOpen, onOpenChange, intention }: IntentionDetailModalProps) {
   const { deepWorkDefinitions, upskillDefinitions, resources } = useAuth();
-  
-  const linkedItems = useMemo(() => {
-    if (!intention) return { deepWork: [], upskill: [], resource: [] };
+  const [navigationStack, setNavigationStack] = useState<ExerciseDefinition[]>([]);
 
-    const linkedDeepWork = (intention.linkedDeepWorkIds || [])
+  useEffect(() => {
+    if (isOpen && intention) {
+      setNavigationStack([intention]);
+    } else if (!isOpen) {
+      // Reset stack when modal is closed
+      setNavigationStack([]);
+    }
+  }, [isOpen, intention]);
+
+  const currentItem = navigationStack.length > 0 ? navigationStack[navigationStack.length - 1] : null;
+
+  const linkedItems = useMemo(() => {
+    if (!currentItem) return { deepWork: [], upskill: [], resource: [] };
+
+    const linkedDeepWork = (currentItem.linkedDeepWorkIds || [])
         .map(id => deepWorkDefinitions.find(d => d.id === id))
         .filter((d): d is ExerciseDefinition => !!d);
 
-    const linkedUpskill = (intention.linkedUpskillIds || [])
+    const linkedUpskill = (currentItem.linkedUpskillIds || [])
         .map(id => upskillDefinitions.find(d => d.id === id))
         .filter((d): d is ExerciseDefinition => !!d);
         
-    const linkedResources = (intention.linkedResourceIds || [])
+    const linkedResources = (currentItem.linkedResourceIds || [])
         .map(id => resources.find(r => r.id === id))
         .filter((r): r is Resource => !!r);
 
     return { deepWork: linkedDeepWork, upskill: linkedUpskill, resource: linkedResources };
-  }, [intention, deepWorkDefinitions, upskillDefinitions, resources]);
+  }, [currentItem, deepWorkDefinitions, upskillDefinitions, resources]);
+  
+  const handleDrillDown = (subtask: ExerciseDefinition) => {
+    setNavigationStack(prev => [...prev, subtask]);
+  };
+  
+  const handleGoBack = () => {
+    setNavigationStack(prev => prev.slice(0, prev.length - 1));
+  };
 
-  if (!intention) return null;
+
+  if (!currentItem) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl h-[80vh] flex flex-col p-2">
-        <DialogHeader className="p-4 flex-shrink-0 border-b">
-          <DialogTitle>Details for: {intention.name}</DialogTitle>
+        <DialogHeader className="p-4 flex-shrink-0 border-b flex flex-row items-center">
+            {navigationStack.length > 1 && (
+              <Button variant="ghost" size="icon" onClick={handleGoBack} className="mr-2 h-8 w-8">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
+            <DialogTitle>Details for: {currentItem.name}</DialogTitle>
         </DialogHeader>
         <div className="flex-grow min-h-0">
             <ScrollArea className="h-full p-4">
                 <div className="space-y-6">
                     {linkedItems.deepWork.length > 0 && (
                         <div>
-                            <h3 className="font-semibold mb-2 flex items-center gap-2"><Lightbulb className="h-5 w-5 text-green-500" />Linked Deep Work</h3>
+                            <h3 className="font-semibold mb-2 flex items-center gap-2"><Briefcase className="h-5 w-5 text-green-500" />Linked Deep Work</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {linkedItems.deepWork.map(item => (
-                                    <Card key={item.id}><CardHeader><CardTitle className="text-base">{item.name}</CardTitle><CardDescription>{item.category}</CardDescription></CardHeader></Card>
+                                    <Card key={item.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleDrillDown(item)}>
+                                      <CardHeader>
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            <Lightbulb className="h-4 w-4 text-green-500" />
+                                            {item.name}
+                                        </CardTitle>
+                                        <CardDescription>{item.category}</CardDescription>
+                                      </CardHeader>
+                                    </Card>
                                 ))}
                             </div>
                         </div>
                     )}
                      {linkedItems.upskill.length > 0 && (
                         <div>
-                            <h3 className="font-semibold mb-2 flex items-center gap-2"><Flashlight className="h-5 w-5 text-amber-500" />Linked Learning</h3>
+                            <h3 className="font-semibold mb-2 flex items-center gap-2"><BookCopy className="h-5 w-5 text-amber-500" />Linked Learning</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {linkedItems.upskill.map(item => (
-                                    <Card key={item.id}><CardHeader><CardTitle className="text-base">{item.name}</CardTitle><CardDescription>{item.category}</CardDescription></CardHeader></Card>
+                                    <Card key={item.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleDrillDown(item)}>
+                                      <CardHeader>
+                                          <CardTitle className="text-base flex items-center gap-2">
+                                            <Flashlight className="h-4 w-4 text-amber-500" />
+                                            {item.name}
+                                          </CardTitle>
+                                          <CardDescription>{item.category}</CardDescription>
+                                      </CardHeader>
+                                    </Card>
                                 ))}
                             </div>
                         </div>
@@ -100,3 +143,4 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention }: Intent
     </Dialog>
   );
 }
+
