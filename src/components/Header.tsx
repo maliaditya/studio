@@ -45,7 +45,6 @@ export function Header() {
     { href: '/offerization', label: 'Offerization' },
     { href: '/offer-system', label: 'Offers' },
     { href: '/matrix', label: 'Matrix' },
-    { href: '/mind-map', label: 'Mind Map' },
     { href: '/kanban', label: 'Kanban' },
     { href: '/timesheet', label: 'Timesheet' },
   ];
