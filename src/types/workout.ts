@@ -224,7 +224,7 @@ export interface Resource {
   id: string;
   name: string;
   folderId: string;
-  type: 'link' | 'card' | 'habit';
+  type: 'link' | 'card' | 'habit' | 'model3d';
   createdAt?: string;
   // For 'link' type
   link?: string;
@@ -242,6 +242,8 @@ export interface Resource {
   response?: { visualize?: string; action?: string; };
   reward?: string;
   newResponse?: { visualize?: string; action?: string; };
+  // For 'model3d' type
+  modelUrl?: string;
 }
 
 export interface ResourceFolder {

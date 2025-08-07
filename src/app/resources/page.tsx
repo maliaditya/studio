@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink, Edit3, Blocks, Zap, Search } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink, Edit3, Blocks, Zap, Search, View } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
@@ -30,6 +30,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format, parseISO } from 'date-fns';
+import { ModelViewer } from '@/components/ModelViewer';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -789,7 +790,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenM
 
 const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingFromId }: {
     resource: Resource; 
-    onUpdate: (resource: Resource) => void; 
+    onUpdate: (updatedResource: Resource) => void; 
     onDelete: (resourceId: string) => void;
     onLinkClick: (resourceId: string) => void;
     linkingFromId: string | null;
@@ -922,7 +923,7 @@ function ResourcesPageContent() {
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [mindMapRootFolderId, setMindMapRootFolderId] = useState<string | null>(null);
   
-  const [addResourceType, setAddResourceType] = useState<'link' | 'card' | 'habit'>('link');
+  const [addResourceType, setAddResourceType] = useState<'link' | 'card' | 'habit' | 'model3d'>('link');
 
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
   
@@ -1232,12 +1233,12 @@ function ResourcesPageContent() {
       toast({ title: "Error", description: "Resource link is required for a link type.", variant: "destructive" });
       return;
     }
-    if ((addResourceType === 'card' || addResourceType === 'habit') && !newResourceName.trim()) {
-      toast({ title: "Error", description: "Name is required for a card or habit type.", variant: "destructive" });
+    if ((addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'model3d') && !newResourceName.trim()) {
+      toast({ title: "Error", description: "Name is required.", variant: "destructive" });
       return;
     }
 
-    if (addResourceType === 'card' || addResourceType === 'habit') {
+    if (addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'model3d') {
         const newRes: Resource = {
             id: `res_${Date.now()}`,
             name: newResourceName.trim(),
@@ -1250,7 +1251,7 @@ function ResourcesPageContent() {
         setResources(prev => [...prev, newRes]);
         setNewResourceName('');
         setIsAdding(false);
-        toast({ title: `Resource ${addResourceType === 'card' ? 'Card' : 'Habit'} Added`, description: `"${newRes.name}" has been saved.`});
+        toast({ title: `Resource Added`, description: `"${newRes.name}" has been saved.`});
         return;
     }
 
@@ -1817,6 +1818,34 @@ function ResourcesPageContent() {
     toast({ title: "Converted to Card", description: `A new card "${newCard.name}" has been created and linked.` });
   };
 
+  const handleModelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedResourceFolderId) return;
+
+    if (!file.name.toLowerCase().endsWith('.glb') && !file.name.toLowerCase().endsWith('.gltf')) {
+      toast({ title: 'Invalid File', description: 'Please upload a .glb or .gltf file.', variant: 'destructive' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const modelUrl = event.target?.result as string;
+      const newRes: Resource = {
+        id: `res_${Date.now()}`,
+        name: newResourceName.trim() || file.name,
+        folderId: selectedResourceFolderId,
+        type: 'model3d',
+        modelUrl: modelUrl,
+        createdAt: new Date().toISOString(),
+      };
+      setResources(prev => [...prev, newRes]);
+      setNewResourceName('');
+      setIsAdding(false);
+      toast({ title: `Model Added`, description: `"${newRes.name}" has been saved.` });
+    };
+    reader.readAsDataURL(file);
+  };
+
 
   return (
     <>
@@ -1899,12 +1928,33 @@ function ResourcesPageContent() {
                         {filteredResources.map(res => {
                              const isCardType = res.type === 'card';
                              const isHabitType = res.type === 'habit';
+                             const isModelType = res.type === 'model3d';
                              const hasMarkdownContent = isCardType && (res.points || []).some(p => p.type === 'markdown' || p.type === 'code');
                              const cardClassName = hasMarkdownContent ? "lg:col-span-3" : "";
  
                             let cardContent: React.ReactNode;
                             
-                            if (isHabitType) {
+                            if (isModelType) {
+                                cardContent = (
+                                    <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl h-full">
+                                        <CardHeader>
+                                            <div className="flex justify-between items-start gap-2">
+                                                <CardTitle className="flex items-center gap-3 text-lg">
+                                                    <span className="text-primary"><View className="h-5 w-5" /></span>
+                                                    <span className="truncate">{res.name}</span>
+                                                </CardTitle>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 -mt-1" onClick={() => handleDeleteResource(res)}>
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent className="flex-grow flex items-center justify-center bg-black/10 dark:bg-black/20 aspect-video">
+                                            {res.modelUrl ? <ModelViewer modelUrl={res.modelUrl} /> : <p className="text-muted-foreground">No model</p>}
+                                        </CardContent>
+                                    </Card>
+                                );
+                            }
+                            else if (isHabitType) {
                                 cardContent = <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} />
                             }
                             else if(isCardType) {
@@ -2232,11 +2282,12 @@ function ResourcesPageContent() {
                 <DialogHeader>
                 <DialogTitle>Add New Resource</DialogTitle>
                 </DialogHeader>
-                <Tabs value={addResourceType} onValueChange={(v) => setAddResourceType(v as 'link' | 'card' | 'habit')} className="w-full mt-2 mb-4">
-                    <TabsList className="grid w-full grid-cols-3">
+                <Tabs value={addResourceType} onValueChange={(v) => setAddResourceType(v as any)} className="w-full mt-2 mb-4">
+                    <TabsList className="grid w-full grid-cols-4">
                         <TabsTrigger value="link">Link</TabsTrigger>
                         <TabsTrigger value="card">Card</TabsTrigger>
                         <TabsTrigger value="habit">Habit</TabsTrigger>
+                        <TabsTrigger value="model3d">3D Model</TabsTrigger>
                     </TabsList>
                     <TabsContent value="link" className="pt-4">
                         <Input autoFocus placeholder="https://example.com" value={newResourceLink} onChange={(e) => setNewResourceLink(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddResource()} />
@@ -2246,6 +2297,10 @@ function ResourcesPageContent() {
                     </TabsContent>
                     <TabsContent value="habit" className="pt-4">
                         <Input autoFocus placeholder="New habit name..." value={newResourceName} onChange={(e) => setNewResourceName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddResource()} />
+                    </TabsContent>
+                    <TabsContent value="model3d" className="pt-4 space-y-2">
+                        <Input autoFocus placeholder="Model name..." value={newResourceName} onChange={(e) => setNewResourceName(e.target.value)} />
+                        <Input type="file" accept=".glb,.gltf" onChange={handleModelUpload} className="file:text-primary file:font-medium" />
                     </TabsContent>
                 </Tabs>
                 <DialogFooter>
