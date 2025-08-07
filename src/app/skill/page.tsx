@@ -58,6 +58,7 @@ function SkillPageContent() {
     selectedSkillId, setSelectedSkillId,
     selectedProjectId, setSelectedProjectId,
     selectedCompanyId, setSelectedCompanyId,
+    linkedUpskillChildIds,
   } = useAuth();
   
   const router = useRouter();
@@ -508,7 +509,7 @@ function SkillPageContent() {
                         <CardHeader>
                           <CardTitle className="text-lg">{coreSkillName}</CardTitle>
                         </CardHeader>
-                        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <CardContent className="space-y-4">
                           {Array.from(data.microSkills.entries()).map(([microSkillName, tasks]) => (
                             <Card key={microSkillName}>
                               <CardHeader className="p-3">
@@ -768,6 +769,7 @@ function SkillPageContent() {
           isOpen={!!selectedIntention}
           onOpenChange={() => setSelectedIntention(null)}
           intention={selectedIntention}
+          linkedUpskillChildIds={linkedUpskillChildIds}
        />
     </div>
     </>
@@ -781,7 +783,3 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
-
-    
-
-

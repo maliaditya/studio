@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -19,10 +20,11 @@ interface IntentionDetailModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   intention: ExerciseDefinition | null;
+  linkedUpskillChildIds: Set<string>;
 }
 
-export function IntentionDetailModal({ isOpen, onOpenChange, intention }: IntentionDetailModalProps) {
-  const { deepWorkDefinitions, upskillDefinitions, resources, linkedUpskillChildIds } = useAuth();
+export function IntentionDetailModal({ isOpen, onOpenChange, intention, linkedUpskillChildIds }: IntentionDetailModalProps) {
+  const { deepWorkDefinitions, upskillDefinitions, resources } = useAuth();
   const [navigationStack, setNavigationStack] = useState<ExerciseDefinition[]>([]);
 
   useEffect(() => {
