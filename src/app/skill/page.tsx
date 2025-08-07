@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -7,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, FolderOpen, GitMerge, Workflow } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, FolderOpen, GitMerge, Workflow, Lightbulb, Flashlight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, Project, Feature, Company, Position, WorkProject, ProjectSkillLink, ExerciseDefinition } from '@/types/workout';
@@ -356,41 +355,27 @@ function SkillPageContent() {
     return coreSkills.filter(skill => skill.type === 'Specialization');
   }, [coreSkills]);
 
-  const projectsBySkill = useMemo(() => {
-    const map = new Map<string, Project[]>();
-    projects.forEach(project => {
-        project.features.forEach(feature => {
-            feature.linkedSkills.forEach(link => {
-                if (!map.has(link.microSkillId)) {
-                    map.set(link.microSkillId, []);
-                }
-                // Avoid adding duplicate projects
-                if (!map.get(link.microSkillId)!.some(p => p.id === project.id)) {
-                    map.get(link.microSkillId)!.push(project);
-                }
-            });
-        });
-    });
-    return map;
-  }, [projects]);
-  
-  const intentions = useMemo(() => {
-      const linkedDeepWorkChildIds = new Set<string>(deepWorkDefinitions.flatMap(def => def.linkedDeepWorkIds || []));
-      return deepWorkDefinitions.filter(def => {
-          const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-          const isChild = linkedDeepWorkChildIds.has(def.id);
-          return isParent && !isChild;
-      });
-  }, [deepWorkDefinitions]);
+  const linkedIntentionsByProject = useMemo(() => {
+      const intentionsAndCuriosities = [...deepWorkDefinitions, ...upskillDefinitions];
+      const linked = intentionsAndCuriosities.filter(item => item.linkedProjectId === selectedProjectId);
+      
+      const grouped = linked.reduce((acc, item) => {
+          const microSkillInfo = microSkillMap.get(item.category);
+          if (!microSkillInfo) return acc;
+          
+          const { coreSkillName, microSkillName } = microSkillInfo;
+          if (!acc[coreSkillName]) {
+              acc[coreSkillName] = {};
+          }
+          if (!acc[coreSkillName][microSkillName]) {
+              acc[coreSkillName][microSkillName] = [];
+          }
+          acc[coreSkillName][microSkillName].push(item);
+          return acc;
+      }, {} as Record<string, Record<string, ExerciseDefinition[]>>);
 
-  const curiosities = useMemo(() => {
-      const linkedUpskillChildIds = new Set<string>(upskillDefinitions.flatMap(def => def.linkedUpskillIds || []));
-      return upskillDefinitions.filter(def => {
-          const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-          const isChild = linkedUpskillChildIds.has(def.id);
-          return isParent && !isChild;
-      });
-  }, [upskillDefinitions]);
+      return grouped;
+  }, [selectedProjectId, deepWorkDefinitions, upskillDefinitions, microSkillMap]);
 
   return (
     <>
@@ -507,10 +492,45 @@ function SkillPageContent() {
           <Card>
             <CardHeader>
               <CardTitle>Details</CardTitle>
-              <CardDescription>{selectedCoreSkill ? `Viewing skill areas for "${selectedCoreSkill.name}"` : selectedProject ? `Viewing features for "${selectedProject.name}"` : selectedCompanyId ? `Viewing positions for "${companies.find(c => c.id === selectedCompanyId)?.name}"` : 'Select an item from the library.'}</CardDescription>
+              <CardDescription>{selectedCoreSkill ? `Viewing skill areas for "${selectedCoreSkill.name}"` : selectedProject ? `Viewing linked tasks for "${selectedProject.name}"` : selectedCompanyId ? `Viewing positions for "${companies.find(c => c.id === selectedCompanyId)?.name}"` : 'Select an item from the library.'}</CardDescription>
             </CardHeader>
             <CardContent>
-              {selectedCoreSkill ? (
+              {selectedProject ? (
+                  <div className="space-y-6">
+                    {Object.keys(linkedIntentionsByProject).length > 0 ? (
+                      Object.entries(linkedIntentionsByProject).map(([coreSkillName, microSkills]) => (
+                        <div key={coreSkillName}>
+                          <h3 className="text-xl font-bold mb-3">{coreSkillName}</h3>
+                          <div className="space-y-4">
+                            {Object.entries(microSkills).map(([microSkillName, items]) => (
+                              <Card key={microSkillName}>
+                                <CardHeader className="pb-3">
+                                  <CardTitle className="text-base">{microSkillName}</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  <ul className="list-disc list-inside text-sm space-y-1">
+                                    {items.map(item => (
+                                      <li key={item.id} className="flex items-center gap-2">
+                                        {upskillDefinitions.some(d => d.id === item.id) ? (
+                                          <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                                        ) : (
+                                          <Lightbulb className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                        )}
+                                        <span className="text-muted-foreground">{item.name}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-center text-muted-foreground">No Intentions or Curiosities linked to this project yet.</p>
+                    )}
+                  </div>
+              ) : selectedCoreSkill ? (
                   <div className="space-y-4">
                       <div className="flex items-center gap-2">
                           <Input value={newSkillAreaNames[selectedSkillId!] || ''} onChange={e => setNewSkillAreaNames(prev => ({...prev, [selectedSkillId!]: e.target.value}))} placeholder="New Skill Area Name" />
@@ -548,57 +568,14 @@ function SkillPageContent() {
                                 </CardHeader>
                                 <AccordionContent className="px-3 pb-3">
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {area.microSkills.map(micro => {
-                                        const filteredIntentions = intentions.filter(def => def.category === micro.name);
-                                        const filteredCuriosities = curiosities.filter(def => def.category === micro.name);
-                                        const linkedProjects = projectsBySkill.get(micro.id) || [];
-                                        return (
-                                            <Card key={micro.id} className="flex flex-col group/item">
-                                                <CardHeader className="p-3 flex flex-row items-center justify-between">
-                                                    <CardTitle className="text-base">{micro.name}</CardTitle>
-                                                    <div className="flex items-center opacity-0 group-hover/item:opacity-100">
-                                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingMicroSkill({skillId: selectedCoreSkill.id, areaId: area.id, microSkill: micro})}><Edit className="h-4 w-4"/></Button>
-                                                        <AlertDialog>
-                                                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive"/></Button></AlertDialogTrigger>
-                                                            <AlertDialogContent>
-                                                                <AlertDialogHeader><AlertDialogTitle>Delete "{micro.name}"?</AlertDialogTitle></AlertDialogHeader>
-                                                                <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteMicroSkill(selectedCoreSkill.id, area.id, micro.id)}>Delete</AlertDialogAction></AlertDialogFooter>
-                                                            </AlertDialogContent>
-                                                        </AlertDialog>
-                                                    </div>
-                                                </CardHeader>
-                                                <CardContent className="p-3 flex-grow space-y-3">
-                                                    <div>
-                                                    <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><BookCopy className="h-3 w-3"/>Curiosities</h4>
-                                                    {filteredCuriosities.length > 0 ? (
-                                                        <ul className="list-disc list-inside text-xs space-y-0.5">
-                                                            {filteredCuriosities.map(t => <li key={t.id} className="cursor-pointer hover:text-primary" onClick={() => setSelectedIntention(t)}>{t.name}</li>)}
-                                                        </ul>
-                                                    ) : <p className="text-xs text-muted-foreground italic">None</p>}
-                                                    </div>
-                                                    <Separator />
-                                                    <div>
-                                                    <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><Briefcase className="h-3 w-3"/>Intentions</h4>
-                                                    {filteredIntentions.length > 0 ? (
-                                                        <ul className="list-disc list-inside text-xs space-y-0.5">
-                                                            {filteredIntentions.map(t => <li key={t.id} className="cursor-pointer hover:text-primary" onClick={() => setSelectedIntention(t)}>{t.name}</li>)}
-                                                        </ul>
-                                                    ) : <p className="text-xs text-muted-foreground italic">None</p>}
-                                                    </div>
-                                                    <Separator />
-                                                    <div>
-                                                    <h4 className="font-semibold text-xs text-muted-foreground mb-1 flex items-center gap-1"><Sprout className="h-3 w-3"/>Project Usage</h4>
-                                                    {linkedProjects.length > 0 ? (
-                                                        <ul className="list-disc list-inside text-xs space-y-0.5">
-                                                            {linkedProjects.map(p => <li key={p.id}>{p.name}</li>)}
-                                                        </ul>
-                                                    ) : <p className="text-xs text-muted-foreground italic">Not used</p>}
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        )
-                                    })}
-                                     <Card className="flex flex-col items-center justify-center border-dashed min-h-[12rem] hover:border-primary hover:bg-muted/50 transition-colors">
+                                    {area.microSkills.map(micro => (
+                                      <Card key={micro.id} className="flex flex-col group/item">
+                                          <CardHeader className="p-3 flex flex-row items-center justify-between">
+                                              <CardTitle className="text-base">{micro.name}</CardTitle>
+                                          </CardHeader>
+                                      </Card>
+                                    ))}
+                                     <Card className="flex flex-col items-center justify-center border-dashed min-h-[5rem] hover:border-primary hover:bg-muted/50 transition-colors">
                                         <form onSubmit={(e) => {
                                             e.preventDefault();
                                             handleAddMicroSkill(selectedCoreSkill.id, area.id, newMicroSkillNames[area.id] || '');
@@ -622,140 +599,6 @@ function SkillPageContent() {
                           ))}
                        </Accordion>
                   </div>
-              ) : selectedProject ? (
-                  <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                          <Input value={newFeatureNames[selectedProjectId!] || ''} onChange={e => setNewFeatureNames(prev => ({ ...prev, [selectedProjectId!]: e.target.value }))} placeholder="New Feature Name" />
-                          <Button onClick={() => handleAddFeature(selectedProjectId!)}>Add Feature</Button>
-                      </div>
-                      <Accordion type="multiple" className="w-full space-y-2">
-                          {selectedProject.features.map(feature => (
-                              <Card key={feature.id}>
-                                  <AccordionItem value={feature.id} className="border-b-0">
-                                      <CardHeader className="p-3">
-                                          <div className="flex items-center justify-between w-full">
-                                              <AccordionTrigger className="hover:no-underline p-0 flex-grow font-semibold text-lg">{feature.name}</AccordionTrigger>
-                                              <div className="flex items-center">
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openPistonsFor({view: 'projects', topicId: feature.id, topicName: feature.name})}>
-                                                    <BrainCircuit className="h-4 w-4" />
-                                                </Button>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteFeature(selectedProjectId!, feature.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                                              </div>
-                                          </div>
-                                      </CardHeader>
-                                      <AccordionContent className="px-3 pb-3">
-                                          <div className="p-4 bg-muted/50 rounded-md">
-                                              <div className="flex justify-between items-center mb-2">
-                                                <h4 className="font-semibold">Linked Skills</h4>
-                                                <Popover onOpenChange={(open) => !open && setLinkingSkillsForFeature(null)}>
-                                                    <PopoverTrigger asChild>
-                                                        <Button variant="outline" size="sm" onClick={() => setLinkingSkillsForFeature(feature)}>Link Skills</Button>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent className="w-80">
-                                                        <div className="grid gap-4">
-                                                            <div className="space-y-2">
-                                                                <h4 className="font-medium leading-none">Link skills to "{feature.name}"</h4>
-                                                                <p className="text-sm text-muted-foreground">Select required micro-skills from the domain.</p>
-                                                            </div>
-                                                            <div className="h-64 overflow-y-auto space-y-2 pr-2">
-                                                                <Accordion type="multiple" className="w-full">
-                                                                    {coreSkillsInDomain.map(coreSkill => (
-                                                                        <AccordionItem value={coreSkill.id} key={coreSkill.id}>
-                                                                            <AccordionTrigger>{coreSkill.name}</AccordionTrigger>
-                                                                            <AccordionContent>
-                                                                              <Accordion type="multiple" className="w-full pl-2">
-                                                                                {coreSkill.skillAreas.map(area => (
-                                                                                   <AccordionItem value={area.id} key={area.id}>
-                                                                                    <AccordionTrigger className="text-xs">{area.name}</AccordionTrigger>
-                                                                                    <AccordionContent className="pl-4 pt-2 space-y-2">
-                                                                                      {area.microSkills.map(ms => (
-                                                                                        <div key={ms.id} className="flex items-center space-x-2">
-                                                                                            <Checkbox id={`link-${feature.id}-${ms.id}`} checked={feature.linkedSkills.some(l => l.microSkillId === ms.id)} onCheckedChange={() => handleToggleSkillLink(feature, ms.id)} />
-                                                                                            <Label htmlFor={`link-${feature.id}-${ms.id}`} className="font-normal text-sm">{ms.name}</Label>
-                                                                                        </div>
-                                                                                      ))}
-                                                                                    </AccordionContent>
-                                                                                   </AccordionItem>
-                                                                                ))}
-                                                                              </Accordion>
-                                                                            </AccordionContent>
-                                                                        </AccordionItem>
-                                                                    ))}
-                                                                </Accordion>
-                                                            </div>
-                                                        </div>
-                                                    </PopoverContent>
-                                                </Popover>
-                                              </div>
-                                              <ul className="space-y-1">
-                                                {feature.linkedSkills.map(link => {
-                                                    const skillPath = microSkillMap.get(link.microSkillId);
-                                                    return (
-                                                      <li key={link.microSkillId} className="text-sm text-muted-foreground flex items-center group">
-                                                        <span className="flex-grow">{skillPath ? `${skillPath.coreSkillName} > ${skillPath.skillAreaName} > ${skillPath.microSkillName}` : 'Unknown Skill'}</span>
-                                                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => handleUnlinkSkill(feature, link)}>
-                                                          <Unlink className="h-3 w-3 text-destructive" />
-                                                        </Button>
-                                                      </li>
-                                                    );
-                                                })}
-                                              </ul>
-                                          </div>
-                                      </AccordionContent>
-                                  </AccordionItem>
-                              </Card>
-                          ))}
-                      </Accordion>
-                  </div>
-              ) : selectedCompanyId ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                      <Input value={newPositionTitle[selectedCompanyId] || ''} onChange={e => setNewPositionTitle(prev => ({ ...prev, [selectedCompanyId]: e.target.value }))} placeholder="New Position Title" />
-                      <Button onClick={() => handleAddPosition(selectedCompanyId)}>Add Position</Button>
-                  </div>
-                  <Accordion type="multiple" className="w-full space-y-2">
-                    {selectedCompanyPositions.map(pos => (
-                      <Card key={pos.id}>
-                        <AccordionItem value={pos.id} className="border-b-0">
-                          <CardHeader className="p-3">
-                              <div className="flex items-center justify-between w-full">
-                                <AccordionTrigger className="hover:no-underline p-0 flex-grow font-semibold text-lg">{pos.title}</AccordionTrigger>
-                                <div className="flex items-center">
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingPosition(pos)}><Edit className="h-4 w-4"/></Button>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeletePosition(pos.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                                </div>
-                              </div>
-                          </CardHeader>
-                          <AccordionContent className="px-3 pb-3">
-                              <CardContent className="p-4 bg-muted/50 rounded-md">
-                                  <div className="flex justify-between items-center mb-2">
-                                    <h4 className="font-semibold">Work Projects</h4>
-                                    <Button variant="outline" size="sm" onClick={() => setEditingWorkProject({ positionId: pos.id, project: {} })}>Add Project</Button>
-                                  </div>
-                                  <ul className="space-y-2">
-                                      {pos.projects.map(wp => (
-                                          <li key={wp.id} className="p-2 border rounded bg-background">
-                                              <div className="flex justify-between items-start">
-                                                  <div>
-                                                      <p className="font-semibold">{wp.name}</p>
-                                                      <p className="text-xs text-muted-foreground">Linked to: {coreSkills.find(s => s.id === wp.linkedSpecializationId)?.name || 'N/A'}</p>
-                                                      <p className="text-sm mt-1">{wp.description}</p>
-                                                  </div>
-                                                  <div className="flex items-center">
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingWorkProject({positionId: pos.id, project: wp})}><Edit className="h-4 w-4"/></Button>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteWorkProject(pos.id, wp.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                                                  </div>
-                                              </div>
-                                          </li>
-                                      ))}
-                                  </ul>
-                              </CardContent>
-                          </AccordionContent>
-                        </AccordionItem>
-                      </Card>
-                    ))}
-                  </Accordion>
-                </div>
               ) : (
                 <div className="text-center py-10 text-muted-foreground">Select an item to see its breakdown.</div>
               )}
