@@ -23,11 +23,10 @@ interface IntentionDetailModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   intention: ExerciseDefinition | null;
-  linkedUpskillChildIds: Set<string>;
 }
 
-export function IntentionDetailModal({ isOpen, onOpenChange, intention, linkedUpskillChildIds }: IntentionDetailModalProps) {
-  const { deepWorkDefinitions, upskillDefinitions, resources } = useAuth();
+export function IntentionDetailModal({ isOpen, onOpenChange, intention }: IntentionDetailModalProps) {
+  const { deepWorkDefinitions, upskillDefinitions, resources, linkedUpskillChildIds } = useAuth();
   const [navigationStack, setNavigationStack] = useState<ExerciseDefinition[]>([]);
 
   useEffect(() => {
@@ -73,9 +72,8 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, linkedUp
         const isParent = (item.linkedUpskillIds?.length ?? 0) > 0 || (item.linkedResourceIds?.length ?? 0) > 0;
         const isChild = linkedUpskillChildIds.has(item.id);
         if (isParent && !isChild) return <Flashlight className="h-4 w-4 text-amber-500" />; // Curiosity
-        if (isParent && isChild) return <BookCopy className="h-4 w-4 text-amber-500" />; // Objective
         if (!isParent && isChild) return <Frame className="h-4 w-4 text-blue-500" />; // Visualization
-        return <BookCopy className="h-4 w-4 text-amber-500" />;
+        return <BookCopy className="h-4 w-4 text-amber-500" />; // Objective
     }
     return <Lightbulb className="h-4 w-4 text-green-500" />;
   };
@@ -119,24 +117,28 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, linkedUp
                         <div>
                             <h3 className="font-semibold mb-2 flex items-center gap-2"><BookCopy className="h-5 w-5 text-amber-500" />Linked Learning</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {linkedItems.upskill.map(item => (
-                                    <Card key={item.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleDrillDown(item)}>
-                                      <CardHeader>
-                                          <CardTitle className="text-base flex items-center gap-2">
-                                            {getIcon(item)}
-                                            {item.name}
-                                          </CardTitle>
-                                          <CardDescription>{item.category}</CardDescription>
-                                      </CardHeader>
-                                      {((item.linkedResourceIds?.length ?? 0) > 0 || (item.linkedUpskillIds?.length ?? 0) > 0) && (
-                                        <CardContent className="pt-2">
-                                            <div className="text-xs text-muted-foreground">
-                                                {item.linkedUpskillIds?.length || 0} sub-task(s), {item.linkedResourceIds?.length || 0} resource(s) linked.
-                                            </div>
-                                        </CardContent>
-                                      )}
-                                    </Card>
-                                ))}
+                                {linkedItems.upskill.map(item => {
+                                    const isParent = (item.linkedUpskillIds?.length ?? 0) > 0 || (item.linkedResourceIds?.length ?? 0) > 0;
+                                    const isClickable = isParent;
+                                    return (
+                                        <Card key={item.id} className={isClickable ? "cursor-pointer hover:bg-muted/50" : ""} onClick={isClickable ? () => handleDrillDown(item) : undefined}>
+                                          <CardHeader>
+                                              <CardTitle className="text-base flex items-center gap-2">
+                                                {getIcon(item)}
+                                                {item.name}
+                                              </CardTitle>
+                                              <CardDescription>{item.category}</CardDescription>
+                                          </CardHeader>
+                                          {isParent && (
+                                            <CardContent className="pt-2">
+                                                <div className="text-xs text-muted-foreground">
+                                                    {item.linkedUpskillIds?.length || 0} sub-task(s), {item.linkedResourceIds?.length || 0} resource(s) linked.
+                                                </div>
+                                            </CardContent>
+                                          )}
+                                        </Card>
+                                    )
+                                })}
                             </div>
                         </div>
                     )}

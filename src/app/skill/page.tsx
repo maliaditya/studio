@@ -10,7 +10,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
-import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ProjectSkillLink } from '@/types/workout';
+import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ActivityType, DailySchedule } from '@/types/workout';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -58,7 +58,6 @@ function SkillPageContent() {
     selectedSkillId, setSelectedSkillId,
     selectedProjectId, setSelectedProjectId,
     selectedCompanyId, setSelectedCompanyId,
-    linkedUpskillChildIds,
   } = useAuth();
   
   const router = useRouter();
@@ -769,7 +768,6 @@ function SkillPageContent() {
           isOpen={!!selectedIntention}
           onOpenChange={() => setSelectedIntention(null)}
           intention={selectedIntention}
-          linkedUpskillChildIds={linkedUpskillChildIds}
        />
     </div>
     </>
