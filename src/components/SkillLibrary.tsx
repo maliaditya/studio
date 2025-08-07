@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
@@ -53,62 +53,51 @@ export function SkillLibrary({
     onUpdateFocusAreaName,
     onOpenMindMap,
 }: SkillLibraryProps) {
-  const { skillDomains, coreSkills, projects, expandedItems, handleExpansionChange, upskillDefinitions, deepWorkDefinitions } = useAuth();
+  const { 
+    skillDomains, 
+    coreSkills, 
+    projects, 
+    expandedItems, 
+    handleExpansionChange, 
+    upskillDefinitions, 
+    deepWorkDefinitions,
+    selectedDomainId, setSelectedDomainId,
+    selectedSkillId, setSelectedSkillId,
+    selectedProjectId, setSelectedProjectId
+  } = useAuth();
   
-  const [currentView, setCurrentView] = useState<'root' | 'domain' | 'coreSkill' | 'skillArea' | 'project' | 'feature'>('root');
-  const [selectedDomain, setSelectedDomain] = useState<SkillDomain | null>(null);
-  const [selectedCoreSkill, setSelectedCoreSkill] = useState<CoreSkill | null>(null);
-  const [selectedSkillArea, setSelectedSkillArea] = useState<SkillArea | null>(null);
-  const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
   const [editingFocusAreaId, setEditingFocusAreaId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
 
+  const selectedDomain = skillDomains.find(d => d.id === selectedDomainId);
+  const selectedCoreSkill = coreSkills.find(s => s.id === selectedSkillId);
+  
   const handleBack = () => {
     if (selectedMicroSkill) {
         onSelectMicroSkill(null);
-    } else if (selectedFeature) {
-        setSelectedFeature(null);
-        setCurrentView('project');
-    } else if (selectedSkillArea) {
-        setSelectedSkillArea(null);
-        setCurrentView('coreSkill');
-    } else if (selectedCoreSkill) {
-        setSelectedCoreSkill(null);
-        setCurrentView('domain');
-    } else if (selectedProject) {
-        onSelectProject(null);
-        setCurrentView('root');
-    } else if (selectedDomain) {
-        setSelectedDomain(null);
-        setCurrentView('root');
+    } else if (selectedSkillId) {
+        setSelectedSkillId(null);
+    } else if (selectedDomainId) {
+        setSelectedDomainId(null);
+    } else if (selectedProjectId) {
+        setSelectedProjectId(null);
     }
   };
   
-  const handleSelect = (item: any, type: string) => {
+  const handleSelect = (item: any, type: 'domain' | 'coreSkill' | 'microSkill' | 'project') => {
+    onSelectFocusArea(null);
     switch(type) {
         case 'domain':
-            setSelectedDomain(item);
-            setCurrentView('domain');
-            break;
-        case 'project':
-            onSelectProject(item);
-            setCurrentView('project');
+            setSelectedDomainId(item.id);
             break;
         case 'coreSkill':
-            setSelectedCoreSkill(item);
-            setCurrentView('coreSkill');
-            break;
-        case 'skillArea':
-            setSelectedSkillArea(item);
-            setCurrentView('skillArea');
-            break;
-        case 'feature':
-            setSelectedFeature(item);
-            setCurrentView('feature');
+            setSelectedSkillId(item.id);
             break;
         case 'microSkill':
             onSelectMicroSkill(item);
-            onSelectFocusArea(null);
+            break;
+        case 'project':
+            setSelectedProjectId(item.id);
             break;
     }
   };
@@ -166,14 +155,12 @@ export function SkillLibrary({
   
   const renderHeader = () => {
     let title = "Library";
-    if (selectedFeature) title = selectedFeature.name;
-    else if (selectedMicroSkill) title = selectedMicroSkill.name;
-    else if (selectedSkillArea) title = selectedSkillArea.name;
+    if (selectedMicroSkill) title = selectedMicroSkill.name;
     else if (selectedCoreSkill) title = selectedCoreSkill.name;
     else if (selectedProject) title = selectedProject.name;
     else if (selectedDomain) title = selectedDomain.name;
 
-    const showBackButton = currentView !== 'root' || selectedMicroSkill !== null;
+    const showBackButton = !!(selectedDomainId || selectedProjectId);
     
     return (
         <div className="flex items-center gap-2">
@@ -264,61 +251,31 @@ export function SkillLibrary({
       )
     }
 
-    if (currentView === 'feature' && selectedFeature) {
-        const linkedMicroSkills = coreSkills.flatMap(cs => cs.skillAreas).flatMap(sa => sa.microSkills).filter(ms => selectedFeature?.linkedSkills.some(l => l.microSkillId === ms.id));
-        return (
-            <div className="space-y-2">
-                {linkedMicroSkills.map(ms => (
-                    <Button key={ms.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(ms, 'microSkill')}>
-                        <Activity className="mr-2 h-4 w-4"/>
-                        {ms.name}
-                    </Button>
-                ))}
-            </div>
-        )
-    }
-
-    if (currentView === 'project' && selectedProject) {
-        return (
-            <div className="space-y-2">
-                {selectedProject.features.map(feature => (
-                    <Button key={feature.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(feature, 'feature')}>
-                        <Workflow className="mr-2 h-4 w-4"/>
-                        {feature.name}
-                    </Button>
-                ))}
-            </div>
-        )
-    }
-    
-    if (currentView === 'skillArea' && selectedSkillArea) {
-       return (
-        <div className="space-y-2">
-            {selectedSkillArea.microSkills.map(ms => (
-                <Button key={ms.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(ms, 'microSkill')}>
-                    <Activity className="mr-2 h-4 w-4"/>
-                    {ms.name}
-                </Button>
-            ))}
-        </div>
-       )
-    }
-
-    if (currentView === 'coreSkill' && selectedCoreSkill) {
+    if (selectedCoreSkill) {
       return (
         <div className="space-y-2">
           {selectedCoreSkill.skillAreas.map(sa => (
-            <Button key={sa.id} variant="outline" className="w-full justify-start" onClick={() => handleSelect(sa, 'skillArea')}>
-                <Folder className="mr-2 h-4 w-4"/>
-              {sa.name}
-            </Button>
+            <Accordion key={sa.id} type="single" collapsible>
+                <AccordionItem value={sa.id} className="border-b-0">
+                    <AccordionTrigger className="p-2 rounded-md hover:no-underline hover:bg-muted font-semibold text-base">{sa.name}</AccordionTrigger>
+                    <AccordionContent className="pl-4 pt-1">
+                        <ul className="space-y-1">
+                            {sa.microSkills.map(ms => (
+                                <li key={ms.id}>
+                                    <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleSelect(ms, 'microSkill')}>{ms.name}</Button>
+                                </li>
+                            ))}
+                        </ul>
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
           ))}
         </div>
       );
     }
     
-    if (currentView === 'domain' && selectedDomain) {
-        const filteredCoreSkills = coreSkills.filter(cs => cs.domainId === selectedDomain?.id);
+    if (selectedDomain) {
+        const filteredCoreSkills = coreSkills.filter(cs => cs.domainId === selectedDomainId);
         return (
              <div className="space-y-2">
                 {filteredCoreSkills.map(cs => (
@@ -328,6 +285,34 @@ export function SkillLibrary({
                     </Button>
                 ))}
              </div>
+        )
+    }
+
+    if (selectedProject) {
+        return (
+            <div className="space-y-2">
+                {selectedProject.features.map(feature => (
+                    <Accordion key={feature.id} type="single" collapsible>
+                        <AccordionItem value={feature.id} className="border-b-0">
+                            <AccordionTrigger className="p-2 rounded-md hover:no-underline hover:bg-muted font-semibold text-base">{feature.name}</AccordionTrigger>
+                            <AccordionContent className="pl-4 pt-1">
+                                <ul className="space-y-1">
+                                {feature.linkedSkills.map(link => {
+                                    const microSkill = coreSkills.flatMap(cs => cs.skillAreas).flatMap(sa => sa.microSkills).find(ms => ms.id === link.microSkillId);
+                                    return microSkill ? (
+                                        <li key={microSkill.id}>
+                                            <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleSelect(microSkill, 'microSkill')}>
+                                                {microSkill.name}
+                                            </Button>
+                                        </li>
+                                    ) : null;
+                                })}
+                                </ul>
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
+                ))}
+            </div>
         )
     }
 
@@ -358,7 +343,6 @@ export function SkillLibrary({
     )
   };
 
-
   return (
     <Card>
         <CardHeader>
@@ -367,7 +351,7 @@ export function SkillLibrary({
         <CardContent>
            <AnimatePresence mode="wait">
              <motion.div
-               key={currentView + (selectedDomain?.id || '') + (selectedCoreSkill?.id || '') + (selectedSkillArea?.id || '') + (selectedProject?.id || '') + (selectedFeature?.id || '') + (selectedMicroSkill?.id || '')}
+               key={currentView + (selectedDomain?.id || '') + (selectedCoreSkill?.id || '') + (selectedProject?.id || '') + (selectedMicroSkill?.id || '')}
                initial={{ opacity: 0, x: -20 }}
                animate={{ opacity: 1, x: 0 }}
                exit={{ opacity: 0, x: 20 }}
@@ -382,3 +366,5 @@ export function SkillLibrary({
     </Card>
   );
 }
+
+    
