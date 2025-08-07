@@ -526,8 +526,8 @@ function DeepWorkPageContent() {
     resourceFolders,
     topicGoals,
     setFloatingVideoUrl,
-    selectedSubtopic, 
-    setSelectedSubtopic,
+    selectedDeepWorkTask, 
+    setSelectedDeepWorkTask,
     skillDomains,
     coreSkills,
     projects,
@@ -551,8 +551,8 @@ function DeepWorkPageContent() {
   
   const [viewMode, setViewMode] = useState<'session' | 'library'>('library');
 
-  const selectedFocusArea = selectedSubtopic;
-  const setSelectedFocusArea = setSelectedSubtopic;
+  const selectedFocusArea = selectedDeepWorkTask;
+  const setSelectedFocusArea = setSelectedDeepWorkTask;
   
   const [isManageLinksModalOpen, setIsManageLinksModalOpen] = useState(false);
   const [manageLinksConfig, setManageLinksConfig] = useState<{type: 'upskill' | 'deepwork' | 'resource', parent: ExerciseDefinition} | null>(null);
@@ -1497,11 +1497,11 @@ function DeepWorkPageContent() {
                                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                                     {(selectedFocusArea.linkedDeepWorkIds || []).map(id => {
                                         const def = deepWorkDefinitions.find(d => d.id === id);
-                                        return def ? <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getIcon, getNodeType, getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, setSelectedFocusArea, setViewMode, handleToggleReadyForBranding, handleUnlinkItem, handleDeleteExerciseDefinition, handleViewProgress, deepWorkDefinitions, formatDuration, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic, linkedDeepWorkChildIds, onOpenMindMap:(id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); }, onUpdateName: handleUpdateDefinitionName }}/> : null;
+                                        return def ? <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getIcon, getNodeType, getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, setSelectedFocusArea, setViewMode, handleToggleReadyForBranding, handleUnlinkItem, handleDeleteExerciseDefinition, handleViewProgress, deepWorkDefinitions, formatDuration, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic: (def) => setSelectedFocusArea(def), linkedDeepWorkChildIds, onOpenMindMap:(id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); }, onUpdateName: handleUpdateDefinitionName }}/> : null;
                                     })}
                                     {(selectedFocusArea.linkedUpskillIds || []).map(id => {
                                         const def = upskillDefinitions.find(d => d.id === id);
-                                        return def ? <LinkedUpskillCard key={id} id={id} upskillDef={def} {...{isUpskillObjectiveComplete, getUpskillLoggedMinutesRecursive, setEmbedUrl, setFloatingVideoUrl, handleViewProgress, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteUpskillDefinition: (id) => handleDeleteUpskillDefinition(id), upskillDefinitions, formatDuration: formatDuration, calculatedEstimate: calculateTotalEstimate(def), setSelectedSubtopic, setViewMode, onUpdateName: () => {} }} /> : null;
+                                        return def ? <LinkedUpskillCard key={id} id={id} upskillDef={def} {...{isUpskillObjectiveComplete, getUpskillLoggedMinutesRecursive, setEmbedUrl, setFloatingVideoUrl, handleViewProgress, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteUpskillDefinition: (id) => handleDeleteUpskillDefinition(id), upskillDefinitions, formatDuration: formatDuration, calculatedEstimate: calculateTotalEstimate(def), setSelectedSubtopic: () => {}, setViewMode, onUpdateName: () => {} }} /> : null;
                                     })}
                                     {(selectedFocusArea.linkedResourceIds || []).map(id => {
                                         const resource = resources.find(r => r.id === id);

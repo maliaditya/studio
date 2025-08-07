@@ -196,8 +196,10 @@ interface AuthContextType {
   microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>;
 
   // New state for selected subtopic/focus area
-  selectedSubtopic: ExerciseDefinition | null;
-  setSelectedSubtopic: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
+  selectedUpskillTask: ExerciseDefinition | null;
+  setSelectedUpskillTask: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
+  selectedDeepWorkTask: ExerciseDefinition | null;
+  setSelectedDeepWorkTask: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
 
   // Sidebar persistence
   expandedItems: string[];
@@ -326,7 +328,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [positions, setPositions] = useState<Position[]>([]);
 
   // Persisted task state
-  const [selectedSubtopic, setSelectedSubtopic] = useState<ExerciseDefinition | null>(null);
+  const [selectedUpskillTask, setSelectedUpskillTask] = useState<ExerciseDefinition | null>(null);
+  const [selectedDeepWorkTask, setSelectedDeepWorkTask] = useState<ExerciseDefinition | null>(null);
   
   const microSkillMap = useMemo(() => {
     const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>();
@@ -446,16 +449,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Persisted task state
       try {
-        const d = loadItem(`selected_subtopic_${username}`);
-        if (d) {
-          const storedTopic = JSON.parse(d);
-          // Verify it's a valid definition-like object
-          if (storedTopic && storedTopic.id && storedTopic.name) {
-            setSelectedSubtopic(storedTopic);
-          }
-        }
+        const upskillTask = loadItem(`selected_upskill_task_${username}`);
+        if (upskillTask) setSelectedUpskillTask(JSON.parse(upskillTask));
+        const deepWorkTask = loadItem(`selected_deepwork_task_${username}`);
+        if (deepWorkTask) setSelectedDeepWorkTask(JSON.parse(deepWorkTask));
       } catch (e) {
-        setSelectedSubtopic(null);
+        setSelectedUpskillTask(null);
+        setSelectedDeepWorkTask(null);
       }
       
       // Sidebar Persistence
@@ -483,7 +483,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setPistons({});
       setSkillDomains([]); setCoreSkills([]); setProjects([]);
       setCompanies([]); setPositions([]);
-      setSelectedSubtopic(null);
+      setSelectedUpskillTask(null);
+      setSelectedDeepWorkTask(null);
       setExpandedItems([]); setSelectedDomainId(null); setSelectedSkillId(null); setSelectedProjectId(null); setSelectedCompanyId(null);
     }
   }, [currentUser]);
@@ -548,7 +549,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`positions_${username}`, JSON.stringify(positions));
       
       // Persisted task state
-      if (selectedSubtopic) localStorage.setItem(`selected_subtopic_${username}`, JSON.stringify(selectedSubtopic)); else localStorage.removeItem(`selected_subtopic_${username}`);
+      if (selectedUpskillTask) localStorage.setItem(`selected_upskill_task_${username}`, JSON.stringify(selectedUpskillTask)); else localStorage.removeItem(`selected_upskill_task_${username}`);
+      if (selectedDeepWorkTask) localStorage.setItem(`selected_deepwork_task_${username}`, JSON.stringify(selectedDeepWorkTask)); else localStorage.removeItem(`selected_deepwork_task_${username}`);
       
       // Sidebar Persistence
       localStorage.setItem(`expanded_items_${username}`, JSON.stringify(expandedItems));
@@ -568,7 +570,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pistons,
     skillDomains, coreSkills, projects,
     companies, positions,
-    currentUser, loading, selectedSubtopic,
+    currentUser, loading, selectedUpskillTask, selectedDeepWorkTask,
     expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId
   ]);
 
@@ -796,7 +798,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       skillDomains, coreSkills, projects,
       companies, positions,
       // Sidebar persistence
-      expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId
+      expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
+      selectedUpskillTask, selectedDeepWorkTask
     };
   }
 
@@ -1650,7 +1653,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     handleDeleteMicroSkill,
     companies, setCompanies,
     positions, setPositions,
-    selectedSubtopic, setSelectedSubtopic,
+    selectedUpskillTask, setSelectedUpskillTask,
+    selectedDeepWorkTask, setSelectedDeepWorkTask,
     microSkillMap,
     expandedItems, handleExpansionChange,
     selectedDomainId, setSelectedDomainId,

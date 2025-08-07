@@ -420,8 +420,8 @@ function UpskillPageContent() {
     topicGoals, 
     resources, setResources, resourceFolders,
     setFloatingVideoUrl,
-    selectedSubtopic, 
-    setSelectedSubtopic,
+    selectedUpskillTask, 
+    setSelectedUpskillTask,
     skillDomains,
     coreSkills,
     projects,
@@ -588,9 +588,9 @@ function UpskillPageContent() {
   }, [allUpskillLogs, upskillDefinitions]);
 
   const totalLoggedTime = useMemo(() => {
-    if (!selectedSubtopic) return 0;
-    return getUpskillLoggedMinutesRecursive(selectedSubtopic);
-  }, [selectedSubtopic, getUpskillLoggedMinutesRecursive]);
+    if (!selectedUpskillTask) return 0;
+    return getUpskillLoggedMinutesRecursive(selectedUpskillTask);
+  }, [selectedUpskillTask, getUpskillLoggedMinutesRecursive]);
 
   const formatMinutes = (minutes: number) => {
     if (minutes === 0) return "0m";
@@ -600,9 +600,9 @@ function UpskillPageContent() {
   }
 
   const totalEstimatedDuration = useMemo(() => {
-    if (!selectedSubtopic) return 0;
-    return calculateTotalEstimate(selectedSubtopic);
-  }, [selectedSubtopic, calculateTotalEstimate]);
+    if (!selectedUpskillTask) return 0;
+    return calculateTotalEstimate(selectedUpskillTask);
+  }, [selectedUpskillTask, calculateTotalEstimate]);
 
   useEffect(() => {
     if (editingSubtopic) {
@@ -676,7 +676,7 @@ function UpskillPageContent() {
         }));
     });
     setAllUpskillLogs(prevLogs => prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) })));
-    if (selectedSubtopic?.id === id) { setSelectedSubtopic(null); setViewMode('session'); }
+    if (selectedUpskillTask?.id === id) { setSelectedUpskillTask(null); setViewMode('session'); }
     toast({ title: "Success", description: `Task "${defToDelete.name}" removed.` });
   };
 
@@ -708,7 +708,7 @@ function UpskillPageContent() {
     
     setUpskillDefinitions(prev => prev.map(def => def.id === editingSubtopic.id ? { ...def, ...finalData } as ExerciseDefinition : def));
     setAllUpskillLogs(prevLogs => prevLogs.map(log => ({...log, exercises: log.exercises.map(ex => ex.definitionId === editingSubtopic.id ? { ...ex, name: finalData.name! } : ex)})));
-    if(selectedSubtopic?.id === editingSubtopic.id) setSelectedSubtopic({ ...selectedSubtopic, ...finalData } as ExerciseDefinition);
+    if(selectedUpskillTask?.id === editingSubtopic.id) setSelectedUpskillTask({ ...selectedUpskillTask, ...finalData } as ExerciseDefinition);
     toast({ title: "Success", description: `Task updated to "${finalData.name}".` });
     setEditingSubtopic(null);
   };
@@ -821,8 +821,8 @@ function UpskillPageContent() {
             
             updatedParent = { ...parent, linkedResourceIds: [...(parent.linkedResourceIds || []), newId] };
             setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
-            if (selectedSubtopic?.id === parent.id) {
-                setSelectedSubtopic(updatedParent);
+            if (selectedUpskillTask?.id === parent.id) {
+                setSelectedUpskillTask(updatedParent);
             }
             toast({ title: "Resource Added", description: `"${newResource.name}" has been saved and linked.`});
 
@@ -852,8 +852,8 @@ function UpskillPageContent() {
     setUpskillDefinitions(prev => [...prev, newUpskillDef]);
     updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newId] };
     setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
-    if (selectedSubtopic?.id === parent.id) {
-        setSelectedSubtopic(updatedParent);
+    if (selectedUpskillTask?.id === parent.id) {
+        setSelectedUpskillTask(updatedParent);
     }
     toast({ title: "Success", description: "New item created and linked." });
     setIsManageLinksModalOpen(false);
@@ -867,8 +867,8 @@ function UpskillPageContent() {
     const updatedParent = { ...parent, [key]: tempLinkedIds };
     
     setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
-    if (selectedSubtopic?.id === parent.id) {
-        setSelectedSubtopic(updatedParent);
+    if (selectedUpskillTask?.id === parent.id) {
+        setSelectedUpskillTask(updatedParent);
     }
     toast({ title: "Success", description: "Links have been updated." });
     setIsManageLinksModalOpen(false);
@@ -905,13 +905,13 @@ function UpskillPageContent() {
 
 
   const handleUnlinkItem = (type: 'upskill' | 'resource', idToUnlink: string) => {
-    if (!selectedSubtopic) return;
+    if (!selectedUpskillTask) return;
     let updatedParent: ExerciseDefinition;
     let key: 'linkedUpskillIds' | 'linkedResourceIds' = type === 'upskill' ? 'linkedUpskillIds' : 'linkedResourceIds';
-    updatedParent = { ...selectedSubtopic, [key]: (selectedSubtopic[key] || []).filter((id: string) => id !== idToUnlink) };
+    updatedParent = { ...selectedUpskillTask, [key]: (selectedUpskillTask[key] || []).filter((id: string) => id !== idToUnlink) };
     
-    setUpskillDefinitions(prev => prev.map(def => def.id === selectedSubtopic.id ? updatedParent : def));
-    setSelectedSubtopic(updatedParent);
+    setUpskillDefinitions(prev => prev.map(def => def.id === selectedUpskillTask.id ? updatedParent : def));
+    setSelectedUpskillTask(updatedParent);
     toast({ title: "Unlinked", description: "The item has been unlinked." });
   };
   
@@ -941,14 +941,14 @@ function UpskillPageContent() {
     const draggedDef = allDefs.find(d => d.id === draggedId);
     const targetDef = allDefs.find(d => d.id === targetId);
   
-    if (!draggedDef || !targetDef || !selectedSubtopic) {
+    if (!draggedDef || !targetDef || !selectedUpskillTask) {
         toast({ title: "Error", description: "Could not find items to link.", variant: "destructive" });
         return;
     }
     
     const parentChildrenIds = new Set([
-        ...(selectedSubtopic.linkedUpskillIds || []),
-        ...(selectedSubtopic.linkedResourceIds || []),
+        ...(selectedUpskillTask.linkedUpskillIds || []),
+        ...(selectedUpskillTask.linkedResourceIds || []),
     ]);
 
     if (!parentChildrenIds.has(draggedId) || !parentChildrenIds.has(targetId)) {
@@ -972,20 +972,20 @@ function UpskillPageContent() {
     }));
     
     const updatedParent = {
-        ...selectedSubtopic,
-        linkedUpskillIds: (selectedSubtopic.linkedUpskillIds || []).filter(id => id !== draggedId),
-        linkedResourceIds: (selectedSubtopic.linkedResourceIds || []).filter(id => id !== draggedId),
+        ...selectedUpskillTask,
+        linkedUpskillIds: (selectedUpskillTask.linkedUpskillIds || []).filter(id => id !== draggedId),
+        linkedResourceIds: (selectedUpskillTask.linkedResourceIds || []).filter(id => id !== draggedId),
     };
     
-    setUpskillDefinitions(prev => prev.map(def => def.id === selectedSubtopic.id ? updatedParent : def));
-    setSelectedSubtopic(updatedParent);
+    setUpskillDefinitions(prev => prev.map(def => def.id === selectedUpskillTask.id ? updatedParent : def));
+    setSelectedUpskillTask(updatedParent);
   
     toast({ title: "Re-linked!", description: `"${draggedDef.name}" is now a sub-task of "${targetDef.name}".` });
   };
 
   const handleProjectSelect = (project: Project | null) => {
     setSelectedProject(project);
-    setSelectedSubtopic(null);
+    setSelectedUpskillTask(null);
     setSelectedMicroSkill(null);
   };
   
@@ -1010,7 +1010,7 @@ function UpskillPageContent() {
                     selectedMicroSkill={selectedMicroSkill}
                     onSelectMicroSkill={setSelectedMicroSkill}
                     definitions={upskillDefinitions}
-                    onSelectFocusArea={setSelectedSubtopic}
+                    onSelectFocusArea={setSelectedUpskillTask}
                     onOpenNewFocusArea={handleOpenNewSubtopicModal}
                     selectedProject={selectedProject}
                     onSelectProject={handleProjectSelect}
@@ -1021,11 +1021,11 @@ function UpskillPageContent() {
                       setIsMindMapModalOpen(true);
                     }}
                 />
-              {selectedSubtopic && (
+              {selectedUpskillTask && (
                   <Card>
                       <CardHeader className="flex flex-row items-center justify-between pb-2">
-                          <div><CardTitle className="text-lg flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary" /> Subtopic Stats</CardTitle><CardDescription className="text-xs">Aggregated progress for "{selectedSubtopic.name}"</CardDescription></div>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewProgress(selectedSubtopic)}><TrendingUp className="h-4 w-4"/></Button>
+                          <div><CardTitle className="text-lg flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary" /> Subtopic Stats</CardTitle><CardDescription className="text-xs">Aggregated progress for "{selectedUpskillTask.name}"</CardDescription></div>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewProgress(selectedUpskillTask)}><TrendingUp className="h-4 w-4"/></Button>
                       </CardHeader>
                       <CardContent className="space-y-4 pt-4">
                           <div className="space-y-2">
@@ -1080,25 +1080,25 @@ function UpskillPageContent() {
                                   </div>
                                 )}
                             </div>
-                        ) : selectedSubtopic ? (
+                        ) : selectedUpskillTask ? (
                              <div className="space-y-4">
                                 <div className="space-y-1">
-                                    <h3 className="text-xl font-bold">{selectedSubtopic.name}</h3>
+                                    <h3 className="text-xl font-bold">{selectedUpskillTask.name}</h3>
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('upskill', selectedSubtopic)}>
+                                        <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('upskill', selectedUpskillTask)}>
                                             <LinkIcon className="mr-2 h-4 w-4" /> Link Sub-task
                                         </Button>
-                                        <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('resource', selectedSubtopic)}>
+                                        <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('resource', selectedUpskillTask)}>
                                             <Folder className="mr-2 h-4 w-4" /> Link Resource
                                         </Button>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {(selectedSubtopic.linkedUpskillIds || []).map(id => {
+                                    {(selectedUpskillTask.linkedUpskillIds || []).map(id => {
                                         const def = upskillDefinitions.find(d => d.id === id);
-                                        return def ? <LinkedUpskillItem key={id} upskillDef={def} {...{ handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteSubtopic, handleViewProgress, isComplete: isUpskillObjectiveComplete(def.id), getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate: calculateTotalEstimate(def), setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName: handleUpdateSubtopicName }} /> : null;
+                                        return def ? <LinkedUpskillItem key={id} upskillDef={def} {...{ handleAddTaskToSession, setSelectedSubtopic: setSelectedUpskillTask, setViewMode, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteSubtopic, handleViewProgress, isComplete: isUpskillObjectiveComplete(def.id), getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate: calculateTotalEstimate(def), setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName: handleUpdateSubtopicName }} /> : null;
                                     })}
-                                    {(selectedSubtopic.linkedResourceIds || []).map(id => {
+                                    {(selectedUpskillTask.linkedResourceIds || []).map(id => {
                                         const resource = resources.find(r => r.id === id);
                                         return resource ? <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={(type, id) => handleUnlinkItem(type, id)} setEmbedUrl={setEmbedUrl} handleOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} /> : null;
                                     })}
