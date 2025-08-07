@@ -14,6 +14,7 @@ export type ExerciseCategory =
   | "Content Bundle"
   | "Lead Generation"
   | "Desire"
+  | "Thought"
   | "Other";
 
 export const exerciseCategories: ExerciseCategory[] = [
@@ -308,6 +309,7 @@ export type PistonState = PistonEntry[];
 export type PistonsData = Partial<Record<PistonType, PistonState> & {
     activity?: string;
     linkedResourceIds?: Partial<Record<PistonType, string>>;
+    thoughtEntries?: PistonEntry[]; // For negative thoughts
 }>;
 
 export interface PistonsCategoryData {

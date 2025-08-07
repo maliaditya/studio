@@ -169,6 +169,19 @@ const PISTON_DETAILS: Record<PistonType, {
     }
 };
 
+const EMOTIONAL_STATES = {
+    'Doubt': { imbalance: '🔻 Dopamine, 🔺 Cortisol', message: '“I don’t trust my next move.”' },
+    'Fear': { imbalance: '🔺 Adrenaline, Norepinephrine, Cortisol', message: '“Something might hurt me.”' },
+    'Shame': { imbalance: '🔻 Serotonin, Oxytocin', message: '“I’m not worthy to connect or try again.”' },
+    'Regret': { imbalance: '🔺 Cortisol, 🔻 Dopamine', message: '“The past stole my future.”' },
+    'Overwhelm': { imbalance: '🔺 Norepinephrine, Cortisol, Adrenaline', message: '“Too much. Can’t handle.”' },
+    'Hopelessness': { imbalance: '🔻 Dopamine, Serotonin', message: '“Nothing will change.”' },
+    'Loneliness': { imbalance: '🔻 Oxytocin, Serotonin', message: '“I don’t matter to anyone.”' },
+    'Imposter Syndrome': { imbalance: '🔻 Serotonin, 🔺 Cortisol', message: '“I’ll be exposed. I don’t belong.”' },
+    'Resentment / Envy': { imbalance: '🔻 Dopamine, 🔺 Cortisol', message: '“They have what I should.”' }
+};
+
+type EmotionalState = keyof typeof EMOTIONAL_STATES;
 
 interface HistoryPopupState {
     piston: PistonType;
@@ -611,7 +624,7 @@ export function PistonsHead() {
     skillDomains, coreSkills, projects,
     pistonsInitialState,
   } = useAuth();
-  const [currentView, setCurrentView] = useState<'main' | 'health' | 'projects' | 'specializations' | 'desires' | 'mindset'>('main');
+  const [currentView, setCurrentView] = useState<'main' | 'health' | 'projects' | 'specializations' | 'desires' | 'mindset' | 'thoughts' | 'negative-thoughts' | 'log-negative-thought'>('main');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [selectedTopicName, setSelectedTopicName] = useState<string | null>(null);
   
@@ -626,6 +639,9 @@ export function PistonsHead() {
 
   const [linkTextDialog, setLinkTextDialog] = useState<{ point: ResourcePoint, resourceId: string } | null>(null);
   const [currentDisplayText, setCurrentDisplayText] = useState('');
+
+  const [selectedEmotionalState, setSelectedEmotionalState] = useState<EmotionalState | null>(null);
+  const [newNegativeThought, setNewNegativeThought] = useState('');
 
   useEffect(() => {
     if (isPistonsHeadOpen && pistonsInitialState) {
@@ -801,7 +817,7 @@ export function PistonsHead() {
     }, 300);
   };
   
-  const handleViewChange = (newView: 'main' | 'health' | 'projects' | 'specializations' | 'desires' | 'mindset') => {
+  const handleViewChange = (newView: 'main' | 'health' | 'projects' | 'specializations' | 'desires' | 'mindset' | 'thoughts') => {
     setCurrentView(newView);
   };
   
@@ -811,7 +827,12 @@ export function PistonsHead() {
   }
 
   const onBack = () => {
-    if (selectedTopicId) {
+    if (currentView === 'log-negative-thought') {
+        setCurrentView('negative-thoughts');
+        setSelectedEmotionalState(null);
+    } else if (currentView === 'negative-thoughts') {
+        setCurrentView('thoughts');
+    } else if (selectedTopicId) {
         setSelectedTopicId(null);
         setSelectedTopicName(null);
     } else {
@@ -829,6 +850,9 @@ export function PistonsHead() {
       case 'specializations': return `Select a Micro-Skill`;
       case 'desires': return `Select a Desire`;
       case 'mindset': return `Select a Mindset`;
+      case 'thoughts': return 'Thoughts';
+      case 'negative-thoughts': return 'Negative Thoughts';
+      case 'log-negative-thought': return `Log: ${selectedEmotionalState}`;
       default: return 'Pistons of Intention';
     }
   };
@@ -932,7 +956,6 @@ export function PistonsHead() {
     setLinkingResourceFor(null);
   };
 
-
   const renderContent = () => {
     const commonProps = { 
         onBack: onBack, 
@@ -945,18 +968,15 @@ export function PistonsHead() {
         handleOpenDetails,
     };
     switch (currentView) {
-      case 'health':
-        return <HealthPistonView {...commonProps} />;
-      case 'projects':
-        return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Project'} {...commonProps} /> : <ProjectSelector onSelect={handleTopicSelect} onBack={onBack} />;
-      case 'specializations':
-         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Skill'} {...commonProps} /> : <SpecializationSelector onSelect={handleTopicSelect} onBack={onBack} />;
-      case 'desires':
-         return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Desire'} {...commonProps} /> : <DesireSelector onSelect={handleTopicSelect} onBack={onBack} />;
-      case 'mindset':
-         return selectedTopicId ? <TopicPistonView topicId={selectedTopicName} topicName={selectedTopicName || 'Mindset'} {...commonProps} /> : <MindsetSelector onSelect={handleTopicSelect} onBack={onBack} />;
-      default:
-        return <MainPistonView onSelect={handleViewChange} />;
+      case 'health': return <HealthPistonView {...commonProps} />;
+      case 'projects': return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Project'} {...commonProps} /> : <ProjectSelector onSelect={handleTopicSelect} onBack={onBack} />;
+      case 'specializations': return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Skill'} {...commonProps} /> : <SpecializationSelector onSelect={handleTopicSelect} onBack={onBack} />;
+      case 'desires': return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Desire'} {...commonProps} /> : <DesireSelector onSelect={handleTopicSelect} onBack={onBack} />;
+      case 'mindset': return selectedTopicId ? <TopicPistonView topicId={selectedTopicName} topicName={selectedTopicName || 'Mindset'} {...commonProps} /> : <MindsetSelector onSelect={handleTopicSelect} onBack={onBack} />;
+      case 'thoughts': return <ThoughtsView onSelect={(type) => setCurrentView(type === 'Positive' ? 'positive-thoughts' : 'negative-thoughts')} />;
+      case 'negative-thoughts': return <NegativeThoughtsView onSelect={(state) => { setSelectedEmotionalState(state); setCurrentView('log-negative-thought'); }} />;
+      case 'log-negative-thought': return <LogNegativeThoughtView emotionalState={selectedEmotionalState!} onBack={onBack} />;
+      default: return <MainPistonView onSelect={handleViewChange} />;
     }
   };
   
@@ -1104,7 +1124,7 @@ export function PistonsHead() {
   );
 }
 
-const MainPistonView = ({ onSelect }: { onSelect: (view: 'health' | 'projects' | 'specializations' | 'desires' | 'mindset') => void }) => (
+const MainPistonView = ({ onSelect }: { onSelect: (view: 'health' | 'projects' | 'specializations' | 'desires' | 'mindset' | 'thoughts') => void }) => (
     <CardContent className="p-4">
         <p className="text-muted-foreground text-center mb-4 text-sm">Select a category to define your core motivations.</p>
         <div className="grid grid-cols-2 gap-4">
@@ -1112,7 +1132,8 @@ const MainPistonView = ({ onSelect }: { onSelect: (view: 'health' | 'projects' |
             <Button onClick={() => onSelect('projects')} variant="outline" className="flex-col h-20"><Briefcase className="h-6 w-6 text-green-500 mb-1"/>Projects</Button>
             <Button onClick={() => onSelect('specializations')} variant="outline" className="flex-col h-20"><BrainCircuit className="h-6 w-6 text-blue-500 mb-1"/>Specializations</Button>
             <Button onClick={() => onSelect('desires')} variant="outline" className="flex-col h-20"><Target className="h-6 w-6 text-purple-500 mb-1"/>Desires</Button>
-            <Button onClick={() => onSelect('mindset')} variant="outline" className="flex-col h-20 col-span-2"><Brain className="h-6 w-6 text-primary mb-1"/>Mindset</Button>
+            <Button onClick={() => onSelect('mindset')} variant="outline" className="flex-col h-20"><Brain className="h-6 w-6 text-primary mb-1"/>Mindset</Button>
+            <Button onClick={() => onSelect('thoughts')} variant="outline" className="flex-col h-20"><MessageSquare className="h-6 w-6 text-orange-500 mb-1"/>Thoughts</Button>
         </div>
     </CardContent>
 );
@@ -1321,6 +1342,78 @@ const SpecializationSelector = ({ onSelect, onBack }: { onSelect: (topicId: stri
                     {selectedSkillArea.microSkills.map(micro => <li key={micro.id}><Button variant="outline" className="w-full justify-start" onClick={() => onSelect(micro.name, micro.name)}><TrendingUp className="mr-2 h-4 w-4"/>{micro.name}</Button></li>)}
                 </ul>
             )}
+        </CardContent>
+    );
+};
+
+const ThoughtsView = ({ onSelect }: { onSelect: (type: 'Positive' | 'Negative') => void }) => (
+    <CardContent className="p-4">
+        <div className="grid grid-cols-2 gap-4">
+            <Button onClick={() => onSelect('Positive')} variant="outline" className="flex-col h-20"><Smile className="h-6 w-6 text-green-500 mb-1"/>Positive</Button>
+            <Button onClick={() => onSelect('Negative')} variant="outline" className="flex-col h-20"><Shield className="h-6 w-6 text-red-500 mb-1"/>Negative</Button>
+        </div>
+    </CardContent>
+);
+
+const NegativeThoughtsView = ({ onSelect }: { onSelect: (state: EmotionalState) => void }) => (
+    <CardContent className="p-4">
+        <ScrollArea className="h-80">
+            <ul className="space-y-2 pr-2">
+                {Object.keys(EMOTIONAL_STATES).map(state => (
+                    <li key={state}>
+                        <Button variant="outline" className="w-full justify-start" onClick={() => onSelect(state as EmotionalState)}>
+                            {state}
+                        </Button>
+                    </li>
+                ))}
+            </ul>
+        </ScrollArea>
+    </CardContent>
+);
+
+const LogNegativeThoughtView = ({ emotionalState, onBack }: { emotionalState: EmotionalState, onBack: () => void }) => {
+    const { setPistons } = useAuth();
+    const [thoughtText, setThoughtText] = useState('');
+    const details = EMOTIONAL_STATES[emotionalState];
+
+    const handleSave = () => {
+        if (!thoughtText.trim()) return;
+        const newEntry: PistonEntry = {
+            id: `thought_${Date.now()}`,
+            text: thoughtText.trim(),
+            timestamp: Date.now()
+        };
+
+        setPistons(prev => {
+            const topicKey = `thought_${emotionalState}`;
+            const existingEntries = prev[topicKey]?.['thoughtEntries'] || [];
+            const updatedTopicData = {
+                ...prev[topicKey],
+                'thoughtEntries': [...existingEntries, newEntry]
+            };
+            return {
+                ...prev,
+                [topicKey]: updatedTopicData
+            };
+        });
+        onBack();
+    };
+
+    return (
+        <CardContent className="p-4">
+            <div className="space-y-4">
+                <Textarea 
+                    value={thoughtText} 
+                    onChange={e => setThoughtText(e.target.value)}
+                    placeholder={`What is the exact thought related to ${emotionalState}?`}
+                    rows={4}
+                />
+                 <Card className="bg-muted/50 p-3 text-sm">
+                    <p><strong>Chemical Imbalance:</strong> {details.imbalance}</p>
+                    <p><strong>Hidden Message:</strong> <em className="text-muted-foreground">{details.message}</em></p>
+                </Card>
+                <Button onClick={handleSave} className="w-full">Log Thought</Button>
+            </div>
         </CardContent>
     );
 };
