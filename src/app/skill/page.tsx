@@ -35,7 +35,7 @@ import { IntentionDetailModal } from '@/components/IntentionDetailModal';
 import { SkillLibrary } from '@/components/SkillLibrary';
 
 function SkillPageContent() {
-  const { toast } = useAuth();
+  const { toast } = useToast();
   const { 
     skillDomains, setSkillDomains, 
     coreSkills, setCoreSkills, 
@@ -45,6 +45,7 @@ function SkillPageContent() {
     microSkillMap,
     upskillDefinitions,
     deepWorkDefinitions,
+    resources,
     openPistonsFor,
     handleUpdateSkillArea,
     handleDeleteSkillArea,
@@ -362,26 +363,24 @@ function SkillPageContent() {
     const intentionsAndCuriosities = [...deepWorkDefinitions, ...upskillDefinitions];
     const linkedItems = intentionsAndCuriosities.filter(item => item.linkedProjectId === selectedProject.id);
 
-    const grouped = new Map<string, { coreSkillName: string, microSkills: Map<string, ExerciseDefinition[]> }>();
+    const groupedByCoreSkill = new Map<string, { coreSkillName: string; microSkills: Map<string, ExerciseDefinition[]> }>();
 
     linkedItems.forEach(item => {
-        const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === item.category);
-        if (microSkillInfo) {
-            const { coreSkillName, microSkillName } = microSkillInfo;
-
-            if (!grouped.has(coreSkillName)) {
-                grouped.set(coreSkillName, { coreSkillName, microSkills: new Map() });
-            }
-
-            const coreSkillGroup = grouped.get(coreSkillName)!;
-            if (!coreSkillGroup.microSkills.has(microSkillName)) {
-                coreSkillGroup.microSkills.set(microSkillName, []);
-            }
-            coreSkillGroup.microSkills.get(microSkillName)!.push(item);
+      const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === item.category);
+      if (microSkill) {
+        const { coreSkillName, microSkillName } = microSkill;
+        if (!groupedByCoreSkill.has(coreSkillName)) {
+          groupedByCoreSkill.set(coreSkillName, { coreSkillName, microSkills: new Map() });
         }
+        const coreSkillGroup = groupedByCoreSkill.get(coreSkillName)!;
+        if (!coreSkillGroup.microSkills.has(microSkillName)) {
+          coreSkillGroup.microSkills.set(microSkillName, []);
+        }
+        coreSkillGroup.microSkills.get(microSkillName)!.push(item);
+      }
     });
 
-    return grouped;
+    return groupedByCoreSkill;
   }, [selectedProject, deepWorkDefinitions, upskillDefinitions, microSkillMap]);
 
   return (
@@ -550,7 +549,7 @@ function SkillPageContent() {
                                   <div className="flex items-center justify-between w-full">
                                     <AccordionTrigger className="hover:no-underline p-0 flex-grow">
                                       <div className="flex items-center gap-2">
-                                        <FolderOpen className="h-5 w-5 text-primary"/>
+                                        <Folder className="h-5 w-5 text-primary"/>
                                         <span className="font-semibold text-lg">{area.name}</span>
                                       </div>
                                     </AccordionTrigger>
@@ -784,4 +783,5 @@ export default function SkillPage() {
 }
 
     
+
 

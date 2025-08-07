@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useMemo } from 'react';
@@ -9,240 +10,89 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from './ui/scroll-area';
-import { BrainCircuit, ArrowDown, Workflow, Clock, AlertTriangle, ArrowRight } from 'lucide-react';
-import type { ExerciseDefinition, DatedWorkout, DailySchedule } from '@/types/workout';
+import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink } from 'lucide-react';
+import type { ExerciseDefinition, Resource } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, parseISO, isBefore, startOfToday, isAfter } from 'date-fns';
-import { Separator } from './ui/separator';
-import { Card, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
+import Image from 'next/image';
 
 interface IntentionDetailModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   intention: ExerciseDefinition | null;
-  avgDailyProductiveHours?: number;
 }
 
-const formatMinutes = (minutes: number) => {
-    if (minutes <= 0) return null;
-    const hours = Math.floor(minutes / 60);
-    const mins = Math.round(minutes % 60);
-    if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
-    if (hours > 0) return `${hours}h`;
-    return `${mins}m`;
-};
-
-export function IntentionDetailModal({ isOpen, onOpenChange, intention, avgDailyProductiveHours = 1 }: IntentionDetailModalProps) {
-  const { deepWorkDefinitions, upskillDefinitions, schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs } = useAuth();
+export function IntentionDetailModal({ isOpen, onOpenChange, intention }: IntentionDetailModalProps) {
+  const { deepWorkDefinitions, upskillDefinitions, resources } = useAuth();
   
-  const { solutionTasks, outcomeObjectives, totalEstimatedMinutes } = useMemo(() => {
-    if (!intention) return { solutionTasks: [], outcomeObjectives: [], totalEstimatedMinutes: 0 };
+  const linkedItems = useMemo(() => {
+    if (!intention) return { deepWork: [], upskill: [], resource: [] };
 
-    const today = startOfToday();
-    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+    const linkedDeepWork = (intention.linkedDeepWorkIds || [])
+        .map(id => deepWorkDefinitions.find(d => d.id === id))
+        .filter((d): d is ExerciseDefinition => !!d);
 
-    const allDescendantIds = new Set<string>();
-    const queue = [intention.id];
-    const visited = new Set<string>();
-    while (queue.length > 0) {
-        const currentId = queue.shift()!;
-        if (visited.has(currentId)) continue;
-        visited.add(currentId);
-        allDescendantIds.add(currentId);
-        const def = allDefs.find(d => d.id === currentId);
-        if (def) {
-            (def.linkedDeepWorkIds || []).forEach(childId => queue.push(childId));
-            (def.linkedUpskillIds || []).forEach(childId => queue.push(childId));
-        }
-    }
-    
-    const scheduledOrPendingDefIds = new Set<string>();
-    for (const dateKey in schedule) {
-        const scheduleDate = parseISO(dateKey);
-        const dailySchedule = schedule[dateKey] as DailySchedule;
-        if (dailySchedule) {
-            const isTodayOrPast = isBefore(scheduleDate, new Date()) || format(scheduleDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+    const linkedUpskill = (intention.linkedUpskillIds || [])
+        .map(id => upskillDefinitions.find(d => d.id === id))
+        .filter((d): d is ExerciseDefinition => !!d);
+        
+    const linkedResources = (intention.linkedResourceIds || [])
+        .map(id => resources.find(r => r.id === id))
+        .filter((r): r is Resource => !!r);
 
-            Object.values(dailySchedule).flat().forEach(activity => {
-                if (activity && !activity.completed && isTodayOrPast) {
-                    (activity.taskIds || []).forEach(taskId => {
-                        let defId: string | undefined;
-                        if (activity.type === 'deepwork') {
-                           defId = allDeepWorkLogs.flatMap(l => l.exercises).find(t => t.id === taskId)?.definitionId;
-                        } else if (activity.type === 'upskill') {
-                           defId = allUpskillLogs.flatMap(l => l.exercises).find(t => t.id === taskId)?.definitionId;
-                        }
-                        if (defId && allDescendantIds.has(defId)) {
-                            scheduledOrPendingDefIds.add(defId);
-                        }
-                    });
-                }
-            });
-        }
-    }
-
-    const allScheduledOrPendingDefs = allDefs.filter(def => scheduledOrPendingDefIds.has(def.id));
-    
-    const solutionTasks: { action: ExerciseDefinition, linkedVisualizations: ExerciseDefinition[] }[] = [];
-    const outcomeObjectiveIds = new Set<string>();
-    
-    const solutionLeafs = allScheduledOrPendingDefs.filter(def => {
-        const isDWAction = deepWorkDefinitions.some(d => d.id === def.id) && (def.linkedDeepWorkIds?.length ?? 0) === 0;
-        const isUpskillViz = upskillDefinitions.some(d => d.id === def.id) && (def.linkedUpskillIds?.length ?? 0) === 0;
-        return isDWAction || isUpskillViz;
-    });
-
-    let estimatedMinutes = 0;
-    solutionLeafs.forEach(leaf => {
-        estimatedMinutes += leaf.estimatedDuration || 0;
-    });
-
-    solutionLeafs.forEach(leaf => {
-        if (upskillDefinitions.some(d => d.id === leaf.id)) {
-            const parentAction = deepWorkDefinitions.find(action => (action.linkedUpskillIds || []).includes(leaf.id));
-            if (parentAction && scheduledOrPendingDefIds.has(parentAction.id)) {
-                let solutionTask = solutionTasks.find(st => st.action.id === parentAction.id);
-                if (!solutionTask) {
-                    solutionTask = { action: parentAction, linkedVisualizations: [] };
-                    solutionTasks.push(solutionTask);
-                }
-                solutionTask.linkedVisualizations.push(leaf);
-            }
-        } else {
-            if (!solutionTasks.some(st => st.action.id === leaf.id)) {
-                solutionTasks.push({ action: leaf, linkedVisualizations: [] });
-            }
-        }
-    });
-
-    solutionTasks.forEach(({ action }) => {
-        deepWorkDefinitions.forEach(parent => {
-            if ((parent.linkedDeepWorkIds || []).includes(action.id)) {
-                outcomeObjectiveIds.add(parent.id);
-            }
-        });
-    });
-
-    const outcomeObjectives = deepWorkDefinitions.filter(def => outcomeObjectiveIds.has(def.id));
-
-    return { solutionTasks, outcomeObjectives, totalEstimatedMinutes: estimatedMinutes };
-  }, [intention, schedule, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs]);
+    return { deepWork: linkedDeepWork, upskill: linkedUpskill, resource: linkedResources };
+  }, [intention, deepWorkDefinitions, upskillDefinitions, resources]);
 
   if (!intention) return null;
-  
-  const outcomeText = outcomeObjectives.length > 0 
-    ? outcomeObjectives.map(obj => obj.name).join(', ')
-    : "Not yet defined";
-  
-  const formattedEstimate = formatMinutes(totalEstimatedMinutes);
-
-  const totalEstimatedHours = totalEstimatedMinutes / 60;
-  const daysToComplete = avgDailyProductiveHours > 0 ? Math.ceil(totalEstimatedHours / avgDailyProductiveHours) : null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl h-[90vh] flex flex-col p-2">
-        <DialogHeader className="p-4 flex-shrink-0">
-          <DialogTitle>Conceptual Flow: {intention.name}</DialogTitle>
+      <DialogContent className="sm:max-w-3xl h-[80vh] flex flex-col p-2">
+        <DialogHeader className="p-4 flex-shrink-0 border-b">
+          <DialogTitle>Details for: {intention.name}</DialogTitle>
         </DialogHeader>
         <div className="flex-grow min-h-0">
             <ScrollArea className="h-full p-4">
-                <div className="flex flex-col items-center gap-4 text-center">
-                   <div className="w-full h-full flex items-center justify-center bg-muted/30 p-8 min-h-[550px]">
-                      <div className="relative w-[800px] h-[500px]">
-                        
-                        {/* Nodes */}
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 text-center max-w-md">
-                          <div className="font-semibold text-lg">Solution</div>
-                           <div className="text-sm text-muted-foreground text-left">
-                            {solutionTasks.length > 0 ? (
-                                <ul className="list-disc list-inside mt-1 space-y-1">
-                                    {solutionTasks.map(st => (
-                                        <li key={st.action.id} className="font-medium text-foreground">
-                                            {st.action.name}
-                                            {st.linkedVisualizations.length > 0 && (
-                                                <ul className="list-[circle] list-inside pl-4 mt-1">
-                                                    {st.linkedVisualizations.map(viz => (
-                                                        <li key={viz.id} className="font-normal text-muted-foreground">{viz.name}</li>
-                                                    ))}
-                                                </ul>
-                                            )}
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : "No solution tasks pending"}
-                          </div>
-                        </div>
-
-                        <div className="absolute bottom-0 left-0 text-center max-w-sm">
-                          <div className="font-semibold text-lg">Current State</div>
-                           <p className="text-sm text-muted-foreground">Productivity: <strong>{avgDailyProductiveHours.toFixed(1)}h/day</strong></p>
-                        </div>
-                        
-                        <div className="absolute bottom-0 right-0 text-center max-w-sm">
-                          <div className="font-semibold text-lg">Outcome</div>
-                          <p className="text-sm text-muted-foreground truncate" title={outcomeText}>{outcomeText}</p>
-                           {formattedEstimate && <p className="text-sm text-muted-foreground">Est. Time: <strong>{formattedEstimate}</strong></p>}
-                        </div>
-
-                        {/* Lines and Arrows */}
-                        <svg className="absolute top-0 left-0 w-full h-full overflow-visible pointer-events-none">
-                          <defs>
-                            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto" markerUnits="strokeWidth">
-                              <polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--foreground))" />
-                            </marker>
-                          </defs>
-                          {/* Base Line */}
-                          <line x1="225" y1="480" x2="575" y2="480" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
-                          {/* Left Line */}
-                          <line x1="175" y1="415" x2="368" y2="145" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
-                          {/* Right Line */}
-                          <line x1="432" y1="145" x2="625" y2="415" stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
-                        </svg>
-
-                        {/* Labels on lines */}
-                        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-center max-w-xs">
-                           <div className="text-sm text-muted-foreground truncate" title={intention.name}>{intention.name}</div>
-                          <div className="font-semibold mt-1">Intention</div>
-                          {daysToComplete !== null && (
-                            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-1">
-                                <Clock className="h-3 w-3" />
-                                <span><strong>{daysToComplete} days</strong> at <strong>{avgDailyProductiveHours.toFixed(1)}h/day</strong></span>
+                <div className="space-y-6">
+                    {linkedItems.deepWork.length > 0 && (
+                        <div>
+                            <h3 className="font-semibold mb-2 flex items-center gap-2"><Lightbulb className="h-5 w-5 text-green-500" />Linked Deep Work</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {linkedItems.deepWork.map(item => (
+                                    <Card key={item.id}><CardHeader><CardTitle className="text-base">{item.name}</CardTitle><CardDescription>{item.category}</CardDescription></CardHeader></Card>
+                                ))}
                             </div>
-                          )}
                         </div>
-                      </div>
-                    </div>
-
-
-                    {/* FOOTER */}
-                    <div className="w-full max-w-4xl pt-8 mx-auto">
-                        <Separator className="my-8" />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <Card className="text-center">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center justify-center gap-2">
-                                        <BrainCircuit className="h-5 w-5 text-primary" />
-                                        The Truth of the Moment
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardDescription className="px-6 pb-6">
-                                    Fulfillment doesn't come from chasing feelings or perfection. It comes from taking justified action, aligned with the truth of your current moment.
-                                </CardDescription>
-                            </Card>
-                            <Card className="text-center">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center justify-center gap-2">
-                                        <AlertTriangle className="h-5 w-5 text-amber-500" />
-                                        Challenge Your Doubts
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardDescription className="px-6 pb-6">
-                                    Do you have a better alternative intention which will keep my present fulfilled and tomorrow intact? If not, do not return to this doubt. Come back only when you have a better intention than this one.
-                                </CardDescription>
-                            </Card>
+                    )}
+                     {linkedItems.upskill.length > 0 && (
+                        <div>
+                            <h3 className="font-semibold mb-2 flex items-center gap-2"><Flashlight className="h-5 w-5 text-amber-500" />Linked Learning</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {linkedItems.upskill.map(item => (
+                                    <Card key={item.id}><CardHeader><CardTitle className="text-base">{item.name}</CardTitle><CardDescription>{item.category}</CardDescription></CardHeader></Card>
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    )}
+                    {linkedItems.resource.length > 0 && (
+                        <div>
+                             <h3 className="font-semibold mb-2 flex items-center gap-2"><Library className="h-5 w-5 text-blue-500" />Linked Resources</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {linkedItems.resource.map(item => (
+                                    <Card key={item.id}>
+                                        <CardHeader className="flex-row items-center gap-3 space-y-0">
+                                            {item.link && item.link.includes('youtube') ? <Youtube className="h-4 w-4 flex-shrink-0 text-red-500" /> : (item.iconUrl ? <Image src={item.iconUrl} alt="" width={16} height={16} className="flex-shrink-0" unoptimized/> : <Globe className="h-4 w-4 flex-shrink-0"/>)}
+                                            <div className='min-w-0 flex-grow'>
+                                                <CardTitle className="text-base truncate" title={item.name}>{item.name}</CardTitle>
+                                                {item.link && <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline">{item.link}</a>}
+                                            </div>
+                                             {item.link && <a href={item.link} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4 text-muted-foreground"/></a>}
+                                        </CardHeader>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </ScrollArea>
         </div>
