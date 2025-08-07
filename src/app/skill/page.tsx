@@ -504,37 +504,37 @@ function SkillPageContent() {
             <CardContent>
               {selectedProject ? (
                   <div className="space-y-4">
-                    {Array.from(linkedTasksByCoreSkill.entries()).map(([coreSkillName, data]) => (
-                      <Card key={coreSkillName}>
-                        <CardHeader className="py-3">
-                          <CardTitle className="text-base">{coreSkillName}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2 p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {Array.from(data.microSkills.entries()).map(([microSkillName, tasks]) => (
-                                <Card key={microSkillName} className="w-full">
-                                    <CardHeader className="p-3">
-                                        <CardTitle className="text-base">{microSkillName}</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="p-3 pt-0">
-                                        <ul className="text-sm space-y-1">
-                                            {tasks.map(task => (
-                                            <li key={task.id} className="flex items-center gap-2 hover:bg-muted/50 p-1 rounded-md cursor-pointer" onClick={() => setSelectedIntention(task)}>
-                                                {upskillDefinitions.some(d => d.id === task.id) ? (
-                                                    <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                                                ) : (
-                                                    <Lightbulb className="h-4 w-4 text-green-500 flex-shrink-0" />
-                                                )}
-                                                <span className="text-muted-foreground truncate" title={task.name}>{task.name}</span>
-                                            </li>
-                                            ))}
-                                        </ul>
-                                    </CardContent>
-                                </Card>
-                            ))}
-                        </CardContent>
-                      </Card>
-                    ))}
-                    {linkedTasksByCoreSkill.size === 0 && <p className="text-center text-muted-foreground">No Intentions or Curiosities linked to this project yet.</p>}
+                      {Array.from(linkedTasksByCoreSkill.entries()).map(([coreSkillName, data]) => (
+                          <Card key={coreSkillName}>
+                              <CardHeader className="py-3">
+                                  <CardTitle className="text-base">{coreSkillName}</CardTitle>
+                              </CardHeader>
+                              <CardContent className="space-y-2 p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {Array.from(data.microSkills.entries()).map(([microSkillName, tasks]) => (
+                                      <Card key={microSkillName} className="w-full">
+                                          <CardHeader className="p-3">
+                                              <CardTitle className="text-sm">{microSkillName}</CardTitle>
+                                          </CardHeader>
+                                          <CardContent className="p-3 pt-0">
+                                              <ul className="text-sm space-y-1">
+                                                  {tasks.map(task => (
+                                                  <li key={task.id} className="flex items-center gap-2 hover:bg-muted/50 p-1 rounded-md cursor-pointer" onClick={() => setSelectedIntention(task)}>
+                                                      {upskillDefinitions.some(d => d.id === task.id) ? (
+                                                          <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                                                      ) : (
+                                                          <Lightbulb className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                                      )}
+                                                      <span className="text-muted-foreground truncate" title={task.name}>{task.name}</span>
+                                                  </li>
+                                                  ))}
+                                              </ul>
+                                          </CardContent>
+                                      </Card>
+                                  ))}
+                              </CardContent>
+                          </Card>
+                      ))}
+                      {linkedTasksByCoreSkill.size === 0 && <p className="text-center text-muted-foreground">No Intentions or Curiosities linked to this project yet.</p>}
                   </div>
               ) : selectedCoreSkill ? (
                   <div className="space-y-4">

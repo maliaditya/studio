@@ -73,6 +73,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, linkedUp
         const isParent = (item.linkedUpskillIds?.length ?? 0) > 0 || (item.linkedResourceIds?.length ?? 0) > 0;
         const isChild = linkedUpskillChildIds.has(item.id);
         if (isParent && !isChild) return <Flashlight className="h-4 w-4 text-amber-500" />; // Curiosity
+        if (isParent && isChild) return <BookCopy className="h-4 w-4 text-amber-500" />; // Objective
         if (!isParent && isChild) return <Frame className="h-4 w-4 text-blue-500" />; // Visualization
         return <BookCopy className="h-4 w-4 text-amber-500" />;
     }
@@ -127,10 +128,10 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, linkedUp
                                           </CardTitle>
                                           <CardDescription>{item.category}</CardDescription>
                                       </CardHeader>
-                                      {(item.linkedResourceIds && item.linkedResourceIds.length > 0) && (
+                                      {((item.linkedResourceIds?.length ?? 0) > 0 || (item.linkedUpskillIds?.length ?? 0) > 0) && (
                                         <CardContent className="pt-2">
                                             <div className="text-xs text-muted-foreground">
-                                                {item.linkedResourceIds.length} resource(s) linked.
+                                                {item.linkedUpskillIds?.length || 0} sub-task(s), {item.linkedResourceIds?.length || 0} resource(s) linked.
                                             </div>
                                         </CardContent>
                                       )}
