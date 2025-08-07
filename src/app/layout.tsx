@@ -15,6 +15,9 @@ import { ClothBackground } from '@/components/ClothBackground';
 import { FloatingVideoPlayer } from '@/components/FloatingVideoPlayer';
 import { PistonsHead } from '@/components/PistonsHead';
 import React from 'react';
+import { DndContext } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+
 
 // export const metadata: Metadata = {
 //   title: 'LifeOS',
@@ -23,10 +26,10 @@ import React from 'react';
 // Metadata needs to be in a server component, moving to a new AppWrapper client component
 
 function AppWrapper({ children }: { children: React.ReactNode }) {
-  const { isPistonsHeadOpen, setIsPistonsHeadOpen, openPopups, ResourcePopup } = useAuth();
+  const { isPistonsHeadOpen, setIsPistonsHeadOpen, openPopups, ResourcePopup, handlePopupDragEnd } = useAuth();
 
   return (
-    <>
+    <DndContext onDragEnd={handlePopupDragEnd}>
       <DefaultBackground />
       <MatrixBackground />
       <ClothBackground />
@@ -39,7 +42,33 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       {ResourcePopup && Array.from(openPopups.values()).map(popupState => (
         <ResourcePopup key={popupState.resourceId} popupState={popupState} />
       ))}
-    </>
+      <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-[65]">
+        {Array.from(openPopups.values()).map(popup => {
+            if (!popup.parentId) return null;
+            const parentPopup = openPopups.get(popup.parentId);
+            if (!parentPopup) return null;
+            
+            const startX = parentPopup.x + (parentPopup.width || 0) / 2;
+            const startY = parentPopup.y + 20; // Start from a consistent vertical point
+            const endX = popup.x + (popup.width || 0) / 2;
+            const endY = popup.y + 20;
+            
+            // Simple straight line for now, can be curved later
+            const d = `M ${startX},${startY} L ${endX},${endY}`;
+
+            return (
+              <path 
+                key={`${popup.parentId}-${popup.resourceId}`}
+                d={d}
+                stroke="hsl(var(--primary))" 
+                strokeWidth="1"
+                strokeOpacity="0.3"
+                fill="none"
+              />
+            )
+        })}
+      </svg>
+    </DndContext>
   );
 }
 
