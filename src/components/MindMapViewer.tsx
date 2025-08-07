@@ -381,8 +381,8 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         parentsToLoad.forEach((parentId, index) => {
             if (!nodes.has(parentId)) {
                 nodesToUpdate.set(parentId, {
-                    x: currentNodePos.x + HORIZONTAL_SPACING, // Changed to expand to the right
-                    y: currentNodePos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
+                    x: pos.x + HORIZONTAL_SPACING, // Changed to expand to the right
+                    y: pos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
                 });
             }
             const edgeId1 = `${parentId}-${nodeId}`;
@@ -769,7 +769,7 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
 export function MindMapViewer({ defaultView, showControls = true, rootFolderId = null, rootFocusAreaId = null }: MindMapViewerProps) {
   const { toast } = useAuth();
   const { 
-      deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs, scheduleTaskFromMindMap, addFeatureToRelease, setDeepWorkDefinitions, resources, resourceFolders,
+      deepWorkDefinitions, upskillDefinitions, productizationPlans, offerizationPlans, schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs, scheduleTaskFromMindMap, addFeatureToRelease, setDeepWorkDefinitions, resources, resourceFolders,
   } = useAuth();
   
   const [selectedTopic, setSelectedTopic] = useState<string>('');
@@ -823,7 +823,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
   }, [allDeepWorkLogs]);
 
   const allTopics = useMemo(() => {
-    const productAndServiceTopics = Object.keys(deepWorkTopicMetadata).sort();
+    const productAndServiceTopics = [...Object.keys(productizationPlans || {}), ...Object.keys(offerizationPlans || {})].sort();
     const hasBundles = deepWorkDefinitions.some(def => def.focusAreaIds && def.focusAreaIds.length > 0);
     const hasResources = resourceFolders.length > 0;
     
@@ -832,8 +832,8 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     if (hasResources) availableTopics.push("Resources");
     availableTopics.push(...productAndServiceTopics);
     
-    return ["Strategic Overview", "Conceptual Flow", ...availableTopics.sort()];
-  }, [deepWorkTopicMetadata, deepWorkDefinitions, resourceFolders]);
+    return ["Strategic Overview", "Conceptual Flow", ...new Set(availableTopics)].sort();
+  }, [productizationPlans, offerizationPlans, deepWorkDefinitions, resourceFolders]);
   
   const mindMapData = useMemo((): MindMapNode | null => {
     const nodeRegistry = new Map<string, MindMapNode>();
@@ -934,7 +934,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     const type = productizationPlans[selectedTopic] ? 'product' : 'service';
     return buildFullTopicTree(selectedTopic, plan, type);
 
-  }, [selectedTopic, rootFocusAreaId, rootFolderId, deepWorkDefinitions, upskillDefinitions, deepWorkTopicMetadata, productizationPlans, offerizationPlans, totalTimePerFocusArea, resources, resourceFolders]);
+  }, [selectedTopic, rootFocusAreaId, rootFolderId, deepWorkDefinitions, upskillDefinitions, productizationPlans, offerizationPlans, totalTimePerFocusArea, resources, resourceFolders]);
 
   const scheduledTaskInfo = useMemo(() => {
     const today = format(new Date(), 'yyyy-MM-dd');
