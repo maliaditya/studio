@@ -5,6 +5,7 @@ import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 
@@ -52,7 +53,13 @@ export function ModelViewer({ modelUrl, className }: ModelViewerProps) {
     directionalLight.position.set(5, 5, 5);
     scene.add(directionalLight);
     
+    // Draco loader setup
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/');
+
     const loader = new GLTFLoader();
+    loader.setDRACOLoader(dracoLoader);
+    
     loader.load(
       modelUrl,
       (gltf) => {
@@ -100,21 +107,22 @@ export function ModelViewer({ modelUrl, className }: ModelViewerProps) {
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      if (mountNode) {
+      if (mountNode && renderer.domElement) {
         mountNode.removeChild(renderer.domElement);
       }
       // Dispose Three.js objects to free memory
       scene.children.forEach(obj => {
           if (obj instanceof THREE.Mesh) {
-              obj.geometry.dispose();
+              if(obj.geometry) obj.geometry.dispose();
               if (Array.isArray(obj.material)) {
                   obj.material.forEach(material => material.dispose());
-              } else {
+              } else if (obj.material) {
                   obj.material.dispose();
               }
           }
       });
       renderer.dispose();
+      dracoLoader.dispose();
     };
   }, [modelUrl]);
 
