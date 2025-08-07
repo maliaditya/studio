@@ -7,10 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, FolderOpen, GitMerge, Workflow, Lightbulb, Flashlight } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, FolderOpen, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
-import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, Project, Feature, Company, Position, WorkProject, ProjectSkillLink, ExerciseDefinition } from '@/types/workout';
+import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ProjectSkillLink } from '@/types/workout';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -35,7 +35,7 @@ import { IntentionDetailModal } from '@/components/IntentionDetailModal';
 import { SkillLibrary } from '@/components/SkillLibrary';
 
 function SkillPageContent() {
-  const { toast } = useToast();
+  const { toast } = useAuth();
   const { 
     skillDomains, setSkillDomains, 
     coreSkills, setCoreSkills, 
@@ -504,36 +504,34 @@ function SkillPageContent() {
             </CardHeader>
             <CardContent>
               {selectedProject ? (
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     {Array.from(linkedTasksByCoreSkill.entries()).map(([coreSkillName, data]) => (
-                        <Card key={coreSkillName}>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base">{coreSkillName}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <Accordion type="multiple" className="w-full">
-                                    {Array.from(data.microSkills.entries()).map(([microSkillName, tasks]) => (
-                                        <AccordionItem value={microSkillName} key={microSkillName}>
-                                            <AccordionTrigger>{microSkillName}</AccordionTrigger>
-                                            <AccordionContent>
-                                                <ul className="list-disc list-inside text-sm space-y-1 pl-2">
-                                                    {tasks.map(task => (
-                                                        <li key={task.id} className="flex items-center gap-2">
-                                                        {upskillDefinitions.some(d => d.id === task.id) ? (
-                                                            <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                                                        ) : (
-                                                            <Lightbulb className="h-4 w-4 text-green-500 flex-shrink-0" />
-                                                        )}
-                                                        <span className="text-muted-foreground">{task.name}</span>
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </AccordionContent>
-                                        </AccordionItem>
-                                    ))}
-                                </Accordion>
-                            </CardContent>
-                        </Card>
+                      <div key={coreSkillName}>
+                        <h3 className="text-lg font-semibold mb-2">{coreSkillName}</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {Array.from(data.microSkills.entries()).map(([microSkillName, tasks]) => (
+                            <Card key={microSkillName}>
+                              <CardHeader className="p-3">
+                                <CardTitle className="text-base">{microSkillName}</CardTitle>
+                              </CardHeader>
+                              <CardContent className="p-3 pt-0">
+                                <ul className="text-sm space-y-1">
+                                  {tasks.map(task => (
+                                    <li key={task.id} className="flex items-center gap-2">
+                                      {upskillDefinitions.some(d => d.id === task.id) ? (
+                                          <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                                      ) : (
+                                          <Lightbulb className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                      )}
+                                      <span className="text-muted-foreground truncate" title={task.name}>{task.name}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
                     ))}
                     {linkedTasksByCoreSkill.size === 0 && <p className="text-center text-muted-foreground">No Intentions or Curiosities linked to this project yet.</p>}
                   </div>
@@ -785,3 +783,4 @@ export default function SkillPage() {
 }
 
     
+
