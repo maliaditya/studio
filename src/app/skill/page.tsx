@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, FolderOpen, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ProjectSkillLink } from '@/types/workout';
@@ -362,7 +362,6 @@ function SkillPageContent() {
     const intentionsAndCuriosities = [...deepWorkDefinitions, ...upskillDefinitions];
     const linkedItems = intentionsAndCuriosities.filter(item => item.linkedProjectId === selectedProject.id);
 
-    // Group by Core Skill, then Micro Skill
     const grouped = new Map<string, { coreSkillName: string, microSkills: Map<string, ExerciseDefinition[]> }>();
 
     linkedItems.forEach(item => {
@@ -506,9 +505,11 @@ function SkillPageContent() {
               {selectedProject ? (
                   <div className="space-y-6">
                     {Array.from(linkedTasksByCoreSkill.entries()).map(([coreSkillName, data]) => (
-                      <div key={coreSkillName}>
-                        <h3 className="text-lg font-semibold mb-2">{coreSkillName}</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Card key={coreSkillName}>
+                        <CardHeader>
+                          <CardTitle className="text-lg">{coreSkillName}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {Array.from(data.microSkills.entries()).map(([microSkillName, tasks]) => (
                             <Card key={microSkillName}>
                               <CardHeader className="p-3">
@@ -517,7 +518,7 @@ function SkillPageContent() {
                               <CardContent className="p-3 pt-0">
                                 <ul className="text-sm space-y-1">
                                   {tasks.map(task => (
-                                    <li key={task.id} className="flex items-center gap-2">
+                                    <li key={task.id} className="flex items-center gap-2 hover:bg-muted/50 p-1 rounded-md cursor-pointer" onClick={() => setSelectedIntention(task)}>
                                       {upskillDefinitions.some(d => d.id === task.id) ? (
                                           <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
                                       ) : (
@@ -530,8 +531,8 @@ function SkillPageContent() {
                               </CardContent>
                             </Card>
                           ))}
-                        </div>
-                      </div>
+                        </CardContent>
+                      </Card>
                     ))}
                     {linkedTasksByCoreSkill.size === 0 && <p className="text-center text-muted-foreground">No Intentions or Curiosities linked to this project yet.</p>}
                   </div>
