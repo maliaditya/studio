@@ -355,27 +355,32 @@ function SkillPageContent() {
     return coreSkills.filter(skill => skill.type === 'Specialization');
   }, [coreSkills]);
 
-  const linkedIntentionsByProject = useMemo(() => {
-      const intentionsAndCuriosities = [...deepWorkDefinitions, ...upskillDefinitions];
-      const linked = intentionsAndCuriosities.filter(item => item.linkedProjectId === selectedProjectId);
-      
-      const grouped = linked.reduce((acc, item) => {
-          const microSkillInfo = microSkillMap.get(item.category);
-          if (!microSkillInfo) return acc;
-          
-          const { coreSkillName, microSkillName } = microSkillInfo;
-          if (!acc[coreSkillName]) {
-              acc[coreSkillName] = {};
-          }
-          if (!acc[coreSkillName][microSkillName]) {
-              acc[coreSkillName][microSkillName] = [];
-          }
-          acc[coreSkillName][microSkillName].push(item);
-          return acc;
-      }, {} as Record<string, Record<string, ExerciseDefinition[]>>);
+  const linkedTasksByProject = useMemo(() => {
+    if (!selectedProject) return {};
 
-      return grouped;
-  }, [selectedProjectId, deepWorkDefinitions, upskillDefinitions, microSkillMap]);
+    const intentionsAndCuriosities = [...deepWorkDefinitions, ...upskillDefinitions];
+    
+    const linkedItems = intentionsAndCuriosities.filter(item => item.linkedProjectId === selectedProject.id);
+
+    const microSkillIdsInProject = new Set(selectedProject.features.flatMap(f => f.linkedSkills.map(l => l.microSkillId)));
+
+    const grouped = linkedItems.reduce((acc, item) => {
+      const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === item.category);
+      if (!microSkill) return acc;
+
+      const microSkillDef = coreSkills.flatMap(cs => cs.skillAreas).flatMap(sa => sa.microSkills).find(ms => ms.name === microSkill.microSkillName);
+      if (!microSkillDef || !microSkillIdsInProject.has(microSkillDef.id)) return acc;
+
+      if (!acc[microSkill.microSkillName]) {
+        acc[microSkill.microSkillName] = [];
+      }
+      acc[microSkill.microSkillName].push(item);
+      return acc;
+    }, {} as Record<string, ExerciseDefinition[]>);
+
+    return grouped;
+  }, [selectedProject, deepWorkDefinitions, upskillDefinitions, microSkillMap, coreSkills]);
+
 
   return (
     <>
@@ -497,34 +502,27 @@ function SkillPageContent() {
             <CardContent>
               {selectedProject ? (
                   <div className="space-y-6">
-                    {Object.keys(linkedIntentionsByProject).length > 0 ? (
-                      Object.entries(linkedIntentionsByProject).map(([coreSkillName, microSkills]) => (
-                        <div key={coreSkillName}>
-                          <h3 className="text-xl font-bold mb-3">{coreSkillName}</h3>
-                          <div className="space-y-4">
-                            {Object.entries(microSkills).map(([microSkillName, items]) => (
-                              <Card key={microSkillName}>
-                                <CardHeader className="pb-3">
-                                  <CardTitle className="text-base">{microSkillName}</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                  <ul className="list-disc list-inside text-sm space-y-1">
-                                    {items.map(item => (
-                                      <li key={item.id} className="flex items-center gap-2">
-                                        {upskillDefinitions.some(d => d.id === item.id) ? (
-                                          <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                                        ) : (
-                                          <Lightbulb className="h-4 w-4 text-green-500 flex-shrink-0" />
-                                        )}
-                                        <span className="text-muted-foreground">{item.name}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
-                        </div>
+                    {Object.keys(linkedTasksByProject).length > 0 ? (
+                      Object.entries(linkedTasksByProject).map(([microSkillName, tasks]) => (
+                        <Card key={microSkillName}>
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base">{microSkillName}</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <ul className="list-disc list-inside text-sm space-y-1">
+                              {tasks.map(task => (
+                                <li key={task.id} className="flex items-center gap-2">
+                                  {upskillDefinitions.some(d => d.id === task.id) ? (
+                                    <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                                  ) : (
+                                    <Lightbulb className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                  )}
+                                  <span className="text-muted-foreground">{task.name}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </CardContent>
+                        </Card>
                       ))
                     ) : (
                       <p className="text-center text-muted-foreground">No Intentions or Curiosities linked to this project yet.</p>
@@ -776,3 +774,5 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
+
+    
