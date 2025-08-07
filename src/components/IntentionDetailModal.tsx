@@ -127,7 +127,7 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, linkedUp
                                           </CardTitle>
                                           <CardDescription>{item.category}</CardDescription>
                                       </CardHeader>
-                                      {item.linkedResourceIds && item.linkedResourceIds.length > 0 && (
+                                      {(item.linkedResourceIds && item.linkedResourceIds.length > 0) && (
                                         <CardContent className="pt-2">
                                             <div className="text-xs text-muted-foreground">
                                                 {item.linkedResourceIds.length} resource(s) linked.

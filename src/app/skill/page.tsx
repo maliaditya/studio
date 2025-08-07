@@ -506,12 +506,12 @@ function SkillPageContent() {
                   <div className="space-y-4">
                     {Array.from(linkedTasksByCoreSkill.entries()).map(([coreSkillName, data]) => (
                       <Card key={coreSkillName}>
-                        <CardHeader>
-                          <CardTitle className="text-lg">{coreSkillName}</CardTitle>
+                        <CardHeader className="py-3">
+                          <CardTitle className="text-base">{coreSkillName}</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-2">
+                        <CardContent className="space-y-2 p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                             {Array.from(data.microSkills.entries()).map(([microSkillName, tasks]) => (
-                                <Card key={microSkillName}>
+                                <Card key={microSkillName} className="w-full">
                                     <CardHeader className="p-3">
                                         <CardTitle className="text-base">{microSkillName}</CardTitle>
                                     </CardHeader>
