@@ -985,7 +985,7 @@ export function PistonsHead() {
       case 'desires': return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Desire'} {...commonProps} /> : <DesireSelector onSelect={handleTopicSelect} onBack={onBack} />;
       case 'mindset': return selectedTopicId ? <TopicPistonView topicId={selectedTopicName} topicName={selectedTopicName || 'Mindset'} {...commonProps} /> : <MindsetSelector onSelect={handleTopicSelect} onBack={onBack} />;
       case 'thoughts': return <ThoughtsView onSelect={(type) => setCurrentView(type === 'Positive' ? 'positive-thoughts' : 'negative-thoughts')} />;
-      case 'negative-thoughts': return <NegativeThoughtsView onSelect={(state) => { handleTopicSelect(`thought_${state}`, state); }} onSchedule={(e, state) => setSchedulePopover({ piston: state, anchor: e.currentTarget })}/>;
+      case 'negative-thoughts': return <NegativeThoughtsView onSelect={(state) => handleTopicSelect(`thought_${state}`, state)} onSchedule={(e, state) => setSchedulePopover({ piston: state, anchor: e.currentTarget })}/>;
       default: return <MainPistonView onSelect={handleViewChange} />;
     }
   };
@@ -1558,5 +1558,6 @@ const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHisto
     
 
     
+
 
 
