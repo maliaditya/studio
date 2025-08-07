@@ -144,6 +144,7 @@ interface AuthContextType {
   openPopups: Map<string, PopupState>;
   handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => void;
   handleClosePopup: (resourceId: string) => void;
+  handlePopupDragEnd: (event: DragEndEvent) => void;
   ResourcePopup?: React.FC<ResourcePopupProps>;
 
 
@@ -1463,6 +1464,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const handlePopupDragEnd = (event: DragEndEvent) => {
+      const { active, delta } = event;
+      const activeId = active.id as string;
+  
+      if (activeId.startsWith('popup-')) {
+          const resourceId = activeId.replace('popup-', '');
+          setOpenPopups(prev => {
+              const newPopups = new Map(prev);
+              const popup = newPopups.get(resourceId);
+              if (popup) {
+                  newPopups.set(resourceId, {
+                      ...popup,
+                      x: popup.x + delta.x,
+                      y: popup.y + delta.y,
+                  });
+              }
+              return newPopups;
+          });
+      }
+  };
+
   const handleUpdateSkillArea = (skillId: string, areaId: string, name: string, purpose: string) => {
     setCoreSkills(prev => prev.map(s => {
         if (s.id === skillId) {
@@ -1634,6 +1656,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     activeResourceTabIds, setActiveResourceTabIds,
     selectedResourceFolderId, setSelectedResourceFolderId,
     openPopups, handleOpenNestedPopup, handleClosePopup,
+    handlePopupDragEnd,
     ResourcePopup,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
