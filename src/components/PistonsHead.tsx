@@ -4,14 +4,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { Brain, BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical, PlusCircle, Trash2, Play, Pause, ChevronRight as ChevronRightIcon, Workflow, Folder, ArrowLeft, Anchor, Flame, Compass, Sun, GitBranch, Info } from 'lucide-react';
+import { Brain, BrainCircuit, Heart, Briefcase, TrendingUp, ChevronLeft, Target, HandHeart, Search, Sprout, Blocks, Mic, Smile, Shield, Edit, X, History, Plus, Save, Link as LinkIcon, Library, MessageSquare, Code, ArrowRight, Upload, MoreVertical, GripVertical, PlusCircle, Trash2, Play, Pause, ChevronRight as ChevronRightIcon, Workflow, Folder, ArrowLeft, Anchor, Flame, Compass, Sun, GitBranch, Info, Calendar } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
-import { PistonEntry, PistonType, PistonsData, Resource, ResourcePoint, ExerciseDefinition, MindsetCard, SkillDomain, CoreSkill, Project, Feature, Company, Position, WorkProject } from '@/types/workout';
+import { PistonEntry, PistonType, PistonsData, Resource, ResourcePoint, ExerciseDefinition, MindsetCard, SkillDomain, CoreSkill, Project, Feature, Company, Position, WorkProject, ActivityType, DailySchedule } from '@/types/workout';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
@@ -184,7 +185,7 @@ const EMOTIONAL_STATES = {
 type EmotionalState = keyof typeof EMOTIONAL_STATES;
 
 interface HistoryPopupState {
-    piston: PistonType;
+    piston: PistonType | EmotionalState;
     x: number;
     y: number;
 }
@@ -193,7 +194,7 @@ const HistoryPopupCard = ({ popupState, entries, onClose, onEdit }: {
     popupState: HistoryPopupState; 
     entries: PistonEntry[]; 
     onClose: () => void; 
-    onEdit: (piston: PistonType, entry: PistonEntry) => void;
+    onEdit: (piston: PistonType | EmotionalState, entry: PistonEntry) => void;
 }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `history-popup-${popupState.piston}`,
@@ -216,8 +217,8 @@ const HistoryPopupCard = ({ popupState, entries, onClose, onEdit }: {
                  <CardHeader className="p-3 relative cursor-grab" {...listeners}>
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2 flex-grow">
-                           {PISTON_ICONS[popupState.piston]} 
-                           <CardTitle className="text-base">{PISTON_FULL_NAMES[popupState.piston]} History</CardTitle>
+                           {PISTON_ICONS[popupState.piston as PistonType] || <Shield className="h-5 w-5 text-red-500"/>} 
+                           <CardTitle className="text-base">{PISTON_FULL_NAMES[popupState.piston as PistonType] || popupState.piston} History</CardTitle>
                         </div>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={onClose}>
                             <X className="h-4 w-4" />
@@ -267,7 +268,7 @@ const DetailsPopupCard = ({ popupState, onClose }: { popupState: HistoryPopupSta
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
     
-    const details = PISTON_DETAILS[popupState.piston];
+    const details = PISTON_DETAILS[popupState.piston as PistonType];
 
     return (
         <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
@@ -275,8 +276,8 @@ const DetailsPopupCard = ({ popupState, onClose }: { popupState: HistoryPopupSta
                  <CardHeader className="p-3 relative cursor-grab" {...listeners}>
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2 flex-grow">
-                           {PISTON_ICONS[popupState.piston]} 
-                           <CardTitle className="text-base">{PISTON_FULL_NAMES[popupState.piston]}</CardTitle>
+                           {PISTON_ICONS[popupState.piston as PistonType]} 
+                           <CardTitle className="text-base">{PISTON_FULL_NAMES[popupState.piston as PistonType]}</CardTitle>
                         </div>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={onClose}>
                             <X className="h-4 w-4" />
@@ -323,7 +324,7 @@ const DetailsPopupCard = ({ popupState, onClose }: { popupState: HistoryPopupSta
                                     
                                     {comp.ego.startsWith("“") && (
                                         <>
-                                            <div className="text-right text-muted-foreground">{PISTON_FULL_NAMES[popupState.piston]} says:</div>
+                                            <div className="text-right text-muted-foreground">{PISTON_FULL_NAMES[popupState.piston as PistonType]} says:</div>
                                             <div className="font-medium text-foreground">{comp.virtue}</div>
                                         </>
                                     )}
@@ -623,8 +624,9 @@ export function PistonsHead() {
     globalVolume,
     skillDomains, coreSkills, projects,
     pistonsInitialState,
+    scheduleTaskFromMindMap,
   } = useAuth();
-  const [currentView, setCurrentView] = useState<'main' | 'health' | 'projects' | 'specializations' | 'desires' | 'mindset' | 'thoughts' | 'negative-thoughts' | 'log-negative-thought'>('main');
+  const [currentView, setCurrentView] = useState<'main' | 'health' | 'projects' | 'specializations' | 'desires' | 'mindset' | 'thoughts' | 'negative-thoughts'>('main');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [selectedTopicName, setSelectedTopicName] = useState<string | null>(null);
   
@@ -639,9 +641,11 @@ export function PistonsHead() {
 
   const [linkTextDialog, setLinkTextDialog] = useState<{ point: ResourcePoint, resourceId: string } | null>(null);
   const [currentDisplayText, setCurrentDisplayText] = useState('');
+  
+  const [schedulePopover, setSchedulePopover] = useState<{ piston: EmotionalState; anchor: HTMLElement | null } | null>(null);
+  const [scheduleDate, setScheduleDate] = useState<Date | undefined>(new Date());
+  const [scheduleSlot, setScheduleSlot] = useState<string>('Morning');
 
-  const [selectedEmotionalState, setSelectedEmotionalState] = useState<EmotionalState | null>(null);
-  const [newNegativeThought, setNewNegativeThought] = useState('');
 
   useEffect(() => {
     if (isPistonsHeadOpen && pistonsInitialState) {
@@ -817,7 +821,7 @@ export function PistonsHead() {
     }, 300);
   };
   
-  const handleViewChange = (newView: 'main' | 'health' | 'projects' | 'specializations' | 'desires' | 'mindset' | 'thoughts') => {
+  const handleViewChange = (newView: 'main' | 'health' | 'projects' | 'specializations' | 'desires' | 'mindset' | 'thoughts' | 'negative-thoughts') => {
     setCurrentView(newView);
   };
   
@@ -827,10 +831,7 @@ export function PistonsHead() {
   }
 
   const onBack = () => {
-    if (currentView === 'log-negative-thought') {
-        setCurrentView('negative-thoughts');
-        setSelectedEmotionalState(null);
-    } else if (currentView === 'negative-thoughts') {
+    if (currentView === 'negative-thoughts') {
         setCurrentView('thoughts');
     } else if (selectedTopicId) {
         setSelectedTopicId(null);
@@ -851,14 +852,13 @@ export function PistonsHead() {
       case 'desires': return `Select a Desire`;
       case 'mindset': return `Select a Mindset`;
       case 'thoughts': return 'Thoughts';
-      case 'negative-thoughts': return 'Negative Thoughts';
-      case 'log-negative-thought': return `Log: ${selectedEmotionalState}`;
+      case 'negative-thoughts': return 'Log a Thought';
       default: return 'Pistons of Intention';
     }
   };
   const topicNameDisplay = getTopicName();
 
-  const handleOpenHistory = (e: React.MouseEvent, piston: PistonType) => {
+  const handleOpenHistory = (e: React.MouseEvent, piston: PistonType | EmotionalState) => {
     e.stopPropagation();
     if (historyPopup?.piston === piston) {
       setHistoryPopup(null);
@@ -932,28 +932,39 @@ export function PistonsHead() {
   };
 
 
-  const [linkingResourceFor, setLinkingResourceFor] = useState<{piston: PistonType; currentResourceId?: string;} | null>(null);
+  const [linkingResourceFor, setLinkingResourceFor] = useState<{piston: PistonType | EmotionalState; currentResourceId?: string;} | null>(null);
 
   const handleLinkResource = (resourceId: string | null) => {
     if (!linkingResourceFor) return;
     const { piston } = linkingResourceFor;
     
     setPistons(prev => {
-        const topicKey = selectedTopicId || (currentView === 'health' ? 'health' : '');
+        const topicKey = selectedTopicId || (currentView === 'health' ? 'health' : `thought_${piston}`);
         if (!topicKey) return prev;
         
         const topicData = { ...(prev[topicKey] || {}) };
         const linkedIds = { ...(topicData.linkedResourceIds || {}) };
 
         if (resourceId === 'none' || resourceId === null) {
-            delete linkedIds[piston];
+            delete linkedIds[piston as PistonType];
         } else {
-            linkedIds[piston] = resourceId;
+            linkedIds[piston as PistonType] = resourceId;
         }
 
         return { ...prev, [topicKey]: { ...topicData, linkedResourceIds: linkedIds } };
     });
     setLinkingResourceFor(null);
+  };
+  
+  const handleScheduleSubmit = () => {
+    if (schedulePopover && scheduleDate && scheduleSlot) {
+        scheduleTaskFromMindMap(
+            `thought_${schedulePopover.piston}`,
+            'thoughtwork',
+            scheduleSlot
+        );
+        setSchedulePopover(null);
+    }
   };
 
   const renderContent = () => {
@@ -974,8 +985,7 @@ export function PistonsHead() {
       case 'desires': return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Desire'} {...commonProps} /> : <DesireSelector onSelect={handleTopicSelect} onBack={onBack} />;
       case 'mindset': return selectedTopicId ? <TopicPistonView topicId={selectedTopicName} topicName={selectedTopicName || 'Mindset'} {...commonProps} /> : <MindsetSelector onSelect={handleTopicSelect} onBack={onBack} />;
       case 'thoughts': return <ThoughtsView onSelect={(type) => setCurrentView(type === 'Positive' ? 'positive-thoughts' : 'negative-thoughts')} />;
-      case 'negative-thoughts': return <NegativeThoughtsView onSelect={(state) => { setSelectedEmotionalState(state); setCurrentView('log-negative-thought'); }} />;
-      case 'log-negative-thought': return <LogNegativeThoughtView emotionalState={selectedEmotionalState!} onBack={onBack} />;
+      case 'negative-thoughts': return <NegativeThoughtsView onSelect={(state) => { handleTopicSelect(`thought_${state}`, state); }} onSchedule={(e, state) => setSchedulePopover({ piston: state, anchor: e.currentTarget })}/>;
       default: return <MainPistonView onSelect={handleViewChange} />;
     }
   };
@@ -1034,7 +1044,7 @@ export function PistonsHead() {
                 {historyPopup && (
                     <HistoryPopupCard 
                         popupState={historyPopup}
-                        entries={pistons[selectedTopicId || (currentView === 'health' ? 'health' : '')]?.[historyPopup.piston] || []}
+                        entries={pistons[selectedTopicId || (currentView === 'health' ? 'health' : `thought_${historyPopup.piston}`)]?.[historyPopup.piston as PistonType] || []}
                         onClose={handleCloseHistory}
                         onEdit={(piston, entry) => {
                             handleCloseHistory();
@@ -1118,6 +1128,33 @@ export function PistonsHead() {
                         </DialogContent>
                     </Dialog>
                 )}
+                 <Popover open={!!schedulePopover} onOpenChange={() => setSchedulePopover(null)}>
+                    <PopoverTrigger asChild>
+                        <div style={{ position: 'fixed', top: schedulePopover?.y, left: schedulePopover?.x }} />
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80">
+                        <div className="grid gap-4">
+                            <div className="space-y-2">
+                                <h4 className="font-medium leading-none">Schedule Thought Work</h4>
+                                <p className="text-sm text-muted-foreground">Schedule a session to address "{schedulePopover?.piston}".</p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Date</Label>
+                                <CalendarComponent mode="single" selected={scheduleDate} onSelect={setScheduleDate} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Time Slot</Label>
+                                <Select value={scheduleSlot} onValueChange={setScheduleSlot}>
+                                    <SelectTrigger><SelectValue/></SelectTrigger>
+                                    <SelectContent>
+                                        {['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <Button onClick={handleScheduleSubmit}>Schedule Session</Button>
+                        </div>
+                    </PopoverContent>
+                </Popover>
             </>
         )}
     </DndContext>
@@ -1355,116 +1392,81 @@ const ThoughtsView = ({ onSelect }: { onSelect: (type: 'Positive' | 'Negative') 
     </CardContent>
 );
 
-const NegativeThoughtsView = ({ onSelect }: { onSelect: (state: EmotionalState) => void }) => (
-    <CardContent className="p-4">
-        <ScrollArea className="h-80">
-            <ul className="space-y-2 pr-2">
-                {Object.keys(EMOTIONAL_STATES).map(state => (
-                    <li key={state}>
-                        <Button variant="outline" className="w-full justify-start" onClick={() => onSelect(state as EmotionalState)}>
-                            {state}
-                        </Button>
-                    </li>
-                ))}
-            </ul>
-        </ScrollArea>
-    </CardContent>
-);
-
-const LogNegativeThoughtView = ({ emotionalState, onBack }: { emotionalState: EmotionalState, onBack: () => void }) => {
-    const { setPistons } = useAuth();
-    const [thoughtText, setThoughtText] = useState('');
-    const details = EMOTIONAL_STATES[emotionalState];
-
-    const handleSave = () => {
-        if (!thoughtText.trim()) return;
-        const newEntry: PistonEntry = {
-            id: `thought_${Date.now()}`,
-            text: thoughtText.trim(),
-            timestamp: Date.now()
-        };
-
-        setPistons(prev => {
-            const topicKey = `thought_${emotionalState}`;
-            const existingEntries = prev[topicKey]?.['thoughtEntries'] || [];
-            const updatedTopicData = {
-                ...prev[topicKey],
-                'thoughtEntries': [...existingEntries, newEntry]
-            };
-            return {
-                ...prev,
-                [topicKey]: updatedTopicData
-            };
-        });
-        onBack();
-    };
-
+const NegativeThoughtsView = ({ onSelect, onSchedule }: { onSelect: (state: EmotionalState) => void; onSchedule: (e: React.MouseEvent<HTMLButtonElement>, state: EmotionalState) => void; }) => {
     return (
         <CardContent className="p-4">
-            <div className="space-y-4">
-                <Textarea 
-                    value={thoughtText} 
-                    onChange={e => setThoughtText(e.target.value)}
-                    placeholder={`What is the exact thought related to ${emotionalState}?`}
-                    rows={4}
-                />
-                 <Card className="bg-muted/50 p-3 text-sm">
-                    <p><strong>Chemical Imbalance:</strong> {details.imbalance}</p>
-                    <p><strong>Hidden Message:</strong> <em className="text-muted-foreground">{details.message}</em></p>
-                </Card>
-                <Button onClick={handleSave} className="w-full">Log Thought</Button>
-            </div>
+            <ScrollArea className="h-80">
+                <ul className="space-y-2 pr-2">
+                    {Object.keys(EMOTIONAL_STATES).map(state => (
+                        <li key={state}>
+                             <div className="flex items-center justify-between group p-2 rounded-md border bg-muted/20">
+                                <button onClick={() => onSelect(state as EmotionalState)} className="flex items-center justify-between w-full text-left group">
+                                    <span className="font-medium group-hover:text-primary transition-colors">{state}</span>
+                                    <ChevronRightIcon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors"/>
+                                </button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100" onClick={(e) => onSchedule(e, state as EmotionalState)}>
+                                    <Calendar className="h-4 w-4 text-primary"/>
+                                </Button>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            </ScrollArea>
         </CardContent>
     );
 };
 
-const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setDetailsPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory, handleOpenDetails }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setDetailsPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType; currentResourceId?: string; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType) => void; handleOpenDetails: (e: React.MouseEvent, piston: PistonType) => void; }) => {
+const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHistoryPopup, setDetailsPopup, setResourcePopup, onLinkResource, handleOpenResource, handleOpenHistory, handleOpenDetails }: { topicId: string, topicName: string, onBack: () => void, onEditTopicName?: () => void, setHistoryPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setDetailsPopup: React.Dispatch<React.SetStateAction<HistoryPopupState | null>>, setResourcePopup: React.Dispatch<React.SetStateAction<Map<string, ResourcePopupState>>>, onLinkResource: (data: { piston: PistonType | EmotionalState; currentResourceId?: string; }) => void; handleOpenResource: (e: React.MouseEvent, resourceId: string) => void; handleOpenHistory: (e: React.MouseEvent, piston: PistonType | EmotionalState) => void; handleOpenDetails: (e: React.MouseEvent, piston: PistonType) => void; }) => {
     const { pistons, setPistons } = useAuth();
-    const [newEntryPiston, setNewEntryPiston] = useState<PistonType | null>(null);
+    const [newEntryPiston, setNewEntryPiston] = useState<PistonType | EmotionalState | null>(null);
     const [newEntryText, setNewEntryText] = useState('');
     
     const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
     const [editedEntryText, setEditedEntryText] = useState('');
-
-    const topicPistons = pistons[topicId] || {};
+    
+    const topicIsThought = topicId.startsWith('thought_');
+    const topicKey = topicIsThought ? topicId : topicId.split('_')[0];
+    const thoughtType = topicIsThought ? topicName as EmotionalState : null;
+    
+    const topicPistons = pistons[topicKey] || {};
     
     const handleStartEditing = (entry: PistonEntry) => {
         setEditingEntryId(entry.id);
         setEditedEntryText(entry.text);
     };
 
-    const handleSaveEdit = (piston: PistonType) => {
+    const handleSaveEdit = (piston: PistonType | EmotionalState) => {
         if (!editingEntryId) return;
 
         setPistons(prev => {
-            const topicData = { ...(prev[topicId] || {}) };
-            const entries = topicData[piston] || [];
+            const topicData = { ...(prev[topicKey] || {}) };
+            const entries = topicData[piston as PistonType] || [];
             const updatedEntries = entries.map(e =>
                 e.id === editingEntryId ? { ...e, text: editedEntryText } : e
             );
-            return { ...prev, [topicId]: { ...topicData, [piston]: updatedEntries } };
+            return { ...prev, [topicKey]: { ...topicData, [piston as PistonType]: updatedEntries } };
         });
         setEditingEntryId(null);
     };
 
 
-    const handleSaveNewEntry = (piston: PistonType) => {
+    const handleSaveNewEntry = (piston: PistonType | EmotionalState) => {
         if (!newEntryText.trim()) { setNewEntryPiston(null); setNewEntryText(''); return; }
         const newEntry: PistonEntry = { id: `piston_${Date.now()}`, text: newEntryText.trim(), timestamp: Date.now() };
         setPistons(prev => {
-            const topicData = { ...(prev[topicId] || {}) };
-            const entries = topicData[piston] || [];
-            return { ...prev, [topicId]: { ...topicData, [piston]: [newEntry, ...entries] } };
+            const topicData = { ...(prev[topicKey] || {}) };
+            const entries = topicData[piston as PistonType] || [];
+            return { ...prev, [topicKey]: { ...topicData, [piston as PistonType]: [newEntry, ...entries] } };
         });
         setNewEntryPiston(null); setNewEntryText('');
     };
     
-    const handleDeleteEntry = (piston: PistonType, entryId: string) => {
+    const handleDeleteEntry = (piston: PistonType | EmotionalState, entryId: string) => {
         setPistons(prev => {
-            const topicData = { ...(prev[topicId] || {}) };
-            const entries = topicData[piston] || [];
+            const topicData = { ...(prev[topicKey] || {}) };
+            const entries = topicData[piston as PistonType] || [];
             const updatedEntries = entries.filter(entry => entry.id !== entryId);
-            return { ...prev, [topicId]: { ...topicData, [piston]: updatedEntries } };
+            return { ...prev, [topicKey]: { ...topicData, [piston as PistonType]: updatedEntries } };
         });
     };
     
@@ -1472,23 +1474,24 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
       <CardContent className="p-0 flex-grow min-h-0 flex flex-col">
           <ScrollArea className="flex-grow p-4">
               <ul className="space-y-2">
-                  {PISTON_NAMES.map(piston => {
-                      const entries = topicPistons[piston] || [];
+                  {(topicIsThought && thoughtType ? [thoughtType] : PISTON_NAMES).map(piston => {
+                      const entries = topicPistons[piston as PistonType] || [];
                       const currentEntry = entries[0];
                       const isAddingNewToThisPiston = newEntryPiston === piston;
-                      const isResourceLinked = !!topicPistons.linkedResourceIds?.[piston];
-                      const details = PISTON_DETAILS[piston];
+                      const isResourceLinked = !!topicPistons.linkedResourceIds?.[piston as PistonType];
+                      const details = topicIsThought ? null : PISTON_DETAILS[piston as PistonType];
+                      const thoughtDetails = topicIsThought ? EMOTIONAL_STATES[thoughtType!] : null;
                       
                       return (
                           <li key={piston} className="p-2 rounded-lg bg-muted/30">
                               <div className="flex items-start gap-3">
-                                  <span className="mt-1">{PISTON_ICONS[piston]}</span>
+                                  <span className="mt-1">{PISTON_ICONS[piston as PistonType] || <Shield className="h-5 w-5 text-red-500"/>}</span>
                                   <div className="flex-grow min-w-0">
                                       <div className="flex justify-between items-center">
-                                         <h4 className="font-semibold text-sm">{PISTON_FULL_NAMES[piston]}</h4>
-                                         <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleOpenDetails(e, piston)}><Info className="h-4 w-4"/></Button>
+                                         <h4 className="font-semibold text-sm">{PISTON_FULL_NAMES[piston as PistonType] || piston}</h4>
+                                         {details && <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleOpenDetails(e, piston as PistonType)}><Info className="h-4 w-4"/></Button>}
                                       </div>
-                                      <p className="text-xs text-muted-foreground italic mb-2">{PISTON_PLACEHOLDERS[piston]}</p>
+                                      <p className="text-xs text-muted-foreground italic mb-2">{PISTON_PLACEHOLDERS[piston as PistonType] || thoughtDetails?.message}</p>
                                       
                                       <div className="text-sm min-h-[2.5rem] pt-1.5 w-full flex justify-between items-start group">
                                           {editingEntryId === currentEntry?.id ? (
@@ -1510,7 +1513,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                           )}
                                           <div className="flex-shrink-0 flex items-center">
                                               {isResourceLinked ? (
-                                                  <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDownCapture={(e) => handleOpenResource(e, topicPistons.linkedResourceIds![piston]!)}>
+                                                  <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDownCapture={(e) => handleOpenResource(e, topicPistons.linkedResourceIds![piston as PistonType]!)}>
                                                       <Library className="h-4 w-4 text-primary" />
                                                   </Button>
                                               ) : null }
@@ -1520,7 +1523,7 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                                       <DropdownMenuContent side="right" align="start" sideOffset={5}>
                                                           <DropdownMenuItem onSelect={() => setNewEntryPiston(piston)}><Plus className="mr-2 h-4 w-4"/>New Entry</DropdownMenuItem>
                                                           {entries.length > 0 && <DropdownMenuItem onSelect={(e) => handleOpenHistory(e, piston)}><History className="mr-2 h-4 w-4"/>View History</DropdownMenuItem>}
-                                                           <DropdownMenuItem onSelect={() => onLinkResource({ piston, currentResourceId: topicPistons.linkedResourceIds?.[piston] })}>
+                                                           <DropdownMenuItem onSelect={() => onLinkResource({ piston, currentResourceId: topicPistons.linkedResourceIds?.[piston as PistonType] })}>
                                                               <LinkIcon className="mr-2 h-4 w-4"/> {isResourceLinked ? 'Change Resource' : 'Link Resource'}
                                                           </DropdownMenuItem>
                                                           {currentEntry && <DropdownMenuItem onSelect={() => handleDeleteEntry(piston, currentEntry.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Current</DropdownMenuItem>}
@@ -1555,3 +1558,4 @@ const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHisto
     
 
     
+
