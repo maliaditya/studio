@@ -38,6 +38,7 @@ import remarkGfm from 'remark-gfm';
 import { useRouter } from 'next/navigation';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { SkillLibrary } from '@/components/SkillLibrary';
+import { MindMapViewer } from '@/components/MindMapViewer';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -459,7 +460,9 @@ function UpskillPageContent() {
   const [newSubtopicData, setNewSubtopicData] = useState({ name: '', description: '', link: '', hours: '', minutes: '' });
 
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
-
+  const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
+  const [mindMapRootFocusAreaId, setMindMapRootFocusAreaId] = useState<string | null>(null);
+  
   const [selectedMicroSkill, setSelectedMicroSkill] = useState<MicroSkill | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
@@ -1013,6 +1016,10 @@ function UpskillPageContent() {
                     onSelectProject={handleProjectSelect}
                     onDeleteFocusArea={handleDeleteSubtopic}
                     onUpdateFocusAreaName={handleUpdateSubtopicName}
+                    onOpenMindMap={(id) => {
+                      setMindMapRootFocusAreaId(id);
+                      setIsMindMapModalOpen(true);
+                    }}
                 />
               {selectedSubtopic && (
                   <Card>
@@ -1226,6 +1233,13 @@ function UpskillPageContent() {
                 </DialogContent>
               </Dialog>
           )}
+
+          <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
+            <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+              <DialogHeader className="sr-only"><DialogTitle>Focus Area Mind Map</DialogTitle></DialogHeader>
+              <MindMapViewer showControls={false} rootFocusAreaId={mindMapRootFocusAreaId} />
+            </DialogContent>
+          </Dialog>
 
         </div>
     </DndContext>

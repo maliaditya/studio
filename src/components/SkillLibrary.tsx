@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building, Folder, Workflow, Trash2 } from 'lucide-react';
+import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building, Folder, Workflow, Trash2, GitMerge } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature } from '@/types/workout';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -38,6 +38,7 @@ interface SkillLibraryProps {
   onSelectProject: (project: Project | null) => void;
   onDeleteFocusArea: (defId: string) => void;
   onUpdateFocusAreaName: (defId: string, newName: string) => void;
+  onOpenMindMap: (focusAreaId: string) => void;
 }
 
 export function SkillLibrary({ 
@@ -51,6 +52,7 @@ export function SkillLibrary({
     onSelectProject,
     onDeleteFocusArea,
     onUpdateFocusAreaName,
+    onOpenMindMap,
 }: SkillLibraryProps) {
   const { skillDomains, coreSkills, projects } = useAuth();
   
@@ -236,23 +238,28 @@ export function SkillLibrary({
                             </TooltipProvider>
                           </button>
                         )}
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0 opacity-0 group-hover/task:opacity-100">
-                                    <Trash2 className="h-3 w-3 text-destructive" />
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                    <AlertDialogDescription>This will permanently delete the task "{task.name}". This action cannot be undone.</AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => onDeleteFocusArea(task.id)}>Delete</AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
+                        <div className="flex-shrink-0 flex items-center opacity-0 group-hover/task:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onOpenMindMap(task.id)}>
+                                <GitMerge className="h-3 w-3" />
+                            </Button>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6">
+                                        <Trash2 className="h-3 w-3 text-destructive" />
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                        <AlertDialogDescription>This will permanently delete the task "{task.name}". This action cannot be undone.</AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => onDeleteFocusArea(task.id)}>Delete</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </div>
                     </div>
                 )) : <p className="text-xs text-muted-foreground text-center py-2">No tasks for this skill yet.</p>}
             </div>

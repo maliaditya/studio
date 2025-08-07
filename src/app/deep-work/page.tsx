@@ -1589,6 +1589,10 @@ function DeepWorkPageContent() {
                     onSelectProject={handleProjectSelect}
                     onDeleteFocusArea={handleDeleteExerciseDefinition}
                     onUpdateFocusAreaName={handleUpdateDefinitionName}
+                    onOpenMindMap={(id) => {
+                      setMindMapRootFocusAreaId(id);
+                      setIsMindMapModalOpen(true);
+                    }}
                  />
               {selectedFocusArea && (
                   <Card>
