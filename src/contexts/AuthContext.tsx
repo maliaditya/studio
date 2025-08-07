@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Button } from '@/components/ui/button';
 import { X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause } from 'lucide-react';
 import { DndContext, useDraggable } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ScrollArea } from '@/components/ui/scroll-area';
