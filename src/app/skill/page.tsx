@@ -35,7 +35,7 @@ import { IntentionDetailModal } from '@/components/IntentionDetailModal';
 import { SkillLibrary } from '@/components/SkillLibrary';
 
 function SkillPageContent() {
-  const { toast } = useToast();
+  const { toast } = useAuth();
   const { 
     skillDomains, setSkillDomains, 
     coreSkills, setCoreSkills, 

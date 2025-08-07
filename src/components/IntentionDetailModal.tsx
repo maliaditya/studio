@@ -10,12 +10,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from './ui/scroll-area';
-import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink, Briefcase, BookCopy, ArrowLeft, Frame } from 'lucide-react';
+import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink, Briefcase, BookCopy, ArrowLeft, Frame, Code, MessageSquare } from 'lucide-react';
 import type { ExerciseDefinition, Resource } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardHeader, CardTitle, CardDescription } from './ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import Image from 'next/image';
 import { Button } from './ui/button';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface IntentionDetailModalProps {
   isOpen: boolean;
@@ -143,14 +145,37 @@ export function IntentionDetailModal({ isOpen, onOpenChange, intention, linkedUp
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {linkedItems.resource.map(item => (
                                     <Card key={item.id}>
-                                        <CardHeader className="flex-row items-center gap-3 space-y-0">
-                                            {item.link && item.link.includes('youtube') ? <Youtube className="h-4 w-4 flex-shrink-0 text-red-500" /> : (item.iconUrl ? <Image src={item.iconUrl} alt="" width={16} height={16} className="flex-shrink-0" unoptimized/> : <Globe className="h-4 w-4 flex-shrink-0"/>)}
-                                            <div className='min-w-0 flex-grow'>
-                                                <CardTitle className="text-base truncate" title={item.name}>{item.name}</CardTitle>
-                                                {item.link && <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline">{item.link}</a>}
-                                            </div>
-                                             {item.link && <a href={item.link} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4 text-muted-foreground"/></a>}
-                                        </CardHeader>
+                                        {item.type === 'card' ? (
+                                             <CardHeader>
+                                                <CardTitle className="text-base flex items-center gap-2">
+                                                    <Library className="h-4 w-4 text-primary" />
+                                                    {item.name}
+                                                </CardTitle>
+                                                <CardContent className="p-0 pt-2 text-xs">
+                                                     <ul className="space-y-2 text-muted-foreground pr-2">
+                                                        {(item.points || []).map(point => (
+                                                            <li key={point.id} className="flex items-start gap-2">
+                                                                {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5" /> : <MessageSquare className="h-4 w-4 mt-0.5" />}
+                                                                {point.type === 'code' ? (
+                                                                    <pre className="w-full bg-muted/50 p-1 rounded-sm text-xs font-mono whitespace-pre-wrap break-words">{point.text}</pre>
+                                                                ) : (
+                                                                    <div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown></div>
+                                                                )}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </CardContent>
+                                            </CardHeader>
+                                        ) : (
+                                            <CardHeader className="flex-row items-center gap-3 space-y-0">
+                                                {item.link && item.link.includes('youtube') ? <Youtube className="h-4 w-4 flex-shrink-0 text-red-500" /> : (item.iconUrl ? <Image src={item.iconUrl} alt="" width={16} height={16} className="flex-shrink-0" unoptimized/> : <Globe className="h-4 w-4 flex-shrink-0"/>)}
+                                                <div className='min-w-0 flex-grow'>
+                                                    <CardTitle className="text-base truncate" title={item.name}>{item.name}</CardTitle>
+                                                    {item.link && <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline">{item.link}</a>}
+                                                </div>
+                                                {item.link && <a href={item.link} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4 text-muted-foreground"/></a>}
+                                            </CardHeader>
+                                        )}
                                     </Card>
                                 ))}
                             </div>
