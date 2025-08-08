@@ -543,25 +543,39 @@ function SkillPageContent() {
                               <CardContent className="space-y-2 p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                                   {Array.from(data.microSkills.entries()).map(([microSkillName, tasks]) => {
                                       const parentCoreSkill = coreSkills.find(cs => cs.name === coreSkillName);
+                                      const curiosities = tasks.filter(t => upskillDefinitions.some(d => d.id === t.id));
+                                      const intentions = tasks.filter(t => deepWorkDefinitions.some(d => d.id === t.id));
                                       return (
                                         <Card key={microSkillName} className="w-full">
                                             <CardHeader className="p-3">
                                                 <CardTitle className="text-sm">{microSkillName}</CardTitle>
                                                 {parentCoreSkill && <Badge variant="outline" className="mt-1">{parentCoreSkill.name}</Badge>}
                                             </CardHeader>
-                                            <CardContent className="p-3 pt-0">
-                                                <ul className="text-sm space-y-1">
-                                                    {tasks.map(task => (
-                                                    <li key={task.id} className="flex items-center gap-2 hover:bg-muted/50 p-1 rounded-md cursor-pointer" onClick={() => openIntentionPopup(task.id)}>
-                                                        {upskillDefinitions.some(d => d.id === task.id) ? (
-                                                            <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                                                        ) : (
-                                                            <Lightbulb className="h-4 w-4 text-green-500 flex-shrink-0" />
-                                                        )}
-                                                        <span className="text-muted-foreground truncate" title={task.name}>{task.name}</span>
-                                                    </li>
-                                                    ))}
-                                                </ul>
+                                            <CardContent className="p-3 pt-0 grid grid-cols-2 gap-4">
+                                              <div className="space-y-1">
+                                                  <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Flashlight className="h-3 w-3 text-amber-500" />Curiosities</h4>
+                                                  {curiosities.length > 0 ? (
+                                                    <ul className="text-xs space-y-1">
+                                                      {curiosities.map(task => (
+                                                        <li key={task.id}>
+                                                          <button onClick={() => openIntentionPopup(task.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{task.name}</button>
+                                                        </li>
+                                                      ))}
+                                                    </ul>
+                                                  ) : <p className="text-muted-foreground text-xs italic">None</p>}
+                                              </div>
+                                              <div className="space-y-1">
+                                                  <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Lightbulb className="h-3 w-3 text-green-500" />Intentions</h4>
+                                                  {intentions.length > 0 ? (
+                                                    <ul className="text-xs space-y-1">
+                                                      {intentions.map(task => (
+                                                        <li key={task.id}>
+                                                          <button onClick={() => openIntentionPopup(task.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{task.name}</button>
+                                                        </li>
+                                                      ))}
+                                                    </ul>
+                                                  ) : <p className="text-muted-foreground text-xs italic">None</p>}
+                                              </div>
                                             </CardContent>
                                         </Card>
                                       )
@@ -618,12 +632,11 @@ function SkillPageContent() {
                                                   <CardHeader className="p-3">
                                                       <CardTitle className="text-base">{micro.name}</CardTitle>
                                                   </CardHeader>
-                                                  <CardContent className="p-3 pt-0 text-xs flex-grow">
-                                                    <div className="grid grid-cols-2 gap-4 h-full">
+                                                  <CardContent className="p-3 pt-0 grid grid-cols-2 gap-4 flex-grow">
                                                       <div className="border-r pr-2">
-                                                          <h4 className="font-semibold mb-1 flex items-center gap-1"><Flashlight className="h-3 w-3 text-amber-500" />Curiosities</h4>
+                                                          <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Flashlight className="h-3 w-3 text-amber-500" />Curiosities</h4>
                                                           {relatedCuriosities.length > 0 ? (
-                                                              <ul className="space-y-1">
+                                                              <ul className="space-y-1 text-xs">
                                                                   {relatedCuriosities.map(curiosity => (
                                                                       <li key={curiosity.id}>
                                                                           <button onClick={() => openIntentionPopup(curiosity.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{curiosity.name}</button>
@@ -633,9 +646,9 @@ function SkillPageContent() {
                                                           ) : <p className="text-muted-foreground text-xs italic">None</p>}
                                                       </div>
                                                       <div>
-                                                          <h4 className="font-semibold mb-1 flex items-center gap-1"><Lightbulb className="h-3 w-3 text-green-500" />Intentions</h4>
+                                                          <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Lightbulb className="h-3 w-3 text-green-500" />Intentions</h4>
                                                            {relatedIntentions.length > 0 ? (
-                                                              <ul className="space-y-1">
+                                                              <ul className="space-y-1 text-xs">
                                                                   {relatedIntentions.map(intention => (
                                                                       <li key={intention.id}>
                                                                           <button onClick={() => openIntentionPopup(intention.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{intention.name}</button>
@@ -644,7 +657,6 @@ function SkillPageContent() {
                                                               </ul>
                                                           ) : <p className="text-muted-foreground text-xs italic">None</p>}
                                                       </div>
-                                                    </div>
                                                   </CardContent>
                                               </Card>
                                             )
@@ -846,6 +858,7 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
+
 
 
 
