@@ -52,7 +52,7 @@ const productivityLevels = [
     { level: 'L12', min: 360, max: 420, description: 'Advanced practice / Bootcamp ready', zone: '🟠 High Intensity' },
     { level: 'L13', min: 420, max: 480, description: 'Peak state zone', zone: '🟠 High Intensity' },
     { level: 'L14', min: 480, max: 540, description: 'Monastic discipline', zone: '🔴 Extreme Zone' },
-    { level: 'L15', min: 540, max: 600, description: 'Total immersion day', zone: '🔴 Extreme Zone' },
+    { level: 'L15', min: 540, max: 600, description: 'Legendary grind day', zone: '🔴 Extreme Zone' },
     { level: 'L16', min: 600, max: 660, description: 'Elite performer stretch', zone: '🔴 Extreme Zone' },
     { level: 'L17', min: 660, max: 720, description: 'Near-max capacity', zone: '🔴 Extreme Zone' },
     { level: 'L18', min: 720, max: 780, description: 'Obsessive learner', zone: '🔴 Extreme Zone' },
@@ -83,6 +83,7 @@ function MyPlatePageContent() {
     leadGenDefinitions,
     productizationPlans,
     offerizationPlans,
+    openIntentionPopup,
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -1021,7 +1022,7 @@ function MyPlatePageContent() {
                   onEditDietClick={() => setIsDietPlanModalOpen(true)}
                   deepWorkDefinitions={deepWorkDefinitions}
                   upskillDefinitions={upskillDefinitions}
-                  avgDailyProductiveHours={productivityStats.totalProductiveHours}
+                  onOpenIntentionPopup={openIntentionPopup}
                 />
               </div>
             </div>
