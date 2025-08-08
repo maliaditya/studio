@@ -579,8 +579,6 @@ function SkillPageContent() {
                       </div>
                        <Accordion type="multiple" className="w-full space-y-2">
                           {selectedCoreSkill.skillAreas.map(area => {
-                              const intentions = microSkillIntentions.get(area.name) || [];
-                              const curiosities = microSkillCuriosities.get(area.name) || [];
                               return (
                                 <Card key={area.id}>
                                   <AccordionItem value={area.id} className="border-b-0">
@@ -620,34 +618,34 @@ function SkillPageContent() {
                                                   <CardHeader className="p-3">
                                                       <CardTitle className="text-base">{micro.name}</CardTitle>
                                                   </CardHeader>
-                                                  {(relatedIntentions.length > 0 || relatedCuriosities.length > 0) && (
-                                                    <CardContent className="p-3 pt-0 text-xs">
-                                                        {relatedIntentions.length > 0 && (
-                                                            <div className="mb-2">
-                                                                <h4 className="font-semibold mb-1 flex items-center gap-1"><Lightbulb className="h-3 w-3 text-amber-500" />Intentions</h4>
-                                                                <ul className="space-y-1">
-                                                                    {relatedIntentions.map(intention => (
-                                                                        <li key={intention.id}>
-                                                                            <button onClick={() => openIntentionPopup(intention.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{intention.name}</button>
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
-                                                            </div>
-                                                        )}
-                                                        {relatedCuriosities.length > 0 && (
-                                                            <div>
-                                                                <h4 className="font-semibold mb-1 flex items-center gap-1"><Flashlight className="h-3 w-3 text-amber-500" />Curiosities</h4>
-                                                                <ul className="space-y-1">
-                                                                    {relatedCuriosities.map(curiosity => (
-                                                                        <li key={curiosity.id}>
-                                                                            <button onClick={() => openIntentionPopup(curiosity.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{curiosity.name}</button>
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
-                                                            </div>
-                                                        )}
-                                                    </CardContent>
-                                                  )}
+                                                  <CardContent className="p-3 pt-0 text-xs flex-grow">
+                                                    <div className="grid grid-cols-2 gap-4 h-full">
+                                                      <div className="border-r pr-2">
+                                                          <h4 className="font-semibold mb-1 flex items-center gap-1"><Flashlight className="h-3 w-3 text-amber-500" />Curiosities</h4>
+                                                          {relatedCuriosities.length > 0 ? (
+                                                              <ul className="space-y-1">
+                                                                  {relatedCuriosities.map(curiosity => (
+                                                                      <li key={curiosity.id}>
+                                                                          <button onClick={() => openIntentionPopup(curiosity.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{curiosity.name}</button>
+                                                                      </li>
+                                                                  ))}
+                                                              </ul>
+                                                          ) : <p className="text-muted-foreground text-xs italic">None</p>}
+                                                      </div>
+                                                      <div>
+                                                          <h4 className="font-semibold mb-1 flex items-center gap-1"><Lightbulb className="h-3 w-3 text-green-500" />Intentions</h4>
+                                                           {relatedIntentions.length > 0 ? (
+                                                              <ul className="space-y-1">
+                                                                  {relatedIntentions.map(intention => (
+                                                                      <li key={intention.id}>
+                                                                          <button onClick={() => openIntentionPopup(intention.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{intention.name}</button>
+                                                                      </li>
+                                                                  ))}
+                                                              </ul>
+                                                          ) : <p className="text-muted-foreground text-xs italic">None</p>}
+                                                      </div>
+                                                    </div>
+                                                  </CardContent>
                                               </Card>
                                             )
                                         })}
@@ -848,5 +846,6 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
+
 
 
