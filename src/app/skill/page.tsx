@@ -640,7 +640,7 @@ function SkillPageContent() {
                                                                 <ul className="space-y-1">
                                                                     {relatedCuriosities.map(curiosity => (
                                                                         <li key={curiosity.id}>
-                                                                            <button onClick={() => { setSelectedUpskillTask(curiosity); router.push('/upskill'); }} className="text-muted-foreground hover:text-primary truncate w-full text-left">{curiosity.name}</button>
+                                                                            <button onClick={() => openIntentionPopup(curiosity.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{curiosity.name}</button>
                                                                         </li>
                                                                     ))}
                                                                 </ul>
@@ -848,4 +848,5 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
+
 
