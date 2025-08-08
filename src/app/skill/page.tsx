@@ -548,8 +548,10 @@ function SkillPageContent() {
                                       return (
                                         <Card key={microSkillName} className="w-full">
                                             <CardHeader className="p-3">
+                                              <div className="flex flex-wrap items-center gap-2">
                                                 <CardTitle className="text-sm">{microSkillName}</CardTitle>
-                                                {parentCoreSkill && <Badge variant="outline" className="mt-1">{parentCoreSkill.name}</Badge>}
+                                                {parentCoreSkill && <Badge variant="outline">{parentCoreSkill.name}</Badge>}
+                                              </div>
                                             </CardHeader>
                                             <CardContent className="p-3 pt-0 grid grid-cols-2 gap-4">
                                               <div className="space-y-1">
@@ -566,7 +568,7 @@ function SkillPageContent() {
                                               </div>
                                               <div className="space-y-1">
                                                   <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Lightbulb className="h-3 w-3 text-green-500" />Intentions</h4>
-                                                  {intentions.length > 0 ? (
+                                                   {intentions.length > 0 ? (
                                                     <ul className="text-xs space-y-1">
                                                       {intentions.map(task => (
                                                         <li key={task.id}>
@@ -858,6 +860,7 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
+
 
 
 
