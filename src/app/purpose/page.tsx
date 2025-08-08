@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { BrainCircuit, Edit, Save, Trash2, Check, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 function PurposePageContent() {
     const { 
