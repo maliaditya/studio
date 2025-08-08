@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
@@ -149,6 +150,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
       left: popupState.x,
       width: '40rem',
       willChange: 'transform',
+      zIndex: 70 + popupState.level,
   };
   if (transform) {
       style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
@@ -232,9 +234,9 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   if (!currentItem) return null;
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
+    <div ref={setNodeRef} style={style} {...attributes}>
        <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col">
-        <div className="p-4 flex-shrink-0 border-b flex flex-row items-center">
+        <CardHeader className="p-3 flex-shrink-0 border-b flex flex-row items-center">
           <div className="cursor-grab p-1 mr-2" {...listeners}>
             <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
           </div>
@@ -249,7 +251,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
           <Button variant="ghost" size="icon" onClick={() => onClose(popupState.resourceId)} className="h-8 w-8">
             <X className="h-4 w-4" />
           </Button>
-        </div>
+        </CardHeader>
         <CardContent className="p-0">
             <ScrollArea className="max-h-[70vh] p-4">
                 <div className="space-y-6">
