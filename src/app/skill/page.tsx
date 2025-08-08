@@ -548,8 +548,8 @@ function SkillPageContent() {
                                       return (
                                         <Card key={microSkillName} className="w-full">
                                             <CardHeader className="p-3">
-                                              <div className="flex flex-wrap items-center gap-2">
-                                                <CardTitle className="text-sm">{microSkillName}</CardTitle>
+                                              <div className="flex justify-between items-start gap-2">
+                                                <CardTitle className="text-sm flex-grow">{microSkillName}</CardTitle>
                                                 {parentCoreSkill && <Badge variant="outline">{parentCoreSkill.name}</Badge>}
                                               </div>
                                             </CardHeader>
@@ -629,10 +629,14 @@ function SkillPageContent() {
                                         {area.microSkills.map(micro => {
                                             const relatedIntentions = microSkillIntentions.get(micro.name) || [];
                                             const relatedCuriosities = microSkillCuriosities.get(micro.name) || [];
+                                            const parentCoreSkill = coreSkills.find(cs => cs.skillAreas.some(sa => sa.id === area.id));
                                             return (
                                               <Card key={micro.id} className="flex flex-col group/item">
                                                   <CardHeader className="p-3">
-                                                      <CardTitle className="text-base">{micro.name}</CardTitle>
+                                                      <div className="flex justify-between items-start gap-2">
+                                                        <CardTitle className="text-base flex-grow">{micro.name}</CardTitle>
+                                                        {parentCoreSkill && <Badge variant="outline">{parentCoreSkill.name}</Badge>}
+                                                      </div>
                                                   </CardHeader>
                                                   <CardContent className="p-3 pt-0 grid grid-cols-2 gap-4 flex-grow">
                                                       <div className="border-r pr-2">
@@ -860,6 +864,7 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
+
 
 
 
