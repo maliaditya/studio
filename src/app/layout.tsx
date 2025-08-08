@@ -113,6 +113,11 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const [isBrowser, setIsBrowser] = React.useState(false);
+  useEffect(() => {
+    setIsBrowser(true);
+  }, []);
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -129,7 +134,7 @@ export default function RootLayout({
           <AppWrapper>{children}</AppWrapper>
         </AuthProvider>
         <Analytics />
-        <div id="global-popup-root" style={{ position: 'fixed', top: 0, left: 0, zIndex: 60 }} />
+        {isBrowser ? <div id="global-popup-root" style={{ position: 'fixed', top: 0, left: 0, zIndex: 60 }} /> : null}
       </body>
     </html>
   );
