@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState } from 'react';
@@ -6,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building, Folder, Workflow, Trash2, GitMerge } from 'lucide-react';
+import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building, Folder, Workflow, Trash2, GitMerge, Edit3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature } from '@/types/workout';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -38,6 +39,7 @@ interface SkillLibraryProps {
   onDeleteFocusArea: (defId: string) => void;
   onUpdateFocusAreaName: (defId: string, newName: string) => void;
   onOpenMindMap: (focusAreaId: string) => void;
+  onEditFocusArea: (def: ExerciseDefinition) => void;
 }
 
 export function SkillLibrary({ 
@@ -52,6 +54,7 @@ export function SkillLibrary({
     onDeleteFocusArea,
     onUpdateFocusAreaName,
     onOpenMindMap,
+    onEditFocusArea,
 }: SkillLibraryProps) {
   const { 
     skillDomains, 
@@ -204,7 +207,7 @@ export function SkillLibrary({
                           />
                         ) : (
                           <button
-                            onDoubleClick={() => handleStartEditing(task)}
+                            onDoubleClick={() => onEditFocusArea(task)}
                             onClick={() => onSelectFocusArea(task)}
                             className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground hover:bg-muted flex items-center gap-2 min-w-0"
                           >
@@ -224,6 +227,9 @@ export function SkillLibrary({
                           </button>
                         )}
                         <div className="flex-shrink-0 flex items-center opacity-0 group-hover/task:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEditFocusArea(task)}>
+                                <Edit3 className="h-3 w-3" />
+                            </Button>
                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onOpenMindMap(task.id)}>
                                 <GitMerge className="h-3 w-3" />
                             </Button>
