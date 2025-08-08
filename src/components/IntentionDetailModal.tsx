@@ -150,7 +150,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
       left: popupState.x,
       width: '40rem',
       willChange: 'transform',
-      zIndex: 70 + popupState.level,
+      zIndex: 80 + popupState.level,
   };
   if (transform) {
       style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
@@ -279,7 +279,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                         <div>
                              <h3 className="font-semibold mb-2 flex items-center gap-2"><Library className="h-5 w-5 text-blue-500" />Linked Resources</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {linkedItems.resource.map(item => <ResourceItem key={item.id} item={item} onOpenNestedPopup={handleOpenNestedPopup} />)}
+                                {linkedItems.resource.map(item => <ResourceItem key={item.id} item={item} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event, popupState)} />)}
                             </div>
                         </div>
                     )}
