@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -818,7 +819,7 @@ function UpskillPageContent() {
 
   const isUpskillObjectiveComplete = useCallback((objectiveId: string): boolean => {
     const visited = new Set<string>();
-    const visualizationIds = a Set<string>();
+    const visualizationIds = new Set<string>();
     const queue: string[] = [objectiveId];
 
     while (queue.length > 0) {
@@ -827,7 +828,7 @@ function UpskillPageContent() {
         visited.add(currentId);
 
         const node = upskillDefinitions.find(d => d.id === currentId);
-        if (!node) return;
+        if (!node) continue;
 
         const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
         
@@ -875,7 +876,7 @@ function UpskillPageContent() {
   const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefinition) => {
     if (!definition) return 0;
     const visited = new Set<string>();
-    const visualizationIds = a Set<string>();
+    const visualizationIds = new Set<string>();
 
     function recurse(nodeId: string) {
         if (visited.has(nodeId)) return;
@@ -1180,9 +1181,35 @@ function UpskillPageContent() {
     toast({ title: "Success", description: "Links have been updated." });
     setIsManageLinksModalOpen(false);
   };
-  
-  const currentFolderIdForLinking = folderPath[folderPath.length - 1] || null;
 
+  const getVisualizationsRecursive = useCallback((nodeId: string): ExerciseDefinition[] => {
+    const visited = new Set<string>();
+    const visualizations: ExerciseDefinition[] = [];
+    const queue: string[] = [nodeId];
+
+    while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        if (visited.has(currentId)) continue;
+        visited.add(currentId);
+
+        const node = upskillDefinitions.find(d => d.id === currentId);
+        if (!node) continue;
+
+        const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+
+        if (!isParent) { // It's a Visualization
+            visualizations.push(node);
+        } else { // It's a Curiosity or Objective, so recurse
+            (node.linkedUpskillIds || []).forEach(childId => {
+                if (!visited.has(childId)) {
+                    queue.push(childId);
+                }
+            });
+        }
+    }
+    return visualizations;
+  }, [upskillDefinitions]);
+  
   const filteredItemsForLinking = useMemo(() => {
     if (!manageLinksConfig) return [];
     const { type, parent } = manageLinksConfig;
