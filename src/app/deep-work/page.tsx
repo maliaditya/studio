@@ -717,17 +717,18 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
   );
 }
 
-function UpskillPageContent() {
+function DeepWorkPageContent() {
   const { toast } = useToast();
   const { 
     currentUser, 
-    allUpskillLogs, setAllUpskillLogs,
-    upskillDefinitions, setUpskillDefinitions,
-    topicGoals, 
-    resources, setResources, resourceFolders,
-    setFloatingVideoUrl,
-    selectedUpskillTask, 
-    setSelectedUpskillTask,
+    allDeepWorkLogs, setAllDeepWorkLogs,
+    allUpskillLogs,
+    upskillDefinitions,
+    deepWorkDefinitions, setDeepWorkDefinitions, 
+    resources, 
+    schedule,
+    selectedDeepWorkTask, 
+    setSelectedDeepWorkTask,
     skillDomains,
     coreSkills,
     projects,
@@ -736,35 +737,17 @@ function UpskillPageContent() {
     scheduleTaskFromMindMap,
   } = useAuth();
   const router = useRouter();
+
+  const [newFocusAreaName, setNewFocusAreaName] = useState('');
+  const [newFocusAreaCategory, setNewFocusAreaCategory] = useState<ExerciseCategory | ''>('');
   
-  const [editingSubtopic, setEditingSubtopic] = useState<ExerciseDefinition | null>(null);
-  const [editedSubtopicData, setEditedSubtopicData] = useState<Partial<ExerciseDefinition> & { estHours?: string; estMinutes?: string }>({});
-  
+  const [editingFocusArea, setEditingFocusArea] = useState<ExerciseDefinition | null>(null);
+
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  
-  const [progressModalConfig, setProgressModalConfig] = useState<{ isOpen: boolean; exercise: ExerciseDefinition | null; }>({ isOpen: false, exercise: null });
-  
+  const [progressModalConfig, setProgressModalConfig] = useState<{ isOpen: boolean; exercise: ExerciseDefinition | null; type: 'deepwork' | 'upskill' }>({ isOpen: false, exercise: null, type: 'deepwork' });
   const [isLoadingPage, setIsLoadingPage] = useState(true);
-
   const [viewMode, setViewMode] = useState<'session' | 'library'>('library');
-  
-  const [isManageLinksModalOpen, setIsManageLinksModalOpen] = useState(false);
-  const [manageLinksConfig, setManageLinksConfig] = useState<{type: 'upskill' | 'resource', parent: ExerciseDefinition} | null>(null);
-  const [newLinkedItemName, setNewLinkedItemName] = useState('');
-  const [newLinkedItemTopic, setNewLinkedItemTopic] = useState('');
-  const [newLinkedItemDescription, setNewLinkedItemDescription] = useState('');
-  const [newLinkedItemLink, setNewLinkedItemLink] = useState('');
-  const [newLinkedItemHours, setNewLinkedItemHours] = useState('');
-  const [newLinkedItemMinutes, setNewLinkedItemMinutes] = useState('');
-  const [newLinkedItemFolderId, setNewLinkedItemFolderId] = useState('');
-  const [linkSearchTerm, setLinkSearchTerm] = useState('');
-  const [tempLinkedIds, setTempLinkedIds] = useState<string[]>([]);
-  const [linkResourceFolderId, setLinkResourceFolderId] = useState<string>('');
-  const [linkUpskillTopic, setLinkUpskillTopic] = useState('');
-  const [isCreatingLink, setIsCreatingLink] = useState(false);
-
-  const [isNewSubtopicModalOpen, setIsNewSubtopicModalOpen] = useState(false);
-  const [newSubtopicData, setNewSubtopicData] = useState({ name: '', description: '', link: '', hours: '', minutes: '' });
+  const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; id: string | null; name: string | null }>({ isOpen: false, id: null, name: null });
 
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
@@ -773,18 +756,13 @@ function UpskillPageContent() {
   const [selectedMicroSkill, setSelectedMicroSkill] = useState<MicroSkill | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
-  const handleOpenNewSubtopicModal = () => {
-    if (!selectedMicroSkill) {
-        toast({ title: "Error", description: "Please select a micro-skill first.", variant: "destructive" });
-        return;
-    }
-    setIsNewSubtopicModalOpen(true);
-  };
+  useEffect(() => {
+    setIsLoadingPage(false);
+  }, []);
 
-  const permanentlyLoggedVisualizationIds = useMemo(() => {
+  const permanentlyLoggedActionIds = useMemo(() => {
     const loggedIds = new Set<string>();
-    if (!allUpskillLogs) return loggedIds;
-    allUpskillLogs.forEach(log => {
+    allDeepWorkLogs.forEach(log => {
       log.exercises.forEach(ex => {
         if (ex.loggedSets.length > 0) {
           loggedIds.add(ex.definitionId);
@@ -792,497 +770,11 @@ function UpskillPageContent() {
       });
     });
     return loggedIds;
-  }, [allUpskillLogs]);
+  }, [allDeepWorkLogs]);
   
   const allKnownTopics = useMemo(() => {
-    const topicsFromDefs = new Set(upskillDefinitions.map(def => def.category));
-    const topicsFromMeta = new Set(Object.keys(topicGoals));
-    return Array.from(new Set([...topicsFromDefs, ...topicsFromMeta])).sort();
-  }, [upskillDefinitions, topicGoals]);
-
-  const linkedUpskillChildIds = useMemo(() => 
-    new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []))
-  , [upskillDefinitions]);
-
-  const isUpskillObjectiveComplete = useCallback((objectiveId: string): boolean => {
-    const visited = new Set<string>();
-    const visualizationIds = new Set<string>();
-    const queue: string[] = [objectiveId];
-
-    while (queue.length > 0) {
-        const currentId = queue.shift()!;
-        if (visited.has(currentId)) continue;
-        visited.add(currentId);
-
-        const node = upskillDefinitions.find(d => d.id === currentId);
-        if (!node) continue;
-
-        const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
-        
-        if (!isParent) { // It's a Visualization
-            visualizationIds.add(node.id);
-        } else { // It's an Objective or Curiosity, so recurse
-            (node.linkedUpskillIds || []).forEach(childId => {
-                if (!visited.has(childId)) {
-                    queue.push(childId);
-                }
-            });
-        }
-    }
-    
-    if (visualizationIds.size === 0) return false;
-
-    return Array.from(visualizationIds).every(vizId => permanentlyLoggedVisualizationIds.has(vizId));
-  }, [upskillDefinitions, permanentlyLoggedVisualizationIds]);
-
-
-  const calculateTotalEstimate = useCallback((def: ExerciseDefinition) => {
-    let total = 0;
-    const visited = new Set<string>();
-  
-    function recurse(d: ExerciseDefinition) {
-      if (visited.has(d.id)) return;
-      visited.add(d.id);
-  
-      const hasChildren = (d.linkedUpskillIds?.length ?? 0) > 0;
-  
-      if (hasChildren) {
-        (d.linkedUpskillIds || []).forEach(childId => {
-          const childDef = upskillDefinitions.find(c => c.id === childId);
-          if (childDef) recurse(childDef);
-        });
-      } else {
-        total += d.estimatedDuration || 0;
-      }
-    }
-  
-    recurse(def);
-    return total;
-  }, [upskillDefinitions]);
-
-  const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefinition) => {
-    if (!definition) return 0;
-    const visited = new Set<string>();
-    const visualizationIds = new Set<string>();
-
-    function recurse(nodeId: string) {
-        if (visited.has(nodeId)) return;
-        visited.add(nodeId);
-        const node = upskillDefinitions.find(d => d.id === nodeId);
-        if (!node) return;
-        
-        const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
-
-        if (!isParent) {
-            visualizationIds.add(node.id);
-        } else {
-            (node.linkedUpskillIds || []).forEach(childId => recurse(childId));
-        }
-    }
-    recurse(definition.id);
-
-    let totalMinutes = 0;
-    if (allUpskillLogs) {
-        allUpskillLogs.forEach(log => {
-            log.exercises.forEach(ex => {
-                if (visualizationIds.has(ex.definitionId)) {
-                    totalMinutes += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0);
-                }
-            });
-        });
-    }
-    return totalMinutes;
-  }, [allUpskillLogs, upskillDefinitions]);
-
-  const totalLoggedTime = useMemo(() => {
-    if (!selectedUpskillTask) return 0;
-    return getUpskillLoggedMinutesRecursive(selectedUpskillTask);
-  }, [selectedUpskillTask, getUpskillLoggedMinutesRecursive]);
-
-  const formatMinutes = (minutes: number) => {
-    if (minutes === 0) return "0m";
-    const h = Math.floor(minutes / 60);
-    const m = Math.round(minutes % 60);
-    return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim();
-  }
-
-  const totalEstimatedDuration = useMemo(() => {
-    if (!selectedUpskillTask) return 0;
-    return calculateTotalEstimate(selectedUpskillTask);
-  }, [selectedUpskillTask, calculateTotalEstimate]);
-
-  useEffect(() => {
-    if (editingSubtopic) {
-        const hours = Math.floor((editingSubtopic.estimatedDuration || 0) / 60);
-        const minutes = (editingSubtopic.estimatedDuration || 0) % 60;
-        setEditedSubtopicData({
-          ...editingSubtopic,
-          estHours: hours > 0 ? String(hours) : '',
-          estMinutes: minutes > 0 ? String(minutes) : ''
-        });
-    }
-  }, [editingSubtopic]);
-  
-  useEffect(() => {
-    setIsLoadingPage(false);
-  }, []);
-
-  const currentDatedWorkout = useMemo(() => {
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    return allUpskillLogs.find(log => log.id === dateKey);
-  }, [selectedDate, allUpskillLogs]);
-
-  const currentWorkoutExercises = useMemo(() => currentDatedWorkout?.exercises || [], [currentDatedWorkout]);
-
-  const updateOrAddWorkoutLog = (updatedWorkout: DatedWorkout) => {
-    setAllUpskillLogs(prevLogs => {
-      const index = prevLogs.findIndex(log => log.id === updatedWorkout.id);
-      if (index > -1) {
-        const newLogs = [...prevLogs]; newLogs[index] = updatedWorkout; return newLogs;
-      }
-      return [...prevLogs, updatedWorkout];
-    });
-  };
-
-  const handleCreateSubtopic = () => {
-    if (!selectedMicroSkill || !newSubtopicData.name.trim()) {
-        toast({ title: "Error", description: "Name is required.", variant: "destructive" });
-        return;
-    }
-
-    const hours = parseInt(newSubtopicData.hours, 10) || 0;
-    const minutes = parseInt(newSubtopicData.minutes, 10) || 0;
-    const totalMinutes = hours * 60 + minutes;
-
-    const newDef: ExerciseDefinition = { 
-        id: `def_${Date.now()}_${Math.random()}`, 
-        name: newSubtopicData.name.trim(), 
-        category: selectedMicroSkill.name as ExerciseCategory,
-        description: newSubtopicData.description.trim(),
-        link: newSubtopicData.link.trim(),
-        iconUrl: getFaviconUrl(newSubtopicData.link.trim()),
-        estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
-    };
-    
-    setUpskillDefinitions(prev => [...prev.filter(d => d.name !== 'placeholder'), newDef]);
-    
-    setIsNewSubtopicModalOpen(false);
-    setNewSubtopicData({ name: '', description: '', link: '', hours: '', minutes: '' });
-    
-    toast({ title: "Success", description: `Task "${newDef.name}" created.` });
-  };
-
-  const handleDeleteSubtopic = (id: string) => {
-    const defToDelete = upskillDefinitions.find(def => def.id === id);
-    if (!defToDelete) return;
-    setUpskillDefinitions(prev => {
-        const withoutDef = prev.filter(def => def.id !== id);
-        return withoutDef.map(d => ({
-            ...d,
-            linkedUpskillIds: (d.linkedUpskillIds || []).filter(linkedId => linkedId !== id)
-        }));
-    });
-    setAllUpskillLogs(prevLogs => prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) })));
-    if (selectedUpskillTask?.id === id) { setSelectedUpskillTask(null); setViewMode('session'); }
-    toast({ title: "Success", description: `Task "${defToDelete.name}" removed.` });
-  };
-
-  const handleUpdateSubtopicName = (id: string, newName: string) => {
-    setUpskillDefinitions(prev => prev.map(def => 
-        def.id === id ? { ...def, name: newName } : def
-    ));
-    setAllUpskillLogs(prevLogs => prevLogs.map(log => ({
-        ...log,
-        exercises: log.exercises.map(ex => 
-            ex.definitionId === id ? { ...ex, name: newName } : ex
-        )
-    })));
-  };
-
-  const handleSaveSubtopicEdit = () => {
-    if (!editingSubtopic || !editedSubtopicData.name?.trim()) { toast({ title: "Error", description: "Subtopic name cannot be empty.", variant: "destructive" }); return; }
-    
-    const hours = parseInt(editedSubtopicData.estHours || '0', 10);
-    const minutes = parseInt(editedSubtopicData.estMinutes || '0', 10);
-    const totalMinutes = hours * 60 + minutes;
-
-    let finalData: Partial<ExerciseDefinition> = { 
-      ...editedSubtopicData,
-      estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined
-    };
-
-    if (finalData.link !== editingSubtopic.link) finalData.iconUrl = getFaviconUrl(finalData.link || '');
-    
-    setUpskillDefinitions(prev => prev.map(def => def.id === editingSubtopic.id ? { ...def, ...finalData } as ExerciseDefinition : def));
-    setAllUpskillLogs(prevLogs => prevLogs.map(log => ({...log, exercises: log.exercises.map(ex => ex.definitionId === editingSubtopic.id ? { ...ex, name: finalData.name! } : ex)})));
-    if(selectedUpskillTask?.id === editingSubtopic.id) setSelectedUpskillTask({ ...selectedUpskillTask, ...finalData } as ExerciseDefinition);
-    toast({ title: "Success", description: `Task updated to "${finalData.name}".` });
-    setEditingSubtopic(null);
-  };
-
-  const handleAddTaskToSession = (definition: ExerciseDefinition, slot: string) => {
-    scheduleTaskFromMindMap(definition.id, 'upskill', slot);
-  };
-
-  const handleRemoveExerciseFromWorkout = (exerciseId: string) => {
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingWorkout = allUpskillLogs.find(log => log.id === dateKey);
-    if (existingWorkout) {
-      const updatedExercises = existingWorkout.exercises.filter(ex => ex.id !== exerciseId);
-      if (updatedExercises.length === 0) setAllUpskillLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
-      else updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
-    }
-  };
-  
-  const handleLogSet = (exerciseId: string, reps: number, weight: number) => { // Reps will be duration, weight is progress
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingWorkout = allUpskillLogs.find(log => log.id === dateKey);
-    if (existingWorkout) {
-      const newSet: LoggedSet = { id: `${Date.now()}-${Math.random()}`, reps, weight, timestamp: Date.now() };
-      const updatedExercises = existingWorkout.exercises.map(ex => 
-        ex.id === exerciseId ? { ...ex, loggedSets: [...ex.loggedSets, newSet] } : ex
-      );
-      updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
-      toast({ title: "Progress Logged!", description: `Your learning session has been saved.`});
-    }
-  };
-
-  const handleDeleteSet = (exerciseId: string, setId: string) => {
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingWorkout = allUpskillLogs.find(log => log.id === dateKey);
-    if (existingWorkout) {
-      const updatedExercises = existingWorkout.exercises.map(ex =>
-        ex.id === exerciseId ? { ...ex, loggedSets: ex.loggedSets.filter(s => s.id !== setId) } : ex
-      );
-      updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
-    }
-  };
-
-  const handleUpdateSet = (exerciseId: string, setId: string, reps: number, weight: number) => { // Reps=duration, weight=progress
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingWorkout = allUpskillLogs.find(log => log.id === dateKey);
-    if (existingWorkout) {
-      const updatedExercises = existingWorkout.exercises.map(ex =>
-        ex.id === exerciseId ? { ...ex, loggedSets: ex.loggedSets.map(set => set.id === setId ? { ...set, reps, weight, timestamp: Date.now() } : set )} : ex
-      );
-      updateOrAddWorkoutLog({ ...existingWorkout, exercises: updatedExercises });
-    }
-  };
-
-  const handleViewProgress = (definition: ExerciseDefinition) => { setProgressModalConfig({ isOpen: true, exercise: definition }); };
-  
-  const handleOpenManageLinksModal = (type: 'upskill' | 'resource', parent: ExerciseDefinition) => {
-    setManageLinksConfig({ type, parent });
-    setTempLinkedIds(type === 'upskill' ? (parent.linkedUpskillIds || []) : (parent.linkedResourceIds || []));
-    setNewLinkedItemTopic(parent.category);
-    setNewLinkedItemName(''); 
-    setNewLinkedItemDescription(''); 
-    setNewLinkedItemLink(''); 
-    setNewLinkedItemHours(''); 
-    setNewLinkedItemMinutes(''); 
-    setNewLinkedItemFolderId('');
-    setLinkSearchTerm(''); 
-    setLinkResourceFolderId(''); 
-    setLinkUpskillTopic('');
-    setIsManageLinksModalOpen(true);
-  };
-  
-  const handleCreateAndLinkItem = async () => {
-    if (!manageLinksConfig) return;
-    const { type, parent } = manageLinksConfig;
-    
-    let newId: string;
-    let updatedParent: ExerciseDefinition;
-
-    if (type === 'resource') {
-        if (!newLinkedItemFolderId) { toast({ title: "Error", description: "A folder must be selected.", variant: "destructive" }); return; }
-        if (!newLinkedItemLink.trim()) { toast({ title: "Error", description: "A link is required.", variant: "destructive" }); return; }
-        
-        setIsCreatingLink(true);
-        try {
-            let fullLink = newLinkedItemLink.trim();
-            if (!fullLink.startsWith('http://') && !fullLink.startsWith('https://')) {
-                fullLink = 'https://' + fullLink;
-            }
-            const response = await fetch('/api/get-link-metadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: fullLink }), });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || 'Failed to fetch metadata.');
-            const newResource: Resource = {
-                id: `res_${Date.now()}_${Math.random()}`, name: result.title || 'Untitled Resource', link: fullLink, type: 'link',
-                description: result.description || '', folderId: newLinkedItemFolderId, iconUrl: getFaviconUrl(fullLink),
-            };
-            newId = newResource.id;
-            setResources(prev => [...prev, newResource]);
-            
-            updatedParent = { ...parent, linkedResourceIds: [...(parent.linkedResourceIds || []), newId] };
-            setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
-            if (selectedUpskillTask?.id === parent.id) {
-                setSelectedUpskillTask(updatedParent);
-            }
-            toast({ title: "Resource Added", description: `"${newResource.name}" has been saved and linked.`});
-
-        } catch (error) {
-            toast({ title: "Error adding resource", description: error instanceof Error ? error.message : "Could not fetch metadata.", variant: "destructive" });
-        } finally { 
-            setIsCreatingLink(false);
-            setIsManageLinksModalOpen(false); 
-        }
-        return;
-    }
-    
-    // For type 'upskill'
-    if (!newLinkedItemName.trim() || !newLinkedItemTopic.trim()) {
-        toast({ title: "Error", description: "Name and topic are required.", variant: "destructive" }); return;
-    }
-    const hours = parseInt(newLinkedItemHours, 10) || 0;
-    const minutes = parseInt(newLinkedItemMinutes, 10) || 0;
-    const totalMinutes = hours * 60 + minutes;
-    const link = newLinkedItemLink.trim();
-    const newUpskillDef: ExerciseDefinition = {
-        id: `def_${Date.now()}_upskill_${Math.random()}`, name: newLinkedItemName.trim(), category: newLinkedItemTopic.trim() as ExerciseCategory,
-        description: newLinkedItemDescription.trim(), link: link, iconUrl: getFaviconUrl(link),
-        estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
-    };
-    newId = newUpskillDef.id;
-    setUpskillDefinitions(prev => [...prev, newUpskillDef]);
-    updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newId] };
-    setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
-    if (selectedUpskillTask?.id === parent.id) {
-        setSelectedUpskillTask(updatedParent);
-    }
-    toast({ title: "Success", description: "New item created and linked." });
-    setIsManageLinksModalOpen(false);
-  };
-
-
-  const handleSaveExistingLinks = () => {
-    if (!manageLinksConfig) return;
-    const { type, parent } = manageLinksConfig;
-    const key = type === 'upskill' ? 'linkedUpskillIds' : 'linkedResourceIds';
-    const updatedParent = { ...parent, [key]: tempLinkedIds };
-    
-    setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
-    if (selectedUpskillTask?.id === parent.id) {
-        setSelectedUpskillTask(updatedParent);
-    }
-    toast({ title: "Success", description: "Links have been updated." });
-    setIsManageLinksModalOpen(false);
-  };
-  
-  const filteredItemsForLinking = useMemo(() => {
-    if (!manageLinksConfig) return [];
-    const { type, parent } = manageLinksConfig;
-    
-    let definitionsSource: any[];
-    let parentLinkedIds: string[] = [];
-    
-    if (type === 'resource') {
-        if (!linkResourceFolderId) return [];
-        definitionsSource = resources.filter(res => res.folderId === linkResourceFolderId);
-        parentLinkedIds = parent.linkedResourceIds || [];
-    } else { // 'upskill'
-        definitionsSource = linkUpskillTopic ? upskillDefinitions.filter(d => d.category === linkUpskillTopic) : upskillDefinitions;
-        parentLinkedIds = parent.linkedUpskillIds || [];
-    }
-    
-    return definitionsSource.filter(def => {
-        if (!def.name || def.name === 'placeholder' || def.id === parent.id || parentLinkedIds.includes(def.id)) {
-            return false;
-        }
-
-        if (linkSearchTerm && !def.name.toLowerCase().includes(linkSearchTerm.toLowerCase())) {
-            return false;
-        }
-        
-        return true;
-    });
-  }, [manageLinksConfig, upskillDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkUpskillTopic]);
-
-
-  const handleUnlinkItem = (type: 'upskill' | 'resource', idToUnlink: string) => {
-    if (!selectedUpskillTask) return;
-    let updatedParent: ExerciseDefinition;
-    let key: 'linkedUpskillIds' | 'linkedResourceIds' = type === 'upskill' ? 'linkedUpskillIds' : 'linkedResourceIds';
-    updatedParent = { ...selectedUpskillTask, [key]: (selectedUpskillTask[key] || []).filter((id: string) => id !== idToUnlink) };
-    
-    setUpskillDefinitions(prev => prev.map(def => def.id === selectedUpskillTask.id ? updatedParent : def));
-    setSelectedUpskillTask(updatedParent);
-    toast({ title: "Unlinked", description: "The item has been unlinked." });
-  };
-  
-  const renderFolderOptions = useCallback((parentId: string | null, level: number): JSX.Element[] => {
-    const folders = resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => a.name.localeCompare(b.name));
-    let options: JSX.Element[] = [];
-    folders.forEach(folder => {
-        options.push(<SelectItem key={folder.id} value={folder.id}><span style={{ paddingLeft: `${level * 1.5}rem` }}>{folder.name}</span></SelectItem>);
-        options = options.concat(renderFolderOptions(folder.id, level + 1));
-    });
-    return options;
-  }, [resourceFolders]);
-
-  const handleStartEditResource = (res: Resource) => {
-    router.push('/resources');
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-  
-    if (!over || active.id === over.id) return;
-  
-    const draggedId = active.id as string;
-    const targetId = over.id as string;
-  
-    const allDefs = [...upskillDefinitions, ...resources];
-    const draggedDef = allDefs.find(d => d.id === draggedId);
-    const targetDef = allDefs.find(d => d.id === targetId);
-  
-    if (!draggedDef || !targetDef || !selectedUpskillTask) {
-        toast({ title: "Error", description: "Could not find items to link.", variant: "destructive" });
-        return;
-    }
-    
-    const parentChildrenIds = new Set([
-        ...(selectedUpskillTask.linkedUpskillIds || []),
-        ...(selectedUpskillTask.linkedResourceIds || []),
-    ]);
-
-    if (!parentChildrenIds.has(draggedId) || !parentChildrenIds.has(targetId)) {
-        toast({ title: "Link Error", description: "Can only link sibling items within the same subtopic.", variant: "destructive" });
-        return;
-    }
-    
-    const isDraggedResource = resources.some(d => d.id === draggedId);
-    
-    setUpskillDefinitions(prev => prev.map(def => {
-        if (def.id === targetId) {
-            let updatedDef = { ...def };
-            if (isDraggedResource) {
-                updatedDef.linkedResourceIds = [...(updatedDef.linkedResourceIds || []), draggedId];
-            } else { // Dragged an upskill item
-                updatedDef.linkedUpskillIds = [...(updatedDef.linkedUpskillIds || []), draggedId];
-            }
-            return updatedDef;
-        }
-        return def;
-    }));
-    
-    const updatedParent = {
-        ...selectedUpskillTask,
-        linkedUpskillIds: (selectedUpskillTask.linkedUpskillIds || []).filter(id => id !== draggedId),
-        linkedResourceIds: (selectedUpskillTask.linkedResourceIds || []).filter(id => id !== draggedId),
-    };
-    
-    setUpskillDefinitions(prev => prev.map(def => def.id === selectedUpskillTask.id ? updatedParent : def));
-    setSelectedUpskillTask(updatedParent);
-  
-    toast({ title: "Re-linked!", description: `"${draggedDef.name}" is now a sub-task of "${targetDef.name}".` });
-  };
-
-  const handleProjectSelect = (project: Project | null) => {
-    setSelectedProject(project);
-    setSelectedUpskillTask(null);
-    setSelectedMicroSkill(null);
-  };
+    return Array.from(new Set(deepWorkDefinitions.map(def => def.category))).sort();
+  }, [deepWorkDefinitions]);
   
   const getDomainForCategory = useCallback((category: string) => {
     const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === category);
@@ -1292,315 +784,291 @@ function UpskillPageContent() {
     return skillDomains.find(sd => sd.id === coreSkill.domainId);
   }, [microSkillMap, coreSkills, skillDomains]);
 
-  const handleLinkProject = useCallback((curiosityId: string, projectId: string | null) => {
-    setUpskillDefinitions(prev =>
+  const projectsInSelectedDomain = selectedDeepWorkTask ? (getDomainForCategory(selectedDeepWorkTask.category) ? projects.filter(p => p.domainId === getDomainForCategory(selectedDeepWorkTask.category)!.id) : []) : [];
+  
+  const linkedDeepWorkChildIds = useMemo(() => 
+    new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || []))
+  , [deepWorkDefinitions]);
+
+  const getDeepWorkNodeType = (def: ExerciseDefinition, childIds: Set<string>): string => {
+      const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+      const isChild = childIds.has(def.id);
+      if(isParent) {
+          return isChild ? 'Objective' : 'Intention';
+      }
+      return isChild ? 'Action' : 'Standalone';
+  };
+
+  const getIcon = (nodeType: string) => {
+    switch (nodeType) {
+        case 'Intention': return <Lightbulb className="h-5 w-5 text-amber-500" />;
+        case 'Objective': return <Flag className="h-5 w-5 text-green-500" />;
+        case 'Action': return <Bolt className="h-5 w-5 text-blue-500" />;
+        case 'Standalone': return <Focus className="h-5 w-5 text-purple-500" />;
+        default: return <Briefcase className="h-5 w-5" />;
+    }
+  };
+
+  const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
+    let total = 0;
+    const visited = new Set<string>();
+    
+    function recurse(d: ExerciseDefinition) {
+        if(visited.has(d.id)) return;
+        visited.add(d.id);
+        
+        const hasDeepWorkChildren = (d.linkedDeepWorkIds?.length ?? 0) > 0;
+        
+        if (hasDeepWorkChildren) {
+            (d.linkedDeepWorkIds || []).forEach(childId => {
+                const childDef = deepWorkDefinitions.find(c => c.id === childId);
+                if (childDef) recurse(childDef);
+            });
+        } else {
+            total += d.estimatedDuration || 0;
+        }
+    }
+    
+    recurse(def);
+    return total;
+  }, [deepWorkDefinitions]);
+
+  const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition) => {
+    let totalMinutes = 0;
+    const allRelevantIds = new Set<string>();
+
+    function getLeafNodes(defId: string) {
+        if(allRelevantIds.has(defId)) return;
+        allRelevantIds.add(defId);
+        
+        const def = deepWorkDefinitions.find(d => d.id === defId);
+        if (!def) return;
+        
+        const hasChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0;
+        if (hasChildren) {
+            (def.linkedDeepWorkIds || []).forEach(childId => getLeafNodes(childId));
+        }
+    }
+    getLeafNodes(definition.id);
+
+    allDeepWorkLogs.forEach(log => {
+        log.exercises.forEach(ex => {
+            if(allRelevantIds.has(ex.definitionId)) {
+                totalMinutes += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0);
+            }
+        });
+    });
+    return totalMinutes;
+  }, [allDeepWorkLogs, deepWorkDefinitions]);
+
+  const formatDuration = (minutes: number) => {
+    if (minutes === 0) return "0m";
+    const h = Math.floor(minutes / 60);
+    const m = Math.round(minutes % 60);
+    return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim();
+  }
+
+  const handleUpdateName = (id: string, newName: string) => {
+    setDeepWorkDefinitions(prev => prev.map(def => def.id === id ? { ...def, name: newName } : def));
+  };
+  
+  const handleLinkProject = (intentionId: string, projectId: string | null) => {
+    setDeepWorkDefinitions(prev =>
         prev.map(def =>
-            def.id === curiosityId
+            def.id === intentionId
                 ? { ...def, linkedProjectId: projectId || undefined }
                 : def
         )
     );
-  }, [setUpskillDefinitions]);
+  };
+  
+  const totalLoggedTime = useMemo(() => {
+    if (!selectedDeepWorkTask) return 0;
+    return getDeepWorkLoggedMinutes(selectedDeepWorkTask);
+  }, [selectedDeepWorkTask, getDeepWorkLoggedMinutes]);
+
+  const totalEstimatedDuration = useMemo(() => {
+    if (!selectedDeepWorkTask) return 0;
+    return calculateTotalEstimate(selectedDeepWorkTask);
+  }, [selectedDeepWorkTask, calculateTotalEstimate]);
+
+  const handleAddTaskToSession = (definition: ExerciseDefinition, slot: string) => {
+    scheduleTaskFromMindMap(definition.id, 'deepwork', slot);
+  };
+
+  const handleDeleteExerciseDefinition = (id: string) => {
+    const defToDelete = deepWorkDefinitions.find(def => def.id === id);
+    if (!defToDelete) return;
+
+    setDeepWorkDefinitions(prevDefs => {
+        const afterDelete = prevDefs.filter(def => def.id !== id);
+        return afterDelete.map(def => ({
+            ...def,
+            linkedDeepWorkIds: (def.linkedDeepWorkIds || []).filter(linkedId => linkedId !== id)
+        }));
+    });
+    
+    setAllDeepWorkLogs(prevLogs => prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) })));
+    if (selectedDeepWorkTask?.id === id) { setSelectedDeepWorkTask(null); setViewMode('session'); }
+    toast({ title: "Success", description: `"${defToDelete.name}" removed.` });
+  };
+  
+  const handleToggleReadyForBranding = (id: string) => {
+    setDeepWorkDefinitions(prev => prev.map(def => 
+        def.id === id ? { ...def, isReadyForBranding: !def.isReadyForBranding } : def
+    ));
+    toast({
+      title: "Updated",
+      description: "Branding status toggled."
+    });
+  };
+
+  const handleViewProgress = (def: ExerciseDefinition, type: 'deepwork' | 'upskill') => {
+    setProgressModalConfig({ isOpen: true, exercise: def, type });
+  };
+  
+  const handleProjectSelect = (project: Project | null) => {
+    setSelectedProject(project);
+    setSelectedDeepWorkTask(null);
+    setSelectedMicroSkill(null);
+  };
+
+  const handleUnlinkItem = (type: 'deepwork' | 'upskill' | 'resource', idToUnlink: string) => {
+    if (!selectedDeepWorkTask) return;
+    
+    let key: 'linkedDeepWorkIds' | 'linkedUpskillIds' | 'linkedResourceIds';
+    if(type === 'deepwork') key = 'linkedDeepWorkIds';
+    else if(type === 'upskill') key = 'linkedUpskillIds';
+    else key = 'linkedResourceIds';
+
+    const updatedParent = { ...selectedDeepWorkTask, [key]: (selectedDeepWorkTask[key] || []).filter((id: string) => id !== idToUnlink) };
+    
+    setDeepWorkDefinitions(prev => prev.map(def => def.id === selectedDeepWorkTask.id ? updatedParent : def));
+    setSelectedDeepWorkTask(updatedParent);
+    toast({ title: "Unlinked", description: "The item has been unlinked." });
+  };
+
 
   if (isLoadingPage) {
-    return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your upskill data...</p></div>;
+    return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading Deep Work module...</p></div>;
   }
-
+  
   const getLibraryTitle = () => {
     if (selectedProject) return selectedProject.name;
     if (selectedMicroSkill) return selectedMicroSkill.name;
     return 'Library';
   }
   
-  const selectedUpskillTaskIsCuriosity = selectedUpskillTask && (getDomainForCategory(selectedUpskillTask.category) !== null);
-  const projectsInSelectedDomain = selectedUpskillTask ? (getDomainForCategory(selectedUpskillTask.category) ? projects.filter(p => p.domainId === getDomainForCategory(selectedUpskillTask.category)!.id) : []) : [];
-
-
   return (
-    <DndContext onDragEnd={handleDragEnd}>
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-            
-            <aside className="lg:col-span-1 space-y-6">
-                 <SkillLibrary
-                    pageType="upskill"
-                    selectedMicroSkill={selectedMicroSkill}
-                    onSelectMicroSkill={setSelectedMicroSkill}
-                    definitions={upskillDefinitions}
-                    onSelectFocusArea={setSelectedUpskillTask}
-                    onOpenNewFocusArea={handleOpenNewSubtopicModal}
-                    selectedProject={selectedProject}
-                    onSelectProject={handleProjectSelect}
-                    onDeleteFocusArea={handleDeleteSubtopic}
-                    onUpdateFocusAreaName={handleUpdateSubtopicName}
-                    onOpenMindMap={(id) => {
-                      setMindMapRootFocusAreaId(id);
-                      setIsMindMapModalOpen(true);
-                    }}
-                    onEditFocusArea={setEditingSubtopic}
-                />
-              {selectedUpskillTask && (
-                  <Card>
-                      <CardHeader className="flex flex-row items-center justify-between pb-2">
-                          <div><CardTitle className="text-lg flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary" /> Subtopic Stats</CardTitle><CardDescription className="text-xs">Aggregated progress for "{selectedUpskillTask.name}"</CardDescription></div>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewProgress(selectedUpskillTask)}><TrendingUp className="h-4 w-4"/></Button>
-                      </CardHeader>
-                      <CardContent className="space-y-4 pt-4">
-                          <div className="space-y-2">
-                              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Logged Time</span><span className="font-medium">{formatMinutes(totalLoggedTime)}</span></div>
-                              {totalEstimatedDuration > 0 && (<div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Estimated Time</span><span className="font-medium">{formatMinutes(totalEstimatedDuration)}</span></div>)}
-                          </div>
-                          {totalEstimatedDuration > 0 && (
-                              <div>
-                                  <Progress value={Math.min(100, (totalLoggedTime / totalEstimatedDuration) * 100)} className="h-2" />
-                                  <div className="flex justify-between text-xs text-muted-foreground mt-1"><span>0%</span><span>{((totalLoggedTime / totalEstimatedDuration) * 100).toFixed(0)}%</span></div>
-                              </div>
-                          )}
-                          {totalEstimatedDuration > 0 && totalLoggedTime > totalEstimatedDuration && (<Badge variant="destructive" className="w-full justify-center">Overspent by {formatMinutes(totalLoggedTime - totalEstimatedDuration)}</Badge>)}
-                      </CardContent>
-                  </Card>
-              )}
-            </aside>
-
-            <section aria-labelledby="main-panel-heading" className="lg:col-span-3 space-y-6">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between p-4">
-                        <div className="flex-grow">
-                          <CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">
-                            {viewMode === 'session' ? <ListChecks /> : <Library />}
-                            {viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : getLibraryTitle()}
-                          </CardTitle>
+    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+        <aside className="lg:col-span-1 space-y-6">
+            <SkillLibrary
+                pageType="deepwork"
+                selectedMicroSkill={selectedMicroSkill}
+                onSelectMicroSkill={setSelectedMicroSkill}
+                definitions={deepWorkDefinitions}
+                onSelectFocusArea={setSelectedDeepWorkTask}
+                onOpenNewFocusArea={() => { /* Implement modal if needed */ }}
+                selectedProject={selectedProject}
+                onSelectProject={handleProjectSelect}
+                onDeleteFocusArea={handleDeleteExerciseDefinition}
+                onUpdateFocusAreaName={handleUpdateName}
+                onOpenMindMap={(id) => {
+                  setMindMapRootFocusAreaId(id);
+                  setIsMindMapModalOpen(true);
+                }}
+                onEditFocusArea={setEditingFocusArea}
+            />
+          {selectedDeepWorkTask && (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <div><CardTitle className="text-lg flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary" /> Focus Area Stats</CardTitle><CardDescription className="text-xs">Aggregated progress for "{selectedDeepWorkTask.name}"</CardDescription></div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewProgress(selectedDeepWorkTask, 'deepwork')}><TrendingUp className="h-4 w-4"/></Button>
+                </CardHeader>
+                <CardContent className="space-y-4 pt-4">
+                    <div className="space-y-2">
+                        <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Logged Time</span><span className="font-medium">{formatDuration(totalLoggedTime)}</span></div>
+                        {totalEstimatedDuration > 0 && (<div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Estimated Time</span><span className="font-medium">{formatDuration(totalEstimatedDuration)}</span></div>)}
+                    </div>
+                    {totalEstimatedDuration > 0 && (
+                        <div>
+                            <Progress value={Math.min(100, (totalLoggedTime / totalEstimatedDuration) * 100)} className="h-2" />
+                            <div className="flex justify-between text-xs text-muted-foreground mt-1"><span>0%</span><span>{((totalLoggedTime / totalEstimatedDuration) * 100).toFixed(0)}%</span></div>
                         </div>
-                        <div className='flex items-center gap-2 flex-shrink-0'>
-                          <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
-                          <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('library')}>Library</Button>
-                          <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent></Popover>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-4">
-                        {viewMode === 'session' ? (
-                            <div className="max-h-[calc(100vh-16rem)] overflow-y-auto pr-2">
-                                {currentWorkoutExercises.length === 0 ? (
-                                  <div className="text-center py-10"><BookCopy className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" /><p className="text-muted-foreground">No tasks for {format(selectedDate, 'PPP')}.</p><p className="text-sm text-muted-foreground/80">Add tasks from the library to get started!</p></div>
-                                ) : (
-                                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                                    {currentWorkoutExercises.map((exercise) => {
-                                        const definition = upskillDefinitions.find(def => def.id === exercise.definitionId);
-                                        return (
-                                          <WorkoutExerciseCard 
-                                            key={exercise.id} exercise={exercise} definition={definition} definitionGoal={topicGoals[exercise.category]}
-                                            onLogSet={handleLogSet} onDeleteSet={handleDeleteSet} onUpdateSet={handleUpdateSet} 
-                                            onRemoveExercise={handleRemoveExerciseFromWorkout} onViewProgress={definition ? () => handleViewProgress(definition) : undefined}
-                                            pageType="upskill"
-                                          />
-                                        );
-                                    })}
-                                  </div>
-                                )}
-                            </div>
-                        ) : selectedUpskillTask ? (
-                             <div className="space-y-4">
-                                <div className="space-y-1">
-                                    <h3 className="text-xl font-bold">{selectedUpskillTask.name}</h3>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('upskill', selectedUpskillTask)}>
-                                            <LinkIcon className="mr-2 h-4 w-4" /> Link Sub-task
-                                        </Button>
-                                        <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('resource', selectedUpskillTask)}>
-                                            <Folder className="mr-2 h-4 w-4" /> Link Resource
-                                        </Button>
-                                        {selectedUpskillTaskIsCuriosity && (
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button size="sm" variant="outline">
-                                                        <Briefcase className="mr-2 h-4 w-4" /> Link Project
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent>
-                                                    <DropdownMenuItem onSelect={() => handleLinkProject(selectedUpskillTask.id, null)}>None</DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                    {projectsInSelectedDomain.map(proj => (
-                                                        <DropdownMenuCheckboxItem key={proj.id} checked={selectedUpskillTask.linkedProjectId === proj.id} onSelect={() => handleLinkProject(selectedUpskillTask.id, selectedUpskillTask.linkedProjectId === proj.id ? null : proj.id)}>{proj.name}</DropdownMenuCheckboxItem>
-                                                    ))}
-                                                    {projectsInSelectedDomain.length === 0 && <DropdownMenuItem disabled>No projects in this domain</DropdownMenuItem>}
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {(selectedUpskillTask.linkedUpskillIds || []).map(id => {
-                                        const def = upskillDefinitions.find(d => d.id === id);
-                                        if (!def) return null;
-                                        const domain = getDomainForCategory(def.category);
-                                        const projectsInDomain = domain ? projects.filter(p => p.domainId === domain.id) : [];
-                                        return <LinkedUpskillItem key={id} upskillDef={def} {...{ handleAddTaskToSession, setSelectedSubtopic: setSelectedUpskillTask, setViewMode, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteSubtopic, handleViewProgress, isComplete: isUpskillObjectiveComplete(def.id), getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate: calculateTotalEstimate(def), setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName: handleUpdateSubtopicName, projectsInDomain, onLinkProject: handleLinkProject, onEdit: setEditingSubtopic }} />;
-                                    })}
-                                    {(selectedUpskillTask.linkedResourceIds || []).map(id => {
-                                        const resource = resources.find(r => r.id === id);
-                                        return resource ? <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={(type, id) => handleUnlinkItem(type, id)} setEmbedUrl={setEmbedUrl} handleOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} /> : null;
-                                    })}
-                                </div>
-                            </div>
-                        ) : selectedProject ? (
-                            <div className="space-y-4">
-                                {selectedProject.features.map(feature => (
-                                    <Card key={feature.id}>
-                                        <CardHeader className="pb-3"><CardTitle className="text-base">{feature.name}</CardTitle></CardHeader>
-                                        <CardContent>
-                                            <p className="text-sm font-medium mb-1">Required Skills:</p>
-                                            <ul className="list-disc list-inside text-sm text-muted-foreground">
-                                                {feature.linkedSkills.map(link => {
-                                                    const skill = microSkillMap.get(link.microSkillId);
-                                                    return <li key={link.microSkillId}>{skill?.microSkillName || 'Unknown Skill'}</li>;
-                                                })}
-                                            </ul>
-                                        </CardContent>
-                                    </Card>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-10 text-muted-foreground">Select a micro-skill or project from the library to view its tasks.</div>
-                        )}
-                    </CardContent>
-                </Card>
-            </section>
-          </div>
-          <Dialog open={isNewSubtopicModalOpen} onOpenChange={setIsNewSubtopicModalOpen}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Create New Task</DialogTitle>
-                    <DialogDescription>
-                        This will create a new standalone task under the "{selectedMicroSkill?.name}" micro-skill.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                    <div className="space-y-1">
-                        <Label htmlFor="new-subtopic-name">Task Name</Label>
-                        <Input id="new-subtopic-name" value={newSubtopicData.name} onChange={(e) => setNewSubtopicData(d => ({ ...d, name: e.target.value }))} />
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="new-subtopic-desc">Description (Optional)</Label>
-                        <Textarea id="new-subtopic-desc" value={newSubtopicData.description} onChange={(e) => setNewSubtopicData(d => ({ ...d, description: e.target.value }))} />
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="new-subtopic-link">Link (Optional)</Label>
-                        <Input id="new-subtopic-link" value={newSubtopicData.link} onChange={(e) => setNewSubtopicData(d => ({ ...d, link: e.target.value }))} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1"><Label htmlFor="new-subtopic-hours">Est. Hours</Label><Input type="number" id="new-subtopic-hours" value={newSubtopicData.hours} onChange={(e) => setNewSubtopicData(d => ({ ...d, hours: e.target.value }))} /></div>
-                        <div className="space-y-1"><Label htmlFor="new-subtopic-mins">Est. Minutes</Label><Input type="number" id="new-subtopic-mins" value={newSubtopicData.minutes} onChange={(e) => setNewSubtopicData(d => ({ ...d, minutes: e.target.value }))} /></div>
-                    </div>
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsNewSubtopicModalOpen(false)}>Cancel</Button>
-                    <Button onClick={handleCreateSubtopic}>Create Task</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-        {editingSubtopic && (
-          <Dialog open={!!editingSubtopic} onOpenChange={() => setEditingSubtopic(null)}>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Edit Task</DialogTitle><DialogDescription>Update the details for "{editingSubtopic.name}".</DialogDescription></DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-1"><Label>Name</Label><Input value={editedSubtopicData.name || ''} onChange={e => setEditedSubtopicData(d => ({...d, name: e.target.value}))}/></div>
-                <div className="space-y-1"><Label>Description</Label><Textarea value={editedSubtopicData.description || ''} onChange={e => setEditedSubtopicData(d => ({...d, description: e.target.value}))}/></div>
-                <div className="space-y-1"><Label>Link</Label><Input value={editedSubtopicData.link || ''} onChange={e => setEditedSubtopicData(d => ({...d, link: e.target.value}))}/></div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1"><Label>Est. Hours</Label><Input type="number" value={editedSubtopicData.estHours || ''} onChange={e => setEditedSubtopicData(d => ({...d, estHours: e.target.value}))}/></div>
-                  <div className="space-y-1"><Label>Est. Minutes</Label><Input type="number" value={editedSubtopicData.estMinutes || ''} onChange={e => setEditedSubtopicData(d => ({...d, estMinutes: e.target.value}))}/></div>
-                </div>
+                    )}
+                    {totalEstimatedDuration > 0 && totalLoggedTime > totalEstimatedDuration && (<Badge variant="destructive" className="w-full justify-center">Overspent by {formatDuration(totalLoggedTime - totalEstimatedDuration)}</Badge>)}
+                </CardContent>
+              </Card>
+          )}
+        </aside>
+        
+        <main className="lg:col-span-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between p-4">
+              <div className="flex-grow">
+                <CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">
+                  {viewMode === 'session' ? <ListChecks /> : <Library />}
+                  {viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : getLibraryTitle()}
+                </CardTitle>
               </div>
-              <DialogFooter><Button variant="outline" onClick={() => setEditingSubtopic(null)}>Cancel</Button><Button onClick={handleSaveSubtopicEdit}>Save Changes</Button></DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
-          {progressModalConfig.isOpen && progressModalConfig.exercise && (
-            <ExerciseProgressModal isOpen={progressModalConfig.isOpen} onOpenChange={(isOpen) => setProgressModalConfig(prev => ({...prev, isOpen}))} exercise={progressModalConfig.exercise} allWorkoutLogs={allUpskillLogs} pageType="upskill" topicGoals={topicGoals} />
-          )}
-          {isManageLinksModalOpen && manageLinksConfig && (
-              <Dialog open={isManageLinksModalOpen} onOpenChange={setIsManageLinksModalOpen}>
-                <DialogContent className="sm:max-w-3xl h-[80vh] flex flex-col">
-                  <DialogHeader>
-                    <DialogTitle>Manage Links for: {manageLinksConfig.parent.name}</DialogTitle>
-                    <DialogDescription>Link existing items or create new ones to build out this objective.</DialogDescription>
-                  </DialogHeader>
-                  <Tabs defaultValue="link" className="flex-grow flex flex-col min-h-0">
-                      <TabsList className="grid w-full grid-cols-2">
-                          <TabsTrigger value="link">Link Existing</TabsTrigger>
-                          <TabsTrigger value="create">Create New</TabsTrigger>
-                      </TabsList>
-                      <TabsContent value="link" className="flex-grow min-h-0">
-                          <div className="flex flex-col h-full">
-                              <div className="flex gap-2 mb-2 p-1">
-                                  {manageLinksConfig.type === 'resource' && <Select value={linkResourceFolderId} onValueChange={setLinkResourceFolderId}><SelectTrigger placeholder="Select Folder..."/><SelectContent>{renderFolderOptions(null, 0)}</SelectContent></Select>}
-                                  {manageLinksConfig.type === 'upskill' && <Select value={linkUpskillTopic} onValueChange={setLinkUpskillTopic}><SelectTrigger placeholder="Select Topic..."/><SelectContent>{allKnownTopics.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select>}
-                                  <Input placeholder="Search..." value={linkSearchTerm} onChange={e => setLinkSearchTerm(e.target.value)} />
-                              </div>
-                              <ScrollArea className="flex-grow border rounded-md p-2">
-                                  {filteredItemsForLinking.length > 0 ? (
-                                      filteredItemsForLinking.map(item => (
-                                          <div key={item.id} className="flex items-center space-x-2 p-1">
-                                              <Checkbox
-                                                  id={`link-${item.id}`}
-                                                  checked={tempLinkedIds.includes(item.id)}
-                                                  onCheckedChange={(checked) => {
-                                                      setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id));
-                                                  }}
-                                              />
-                                              <Label htmlFor={`link-${item.id}`} className="font-normal">{item.name}</Label>
-                                          </div>
-                                      ))
-                                  ) : <p className="text-sm text-center text-muted-foreground p-4">No items to link. Try another filter or create a new item.</p>}
-                              </ScrollArea>
-                              <DialogFooter className="pt-4">
-                                  <Button onClick={handleSaveExistingLinks}>Save Links</Button>
-                              </DialogFooter>
-                          </div>
-                      </TabsContent>
-                      <TabsContent value="create" className="flex-grow">
-                          <ScrollArea className="h-full pr-4">
-                              <div className="space-y-4">
-                                  {manageLinksConfig.type !== 'resource' ? (
-                                      <>
-                                          <div className="space-y-1"><Label>Topic</Label><Input value={newLinkedItemTopic} onChange={e => setNewLinkedItemTopic(e.target.value)} /></div>
-                                          <div className="space-y-1"><Label>Name</Label><Input value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} /></div>
-                                          <div className="space-y-1"><Label>Description</Label><Textarea value={newLinkedItemDescription} onChange={e => setNewLinkedItemDescription(e.target.value)} /></div>
-                                          <div className="space-y-1"><Label>Link (Optional)</Label><Input value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} /></div>
-                                          <div className="grid grid-cols-2 gap-4">
-                                              <div className="space-y-1"><Label>Est. Hours</Label><Input type="number" value={newLinkedItemHours} onChange={e => setNewLinkedItemHours(e.target.value)} /></div>
-                                              <div className="space-y-1"><Label>Est. Minutes</Label><Input type="number" value={newLinkedItemMinutes} onChange={e => setNewLinkedItemMinutes(e.target.value)} /></div>
-                                          </div>
-                                      </>
-                                  ) : (
-                                      <>
-                                          <div className="space-y-1"><Label>Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger/><SelectContent>{renderFolderOptions(null, 0)}</SelectContent></Select></div>
-                                          <div className="space-y-1"><Label>Link</Label><Input value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} /></div>
-                                      </>
-                                  )}
-                                  <DialogFooter className="pt-4">
-                                      <Button onClick={handleCreateAndLinkItem} disabled={isCreatingLink}>{isCreatingLink && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create & Link</Button>
-                                  </DialogFooter>
-                              </div>
-                          </ScrollArea>
-                      </TabsContent>
-                  </Tabs>
-                </DialogContent>
-              </Dialog>
-          )}
+              <div className='flex items-center gap-2 flex-shrink-0'>
+                <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
+                <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('library')}>Library</Button>
+                <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent></Popover>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4">
+              {viewMode === 'library' && selectedDeepWorkTask ? (
+                <div className="space-y-4">
+                  <h3 className="text-xl font-bold">{selectedDeepWorkTask.name}</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {/* Sub-tasks will be rendered here */}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-10 text-muted-foreground">Select a micro-skill or project from the library to view its tasks.</div>
+              )}
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+      
+       <Dialog open={!!editingFocusArea} onOpenChange={setEditingFocusArea}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Focus Area</DialogTitle>
+            <DialogDescription>
+              Update the details for this deep work focus area.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+             {/* Form fields will go here */}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingFocusArea(null)}>Cancel</Button>
+            <Button>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <FocusAreaProgressModal isOpen={progressModalConfig.isOpen} onOpenChange={(isOpen) => setProgressModalConfig(p => ({...p, isOpen}))} focusArea={progressModalConfig.exercise} deepWorkDefinitions={deepWorkDefinitions} upskillDefinitions={upskillDefinitions} allDeepWorkLogs={allDeepWorkLogs} allUpskillLogs={allUpskillLogs} avgDailyProductiveHours={5} />
 
-          <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
-            <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
-              <DialogHeader className="sr-only"><DialogTitle>Focus Area Mind Map</DialogTitle></DialogHeader>
-              <MindMapViewer showControls={false} rootFocusAreaId={mindMapRootFocusAreaId} />
-            </DialogContent>
-          </Dialog>
-
-        </div>
-    </DndContext>
+      <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
+        <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+          <DialogHeader className="sr-only"><DialogTitle>Focus Area Mind Map</DialogTitle></DialogHeader>
+          <MindMapViewer showControls={false} rootFocusAreaId={mindMapRootFocusAreaId} />
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
 
-export default function UpskillPage() {
-  return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
+export default function DeepWorkPage() {
+    return (
+        <AuthGuard>
+            <DeepWorkPageContent/>
+        </AuthGuard>
+    )
 }
+
