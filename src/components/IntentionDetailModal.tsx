@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
@@ -138,8 +136,6 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     deepWorkDefinitions, 
     upskillDefinitions, 
     resources, 
-    openPopups,
-    ResourcePopup,
     handleOpenNestedPopup
   } = useAuth();
   
@@ -190,13 +186,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   
   const handleDrillDown = (subtask: ExerciseDefinition) => {
     if (upskillDefinitions.some(d => d.id === subtask.id)) {
-        // Find if this upskill node has a popup already
-        const existingPopup = Array.from(openPopups.values()).find(p => p.resourceId === subtask.id);
-        if(!existingPopup) {
-            // This is a temporary solution, ideally we should open a specific popup for upskill items too.
-            // For now, let's just log it.
-            console.log("Drilling into upskill item from intention popup is not fully supported yet with its own popup type.");
-        }
+        console.log("Drilling into upskill item from intention popup is not fully supported yet with its own popup type.");
     } else {
       setNavigationStack(prev => [...prev, subtask]);
     }
@@ -244,9 +234,11 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
        <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[85vh] flex flex-col">
         <div 
-          className="p-4 flex-shrink-0 border-b flex flex-row items-center cursor-grab active:cursor-grabbing"
-          {...listeners}
+          className="p-4 flex-shrink-0 border-b flex flex-row items-center"
         >
+          <div className="cursor-grab p-1 mr-2" {...listeners}>
+            <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
+          </div>
           {navigationStack.length > 1 && (
             <Button variant="ghost" size="icon" onClick={handleGoBack} className="mr-2 h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
