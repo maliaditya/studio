@@ -84,11 +84,13 @@ export function SkillLibrary({
         setSelectedDomainId(null);
     } else if (selectedProjectId) {
         setSelectedProjectId(null);
+        onSelectProject(null);
     }
   };
   
   const handleSelect = (item: any, type: 'domain' | 'coreSkill' | 'microSkill' | 'project') => {
     onSelectFocusArea(null);
+    onSelectProject(null);
     switch(type) {
         case 'domain':
             setSelectedDomainId(item.id);
@@ -182,7 +184,10 @@ export function SkillLibrary({
       
       const filteredTasks = allTasks.filter(task => {
         const nodeType = pageType === 'deepwork' ? getDeepWorkNodeType(task) : getUpskillNodeType(task);
-        return ['Intention', 'Curiosity', 'Standalone'].includes(nodeType);
+        if (pageType === 'deepwork') {
+          return ['Intention', 'Standalone'].includes(nodeType);
+        }
+        return ['Curiosity', 'Standalone'].includes(nodeType);
       });
       
       return (
