@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
@@ -8,9 +6,10 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { ScrollArea } from './ui/scroll-area';
-import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink, Briefcase, BookCopy, ArrowLeft, Frame, Code, MessageSquare, ArrowRight, GitMerge, GripVertical, X, Flag, Bolt, Focus } from 'lucide-react';
+import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink, Briefcase, BookCopy, ArrowLeft, Frame, Code, MessageSquare, ArrowRight, GitMerge, GripVertical, X, Flag, Bolt, Focus, Link as LinkIcon } from 'lucide-react';
 import type { ExerciseDefinition, Resource, PopupState as IntentionPopupState, ResourcePoint } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
@@ -114,7 +113,7 @@ const DeepWorkItem = ({ item, onDrillDown, getIcon, children }: { item: Exercise
         return (
              <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value={item.id} className="border-none">
-                     <AccordionTrigger className="hover:no-underline p-2 rounded-md hover:bg-muted/50">
+                     <AccordionTrigger className="hover:no-underline p-2 rounded-md hover:bg-muted/50" onClick={(e) => { e.stopPropagation(); }}>
                         <div className="flex items-center gap-2">
                            {getIcon(item)}
                            <span className="font-semibold">{item.name}</span>
@@ -147,6 +146,9 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   const [navigationStack, setNavigationStack] = useState<ExerciseDefinition[]>([]);
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `intention-popup-${popupState.resourceId}` });
   const cardRef = useRef<HTMLDivElement>(null);
+
+  const [isLinksModalOpen, setIsLinksModalOpen] = useState(false);
+  const [linkedIntentions, setLinkedIntentions] = useState<ExerciseDefinition[]>([]);
 
   const style: React.CSSProperties = {
       position: 'fixed',
@@ -239,6 +241,56 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     }
   };
   
+  const handleViewLinkedIntentions = () => {
+    if (!currentItem) return;
+    
+    const getDescendantIds = (startNodeId: string, defs: ExerciseDefinition[]): Set<string> => {
+        const visited = new Set<string>();
+        const queue: string[] = [startNodeId];
+        const childrenIds = new Set<string>();
+        
+        while(queue.length > 0) {
+            const currentId = queue.shift()!;
+            if (visited.has(currentId)) continue;
+            visited.add(currentId);
+
+            const node = defs.find(d => d.id === currentId);
+            if (!node) continue;
+            
+            const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0 || (node.linkedUpskillIds?.length ?? 0) > 0;
+            if (!isParent) {
+                childrenIds.add(node.id);
+            } else {
+                (node.linkedDeepWorkIds || []).forEach(id => queue.push(id));
+                (node.linkedUpskillIds || []).forEach(id => queue.push(id));
+            }
+        }
+        return childrenIds;
+    };
+
+    const curiosityChildren = getDescendantIds(currentItem.id, upskillDefinitions);
+    
+    const intentions = deepWorkDefinitions.filter(def => {
+        const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
+        const isChild = linkedDeepWorkChildIds.has(def.id);
+        return isParent && !isChild;
+    });
+
+    const foundLinks = intentions.filter(intention => {
+        const intentionChildren = getDescendantIds(intention.id, deepWorkDefinitions);
+        // Check for intersection
+        for (const childId of curiosityChildren) {
+            if (intentionChildren.has(childId)) {
+                return true;
+            }
+        }
+        return false;
+    });
+
+    setLinkedIntentions(foundLinks);
+    setIsLinksModalOpen(true);
+  };
+
   const renderDeepWorkNode = (item: ExerciseDefinition): JSX.Element => {
     const childDeepWorkItems = (item.linkedDeepWorkIds || [])
         .map(id => deepWorkDefinitions.find(d => d.id === id))
@@ -293,60 +345,96 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   
   if (!currentItem) return null;
 
+  const isUpskillCuriosity = upskillDefinitions.some(d => d.id === currentItem!.id) && (currentItem!.linkedUpskillIds?.length ?? 0) > 0;
+
   return (
-    <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
-       <Card ref={cardRef} className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[70vh]">
-        <CardHeader className="p-2 flex-shrink-0 border-b flex flex-row items-center">
-          <div className="cursor-grab p-1 mr-1" {...listeners}>
-            <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
-          </div>
-          {navigationStack.length > 1 && (
-            <Button variant="ghost" size="icon" onClick={handleGoBack} className="mr-1 h-7 w-7">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          )}
-          <div className="flex-grow min-w-0">
-              <CardTitle className="truncate text-base" title={currentItem.name}>Details for: {currentItem.name}</CardTitle>
-          </div>
-          <Button variant="ghost" size="icon" onClick={() => onClose(popupState.resourceId)} className="h-7 w-7">
-            <X className="h-4 w-4" />
-          </Button>
-        </CardHeader>
-        <CardContent className="p-0">
-            <ScrollArea className="max-h-[calc(70vh-4rem)] p-3">
-                <div className="space-y-4">
-                    {linkedItems.deepWork.length > 0 && (
-                        <div>
-                            <h3 className="font-semibold mb-1 flex items-center gap-2 text-sm"><Briefcase className="h-4 w-4 text-green-500" />Linked Deep Work</h3>
-                            <div className="space-y-1">
-                                {linkedItems.deepWork.map(item => renderDeepWorkNode(item))}
+    <>
+        <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
+           <Card ref={cardRef} className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[70vh]">
+            <CardHeader className="p-2 flex-shrink-0 border-b flex flex-row items-center">
+              <div className="cursor-grab p-1 mr-1" {...listeners}>
+                <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
+              </div>
+              {navigationStack.length > 1 && (
+                <Button variant="ghost" size="icon" onClick={handleGoBack} className="mr-1 h-7 w-7">
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              )}
+              <div className="flex-grow min-w-0">
+                  <CardTitle className="truncate text-base" title={currentItem.name}>Details for: {currentItem.name}</CardTitle>
+              </div>
+               {isUpskillCuriosity && (
+                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleViewLinkedIntentions}>
+                    <LinkIcon className="h-4 w-4 text-primary" />
+                 </Button>
+               )}
+              <Button variant="ghost" size="icon" onClick={() => onClose(popupState.resourceId)} className="h-7 w-7">
+                <X className="h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+                <ScrollArea className="max-h-[calc(70vh-4rem)] p-3">
+                    <div className="space-y-4">
+                        {linkedItems.deepWork.length > 0 && (
+                            <div>
+                                <h3 className="font-semibold mb-1 flex items-center gap-2 text-sm"><Briefcase className="h-4 w-4 text-green-500" />Linked Deep Work</h3>
+                                <div className="space-y-1">
+                                    {linkedItems.deepWork.map(item => renderDeepWorkNode(item))}
+                                </div>
                             </div>
-                        </div>
-                    )}
-                     {linkedItems.upskill.length > 0 && (
-                        <div>
-                            <h3 className="font-semibold mb-1 flex items-center gap-2 text-sm"><BookCopy className="h-4 w-4 text-amber-500" />Linked Learning</h3>
-                            <div className="space-y-1">
-                                {linkedItems.upskill.map(item => renderUpskillNode(item))}
+                        )}
+                         {linkedItems.upskill.length > 0 && (
+                            <div>
+                                <h3 className="font-semibold mb-1 flex items-center gap-2 text-sm"><BookCopy className="h-4 w-4 text-amber-500" />Linked Learning</h3>
+                                <div className="space-y-1">
+                                    {linkedItems.upskill.map(item => renderUpskillNode(item))}
+                                </div>
                             </div>
-                        </div>
-                    )}
-                    {linkedItems.resource.length > 0 && (
-                        <div>
-                             <h3 className="font-semibold mb-1 flex items-center gap-2 text-sm"><Library className="h-4 w-4 text-blue-500" />Linked Resources</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {linkedItems.resource.map(item => <ResourceItem key={item.id} item={item} onOpenNestedPopup={(resourceId, event) => {
-                                    if (cardRef.current) {
-                                        handleOpenNestedPopup(resourceId, event, popupState, cardRef.current.getBoundingClientRect());
-                                    }
-                                }} />)}
+                        )}
+                        {linkedItems.resource.length > 0 && (
+                            <div>
+                                 <h3 className="font-semibold mb-1 flex items-center gap-2 text-sm"><Library className="h-4 w-4 text-blue-500" />Linked Resources</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    {linkedItems.resource.map(item => <ResourceItem key={item.id} item={item} onOpenNestedPopup={(resourceId, event) => {
+                                        if (cardRef.current) {
+                                            handleOpenNestedPopup(resourceId, event, popupState, cardRef.current.getBoundingClientRect());
+                                        }
+                                    }} />)}
+                                </div>
                             </div>
-                        </div>
-                    )}
-                </div>
+                        )}
+                    </div>
+                </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Dialog open={isLinksModalOpen} onOpenChange={setIsLinksModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Linked Intentions for "{currentItem.name}"</DialogTitle>
+              <DialogDescription>
+                These are the Deep Work intentions that are supported by the learning tasks within this curiosity.
+              </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-96 my-4 pr-4">
+              {linkedIntentions.length > 0 ? (
+                <ul className="space-y-2">
+                  {linkedIntentions.map(intention => (
+                    <li key={intention.id} className="p-3 border rounded-md">
+                      <p className="font-medium text-foreground">{intention.name}</p>
+                      <p className="text-sm text-muted-foreground">{intention.category}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No intentions are currently linked to this curiosity.
+                </p>
+              )}
             </ScrollArea>
-        </CardContent>
-      </Card>
-    </div>
+          </DialogContent>
+        </Dialog>
+    </>
   );
 }
