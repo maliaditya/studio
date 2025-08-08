@@ -542,7 +542,6 @@ function SkillPageContent() {
                               </CardHeader>
                               <CardContent className="space-y-2 p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                                   {Array.from(data.microSkills.entries()).map(([microSkillName, tasks]) => {
-                                      const parentCoreSkill = coreSkills.find(cs => cs.name === coreSkillName);
                                       const curiosities = tasks.filter(t => upskillDefinitions.some(d => d.id === t.id));
                                       const intentions = tasks.filter(t => deepWorkDefinitions.some(d => d.id === t.id));
                                       return (
@@ -550,7 +549,7 @@ function SkillPageContent() {
                                             <CardHeader className="p-3">
                                               <div className="flex justify-between items-start gap-2">
                                                 <CardTitle className="text-sm flex-grow">{microSkillName}</CardTitle>
-                                                {parentCoreSkill && <Badge variant="outline">{parentCoreSkill.name}</Badge>}
+                                                <Badge variant="outline">{coreSkillName}</Badge>
                                               </div>
                                             </CardHeader>
                                             <CardContent className="p-3 pt-0 grid grid-cols-2 gap-4">
@@ -629,13 +628,12 @@ function SkillPageContent() {
                                         {area.microSkills.map(micro => {
                                             const relatedIntentions = microSkillIntentions.get(micro.name) || [];
                                             const relatedCuriosities = microSkillCuriosities.get(micro.name) || [];
-                                            const parentCoreSkill = coreSkills.find(cs => cs.skillAreas.some(sa => sa.id === area.id));
                                             return (
                                               <Card key={micro.id} className="flex flex-col group/item">
                                                   <CardHeader className="p-3">
                                                       <div className="flex justify-between items-start gap-2">
                                                         <CardTitle className="text-base flex-grow">{micro.name}</CardTitle>
-                                                        {parentCoreSkill && <Badge variant="outline">{parentCoreSkill.name}</Badge>}
+                                                        {selectedCoreSkill && <Badge variant="outline">{selectedCoreSkill.name}</Badge>}
                                                       </div>
                                                   </CardHeader>
                                                   <CardContent className="p-3 pt-0 grid grid-cols-2 gap-4 flex-grow">
@@ -864,6 +862,7 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
+
 
 
 
