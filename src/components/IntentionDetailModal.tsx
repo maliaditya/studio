@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
@@ -129,8 +130,8 @@ const DeepWorkItem = ({ item, onDrillDown, getIcon, children }: { item: Exercise
     );
 }
 
-const LinkedIntentionsPopup = ({ popupState, onClose }: {
-    popupState: { x: number; y: number; intentions: { intention: ExerciseDefinition; linkedVia: string }[] };
+const LinkedIntentionsPopupCard = ({ popupState, onClose }: {
+    popupState: { x: number; y: number; intentions: { intention: ExerciseDefinition; links: { source: string; target: string; }[] }[] };
     onClose: () => void;
 }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: 'linked-intentions-popup' });
@@ -147,7 +148,7 @@ const LinkedIntentionsPopup = ({ popupState, onClose }: {
 
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
-            <Card className="w-80 shadow-2xl border-2 border-primary/30 bg-card">
+            <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
                 <CardHeader className="p-3 relative cursor-grab" {...listeners}>
                     <div className="flex justify-between items-center">
                         <CardTitle className="text-base">Linked Intentions</CardTitle>
@@ -159,13 +160,19 @@ const LinkedIntentionsPopup = ({ popupState, onClose }: {
                 <CardContent className="p-3 pt-0">
                     <ScrollArea className="max-h-96 my-4 pr-4">
                         {popupState.intentions.length > 0 ? (
-                            <ul className="space-y-2">
-                            {popupState.intentions.map(({ intention, linkedVia }) => (
+                            <ul className="space-y-4">
+                            {popupState.intentions.map(({ intention, links }) => (
                                 <li key={intention.id} className="p-3 border rounded-md">
                                 <p className="font-medium text-foreground">{intention.name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                    Linked via: <span className="font-medium">{linkedVia}</span>
-                                </p>
+                                <ul className="mt-2 space-y-1 text-xs">
+                                    {links.map((link, index) => (
+                                        <li key={index} className="flex items-center gap-2 text-muted-foreground">
+                                           <span>- {link.source}</span>
+                                           <ArrowRight className="h-3 w-3" />
+                                           <span>{link.target}</span>
+                                        </li>
+                                    ))}
+                                </ul>
                                 </li>
                             ))}
                             </ul>
@@ -194,7 +201,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `intention-popup-${popupState.resourceId}` });
   const cardRef = useRef<HTMLDivElement>(null);
 
-  const [linkedIntentionsPopup, setLinkedIntentionsPopup] = useState<{ x: number; y: number; intentions: { intention: ExerciseDefinition; linkedVia: string }[] } | null>(null);
+  const [linkedIntentionsPopup, setLinkedIntentionsPopup] = useState<{ x: number; y: number; intentions: { intention: ExerciseDefinition; links: { source: string; target: string; }[] }[] } | null>(null);
 
   const style: React.CSSProperties = {
       position: 'fixed',
@@ -288,62 +295,69 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   
  const handleViewLinkedIntentions = () => {
     if (!currentItem || !cardRef.current) return;
+    
+    const allUpskillDefs = new Map(upskillDefinitions.map(d => [d.id, d]));
+    const allDeepWorkDefs = new Map(deepWorkDefinitions.map(d => [d.id, d]));
 
-    const getDescendantIds = (startNodeId: string, defs: ExerciseDefinition[], linkKey: 'linkedDeepWorkIds' | 'linkedUpskillIds'): Set<string> => {
+    const getDescendants = (startNodeId: string, defsMap: Map<string, ExerciseDefinition>, linkKey: 'linkedDeepWorkIds' | 'linkedUpskillIds'): Map<string, ExerciseDefinition> => {
         const visited = new Set<string>();
         const queue: string[] = [startNodeId];
-        const allDescendants = new Set<string>([startNodeId]);
+        const descendantsMap = new Map<string, ExerciseDefinition>();
+        const startNode = defsMap.get(startNodeId);
+        if (startNode) descendantsMap.set(startNodeId, startNode);
 
         while (queue.length > 0) {
             const currentId = queue.shift()!;
             if (visited.has(currentId)) continue;
             visited.add(currentId);
-
-            const node = defs.find(d => d.id === currentId);
+            const node = defsMap.get(currentId);
             if (node) {
                 const childIds = (node[linkKey] || []);
                 childIds.forEach(childId => {
                     if (!visited.has(childId)) {
-                        allDescendants.add(childId);
-                        queue.push(childId);
+                        const childNode = defsMap.get(childId);
+                        if (childNode) {
+                            descendantsMap.set(childId, childNode);
+                            queue.push(childId);
+                        }
                     }
                 });
             }
         }
-        return allDescendants;
+        return descendantsMap;
     };
     
-    const curiosityTreeIds = getDescendantIds(currentItem.id, upskillDefinitions, 'linkedUpskillIds');
+    const curiosityTree = getDescendants(currentItem.id, allUpskillDefs, 'linkedUpskillIds');
     const intentions = deepWorkDefinitions.filter(def => getDeepWorkNodeType(def) === 'Intention');
     
-    const foundLinks: { intention: ExerciseDefinition, linkedVia: string }[] = [];
-    const addedIntentions = new Set<string>();
+    const foundLinksByIntention = new Map<string, { intention: ExerciseDefinition; links: { source: string; target: string }[] }>();
 
     intentions.forEach(intention => {
-        const intentionTreeIds = getDescendantIds(intention.id, deepWorkDefinitions, 'linkedDeepWorkIds');
+        const intentionTree = getDescendants(intention.id, allDeepWorkDefs, 'linkedDeepWorkIds');
         
-        for (const intentionNodeId of intentionTreeIds) {
-            const intentionNode = deepWorkDefinitions.find(d => d.id === intentionNodeId);
-            if (intentionNode?.linkedUpskillIds) {
-                for (const linkedUpskillId of intentionNode.linkedUpskillIds) {
-                    if (curiosityTreeIds.has(linkedUpskillId)) {
-                        if (!addedIntentions.has(intention.id)) {
-                            foundLinks.push({ intention: intention, linkedVia: intentionNode.name });
-                            addedIntentions.add(intention.id);
-                        }
-                        break; 
+        intentionTree.forEach(intentionNode => {
+            (intentionNode.linkedUpskillIds || []).forEach(linkedUpskillId => {
+                if (curiosityTree.has(linkedUpskillId)) {
+                    if (!foundLinksByIntention.has(intention.id)) {
+                        foundLinksByIntention.set(intention.id, { intention, links: [] });
+                    }
+                    const upskillNode = curiosityTree.get(linkedUpskillId);
+                    if (upskillNode) {
+                        foundLinksByIntention.get(intention.id)!.links.push({
+                            source: intentionNode.name,
+                            target: upskillNode.name,
+                        });
                     }
                 }
-            }
-            if(addedIntentions.has(intention.id)) break;
-        }
+            });
+        });
     });
-    
+
     const rect = cardRef.current.getBoundingClientRect();
     setLinkedIntentionsPopup({
         x: rect.right + 20,
         y: rect.top,
-        intentions: foundLinks,
+        intentions: Array.from(foundLinksByIntention.values()),
     });
 };
 
@@ -467,7 +481,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
         </div>
         
         {linkedIntentionsPopup && (
-            <LinkedIntentionsPopup
+            <LinkedIntentionsPopupCard
                 popupState={linkedIntentionsPopup}
                 onClose={() => setLinkedIntentionsPopup(null)}
             />
