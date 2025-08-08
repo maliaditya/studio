@@ -148,7 +148,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
       position: 'fixed',
       top: popupState.y,
       left: popupState.x,
-      width: '36rem',
+      width: '24rem',
       willChange: 'transform',
       zIndex: 80 + popupState.level,
   };
@@ -235,7 +235,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
 
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
-       <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col">
+       <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[70vh]">
         <CardHeader className="p-2 flex-shrink-0 border-b flex flex-row items-center">
           <div className="cursor-grab p-1 mr-1" {...listeners}>
             <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
@@ -253,7 +253,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
           </Button>
         </CardHeader>
         <CardContent className="p-0">
-            <ScrollArea className="max-h-[70vh] p-3">
+            <ScrollArea className="max-h-[calc(70vh-4rem)] p-3">
                 <div className="space-y-4">
                     {linkedItems.deepWork.length > 0 && (
                         <div>
