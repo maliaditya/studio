@@ -14,10 +14,11 @@ import { DefaultBackground } from '@/components/DefaultBackground';
 import { ClothBackground } from '@/components/ClothBackground';
 import { FloatingVideoPlayer } from '@/components/FloatingVideoPlayer';
 import { PistonsHead } from '@/components/PistonsHead';
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { DndContext } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { IntentionDetailPopup } from '@/components/IntentionDetailModal';
+import { createPortal } from 'react-dom';
 
 
 // export const metadata: Metadata = {
@@ -27,7 +28,31 @@ import { IntentionDetailPopup } from '@/components/IntentionDetailModal';
 // Metadata needs to be in a server component, moving to a new AppWrapper client component
 
 function AppWrapper({ children }: { children: React.ReactNode }) {
-  const { isPistonsHeadOpen, setIsPistonsHeadOpen, openPopups, ResourcePopup, handlePopupDragEnd, intentionPopups, closeIntentionPopup } = useAuth();
+  const { isPistonsHeadOpen, setIsPistonsHeadOpen, openPopups, ResourcePopup, handlePopupDragEnd, intentionPopups, closeIntentionPopup, closeAllResourcePopups } = useAuth();
+  const [isBrowser, setIsBrowser] = React.useState(false);
+
+  useEffect(() => {
+    setIsBrowser(true);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // If there are no popups, do nothing.
+      if (openPopups.size === 0) return;
+
+      const target = event.target as HTMLElement;
+
+      // Check if the click was inside any of the open popups.
+      if (!target.closest('[data-popup-id]')) {
+        closeAllResourcePopups();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [openPopups, closeAllResourcePopups]);
 
   return (
     <DndContext onDragEnd={handlePopupDragEnd}>
@@ -40,38 +65,45 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <Toaster />
       <BackgroundAudioPlayer />
       <FloatingVideoPlayer />
-      {ResourcePopup && Array.from(openPopups.values()).map(popupState => (
-        <ResourcePopup key={popupState.resourceId} popupState={popupState} />
-      ))}
-      {Array.from(intentionPopups.values()).map(popupState => (
-          <IntentionDetailPopup key={popupState.resourceId} popupState={popupState} onClose={closeIntentionPopup} />
-      ))}
-      <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-[65]">
-        {Array.from(openPopups.values()).map(popup => {
-            if (!popup.parentId) return null;
-            const parentPopup = openPopups.get(popup.parentId);
-            if (!parentPopup) return null;
-            
-            const startX = parentPopup.x + (parentPopup.width || 0) / 2;
-            const startY = parentPopup.y + 20; // Start from a consistent vertical point
-            const endX = popup.x + (popup.width || 0) / 2;
-            const endY = popup.y + 20;
-            
-            // Simple straight line for now, can be curved later
-            const d = `M ${startX},${startY} L ${endX},${endY}`;
+      {isBrowser &&
+        createPortal(
+          <>
+            {ResourcePopup && Array.from(openPopups.values()).map(popupState => (
+              <ResourcePopup key={popupState.resourceId} popupState={popupState} />
+            ))}
+            {Array.from(intentionPopups.values()).map(popupState => (
+                <IntentionDetailPopup key={popupState.resourceId} popupState={popupState} onClose={closeIntentionPopup} />
+            ))}
+            <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-[65]">
+              {Array.from(openPopups.values()).map(popup => {
+                  if (!popup.parentId) return null;
+                  const parentPopup = openPopups.get(popup.parentId);
+                  if (!parentPopup) return null;
+                  
+                  const startX = parentPopup.x + (parentPopup.width || 0) / 2;
+                  const startY = parentPopup.y + 20; // Start from a consistent vertical point
+                  const endX = popup.x + (popup.width || 0) / 2;
+                  const endY = popup.y + 20;
+                  
+                  // Simple straight line for now, can be curved later
+                  const d = `M ${startX},${startY} L ${endX},${endY}`;
 
-            return (
-              <path 
-                key={`${popup.parentId}-${popup.resourceId}`}
-                d={d}
-                stroke="hsl(var(--primary))" 
-                strokeWidth="1"
-                strokeOpacity="0.3"
-                fill="none"
-              />
-            )
-        })}
-      </svg>
+                  return (
+                    <path 
+                      key={`${popup.parentId}-${popup.resourceId}`}
+                      d={d}
+                      stroke="hsl(var(--primary))" 
+                      strokeWidth="1"
+                      strokeOpacity="0.3"
+                      fill="none"
+                    />
+                  )
+              })}
+            </svg>
+          </>,
+          document.getElementById('global-popup-root')!
+        )
+      }
     </DndContext>
   );
 }
@@ -97,6 +129,7 @@ export default function RootLayout({
           <AppWrapper>{children}</AppWrapper>
         </AuthProvider>
         <Analytics />
+        <div id="global-popup-root" style={{ position: 'fixed', top: 0, left: 0, zIndex: 60 }} />
       </body>
     </html>
   );

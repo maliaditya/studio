@@ -146,6 +146,7 @@ interface AuthContextType {
   handleClosePopup: (resourceId: string) => void;
   handlePopupDragEnd: (event: DragEndEvent) => void;
   ResourcePopup: React.FC<ResourcePopupProps>;
+  closeAllResourcePopups: () => void;
 
   // Intention Popups
   intentionPopups: Map<string, PopupState>;
@@ -308,7 +309,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (audioEl.src !== resourceToPlay.audioUrl) {
           audioEl.src = resourceToPlay.audioUrl;
         }
-        audioEl.volume = globalVolume;
+        audioEl.volume = globalVolume; // Use global volume
         audioEl.play().catch(e => console.error("Audio play failed:", e));
       }
     } else {
@@ -1419,41 +1420,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => {
     setOpenPopups(prev => {
-        const newPopups = new Map(prev);
-        const resource = resources.find(r => r.id === resourceId);
-        if (!resource) return newPopups;
-        
-        const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
-        const popupWidth = hasMarkdown ? 896 : 512;
-    
-        let x, y, level, parentId;
-    
-        if (parentPopupState && parentRect) {
-            level = parentPopupState.level + 1;
-            parentId = parentPopupState.resourceId;
-            const screenWidth = window.innerWidth;
-            if (parentRect.x + parentRect.width + popupWidth + 20 < screenWidth) {
-                // Open to the right
-                x = parentRect.x + parentRect.width + 20;
-            } else {
-                // Open to the left
-                x = parentRect.x - popupWidth - 20;
-            }
-            y = parentRect.y;
-        } else {
-            level = 0;
-            parentId = undefined;
-            x = event.clientX;
-            y = event.clientY;
-        }
-        
-        newPopups.set(resourceId, {
-            resourceId, level, x, y, parentId, width: popupWidth,
-            z: 80 + level
-        });
-        return newPopups;
+      const newPopups = new Map(prev);
+      const resource = resources.find(r => r.id === resourceId);
+      if (!resource) return newPopups;
+      
+      const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+      const popupWidth = hasMarkdown ? 896 : 512;
+  
+      let x, y, level, parentId;
+  
+      if (parentPopupState && parentRect) {
+          level = parentPopupState.level + 1;
+          parentId = parentPopupState.resourceId;
+          const screenWidth = window.innerWidth;
+          if (parentRect.x + parentRect.width + popupWidth + 20 < screenWidth) {
+              x = parentRect.x + parentRect.width + 20;
+          } else {
+              x = parentRect.x - popupWidth - 20;
+          }
+          y = parentRect.y;
+      } else {
+          level = 0;
+          parentId = undefined;
+          x = event.clientX;
+          y = event.clientY;
+      }
+      
+      newPopups.set(resourceId, { resourceId, level, x, y, parentId, width: popupWidth, z: 80 + level });
+      return newPopups;
     });
   };
+
+  const closeAllResourcePopups = useCallback(() => {
+    setOpenPopups(new Map());
+  }, []);
 
   const handleClosePopup = (resourceId: string) => {
     setOpenPopups(prev => {
@@ -1570,12 +1570,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const openIntentionPopup = (intentionId: string) => {
     setIntentionPopups(prev => {
         const newPopups = new Map(prev);
-        const yOffset = newPopups.size * 30;
-        const xOffset = newPopups.size * 30;
+        const popupsPerRow = 3;
+        const xOffset = (newPopups.size % popupsPerRow) * 400 + 100; // 400 = width + margin
+        const yOffset = Math.floor(newPopups.size / popupsPerRow) * 400 + 100;
+
         newPopups.set(intentionId, { 
             resourceId: intentionId, 
-            x: 100 + xOffset, 
-            y: 100 + yOffset, 
+            x: xOffset, 
+            y: yOffset, 
             level: 0,
             z: 70 + newPopups.size
         });
@@ -1601,6 +1603,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         left: popupState.x,
         width: `${popupState.width || 512}px`,
         willChange: 'transform',
+        zIndex: 80 + popupState.level,
     };
     if (transform) {
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
@@ -1609,7 +1612,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!resource) return null;
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes}>
+        <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
              <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative group">
                 <div 
                     className="absolute top-2 left-2 z-20 p-1 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
@@ -1681,6 +1684,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     openPopups, handleOpenNestedPopup, handleClosePopup,
     handlePopupDragEnd,
     ResourcePopup,
+    closeAllResourcePopups,
     intentionPopups, openIntentionPopup, closeIntentionPopup,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
