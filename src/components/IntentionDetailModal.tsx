@@ -108,12 +108,10 @@ const UpskillItem = ({ item, onDrillDown, getIcon, children }: { item: ExerciseD
 }
 
 const DeepWorkItem = ({ item, onDrillDown, getIcon, children }: { item: ExerciseDefinition, onDrillDown: (item: ExerciseDefinition) => void, getIcon: (item: ExerciseDefinition) => React.ReactNode, children: React.ReactNode }) => {
-    const isParent = (item.linkedDeepWorkIds?.length ?? 0) > 0 || (item.linkedUpskillIds?.length ?? 0) > 0 || (item.linkedResourceIds?.length ?? 0) > 0;
-
     return (
         <Accordion type="single" collapsible className="w-full">
             <AccordionItem value={item.id} className="border-none">
-                 <AccordionTrigger className="hover:no-underline p-2 rounded-md hover:bg-muted/50" onClick={(e) => e.stopPropagation()}>
+                 <AccordionTrigger className="hover:no-underline p-2 rounded-md hover:bg-muted/50">
                     <div className="flex items-center gap-2">
                        {getIcon(item)}
                        <span className="font-semibold">{item.name}</span>
@@ -236,8 +234,8 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   const handleViewLinkedIntentions = () => {
     if (!currentItem) return;
 
-    // 1. Get all descendant IDs of the current curiosity.
-    const getDescendantIds = (startNodeId: string, defs: ExerciseDefinition[]): Set<string> => {
+    // Helper function to get all descendant IDs for a given node and definition set
+    const getDescendantIds = (startNodeId: string, defs: ExerciseDefinition[], linkKey: 'linkedDeepWorkIds' | 'linkedUpskillIds'): Set<string> => {
         const visited = new Set<string>();
         const queue: string[] = [startNodeId];
         const allDescendants = new Set<string>();
@@ -248,37 +246,39 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
             visited.add(currentId);
 
             const node = defs.find(d => d.id === currentId);
-            if (!node) continue;
-            
-            const childIds = [...(node.linkedDeepWorkIds || []), ...(node.linkedUpskillIds || [])];
-            childIds.forEach(childId => {
-                if (!visited.has(childId)) {
-                    allDescendants.add(childId);
-                    queue.push(childId);
-                }
-            });
+            if (node) {
+                const childIds = (node[linkKey] || []);
+                childIds.forEach(childId => {
+                    if (!visited.has(childId)) {
+                        allDescendants.add(childId);
+                        queue.push(childId);
+                    }
+                });
+            }
         }
         return allDescendants;
     };
-
-    const curiosityDescendantIds = getDescendantIds(currentItem.id, upskillDefinitions);
-
-    // 2. Find all top-level intentions.
-    const intentions = deepWorkDefinitions.filter(def => {
-        const nodeType = getDeepWorkNodeType(def);
-        return nodeType === 'Intention';
-    });
-
-    // 3. Find which intentions are linked.
+    
+    // 1. Get all nodes in the current Curiosity's tree.
+    const curiosityTreeIds = new Set([currentItem.id, ...getDescendantIds(currentItem.id, upskillDefinitions, 'linkedUpskillIds')]);
+    
+    // 2. Find all top-level Intentions.
+    const intentions = deepWorkDefinitions.filter(def => getDeepWorkNodeType(def) === 'Intention');
+    
+    // 3. For each Intention, check if its tree links to the Curiosity's tree.
     const foundLinks = intentions.filter(intention => {
-        // An intention is linked if any of its direct children (linkedUpskillIds)
-        // is one of the curiosity's descendants.
-        const intentionChildren = new Set(intention.linkedUpskillIds || []);
-        if (intentionChildren.size === 0) return false;
-
-        for (const childId of intentionChildren) {
-            if (curiosityDescendantIds.has(childId)) {
-                return true; // Found a link
+        // Get all nodes in this Intention's tree.
+        const intentionTreeIds = new Set([intention.id, ...getDescendantIds(intention.id, deepWorkDefinitions, 'linkedDeepWorkIds')]);
+        
+        // Check if any node in the intention's tree links to any node in the curiosity's tree.
+        for (const intentionNodeId of intentionTreeIds) {
+            const intentionNode = deepWorkDefinitions.find(d => d.id === intentionNodeId);
+            if (intentionNode?.linkedUpskillIds) {
+                for (const linkedUpskillId of intentionNode.linkedUpskillIds) {
+                    if (curiosityTreeIds.has(linkedUpskillId)) {
+                        return true; // Found a link
+                    }
+                }
             }
         }
         return false;
@@ -287,6 +287,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     setLinkedIntentions(foundLinks);
     setIsLinksModalOpen(true);
   };
+
 
   const renderDeepWorkNode = (item: ExerciseDefinition): JSX.Element => {
     const childDeepWorkItems = (item.linkedDeepWorkIds || [])
