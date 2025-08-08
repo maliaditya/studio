@@ -600,12 +600,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('lifeos_theme', theme);
   }, [theme]);
 
-  const [isScheduleLoaded, setIsScheduleLoaded] = useState(false);
-  useEffect(() => {
-    if (currentUser?.username) {
-        setIsScheduleLoaded(true);
-    }
-  }, [currentUser]);
+  const isScheduleLoaded = useMemo(() => Object.keys(schedule).length > 0 || !loading, [schedule, loading]);
 
   // Carry forward tasks logic
   useEffect(() => {
@@ -626,7 +621,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (lastCarryForwardDate === todayDateKey) return;
 
     const todaysActivities = schedule[todayDateKey];
-    const hasTodaysActivities = todaysActivities && Object.keys(todaysActivities).length > 0 && Object.values(todaysActivities).some(slot => slot.length > 0);
+    const hasTodaysActivities = todaysActivities && Object.keys(todaysActivities).length > 0 && Object.values(todaysActivities).some(slot => Array.isArray(slot) && slot.length > 0);
     if (hasTodaysActivities) {
         localStorage.setItem(lastCarryForwardKey, todayDateKey);
         return;
@@ -1420,34 +1415,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => {
     setOpenPopups(prev => {
-      const newPopups = new Map(prev);
-      const resource = resources.find(r => r.id === resourceId);
-      if (!resource) return newPopups;
-      
-      const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
-      const popupWidth = hasMarkdown ? 896 : 512;
-  
-      let x, y, level, parentId;
-  
-      if (parentPopupState && parentRect) {
-          level = parentPopupState.level + 1;
-          parentId = parentPopupState.resourceId;
-          const screenWidth = window.innerWidth;
-          if (parentRect.x + parentRect.width + popupWidth + 20 < screenWidth) {
-              x = parentRect.x + parentRect.width + 20;
-          } else {
-              x = parentRect.x - popupWidth - 20;
-          }
-          y = parentRect.y;
-      } else {
-          level = 0;
-          parentId = undefined;
-          x = event.clientX;
-          y = event.clientY;
-      }
-      
-      newPopups.set(resourceId, { resourceId, level, x, y, parentId, width: popupWidth, z: 80 + level });
-      return newPopups;
+        const newPopups = new Map(prev);
+        const resource = resources.find(r => r.id === resourceId);
+        if (!resource) return newPopups;
+        
+        const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+        const popupWidth = hasMarkdown ? 896 : 512;
+    
+        let x, y, level, parentId;
+    
+        if (parentPopupState && parentRect) {
+            level = parentPopupState.level + 1;
+            parentId = parentPopupState.resourceId;
+            const screenWidth = window.innerWidth;
+            if (parentRect.x + parentRect.width + popupWidth + 20 < screenWidth) {
+                x = parentRect.x + parentRect.width + 20;
+            } else {
+                x = parentRect.x - popupWidth - 20;
+            }
+            y = parentRect.y;
+        } else {
+            level = 0;
+            parentId = undefined;
+            x = event.clientX;
+            y = event.clientY;
+        }
+        
+        newPopups.set(resourceId, {
+            resourceId, level, x, y, parentId, width: popupWidth, z: 80 + level
+        });
+        return newPopups;
     });
   };
 
