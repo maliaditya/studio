@@ -386,3 +386,9 @@ export interface Position {
     title: string;
     projects: WorkProject[];
 }
+
+// Purpose Page Types
+export interface PurposeData {
+  statement: string;
+  specializationPurposes: Record<string, string>; // Key is CoreSkill ID
+}

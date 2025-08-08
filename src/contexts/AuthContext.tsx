@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -198,6 +198,12 @@ interface AuthContextType {
   setCompanies: React.Dispatch<React.SetStateAction<Company[]>>;
   positions: Position[];
   setPositions: React.Dispatch<React.SetStateAction<Position[]>>;
+  
+  // Purpose Page
+  purposeStatement: string;
+  setPurposeStatement: React.Dispatch<React.SetStateAction<string>>;
+  specializationPurposes: Record<string, string>;
+  setSpecializationPurposes: React.Dispatch<React.SetStateAction<Record<string, string>>>;
 
   // New global map
   microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>;
@@ -337,6 +343,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
 
+  // Purpose State
+  const [purposeStatement, setPurposeStatement] = useState('');
+  const [specializationPurposes, setSpecializationPurposes] = useState<Record<string, string>>({});
+
+
   // Persisted task state
   const [selectedUpskillTask, setSelectedUpskillTask] = useState<ExerciseDefinition | null>(null);
   const [selectedDeepWorkTask, setSelectedDeepWorkTask] = useState<ExerciseDefinition | null>(null);
@@ -457,6 +468,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`companies_${username}`); setCompanies(d ? JSON.parse(d) : []); } catch (e) { setCompanies([]); }
       try { const d = loadItem(`positions_${username}`); setPositions(d ? JSON.parse(d) : []); } catch (e) { setPositions([]); }
       
+      // Purpose Data
+      const storedPurpose = loadItem(`purpose_data_${username}`);
+      if (storedPurpose) {
+          const purposeData: PurposeData = JSON.parse(storedPurpose);
+          setPurposeStatement(purposeData.statement);
+          setSpecializationPurposes(purposeData.specializationPurposes);
+      } else {
+          setPurposeStatement('');
+          setSpecializationPurposes({});
+      }
+
       // Persisted task state
       try {
         const upskillTask = loadItem(`selected_upskill_task_${username}`);
@@ -493,6 +515,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setPistons({});
       setSkillDomains([]); setCoreSkills([]); setProjects([]);
       setCompanies([]); setPositions([]);
+      setPurposeStatement(''); setSpecializationPurposes({});
       setSelectedUpskillTask(null);
       setSelectedDeepWorkTask(null);
       setExpandedItems([]); setSelectedDomainId(null); setSelectedSkillId(null); setSelectedProjectId(null); setSelectedCompanyId(null);
@@ -557,6 +580,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Professional Experience
       localStorage.setItem(`companies_${username}`, JSON.stringify(companies));
       localStorage.setItem(`positions_${username}`, JSON.stringify(positions));
+
+      // Purpose
+      localStorage.setItem(`purpose_data_${username}`, JSON.stringify({ statement: purposeStatement, specializationPurposes }));
       
       // Persisted task state
       if (selectedUpskillTask) localStorage.setItem(`selected_upskill_task_${username}`, JSON.stringify(selectedUpskillTask)); else localStorage.removeItem(`selected_upskill_task_${username}`);
@@ -580,6 +606,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pistons,
     skillDomains, coreSkills, projects,
     companies, positions,
+    purposeStatement, specializationPurposes,
     currentUser, loading, selectedUpskillTask, selectedDeepWorkTask,
     expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId
   ]);
@@ -802,6 +829,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       pistons,
       skillDomains, coreSkills, projects,
       companies, positions,
+      purposeData: { statement: purposeStatement, specializationPurposes },
       // Sidebar persistence
       expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
       selectedUpskillTask, selectedDeepWorkTask
@@ -1701,6 +1729,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     handleDeleteMicroSkill,
     companies, setCompanies,
     positions, setPositions,
+    purposeStatement, setPurposeStatement,
+    specializationPurposes, setSpecializationPurposes,
     selectedUpskillTask, setSelectedUpskillTask,
     selectedDeepWorkTask, setSelectedDeepWorkTask,
     microSkillMap,
