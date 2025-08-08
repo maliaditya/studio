@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from './ui/scroll-area';
 import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink, Briefcase, BookCopy, ArrowLeft, Frame, Code, MessageSquare, ArrowRight, GitMerge, GripVertical, X } from 'lucide-react';
-import type { ExerciseDefinition, Resource, PopupState } from '@/types/workout';
+import type { ExerciseDefinition, Resource, PopupState, ResourcePoint } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import Image from 'next/image';
@@ -119,7 +119,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
             </Button>
           )}
           <div className="flex-grow min-w-0">
-              <DialogTitle className="truncate" title={currentItem.name}>Details for: {currentItem.name}</DialogTitle>
+              <CardTitle className="truncate text-lg" title={currentItem.name}>Details for: {currentItem.name}</CardTitle>
           </div>
           <Button variant="ghost" size="icon" onClick={() => onClose(popupState.resourceId)} className="h-8 w-8">
             <X className="h-4 w-4" />
