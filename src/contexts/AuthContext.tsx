@@ -145,7 +145,7 @@ interface AuthContextType {
   handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => void;
   handleClosePopup: (resourceId: string) => void;
   handlePopupDragEnd: (event: DragEndEvent) => void;
-  ResourcePopup?: React.FC<ResourcePopupProps>;
+  ResourcePopup: React.FC<ResourcePopupProps>;
 
 
   // Workout Log Handlers
@@ -447,7 +447,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Professional Experience Data
       try { const d = loadItem(`companies_${username}`); setCompanies(d ? JSON.parse(d) : []); } catch (e) { setCompanies([]); }
       try { const d = loadItem(`positions_${username}`); setPositions(d ? JSON.parse(d) : []); } catch (e) { setPositions([]); }
-
+      
       // Persisted task state
       try {
         const upskillTask = loadItem(`selected_upskill_task_${username}`);
@@ -1549,7 +1549,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const ResourcePopup: React.FC<ResourcePopupProps> = useCallback(({ popupState }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `popup-${popupState.resourceId}` });
-    
+    const resource = resources.find(r => r.id === popupState.resourceId);
+
     const style: React.CSSProperties = {
         position: 'fixed',
         top: popupState.y,
@@ -1561,18 +1562,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
 
-    const resource = resources.find(r => r.id === popupState.resourceId);
     if (!resource) return null;
-
-    const handleUpdateResourceInPopup = (updatedResource: Resource) => {
-        setResources(prev => prev.map(res => res.id === updatedResource.id ? updatedResource : res));
-    };
-    
-    const handleAddPoint = (type: ResourcePoint['type']) => {
-        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: 'New step...', type };
-        const updatedPoints = [...(resource.points || []), newPoint];
-        handleUpdateResourceInPopup({ ...resource, points: updatedPoints });
-    };
 
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
@@ -1607,27 +1597,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         </ul>
                     </CardContent>
                 </div>
-                <CardFooter className="p-2">
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="w-full">
-                                <PlusCircle className="mr-2 h-4 w-4" /> Add Step
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-48 p-1">
-                           <div className="space-y-1">
-                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('text')}><MessageSquare className="mr-2 h-4 w-4" />Text</Button>
-                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('markdown')}><MessageSquare className="mr-2 h-4 w-4" />Markdown</Button>
-                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('code')}><Code className="mr-2 h-4 w-4" />Code</Button>
-                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('link')}><LinkIcon className="mr-2 h-4 w-4" />Link</Button>
-                           </div>
-                        </PopoverContent>
-                    </Popover>
-                 </CardFooter>
             </Card>
         </div>
     );
-  }, [resources, setResources, handleClosePopup, handleOpenNestedPopup]);
+  }, [resources, handleClosePopup, handleOpenNestedPopup]);
 
 
   const value: AuthContextType = {
