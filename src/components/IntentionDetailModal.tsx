@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
@@ -109,30 +110,21 @@ const UpskillItem = ({ item, onDrillDown, getIcon, children }: { item: ExerciseD
 const DeepWorkItem = ({ item, onDrillDown, getIcon, children }: { item: ExerciseDefinition, onDrillDown: (item: ExerciseDefinition) => void, getIcon: (item: ExerciseDefinition) => React.ReactNode, children: React.ReactNode }) => {
     const isParent = (item.linkedDeepWorkIds?.length ?? 0) > 0 || (item.linkedUpskillIds?.length ?? 0) > 0 || (item.linkedResourceIds?.length ?? 0) > 0;
 
-    if (isParent) {
-        return (
-             <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value={item.id} className="border-none">
-                     <AccordionTrigger className="hover:no-underline p-2 rounded-md hover:bg-muted/50" onClick={(e) => { e.stopPropagation(); }}>
-                        <div className="flex items-center gap-2">
-                           {getIcon(item)}
-                           <span className="font-semibold">{item.name}</span>
-                       </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pl-6 border-l ml-2">
-                       {children}
-                    </AccordionContent>
-                </AccordionItem>
-            </Accordion>
-        );
-    }
-
     return (
-        <div className="flex items-center gap-2 p-2 rounded-md">
-            {getIcon(item)}
-            <span>{item.name}</span>
-        </div>
-    )
+        <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value={item.id} className="border-none">
+                 <AccordionTrigger className="hover:no-underline p-2 rounded-md hover:bg-muted/50" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-2">
+                       {getIcon(item)}
+                       <span className="font-semibold">{item.name}</span>
+                   </div>
+                </AccordionTrigger>
+                <AccordionContent className="pl-6 border-l ml-2">
+                   {children}
+                </AccordionContent>
+            </AccordionItem>
+        </Accordion>
+    );
 }
 
 export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPopupProps) {
@@ -243,13 +235,14 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   
   const handleViewLinkedIntentions = () => {
     if (!currentItem) return;
-    
+
+    // 1. Get all descendant IDs of the current curiosity.
     const getDescendantIds = (startNodeId: string, defs: ExerciseDefinition[]): Set<string> => {
         const visited = new Set<string>();
         const queue: string[] = [startNodeId];
-        const childrenIds = new Set<string>();
-        
-        while(queue.length > 0) {
+        const allDescendants = new Set<string>();
+
+        while (queue.length > 0) {
             const currentId = queue.shift()!;
             if (visited.has(currentId)) continue;
             visited.add(currentId);
@@ -257,31 +250,35 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
             const node = defs.find(d => d.id === currentId);
             if (!node) continue;
             
-            const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0 || (node.linkedUpskillIds?.length ?? 0) > 0;
-            if (!isParent) {
-                childrenIds.add(node.id);
-            } else {
-                (node.linkedDeepWorkIds || []).forEach(id => queue.push(id));
-                (node.linkedUpskillIds || []).forEach(id => queue.push(id));
-            }
+            const childIds = [...(node.linkedDeepWorkIds || []), ...(node.linkedUpskillIds || [])];
+            childIds.forEach(childId => {
+                if (!visited.has(childId)) {
+                    allDescendants.add(childId);
+                    queue.push(childId);
+                }
+            });
         }
-        return childrenIds;
+        return allDescendants;
     };
 
-    const curiosityChildren = getDescendantIds(currentItem.id, upskillDefinitions);
-    
+    const curiosityDescendantIds = getDescendantIds(currentItem.id, upskillDefinitions);
+
+    // 2. Find all top-level intentions.
     const intentions = deepWorkDefinitions.filter(def => {
-        const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
-        const isChild = linkedDeepWorkChildIds.has(def.id);
-        return isParent && !isChild;
+        const nodeType = getDeepWorkNodeType(def);
+        return nodeType === 'Intention';
     });
 
+    // 3. Find which intentions are linked.
     const foundLinks = intentions.filter(intention => {
-        const intentionChildren = getDescendantIds(intention.id, deepWorkDefinitions);
-        // Check for intersection
-        for (const childId of curiosityChildren) {
-            if (intentionChildren.has(childId)) {
-                return true;
+        // An intention is linked if any of its direct children (linkedUpskillIds)
+        // is one of the curiosity's descendants.
+        const intentionChildren = new Set(intention.linkedUpskillIds || []);
+        if (intentionChildren.size === 0) return false;
+
+        for (const childId of intentionChildren) {
+            if (curiosityDescendantIds.has(childId)) {
+                return true; // Found a link
             }
         }
         return false;
@@ -345,7 +342,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   
   if (!currentItem) return null;
 
-  const isUpskillCuriosity = upskillDefinitions.some(d => d.id === currentItem!.id) && (currentItem!.linkedUpskillIds?.length ?? 0) > 0;
+  const isUpskillCuriosity = upskillDefinitions.some(d => d.id === currentItem!.id) && (currentItem!.linkedUpskillIds?.length ?? 0) > 0 && !linkedUpskillChildIds.has(currentItem!.id);
 
   return (
     <>
