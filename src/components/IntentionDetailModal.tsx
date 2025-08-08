@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
@@ -108,21 +109,32 @@ const UpskillItem = ({ item, onDrillDown, getIcon, children }: { item: ExerciseD
 }
 
 const DeepWorkItem = ({ item, onDrillDown, getIcon, children }: { item: ExerciseDefinition, onDrillDown: (item: ExerciseDefinition) => void, getIcon: (item: ExerciseDefinition) => React.ReactNode, children: React.ReactNode }) => {
-    return (
-        <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value={item.id} className="border-none">
-                 <AccordionTrigger className="hover:no-underline p-2 rounded-md hover:bg-muted/50">
-                    <div className="flex items-center gap-2">
-                       {getIcon(item)}
-                       <span className="font-semibold">{item.name}</span>
-                   </div>
-                </AccordionTrigger>
-                <AccordionContent className="pl-6 border-l ml-2">
-                   {children}
-                </AccordionContent>
-            </AccordionItem>
-        </Accordion>
-    );
+    const isParent = (item.linkedDeepWorkIds?.length ?? 0) > 0 || (item.linkedUpskillIds?.length ?? 0) > 0 || (item.linkedResourceIds?.length ?? 0) > 0;
+    
+    if (isParent) {
+        return (
+            <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value={item.id} className="border-none">
+                     <AccordionTrigger className="hover:no-underline p-2 rounded-md hover:bg-muted/50">
+                        <div className="flex items-center gap-2">
+                           {getIcon(item)}
+                           <span className="font-semibold">{item.name}</span>
+                       </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pl-6 border-l ml-2">
+                       {children}
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
+        );
+    }
+
+     return (
+        <div className="flex items-center gap-2 p-2 rounded-md">
+            {getIcon(item)}
+            <span>{item.name}</span>
+        </div>
+    )
 }
 
 export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPopupProps) {
@@ -138,7 +150,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   const cardRef = useRef<HTMLDivElement>(null);
 
   const [isLinksModalOpen, setIsLinksModalOpen] = useState(false);
-  const [linkedIntentions, setLinkedIntentions] = useState<ExerciseDefinition[]>([]);
+  const [linkedIntentions, setLinkedIntentions] = useState<{ intention: ExerciseDefinition; linkedVia: string }[]>([]);
 
   const style: React.CSSProperties = {
       position: 'fixed',
@@ -234,11 +246,11 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   const handleViewLinkedIntentions = () => {
     if (!currentItem) return;
 
-    // Helper function to get all descendant IDs for a given node and definition set
+    // Helper to get all descendant IDs for a given tree
     const getDescendantIds = (startNodeId: string, defs: ExerciseDefinition[], linkKey: 'linkedDeepWorkIds' | 'linkedUpskillIds'): Set<string> => {
         const visited = new Set<string>();
         const queue: string[] = [startNodeId];
-        const allDescendants = new Set<string>();
+        const allDescendants = new Set<string>([startNodeId]); // Include the start node itself
 
         while (queue.length > 0) {
             const currentId = queue.shift()!;
@@ -260,15 +272,18 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     };
     
     // 1. Get all nodes in the current Curiosity's tree.
-    const curiosityTreeIds = new Set([currentItem.id, ...getDescendantIds(currentItem.id, upskillDefinitions, 'linkedUpskillIds')]);
+    const curiosityTreeIds = getDescendantIds(currentItem.id, upskillDefinitions, 'linkedUpskillIds');
     
     // 2. Find all top-level Intentions.
     const intentions = deepWorkDefinitions.filter(def => getDeepWorkNodeType(def) === 'Intention');
     
-    // 3. For each Intention, check if its tree links to the Curiosity's tree.
-    const foundLinks = intentions.filter(intention => {
+    // 3. For each Intention, check if any of its tree links to the Curiosity's tree.
+    const foundLinks: { intention: ExerciseDefinition, linkedVia: string }[] = [];
+    const addedIntentions = new Set<string>();
+
+    intentions.forEach(intention => {
         // Get all nodes in this Intention's tree.
-        const intentionTreeIds = new Set([intention.id, ...getDescendantIds(intention.id, deepWorkDefinitions, 'linkedDeepWorkIds')]);
+        const intentionTreeIds = getDescendantIds(intention.id, deepWorkDefinitions, 'linkedDeepWorkIds');
         
         // Check if any node in the intention's tree links to any node in the curiosity's tree.
         for (const intentionNodeId of intentionTreeIds) {
@@ -276,12 +291,18 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
             if (intentionNode?.linkedUpskillIds) {
                 for (const linkedUpskillId of intentionNode.linkedUpskillIds) {
                     if (curiosityTreeIds.has(linkedUpskillId)) {
-                        return true; // Found a link
+                        if (!addedIntentions.has(intention.id)) {
+                            foundLinks.push({ intention: intention, linkedVia: intentionNode.name });
+                            addedIntentions.add(intention.id);
+                        }
+                        // If you want to show ALL links, not just the first one, you can remove the addedIntentions check
+                        // and push every time a link is found. For now, we'll just show the first connection found for each Intention.
+                        break; 
                     }
                 }
             }
+            if(addedIntentions.has(intention.id)) break;
         }
-        return false;
     });
 
     setLinkedIntentions(foundLinks);
@@ -418,10 +439,12 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
             <ScrollArea className="max-h-96 my-4 pr-4">
               {linkedIntentions.length > 0 ? (
                 <ul className="space-y-2">
-                  {linkedIntentions.map(intention => (
+                  {linkedIntentions.map(({ intention, linkedVia }) => (
                     <li key={intention.id} className="p-3 border rounded-md">
                       <p className="font-medium text-foreground">{intention.name}</p>
-                      <p className="text-sm text-muted-foreground">{intention.category}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Linked via: <span className="font-medium">{linkedVia}</span>
+                      </p>
                     </li>
                   ))}
                 </ul>
