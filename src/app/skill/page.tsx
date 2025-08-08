@@ -632,8 +632,8 @@ function SkillPageContent() {
                                               <Card key={micro.id} className="flex flex-col group/item">
                                                   <CardHeader className="p-3">
                                                       <div className="flex justify-between items-start gap-2">
-                                                        <CardTitle className="text-base flex-grow">{micro.name}</CardTitle>
-                                                        {selectedCoreSkill && <Badge variant="outline">{selectedCoreSkill.name}</Badge>}
+                                                          <CardTitle className="text-base flex-grow">{micro.name}</CardTitle>
+                                                          {selectedCoreSkill && <Badge variant="outline">{area.name}</Badge>}
                                                       </div>
                                                   </CardHeader>
                                                   <CardContent className="p-3 pt-0 grid grid-cols-2 gap-4 flex-grow">
@@ -862,10 +862,3 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
-
-
-
-
-
-
-
