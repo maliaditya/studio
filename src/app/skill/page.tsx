@@ -31,7 +31,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Separator } from '@/components/ui/separator';
 import { useRouter } from 'next/navigation';
 import { MindMapViewer } from '@/components/MindMapViewer';
-import { IntentionDetailModal } from '@/components/IntentionDetailModal';
+import { IntentionDetailPopup } from '@/components/IntentionDetailModal';
 import { SkillLibrary } from '@/components/SkillLibrary';
 import { Badge } from '@/components/ui/badge';
 
@@ -59,6 +59,7 @@ function SkillPageContent() {
     selectedSkillId, setSelectedSkillId,
     selectedProjectId, setSelectedProjectId,
     selectedCompanyId, setSelectedCompanyId,
+    intentionPopups, openIntentionPopup,
   } = useAuth();
   
   const router = useRouter();
@@ -90,9 +91,6 @@ function SkillPageContent() {
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
   const [newPositionTitle, setNewPositionTitle] = useState<Record<string, string>>({});
   const [editingWorkProject, setEditingWorkProject] = useState<{ positionId: string; project: Partial<WorkProject> } | null>(null);
-
-  // State for the modal
-  const [selectedIntention, setSelectedIntention] = useState<ExerciseDefinition | null>(null);
 
 
   const handleAddDomain = (e: React.FormEvent) => {
@@ -521,7 +519,7 @@ function SkillPageContent() {
                                             <CardContent className="p-3 pt-0">
                                                 <ul className="text-sm space-y-1">
                                                     {tasks.map(task => (
-                                                    <li key={task.id} className="flex items-center gap-2 hover:bg-muted/50 p-1 rounded-md cursor-pointer" onClick={() => setSelectedIntention(task)}>
+                                                    <li key={task.id} className="flex items-center gap-2 hover:bg-muted/50 p-1 rounded-md cursor-pointer" onClick={() => openIntentionPopup(task.id)}>
                                                         {upskillDefinitions.some(d => d.id === task.id) ? (
                                                             <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
                                                         ) : (
@@ -769,11 +767,13 @@ function SkillPageContent() {
             </div>
         </div>
        )}
-       <IntentionDetailModal
-          isOpen={!!selectedIntention}
-          onOpenChange={() => setSelectedIntention(null)}
-          intention={selectedIntention}
-       />
+        {Array.from(intentionPopups.values()).map(popupState => (
+            <IntentionDetailPopup
+                key={popupState.resourceId}
+                popupState={popupState}
+                onClose={() => {}}
+            />
+        ))}
     </div>
     </>
   );

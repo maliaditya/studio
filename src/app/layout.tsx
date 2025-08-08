@@ -17,6 +17,7 @@ import { PistonsHead } from '@/components/PistonsHead';
 import React from 'react';
 import { DndContext } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
+import { IntentionDetailPopup } from '@/components/IntentionDetailModal';
 
 
 // export const metadata: Metadata = {
@@ -26,7 +27,7 @@ import type { DragEndEvent } from '@dnd-kit/core';
 // Metadata needs to be in a server component, moving to a new AppWrapper client component
 
 function AppWrapper({ children }: { children: React.ReactNode }) {
-  const { isPistonsHeadOpen, setIsPistonsHeadOpen, openPopups, ResourcePopup, handlePopupDragEnd } = useAuth();
+  const { isPistonsHeadOpen, setIsPistonsHeadOpen, openPopups, ResourcePopup, handlePopupDragEnd, intentionPopups, closeIntentionPopup } = useAuth();
 
   return (
     <DndContext onDragEnd={handlePopupDragEnd}>
@@ -41,6 +42,9 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <FloatingVideoPlayer />
       {ResourcePopup && Array.from(openPopups.values()).map(popupState => (
         <ResourcePopup key={popupState.resourceId} popupState={popupState} />
+      ))}
+      {Array.from(intentionPopups.values()).map(popupState => (
+          <IntentionDetailPopup key={popupState.resourceId} popupState={popupState} onClose={closeIntentionPopup} />
       ))}
       <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-[65]">
         {Array.from(openPopups.values()).map(popup => {

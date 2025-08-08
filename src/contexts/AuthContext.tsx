@@ -147,6 +147,11 @@ interface AuthContextType {
   handlePopupDragEnd: (event: DragEndEvent) => void;
   ResourcePopup: React.FC<ResourcePopupProps>;
 
+  // Intention Popups
+  intentionPopups: Map<string, PopupState>;
+  openIntentionPopup: (intentionId: string) => void;
+  closeIntentionPopup: (intentionId: string) => void;
+
 
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
@@ -282,6 +287,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
+  // Intention Popups
+  const [intentionPopups, setIntentionPopups] = useState<Map<string, PopupState>>(new Map());
+
   // Sidebar State
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
@@ -1482,6 +1490,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               }
               return newPopups;
           });
+      } else if (activeId.startsWith('intention-popup-')) {
+        const intentionId = activeId.replace('intention-popup-', '');
+        setIntentionPopups(prev => {
+            const newPopups = new Map(prev);
+            const popup = newPopups.get(intentionId);
+            if (popup) {
+                newPopups.set(intentionId, { ...popup, x: popup.x + delta.x, y: popup.y + delta.y });
+            }
+            return newPopups;
+        });
       }
   };
 
@@ -1546,6 +1564,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const handleExpansionChange = useCallback((value: string[]) => {
     setExpandedItems(value);
   }, []);
+  
+  const openIntentionPopup = (intentionId: string) => {
+    setIntentionPopups(prev => {
+        const newPopups = new Map(prev);
+        const yOffset = newPopups.size * 30;
+        const xOffset = newPopups.size * 30;
+        newPopups.set(intentionId, { 
+            resourceId: intentionId, 
+            x: 100 + xOffset, 
+            y: 100 + yOffset, 
+            level: 0 
+        });
+        return newPopups;
+    });
+  };
+
+  const closeIntentionPopup = (intentionId: string) => {
+    setIntentionPopups(prev => {
+        const newPopups = new Map(prev);
+        newPopups.delete(intentionId);
+        return newPopups;
+    });
+  };
 
   const ResourcePopup: React.FC<ResourcePopupProps> = useCallback(({ popupState }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `popup-${popupState.resourceId}` });
@@ -1566,8 +1607,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
-             <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col">
-                <CardHeader className="p-3 relative cursor-grab" {...listeners}>
+             <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative group">
+                <div 
+                    className="absolute top-2 left-2 z-20 p-1 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
+                    {...listeners}
+                >
+                    <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
+                </div>
+                <CardHeader className="p-3 pt-8 relative flex-shrink-0 text-center">
                     <div className="flex justify-between items-center">
                         <CardTitle className="text-base flex items-center gap-2">
                            <Library className="h-4 w-4" /> <span className="truncate">{resource.name}</span>
@@ -1631,6 +1678,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     openPopups, handleOpenNestedPopup, handleClosePopup,
     handlePopupDragEnd,
     ResourcePopup,
+    intentionPopups, openIntentionPopup, closeIntentionPopup,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,
