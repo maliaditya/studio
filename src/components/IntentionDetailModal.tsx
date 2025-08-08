@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
@@ -14,7 +13,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink, Briefcase, BookCopy, ArrowLeft, Frame, Code, MessageSquare, ArrowRight, GitMerge, GripVertical, X, Flag, Bolt, Focus, Link as LinkIcon } from 'lucide-react';
 import type { ExerciseDefinition, Resource, PopupState as IntentionPopupState, ResourcePoint } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import Image from 'next/image';
 import { Button } from './ui/button';
 import ReactMarkdown from 'react-markdown';
@@ -243,14 +242,13 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     }
   };
   
-  const handleViewLinkedIntentions = () => {
+ const handleViewLinkedIntentions = () => {
     if (!currentItem) return;
 
-    // Helper to get all descendant IDs for a given tree
     const getDescendantIds = (startNodeId: string, defs: ExerciseDefinition[], linkKey: 'linkedDeepWorkIds' | 'linkedUpskillIds'): Set<string> => {
         const visited = new Set<string>();
         const queue: string[] = [startNodeId];
-        const allDescendants = new Set<string>([startNodeId]); // Include the start node itself
+        const allDescendants = new Set<string>([startNodeId]);
 
         while (queue.length > 0) {
             const currentId = queue.shift()!;
@@ -271,21 +269,15 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
         return allDescendants;
     };
     
-    // 1. Get all nodes in the current Curiosity's tree.
     const curiosityTreeIds = getDescendantIds(currentItem.id, upskillDefinitions, 'linkedUpskillIds');
-    
-    // 2. Find all top-level Intentions.
     const intentions = deepWorkDefinitions.filter(def => getDeepWorkNodeType(def) === 'Intention');
     
-    // 3. For each Intention, check if any of its tree links to the Curiosity's tree.
     const foundLinks: { intention: ExerciseDefinition, linkedVia: string }[] = [];
     const addedIntentions = new Set<string>();
 
     intentions.forEach(intention => {
-        // Get all nodes in this Intention's tree.
         const intentionTreeIds = getDescendantIds(intention.id, deepWorkDefinitions, 'linkedDeepWorkIds');
         
-        // Check if any node in the intention's tree links to any node in the curiosity's tree.
         for (const intentionNodeId of intentionTreeIds) {
             const intentionNode = deepWorkDefinitions.find(d => d.id === intentionNodeId);
             if (intentionNode?.linkedUpskillIds) {
@@ -295,8 +287,6 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                             foundLinks.push({ intention: intention, linkedVia: intentionNode.name });
                             addedIntentions.add(intention.id);
                         }
-                        // If you want to show ALL links, not just the first one, you can remove the addedIntentions check
-                        // and push every time a link is found. For now, we'll just show the first connection found for each Intention.
                         break; 
                     }
                 }
@@ -307,7 +297,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
 
     setLinkedIntentions(foundLinks);
     setIsLinksModalOpen(true);
-  };
+};
 
 
   const renderDeepWorkNode = (item: ExerciseDefinition): JSX.Element => {
@@ -432,9 +422,6 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Linked Intentions for "{currentItem.name}"</DialogTitle>
-              <DialogDescription>
-                These are the Deep Work intentions that are supported by the learning tasks within this curiosity.
-              </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-96 my-4 pr-4">
               {linkedIntentions.length > 0 ? (
