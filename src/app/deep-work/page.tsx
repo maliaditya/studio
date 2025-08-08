@@ -824,21 +824,18 @@ function DeepWorkPageContent() {
     const topicsFromDefs = new Set(deepWorkDefinitions.map(def => def.category));
     return Array.from(topicsFromDefs).sort();
   }, [deepWorkDefinitions]);
-
-  const linkedDeepWorkChildIds = useMemo(() => 
-    new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || []))
-  , [deepWorkDefinitions]);
+  
+  const linkedDeepWorkChildIds = useMemo(() => new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])), [deepWorkDefinitions]);
+  const linkedUpskillChildIds = useMemo(() => new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || [])), [upskillDefinitions]);
 
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition) => {
     const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
     const isChild = linkedDeepWorkChildIds.has(def.id);
-
-    if (isParent) {
-        return isChild ? 'Objective' : 'Intention';
-    }
-    return isChild ? 'Action' : 'Standalone';
+    if (isParent && !isChild) return 'Intention';
+    if (isParent && isChild) return 'Objective';
+    if (!isParent && isChild) return 'Action';
+    return 'Standalone';
   }, [linkedDeepWorkChildIds]);
-
 
   const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition): number => {
     let totalMinutes = 0;
@@ -1359,6 +1356,10 @@ function DeepWorkPageContent() {
       )
     );
   };
+  
+  const allUpskillKnownTopics = useMemo(() => {
+    return [...new Set(upskillDefinitions.map(def => def.category))];
+  }, [upskillDefinitions]);
 
   if (isLoadingPage) {
     return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your deep work data...</p></div>;
@@ -1592,13 +1593,96 @@ function DeepWorkPageContent() {
                     <DialogTitle>Manage Links for: {manageLinksConfig.parent.name}</DialogTitle>
                     <DialogDescription>Link existing items or create new ones to build out this objective.</DialogDescription>
                   </DialogHeader>
-                  <Tabs defaultValue="link" className="flex-grow flex flex-col min-h-0">
-                      <TabsList className="grid w-full grid-cols-3">
-                          <TabsTrigger value="link-deepwork">Deep Work</TabsTrigger>
-                          <TabsTrigger value="link-upskill">Upskill</TabsTrigger>
-                          <TabsTrigger value="link-resource">Resource</TabsTrigger>
+                  <Tabs defaultValue="link-deepwork" className="flex-grow flex flex-col min-h-0">
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="link">Link Existing</TabsTrigger>
+                        <TabsTrigger value="create">Create New</TabsTrigger>
                       </TabsList>
-                      {/* Placeholder for content */}
+                      <TabsContent value="link" className="flex-grow min-h-0">
+                          <div className="flex flex-col h-full">
+                              <div className="flex gap-2 mb-2 p-1">
+                                <Input placeholder="Search..." value={linkSearchTerm} onChange={e => setLinkSearchTerm(e.target.value)} />
+                                 <Select value={manageLinksConfig.type} onValueChange={(value) => setManageLinksConfig(prev => prev ? { ...prev, type: value as any } : null)}>
+                                    <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="deepwork">Deep Work</SelectItem>
+                                        <SelectItem value="upskill">Upskill</SelectItem>
+                                        <SelectItem value="resource">Resource</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="flex items-center gap-1 text-sm text-muted-foreground w-full mb-2 p-1 border-b">
+                                {manageLinksConfig.type === 'resource' ? (
+                                  <>
+                                    <Button variant="ghost" size="sm" onClick={() => setFolderPath([])} disabled={folderPath.length === 0}>Root</Button>
+                                    {folderPath.map((folderId, index) => {
+                                        const folder = resourceFolders.find(f => f.id === folderId);
+                                        return ( <React.Fragment key={folderId}> <ChevronRightIcon className="h-4 w-4" /> <Button variant="ghost" size="sm" onClick={() => setFolderPath(p => p.slice(0, index + 1))} disabled={index === folderPath.length - 1}> {folder?.name} </Button> </React.Fragment> )
+                                    })}
+                                  </>
+                                ) : manageLinksConfig.type === 'upskill' ? (
+                                  <>
+                                    <Button variant="ghost" size="sm" onClick={() => { setSkillSelectionStep('topic'); setSelectedUpskillTopic(''); setSelectedUpskillCuriosity(null); }} disabled={skillSelectionStep === 'topic'}>Topics</Button>
+                                    {selectedUpskillTopic && <ChevronRightIcon className="h-4 w-4" />}
+                                    <Button variant="ghost" size="sm" onClick={() => { setSkillSelectionStep('curiosity'); setSelectedUpskillCuriosity(null); }} disabled={skillSelectionStep === 'curiosity' || !selectedUpskillTopic} className="truncate">{selectedUpskillTopic}</Button>
+                                    {selectedUpskillCuriosity && <ChevronRightIcon className="h-4 w-4" />}
+                                    <span className="font-semibold text-foreground truncate">{selectedUpskillCuriosity?.name}</span>
+                                  </>
+                                ) : null }
+                              </div>
+                              <ScrollArea className="flex-grow border rounded-md p-2">
+                                  {filteredItemsForLinking.length > 0 ? (
+                                      filteredItemsForLinking.map(item => {
+                                          const isFolder = 'parentId' in item;
+                                          return (
+                                            <div key={item.id} className="flex items-center space-x-2 p-1">
+                                                {!isFolder && (
+                                                  <Checkbox id={`link-${item.id}`} checked={tempLinkedIds.includes(item.id)} onCheckedChange={(checked) => setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id))}/>
+                                                )}
+                                                <Label 
+                                                    htmlFor={isFolder ? undefined : `link-${item.id}`} 
+                                                    className="font-normal w-full flex items-center gap-2 cursor-pointer"
+                                                    onClick={isFolder ? () => setFolderPath(p => [...p, item.id]) : undefined}
+                                                >
+                                                    {isFolder ? <Folder className="h-4 w-4 text-primary" /> : manageLinksConfig.type === 'resource' ? <Library className="h-4 w-4" /> : <BookCopy className="h-4 w-4"/>}
+                                                    {item.name}
+                                                </Label>
+                                            </div>
+                                          )
+                                      })
+                                  ) : <p className="text-sm text-center text-muted-foreground p-4">No items to link. Try another filter or create a new item.</p>}
+                              </ScrollArea>
+                              <DialogFooter className="pt-4">
+                                  <Button onClick={handleSaveExistingLinks}>Save Links</Button>
+                              </DialogFooter>
+                          </div>
+                      </TabsContent>
+                      <TabsContent value="create" className="flex-grow">
+                          <ScrollArea className="h-full pr-4">
+                              <div className="space-y-4">
+                                  {manageLinksConfig.type === 'resource' ? (
+                                      <>
+                                          <div className="space-y-1"><Label>Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger/><SelectContent>{resourceFolders.map(f => (<SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>))}</SelectContent></Select></div>
+                                          <div className="space-y-1"><Label>Link</Label><Input value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} /></div>
+                                      </>
+                                  ) : (
+                                      <>
+                                          <div className="space-y-1"><Label>Topic</Label><Input value={newLinkedItemTopic} onChange={e => setNewLinkedItemTopic(e.target.value)} /></div>
+                                          <div className="space-y-1"><Label>Name</Label><Input value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} /></div>
+                                          <div className="space-y-1"><Label>Description</Label><Textarea value={newLinkedItemDescription} onChange={e => setNewLinkedItemDescription(e.target.value)} /></div>
+                                          <div className="space-y-1"><Label>Link (Optional)</Label><Input value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} /></div>
+                                          <div className="grid grid-cols-2 gap-4">
+                                              <div className="space-y-1"><Label>Est. Hours</Label><Input type="number" value={newLinkedItemHours} onChange={e => setNewLinkedItemHours(e.target.value)} /></div>
+                                              <div className="space-y-1"><Label>Est. Minutes</Label><Input type="number" value={newLinkedItemMinutes} onChange={e => setNewLinkedItemMinutes(e.target.value)} /></div>
+                                          </div>
+                                      </>
+                                  )}
+                                  <DialogFooter className="pt-4">
+                                      <Button onClick={handleCreateAndLinkItem} disabled={isCreatingLink}>{isCreatingLink && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create & Link</Button>
+                                  </DialogFooter>
+                              </div>
+                          </ScrollArea>
+                      </TabsContent>
                   </Tabs>
                 </DialogContent>
               </Dialog>
