@@ -59,7 +59,7 @@ function SkillPageContent() {
     selectedSkillId, setSelectedSkillId,
     selectedProjectId, setSelectedProjectId,
     selectedCompanyId, setSelectedCompanyId,
-    intentionPopups, openIntentionPopup,
+    openIntentionPopup,
     setSelectedDeepWorkTask,
     setSelectedUpskillTask,
   } = useAuth();
@@ -628,7 +628,7 @@ function SkillPageContent() {
                                                                 <ul className="space-y-1">
                                                                     {relatedIntentions.map(intention => (
                                                                         <li key={intention.id}>
-                                                                            <button onClick={() => { setSelectedDeepWorkTask(intention); router.push('/deep-work'); }} className="text-muted-foreground hover:text-primary truncate w-full text-left">{intention.name}</button>
+                                                                            <button onClick={() => openIntentionPopup(intention.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{intention.name}</button>
                                                                         </li>
                                                                     ))}
                                                                 </ul>
@@ -836,13 +836,6 @@ function SkillPageContent() {
             </div>
         </div>
        )}
-        {Array.from(intentionPopups.values()).map(popupState => (
-            <IntentionDetailPopup
-                key={popupState.resourceId}
-                popupState={popupState}
-                onClose={() => {}}
-            />
-        ))}
     </div>
     </>
   );
@@ -855,3 +848,4 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
+
