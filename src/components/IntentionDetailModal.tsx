@@ -158,28 +158,43 @@ const LinkedIntentionsPopupCard = ({ popupState, onClose }: {
                     </div>
                 </CardHeader>
                 <CardContent className="p-3 pt-0">
-                    <ScrollArea className="max-h-96 my-4 pr-4">
+                    <ScrollArea className="h-96 pr-4">
                         {popupState.intentions.length > 0 ? (
-                            <ul className="space-y-4">
+                            <div className="space-y-4">
                             {popupState.intentions.map(({ intention, links }) => (
-                                <li key={intention.id} className="p-3 border rounded-md">
-                                <p className="font-medium text-foreground">{intention.name}</p>
-                                <ul className="mt-2 space-y-1 text-xs">
-                                    {links.map((link, index) => (
-                                        <li key={index} className="flex items-center gap-2 text-muted-foreground">
-                                           <span>- {link.source}</span>
-                                           <ArrowRight className="h-3 w-3" />
-                                           <span>{link.target}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                                </li>
+                                <Card key={intention.id} className="bg-muted/50">
+                                    <CardHeader className="p-3">
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            <Lightbulb className="h-4 w-4 text-amber-500" />
+                                            {intention.name}
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-3 pt-0">
+                                        <ul className="space-y-3">
+                                            {links.map((link, index) => (
+                                                <li key={index} className="space-y-1 text-xs">
+                                                    <div className="flex items-center gap-2">
+                                                        <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
+                                                        <span className="font-medium text-foreground">{link.source}</span>
+                                                    </div>
+                                                    <div className="flex items-center pl-1">
+                                                        <ArrowRight className="h-3 w-3 mr-2 text-muted-foreground" />
+                                                        <div className="flex items-center gap-2">
+                                                            <BookCopy className="h-3.5 w-3.5 text-muted-foreground" />
+                                                            <span className="text-muted-foreground">{link.target}</span>
+                                                        </div>
+                                                    </div>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </CardContent>
+                                </Card>
                             ))}
-                            </ul>
+                            </div>
                         ) : (
-                            <p className="text-sm text-muted-foreground text-center py-8">
-                            No intentions are currently linked to this curiosity.
-                            </p>
+                             <div className="text-sm text-muted-foreground text-center py-8">
+                                No intentions are currently linked to this curiosity.
+                            </div>
                         )}
                     </ScrollArea>
                 </CardContent>
@@ -293,33 +308,28 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     }
   };
   
- const handleViewLinkedIntentions = () => {
+  const handleViewLinkedIntentions = () => {
     if (!currentItem || !cardRef.current) return;
     
     const allUpskillDefs = new Map(upskillDefinitions.map(d => [d.id, d]));
     const allDeepWorkDefs = new Map(deepWorkDefinitions.map(d => [d.id, d]));
-
+  
     const getDescendants = (startNodeId: string, defsMap: Map<string, ExerciseDefinition>, linkKey: 'linkedDeepWorkIds' | 'linkedUpskillIds'): Map<string, ExerciseDefinition> => {
         const visited = new Set<string>();
         const queue: string[] = [startNodeId];
         const descendantsMap = new Map<string, ExerciseDefinition>();
-        const startNode = defsMap.get(startNodeId);
-        if (startNode) descendantsMap.set(startNodeId, startNode);
-
+        
         while (queue.length > 0) {
             const currentId = queue.shift()!;
             if (visited.has(currentId)) continue;
             visited.add(currentId);
             const node = defsMap.get(currentId);
             if (node) {
+                descendantsMap.set(currentId, node);
                 const childIds = (node[linkKey] || []);
                 childIds.forEach(childId => {
                     if (!visited.has(childId)) {
-                        const childNode = defsMap.get(childId);
-                        if (childNode) {
-                            descendantsMap.set(childId, childNode);
-                            queue.push(childId);
-                        }
+                        queue.push(childId);
                     }
                 });
             }
@@ -327,39 +337,39 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
         return descendantsMap;
     };
     
-    const curiosityTree = getDescendants(currentItem.id, allUpskillDefs, 'linkedUpskillIds');
+    const curiosityTreeDescendants = getDescendants(currentItem.id, allUpskillDefs, 'linkedUpskillIds');
     const intentions = deepWorkDefinitions.filter(def => getDeepWorkNodeType(def) === 'Intention');
     
-    const foundLinksByIntention = new Map<string, { intention: ExerciseDefinition; links: { source: string; target: string }[] }>();
-
+    const foundLinksByIntention = new Map<string, { intention: ExerciseDefinition; links: { source: string; target: string; }[] }>();
+  
     intentions.forEach(intention => {
-        const intentionTree = getDescendants(intention.id, allDeepWorkDefs, 'linkedDeepWorkIds');
-        
-        intentionTree.forEach(intentionNode => {
-            (intentionNode.linkedUpskillIds || []).forEach(linkedUpskillId => {
-                if (curiosityTree.has(linkedUpskillId)) {
-                    if (!foundLinksByIntention.has(intention.id)) {
-                        foundLinksByIntention.set(intention.id, { intention, links: [] });
-                    }
-                    const upskillNode = curiosityTree.get(linkedUpskillId);
-                    if (upskillNode) {
-                        foundLinksByIntention.get(intention.id)!.links.push({
-                            source: intentionNode.name,
-                            target: upskillNode.name,
-                        });
-                    }
-                }
-            });
+      const intentionTreeDescendants = getDescendants(intention.id, allDeepWorkDefs, 'linkedDeepWorkIds');
+      
+      intentionTreeDescendants.forEach(intentionNode => {
+        (intentionNode.linkedUpskillIds || []).forEach(linkedUpskillId => {
+          if (curiosityTreeDescendants.has(linkedUpskillId)) {
+            if (!foundLinksByIntention.has(intention.id)) {
+              foundLinksByIntention.set(intention.id, { intention, links: [] });
+            }
+            const upskillNode = curiosityTreeDescendants.get(linkedUpskillId);
+            if (upskillNode) {
+              foundLinksByIntention.get(intention.id)!.links.push({
+                source: intentionNode.name,
+                target: upskillNode.name,
+              });
+            }
+          }
         });
+      });
     });
-
+  
     const rect = cardRef.current.getBoundingClientRect();
     setLinkedIntentionsPopup({
-        x: rect.right + 20,
-        y: rect.top,
-        intentions: Array.from(foundLinksByIntention.values()),
+      x: rect.right + 20,
+      y: rect.top,
+      intentions: Array.from(foundLinksByIntention.values()),
     });
-};
+  };
 
 
   const renderDeepWorkNode = (item: ExerciseDefinition): JSX.Element => {
