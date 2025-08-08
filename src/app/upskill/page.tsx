@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -23,7 +21,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -38,7 +36,6 @@ import remarkGfm from 'remark-gfm';
 import { useRouter } from 'next/navigation';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { SkillLibrary } from '@/components/SkillLibrary';
-import { MindMapViewer } from '@/components/MindMapViewer';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -515,9 +512,13 @@ function UpskillPageContent() {
   const [newLinkedItemFolderId, setNewLinkedItemFolderId] = useState('');
   const [linkSearchTerm, setLinkSearchTerm] = useState('');
   const [tempLinkedIds, setTempLinkedIds] = useState<string[]>([]);
-  const [linkResourceFolderId, setLinkResourceFolderId] = useState<string>('');
-  const [linkUpskillTopic, setLinkUpskillTopic] = useState('');
   const [isCreatingLink, setIsCreatingLink] = useState(false);
+
+  // State for hierarchical linking
+  const [skillSelectionStep, setSkillSelectionStep] = useState<'topic' | 'curiosity' | 'visualization'>('topic');
+  const [selectedUpskillTopic, setSelectedUpskillTopic] = useState('');
+  const [selectedUpskillCuriosity, setSelectedUpskillCuriosity] = useState<ExerciseDefinition | null>(null);
+  const [folderPath, setFolderPath] = useState<string[]>([]);
 
   const [isNewSubtopicModalOpen, setIsNewSubtopicModalOpen] = useState(false);
   const [newSubtopicData, setNewSubtopicData] = useState({ name: '', description: '', link: '', hours: '', minutes: '' });
@@ -629,7 +630,7 @@ function UpskillPageContent() {
   const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefinition) => {
     if (!definition) return 0;
     const visited = new Set<string>();
-    const visualizationIds = new Set<string>();
+    const visualizationIds = a Set<string>();
 
     function recurse(nodeId: string) {
         if (visited.has(nodeId)) return;
@@ -848,8 +849,8 @@ function UpskillPageContent() {
     setNewLinkedItemMinutes(''); 
     setNewLinkedItemFolderId('');
     setLinkSearchTerm(''); 
-    setLinkResourceFolderId(''); 
-    setLinkUpskillTopic('');
+    setSkillSelectionStep('topic');
+    setFolderPath([]);
     setIsManageLinksModalOpen(true);
   };
   
@@ -935,34 +936,46 @@ function UpskillPageContent() {
     setIsManageLinksModalOpen(false);
   };
   
+  const currentFolderIdForLinking = folderPath[folderPath.length - 1] || null;
+
   const filteredItemsForLinking = useMemo(() => {
     if (!manageLinksConfig) return [];
     const { type, parent } = manageLinksConfig;
     
-    let definitionsSource: any[];
-    let parentLinkedIds: string[] = [];
-    
     if (type === 'resource') {
-        if (!linkResourceFolderId) return [];
-        definitionsSource = resources.filter(res => res.folderId === linkResourceFolderId);
-        parentLinkedIds = parent.linkedResourceIds || [];
-    } else { // 'upskill'
-        definitionsSource = linkUpskillTopic ? upskillDefinitions.filter(d => d.category === linkUpskillTopic) : upskillDefinitions;
-        parentLinkedIds = parent.linkedUpskillIds || [];
+        let displayItems: (ResourceFolder | Resource)[] = [];
+        const subfolders = resourceFolders.filter(f => f.parentId === currentFolderIdForLinking);
+        const resourcesInFolder = resources.filter(res => res.folderId === currentFolderIdForLinking);
+        displayItems = [...subfolders, ...resourcesInFolder];
+        
+        return displayItems.filter(item => {
+            if ('link' in item) { // It's a resource
+                if (linkSearchTerm && !item.name.toLowerCase().includes(linkSearchTerm.toLowerCase())) return false;
+            }
+            return true;
+        });
     }
     
-    return definitionsSource.filter(def => {
-        if (!def.name || def.name === 'placeholder' || def.id === parent.id || parentLinkedIds.includes(def.id)) {
-            return false;
-        }
-
-        if (linkSearchTerm && !def.name.toLowerCase().includes(linkSearchTerm.toLowerCase())) {
-            return false;
-        }
-        
+    let definitionsSource: any[];
+    if (skillSelectionStep === 'curiosity') {
+        definitionsSource = (upskillDefinitions || []).filter(def => {
+            if (def.category !== selectedUpskillTopic) return false;
+            const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+            const isLinkedAsChild = linkedUpskillChildIds.has(def.id);
+            return isParent && !isLinkedAsChild;
+        });
+    } else if (skillSelectionStep === 'visualization' && selectedUpskillCuriosity) {
+        definitionsSource = getVisualizationsRecursive(selectedUpskillCuriosity.id);
+    } else {
+        definitionsSource = allKnownTopics.map(t => ({ id: t, name: t }));
+    }
+    
+    return definitionsSource.filter(item => {
+        if (!item.name || item.name === 'placeholder' || item.id === parent.id) return false;
+        if (linkSearchTerm && !item.name.toLowerCase().includes(linkSearchTerm.toLowerCase())) return false;
         return true;
     });
-  }, [manageLinksConfig, upskillDefinitions, resources, linkSearchTerm, linkResourceFolderId, linkUpskillTopic]);
+  }, [manageLinksConfig, upskillDefinitions, resources, linkSearchTerm, skillSelectionStep, selectedUpskillTopic, selectedUpskillCuriosity, resourceFolders, currentFolderIdForLinking, linkedUpskillChildIds, allKnownTopics, getVisualizationsRecursive]);
 
 
   const handleUnlinkItem = (type: 'upskill' | 'resource', idToUnlink: string) => {
@@ -976,16 +989,6 @@ function UpskillPageContent() {
     toast({ title: "Unlinked", description: "The item has been unlinked." });
   };
   
-  const renderFolderOptions = useCallback((parentId: string | null, level: number): JSX.Element[] => {
-    const folders = resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => a.name.localeCompare(b.name));
-    let options: JSX.Element[] = [];
-    folders.forEach(folder => {
-        options.push(<SelectItem key={folder.id} value={folder.id}><span style={{ paddingLeft: `${level * 1.5}rem` }}>{folder.name}</span></SelectItem>);
-        options = options.concat(renderFolderOptions(folder.id, level + 1));
-    });
-    return options;
-  }, [resourceFolders]);
-
   const handleStartEditResource = (res: Resource) => {
     router.push('/resources');
   };
@@ -1294,24 +1297,47 @@ function UpskillPageContent() {
                       <TabsContent value="link" className="flex-grow min-h-0">
                           <div className="flex flex-col h-full">
                               <div className="flex gap-2 mb-2 p-1">
-                                  {manageLinksConfig.type === 'resource' && <Select value={linkResourceFolderId} onValueChange={setLinkResourceFolderId}><SelectTrigger placeholder="Select Folder..."/><SelectContent>{renderFolderOptions(null, 0)}</SelectContent></Select>}
-                                  {manageLinksConfig.type === 'upskill' && <Select value={linkUpskillTopic} onValueChange={setLinkUpskillTopic}><SelectTrigger placeholder="Select Topic..."/><SelectContent>{allKnownTopics.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select>}
-                                  <Input placeholder="Search..." value={linkSearchTerm} onChange={e => setLinkSearchTerm(e.target.value)} />
+                                <Input placeholder="Search..." value={linkSearchTerm} onChange={e => setLinkSearchTerm(e.target.value)} />
+                              </div>
+                              <div className="flex items-center gap-1 text-sm text-muted-foreground w-full mb-2 p-1 border-b">
+                                {manageLinksConfig.type === 'resource' ? (
+                                  <>
+                                    <Button variant="ghost" size="sm" onClick={() => setFolderPath([])} disabled={folderPath.length === 0}>Root</Button>
+                                    {folderPath.map((folderId, index) => {
+                                        const folder = resourceFolders.find(f => f.id === folderId);
+                                        return ( <React.Fragment key={folderId}> <ChevronRightIcon className="h-4 w-4" /> <Button variant="ghost" size="sm" onClick={() => setFolderPath(p => p.slice(0, index + 1))} disabled={index === folderPath.length - 1}> {folder?.name} </Button> </React.Fragment> )
+                                    })}
+                                  </>
+                                ) : (
+                                  <>
+                                    <Button variant="ghost" size="sm" onClick={() => { setSkillSelectionStep('topic'); setSelectedUpskillTopic(''); setSelectedUpskillCuriosity(null); }} disabled={skillSelectionStep === 'topic'}>Topics</Button>
+                                    {selectedUpskillTopic && <ChevronRightIcon className="h-4 w-4" />}
+                                    <Button variant="ghost" size="sm" onClick={() => { setSkillSelectionStep('curiosity'); setSelectedUpskillCuriosity(null); }} disabled={skillSelectionStep === 'curiosity' || !selectedUpskillTopic} className="truncate">{selectedUpskillTopic}</Button>
+                                    {selectedUpskillCuriosity && <ChevronRightIcon className="h-4 w-4" />}
+                                    <span className="font-semibold text-foreground truncate">{selectedUpskillCuriosity?.name}</span>
+                                  </>
+                                )}
                               </div>
                               <ScrollArea className="flex-grow border rounded-md p-2">
                                   {filteredItemsForLinking.length > 0 ? (
-                                      filteredItemsForLinking.map(item => (
-                                          <div key={item.id} className="flex items-center space-x-2 p-1">
-                                              <Checkbox
-                                                  id={`link-${item.id}`}
-                                                  checked={tempLinkedIds.includes(item.id)}
-                                                  onCheckedChange={(checked) => {
-                                                      setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id));
-                                                  }}
-                                              />
-                                              <Label htmlFor={`link-${item.id}`} className="font-normal">{item.name}</Label>
-                                          </div>
-                                      ))
+                                      filteredItemsForLinking.map(item => {
+                                          const isFolder = 'parentId' in item;
+                                          return (
+                                            <div key={item.id} className="flex items-center space-x-2 p-1">
+                                                {!isFolder && (
+                                                  <Checkbox id={`link-${item.id}`} checked={tempLinkedIds.includes(item.id)} onCheckedChange={(checked) => setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id))}/>
+                                                )}
+                                                <Label 
+                                                    htmlFor={isFolder ? undefined : `link-${item.id}`} 
+                                                    className="font-normal w-full flex items-center gap-2 cursor-pointer"
+                                                    onClick={isFolder ? () => setFolderPath(p => [...p, item.id]) : undefined}
+                                                >
+                                                    {isFolder ? <Folder className="h-4 w-4 text-primary" /> : manageLinksConfig.type === 'resource' ? <Library className="h-4 w-4" /> : <BookCopy className="h-4 w-4"/>}
+                                                    {item.name}
+                                                </Label>
+                                            </div>
+                                          )
+                                      })
                                   ) : <p className="text-sm text-center text-muted-foreground p-4">No items to link. Try another filter or create a new item.</p>}
                               </ScrollArea>
                               <DialogFooter className="pt-4">
@@ -1335,7 +1361,7 @@ function UpskillPageContent() {
                                       </>
                                   ) : (
                                       <>
-                                          <div className="space-y-1"><Label>Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger/><SelectContent>{renderFolderOptions(null, 0)}</SelectContent></Select></div>
+                                          <div className="space-y-1"><Label>Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger/><SelectContent>{/* TODO */}</SelectContent></Select></div>
                                           <div className="space-y-1"><Label>Link</Label><Input value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} /></div>
                                       </>
                                   )}
