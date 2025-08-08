@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -12,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ExerciseDefinition, WorkoutExercise } from '@/types/workout';
-import { BookOpenCheck, Briefcase, Share2, Save, PlusCircle, ChevronRight, Flashlight, Focus, Frame } from 'lucide-react';
+import { BookOpenCheck, Briefcase, Share2, Save, PlusCircle, ChevronRight, Flashlight, Focus, Frame, ArrowLeft, Bolt, Flag, Lightbulb } from 'lucide-react';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
@@ -319,7 +320,10 @@ export function TodaysLearningModal({
                         <div className="space-y-2">
                            {objectivesForTopic.length > 0 ? objectivesForTopic.map(obj => (
                                 <button key={obj.id} onClick={() => { setSelectedDeepWorkObjective(obj); setSelectionStep('action'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
-                                    <span className="font-medium">{obj.name}</span>
+                                    <div className='flex items-center gap-2 min-w-0'>
+                                        <Flag className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                        <span className="font-medium truncate">{obj.name}</span>
+                                    </div>
                                     <ChevronRight className="h-4 w-4" />
                                 </button>
                             )) : <p className="text-sm text-center text-muted-foreground py-4">No objectives with actions found in this topic.</p>}
@@ -332,7 +336,8 @@ export function TodaysLearningModal({
                                 {actionsForObjective.map(action => (
                                     <div key={action.id} className="flex items-center space-x-3 p-3 rounded-md border bg-muted/20 has-[[data-state=checked]]:bg-accent transition-colors">
                                         <RadioGroupItem value={action.id} id={`action-radio-${action.id}`} />
-                                        <Label htmlFor={`action-radio-${action.id}`} className="font-normal w-full cursor-pointer">
+                                        <Label htmlFor={`action-radio-${action.id}`} className="font-normal w-full cursor-pointer flex items-center gap-2">
+                                            <Bolt className="h-4 w-4 text-blue-500 flex-shrink-0" />
                                             {action.name}
                                         </Label>
                                     </div>
