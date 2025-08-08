@@ -114,12 +114,15 @@ const DeepWorkItem = ({ item, onDrillDown, getIcon, children }: { item: Exercise
         return (
              <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value={item.id} className="border-none">
-                     <AccordionTrigger className="hover:no-underline p-2 rounded-md hover:bg-muted/50" onClick={(e) => { e.stopPropagation(); onDrillDown(item); }}>
+                     <AccordionTrigger className="hover:no-underline p-2 rounded-md hover:bg-muted/50">
                         <div className="flex items-center gap-2">
                            {getIcon(item)}
                            <span className="font-semibold">{item.name}</span>
                        </div>
                     </AccordionTrigger>
+                    <AccordionContent className="pl-6 border-l ml-2">
+                       {children}
+                    </AccordionContent>
                 </AccordionItem>
             </Accordion>
         );
@@ -235,6 +238,35 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
         default: return <Briefcase className="h-4 w-4" />;
     }
   };
+  
+  const renderDeepWorkNode = (item: ExerciseDefinition): JSX.Element => {
+    const childDeepWorkItems = (item.linkedDeepWorkIds || [])
+        .map(id => deepWorkDefinitions.find(d => d.id === id))
+        .filter((d): d is ExerciseDefinition => !!d)
+        .map(renderDeepWorkNode);
+
+    const childUpskillItems = (item.linkedUpskillIds || [])
+        .map(id => upskillDefinitions.find(d => d.id === id))
+        .filter((d): d is ExerciseDefinition => !!d)
+        .map(renderUpskillNode);
+    
+    const childResourceItems = (item.linkedResourceIds || [])
+        .map(id => resources.find(r => r.id === id))
+        .filter((r): r is Resource => !!r)
+        .map(r => <ResourceItem key={r.id} item={r} onOpenNestedPopup={(resourceId, event) => {
+            if (cardRef.current) {
+                handleOpenNestedPopup(resourceId, event, popupState, cardRef.current.getBoundingClientRect());
+            }
+        }} />);
+        
+    return (
+        <DeepWorkItem key={item.id} item={item} onDrillDown={handleDrillDown} getIcon={getIcon}>
+            {childDeepWorkItems}
+            {childUpskillItems}
+            {childResourceItems.length > 0 && <div className="space-y-2 mt-2">{childResourceItems}</div>}
+        </DeepWorkItem>
+    );
+  };
 
   const renderUpskillNode = (item: ExerciseDefinition): JSX.Element => {
     const childUpskillItems = (item.linkedUpskillIds || [])
@@ -287,11 +319,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                         <div>
                             <h3 className="font-semibold mb-1 flex items-center gap-2 text-sm"><Briefcase className="h-4 w-4 text-green-500" />Linked Deep Work</h3>
                             <div className="space-y-1">
-                                {linkedItems.deepWork.map(item => (
-                                    <DeepWorkItem key={item.id} item={item} onDrillDown={handleDrillDown} getIcon={getIcon}>
-                                        {/* Children are not rendered here as drill-down is the interaction */}
-                                    </DeepWorkItem>
-                                ))}
+                                {linkedItems.deepWork.map(item => renderDeepWorkNode(item))}
                             </div>
                         </div>
                     )}
