@@ -536,6 +536,16 @@ function UpskillPageContent() {
     }
     setIsNewSubtopicModalOpen(true);
   };
+  
+  const getDomainForCategory = useCallback((category: string) => {
+    const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === category);
+    if (!microSkill) return null;
+    const coreSkill = coreSkills.find(cs => cs.name === microSkill.coreSkillName);
+    if (!coreSkill) return null;
+    return skillDomains.find(sd => sd.id === coreSkill.domainId);
+  }, [microSkillMap, coreSkills, skillDomains]);
+
+  const projectsInDomain = selectedUpskillTask ? (getDomainForCategory(selectedUpskillTask.category) ? projects.filter(p => p.domainId === getDomainForCategory(selectedUpskillTask.category)!.id) : []) : [];
 
   const permanentlyLoggedVisualizationIds = useMemo(() => {
     const loggedIds = new Set<string>();
@@ -1039,14 +1049,6 @@ function UpskillPageContent() {
     setSelectedUpskillTask(null);
     setSelectedMicroSkill(null);
   };
-  
-  const getDomainForCategory = useCallback((category: string) => {
-    const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === category);
-    if (!microSkill) return null;
-    const coreSkill = coreSkills.find(cs => cs.name === microSkill.coreSkillName);
-    if (!coreSkill) return null;
-    return skillDomains.find(sd => sd.id === coreSkill.domainId);
-  }, [microSkillMap, coreSkills, skillDomains]);
 
   const handleLinkProject = useCallback((curiosityId: string, projectId: string | null) => {
     setUpskillDefinitions(prev =>
@@ -1069,8 +1071,6 @@ function UpskillPageContent() {
   }
   
   const selectedUpskillTaskIsCuriosity = selectedUpskillTask && (getDomainForCategory(selectedUpskillTask.category) !== null);
-  const projectsInSelectedDomain = selectedUpskillTask ? (getDomainForCategory(selectedUpskillTask.category) ? projects.filter(p => p.domainId === getDomainForCategory(selectedUpskillTask.category)!.id) : []) : [];
-
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
@@ -1189,8 +1189,8 @@ function UpskillPageContent() {
                                         const def = upskillDefinitions.find(d => d.id === id);
                                         if (!def) return null;
                                         const domain = getDomainForCategory(def.category);
-                                        const projectsInDomain = domain ? projects.filter(p => p.domainId === domain.id) : [];
-                                        return <LinkedUpskillItem key={id} upskillDef={def} {...{ handleAddTaskToSession, setSelectedSubtopic: setSelectedUpskillTask, setViewMode, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteSubtopic, handleViewProgress, isComplete: isUpskillObjectiveComplete(def.id), getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate: calculateTotalEstimate(def), setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName: handleUpdateSubtopicName, projectsInDomain, onLinkProject: handleLinkProject, onEdit: setEditingSubtopic }} />;
+                                        const projectsInDomainForChild = domain ? projects.filter(p => p.domainId === domain.id) : [];
+                                        return <LinkedUpskillItem key={id} upskillDef={def} {...{ handleAddTaskToSession, setSelectedSubtopic: setSelectedUpskillTask, setViewMode, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteSubtopic, handleViewProgress, isComplete: isUpskillObjectiveComplete(def.id), getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate: calculateTotalEstimate(def), setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName: handleUpdateSubtopicName, projectsInDomain: projectsInDomainForChild, onLinkProject: handleLinkProject, onEdit: setEditingSubtopic }} />;
                                     })}
                                     {(selectedUpskillTask.linkedResourceIds || []).map(id => {
                                         const resource = resources.find(r => r.id === id);
