@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from './ui/scroll-area';
-import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink, Briefcase, BookCopy, ArrowLeft, Frame, Code, MessageSquare, ArrowRight, GitMerge, GripVertical, X } from 'lucide-react';
+import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink, Briefcase, BookCopy, ArrowLeft, Frame, Code, MessageSquare, ArrowRight, GitMerge, GripVertical, X, Flag, Bolt, Focus } from 'lucide-react';
 import type { ExerciseDefinition, Resource, PopupState as IntentionPopupState, ResourcePoint } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
@@ -138,8 +138,9 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     deepWorkDefinitions, 
     upskillDefinitions, 
     resources, 
-    handleOpenNestedPopup,
-    openIntentionPopup
+    openPopups,
+    ResourcePopup,
+    handleOpenNestedPopup
   } = useAuth();
   
   const [navigationStack, setNavigationStack] = useState<ExerciseDefinition[]>([]);
@@ -149,7 +150,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
       position: 'fixed',
       top: popupState.y,
       left: popupState.x,
-      width: '56rem', // equivalent to max-w-4xl
+      width: '40rem',
       willChange: 'transform',
   };
   if (transform) {
@@ -189,7 +190,13 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   
   const handleDrillDown = (subtask: ExerciseDefinition) => {
     if (upskillDefinitions.some(d => d.id === subtask.id)) {
-      openIntentionPopup(subtask.id);
+        // Find if this upskill node has a popup already
+        const existingPopup = Array.from(openPopups.values()).find(p => p.resourceId === subtask.id);
+        if(!existingPopup) {
+            // This is a temporary solution, ideally we should open a specific popup for upskill items too.
+            // For now, let's just log it.
+            console.log("Drilling into upskill item from intention popup is not fully supported yet with its own popup type.");
+        }
     } else {
       setNavigationStack(prev => [...prev, subtask]);
     }
@@ -205,9 +212,9 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
         const isParent = (item.linkedUpskillIds?.length ?? 0) > 0 || (item.linkedResourceIds?.length ?? 0) > 0;
         const isChild = linkedUpskillChildIds ? linkedUpskillChildIds.has(item.id) : false;
         if (isParent && !isChild) return <Flashlight className="h-4 w-4 text-amber-500" />; // Curiosity
-        if (isParent && isChild) return <GitMerge className="h-4 w-4 text-green-500" />; // Objective
+        if (isParent && isChild) return <Flag className="h-4 w-4 text-green-500" />; // Objective
         if (!isParent && isChild) return <Frame className="h-4 w-4 text-blue-500" />; // Visualization
-        return <BookCopy className="h-4 w-4 text-amber-500" />;
+        return <Focus className="h-4 w-4 text-purple-500" />; // Standalone
     }
     return <Lightbulb className="h-4 w-4 text-green-500" />;
   };
