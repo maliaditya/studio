@@ -364,20 +364,24 @@ function SkillPageContent() {
     const intentionsAndCuriosities = [...deepWorkDefinitions, ...upskillDefinitions];
     const linkedItems = intentionsAndCuriosities.filter(item => item.linkedProjectId === selectedProject.id);
 
-    const groupedByCoreSkill = new Map<string, { coreSkillName: string; microSkills: Map<string, ExerciseDefinition[]> }>();
+    const groupedByCoreSkill = new Map<string, { coreSkillName: string; microSkills: Map<string, { microSkill: MicroSkill; tasks: ExerciseDefinition[] }> }>();
 
     linkedItems.forEach(item => {
-      const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === item.category);
-      if (microSkill) {
-        const { coreSkillName, microSkillName } = microSkill;
+      const microSkillInfo = Array.from(microSkillMap.entries()).find(([, ms]) => ms.microSkillName === item.category);
+      if (microSkillInfo) {
+        const [microSkillId, { coreSkillName, skillAreaName, microSkillName }] = microSkillInfo;
+        const microSkill = { id: microSkillId, name: microSkillName };
+
         if (!groupedByCoreSkill.has(coreSkillName)) {
           groupedByCoreSkill.set(coreSkillName, { coreSkillName, microSkills: new Map() });
         }
         const coreSkillGroup = groupedByCoreSkill.get(coreSkillName)!;
-        if (!coreSkillGroup.microSkills.has(microSkillName)) {
-          coreSkillGroup.microSkills.set(microSkillName, []);
+        
+        const mapKey = `${skillAreaName} > ${microSkillName}`;
+        if (!coreSkillGroup.microSkills.has(mapKey)) {
+          coreSkillGroup.microSkills.set(mapKey, { microSkill, tasks: [] });
         }
-        coreSkillGroup.microSkills.get(microSkillName)!.push(item);
+        coreSkillGroup.microSkills.get(mapKey)!.tasks.push(item);
       }
     });
 
@@ -541,15 +545,17 @@ function SkillPageContent() {
                                   <CardTitle className="text-base">{coreSkillName}</CardTitle>
                               </CardHeader>
                               <CardContent className="space-y-2 p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                                  {Array.from(data.microSkills.entries()).map(([microSkillName, tasks]) => {
+                                  {Array.from(data.microSkills.entries()).map(([mapKey, { microSkill, tasks }]) => {
                                       const curiosities = tasks.filter(t => upskillDefinitions.some(d => d.id === t.id));
                                       const intentions = tasks.filter(t => deepWorkDefinitions.some(d => d.id === t.id));
+                                      const skillAreaName = mapKey.split(' > ')[0];
+                                      
                                       return (
-                                        <Card key={microSkillName} className="w-full">
+                                        <Card key={mapKey} className="w-full">
                                             <CardHeader className="p-3">
                                               <div className="flex justify-between items-start gap-2">
-                                                <CardTitle className="text-sm flex-grow">{microSkillName}</CardTitle>
-                                                <Badge variant="outline">{coreSkillName}</Badge>
+                                                <CardTitle className="text-sm flex-grow">{microSkill.name}</CardTitle>
+                                                <Badge variant="outline">{skillAreaName}</Badge>
                                               </div>
                                             </CardHeader>
                                             <CardContent className="p-3 pt-0 grid grid-cols-2 gap-4">
