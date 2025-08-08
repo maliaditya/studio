@@ -440,22 +440,27 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
     return (
         <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
             <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
-            <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative">
+            <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative group">
                 <div 
-                    className="absolute top-2 left-2 z-20 cursor-grab active:cursor-grabbing p-1" 
+                    className="absolute top-2 left-2 z-20 p-1 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
                     {...listeners}
                 >
                     <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
                 </div>
                 
-                 <div className="absolute top-2 right-2 z-20 flex items-center">
+                 <div className="absolute top-2 right-2 z-20 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                     {resource.audioUrl ? (
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={togglePlayAudio}>
-                            {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
-                        </Button>
+                        <>
+                           <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={togglePlayAudio}>
+                                {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => audioInputRef.current?.click()}>
+                                <Upload className="h-4 w-4" />
+                            </Button>
+                        </>
                     ) : (
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => audioInputRef.current?.click()}>
-                            <Upload className="h-4 w-4"/>
+                            <Upload className="h-4 w-4" />
                         </Button>
                     )}
                     <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={handleClose}>
@@ -1566,6 +1571,7 @@ const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHisto
     
 
     
+
 
 
 
