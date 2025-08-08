@@ -37,6 +37,7 @@ import remarkGfm from 'remark-gfm';
 import { useRouter } from 'next/navigation';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { SkillLibrary } from '@/components/SkillLibrary';
+import { MindMapViewer } from '@/components/MindMapViewer';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -547,7 +548,12 @@ function UpskillPageContent() {
     return skillDomains.find(sd => sd.id === coreSkill.domainId);
   }, [microSkillMap, coreSkills, skillDomains]);
 
-  const projectsInDomain = selectedUpskillTask ? (getDomainForCategory(selectedUpskillTask.category) ? projects.filter(p => p.domainId === getDomainForCategory(selectedUpskillTask.category)!.id) : []) : [];
+  const projectsInDomain = useMemo(() => {
+    if (!selectedUpskillTask || !selectedUpskillTask.category) return [];
+    const domain = getDomainForCategory(selectedUpskillTask.category);
+    if (!domain) return [];
+    return projects.filter(p => p.domainId === domain.id);
+  }, [selectedUpskillTask, getDomainForCategory, projects]);
 
   const permanentlyLoggedVisualizationIds = useMemo(() => {
     const loggedIds = new Set<string>();
