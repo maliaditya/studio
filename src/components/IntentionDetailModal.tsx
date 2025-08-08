@@ -161,6 +161,11 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []))
   , [upskillDefinitions]);
 
+  const linkedDeepWorkChildIds = useMemo(() => 
+    new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || []))
+  , [deepWorkDefinitions]);
+
+
   useEffect(() => {
     const initialIntention = deepWorkDefinitions.find(d => d.id === popupState.resourceId) || upskillDefinitions.find(d => d.id === popupState.resourceId);
     if (initialIntention) {
@@ -200,6 +205,15 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     setNavigationStack(prev => prev.slice(0, prev.length - 1));
   };
   
+  const getDeepWorkNodeType = useCallback((def: ExerciseDefinition) => {
+    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+    const isChild = linkedDeepWorkChildIds.has(def.id);
+    if (isParent && !isChild) return 'Intention';
+    if (isParent && isChild) return 'Objective';
+    if (!isParent && isChild) return 'Action';
+    return 'Standalone';
+  }, [linkedDeepWorkChildIds]);
+  
   const getIcon = (item: ExerciseDefinition) => {
     const isUpskill = upskillDefinitions.some(d => d.id === item.id);
     if (isUpskill) {
@@ -210,7 +224,16 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
         if (!isParent && isChild) return <Frame className="h-4 w-4 text-blue-500" />; // Visualization
         return <Focus className="h-4 w-4 text-purple-500" />; // Standalone
     }
-    return <Lightbulb className="h-4 w-4 text-green-500" />;
+    
+    // Deep Work Icon Logic
+    const nodeType = getDeepWorkNodeType(item);
+    switch (nodeType) {
+        case 'Intention': return <Lightbulb className="h-4 w-4 text-amber-500" />;
+        case 'Objective': return <Flag className="h-4 w-4 text-green-500" />;
+        case 'Action': return <Bolt className="h-4 w-4 text-blue-500" />;
+        case 'Standalone': return <Focus className="h-4 w-4 text-purple-500" />;
+        default: return <Briefcase className="h-4 w-4" />;
+    }
   };
 
   const renderUpskillNode = (item: ExerciseDefinition): JSX.Element => {
