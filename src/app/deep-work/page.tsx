@@ -211,12 +211,11 @@ function AddToSessionPopover({ definition, onSelectSlot }: { definition: Exercis
 function LinkedDeepWorkCard({
     id,
     deepworkDef,
-    getIcon,
-    getNodeType,
+    getDeepWorkNodeType,
     getDeepWorkLoggedMinutes,
     permanentlyLoggedActionIds,
     handleAddTaskToSession,
-    setSelectedFocusArea,
+    setSelectedDeepWorkTask,
     setViewMode,
     handleToggleReadyForBranding,
     handleUnlinkItem,
@@ -228,7 +227,6 @@ function LinkedDeepWorkCard({
     upskillDefinitions,
     resources,
     setSelectedSubtopic,
-    linkedDeepWorkChildIds,
     onOpenMindMap,
     onUpdateName,
     projectsInDomain,
@@ -236,12 +234,11 @@ function LinkedDeepWorkCard({
 }: {
     id: string;
     deepworkDef: ExerciseDefinition;
-    getIcon: (nodeType: string) => React.ReactNode;
-    getNodeType: (def: ExerciseDefinition, childIds: Set<string>) => string;
+    getDeepWorkNodeType: (def: ExerciseDefinition) => string;
     getDeepWorkLoggedMinutes: (def: ExerciseDefinition) => number;
     permanentlyLoggedActionIds: Set<string>;
     handleAddTaskToSession: (definition: ExerciseDefinition, slot: string) => void;
-    setSelectedFocusArea: (def: ExerciseDefinition | null) => void;
+    setSelectedDeepWorkTask: (def: ExerciseDefinition | null) => void;
     setViewMode: (mode: 'session' | 'library') => void;
     handleToggleReadyForBranding: (id: string) => void;
     handleUnlinkItem: (type: 'deepwork' | 'upskill' | 'resource', id: string) => void;
@@ -253,7 +250,6 @@ function LinkedDeepWorkCard({
     upskillDefinitions: ExerciseDefinition[];
     resources: Resource[];
     setSelectedSubtopic: (def: ExerciseDefinition | null) => void;
-    linkedDeepWorkChildIds: Set<string>;
     onOpenMindMap: (id: string) => void;
     onUpdateName: (id: string, newName: string) => void;
     projectsInDomain: Project[];
@@ -271,12 +267,22 @@ function LinkedDeepWorkCard({
     };
 
     const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: transform ? 100 : 'auto', } : undefined;
-    const nodeType = getNodeType(deepworkDef, linkedDeepWorkChildIds);
-    const isParent = (deepworkDef.linkedDeepWorkIds?.length ?? 0) > 0 || (deepworkDef.linkedUpskillIds?.length ?? 0) > 0 || (deepworkDef.linkedResourceIds?.length ?? 0) > 0;
-    const isAction = !isParent;
-    const isComplete = isAction && permanentlyLoggedActionIds.has(deepworkDef.id);
+    const nodeType = getDeepWorkNodeType(deepworkDef);
+
+    const getIcon = (type: string) => {
+        switch (type) {
+            case 'Intention': return <Lightbulb className="h-5 w-5 text-amber-500" />;
+            case 'Objective': return <Flag className="h-5 w-5 text-green-500" />;
+            case 'Action': return <Bolt className="h-5 w-5 text-blue-500" />;
+            case 'Standalone': return <Focus className="h-5 w-5 text-purple-500" />;
+            default: return <Briefcase className="h-5 w-5" />;
+        }
+    };
+
+    const isActionable = nodeType === 'Action' || nodeType === 'Standalone';
+    const isComplete = isActionable && permanentlyLoggedActionIds.has(deepworkDef.id);
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
-    const estDuration = isParent ? calculatedEstimate : deepworkDef.estimatedDuration;
+    const estDuration = (nodeType === 'Intention' || nodeType === 'Objective') ? calculatedEstimate : deepworkDef.estimatedDuration;
 
     const handleNameSave = () => {
         if (currentName.trim()) {
@@ -294,17 +300,17 @@ function LinkedDeepWorkCard({
             <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isComplete && "opacity-70 bg-muted/30")}>
                  <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
-                    {isAction ? (
+                    {isActionable ? (
                         <AddToSessionPopover definition={deepworkDef} onSelectSlot={(slot) => handleAddTaskToSession(deepworkDef, slot)} />
                     ) : (
-                        <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => { setSelectedFocusArea(deepworkDef); setViewMode('library'); }}><ArrowRight className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Drill Down</TooltipContent></Tooltip></TooltipProvider>
+                        <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => { setSelectedDeepWorkTask(deepworkDef); setViewMode('library'); }}><ArrowRight className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Drill Down</TooltipContent></Tooltip></TooltipProvider>
                     )}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                             <DropdownMenuItem onSelect={() => onOpenMindMap(deepworkDef.id)}><GitMerge className="mr-2 h-4 w-4"/>View Mind Map</DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => handleViewProgress(deepworkDef, 'deepwork')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
-                            {isAction && <DropdownMenuItem onSelect={() => handleToggleReadyForBranding(deepworkDef.id)}><Checkbox className="mr-2" checked={!!deepworkDef.isReadyForBranding} /><span>Mark as Ready for Branding</span></DropdownMenuItem>}
+                            {isActionable && <DropdownMenuItem onSelect={() => handleToggleReadyForBranding(deepworkDef.id)}><Checkbox className="mr-2" checked={!!deepworkDef.isReadyForBranding} /><span>Mark as Ready for Branding</span></DropdownMenuItem>}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onSelect={() => handleUnlinkItem('deepwork', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
@@ -336,12 +342,12 @@ function LinkedDeepWorkCard({
                     )}
                 </CardHeader>
                 <CardContent className="flex-grow">
-                    {isParent ? (
+                    {nodeType === 'Intention' || nodeType === 'Objective' ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
                             {(deepworkDef.linkedDeepWorkIds || []).map(childId => {
                                 const childDef = deepWorkDefinitions.find(d => d.id === childId);
                                 if (!childDef) return null;
-                                return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={permanentlyLoggedActionIds.has(childId)} type="deepwork" onClick={() => { setSelectedSubtopic(childDef); setViewMode('library'); }}/>;
+                                return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={permanentlyLoggedActionIds.has(childId)} type="deepwork" onClick={() => { setSelectedDeepWorkTask(childDef); setViewMode('library'); }}/>;
                             })}
                             {(deepworkDef.linkedUpskillIds || []).map(childId => {
                                 const childDef = upskillDefinitions.find(d => d.id === childId);
@@ -822,6 +828,17 @@ function DeepWorkPageContent() {
   const linkedDeepWorkChildIds = useMemo(() => 
     new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || []))
   , [deepWorkDefinitions]);
+
+  const getDeepWorkNodeType = useCallback((def: ExerciseDefinition) => {
+    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+    const isChild = linkedDeepWorkChildIds.has(def.id);
+
+    if (isParent) {
+        return isChild ? 'Objective' : 'Intention';
+    }
+    return isChild ? 'Action' : 'Standalone';
+  }, [linkedDeepWorkChildIds]);
+
 
   const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition): number => {
     let totalMinutes = 0;
@@ -1476,7 +1493,7 @@ function DeepWorkPageContent() {
                                         if (!def) return null;
                                         const domain = getDomainForCategory(def.category);
                                         const projectsInDomainForChild = domain ? projects.filter(p => p.domainId === domain.id) : [];
-                                        return <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getIcon: (type) => <Lightbulb className="h-5 w-5 text-amber-500" />, getNodeType: getDeepWorkNodeType, getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, setSelectedFocusArea: setSelectedDeepWorkTask, setViewMode, handleToggleReadyForBranding, handleUnlinkItem, handleDeleteExerciseDefinition: handleDeleteFocusArea, handleViewProgress, deepWorkDefinitions, formatDuration: formatMinutes, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic: setSelectedDeepWorkTask, linkedDeepWorkChildIds, onOpenMindMap: (id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); }, onUpdateName: handleUpdateFocusAreaName, projectsInDomain: projectsInDomainForChild, onLinkProject: handleLinkProject }} />;
+                                        return <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getDeepWorkNodeType, getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, setSelectedDeepWorkTask, setViewMode, handleToggleReadyForBranding, handleUnlinkItem, handleDeleteExerciseDefinition: handleDeleteFocusArea, handleViewProgress, deepWorkDefinitions, formatDuration: formatMinutes, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic: setSelectedDeepWorkTask, onOpenMindMap: (id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); }, onUpdateName: handleUpdateFocusAreaName, projectsInDomain: projectsInDomainForChild, onLinkProject: handleLinkProject }} />;
                                     })}
                                     {(selectedDeepWorkTask.linkedUpskillIds || []).map(id => {
                                         const def = upskillDefinitions.find(d => d.id === id);
@@ -1484,8 +1501,7 @@ function DeepWorkPageContent() {
                                         // Fake implementation for now to avoid crashes
                                         const isUpskillObjectiveComplete = (id: string) => false;
                                         const getUpskillLoggedMinutesRecursive = (def: ExerciseDefinition) => 0;
-                                        const linkedUpskillChildIds = new Set<string>();
-                                        return <LinkedUpskillCard key={id} id={id} upskillDef={def} {...{ handleAddTaskToSession, setSelectedSubtopic: setSelectedDeepWorkTask, setViewMode, handleUnlinkItem: (type,id)=>handleUnlinkItem(type as any, id), handleDeleteUpskillDefinition: (id) => {}, handleViewProgress, isUpskillObjectiveComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate: 0, setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName: () => {}, projectsInDomain, onLinkProject: () => {}, onEdit: () => {} }} />;
+                                        return <LinkedUpskillCard key={id} id={id} upskillDef={def} {...{ handleAddTaskToSession, setSelectedSubtopic: setSelectedDeepWorkTask, setViewMode, handleUnlinkItem: (type,id)=>handleUnlinkItem(type as any, id), handleDeleteUpskillDefinition: (id) => {}, handleViewProgress, isUpskillObjectiveComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate: 0, setEmbedUrl, setFloatingVideoUrl, onUpdateName: () => {}, projectsInDomain, onLinkProject: () => {}, onEdit: () => {} }} />;
                                     })}
                                     {(selectedDeepWorkTask.linkedResourceIds || []).map(id => {
                                         const resource = resources.find(r => r.id === id);
@@ -1599,12 +1615,6 @@ function DeepWorkPageContent() {
     </DndContext>
   );
 }
-
-const getDeepWorkNodeType = (def: ExerciseDefinition, childIds: Set<string>) => {
-    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-    if (isParent) return 'Intention';
-    return 'Action';
-};
 
 const formatMinutes = (minutes: number) => {
     if (minutes === 0) return "0m";
