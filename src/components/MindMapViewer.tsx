@@ -23,7 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DndContext, useDraggable, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
 import { Progress } from './ui/progress';
-import { IntentionDetailModal } from './IntentionDetailModal';
+import { IntentionDetailPopup } from './IntentionDetailModal';
 
 // Component-specific icons
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -672,7 +672,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
 
 const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealParents, canExpandChildren, canRevealParents, onExpandAll, isRootNode, status, nodeType, upskillDefinitions, progress }: any) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: nodeId });
-    const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
+    const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : style;
     
     const { loggedHours = 0, estimatedHours = 0 } = progress || {};
     const showProgress = estimatedHours > 0;
@@ -705,7 +705,7 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
                 status.isLoggedToday && "bg-green-100 dark:bg-green-900/30 border-green-500 dark:border-green-400",
                 status.isScheduledToday && "bg-yellow-100 dark:bg-transparent border-yellow-500 dark:border-yellow-400",
                 status.isPending && "bg-orange-100 dark:bg-transparent border-orange-400 dark:border-orange-500",
-                status.isPastLogged && !status.isLoggedToday && "border-green-500 dark:border-green-400"
+                status.isPastLogged && !status.isLoggedToday && "border-green-400"
             )}>
                 <div className="p-2 cursor-grab" {...listeners} {...attributes}>
                     <div className="flex items-start justify-between">
@@ -767,7 +767,7 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
 
 // Main Component
 export function MindMapViewer({ defaultView, showControls = true, rootFolderId = null, rootFocusAreaId = null }: MindMapViewerProps) {
-  const { toast } = useAuth();
+  const { toast, openIntentionPopup } = useAuth();
   const { 
       deepWorkDefinitions, upskillDefinitions, productizationPlans, offerizationPlans, schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs, scheduleTaskFromMindMap, addFeatureToRelease, setDeepWorkDefinitions, resources, resourceFolders,
   } = useAuth();
@@ -783,7 +783,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
   const [isLinkLearningPopoverOpen, setIsLinkLearningPopoverOpen] = useState(false);
   const [linkingLearningToFocusArea, setLinkingLearningToFocusArea] = useState<MindMapNode | null>(null);
   const [editableLinkedUpskillIds, setEditableLinkedUpskillIds] = useState<string[]>([]);
-  const [selectedIntention, setSelectedIntention] = useState<ExerciseDefinition | null>(null);
+  
 
 
   // State for inline adding
@@ -1154,8 +1154,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
             const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0 || (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
             const isChild = linkedDeepWorkChildIds.has(node.id);
             if (isParent && !isChild) {
-                const def = deepWorkDefinitions.find(d => d.id === node.id);
-                if (def) setSelectedIntention(def);
+                openIntentionPopup(node.id);
             }
         }
     }
@@ -1300,11 +1299,6 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
             </DialogFooter>
         </DialogContent>
       </Dialog>
-      <IntentionDetailModal 
-        isOpen={!!selectedIntention} 
-        onOpenChange={() => setSelectedIntention(null)} 
-        intention={selectedIntention} 
-      />
     </>
   );
 }
