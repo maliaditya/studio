@@ -44,8 +44,8 @@ function SkillPageContent() {
     companies, setCompanies,
     positions, setPositions,
     microSkillMap,
-    upskillDefinitions,
-    deepWorkDefinitions,
+    upskillDefinitions, setUpskillDefinitions,
+    deepWorkDefinitions, setDeepWorkDefinitions,
     resources,
     openPistonsFor,
     handleUpdateSkillArea,
@@ -60,6 +60,8 @@ function SkillPageContent() {
     selectedProjectId, setSelectedProjectId,
     selectedCompanyId, setSelectedCompanyId,
     intentionPopups, openIntentionPopup,
+    setSelectedDeepWorkTask,
+    setSelectedUpskillTask,
   } = useAuth();
   
   const router = useRouter();
@@ -382,6 +384,37 @@ function SkillPageContent() {
     return groupedByCoreSkill;
   }, [selectedProject, deepWorkDefinitions, upskillDefinitions, microSkillMap]);
 
+  const linkedDeepWorkChildIds = useMemo(() => new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])), [deepWorkDefinitions]);
+  const linkedUpskillChildIds = useMemo(() => new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || [])), [upskillDefinitions]);
+
+  const microSkillIntentions = useMemo(() => {
+    const map = new Map<string, ExerciseDefinition[]>();
+    deepWorkDefinitions.forEach(def => {
+        const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+        const isChild = linkedDeepWorkChildIds.has(def.id);
+        if (isParent && !isChild) { // Is an Intention
+            const category = def.category;
+            if (!map.has(category)) map.set(category, []);
+            map.get(category)!.push(def);
+        }
+    });
+    return map;
+  }, [deepWorkDefinitions, linkedDeepWorkChildIds]);
+
+  const microSkillCuriosities = useMemo(() => {
+    const map = new Map<string, ExerciseDefinition[]>();
+    upskillDefinitions.forEach(def => {
+        const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+        const isChild = linkedUpskillChildIds.has(def.id);
+        if (isParent && !isChild) { // Is a Curiosity
+            const category = def.category;
+            if (!map.has(category)) map.set(category, []);
+            map.get(category)!.push(def);
+        }
+    });
+    return map;
+  }, [upskillDefinitions, linkedUpskillChildIds]);
+
   return (
     <>
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -545,66 +578,102 @@ function SkillPageContent() {
                           <Button onClick={() => handleAddSkillArea(selectedSkillId!)}>Add Skill Area</Button>
                       </div>
                        <Accordion type="multiple" className="w-full space-y-2">
-                          {selectedCoreSkill.skillAreas.map(area => (
-                            <Card key={area.id}>
-                              <AccordionItem value={area.id} className="border-b-0">
-                                <CardHeader className="p-3">
-                                  <div className="flex items-center justify-between w-full">
-                                    <AccordionTrigger className="hover:no-underline p-0 flex-grow">
-                                      <div className="flex items-center gap-2">
-                                        <Folder className="h-5 w-5 text-primary"/>
-                                        <span className="font-semibold text-lg">{area.name}</span>
+                          {selectedCoreSkill.skillAreas.map(area => {
+                              const intentions = microSkillIntentions.get(area.name) || [];
+                              const curiosities = microSkillCuriosities.get(area.name) || [];
+                              return (
+                                <Card key={area.id}>
+                                  <AccordionItem value={area.id} className="border-b-0">
+                                    <CardHeader className="p-3">
+                                      <div className="flex items-center justify-between w-full">
+                                        <AccordionTrigger className="hover:no-underline p-0 flex-grow">
+                                          <div className="flex items-center gap-2">
+                                            <Folder className="h-5 w-5 text-primary"/>
+                                            <span className="font-semibold text-lg">{area.name}</span>
+                                          </div>
+                                        </AccordionTrigger>
+                                        <div className="flex items-center">
+                                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingArea({skillId: selectedCoreSkill.id, area}); }}><Edit className="h-4 w-4"/></Button>
+                                          <AlertDialog>
+                                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive"/></Button></AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Delete "{area.name}"?</AlertDialogTitle>
+                                                    <AlertDialogDescription>This will permanently delete the skill area and all its micro-skills.</AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDeleteSkillArea(selectedCoreSkill.id, area.id)}>Delete</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                          </AlertDialog>
+                                        </div>
                                       </div>
-                                    </AccordionTrigger>
-                                    <div className="flex items-center">
-                                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingArea({skillId: selectedCoreSkill.id, area}); }}><Edit className="h-4 w-4"/></Button>
-                                      <AlertDialog>
-                                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive"/></Button></AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>Delete "{area.name}"?</AlertDialogTitle>
-                                                <AlertDialogDescription>This will permanently delete the skill area and all its micro-skills.</AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => handleDeleteSkillArea(selectedCoreSkill.id, area.id)}>Delete</AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                      </AlertDialog>
-                                    </div>
-                                  </div>
-                                </CardHeader>
-                                <AccordionContent className="px-3 pb-3">
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {area.microSkills.map(micro => (
-                                      <Card key={micro.id} className="flex flex-col group/item">
-                                          <CardHeader className="p-3 flex flex-row items-center justify-between">
-                                              <CardTitle className="text-base">{micro.name}</CardTitle>
-                                          </CardHeader>
-                                      </Card>
-                                    ))}
-                                     <Card className="flex flex-col items-center justify-center border-dashed min-h-[5rem] hover:border-primary hover:bg-muted/50 transition-colors">
-                                        <form onSubmit={(e) => {
-                                            e.preventDefault();
-                                            handleAddMicroSkill(selectedCoreSkill.id, area.id, newMicroSkillNames[area.id] || '');
-                                            setNewMicroSkillNames(prev => ({ ...prev, [area.id]: '' }));
-                                        }} className="flex items-center gap-2 mt-2 pt-2 w-full p-4">
-                                            <Input
-                                                value={newMicroSkillNames[area.id] || ''}
-                                                onChange={e => setNewMicroSkillNames(prev => ({...prev, [area.id]: e.target.value}))}
-                                                placeholder="Add new micro-skill..."
-                                                className="h-8"
-                                            />
-                                            <Button size="icon" type="submit" className="h-8 w-8 shrink-0">
-                                                <PlusCircle className="h-4 w-4" />
-                                            </Button>
-                                        </form>
-                                     </Card>
-                                  </div>
-                                </AccordionContent>
-                              </AccordionItem>
-                            </Card>
-                          ))}
+                                    </CardHeader>
+                                    <AccordionContent className="px-3 pb-3">
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {area.microSkills.map(micro => {
+                                            const relatedIntentions = microSkillIntentions.get(micro.name) || [];
+                                            const relatedCuriosities = microSkillCuriosities.get(micro.name) || [];
+                                            return (
+                                              <Card key={micro.id} className="flex flex-col group/item">
+                                                  <CardHeader className="p-3">
+                                                      <CardTitle className="text-base">{micro.name}</CardTitle>
+                                                  </CardHeader>
+                                                  {(relatedIntentions.length > 0 || relatedCuriosities.length > 0) && (
+                                                    <CardContent className="p-3 pt-0 text-xs">
+                                                        {relatedIntentions.length > 0 && (
+                                                            <div className="mb-2">
+                                                                <h4 className="font-semibold mb-1 flex items-center gap-1"><Lightbulb className="h-3 w-3 text-amber-500" />Intentions</h4>
+                                                                <ul className="space-y-1">
+                                                                    {relatedIntentions.map(intention => (
+                                                                        <li key={intention.id}>
+                                                                            <button onClick={() => { setSelectedDeepWorkTask(intention); router.push('/deep-work'); }} className="text-muted-foreground hover:text-primary truncate w-full text-left">{intention.name}</button>
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            </div>
+                                                        )}
+                                                        {relatedCuriosities.length > 0 && (
+                                                            <div>
+                                                                <h4 className="font-semibold mb-1 flex items-center gap-1"><Flashlight className="h-3 w-3 text-amber-500" />Curiosities</h4>
+                                                                <ul className="space-y-1">
+                                                                    {relatedCuriosities.map(curiosity => (
+                                                                        <li key={curiosity.id}>
+                                                                            <button onClick={() => { setSelectedUpskillTask(curiosity); router.push('/upskill'); }} className="text-muted-foreground hover:text-primary truncate w-full text-left">{curiosity.name}</button>
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            </div>
+                                                        )}
+                                                    </CardContent>
+                                                  )}
+                                              </Card>
+                                            )
+                                        })}
+                                         <Card className="flex flex-col items-center justify-center border-dashed min-h-[5rem] hover:border-primary hover:bg-muted/50 transition-colors">
+                                            <form onSubmit={(e) => {
+                                                e.preventDefault();
+                                                handleAddMicroSkill(selectedCoreSkill.id, area.id, newMicroSkillNames[area.id] || '');
+                                                setNewMicroSkillNames(prev => ({ ...prev, [area.id]: '' }));
+                                            }} className="flex items-center gap-2 mt-2 pt-2 w-full p-4">
+                                                <Input
+                                                    value={newMicroSkillNames[area.id] || ''}
+                                                    onChange={e => setNewMicroSkillNames(prev => ({...prev, [area.id]: e.target.value}))}
+                                                    placeholder="Add new micro-skill..."
+                                                    className="h-8"
+                                                />
+                                                <Button size="icon" type="submit" className="h-8 w-8 shrink-0">
+                                                    <PlusCircle className="h-4 w-4" />
+                                                </Button>
+                                            </form>
+                                         </Card>
+                                      </div>
+                                    </AccordionContent>
+                                  </AccordionItem>
+                                </Card>
+                              );
+                          })}
                        </Accordion>
                   </div>
               ) : (
@@ -786,4 +855,3 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
-
