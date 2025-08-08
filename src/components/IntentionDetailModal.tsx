@@ -110,31 +110,77 @@ const UpskillItem = ({ item, onDrillDown, getIcon, children }: { item: ExerciseD
 const DeepWorkItem = ({ item, onDrillDown, getIcon, children }: { item: ExerciseDefinition, onDrillDown: (item: ExerciseDefinition) => void, getIcon: (item: ExerciseDefinition) => React.ReactNode, children: React.ReactNode }) => {
     const isParent = (item.linkedDeepWorkIds?.length ?? 0) > 0 || (item.linkedUpskillIds?.length ?? 0) > 0 || (item.linkedResourceIds?.length ?? 0) > 0;
     
-    if (isParent) {
-        return (
-            <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value={item.id} className="border-none">
-                     <AccordionTrigger className="hover:no-underline p-2 rounded-md hover:bg-muted/50">
-                        <div className="flex items-center gap-2">
-                           {getIcon(item)}
-                           <span className="font-semibold">{item.name}</span>
-                       </div>
-                    </AccordionTrigger>
+    return (
+        <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value={item.id} className="border-none">
+                 <AccordionTrigger className="hover:no-underline p-2 rounded-md hover:bg-muted/50" disabled={!isParent}>
+                    <div className="flex items-center gap-2">
+                       {getIcon(item)}
+                       <span className="font-semibold">{item.name}</span>
+                   </div>
+                </AccordionTrigger>
+                {isParent && (
                     <AccordionContent className="pl-6 border-l ml-2">
-                       {children}
+                    {children}
                     </AccordionContent>
-                </AccordionItem>
-            </Accordion>
-        );
+                )}
+            </AccordionItem>
+        </Accordion>
+    );
+}
+
+const LinkedIntentionsPopup = ({ popupState, onClose }: {
+    popupState: { x: number; y: number; intentions: { intention: ExerciseDefinition; linkedVia: string }[] };
+    onClose: () => void;
+}) => {
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: 'linked-intentions-popup' });
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: popupState.y,
+        left: popupState.x,
+        zIndex: 100, // Ensure it's on top
+        willChange: 'transform',
+    };
+     if (transform) {
+        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
 
-     return (
-        <div className="flex items-center gap-2 p-2 rounded-md">
-            {getIcon(item)}
-            <span>{item.name}</span>
+    return (
+        <div ref={setNodeRef} style={style} {...attributes}>
+            <Card className="w-80 shadow-2xl border-2 border-primary/30 bg-card">
+                <CardHeader className="p-3 relative cursor-grab" {...listeners}>
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-base">Linked Intentions</CardTitle>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={onClose}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-3 pt-0">
+                    <ScrollArea className="max-h-96 my-4 pr-4">
+                        {popupState.intentions.length > 0 ? (
+                            <ul className="space-y-2">
+                            {popupState.intentions.map(({ intention, linkedVia }) => (
+                                <li key={intention.id} className="p-3 border rounded-md">
+                                <p className="font-medium text-foreground">{intention.name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Linked via: <span className="font-medium">{linkedVia}</span>
+                                </p>
+                                </li>
+                            ))}
+                            </ul>
+                        ) : (
+                            <p className="text-sm text-muted-foreground text-center py-8">
+                            No intentions are currently linked to this curiosity.
+                            </p>
+                        )}
+                    </ScrollArea>
+                </CardContent>
+            </Card>
         </div>
-    )
-}
+    );
+};
+
 
 export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPopupProps) {
   const { 
@@ -148,8 +194,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `intention-popup-${popupState.resourceId}` });
   const cardRef = useRef<HTMLDivElement>(null);
 
-  const [isLinksModalOpen, setIsLinksModalOpen] = useState(false);
-  const [linkedIntentions, setLinkedIntentions] = useState<{ intention: ExerciseDefinition; linkedVia: string }[]>([]);
+  const [linkedIntentionsPopup, setLinkedIntentionsPopup] = useState<{ x: number; y: number; intentions: { intention: ExerciseDefinition; linkedVia: string }[] } | null>(null);
 
   const style: React.CSSProperties = {
       position: 'fixed',
@@ -231,7 +276,6 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
         return <Focus className="h-4 w-4 text-purple-500" />; // Standalone
     }
     
-    // Deep Work Icon Logic
     const nodeType = getDeepWorkNodeType(item);
     switch (nodeType) {
         case 'Intention': return <Lightbulb className="h-4 w-4 text-amber-500" />;
@@ -243,7 +287,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   };
   
  const handleViewLinkedIntentions = () => {
-    if (!currentItem) return;
+    if (!currentItem || !cardRef.current) return;
 
     const getDescendantIds = (startNodeId: string, defs: ExerciseDefinition[], linkKey: 'linkedDeepWorkIds' | 'linkedUpskillIds'): Set<string> => {
         const visited = new Set<string>();
@@ -294,9 +338,13 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
             if(addedIntentions.has(intention.id)) break;
         }
     });
-
-    setLinkedIntentions(foundLinks);
-    setIsLinksModalOpen(true);
+    
+    const rect = cardRef.current.getBoundingClientRect();
+    setLinkedIntentionsPopup({
+        x: rect.right + 20,
+        y: rect.top,
+        intentions: foundLinks,
+    });
 };
 
 
@@ -417,32 +465,13 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
             </CardContent>
           </Card>
         </div>
-
-        <Dialog open={isLinksModalOpen} onOpenChange={setIsLinksModalOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Linked Intentions for "{currentItem.name}"</DialogTitle>
-            </DialogHeader>
-            <ScrollArea className="max-h-96 my-4 pr-4">
-              {linkedIntentions.length > 0 ? (
-                <ul className="space-y-2">
-                  {linkedIntentions.map(({ intention, linkedVia }) => (
-                    <li key={intention.id} className="p-3 border rounded-md">
-                      <p className="font-medium text-foreground">{intention.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Linked via: <span className="font-medium">{linkedVia}</span>
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  No intentions are currently linked to this curiosity.
-                </p>
-              )}
-            </ScrollArea>
-          </DialogContent>
-        </Dialog>
+        
+        {linkedIntentionsPopup && (
+            <LinkedIntentionsPopup
+                popupState={linkedIntentionsPopup}
+                onClose={() => setLinkedIntentionsPopup(null)}
+            />
+        )}
     </>
   );
 }
