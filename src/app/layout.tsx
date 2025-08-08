@@ -65,7 +65,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <Toaster />
       <BackgroundAudioPlayer />
       <FloatingVideoPlayer />
-      {isBrowser &&
+      {isBrowser && document.getElementById('global-popup-root') &&
         createPortal(
           <>
             {ResourcePopup && Array.from(openPopups.values()).map(popupState => (
