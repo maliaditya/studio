@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
@@ -232,10 +233,8 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
-       <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[85vh] flex flex-col">
-        <div 
-          className="p-4 flex-shrink-0 border-b flex flex-row items-center"
-        >
+       <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col">
+        <div className="p-4 flex-shrink-0 border-b flex flex-row items-center">
           <div className="cursor-grab p-1 mr-2" {...listeners}>
             <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
           </div>
@@ -251,8 +250,8 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex-grow min-h-0">
-            <ScrollArea className="h-full p-4">
+        <CardContent className="p-0">
+            <ScrollArea className="max-h-[70vh] p-4">
                 <div className="space-y-6">
                     {linkedItems.deepWork.length > 0 && (
                         <div>
@@ -284,7 +283,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                     )}
                 </div>
             </ScrollArea>
-        </div>
+        </CardContent>
       </Card>
     </div>
   );
