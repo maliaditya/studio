@@ -1162,7 +1162,7 @@ function DeepWorkPageContent() {
     toast({ title: "Success", description: "Links have been updated." });
     setIsManageLinksModalOpen(false);
   };
-
+  
   const getVisualizationsRecursive = useCallback((nodeId: string): ExerciseDefinition[] => {
     const visited = new Set<string>();
     const visualizations: ExerciseDefinition[] = [];
@@ -1223,7 +1223,7 @@ function DeepWorkPageContent() {
         definitionsSource = (upskillDefinitions || []).filter(def => {
             if (def.category !== selectedUpskillTopic) return false;
             const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-            const isLinkedAsChild = linkedUpskillChildIds.has(def.id);
+            const isLinkedAsChild = linkedDeepWorkChildIds.has(def.id);
             return isParent && !isLinkedAsChild;
         });
     } else if (skillSelectionStep === 'visualization' && selectedUpskillCuriosity) {
@@ -1476,7 +1476,7 @@ function DeepWorkPageContent() {
                                         if (!def) return null;
                                         const domain = getDomainForCategory(def.category);
                                         const projectsInDomainForChild = domain ? projects.filter(p => p.domainId === domain.id) : [];
-                                        return <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getIcon: (type) => <Lightbulb className="h-5 w-5 text-amber-500" />, getNodeType: getDeepWorkNodeType, getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, setSelectedFocusArea, setViewMode, handleToggleReadyForBranding, handleUnlinkItem, handleDeleteExerciseDefinition: handleDeleteFocusArea, handleViewProgress, deepWorkDefinitions, formatDuration: formatMinutes, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic: setSelectedDeepWorkTask, linkedDeepWorkChildIds, onOpenMindMap: (id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); }, onUpdateName: handleUpdateFocusAreaName, projectsInDomain: projectsInDomainForChild, onLinkProject: handleLinkProject }} />;
+                                        return <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getIcon: (type) => <Lightbulb className="h-5 w-5 text-amber-500" />, getNodeType: getDeepWorkNodeType, getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, setSelectedFocusArea: setSelectedDeepWorkTask, setViewMode, handleToggleReadyForBranding, handleUnlinkItem, handleDeleteExerciseDefinition: handleDeleteFocusArea, handleViewProgress, deepWorkDefinitions, formatDuration: formatMinutes, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic: setSelectedDeepWorkTask, linkedDeepWorkChildIds, onOpenMindMap: (id) => { setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true); }, onUpdateName: handleUpdateFocusAreaName, projectsInDomain: projectsInDomainForChild, onLinkProject: handleLinkProject }} />;
                                     })}
                                     {(selectedDeepWorkTask.linkedUpskillIds || []).map(id => {
                                         const def = upskillDefinitions.find(d => d.id === id);
@@ -1484,6 +1484,7 @@ function DeepWorkPageContent() {
                                         // Fake implementation for now to avoid crashes
                                         const isUpskillObjectiveComplete = (id: string) => false;
                                         const getUpskillLoggedMinutesRecursive = (def: ExerciseDefinition) => 0;
+                                        const linkedUpskillChildIds = new Set<string>();
                                         return <LinkedUpskillCard key={id} id={id} upskillDef={def} {...{ handleAddTaskToSession, setSelectedSubtopic: setSelectedDeepWorkTask, setViewMode, handleUnlinkItem: (type,id)=>handleUnlinkItem(type as any, id), handleDeleteUpskillDefinition: (id) => {}, handleViewProgress, isUpskillObjectiveComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate: 0, setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName: () => {}, projectsInDomain, onLinkProject: () => {}, onEdit: () => {} }} />;
                                     })}
                                     {(selectedDeepWorkTask.linkedResourceIds || []).map(id => {
