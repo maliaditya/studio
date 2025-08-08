@@ -13,7 +13,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, getISOWeek, isMonday, getYear, addDays, parseISO, differenceInDays } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, SkillArea, SkillDomain, CoreSkill, MicroSkill, Project, Feature } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, SkillArea, SkillDomain, CoreSkill, MicroSkill, Project, Feature, DailySchedule } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { AuthGuard } from '@/components/AuthGuard';
@@ -174,6 +174,40 @@ const DraggableSubtaskItem: React.FC<{
     );
 };
 
+const SLOT_NAMES: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
+
+function AddToSessionPopover({ definition, onSelectSlot }: { definition: ExerciseDefinition; onSelectSlot: (slotName: string) => void; }) {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
+          <PlusCircle className="h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-48 p-1">
+        <div className="flex flex-col">
+          <p className="p-2 text-xs font-semibold text-muted-foreground">Add to slot...</p>
+          {SLOT_NAMES.map(slotName => (
+            <Button
+              key={slotName}
+              variant="ghost"
+              className="w-full justify-start h-8"
+              onClick={() => {
+                onSelectSlot(slotName as string);
+                setIsOpen(false);
+              }}
+            >
+              {slotName}
+            </Button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function LinkedDeepWorkCard({
     id,
     deepworkDef,
@@ -206,7 +240,7 @@ function LinkedDeepWorkCard({
     getNodeType: (def: ExerciseDefinition, childIds: Set<string>) => string;
     getDeepWorkLoggedMinutes: (def: ExerciseDefinition) => number;
     permanentlyLoggedActionIds: Set<string>;
-    handleAddTaskToSession: (def: ExerciseDefinition) => void;
+    handleAddTaskToSession: (definition: ExerciseDefinition, slot: string) => void;
     setSelectedFocusArea: (def: ExerciseDefinition | null) => void;
     setViewMode: (mode: 'session' | 'library') => void;
     handleToggleReadyForBranding: (id: string) => void;
@@ -261,7 +295,7 @@ function LinkedDeepWorkCard({
                  <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
                     {isAction ? (
-                        <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => handleAddTaskToSession(deepworkDef)}><PlusCircle className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Add to Session</TooltipContent></Tooltip></TooltipProvider>
+                        <AddToSessionPopover definition={deepworkDef} onSelectSlot={(slot) => handleAddTaskToSession(deepworkDef, slot)} />
                     ) : (
                         <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => { setSelectedFocusArea(deepworkDef); setViewMode('library'); }}><ArrowRight className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Drill Down</TooltipContent></Tooltip></TooltipProvider>
                     )}
@@ -699,6 +733,7 @@ function DeepWorkPageContent() {
     projects,
     microSkillMap,
     handleOpenNestedPopup,
+    scheduleTaskFromMindMap,
   } = useAuth();
   
   const [isNewFocusAreaModalOpen, setIsNewFocusAreaModalOpen] = useState(false);
@@ -1024,23 +1059,8 @@ function DeepWorkPageContent() {
     });
   };
 
-  const handleAddTaskToSession = (definition: ExerciseDefinition) => {
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const newWorkoutExercise: WorkoutExercise = {
-      id: `dwex_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-      definitionId: definition.id, name: definition.name, category: definition.category,
-      loggedSets: [], targetSets: parseInt(DEFAULT_TARGET_SESSIONS.toString(), 10), targetReps: DEFAULT_TARGET_DURATION,
-    };
-    const existingWorkout = allDeepWorkLogs.find(log => log.id === dateKey);
-    if (existingWorkout) {
-      if (existingWorkout.exercises.some(ex => ex.definitionId === definition.id)) {
-        toast({ title: "Info", description: `"${definition.name}" is already in this session.` }); return;
-      }
-      updateOrAddWorkoutLog({ ...existingWorkout, exercises: [...existingWorkout.exercises, newWorkoutExercise] });
-    } else {
-      updateOrAddWorkoutLog({ id: dateKey, date: dateKey, exercises: [newWorkoutExercise] });
-    }
-    toast({ title: "Added to Session", description: `"${definition.name}" added for ${format(selectedDate, 'PPP')}.` });
+  const handleAddTaskToSession = (definition: ExerciseDefinition, slot: string) => {
+    scheduleTaskFromMindMap(definition.id, 'deepwork', slot);
   };
 
   const handleRemoveExerciseFromWorkout = (exerciseId: string) => {

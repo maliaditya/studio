@@ -13,7 +13,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, getISOWeek, isMonday, getYear, parseISO, differenceInDays } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, TopicGoal, SkillDomain, CoreSkill, MicroSkill, Project } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, TopicGoal, SkillDomain, CoreSkill, MicroSkill, Project, DailySchedule } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { AuthGuard } from '@/components/AuthGuard';
@@ -133,9 +133,43 @@ const DraggableSubtaskItem: React.FC<{
     );
 };
 
+const SLOT_NAMES: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
+
+function AddToSessionPopover({ definition, onSelectSlot }: { definition: ExerciseDefinition; onSelectSlot: (slotName: string) => void; }) {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
+          <PlusCircle className="h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-48 p-1">
+        <div className="flex flex-col">
+          <p className="p-2 text-xs font-semibold text-muted-foreground">Add to slot...</p>
+          {SLOT_NAMES.map(slotName => (
+            <Button
+              key={slotName}
+              variant="ghost"
+              className="w-full justify-start h-8"
+              onClick={() => {
+                onSelectSlot(slotName as string);
+                setIsOpen(false);
+              }}
+            >
+              {slotName}
+            </Button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleUnlinkItem, handleDeleteSubtopic, handleViewProgress, isComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate, setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName, projectsInDomain, onLinkProject }: {
   upskillDef: ExerciseDefinition;
-  handleAddTaskToSession: (def: ExerciseDefinition) => void;
+  handleAddTaskToSession: (definition: ExerciseDefinition, slot: string) => void;
   setSelectedSubtopic: (def: ExerciseDefinition | null) => void;
   setViewMode: (mode: 'session' | 'library') => void;
   handleUnlinkItem: (type: 'upskill' | 'resource', id: string) => void;
@@ -207,6 +241,7 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
   };
   
   const linkedProject = upskillDef.linkedProjectId ? projectsInDomain.find(p => p.id === upskillDef.linkedProjectId) : null;
+  const isActionable = nodeType === 'Visualization' || nodeType === 'Standalone';
 
   return (
     <div ref={setCombinedRefs} style={style} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
@@ -215,7 +250,20 @@ function LinkedUpskillItem({ upskillDef, handleAddTaskToSession, setSelectedSubt
          <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
             <TooltipProvider>
-                <Tooltip><TooltipTrigger asChild><span tabIndex={nodeType === 'Visualization' || nodeType === 'Standalone' ? 0 : -1}><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); (nodeType === 'Visualization' || nodeType === 'Standalone') && handleAddTaskToSession(upskillDef); }} disabled={nodeType !== 'Visualization' && nodeType !== 'Standalone'}><PlusCircle className="h-4 w-4" /></Button></span></TooltipTrigger><TooltipContent>{nodeType === 'Visualization' || nodeType === 'Standalone' ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent></Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={isActionable ? 0 : -1}>
+                    {isActionable ? (
+                      <AddToSessionPopover definition={upskillDef} onSelectSlot={(slot) => handleAddTaskToSession(upskillDef, slot)} />
+                    ) : (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" disabled>
+                        <PlusCircle className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{isActionable ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent>
+              </Tooltip>
             </TooltipProvider>
             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setSelectedSubtopic(upskillDef); setViewMode('library'); }}><ArrowRight className="h-4 w-4" /></Button>
             <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => handleViewProgress(upskillDef)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
@@ -437,7 +485,8 @@ function UpskillPageContent() {
     coreSkills,
     projects,
     microSkillMap,
-    handleOpenNestedPopup
+    handleOpenNestedPopup,
+    scheduleTaskFromMindMap,
   } = useAuth();
   const router = useRouter();
   
@@ -724,20 +773,8 @@ function UpskillPageContent() {
     setEditingSubtopic(null);
   };
 
-  const handleAddTaskToSession = (definition: ExerciseDefinition) => {
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const newWorkoutExercise: WorkoutExercise = {
-      id: `${definition.id}-${Date.now()}-${Math.random()}`, definitionId: definition.id, name: definition.name, category: definition.category,
-      loggedSets: [], targetSets: parseInt(DEFAULT_TARGET_SESSIONS.toString(), 10), targetReps: DEFAULT_TARGET_DURATION,
-    };
-    const existingWorkout = allUpskillLogs.find(log => log.id === dateKey);
-    if (existingWorkout) {
-      if (existingWorkout.exercises.some(ex => ex.definitionId === definition.id)) { toast({ title: "Info", description: `"${definition.name}" is already in this session.` }); return; }
-      updateOrAddWorkoutLog({ ...existingWorkout, exercises: [...existingWorkout.exercises, newWorkoutExercise] });
-    } else {
-      updateOrAddWorkoutLog({ id: dateKey, date: dateKey, exercises: [newWorkoutExercise] });
-    }
-    toast({ title: "Added to Session", description: `"${definition.name}" added for ${format(selectedDate, 'PPP')}.` });
+  const handleAddTaskToSession = (definition: ExerciseDefinition, slot: string) => {
+    scheduleTaskFromMindMap(definition.id, 'upskill', slot);
   };
 
   const handleRemoveExerciseFromWorkout = (exerciseId: string) => {
