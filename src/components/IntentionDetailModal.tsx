@@ -239,7 +239,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   if (!currentItem) return null;
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes}>
+    <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
        <Card ref={cardRef} className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[70vh]">
         <CardHeader className="p-2 flex-shrink-0 border-b flex flex-row items-center">
           <div className="cursor-grab p-1 mr-1" {...listeners}>
