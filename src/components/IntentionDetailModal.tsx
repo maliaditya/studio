@@ -148,7 +148,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
       position: 'fixed',
       top: popupState.y,
       left: popupState.x,
-      width: '40rem',
+      width: '36rem',
       willChange: 'transform',
       zIndex: 80 + popupState.level,
   };
@@ -236,28 +236,28 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
        <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col">
-        <CardHeader className="p-3 flex-shrink-0 border-b flex flex-row items-center">
-          <div className="cursor-grab p-1 mr-2" {...listeners}>
+        <CardHeader className="p-2 flex-shrink-0 border-b flex flex-row items-center">
+          <div className="cursor-grab p-1 mr-1" {...listeners}>
             <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
           </div>
           {navigationStack.length > 1 && (
-            <Button variant="ghost" size="icon" onClick={handleGoBack} className="mr-2 h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={handleGoBack} className="mr-1 h-7 w-7">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           )}
           <div className="flex-grow min-w-0">
-              <CardTitle className="truncate text-lg" title={currentItem.name}>Details for: {currentItem.name}</CardTitle>
+              <CardTitle className="truncate text-base" title={currentItem.name}>Details for: {currentItem.name}</CardTitle>
           </div>
-          <Button variant="ghost" size="icon" onClick={() => onClose(popupState.resourceId)} className="h-8 w-8">
+          <Button variant="ghost" size="icon" onClick={() => onClose(popupState.resourceId)} className="h-7 w-7">
             <X className="h-4 w-4" />
           </Button>
         </CardHeader>
         <CardContent className="p-0">
-            <ScrollArea className="max-h-[70vh] p-4">
-                <div className="space-y-6">
+            <ScrollArea className="max-h-[70vh] p-3">
+                <div className="space-y-4">
                     {linkedItems.deepWork.length > 0 && (
                         <div>
-                            <h3 className="font-semibold mb-2 flex items-center gap-2"><Briefcase className="h-5 w-5 text-green-500" />Linked Deep Work</h3>
+                            <h3 className="font-semibold mb-1 flex items-center gap-2 text-sm"><Briefcase className="h-4 w-4 text-green-500" />Linked Deep Work</h3>
                             <div className="space-y-1">
                                 {linkedItems.deepWork.map(item => (
                                     <DeepWorkItem key={item.id} item={item} onDrillDown={handleDrillDown} getIcon={getIcon}>
@@ -269,7 +269,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                     )}
                      {linkedItems.upskill.length > 0 && (
                         <div>
-                            <h3 className="font-semibold mb-2 flex items-center gap-2"><BookCopy className="h-5 w-5 text-amber-500" />Linked Learning</h3>
+                            <h3 className="font-semibold mb-1 flex items-center gap-2 text-sm"><BookCopy className="h-4 w-4 text-amber-500" />Linked Learning</h3>
                             <div className="space-y-1">
                                 {linkedItems.upskill.map(item => renderUpskillNode(item))}
                             </div>
@@ -277,8 +277,8 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                     )}
                     {linkedItems.resource.length > 0 && (
                         <div>
-                             <h3 className="font-semibold mb-2 flex items-center gap-2"><Library className="h-5 w-5 text-blue-500" />Linked Resources</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                             <h3 className="font-semibold mb-1 flex items-center gap-2 text-sm"><Library className="h-4 w-4 text-blue-500" />Linked Resources</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                 {linkedItems.resource.map(item => <ResourceItem key={item.id} item={item} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event, popupState)} />)}
                             </div>
                         </div>
