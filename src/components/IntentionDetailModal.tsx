@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -143,6 +143,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   
   const [navigationStack, setNavigationStack] = useState<ExerciseDefinition[]>([]);
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `intention-popup-${popupState.resourceId}` });
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const style: React.CSSProperties = {
       position: 'fixed',
@@ -150,7 +151,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
       left: popupState.x,
       width: '24rem',
       willChange: 'transform',
-      zIndex: 80 + popupState.level,
+      zIndex: 70 + popupState.level,
   };
   if (transform) {
       style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
@@ -221,7 +222,11 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     const childResourceItems = (item.linkedResourceIds || [])
         .map(id => resources.find(r => r.id === id))
         .filter((r): r is Resource => !!r)
-        .map(r => <ResourceItem key={r.id} item={r} onOpenNestedPopup={handleOpenNestedPopup} />);
+        .map(r => <ResourceItem key={r.id} item={r} onOpenNestedPopup={(resourceId, event) => {
+            if (cardRef.current) {
+                handleOpenNestedPopup(resourceId, event, popupState, cardRef.current.getBoundingClientRect());
+            }
+        }} />);
 
     return (
         <UpskillItem key={item.id} item={item} onDrillDown={handleDrillDown} getIcon={getIcon}>
@@ -235,7 +240,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
 
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
-       <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[70vh]">
+       <Card ref={cardRef} className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[70vh]">
         <CardHeader className="p-2 flex-shrink-0 border-b flex flex-row items-center">
           <div className="cursor-grab p-1 mr-1" {...listeners}>
             <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
@@ -279,7 +284,11 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                         <div>
                              <h3 className="font-semibold mb-1 flex items-center gap-2 text-sm"><Library className="h-4 w-4 text-blue-500" />Linked Resources</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {linkedItems.resource.map(item => <ResourceItem key={item.id} item={item} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event, popupState)} />)}
+                                {linkedItems.resource.map(item => <ResourceItem key={item.id} item={item} onOpenNestedPopup={(resourceId, event) => {
+                                    if (cardRef.current) {
+                                        handleOpenNestedPopup(resourceId, event, popupState, cardRef.current.getBoundingClientRect());
+                                    }
+                                }} />)}
                             </div>
                         </div>
                     )}

@@ -142,7 +142,7 @@ interface AuthContextType {
   
   // Resource Popups
   openPopups: Map<string, PopupState>;
-  handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => void;
+  handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => void;
   handleClosePopup: (resourceId: string) => void;
   handlePopupDragEnd: (event: DragEndEvent) => void;
   ResourcePopup: React.FC<ResourcePopupProps>;
@@ -1417,7 +1417,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsPistonsHeadOpen(true);
   };
   
-  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
+  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => {
     setOpenPopups(prev => {
         const newPopups = new Map(prev);
         const resource = resources.find(r => r.id === resourceId);
@@ -1428,26 +1428,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
         let x, y, level, parentId;
     
-        if (parentPopupState) {
+        if (parentPopupState && parentRect) {
             level = parentPopupState.level + 1;
             parentId = parentPopupState.resourceId;
-            x = parentPopupState.x + 40;
-            y = parentPopupState.y + 40;
+            const screenWidth = window.innerWidth;
+            if (parentRect.x + parentRect.width + popupWidth + 20 < screenWidth) {
+                // Open to the right
+                x = parentRect.x + parentRect.width + 20;
+            } else {
+                // Open to the left
+                x = parentRect.x - popupWidth - 20;
+            }
+            y = parentRect.y;
         } else {
             level = 0;
             parentId = undefined;
-            if (hasMarkdown) {
-                // Center large popups
-                x = window.innerWidth / 2 - popupWidth / 2;
-                y = window.innerHeight / 2 - Math.min(window.innerHeight * 0.7, 700) / 2;
-            } else {
-                x = event.clientX;
-                y = event.clientY;
-            }
+            x = event.clientX;
+            y = event.clientY;
         }
         
         newPopups.set(resourceId, {
-            resourceId, level, x, y, parentId, width: popupWidth
+            resourceId, level, x, y, parentId, width: popupWidth,
+            z: 80 + level
         });
         return newPopups;
     });
@@ -1574,7 +1576,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             resourceId: intentionId, 
             x: 100 + xOffset, 
             y: 100 + yOffset, 
-            level: 0 
+            level: 0,
+            z: 70 + newPopups.size
         });
         return newPopups;
     });
