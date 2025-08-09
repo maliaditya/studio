@@ -994,7 +994,7 @@ export function PistonsHead() {
       case 'specializations': return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Skill'} {...commonProps} /> : <SpecializationSelector onSelect={handleTopicSelect} onBack={onBack} />;
       case 'desires': return selectedTopicId ? <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Desire'} {...commonProps} /> : <DesireSelector onSelect={handleTopicSelect} onBack={onBack} />;
       case 'mindset': return selectedTopicId ? <TopicPistonView topicId={selectedTopicName} topicName={selectedTopicName || 'Mindset'} {...commonProps} /> : <MindsetSelector onSelect={handleTopicSelect} onBack={onBack} />;
-      case 'thoughts': return <ThoughtsView onSelect={(type) => setCurrentView(type === 'Positive' ? 'positive-thoughts' : 'negative-thoughts')} />;
+      case 'thoughts': return <ThoughtsView onSelect={(type) => setCurrentView(type === 'Fantasy' ? 'positive-thoughts' : 'negative-thoughts')} />;
       case 'negative-thoughts':
         if (selectedTopicId) {
             return <TopicPistonView topicId={selectedTopicId} topicName={selectedTopicName || 'Thought'} {...commonProps} />;
@@ -1397,11 +1397,11 @@ const SpecializationSelector = ({ onSelect, onBack }: { onSelect: (topicId: stri
     );
 };
 
-const ThoughtsView = ({ onSelect }: { onSelect: (type: 'Positive' | 'Negative') => void }) => (
+const ThoughtsView = ({ onSelect }: { onSelect: (type: 'Fantasy' | 'Disruptive') => void }) => (
     <CardContent className="p-4">
         <div className="grid grid-cols-2 gap-4">
-            <Button onClick={() => onSelect('Positive')} variant="outline" className="flex-col h-20"><Smile className="h-6 w-6 text-green-500 mb-1"/>Positive</Button>
-            <Button onClick={() => onSelect('Negative')} variant="outline" className="flex-col h-20"><Shield className="h-6 w-6 text-red-500 mb-1"/>Negative</Button>
+            <Button onClick={() => onSelect('Fantasy')} variant="outline" className="flex-col h-20"><Smile className="h-6 w-6 text-green-500 mb-1"/>Fantasy</Button>
+            <Button onClick={() => onSelect('Disruptive')} variant="outline" className="flex-col h-20"><Shield className="h-6 w-6 text-red-500 mb-1"/>Disruptive</Button>
         </div>
     </CardContent>
 );
@@ -1572,6 +1572,7 @@ const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHisto
     
 
     
+
 
 
 
