@@ -193,14 +193,11 @@ function PurposePageContent() {
                                         </div>
                                         {linkedHabits.length > 0 && (
                                             <div className="mt-4 pt-3 border-t">
-                                                <h4 className="font-medium text-sm mb-2">Connected Habits</h4>
+                                                <h4 className="font-medium text-sm mb-2">Habits</h4>
                                                 <div className="space-y-2">
                                                     {linkedHabits.map((link, i) => (
                                                         <div key={i} className="text-xs p-2 rounded bg-background/50">
-                                                            <p className="font-semibold text-foreground">{link.habitName}</p>
-                                                            <p className="text-muted-foreground flex items-center">
-                                                                {link.response} <ArrowRight className="h-3 w-3 mx-1" /> {link.newResponse}
-                                                            </p>
+                                                          <p className="font-semibold text-foreground">{link.habitName} = <span className="font-normal text-muted-foreground">{link.response} <ArrowRight className="inline h-3 w-3" /> {link.newResponse}</span></p>
                                                         </div>
                                                     ))}
                                                 </div>
