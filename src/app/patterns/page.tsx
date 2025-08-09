@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -16,7 +15,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen, Workflow, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Pattern, PatternPhrase, MetaRule } from '@/types/workout';
+import type { Pattern, PatternPhrase, MetaRule, Resource } from '@/types/workout';
 import { cn } from '@/lib/utils';
 
 
@@ -35,6 +34,10 @@ function PatternsPageContent() {
     const mechanismCards = useMemo(() => {
         return resources.filter(r => r.type === 'mechanism');
     }, [resources]);
+    
+    const habitCards = useMemo(() => {
+        return resources.filter(r => r.type === 'habit');
+    }, [resources]);
 
     const usedPhrases = useMemo(() => {
         return new Set(patterns.flatMap(p => p.phrases.map(phrase => phrase.text)));
@@ -46,21 +49,13 @@ function PatternsPageContent() {
             Costs: [],
             'Positive Laws': [],
             'Negative Laws': [],
-            'Mechanism Cards': [],
+            'Habit Cards': [],
         };
         
-        const habitCards = resources.filter(r => r.type === 'habit');
-
         mechanismCards.forEach(card => {
             const cardName = card.name;
             const cardId = card.id;
 
-            const linkedHabits = habitCards.filter(habit => 
-                habit.response?.resourceId === cardId || habit.newResponse?.resourceId === cardId
-            ).map(habit => habit.name);
-
-            fields['Mechanism Cards'].push({ category: 'Mechanism Cards', text: cardName, mechanismCardId: cardId, mechanismCardName: cardName, linkedHabits });
-            
             if (card.mechanismFramework === 'positive') {
                 if (card.benefit) fields.Benefits.push({ category: 'Benefits', text: card.benefit, mechanismCardId: cardId, mechanismCardName: cardName });
                 if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: cardId, mechanismCardName: cardName });
@@ -83,9 +78,28 @@ function PatternsPageContent() {
                 }
             }
         });
+
+        // Invert logic: Iterate habits and find their linked mechanisms
+        habitCards.forEach(habit => {
+            const linkedMechanisms: string[] = [];
+            const mechanismForResponse = mechanismCards.find(m => m.id === habit.response?.resourceId);
+            const mechanismForNewResponse = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
+            
+            if (mechanismForResponse) linkedMechanisms.push(mechanismForResponse.name);
+            if (mechanismForNewResponse && mechanismForNewResponse.name !== mechanismForResponse?.name) {
+                linkedMechanisms.push(mechanismForNewResponse.name);
+            }
+
+            fields['Habit Cards'].push({
+                category: 'Habit Cards',
+                text: habit.name,
+                mechanismCardId: habit.id, // Use habit ID as the key here
+                linkedMechanisms: linkedMechanisms,
+            });
+        });
         
         Object.keys(fields).forEach(key => {
-            if (key !== 'Mechanism Cards') {
+            if (key !== 'Habit Cards') {
               const uniquePhrases = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
               fields[key] = uniquePhrases.filter(phrase => !usedPhrases.has(phrase.text));
             } else {
@@ -94,7 +108,7 @@ function PatternsPageContent() {
         });
 
         return fields;
-    }, [mechanismCards, resources, usedPhrases]);
+    }, [mechanismCards, habitCards, usedPhrases]);
 
     const handlePhraseToggle = (phrase: PatternPhrase) => {
         setSelectedPhrases(prev => 
@@ -191,7 +205,7 @@ function PatternsPageContent() {
                         {Object.entries(aggregatedFields).map(([title, phrases]) => (
                             <div key={title}>
                                 <h3 className="font-semibold mb-2 flex items-center gap-2">
-                                  {title === 'Mechanism Cards' && <Workflow className="h-4 w-4 text-muted-foreground" />}
+                                  {title === 'Habit Cards' && <Workflow className="h-4 w-4 text-muted-foreground" />}
                                   {title}
                                 </h3>
                                 <ScrollArea className="h-60 border rounded-md p-2">
@@ -199,7 +213,7 @@ function PatternsPageContent() {
                                         <div className="space-y-2">
                                             {phrases.map((phrase, i) => (
                                                 <div key={i} className="flex items-start space-x-2">
-                                                    {title !== 'Mechanism Cards' ? (
+                                                    {title !== 'Habit Cards' ? (
                                                       <Checkbox
                                                           id={`phrase-${title}-${i}`}
                                                           checked={selectedPhrases.some(p => p.text === phrase.text)}
@@ -207,14 +221,14 @@ function PatternsPageContent() {
                                                       />
                                                     ) : null}
                                                     <div className="flex-grow">
-                                                      {title === 'Mechanism Cards' ? (
+                                                      {title === 'Habit Cards' ? (
                                                         <div className="text-sm p-2 bg-muted/30 rounded-md">
                                                           <p className="font-semibold text-foreground">{phrase.text}</p>
-                                                          {(phrase.linkedHabits && phrase.linkedHabits.length > 0) && (
+                                                          {(phrase.linkedMechanisms && phrase.linkedMechanisms.length > 0) && (
                                                             <div className="mt-1 pt-1 border-t">
-                                                              <p className="text-xs text-muted-foreground font-medium">Linked Habits:</p>
+                                                              <p className="text-xs text-muted-foreground font-medium">Linked Mechanisms:</p>
                                                               <ul className="list-disc list-inside text-xs text-muted-foreground">
-                                                                {phrase.linkedHabits.map((habit, hIndex) => <li key={hIndex}>{habit}</li>)}
+                                                                {phrase.linkedMechanisms.map((mech, hIndex) => <li key={hIndex}>{mech}</li>)}
                                                               </ul>
                                                             </div>
                                                           )}
@@ -370,3 +384,5 @@ export default function PatternsPage() {
         </AuthGuard>
     );
 }
+
+    
