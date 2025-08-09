@@ -53,31 +53,33 @@ function PatternsPageContent() {
 
         mechanismCards.forEach(card => {
             const cardName = card.name;
+            const cardId = card.id;
 
             const linkedHabits = habitCards.filter(habit => 
-                habit.response?.resourceId === card.id || habit.newResponse?.resourceId === card.id
-            ).map(habit => habit.name).join(', ');
+                habit.response?.resourceId === cardId || habit.newResponse?.resourceId === cardId
+            ).map(habit => habit.name);
 
-            const displayText = linkedHabits ? `${cardName} (from: ${linkedHabits})` : cardName;
-
-            fields['Mechanism Cards'].push({ category: 'Mechanism Cards', text: displayText, mechanismCardId: card.id, mechanismCardName: cardName });
+            fields['Mechanism Cards'].push({ category: 'Mechanism Cards', text: cardName, mechanismCardId: cardId, mechanismCardName: cardName, linkedHabits });
             
             if (card.mechanismFramework === 'positive') {
-                if (card.benefit) fields.Benefits.push({ category: 'Benefits', text: card.benefit, mechanismCardId: card.id, mechanismCardName: cardName });
-                if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: card.id, mechanismCardName: cardName });
+                if (card.benefit) fields.Benefits.push({ category: 'Benefits', text: card.benefit, mechanismCardId: cardId, mechanismCardName: cardName });
+                if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: cardId, mechanismCardName: cardName });
                 if (card.law?.premise && card.law?.outcome) {
                   const lawText = `${card.law.premise} can only happen when ${card.law.outcome}`;
-                  fields['Positive Laws'].push({ category: 'Positive Laws', text: lawText, mechanismCardId: card.id, mechanismCardName: cardName });
+                  fields['Positive Laws'].push({ category: 'Positive Laws', text: lawText, mechanismCardId: cardId, mechanismCardName: cardName });
                 }
             } else { // Negative Framework
-                if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: card.id, mechanismCardName: cardName });
-                if (card.trigger?.feeling && card.benefit) {
-                    const costText = `That one ${card.trigger.feeling} costs me ${card.benefit}.`;
-                    fields.Costs.push({ category: 'Costs', text: costText, mechanismCardId: card.id, mechanismCardName: cardName });
+                if (card.reward) { // This is a "Cost" in the negative framework
+                    const costText = `That one ${card.trigger?.feeling || 'action'} costs me ${card.reward}.`;
+                    fields.Costs.push({ category: 'Costs', text: costText, mechanismCardId: cardId, mechanismCardName: cardName });
+                }
+                 if (card.benefit) { // This is a "Benefit" blocked by the negative action
+                    const benefitText = `This blocks ${card.benefit}.`;
+                    fields.Benefits.push({ category: 'Benefits', text: benefitText, mechanismCardId: cardId, mechanismCardName: cardName });
                 }
                 if (card.law?.premise && card.law?.outcome) {
                     const lawText = `${card.law.premise} cannot happen when ${card.law.outcome}`;
-                    fields['Negative Laws'].push({ category: 'Negative Laws', text: lawText, mechanismCardId: card.id, mechanismCardName: cardName });
+                    fields['Negative Laws'].push({ category: 'Negative Laws', text: lawText, mechanismCardId: cardId, mechanismCardName: cardName });
                 }
             }
         });
@@ -197,16 +199,32 @@ function PatternsPageContent() {
                                         <div className="space-y-2">
                                             {phrases.map((phrase, i) => (
                                                 <div key={i} className="flex items-start space-x-2">
-                                                    {title !== 'Mechanism Cards' && (
+                                                    {title !== 'Mechanism Cards' ? (
                                                       <Checkbox
                                                           id={`phrase-${title}-${i}`}
                                                           checked={selectedPhrases.some(p => p.text === phrase.text)}
                                                           onCheckedChange={() => handlePhraseToggle(phrase)}
                                                       />
-                                                    )}
-                                                    <Label htmlFor={`phrase-${title}-${i}`} className="text-sm font-normal cursor-pointer">
-                                                        {phrase.text}
-                                                    </Label>
+                                                    ) : null}
+                                                    <div className="flex-grow">
+                                                      {title === 'Mechanism Cards' ? (
+                                                        <div className="text-sm p-2 bg-muted/30 rounded-md">
+                                                          <p className="font-semibold text-foreground">{phrase.text}</p>
+                                                          {(phrase.linkedHabits && phrase.linkedHabits.length > 0) && (
+                                                            <div className="mt-1 pt-1 border-t">
+                                                              <p className="text-xs text-muted-foreground font-medium">Linked Habits:</p>
+                                                              <ul className="list-disc list-inside text-xs text-muted-foreground">
+                                                                {phrase.linkedHabits.map((habit, hIndex) => <li key={hIndex}>{habit}</li>)}
+                                                              </ul>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      ) : (
+                                                        <Label htmlFor={`phrase-${title}-${i}`} className="text-sm font-normal cursor-pointer">
+                                                            {phrase.text}
+                                                        </Label>
+                                                      )}
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
