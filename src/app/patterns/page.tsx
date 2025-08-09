@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -16,6 +16,12 @@ import { Badge } from '@/components/ui/badge';
 import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Pattern, PatternPhrase } from '@/types/workout';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 function PatternsPageContent() {
     const { resources, patterns, setPatterns, metaRules, setMetaRules } = useAuth();
@@ -38,7 +44,7 @@ function PatternsPageContent() {
     }, [patterns]);
 
     const aggregatedFields = useMemo(() => {
-        const fields: Record<string, string[]> = {
+        const fields: Record<string, PatternPhrase[]> = {
             Benefits: [],
             Costs: [],
             'Positive Laws': [],
@@ -46,20 +52,21 @@ function PatternsPageContent() {
         };
 
         mechanismCards.forEach(card => {
-            if (card.benefit) fields.Benefits.push(card.benefit);
-            if (card.reward) fields.Costs.push(card.reward);
+            if (card.benefit) fields.Benefits.push({ category: 'Benefits', text: card.benefit });
+            if (card.reward) fields.Costs.push({ category: 'Costs', text: card.reward });
             if (card.law?.premise && card.law?.outcome) {
+              const lawText = `${card.law.premise} ${card.mechanismFramework === 'positive' ? 'can only happen when' : 'cannot happen when'} ${card.law.outcome}`;
               if (card.mechanismFramework === 'positive') {
-                fields['Positive Laws'].push(`${card.law.premise} can only happen when ${card.law.outcome}`);
+                fields['Positive Laws'].push({ category: 'Positive Laws', text: lawText });
               } else {
-                fields['Negative Laws'].push(`${card.law.premise} cannot happen when ${card.law.outcome}`);
+                fields['Negative Laws'].push({ category: 'Negative Laws', text: lawText });
               }
             }
         });
         
         Object.keys(fields).forEach(key => {
-            const uniquePhrases = [...new Set(fields[key])];
-            fields[key] = uniquePhrases.filter(phrase => !usedPhrases.has(phrase));
+            const uniquePhrases = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
+            fields[key] = uniquePhrases.filter(phrase => !usedPhrases.has(phrase.text));
         });
 
         return fields;
@@ -79,7 +86,6 @@ function PatternsPageContent() {
             return;
         }
 
-        // Updating an existing pattern
         if (selectedPatternToUpdate) {
             setPatterns(prev => prev.map(p => {
                 if (p.id === selectedPatternToUpdate) {
@@ -91,7 +97,6 @@ function PatternsPageContent() {
             }));
             toast({ title: 'Pattern Updated!', description: `Phrases added to the existing pattern.`});
         } 
-        // Creating a new pattern
         else {
             if (!newPatternName.trim()) {
                 toast({ title: 'Error', description: 'Pattern name cannot be empty.', variant: 'destructive' });
@@ -147,6 +152,13 @@ function PatternsPageContent() {
             
             <Card>
                 <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><BookOpen/> Step 1: Collect Data</CardTitle>
+                    <CardDescription>For a week (or longer), fill out both the Negative and Positive Frameworks for different actions in your life. Don’t overthink — just write what comes to mind, even if it’s messy.</CardDescription>
+                </CardHeader>
+            </Card>
+            
+            <Card>
+                <CardHeader>
                     <CardTitle className="flex items-center gap-2"><FileText /> Step 2: Review Your Data</CardTitle>
                     <CardDescription>Review aggregated data from your Mechanism cards. Select phrases that repeat or resonate with you.</CardDescription>
                 </CardHeader>
@@ -162,11 +174,11 @@ function PatternsPageContent() {
                                                 <div key={i} className="flex items-start space-x-2">
                                                     <Checkbox
                                                         id={`phrase-${title}-${i}`}
-                                                        checked={selectedPhrases.some(p => p.text === phrase)}
-                                                        onCheckedChange={() => handlePhraseToggle({ category: title, text: phrase })}
+                                                        checked={selectedPhrases.some(p => p.text === phrase.text)}
+                                                        onCheckedChange={() => handlePhraseToggle(phrase)}
                                                     />
                                                     <Label htmlFor={`phrase-${title}-${i}`} className="text-sm font-normal cursor-pointer">
-                                                        {phrase}
+                                                        {phrase.text}
                                                     </Label>
                                                 </div>
                                             ))}
@@ -244,20 +256,47 @@ function PatternsPageContent() {
                         <ScrollArea className="h-60 mt-2 pr-4">
                             {patterns.length > 0 ? (
                                 <RadioGroup value={selectedPatternForRule || ''} onValueChange={setSelectedPatternForRule} className="space-y-4">
-                                    {patterns.map(p => (
-                                        <Card key={p.id}>
-                                            <CardHeader className="p-3 flex flex-row items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <RadioGroupItem value={p.id} id={`rule-pattern-${p.id}`} />
-                                                    <Label htmlFor={`rule-pattern-${p.id}`} className="cursor-pointer">
-                                                        <Badge variant={p.type === 'Positive' ? 'default' : 'destructive'} className="mr-2">{p.type}</Badge>
-                                                        {p.name}
-                                                    </Label>
-                                                </div>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => {e.stopPropagation(); handleDeletePattern(p.id)}}><Trash2 className="h-4 w-4"/></Button>
-                                            </CardHeader>
+                                    {patterns.map(p => {
+                                      const isSelected = selectedPatternForRule === p.id;
+                                      const categorizedPhrases = isSelected ? p.phrases.reduce((acc, phrase) => {
+                                        if (!acc[phrase.category]) acc[phrase.category] = [];
+                                        acc[phrase.category].push(phrase.text);
+                                        return acc;
+                                      }, {} as Record<string, string[]>) : null;
+
+                                      return (
+                                        <Card key={p.id} className={cn("transition-all", isSelected && "ring-2 ring-primary")}>
+                                          <CardHeader className="p-3">
+                                            <div className="flex flex-row items-center justify-between">
+                                              <div className="flex items-center gap-2 flex-grow">
+                                                <RadioGroupItem value={p.id} id={`rule-pattern-${p.id}`} />
+                                                <Label htmlFor={`rule-pattern-${p.id}`} className="cursor-pointer flex-grow">
+                                                  <Badge variant={p.type === 'Positive' ? 'default' : 'destructive'} className="mr-2">{p.type}</Badge>
+                                                  {p.name}
+                                                </Label>
+                                              </div>
+                                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleDeletePattern(p.id); }}>
+                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                              </Button>
+                                            </div>
+                                          </CardHeader>
+                                          {isSelected && categorizedPhrases && (
+                                            <CardContent className="p-3 pt-0 text-xs">
+                                              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                                {Object.entries(categorizedPhrases).map(([category, phrases]) => (
+                                                  <div key={category}>
+                                                    <h4 className="font-medium text-muted-foreground mb-1">{category}</h4>
+                                                    <ul className="list-disc list-inside space-y-1">
+                                                      {phrases.map((phrase, i) => <li key={i}>{phrase}</li>)}
+                                                    </ul>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </CardContent>
+                                          )}
                                         </Card>
-                                    ))}
+                                      );
+                                    })}
                                 </RadioGroup>
                             ) : (
                                 <div className="h-full flex items-center justify-center border rounded-md">
