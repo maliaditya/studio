@@ -640,7 +640,19 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                                   placeholder1="..."
                                   placeholder2="..."
                                 />
-                                <EditableField field="trigger" subField="feeling" prefix="Emotion/Image: That one" suffix={`costs me ${resource.reward || "..."}.`} resource={resource} onUpdate={onUpdate} />
+                                <DoubleEditableField 
+                                    prefix="Emotion/Image: That one"
+                                    suffix="."
+                                    value1={resource.trigger?.feeling || ""}
+                                    value2={`costs me ${resource.reward || "..."}`}
+                                    onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...resource.trigger, feeling: newValue } })}
+                                    onUpdate2={(newValue) => {
+                                        const cost = newValue.replace('costs me', '').trim();
+                                        onUpdate({ ...resource, reward: cost });
+                                    }}
+                                    placeholder1="..."
+                                    placeholder2="costs me..."
+                                />
                             </div>
                         ) : (
                          <DndContext onDragEnd={handlePointDragEnd}>
@@ -781,7 +793,19 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
                     placeholder1="..."
                     placeholder2="..."
                 />
-                <EditableField field="trigger" subField="feeling" prefix="Emotion/Image: That one" suffix={`costs me ${resource.reward || "..."}.`} resource={resource} onUpdate={onUpdate} />
+                 <DoubleEditableField 
+                    prefix="Emotion/Image: That one"
+                    suffix="."
+                    value1={resource.trigger?.feeling || ""}
+                    value2={`costs me ${resource.reward || "..."}`}
+                    onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...resource.trigger, feeling: newValue } })}
+                    onUpdate2={(newValue) => {
+                        const cost = newValue.replace('costs me', '').trim();
+                        onUpdate({ ...resource, reward: cost });
+                    }}
+                    placeholder1="..."
+                    placeholder2="costs me..."
+                />
             </CardContent>
         </Card>
     );
@@ -2486,7 +2510,7 @@ function ResourcesPageContent() {
   );
 }
 
-const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onConvertToCard, dragHandle }: { 
+const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onEditLinkText, dragHandle }: { 
     point: ResourcePoint, 
     onUpdate: (text: string) => void, 
     onDelete: () => void,
@@ -2575,6 +2599,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
