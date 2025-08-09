@@ -15,35 +15,16 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-
-interface PatternPhrase {
-  category: string;
-  text: string;
-}
-
-interface Pattern {
-  id: string;
-  name: string;
-  type: 'Positive' | 'Negative';
-  phrases: PatternPhrase[];
-}
-
-interface MetaRule {
-  id: string;
-  text: string;
-  patternId: string;
-}
+import type { Pattern, PatternPhrase } from '@/types/workout';
 
 function PatternsPageContent() {
-    const { resources } = useAuth();
+    const { resources, patterns, setPatterns, metaRules, setMetaRules } = useAuth();
     const { toast } = useToast();
 
-    const [patterns, setPatterns] = useState<Pattern[]>([]);
-    const [metaRules, setMetaRules] = useState<MetaRule[]>([]);
-    
     const [selectedPhrases, setSelectedPhrases] = useState<PatternPhrase[]>([]);
     const [newPatternName, setNewPatternName] = useState('');
     const [newPatternType, setNewPatternType] = useState<'Positive' | 'Negative'>('Positive');
+    const [selectedPatternToUpdate, setSelectedPatternToUpdate] = useState<string | null>(null);
 
     const [newMetaRuleText, setNewMetaRuleText] = useState('');
     const [selectedPatternForRule, setSelectedPatternForRule] = useState<string | null>(null);
@@ -51,6 +32,10 @@ function PatternsPageContent() {
     const mechanismCards = useMemo(() => {
         return resources.filter(r => r.type === 'mechanism');
     }, [resources]);
+
+    const usedPhrases = useMemo(() => {
+        return new Set(patterns.flatMap(p => p.phrases.map(phrase => phrase.text)));
+    }, [patterns]);
 
     const aggregatedFields = useMemo(() => {
         const fields: Record<string, string[]> = {
@@ -71,14 +56,14 @@ function PatternsPageContent() {
               }
             }
         });
-
-        // Deduplicate while preserving order
+        
         Object.keys(fields).forEach(key => {
-            fields[key] = [...new Set(fields[key])];
+            const uniquePhrases = [...new Set(fields[key])];
+            fields[key] = uniquePhrases.filter(phrase => !usedPhrases.has(phrase));
         });
 
         return fields;
-    }, [mechanismCards]);
+    }, [mechanismCards, usedPhrases]);
 
     const handlePhraseToggle = (phrase: PatternPhrase) => {
         setSelectedPhrases(prev => 
@@ -88,30 +73,47 @@ function PatternsPageContent() {
         );
     };
 
-    const handleCreatePattern = () => {
-        if (!newPatternName.trim()) {
-            toast({ title: 'Error', description: 'Pattern name cannot be empty.', variant: 'destructive' });
-            return;
-        }
+    const handleCreateOrUpdatePattern = () => {
         if (selectedPhrases.length === 0) {
-            toast({ title: 'Error', description: 'Please select at least one phrase for the pattern.', variant: 'destructive' });
+            toast({ title: 'Error', description: 'Please select at least one phrase.', variant: 'destructive' });
             return;
         }
-        const newPattern: Pattern = {
-            id: `pattern_${Date.now()}`,
-            name: newPatternName,
-            type: newPatternType,
-            phrases: selectedPhrases,
-        };
-        setPatterns(prev => [...prev, newPattern]);
-        setNewPatternName('');
+
+        // Updating an existing pattern
+        if (selectedPatternToUpdate) {
+            setPatterns(prev => prev.map(p => {
+                if (p.id === selectedPatternToUpdate) {
+                    const existingPhraseTexts = new Set(p.phrases.map(ph => ph.text));
+                    const newPhrasesToAdd = selectedPhrases.filter(sp => !existingPhraseTexts.has(sp.text));
+                    return { ...p, phrases: [...p.phrases, ...newPhrasesToAdd] };
+                }
+                return p;
+            }));
+            toast({ title: 'Pattern Updated!', description: `Phrases added to the existing pattern.`});
+        } 
+        // Creating a new pattern
+        else {
+            if (!newPatternName.trim()) {
+                toast({ title: 'Error', description: 'Pattern name cannot be empty.', variant: 'destructive' });
+                return;
+            }
+            const newPattern: Pattern = {
+                id: `pattern_${Date.now()}`,
+                name: newPatternName,
+                type: newPatternType,
+                phrases: selectedPhrases,
+            };
+            setPatterns(prev => [...prev, newPattern]);
+            setNewPatternName('');
+            toast({ title: 'Pattern Created!', description: `The "${newPattern.name}" pattern has been saved.`});
+        }
+        
         setSelectedPhrases([]);
-        toast({ title: 'Pattern Created!', description: `The "${newPattern.name}" pattern has been saved.`});
+        setSelectedPatternToUpdate(null);
     };
 
     const handleDeletePattern = (patternId: string) => {
         setPatterns(prev => prev.filter(p => p.id !== patternId));
-        // Also remove any meta-rules based on this pattern
         setMetaRules(prev => prev.filter(r => r.patternId !== patternId));
     };
 
@@ -125,7 +127,7 @@ function PatternsPageContent() {
             return;
         }
 
-        const newRule: MetaRule = {
+        const newRule = {
             id: `rule_${Date.now()}`,
             text: newMetaRuleText.trim(),
             patternId: selectedPatternForRule,
@@ -133,13 +135,8 @@ function PatternsPageContent() {
         setMetaRules(prev => [...prev, newRule]);
         setNewMetaRuleText('');
         setSelectedPatternForRule(null);
-        toast({ title: 'Meta-Rule Created!', description: 'A new rule has been added to your principles.' });
+        toast({ title: 'Meta-Rule Created!', description: 'A new rule has been added to your Purpose page.' });
     };
-
-    const handleDeleteMetaRule = (ruleId: string) => {
-        setMetaRules(prev => prev.filter(r => r.id !== ruleId));
-    };
-
 
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
@@ -148,7 +145,6 @@ function PatternsPageContent() {
                 <p className="mt-4 text-lg text-muted-foreground">Discover the underlying rules that govern your behavior.</p>
             </div>
             
-            {/* Step 2: Review */}
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2"><FileText /> Step 2: Review Your Data</CardTitle>
@@ -175,7 +171,7 @@ function PatternsPageContent() {
                                                 </div>
                                             ))}
                                         </div>
-                                    ) : <p className="text-xs text-muted-foreground text-center pt-8">No data for this category yet.</p>}
+                                    ) : <p className="text-xs text-muted-foreground text-center pt-8">No unassigned data for this category.</p>}
                                 </ScrollArea>
                             </div>
                         ))}
@@ -183,11 +179,10 @@ function PatternsPageContent() {
                 </CardContent>
             </Card>
 
-            {/* Step 3 & 4: Name Pattern */}
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2"><Zap /> Steps 3 & 4: Spot & Name Patterns</CardTitle>
-                    <CardDescription>Group your selected phrases into a named pattern.</CardDescription>
+                    <CardDescription>Group your selected phrases into a new pattern or add them to an existing one.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div>
@@ -201,36 +196,47 @@ function PatternsPageContent() {
                         </ScrollArea>
                     </div>
                     <div className="space-y-4">
-                        <div>
-                            <Label htmlFor="pattern-name">Pattern Name</Label>
-                            <Input id="pattern-name" value={newPatternName} onChange={e => setNewPatternName(e.target.value)} placeholder="e.g., Energy Feeders, Focus Killers" />
-                        </div>
-                        <div>
-                            <Label>Pattern Type</Label>
-                            <RadioGroup value={newPatternType} onValueChange={(v) => setNewPatternType(v as any)} className="flex items-center space-x-4 mt-2">
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="Positive" id="type-positive" />
-                                    <Label htmlFor="type-positive">Positive</Label>
+                        <RadioGroup value={selectedPatternToUpdate || 'new'} onValueChange={(v) => setSelectedPatternToUpdate(v === 'new' ? null : v)}>
+                           <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="new" id="type-new-pattern" />
+                                <Label htmlFor="type-new-pattern">Create New Pattern</Label>
+                            </div>
+                            {patterns.map(p => (
+                                <div key={p.id} className="flex items-center space-x-2">
+                                    <RadioGroupItem value={p.id} id={`pattern-${p.id}`} />
+                                    <Label htmlFor={`pattern-${p.id}`}>Add to: <span className="font-semibold">{p.name}</span></Label>
                                 </div>
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="Negative" id="type-negative" />
-                                    <Label htmlFor="type-negative">Negative</Label>
+                            ))}
+                        </RadioGroup>
+                        
+                        {!selectedPatternToUpdate && (
+                            <div className="space-y-4 pl-6 border-l-2 ml-2">
+                                <div>
+                                    <Label htmlFor="pattern-name">New Pattern Name</Label>
+                                    <Input id="pattern-name" value={newPatternName} onChange={e => setNewPatternName(e.target.value)} placeholder="e.g., Energy Feeders" />
                                 </div>
-                            </RadioGroup>
-                        </div>
-                        <Button onClick={handleCreatePattern} disabled={selectedPhrases.length === 0 || !newPatternName.trim()}>
+                                <div>
+                                    <Label>Pattern Type</Label>
+                                    <RadioGroup value={newPatternType} onValueChange={(v) => setNewPatternType(v as any)} className="flex items-center space-x-4 mt-2">
+                                        <div className="flex items-center space-x-2"><RadioGroupItem value="Positive" id="type-positive" /><Label htmlFor="type-positive">Positive</Label></div>
+                                        <div className="flex items-center space-x-2"><RadioGroupItem value="Negative" id="type-negative" /><Label htmlFor="type-negative">Negative</Label></div>
+                                    </RadioGroup>
+                                </div>
+                            </div>
+                        )}
+                        
+                        <Button onClick={handleCreateOrUpdatePattern} disabled={selectedPhrases.length === 0 || (!selectedPatternToUpdate && !newPatternName.trim())}>
                             <PlusCircle className="mr-2 h-4 w-4"/>
-                            Create Pattern
+                            {selectedPatternToUpdate ? 'Add to Pattern' : 'Create Pattern'}
                         </Button>
                     </div>
                 </CardContent>
             </Card>
             
-            {/* Step 5: Meta-Rules */}
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2"><Lightbulb /> Step 5: Create Meta-Rules</CardTitle>
-                    <CardDescription>Turn your defined patterns into actionable life rules.</CardDescription>
+                    <CardDescription>Turn your defined patterns into actionable life rules. These will appear on your Purpose page.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div>
@@ -242,8 +248,8 @@ function PatternsPageContent() {
                                         <Card key={p.id}>
                                             <CardHeader className="p-3 flex flex-row items-center justify-between">
                                                 <div className="flex items-center gap-2">
-                                                    <RadioGroupItem value={p.id} id={`pattern-${p.id}`} />
-                                                    <Label htmlFor={`pattern-${p.id}`} className="cursor-pointer">
+                                                    <RadioGroupItem value={p.id} id={`rule-pattern-${p.id}`} />
+                                                    <Label htmlFor={`rule-pattern-${p.id}`} className="cursor-pointer">
                                                         <Badge variant={p.type === 'Positive' ? 'default' : 'destructive'} className="mr-2">{p.type}</Badge>
                                                         {p.name}
                                                     </Label>
@@ -269,52 +275,6 @@ function PatternsPageContent() {
                     </div>
                 </CardContent>
             </Card>
-
-            {/* Display Meta-Rules */}
-            {metaRules.length > 0 && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><BookOpen /> Your Meta-Rules</CardTitle>
-                        <CardDescription>Your guiding principles, derived from your own data.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {metaRules.map(rule => {
-                            const pattern = patterns.find(p => p.id === rule.patternId);
-                            if (!pattern) return null;
-
-                            const categorizedPhrases = pattern.phrases.reduce((acc, phrase) => {
-                                if (!acc[phrase.category]) {
-                                    acc[phrase.category] = [];
-                                }
-                                acc[phrase.category].push(phrase.text);
-                                return acc;
-                            }, {} as Record<string, string[]>);
-
-                            return (
-                                <Card key={rule.id} className="bg-muted/50">
-                                    <CardHeader className="flex flex-row items-center justify-between pb-3">
-                                        <CardTitle className="text-lg">{rule.text}</CardTitle>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteMetaRule(rule.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <p className="text-sm text-muted-foreground mb-2">Based on pattern: <span className="font-semibold text-foreground">{pattern.name}</span></p>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {Object.entries(categorizedPhrases).map(([category, phrases]) => (
-                                                <div key={category}>
-                                                    <h4 className="font-medium text-sm mb-1">{category}</h4>
-                                                    <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
-                                                        {phrases.map((phrase, i) => <li key={i}>{phrase}</li>)}
-                                                    </ul>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )
-                        })}
-                    </CardContent>
-                </Card>
-            )}
         </div>
     );
 }

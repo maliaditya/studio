@@ -397,3 +397,22 @@ export interface PurposeData {
   statement: string;
   specializationPurposes: Record<string, string>; // Key is CoreSkill ID
 }
+
+// Pattern Recognition Types
+export interface PatternPhrase {
+  category: string;
+  text: string;
+}
+
+export interface Pattern {
+  id: string;
+  name: string;
+  type: 'Positive' | 'Negative';
+  phrases: PatternPhrase[];
+}
+
+export interface MetaRule {
+  id: string;
+  text: string;
+  patternId: string;
+}

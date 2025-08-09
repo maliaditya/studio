@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { BrainCircuit, Edit, Save, Trash2, Check, X } from 'lucide-react';
+import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,7 +18,10 @@ function PurposePageContent() {
         purposeStatement, 
         setPurposeStatement,
         specializationPurposes,
-        setSpecializationPurposes
+        setSpecializationPurposes,
+        patterns,
+        metaRules,
+        setMetaRules,
     } = useAuth();
     const { toast } = useToast();
 
@@ -68,6 +71,10 @@ function PurposePageContent() {
         toast({ title: "Connection Cleared", description: "The specialization's link to your purpose has been removed." });
     };
 
+    const handleDeleteMetaRule = (ruleId: string) => {
+        setMetaRules(prev => prev.filter(r => r.id !== ruleId));
+    };
+
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
             <div className="text-center">
@@ -75,7 +82,7 @@ function PurposePageContent() {
                     Your Purpose
                 </h1>
                 <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-                    Define your central mission. Then, connect your specializations to see how every skill you build serves your ultimate goal.
+                    Define your central mission. Then, connect your specializations and meta-rules to see how every skill and insight serves your ultimate goal.
                 </p>
             </div>
 
@@ -119,6 +126,51 @@ function PurposePageContent() {
                     )}
                 </CardContent>
             </Card>
+
+            {metaRules.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><BookOpen /> Your Meta-Rules</CardTitle>
+                        <CardDescription>Your guiding principles, derived from your own data.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {metaRules.map(rule => {
+                            const pattern = patterns.find(p => p.id === rule.patternId);
+                            if (!pattern) return null;
+
+                            const categorizedPhrases = pattern.phrases.reduce((acc, phrase) => {
+                                if (!acc[phrase.category]) {
+                                    acc[phrase.category] = [];
+                                }
+                                acc[phrase.category].push(phrase.text);
+                                return acc;
+                            }, {} as Record<string, string[]>);
+
+                            return (
+                                <Card key={rule.id} className="bg-muted/50">
+                                    <CardHeader className="flex flex-row items-center justify-between pb-3">
+                                        <CardTitle className="text-lg">{rule.text}</CardTitle>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteMetaRule(rule.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className="text-sm text-muted-foreground mb-2">Based on pattern: <span className="font-semibold text-foreground">{pattern.name}</span></p>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {Object.entries(categorizedPhrases).map(([category, phrases]) => (
+                                                <div key={category}>
+                                                    <h4 className="font-medium text-sm mb-1">{category}</h4>
+                                                    <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
+                                                        {phrases.map((phrase, i) => <li key={i}>{phrase}</li>)}
+                                                    </ul>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )
+                        })}
+                    </CardContent>
+                </Card>
+            )}
 
             <div>
                 <h2 className="text-2xl font-bold text-center mb-6">How Your Specializations Serve Your Purpose</h2>
@@ -177,7 +229,6 @@ function PurposePageContent() {
                     </div>
                 )}
             </div>
-
         </div>
     );
 }

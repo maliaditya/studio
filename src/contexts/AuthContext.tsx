@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -204,6 +204,10 @@ interface AuthContextType {
   setPurposeStatement: React.Dispatch<React.SetStateAction<string>>;
   specializationPurposes: Record<string, string>;
   setSpecializationPurposes: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  patterns: Pattern[];
+  setPatterns: React.Dispatch<React.SetStateAction<Pattern[]>>;
+  metaRules: MetaRule[];
+  setMetaRules: React.Dispatch<React.SetStateAction<MetaRule[]>>;
 
   // New global map
   microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>;
@@ -343,9 +347,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
 
-  // Purpose State
+  // Purpose Page State
   const [purposeStatement, setPurposeStatement] = useState('');
   const [specializationPurposes, setSpecializationPurposes] = useState<Record<string, string>>({});
+  const [patterns, setPatterns] = useState<Pattern[]>([]);
+  const [metaRules, setMetaRules] = useState<MetaRule[]>([]);
 
 
   // Persisted task state
@@ -468,7 +474,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`companies_${username}`); setCompanies(d ? JSON.parse(d) : []); } catch (e) { setCompanies([]); }
       try { const d = loadItem(`positions_${username}`); setPositions(d ? JSON.parse(d) : []); } catch (e) { setPositions([]); }
       
-      // Purpose Data
+      // Purpose Page Data
       const storedPurpose = loadItem(`purpose_data_${username}`);
       if (storedPurpose) {
           const purposeData: PurposeData = JSON.parse(storedPurpose);
@@ -478,6 +484,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setPurposeStatement('');
           setSpecializationPurposes({});
       }
+      try { const d = loadItem(`patterns_${username}`); setPatterns(d ? JSON.parse(d) : []); } catch(e) { setPatterns([]); }
+      try { const d = loadItem(`meta_rules_${username}`); setMetaRules(d ? JSON.parse(d) : []); } catch(e) { setMetaRules([]); }
+
 
       // Persisted task state
       try {
@@ -516,6 +525,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSkillDomains([]); setCoreSkills([]); setProjects([]);
       setCompanies([]); setPositions([]);
       setPurposeStatement(''); setSpecializationPurposes({});
+      setPatterns([]); setMetaRules([]);
       setSelectedUpskillTask(null);
       setSelectedDeepWorkTask(null);
       setExpandedItems([]); setSelectedDomainId(null); setSelectedSkillId(null); setSelectedProjectId(null); setSelectedCompanyId(null);
@@ -581,8 +591,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`companies_${username}`, JSON.stringify(companies));
       localStorage.setItem(`positions_${username}`, JSON.stringify(positions));
 
-      // Purpose
+      // Purpose & Patterns
       localStorage.setItem(`purpose_data_${username}`, JSON.stringify({ statement: purposeStatement, specializationPurposes }));
+      localStorage.setItem(`patterns_${username}`, JSON.stringify(patterns));
+      localStorage.setItem(`meta_rules_${username}`, JSON.stringify(metaRules));
       
       // Persisted task state
       if (selectedUpskillTask) localStorage.setItem(`selected_upskill_task_${username}`, JSON.stringify(selectedUpskillTask)); else localStorage.removeItem(`selected_upskill_task_${username}`);
@@ -606,7 +618,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pistons,
     skillDomains, coreSkills, projects,
     companies, positions,
-    purposeStatement, specializationPurposes,
+    purposeStatement, specializationPurposes, patterns, metaRules,
     currentUser, loading, selectedUpskillTask, selectedDeepWorkTask,
     expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId
   ]);
@@ -769,6 +781,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setProjects(data.projects || []);
     setCompanies(data.companies || []);
     setPositions(data.positions || []);
+    
+    // Purpose & Patterns Data
+    const purposeData = data.purposeData || {};
+    setPurposeStatement(purposeData.statement || '');
+    setSpecializationPurposes(purposeData.specializationPurposes || {});
+    setPatterns(data.patterns || []);
+    setMetaRules(data.metaRules || []);
   };
   
   const register = async (username: string, password: string) => {
@@ -830,6 +849,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       skillDomains, coreSkills, projects,
       companies, positions,
       purposeData: { statement: purposeStatement, specializationPurposes },
+      patterns, metaRules,
       // Sidebar persistence
       expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
       selectedUpskillTask, selectedDeepWorkTask
@@ -1731,6 +1751,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     positions, setPositions,
     purposeStatement, setPurposeStatement,
     specializationPurposes, setSpecializationPurposes,
+    patterns, setPatterns,
+    metaRules, setMetaRules,
     selectedUpskillTask, setSelectedUpskillTask,
     selectedDeepWorkTask, setSelectedDeepWorkTask,
     microSkillMap,
