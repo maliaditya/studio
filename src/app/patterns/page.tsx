@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -366,7 +367,7 @@ function PatternsPageContent() {
                                                                 if (relatedHabits.length === 0) return null;
                                                                 return (
                                                                     <div key={category} className="md:col-span-2">
-                                                                        <h4 className="font-medium text-muted-foreground mb-1">{category}</h4>
+                                                                        <h4 className="font-medium text-muted-foreground mb-1">Habits</h4>
                                                                         <div className="space-y-1">
                                                                             {relatedHabits.map(habit => (
                                                                                 <div key={habit.id} className="p-1 rounded bg-background/50 text-foreground">
