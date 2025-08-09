@@ -188,3 +188,33 @@
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground));
 }
+
+/* Seamless Editable Component Styles */
+.editable-sentence {
+  line-height: 1.7;
+}
+
+.editable-sentence:focus-within {
+  outline: none;
+}
+
+.editable-placeholder {
+  background-color: hsl(var(--primary) / 0.1);
+  padding: 0.1em 0.3em;
+  border-radius: 0.25em;
+  outline: none;
+}
+
+.editable-placeholder:focus {
+  background-color: hsl(var(--primary) / 0.2);
+  box-shadow: 0 0 0 2px hsl(var(--ring));
+}
+
+.uneditable-text {
+  color: hsl(var(--muted-foreground));
+}
+
+.editable-sentence span {
+  display: inline;
+}
+

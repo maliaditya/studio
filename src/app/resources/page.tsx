@@ -115,78 +115,54 @@ interface PopupState {
   width?: number;
 }
 
-const EditableField = ({ field, subField, prefix, suffix, resource, onUpdate }: { field: keyof Resource, subField?: string, prefix: string, suffix?: string, resource: Resource, onUpdate: (updatedResource: Resource) => void }) => {
-    const [isEditing, setIsEditing] = useState(false);
-    
+const EditableField = ({ field, subField, prefix, suffix, resource, onUpdate }: { 
+    field: keyof Resource, 
+    subField?: string, 
+    prefix: string, 
+    suffix?: string, 
+    resource: Resource, 
+    onUpdate: (updatedResource: Resource) => void 
+}) => {
+    const editorRef = useRef<HTMLDivElement>(null);
     let initialValue = '';
     if (subField && typeof resource[field] === 'object' && resource[field] !== null) {
       initialValue = (resource[field] as any)[subField] || '';
     } else {
       initialValue = (resource[field] as string) || '';
     }
-
-    const [text, setText] = useState(initialValue);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-    useEffect(() => {
-        if (isEditing && textareaRef.current) {
-            textareaRef.current.focus();
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-        }
-    }, [isEditing]);
     
-    useEffect(() => {
-        setText(initialValue);
-    }, [initialValue]);
-
-    const handleSave = () => {
-        setIsEditing(false);
-        let updatedResource = { ...resource };
-        if (subField) {
-            updatedResource[field] = { ...(updatedResource[field] as object), [subField]: text };
-        } else {
-            updatedResource[field] = text as any;
+    const handleBlur = () => {
+        if (!editorRef.current) return;
+        const editableSpan = editorRef.current.querySelector('[contenteditable=true]');
+        const newValue = editableSpan?.textContent || '';
+        if (newValue !== initialValue) {
+            let updatedResource = { ...resource };
+            if (subField) {
+                updatedResource[field] = { ...(updatedResource[field] as object), [subField]: newValue };
+            } else {
+                updatedResource[field] = newValue as any;
+            }
+            onUpdate(updatedResource);
         }
-        onUpdate(updatedResource);
     };
 
     return (
         <div 
-          className="text-sm p-2 rounded-md transition-colors min-h-[40px] flex items-center" 
-          onDoubleClick={() => setIsEditing(true)}
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          onBlur={handleBlur}
+          className="editable-sentence text-sm p-2 rounded-md transition-colors"
         >
-          {isEditing ? (
-              <div className="flex items-center gap-2 w-full">
-                <span className="text-muted-foreground flex-shrink-0">{prefix}</span>
-                <Textarea 
-                    ref={textareaRef}
-                    value={text} 
-                    onChange={e => {
-                        setText(e.target.value);
-                        if (textareaRef.current) {
-                            textareaRef.current.style.height = 'auto';
-                            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-                        }
-                    }}
-                    onBlur={handleSave}
-                    className="text-sm mt-0 flex-grow bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0"
-                    rows={1}
-                />
-                {suffix && <span className="text-muted-foreground flex-shrink-0">{suffix}</span>}
-              </div>
-          ) : (
-             <p className="min-h-[1.5rem] text-foreground whitespace-pre-wrap">
-                <span className="text-muted-foreground">{prefix}</span>
-                <span className="font-medium mx-1">
-                    {text || <span className="italic font-normal text-muted-foreground/70">...</span>}
-                </span>
-                {suffix && <span className="text-muted-foreground">{suffix}</span>}
-            </p>
-          )}
+          <span contentEditable={false} className="uneditable-text">{prefix}</span>
+          {' '}
+          <span contentEditable={true} className="editable-placeholder" dangerouslySetInnerHTML={{ __html: initialValue || '...' }} />
+          {suffix && ' '}
+          {suffix && <span contentEditable={false} className="uneditable-text">{suffix}</span>}
         </div>
     );
 };
+
 
 const DoubleEditableField = ({ prefix, suffix, value1, value2, onUpdate1, onUpdate2, placeholder1 = "...", placeholder2 = "..." }: { 
     prefix: string;
@@ -198,51 +174,37 @@ const DoubleEditableField = ({ prefix, suffix, value1, value2, onUpdate1, onUpda
     placeholder1?: string;
     placeholder2?: string;
 }) => {
-    const [isEditing, setIsEditing] = useState(false);
-    const [text1, setText1] = useState(value1);
-    const [text2, setText2] = useState(value2);
-    const textarea1Ref = useRef<HTMLTextAreaElement>(null);
-    const textarea2Ref = useRef<HTMLTextAreaElement>(null);
-
-    useEffect(() => {
-        setText1(value1);
-        setText2(value2);
-    }, [value1, value2]);
-
-    const handleSave = () => {
-        setIsEditing(false);
-        onUpdate1(text1);
-        onUpdate2(text2);
+    const editorRef = useRef<HTMLDivElement>(null);
+    
+    const handleBlur = () => {
+        if (!editorRef.current) return;
+        const editableSpans = editorRef.current.querySelectorAll('[contenteditable=true]');
+        const newValue1 = editableSpans[0]?.textContent || '';
+        const newValue2 = editableSpans[1]?.textContent || '';
+        if (newValue1 !== value1) onUpdate1(newValue1);
+        if (newValue2 !== value2) onUpdate2(newValue2);
     };
 
-    const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>, setter: React.Dispatch<React.SetStateAction<string>>) => {
-        setter(e.target.value);
-        e.target.style.height = 'auto';
-        e.target.style.height = `${e.target.scrollHeight}px`;
-    }
-
     return (
-        <div className="text-sm p-2 rounded-md transition-colors min-h-[40px] flex items-start" onDoubleClick={() => setIsEditing(true)}>
-            {isEditing ? (
-                <div className="flex items-start gap-2 w-full">
-                    <span className="text-muted-foreground shrink-0 pt-2">{prefix}</span>
-                    <Textarea ref={textarea1Ref} value={text1} onChange={(e) => handleTextareaChange(e, setText1)} onBlur={handleSave} className="flex-grow min-w-0 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0" placeholder={placeholder1} rows={1} />
-                    <span className="text-muted-foreground shrink-0 pt-2">,</span>
-                    <Textarea ref={textarea2Ref} value={text2} onChange={(e) => handleTextareaChange(e, setText2)} onBlur={handleSave} className="flex-grow min-w-0 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0" placeholder={placeholder2} rows={1} />
-                    <span className="text-muted-foreground shrink-0 pt-2">{suffix}</span>
-                </div>
-            ) : (
-                 <p className="min-h-[1.5rem] text-foreground whitespace-pre-wrap">
-                    <span className="text-muted-foreground">{prefix}</span>
-                    <span className="font-medium mx-1">{value1 || <span className="italic font-normal text-muted-foreground/70">{placeholder1}</span>}</span>
-                    <span className="text-muted-foreground">,</span>
-                    <span className="font-medium mx-1">{value2 || <span className="italic font-normal text-muted-foreground/70">{placeholder2}</span>}</span>
-                    <span className="text-muted-foreground">{suffix}</span>
-                </p>
-            )}
+        <div 
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          onBlur={handleBlur}
+          className="editable-sentence text-sm p-2 rounded-md transition-colors"
+        >
+          <span contentEditable={false} className="uneditable-text">{prefix}</span>
+          {' '}
+          <span contentEditable={true} className="editable-placeholder" dangerouslySetInnerHTML={{ __html: value1 || placeholder1 }} />
+          <span contentEditable={false} className="uneditable-text">,</span>
+          {' '}
+          <span contentEditable={true} className="editable-placeholder" dangerouslySetInnerHTML={{ __html: value2 || placeholder2 }} />
+          {' '}
+          <span contentEditable={false} className="uneditable-text">{suffix}</span>
         </div>
     );
 };
+
 
 const EmotionEditableField = ({ value1, value2, onUpdate1, onUpdate2, placeholder1 = "...", placeholder2 = "..." }: { 
     value1: string;
@@ -252,51 +214,37 @@ const EmotionEditableField = ({ value1, value2, onUpdate1, onUpdate2, placeholde
     placeholder1?: string;
     placeholder2?: string;
 }) => {
-    const [isEditing, setIsEditing] = useState(false);
-    const [text1, setText1] = useState(value1);
-    const [text2, setText2] = useState(value2);
-    const textarea1Ref = useRef<HTMLTextAreaElement>(null);
-    const textarea2Ref = useRef<HTMLTextAreaElement>(null);
+    const editorRef = useRef<HTMLDivElement>(null);
     
-    useEffect(() => {
-        setText1(value1);
-        setText2(value2);
-    }, [value1, value2]);
-
-    const handleSave = () => {
-        setIsEditing(false);
-        onUpdate1(text1);
-        onUpdate2(text2);
+    const handleBlur = () => {
+        if (!editorRef.current) return;
+        const editableSpans = editorRef.current.querySelectorAll('[contenteditable=true]');
+        const newValue1 = editableSpans[0]?.textContent || '';
+        const newValue2 = editableSpans[1]?.textContent || '';
+        if (newValue1 !== value1) onUpdate1(newValue1);
+        if (newValue2 !== value2) onUpdate2(newValue2);
     };
 
-    const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>, setter: React.Dispatch<React.SetStateAction<string>>) => {
-        setter(e.target.value);
-        e.target.style.height = 'auto';
-        e.target.style.height = `${e.target.scrollHeight}px`;
-    }
-
     return (
-        <div className="text-sm p-2 rounded-md transition-colors min-h-[40px] flex items-start" onDoubleClick={() => setIsEditing(true)}>
-            {isEditing ? (
-                <div className="flex items-start gap-2 w-full">
-                    <span className="text-muted-foreground shrink-0 pt-2">Emotion/Image: That one</span>
-                    <Textarea ref={textarea1Ref} value={text1} onChange={(e) => handleTextareaChange(e, setText1)} onBlur={handleSave} className="flex-grow min-w-0 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0" placeholder={placeholder1} rows={1} />
-                    <span className="text-muted-foreground shrink-0 pt-2">costs me</span>
-                    <Textarea ref={textarea2Ref} value={text2} onChange={(e) => handleTextareaChange(e, setText2)} onBlur={handleSave} className="flex-grow min-w-0 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0" placeholder={placeholder2} rows={1} />
-                    <span className="text-muted-foreground shrink-0 pt-2">.</span>
-                </div>
-            ) : (
-                <p className="min-h-[1.5rem] text-foreground whitespace-pre-wrap">
-                    <span className="text-muted-foreground">Emotion/Image: That one</span>
-                    <span className="font-medium mx-1">{value1 || <span className="italic font-normal text-muted-foreground/70">{placeholder1}</span>}</span>
-                    <span className="text-muted-foreground mx-1">costs me</span>
-                    <span className="font-medium mx-1">{value2 || <span className="italic font-normal text-muted-foreground/70">{placeholder2}</span>}</span>
-                    <span className="text-muted-foreground">.</span>
-                </p>
-            )}
+        <div 
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          onBlur={handleBlur}
+          className="editable-sentence text-sm p-2 rounded-md transition-colors"
+        >
+          <span contentEditable={false} className="uneditable-text">Emotion/Image: That one</span>
+          {' '}
+          <span contentEditable={true} className="editable-placeholder" dangerouslySetInnerHTML={{ __html: value1 || placeholder1 }} />
+          {' '}
+          <span contentEditable={false} className="uneditable-text">costs me</span>
+          {' '}
+          <span contentEditable={true} className="editable-placeholder" dangerouslySetInnerHTML={{ __html: value2 || placeholder2 }} />
+          <span contentEditable={false} className="uneditable-text">.</span>
         </div>
     );
 };
+
 
 interface ResourcePopupProps {
   popupState: PopupState;
@@ -2551,7 +2499,7 @@ function ResourcesPageContent() {
                         placeholder="Enter display text..."
                         autoFocus
                     />
-                    {linkTextDialog?.point && (
+                    {linkTextDialog?.point.url && (
                         <p className="text-xs text-muted-foreground mt-2">URL: <span className="font-mono text-xs truncate">{linkTextDialog.point.text}</span></p>
                     )}
                 </div>
