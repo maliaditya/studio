@@ -904,6 +904,105 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
     );
 };
 
+const MechanismResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingFromId, onOpenNestedPopup }: {
+    resource: Resource; 
+    onUpdate: (updatedResource: Resource) => void; 
+    onDelete: (resourceId: string) => void;
+    onLinkClick: (resourceId: string) => void;
+    linkingFromId: string | null;
+    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
+}) => {
+    const [editingTitle, setEditingTitle] = useState(false);
+    return (
+        <Card onClick={(e) => onOpenNestedPopup(resource.id, e)} className={cn("flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl cursor-pointer", linkingFromId === resource.id && "ring-2 ring-primary", linkingFromId && linkingFromId !== resource.id && "cursor-pointer hover:ring-2 hover:ring-primary/50")}>
+            <CardHeader onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-start gap-2">
+                    <div className="flex items-center gap-2 flex-grow min-w-0">
+                        {editingTitle ? (
+                            <Input value={resource.name} onChange={(e) => onUpdate({...resource, name: e.target.value})} onBlur={() => setEditingTitle(false)} autoFocus className="text-lg font-semibold h-9" />
+                        ) : (
+                            <CardTitle className="flex items-center gap-3 text-lg cursor-pointer" onClick={() => setEditingTitle(true)}>
+                                <span className="text-primary"><Workflow className="h-5 w-5" /></span>
+                                <span className="truncate">{resource.name}</span>
+                            </CardTitle>
+                        )}
+                    </div>
+                     <div className="flex items-center">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onLinkClick(resource.id)}>
+                            <LinkIcon className="h-4 w-4" />
+                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 -mr-2 -mt-1"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => setEditingTitle(true)}>Edit Title</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => onDelete(resource.id)} className="text-destructive">Delete Card</DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                </div>
+                 {resource.createdAt && (
+                    <CardDescription className="text-xs pt-1">
+                        Created: {format(parseISO(resource.createdAt), 'MMM d, yyyy')}
+                    </CardDescription>
+                )}
+            </CardHeader>
+            <CardContent className="space-y-1" onClick={(e) => e.stopPropagation()}>
+                {resource.mechanismFramework === 'positive' ? (
+                    <>
+                        <EditableField field="trigger" subField="action" prefix="Action: When I" suffix="," resource={resource} onUpdate={onUpdate} />
+                        <EditableField field="response" subField="visualize" prefix="Mechanism: It triggers" suffix="internally." resource={resource} onUpdate={onUpdate} />
+                        <EditableField field="benefit" prefix="Benefit: This opens" suffix="." resource={resource} onUpdate={onUpdate} />
+                        <DoubleEditableField 
+                            prefix="Key Condition: Only when"
+                            suffix="happens."
+                            value1={resource.newResponse?.visualize || ""}
+                            value2={resource.newResponse?.action || ""}
+                            onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, visualize: newValue } })}
+                            onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, action: newValue } })}
+                            placeholder1="..."
+                            placeholder2="..."
+                        />
+                        <EmotionEditableField
+                            value1={resource.trigger?.feeling || ''}
+                            value2={resource.reward || ''}
+                            onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...resource.trigger, feeling: newValue } })}
+                            onUpdate2={(newValue) => onUpdate({ ...resource, reward: newValue })}
+                            label="gives me"
+                            placeholder1="..."
+                            placeholder2="..."
+                        />
+                    </>
+                ) : (
+                    <>
+                        <EditableField field="trigger" subField="action" prefix="Action: When I" suffix="," resource={resource} onUpdate={onUpdate} />
+                        <EditableField field="response" subField="visualize" prefix="Mechanism: It causes" suffix="internally." resource={resource} onUpdate={onUpdate} />
+                        <EditableField field="reward" prefix="Cost: This blocks" suffix="." resource={resource} onUpdate={onUpdate} />
+                        <DoubleEditableField 
+                            prefix="Opposite: Only when"
+                            suffix="happens."
+                            value1={resource.newResponse?.visualize || ""}
+                            value2={resource.newResponse?.action || ""}
+                            onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, visualize: newValue } })}
+                            onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, action: newValue } })}
+                            placeholder1="..."
+                            placeholder2="..."
+                        />
+                        <EmotionEditableField
+                            value1={resource.trigger?.feeling || ''}
+                            value2={resource.benefit || ''}
+                            onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...resource.trigger, feeling: newValue } })}
+                            onUpdate2={(newValue) => onUpdate({ ...resource, benefit: newValue })}
+                            label="costs me"
+                            placeholder1="..."
+                            placeholder2="..."
+                        />
+                    </>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
 const LinkDropZone = ({ resourceId, linkingFromId }: { resourceId: string; linkingFromId: string | null; }) => {
     const { isOver, setNodeRef } = useDroppable({
         id: `link-dropzone-${resourceId}`,
@@ -2129,15 +2228,12 @@ function ResourcesPageContent() {
                 <SortableContext items={filteredResources.map(r => r.id)}>
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                         {filteredResources.map(res => {
-                             const isCardType = res.type === 'card';
-                             const isHabitType = res.type === 'habit' || res.type === 'mechanism';
-                             const isModelType = res.type === 'model3d';
-                             const hasMarkdownContent = isCardType && (res.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+                             const hasMarkdownContent = res.type === 'card' && (res.points || []).some(p => p.type === 'markdown' || p.type === 'code');
                              const cardClassName = hasMarkdownContent ? "lg:col-span-3" : "";
  
                             let cardContent: React.ReactNode;
                             
-                            if (isModelType) {
+                            if (res.type === 'model3d') {
                                 cardContent = (
                                     <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl h-full">
                                         <CardHeader className="p-3">
@@ -2161,11 +2257,11 @@ function ResourcesPageContent() {
                                         </CardContent>
                                     </Card>
                                 );
-                            }
-                            else if (isHabitType) {
+                            } else if (res.type === 'habit') {
                                 cardContent = <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={handleOpenNestedPopup} />;
-                            }
-                            else if(isCardType) {
+                            } else if (res.type === 'mechanism') {
+                                cardContent = <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={handleOpenNestedPopup} />;
+                            } else if(res.type === 'card') {
                                 cardContent = <ResourceCardComponent resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
@@ -2704,3 +2800,4 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
