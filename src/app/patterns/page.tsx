@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils';
 
 
 function PatternsPageContent() {
-    const { resources, patterns, setPatterns, metaRules, setMetaRules } = useAuth();
+    const { resources, patterns, setPatterns, metaRules, setMetaRules, handleOpenNestedPopup } = useAuth();
     const { toast } = useToast();
 
     const [selectedPhrases, setSelectedPhrases] = useState<PatternPhrase[]>([]);
@@ -207,25 +207,24 @@ function PatternsPageContent() {
         const pattern = patterns.find(p => p.id === rule.patternId);
         if (!pattern) return [];
 
-        const mechanismIds = new Set(pattern.phrases.map(p => p.mechanismCardId));
+        const habitPhrases = pattern.phrases.filter(p => p.category === 'Habit Cards');
         
-        const linkedHabits = habitCards.filter(habit => {
-            if (!habit.response?.resourceId && !habit.newResponse?.resourceId) {
-                return false;
-            }
-            return mechanismIds.has(habit.response?.resourceId || '') || mechanismIds.has(habit.newResponse?.resourceId || '');
-        });
+        return habitPhrases.map(phrase => {
+            const habit = habitCards.find(h => h.id === phrase.mechanismCardId);
+            if (!habit) return null;
 
-        return linkedHabits.map(habit => {
-          const responseMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
-          const newResponseMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
-          return {
-            habitName: habit.name,
-            response: responseMechanism?.response?.visualize || '...',
-            newResponse: newResponseMechanism?.newResponse?.action || '...'
-          };
-        });
+            const responseMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
+            const newResponseMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
+
+            return {
+                habitId: habit.id,
+                habitName: habit.name,
+                response: responseMechanism?.response?.visualize || '...',
+                newResponse: newResponseMechanism?.newResponse?.action || '...'
+            };
+        }).filter((h): h is NonNullable<typeof h> => h !== null);
     };
+
 
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
@@ -403,9 +402,13 @@ function PatternsPageContent() {
                                                             <h4 className="font-medium text-muted-foreground mb-1">Habits</h4>
                                                             <div className="space-y-1">
                                                                 {linkedHabits.map((habit, i) => (
-                                                                    <div key={i} className="p-1 rounded bg-background/50 text-foreground">
-                                                                        <span className="font-semibold">{habit.habitName}</span> = <span className="text-muted-foreground">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</span>
-                                                                    </div>
+                                                                    <button 
+                                                                        key={i} 
+                                                                        className="text-left p-1 rounded bg-background/50 hover:bg-background w-full"
+                                                                        onClick={(e) => handleOpenNestedPopup(habit.habitId, e)}
+                                                                    >
+                                                                        <span className="font-semibold text-foreground">{habit.habitName}</span> = <span className="text-muted-foreground">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</span>
+                                                                    </button>
                                                                 ))}
                                                             </div>
                                                         </div>
@@ -443,3 +446,4 @@ export default function PatternsPage() {
         </AuthGuard>
     );
 }
+
