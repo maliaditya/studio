@@ -351,13 +351,12 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                     <CardContent className="p-3 pt-0">
                         {resource.type === 'habit' ? (
                             <div className="space-y-4">
-                                <EditableField field="trigger" subField="action" label="Trigger (Action)" resource={resource} onUpdate={onUpdate} />
-                                <EditableField field="trigger" subField="feeling" label="Trigger (Feeling)" resource={resource} onUpdate={onUpdate} />
-                                <EditableField field="response" subField="visualize" label="Response (Visualize)" resource={resource} onUpdate={onUpdate} />
-                                <EditableField field="response" subField="action" label="Response (Action)" resource={resource} onUpdate={onUpdate} />
-                                <EditableField field="reward" label="Reward" resource={resource} onUpdate={onUpdate} />
-                                <EditableField field="newResponse" subField="visualize" label="New Response (Visualize)" resource={resource} onUpdate={onUpdate} />
-                                <EditableField field="newResponse" subField="action" label="New Response (Action)" resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="trigger" subField="action" label="Action: When I..." resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="response" subField="visualize" label="Mechanism: It causes..." resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="reward" label="Cost: This blocks..." resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="newResponse" subField="visualize" label="Opposite: Only when..." resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="newResponse" subField="action" label="Law: ...cannot happen when..." resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="trigger" subField="feeling" label="Emotion/Image: That one...costs me..." resource={resource} onUpdate={onUpdate} />
                             </div>
                         ) : (
                          <DndContext onDragEnd={handlePointDragEnd}>
@@ -831,13 +830,12 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
                 )}
             </CardHeader>
             <CardContent className="space-y-4">
-                <EditableField field="trigger" subField="action" label="Trigger (Action)" resource={resource} onUpdate={onUpdate} />
-                <EditableField field="trigger" subField="feeling" label="Trigger (Feeling)" resource={resource} onUpdate={onUpdate} />
-                <EditableField field="response" subField="visualize" label="Response (Visualize)" resource={resource} onUpdate={onUpdate} />
-                <EditableField field="response" subField="action" label="Response (Action)" resource={resource} onUpdate={onUpdate} />
-                <EditableField field="reward" label="Reward" resource={resource} onUpdate={onUpdate} />
-                <EditableField field="newResponse" subField="visualize" label="New Response (Visualize)" resource={resource} onUpdate={onUpdate} />
-                <EditableField field="newResponse" subField="action" label="New Response (Action)" resource={resource} onUpdate={onUpdate} />
+                <EditableField field="trigger" subField="action" label="Action: When I..." resource={resource} onUpdate={onUpdate} />
+                <EditableField field="response" subField="visualize" label="Mechanism: It causes..." resource={resource} onUpdate={onUpdate} />
+                <EditableField field="reward" label="Cost: This blocks..." resource={resource} onUpdate={onUpdate} />
+                <EditableField field="newResponse" subField="visualize" label="Opposite: Only when..." resource={resource} onUpdate={onUpdate} />
+                <EditableField field="newResponse" subField="action" label="Law: ...cannot happen when..." resource={resource} onUpdate={onUpdate} />
+                <EditableField field="trigger" subField="feeling" label="Emotion/Image: That one...costs me..." resource={resource} onUpdate={onUpdate} />
             </CardContent>
         </Card>
     );
@@ -2492,3 +2490,4 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
