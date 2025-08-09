@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -125,18 +126,20 @@ const EditableField = ({ field, subField, prefix, suffix, resource, onUpdate }: 
     onUpdate: (updatedResource: Resource) => void 
 }) => {
     const editorRef = useRef<HTMLDivElement>(null);
-    let initialValue = '';
-    if (subField && typeof resource[field] === 'object' && resource[field] !== null) {
-      initialValue = (resource[field] as any)[subField] || '';
-    } else {
-      initialValue = (resource[field] as string) || '';
-    }
     
     const handleBlur = () => {
         if (!editorRef.current) return;
-        const editableSpan = editorRef.current.querySelector('[contenteditable=true]');
+        const editableSpan = editorRef.current.querySelector<HTMLSpanElement>('[contenteditable=true]');
         const newValue = editableSpan?.textContent || '';
-        if (newValue !== initialValue) {
+        
+        let currentValue = '';
+        if (subField && typeof resource[field] === 'object' && resource[field] !== null) {
+            currentValue = (resource[field] as any)[subField] || '';
+        } else {
+            currentValue = (resource[field] as string) || '';
+        }
+
+        if (newValue !== currentValue) {
             let updatedResource = { ...resource };
             if (subField) {
                 updatedResource[field] = { ...(updatedResource[field] as object), [subField]: newValue };
@@ -146,19 +149,27 @@ const EditableField = ({ field, subField, prefix, suffix, resource, onUpdate }: 
             onUpdate(updatedResource);
         }
     };
+    
+    let displayValue = '';
+    if (subField && typeof resource[field] === 'object' && resource[field] !== null) {
+      displayValue = (resource[field] as any)[subField] || '';
+    } else {
+      displayValue = (resource[field] as string) || '';
+    }
 
     return (
         <div 
           ref={editorRef}
-          contentEditable
-          suppressContentEditableWarning
           onBlur={handleBlur}
-          className="editable-sentence text-sm p-2 rounded-md transition-colors"
+          className="editable-sentence"
         >
           <span contentEditable={false} className="uneditable-text">{prefix}</span>
-          {' '}
-          <span contentEditable={true} className="editable-placeholder" dangerouslySetInnerHTML={{ __html: initialValue || '...' }} />
-          {suffix && ' '}
+          <span 
+            contentEditable={true} 
+            suppressContentEditableWarning={true}
+            className="editable-placeholder"
+            dangerouslySetInnerHTML={{ __html: displayValue || '...' }} 
+          />
           {suffix && <span contentEditable={false} className="uneditable-text">{suffix}</span>}
         </div>
     );
@@ -179,7 +190,7 @@ const DoubleEditableField = ({ prefix, suffix, value1, value2, onUpdate1, onUpda
     
     const handleBlur = () => {
         if (!editorRef.current) return;
-        const editableSpans = editorRef.current.querySelectorAll('[contenteditable=true]');
+        const editableSpans = editorRef.current.querySelectorAll<HTMLSpanElement>('[contenteditable=true]');
         const newValue1 = editableSpans[0]?.textContent || '';
         const newValue2 = editableSpans[1]?.textContent || '';
         if (newValue1 !== value1) onUpdate1(newValue1);
@@ -189,18 +200,23 @@ const DoubleEditableField = ({ prefix, suffix, value1, value2, onUpdate1, onUpda
     return (
         <div 
           ref={editorRef}
-          contentEditable
-          suppressContentEditableWarning
           onBlur={handleBlur}
-          className="editable-sentence text-sm p-2 rounded-md transition-colors"
+          className="editable-sentence"
         >
           <span contentEditable={false} className="uneditable-text">{prefix}</span>
-          {' '}
-          <span contentEditable={true} className="editable-placeholder" dangerouslySetInnerHTML={{ __html: value1 || placeholder1 }} />
+          <span 
+            contentEditable={true} 
+            suppressContentEditableWarning={true}
+            className="editable-placeholder"
+            dangerouslySetInnerHTML={{ __html: value1 || placeholder1 }} 
+          />
           <span contentEditable={false} className="uneditable-text">,</span>
-          {' '}
-          <span contentEditable={true} className="editable-placeholder" dangerouslySetInnerHTML={{ __html: value2 || placeholder2 }} />
-          {' '}
+          <span 
+            contentEditable={true} 
+            suppressContentEditableWarning={true}
+            className="editable-placeholder"
+            dangerouslySetInnerHTML={{ __html: value2 || placeholder2 }} 
+          />
           <span contentEditable={false} className="uneditable-text">{suffix}</span>
         </div>
     );
@@ -220,7 +236,7 @@ const EmotionEditableField = ({ value1, value2, onUpdate1, onUpdate2, label, pla
     
     const handleBlur = () => {
         if (!editorRef.current) return;
-        const editableSpans = editorRef.current.querySelectorAll('[contenteditable=true]');
+        const editableSpans = editorRef.current.querySelectorAll<HTMLSpanElement>('[contenteditable=true]');
         const newValue1 = editableSpans[0]?.textContent || '';
         const newValue2 = editableSpans[1]?.textContent || '';
         if (newValue1 !== value1) onUpdate1(newValue1);
@@ -230,18 +246,23 @@ const EmotionEditableField = ({ value1, value2, onUpdate1, onUpdate2, label, pla
     return (
         <div 
           ref={editorRef}
-          contentEditable
-          suppressContentEditableWarning
           onBlur={handleBlur}
-          className="editable-sentence text-sm p-2 rounded-md transition-colors"
+          className="editable-sentence"
         >
           <span contentEditable={false} className="uneditable-text">Emotion/Image: That one</span>
-          {' '}
-          <span contentEditable={true} className="editable-placeholder" dangerouslySetInnerHTML={{ __html: value1 || placeholder1 }} />
-          {' '}
+          <span 
+            contentEditable={true} 
+            suppressContentEditableWarning={true}
+            className="editable-placeholder"
+            dangerouslySetInnerHTML={{ __html: value1 || placeholder1 }} 
+          />
           <span contentEditable={false} className="uneditable-text">{label}</span>
-          {' '}
-          <span contentEditable={true} className="editable-placeholder" dangerouslySetInnerHTML={{ __html: value2 || placeholder2 }} />
+          <span 
+            contentEditable={true} 
+            suppressContentEditableWarning={true}
+            className="editable-placeholder"
+            dangerouslySetInnerHTML={{ __html: value2 || placeholder2 }} 
+          />
           <span contentEditable={false} className="uneditable-text">.</span>
         </div>
     );
@@ -785,17 +806,59 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
     linkingFromId: string | null;
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
 }) => {
+    const { resources } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
 
-    const getIcon = () => {
-        switch (resource.type) {
-            case 'habit':
-                return <Zap className="h-5 w-5" />;
-            case 'mechanism':
-                return <Workflow className="h-5 w-5"/>;
-            default:
-                return <Library className="h-5 w-5" />;
-        }
+    const handleUpdateField = (field: keyof Pick<Resource, 'response' | 'newResponse'>, value: { text?: string; resourceId?: string }) => {
+        onUpdate({ ...resource, [field]: value });
+    };
+
+    const renderEditableResponse = (field: 'response' | 'newResponse', label: string) => {
+        const responseValue = resource[field];
+        const linkedResource = responseValue?.resourceId ? resources.find(r => r.id === responseValue.resourceId) : null;
+        
+        return (
+            <div className="space-y-1">
+                {linkedResource ? (
+                    <div className="flex items-center justify-between text-sm p-2 rounded-md bg-muted/50 border-l-2 border-primary">
+                        <div className="flex items-center gap-2 min-w-0">
+                           <Workflow className="h-4 w-4 text-primary flex-shrink-0" />
+                           <span className="font-medium text-foreground truncate" title={linkedResource.name}>{linkedResource.name}</span>
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleUpdateField(field, { ...responseValue, resourceId: undefined })}>
+                            <Unlink className="h-3 w-3 text-destructive" />
+                        </Button>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-2">
+                        <EditableField
+                          field={field}
+                          subField="text"
+                          prefix={`${label}:`}
+                          resource={resource}
+                          onUpdate={onUpdate}
+                        />
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7"><LinkIcon className="h-4 w-4" /></Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-56 p-0">
+                                <Select onValueChange={(val) => handleUpdateField(field, { text: '', resourceId: val })}>
+                                    <SelectTrigger className="w-full border-0 focus:ring-0">
+                                        <SelectValue placeholder="Link a mechanism..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {resources.filter(r => r.type === 'mechanism').map(r => (
+                                            <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                )}
+            </div>
+        );
     };
 
     return (
@@ -807,7 +870,7 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
                             <Input value={resource.name} onChange={(e) => onUpdate({...resource, name: e.target.value})} onBlur={() => setEditingTitle(false)} autoFocus className="text-lg font-semibold h-9" />
                         ) : (
                             <CardTitle className="flex items-center gap-3 text-lg cursor-pointer" onClick={() => setEditingTitle(true)}>
-                                <span className="text-primary">{getIcon()}</span>
+                                <span className="text-primary"><Zap className="h-5 w-5" /></span>
                                 <span className="truncate">{resource.name}</span>
                             </CardTitle>
                         )}
@@ -832,66 +895,10 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
                 )}
             </CardHeader>
             <CardContent className="space-y-1" onClick={(e) => e.stopPropagation()}>
-                {resource.type === 'habit' ? (
-                     <>
-                        <EditableField field="trigger" subField="action" prefix="Trigger: When I" suffix="." resource={resource} onUpdate={onUpdate} />
-                        <EditableField field="response" subField="action" prefix="Response:" suffix="" resource={resource} onUpdate={onUpdate} />
-                        <EditableField field="reward" prefix="Reward:" suffix="" resource={resource} onUpdate={onUpdate} />
-                        <EditableField field="newResponse" subField="action" prefix="New Response:" suffix="" resource={resource} onUpdate={onUpdate} />
-                     </>
-                ) : resource.type === 'mechanism' ? (
-                    resource.mechanismFramework === 'positive' ? (
-                        <>
-                            <EditableField field="trigger" subField="action" prefix="Action: When I" suffix="," resource={resource} onUpdate={onUpdate} />
-                            <EditableField field="response" subField="visualize" prefix="Mechanism: It triggers" suffix="internally." resource={resource} onUpdate={onUpdate} />
-                            <EditableField field="benefit" prefix="Benefit: This opens" suffix="." resource={resource} onUpdate={onUpdate} />
-                            <DoubleEditableField 
-                                prefix="Key Condition: Only when"
-                                suffix="happens."
-                                value1={resource.newResponse?.visualize || ""}
-                                value2={resource.newResponse?.action || ""}
-                                onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, visualize: newValue } })}
-                                onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, action: newValue } })}
-                                placeholder1="..."
-                                placeholder2="..."
-                            />
-                            <EmotionEditableField
-                                value1={resource.trigger?.feeling || ''}
-                                value2={resource.reward || ''}
-                                onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...resource.trigger, feeling: newValue } })}
-                                onUpdate2={(newValue) => onUpdate({ ...resource, reward: newValue })}
-                                label="gives me"
-                                placeholder1="..."
-                                placeholder2="..."
-                            />
-                        </>
-                    ) : ( // Negative Framework (default)
-                        <>
-                            <EditableField field="trigger" subField="action" prefix="Action: When I" suffix="," resource={resource} onUpdate={onUpdate} />
-                            <EditableField field="response" subField="visualize" prefix="Mechanism: It causes" suffix="internally." resource={resource} onUpdate={onUpdate} />
-                            <EditableField field="reward" prefix="Cost: This blocks" suffix="." resource={resource} onUpdate={onUpdate} />
-                            <DoubleEditableField 
-                                prefix="Opposite: Only when"
-                                suffix="happens."
-                                value1={resource.newResponse?.visualize || ""}
-                                value2={resource.newResponse?.action || ""}
-                                onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, visualize: newValue } })}
-                                onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, action: newValue } })}
-                                placeholder1="..."
-                                placeholder2="..."
-                            />
-                            <EmotionEditableField
-                                value1={resource.trigger?.feeling || ''}
-                                value2={resource.reward || ''}
-                                onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...resource.trigger, feeling: newValue } })}
-                                onUpdate2={(newValue) => onUpdate({ ...resource, reward: newValue })}
-                                label="costs me"
-                                placeholder1="..."
-                                placeholder2="..."
-                            />
-                        </>
-                    )
-                ) : null}
+                <EditableField field="trigger" subField="action" prefix="Trigger: When I" suffix="." resource={resource} onUpdate={onUpdate} />
+                {renderEditableResponse('response', 'Response')}
+                <EditableField field="reward" prefix="Reward:" resource={resource} onUpdate={onUpdate} />
+                {renderEditableResponse('newResponse', 'New Response')}
             </CardContent>
         </Card>
     );
@@ -2617,6 +2624,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
     dragHandle?: { attributes: any; listeners: any };
 }) => {
     const { setFloatingVideoUrl } = useAuth();
+    
     const [isEditing, setIsEditing] = useState(point.text === 'New step...');
     const [editText, setEditText] = useState(point.text);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -2693,6 +2701,54 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
         </li>
     );
 }
+
+const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText, onConvertToCard }: {
+    point: ResourcePoint;
+    onUpdate: (text: string) => void;
+    onDelete: () => void;
+    onOpenNestedPopup: (event: React.MouseEvent) => void;
+    onEditLinkText: (point: ResourcePoint) => void;
+    onConvertToCard: (point: ResourcePoint) => void;
+}) => {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 10 : 'auto',
+    };
+    
+    if (point.type === 'card' && point.resourceId) {
+        return (
+            <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
+                <button {...attributes} {...listeners} className="cursor-grab p-1"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
+                <div 
+                    onClick={onOpenNestedPopup}
+                    className="flex items-start gap-3 flex-grow cursor-pointer p-2 rounded-md hover:bg-muted/50 border border-dashed"
+                >
+                    <Library className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
+                    <span className="font-medium text-foreground">{point.text}</span>
+                </div>
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={onDelete}>
+                    <Trash2 className="h-3 w-3"/>
+                </Button>
+            </div>
+        )
+    }
+
+    return (
+        <div ref={setNodeRef} style={style} className="relative bg-card">
+            <EditableResourcePoint 
+                point={point}
+                onUpdate={onUpdate}
+                onDelete={onDelete}
+                onEditLinkText={onEditLinkText}
+                onConvertToCard={onConvertToCard}
+                dragHandle={{ attributes, listeners }}
+            />
+        </div>
+    );
+};
 
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
