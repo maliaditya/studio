@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -163,7 +162,13 @@ const EditableField = ({ field, subField, prefix, suffix, resource, onUpdate }: 
                 <Textarea 
                     ref={textareaRef}
                     value={text} 
-                    onChange={e => setText(e.target.value)}
+                    onChange={e => {
+                        setText(e.target.value);
+                        if (textareaRef.current) {
+                            textareaRef.current.style.height = 'auto';
+                            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+                        }
+                    }}
                     onBlur={handleSave}
                     className="text-sm mt-0 flex-grow bg-background/50 border-primary"
                     rows={1}
@@ -173,7 +178,7 @@ const EditableField = ({ field, subField, prefix, suffix, resource, onUpdate }: 
           ) : (
              <p className="text-foreground">
                 <span className="text-muted-foreground">{prefix}</span>
-                <span className="font-medium mx-1">
+                <span className="font-medium mx-1 whitespace-pre-wrap">
                     {text || <span className="italic font-normal text-muted-foreground/70">...</span>}
                 </span>
                 {suffix && <span className="text-muted-foreground">{suffix}</span>}
@@ -196,7 +201,9 @@ const DoubleEditableField = ({ prefix, suffix, value1, value2, onUpdate1, onUpda
     const [isEditing, setIsEditing] = useState(false);
     const [text1, setText1] = useState(value1);
     const [text2, setText2] = useState(value2);
-    
+    const textarea1Ref = useRef<HTMLTextAreaElement>(null);
+    const textarea2Ref = useRef<HTMLTextAreaElement>(null);
+
     useEffect(() => {
         setText1(value1);
         setText2(value2);
@@ -208,22 +215,28 @@ const DoubleEditableField = ({ prefix, suffix, value1, value2, onUpdate1, onUpda
         onUpdate2(text2);
     };
 
+    const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>, setter: React.Dispatch<React.SetStateAction<string>>) => {
+        setter(e.target.value);
+        e.target.style.height = 'auto';
+        e.target.style.height = `${e.target.scrollHeight}px`;
+    }
+
     return (
-        <div className="text-sm p-2 rounded-md transition-colors min-h-[40px] flex items-center" onDoubleClick={() => setIsEditing(true)}>
+        <div className="text-sm p-2 rounded-md transition-colors min-h-[40px] flex items-start" onDoubleClick={() => setIsEditing(true)}>
             {isEditing ? (
-                <div className="flex items-center gap-2 w-full">
-                    <span className="text-muted-foreground shrink-0">{prefix}</span>
-                    <Input value={text1} onChange={e => setText1(e.target.value)} onBlur={handleSave} className="h-8 flex-grow min-w-0" placeholder={placeholder1} />
-                    <span className="text-muted-foreground shrink-0">,</span>
-                    <Input value={text2} onChange={e => setText2(e.target.value)} onBlur={handleSave} className="h-8 flex-grow min-w-0" placeholder={placeholder2} />
-                    <span className="text-muted-foreground shrink-0">{suffix}</span>
+                <div className="flex items-start gap-2 w-full">
+                    <span className="text-muted-foreground shrink-0 pt-2">{prefix}</span>
+                    <Textarea ref={textarea1Ref} value={text1} onChange={(e) => handleTextareaChange(e, setText1)} onBlur={handleSave} className="flex-grow min-w-0" placeholder={placeholder1} rows={1} />
+                    <span className="text-muted-foreground shrink-0 pt-2">,</span>
+                    <Textarea ref={textarea2Ref} value={text2} onChange={(e) => handleTextareaChange(e, setText2)} onBlur={handleSave} className="flex-grow min-w-0" placeholder={placeholder2} rows={1} />
+                    <span className="text-muted-foreground shrink-0 pt-2">{suffix}</span>
                 </div>
             ) : (
-                <p className="min-h-[1.5rem] text-foreground">
+                 <p className="min-h-[1.5rem] text-foreground">
                     <span className="text-muted-foreground">{prefix}</span>
-                    <span className="font-medium mx-1">{value1 || <span className="italic font-normal text-muted-foreground/70">{placeholder1}</span>}</span>
+                    <span className="font-medium mx-1 whitespace-pre-wrap">{value1 || <span className="italic font-normal text-muted-foreground/70">{placeholder1}</span>}</span>
                     <span className="text-muted-foreground">,</span>
-                    <span className="font-medium mx-1">{value2 || <span className="italic font-normal text-muted-foreground/70">{placeholder2}</span>}</span>
+                    <span className="font-medium mx-1 whitespace-pre-wrap">{value2 || <span className="italic font-normal text-muted-foreground/70">{placeholder2}</span>}</span>
                     <span className="text-muted-foreground">{suffix}</span>
                 </p>
             )}
@@ -242,6 +255,8 @@ const EmotionEditableField = ({ value1, value2, onUpdate1, onUpdate2, placeholde
     const [isEditing, setIsEditing] = useState(false);
     const [text1, setText1] = useState(value1);
     const [text2, setText2] = useState(value2);
+    const textarea1Ref = useRef<HTMLTextAreaElement>(null);
+    const textarea2Ref = useRef<HTMLTextAreaElement>(null);
     
     useEffect(() => {
         setText1(value1);
@@ -254,22 +269,28 @@ const EmotionEditableField = ({ value1, value2, onUpdate1, onUpdate2, placeholde
         onUpdate2(text2);
     };
 
+    const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>, setter: React.Dispatch<React.SetStateAction<string>>) => {
+        setter(e.target.value);
+        e.target.style.height = 'auto';
+        e.target.style.height = `${e.target.scrollHeight}px`;
+    }
+
     return (
-        <div className="text-sm p-2 rounded-md transition-colors min-h-[40px] flex items-center" onDoubleClick={() => setIsEditing(true)}>
+        <div className="text-sm p-2 rounded-md transition-colors min-h-[40px] flex items-start" onDoubleClick={() => setIsEditing(true)}>
             {isEditing ? (
-                <div className="flex items-center gap-2 w-full">
-                    <span className="text-muted-foreground shrink-0">Emotion/Image: That one</span>
-                    <Input value={text1} onChange={e => setText1(e.target.value)} onBlur={handleSave} className="h-8 flex-grow min-w-0" placeholder={placeholder1} />
-                    <span className="text-muted-foreground shrink-0">costs me</span>
-                    <Input value={text2} onChange={e => setText2(e.target.value)} onBlur={handleSave} className="h-8 flex-grow min-w-0" placeholder={placeholder2} />
-                    <span className="text-muted-foreground shrink-0">.</span>
+                <div className="flex items-start gap-2 w-full">
+                    <span className="text-muted-foreground shrink-0 pt-2">Emotion/Image: That one</span>
+                    <Textarea ref={textarea1Ref} value={text1} onChange={(e) => handleTextareaChange(e, setText1)} onBlur={handleSave} className="flex-grow min-w-0" placeholder={placeholder1} rows={1} />
+                    <span className="text-muted-foreground shrink-0 pt-2">costs me</span>
+                    <Textarea ref={textarea2Ref} value={text2} onChange={(e) => handleTextareaChange(e, setText2)} onBlur={handleSave} className="flex-grow min-w-0" placeholder={placeholder2} rows={1} />
+                    <span className="text-muted-foreground shrink-0 pt-2">.</span>
                 </div>
             ) : (
                 <p className="min-h-[1.5rem] text-foreground">
                     <span className="text-muted-foreground">Emotion/Image: That one</span>
-                    <span className="font-medium mx-1">{value1 || <span className="italic font-normal text-muted-foreground/70">{placeholder1}</span>}</span>
+                    <span className="font-medium mx-1 whitespace-pre-wrap">{value1 || <span className="italic font-normal text-muted-foreground/70">{placeholder1}</span>}</span>
                     <span className="text-muted-foreground">costs me</span>
-                    <span className="font-medium mx-1">{value2 || <span className="italic font-normal text-muted-foreground/70">{placeholder2}</span>}</span>
+                    <span className="font-medium mx-1 whitespace-pre-wrap">{value2 || <span className="italic font-normal text-muted-foreground/70">{placeholder2}</span>}</span>
                     <span className="text-muted-foreground">.</span>
                 </p>
             )}
@@ -2577,7 +2598,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
     const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setEditText(e.target.value);
         e.target.style.height = 'auto';
-        e.target.style.height = `${e.target.scrollHeight}px`;
+        e.target.style.height = `${textareaRef.current.scrollHeight}px`;
     }
 
     return (
@@ -2634,10 +2655,4 @@ export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
 
-
-
-
-
-
-
-
+    
