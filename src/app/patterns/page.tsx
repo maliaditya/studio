@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -80,7 +79,6 @@ function PatternsPageContent() {
             }
         });
 
-        // Invert logic: Iterate habits and find their linked mechanisms
         habitCards.forEach(habit => {
             const linkedMechanisms: string[] = [];
             const mechanismForResponse = mechanismCards.find(m => m.id === habit.response?.resourceId);
@@ -94,17 +92,17 @@ function PatternsPageContent() {
             fields['Habit Cards'].push({
                 category: 'Habit Cards',
                 text: habit.name,
-                mechanismCardId: habit.id, // Use habit ID as the key here
+                mechanismCardId: habit.id,
                 linkedMechanisms: linkedMechanisms,
             });
         });
         
         Object.keys(fields).forEach(key => {
             if (key !== 'Habit Cards') {
-              const uniquePhrases = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
-              fields[key] = uniquePhrases.filter(phrase => !usedPhrases.has(phrase.text));
+                const uniquePhrases = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
+                fields[key] = uniquePhrases.filter(phrase => !usedPhrases.has(phrase.text));
             } else {
-              fields[key] = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
+                 fields[key] = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
             }
         });
 
@@ -114,24 +112,18 @@ function PatternsPageContent() {
     const handlePhraseToggle = (phrase: PatternPhrase) => {
         const isSelected = selectedPhrases.some(p => p.text === phrase.text);
         
-        // Find habits linked to the current phrase's mechanism
         const linkedHabitPhrases = aggregatedFields['Habit Cards'].filter(habitPhrase => {
             const habitCard = habitCards.find(h => h.id === habitPhrase.mechanismCardId);
             return habitCard && (habitCard.response?.resourceId === phrase.mechanismCardId || habitCard.newResponse?.resourceId === phrase.mechanismCardId);
         });
 
         if (!isSelected) {
-            // Add the phrase and its linked habits
             const newSelection = [...selectedPhrases, phrase, ...linkedHabitPhrases];
-            // Remove duplicates
             setSelectedPhrases(Array.from(new Map(newSelection.map(item => [item.text, item])).values()));
         } else {
-            // Remove the phrase
             let newSelection = selectedPhrases.filter(p => p.text !== phrase.text);
             
-            // Check if we should remove the linked habits
             linkedHabitPhrases.forEach(habitPhrase => {
-                // Find all phrases (benefits, costs, laws) linked to this habit's mechanism(s)
                 const habitCard = habitCards.find(h => h.id === habitPhrase.mechanismCardId);
                 const relatedMechanismIds = new Set([habitCard?.response?.resourceId, habitCard?.newResponse?.resourceId].filter(Boolean));
                 
@@ -249,7 +241,7 @@ function PatternsPageContent() {
                                                     />
                                                      <Label htmlFor={`phrase-${title}-${i}`} className="font-normal w-full flex-grow cursor-pointer">
                                                       {title === 'Habit Cards' ? (
-                                                        <div className="p-2 bg-muted/30 rounded-md">
+                                                        <Card className="p-2 bg-muted/30">
                                                           <p className="font-semibold text-foreground">{phrase.text}</p>
                                                           {(phrase.linkedMechanisms && phrase.linkedMechanisms.length > 0) && (
                                                             <div className="mt-1 pt-1 border-t">
@@ -259,7 +251,7 @@ function PatternsPageContent() {
                                                               </ul>
                                                             </div>
                                                           )}
-                                                        </div>
+                                                        </Card>
                                                       ) : (
                                                         phrase.text
                                                       )}
@@ -341,45 +333,64 @@ function PatternsPageContent() {
                             {patterns.length > 0 ? (
                                 <RadioGroup value={selectedPatternForRule || ''} onValueChange={setSelectedPatternForRule} className="space-y-4">
                                     {patterns.map(p => {
-                                      const isSelected = selectedPatternForRule === p.id;
-                                      const categorizedPhrases = isSelected ? p.phrases.reduce((acc, phrase) => {
-                                        if (!acc[phrase.category]) acc[phrase.category] = [];
-                                        acc[phrase.category].push(phrase);
-                                        return acc;
-                                      }, {} as Record<string, PatternPhrase[]>) : null;
+                                        const isSelected = selectedPatternForRule === p.id;
+                                        const categorizedPhrases = isSelected ? p.phrases.reduce((acc, phrase) => {
+                                            if (!acc[phrase.category]) acc[phrase.category] = [];
+                                            acc[phrase.category].push(phrase);
+                                            return acc;
+                                        }, {} as Record<string, PatternPhrase[]>) : null;
 
-                                      return (
-                                        <Card key={p.id} className={cn("transition-all", isSelected && "ring-2 ring-primary")}>
-                                          <CardHeader className="p-3">
-                                            <div className="flex flex-row items-center justify-between">
-                                              <div className="flex items-center gap-2 flex-grow">
-                                                <RadioGroupItem value={p.id} id={`rule-pattern-${p.id}`} />
-                                                <Label htmlFor={`rule-pattern-${p.id}`} className="cursor-pointer flex-grow">
-                                                  <Badge variant={p.type === 'Positive' ? 'default' : 'destructive'} className="mr-2">{p.type}</Badge>
-                                                  {p.name}
-                                                </Label>
-                                              </div>
-                                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleDeletePattern(p.id); }}>
-                                                <Trash2 className="h-4 w-4 text-destructive" />
-                                              </Button>
-                                            </div>
-                                          </CardHeader>
-                                          {isSelected && categorizedPhrases && (
-                                            <CardContent className="p-3 pt-0 text-xs">
-                                              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                                                {Object.entries(categorizedPhrases).map(([category, phrases]) => (
-                                                  <div key={category}>
-                                                    <h4 className="font-medium text-muted-foreground mb-1">{category}</h4>
-                                                    <ul className="list-disc list-inside space-y-1">
-                                                      {phrases.map((phrase, i) => <li key={i}>{phrase.text}</li>)}
-                                                    </ul>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            </CardContent>
-                                          )}
-                                        </Card>
-                                      );
+                                        return (
+                                            <Card key={p.id} className={cn("transition-all", isSelected && "ring-2 ring-primary")}>
+                                                <CardHeader className="p-3">
+                                                <div className="flex flex-row items-center justify-between">
+                                                    <div className="flex items-center gap-2 flex-grow">
+                                                    <RadioGroupItem value={p.id} id={`rule-pattern-${p.id}`} />
+                                                    <Label htmlFor={`rule-pattern-${p.id}`} className="cursor-pointer flex-grow">
+                                                        <Badge variant={p.type === 'Positive' ? 'default' : 'destructive'} className="mr-2">{p.type}</Badge>
+                                                        {p.name}
+                                                    </Label>
+                                                    </div>
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleDeletePattern(p.id); }}>
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                    </Button>
+                                                </div>
+                                                </CardHeader>
+                                                {isSelected && categorizedPhrases && (
+                                                <CardContent className="p-3 pt-0 text-xs">
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
+                                                        {Object.entries(categorizedPhrases).map(([category, phrases]) => {
+                                                            if (category === 'Habit Cards') {
+                                                                const habitIds = new Set(phrases.map(phrase => phrase.mechanismCardId));
+                                                                const relatedHabits = habitCards.filter(habit => habitIds.has(habit.id));
+                                                                if (relatedHabits.length === 0) return null;
+                                                                return (
+                                                                    <div key={category} className="md:col-span-2">
+                                                                        <h4 className="font-medium text-muted-foreground mb-1">{category}</h4>
+                                                                        <div className="space-y-1">
+                                                                            {relatedHabits.map(habit => (
+                                                                                <div key={habit.id} className="p-1 rounded bg-background/50 text-foreground">
+                                                                                    <span className="font-semibold">{habit.name}</span> = <span className="text-muted-foreground">{habit.response?.text || '...'} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse?.text || '...'}</span>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )
+                                                            }
+                                                            return (
+                                                                <div key={category}>
+                                                                    <h4 className="font-medium text-muted-foreground mb-1">{category}</h4>
+                                                                    <ul className="list-disc list-inside space-y-1">
+                                                                        {phrases.map((phrase, i) => <li key={i}>{phrase.text}</li>)}
+                                                                    </ul>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </CardContent>
+                                                )}
+                                            </Card>
+                                        );
                                     })}
                                 </RadioGroup>
                             ) : (
