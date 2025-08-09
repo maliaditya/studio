@@ -170,13 +170,13 @@ const EditableField = ({ field, subField, prefix, suffix, resource, onUpdate }: 
                         }
                     }}
                     onBlur={handleSave}
-                    className="text-sm mt-0 flex-grow bg-background/50 border-primary"
+                    className="text-sm mt-0 flex-grow bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0"
                     rows={1}
                 />
                 {suffix && <span className="text-muted-foreground flex-shrink-0">{suffix}</span>}
               </div>
           ) : (
-             <p className="text-foreground">
+             <p className="min-h-[1.5rem] text-foreground">
                 <span className="text-muted-foreground">{prefix}</span>
                 <span className="font-medium mx-1 whitespace-pre-wrap">
                     {text || <span className="italic font-normal text-muted-foreground/70">...</span>}
@@ -226,9 +226,9 @@ const DoubleEditableField = ({ prefix, suffix, value1, value2, onUpdate1, onUpda
             {isEditing ? (
                 <div className="flex items-start gap-2 w-full">
                     <span className="text-muted-foreground shrink-0 pt-2">{prefix}</span>
-                    <Textarea ref={textarea1Ref} value={text1} onChange={(e) => handleTextareaChange(e, setText1)} onBlur={handleSave} className="flex-grow min-w-0" placeholder={placeholder1} rows={1} />
+                    <Textarea ref={textarea1Ref} value={text1} onChange={(e) => handleTextareaChange(e, setText1)} onBlur={handleSave} className="flex-grow min-w-0 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0" placeholder={placeholder1} rows={1} />
                     <span className="text-muted-foreground shrink-0 pt-2">,</span>
-                    <Textarea ref={textarea2Ref} value={text2} onChange={(e) => handleTextareaChange(e, setText2)} onBlur={handleSave} className="flex-grow min-w-0" placeholder={placeholder2} rows={1} />
+                    <Textarea ref={textarea2Ref} value={text2} onChange={(e) => handleTextareaChange(e, setText2)} onBlur={handleSave} className="flex-grow min-w-0 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0" placeholder={placeholder2} rows={1} />
                     <span className="text-muted-foreground shrink-0 pt-2">{suffix}</span>
                 </div>
             ) : (
@@ -280,9 +280,9 @@ const EmotionEditableField = ({ value1, value2, onUpdate1, onUpdate2, placeholde
             {isEditing ? (
                 <div className="flex items-start gap-2 w-full">
                     <span className="text-muted-foreground shrink-0 pt-2">Emotion/Image: That one</span>
-                    <Textarea ref={textarea1Ref} value={text1} onChange={(e) => handleTextareaChange(e, setText1)} onBlur={handleSave} className="flex-grow min-w-0" placeholder={placeholder1} rows={1} />
+                    <Textarea ref={textarea1Ref} value={text1} onChange={(e) => handleTextareaChange(e, setText1)} onBlur={handleSave} className="flex-grow min-w-0 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0" placeholder={placeholder1} rows={1} />
                     <span className="text-muted-foreground shrink-0 pt-2">costs me</span>
-                    <Textarea ref={textarea2Ref} value={text2} onChange={(e) => handleTextareaChange(e, setText2)} onBlur={handleSave} className="flex-grow min-w-0" placeholder={placeholder2} rows={1} />
+                    <Textarea ref={textarea2Ref} value={text2} onChange={(e) => handleTextareaChange(e, setText2)} onBlur={handleSave} className="flex-grow min-w-0 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0" placeholder={placeholder2} rows={1} />
                     <span className="text-muted-foreground shrink-0 pt-2">.</span>
                 </div>
             ) : (
@@ -2598,7 +2598,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
     const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setEditText(e.target.value);
         e.target.style.height = 'auto';
-        e.target.style.height = `${textareaRef.current.scrollHeight}px`;
+        e.target.style.height = `${e.target.scrollHeight}px`;
     }
 
     return (
