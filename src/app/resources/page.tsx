@@ -183,6 +183,59 @@ const EditableField = ({ field, subField, prefix, suffix, resource, onUpdate }: 
     );
 };
 
+const DoubleEditableField = ({ prefix, suffix, value1, value2, onUpdate1, onUpdate2, placeholder1 = "...", placeholder2 = "..." }: { 
+    prefix: string;
+    suffix: string;
+    value1: string;
+    value2: string;
+    onUpdate1: (newValue: string) => void;
+    onUpdate2: (newValue: string) => void;
+    placeholder1?: string;
+    placeholder2?: string;
+}) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [text1, setText1] = useState(value1);
+    const [text2, setText2] = useState(value2);
+    
+    useEffect(() => {
+        setText1(value1);
+        setText2(value2);
+    }, [value1, value2]);
+
+    const handleSave = () => {
+        setIsEditing(false);
+        onUpdate1(text1);
+        onUpdate2(text2);
+    };
+
+    return (
+        <div className="text-sm p-2 rounded-md transition-colors" onDoubleClick={() => setIsEditing(true)}>
+            {isEditing ? (
+                <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground flex-shrink-0">{prefix}</span>
+                        <Input value={text1} onChange={e => setText1(e.target.value)} className="h-8" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Input value={text2} onChange={e => setText2(e.target.value)} className="h-8" />
+                        <span className="text-muted-foreground flex-shrink-0">{suffix}</span>
+                    </div>
+                    <div className="flex justify-end">
+                        <Button size="sm" onClick={handleSave}>Save</Button>
+                    </div>
+                </div>
+            ) : (
+                <p className="min-h-[1.5rem] text-foreground">
+                    <span className="text-muted-foreground">{prefix}</span>
+                    <span className="font-medium mx-1">{value1 || <span className="italic font-normal text-muted-foreground/70">{placeholder1}</span>}</span>,
+                    <span className="font-medium mx-1">{value2 || <span className="italic font-normal text-muted-foreground/70">{placeholder2}</span>}</span>
+                    <span className="text-muted-foreground">{suffix}</span>
+                </p>
+            )}
+        </div>
+    );
+};
+
 interface ResourcePopupProps {
   popupState: PopupState;
   resource: Resource;
@@ -194,390 +247,6 @@ interface ResourcePopupProps {
   onEditLinkText: (point: ResourcePoint) => void;
   onConvertToCard: (point: ResourcePoint) => void;
 }
-
-const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAudio, setPlayingAudio, onOpenNestedPopup, onEditLinkText, onConvertToCard }: ResourcePopupProps) => {
-    const { resources } = useAuth();
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({
-        id: `popup-${popupState.resourceId}`,
-    });
-    
-    const [editingTitle, setEditingTitle] = useState(false);
-    const audioInputRef = useRef<HTMLInputElement>(null);
-    const [linkCardPopoverOpen, setLinkCardPopoverOpen] = useState(false);
-    const [linkedCardId, setLinkedCardId] = useState<string>('');
-
-
-    const style: React.CSSProperties = {
-        position: 'fixed',
-        top: popupState.y,
-        left: popupState.x,
-        width: `${popupState.width || 512}px`,
-        willChange: 'transform',
-    };
-
-    if (transform) {
-        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
-    }
-    
-    const handleAudioUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const audioUrl = e.target?.result as string;
-                onUpdate({ ...resource, audioUrl });
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-    
-    const togglePlayAudio = (e: React.MouseEvent | React.PointerEvent) => {
-        e.stopPropagation();
-        setPlayingAudio(prev => {
-            if (prev?.id === resource.id && prev.isPlaying) {
-                return { ...prev, isPlaying: false };
-            }
-            return { id: resource.id, isPlaying: true };
-        });
-    };
-
-    const handleTitleChange = (newTitle: string) => {
-        onUpdate({ ...resource, name: newTitle });
-    };
-
-    const handleAddPoint = (type: ResourcePoint['type']) => {
-        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: 'New step...', type };
-        const updatedPoints = [...(resource.points || []), newPoint];
-        onUpdate({ ...resource, points: updatedPoints });
-    };
-
-    const handleAddCardLinkPoint = () => {
-        if (!linkedCardId) return;
-        const linkedCard = resources.find(r => r.id === linkedCardId);
-        if (!linkedCard) return;
-
-        const newPoint: ResourcePoint = {
-            id: `point_${Date.now()}`,
-            type: 'card',
-            text: linkedCard.name,
-            resourceId: linkedCardId
-        };
-        const updatedPoints = [...(resource.points || []), newPoint];
-        onUpdate({ ...resource, points: updatedPoints });
-        setLinkCardPopoverOpen(false);
-        setLinkedCardId('');
-    };
-
-    const handleUpdatePoint = (pointId: string, newText: string) => {
-        const updatedPoints = (resource.points || []).map(p =>
-            p.id === pointId ? { ...p, text: newText } : p
-        );
-        onUpdate({ ...resource, points: updatedPoints });
-    };
-
-    const handleDeletePoint = (pointId: string) => {
-        const updatedPoints = (resource.points || []).filter(p => p.id !== pointId);
-        onUpdate({ ...resource, points: updatedPoints });
-    };
-    
-    const handleClose = (e: React.MouseEvent | React.PointerEvent) => {
-        e.stopPropagation();
-        setPlayingAudio(null);
-        onClose(resource.id);
-    }
-    
-    const handleLinkClick = (e: React.MouseEvent, pointResourceId: string) => {
-      e.stopPropagation();
-      onOpenNestedPopup(pointResourceId, e, popupState);
-    };
-
-    const handlePointDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event;
-        if (!over || active.id === over.id) return;
-        const oldIndex = (resource.points || []).findIndex(p => p.id === active.id);
-        const newIndex = (resource.points || []).findIndex(p => p.id === over.id);
-        if (oldIndex !== -1 && newIndex !== -1) {
-          const newPoints = arrayMove(resource.points!, oldIndex, newIndex);
-          onUpdate({ ...resource, points: newPoints });
-        }
-    };
-
-
-    return (
-        <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
-            <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
-            <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative group">
-                <div 
-                    className="absolute top-2 left-2 z-20 p-1 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
-                    {...listeners}
-                >
-                    <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
-                </div>
-                
-                 <div className="absolute top-2 right-2 z-20 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    {resource.audioUrl ? (
-                        <>
-                           <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={togglePlayAudio}>
-                                {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => audioInputRef.current?.click()}>
-                                <Upload className="h-4 w-4" />
-                            </Button>
-                        </>
-                    ) : (
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => audioInputRef.current?.click()}>
-                            <Upload className="h-4 w-4" />
-                        </Button>
-                    )}
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={handleClose}>
-                        <X className="h-4 w-4" />
-                    </Button>
-                </div>
-
-                <CardHeader className="p-3 pt-8 relative flex-shrink-0 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                        {resource.type === 'habit' ? <Zap className="h-4 w-4" /> : resource.type === 'mechanism' ? <Workflow className="h-4 w-4"/> : <Library className="h-4 w-4" />}
-                        {editingTitle ? (
-                            <Input 
-                                value={resource.name} 
-                                onChange={(e) => handleTitleChange(e.target.value)} 
-                                onBlur={() => setEditingTitle(false)} 
-                                onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
-                                className="h-8 text-base"
-                                autoFocus
-                            />
-                        ) : (
-                            <CardTitle className="text-base truncate cursor-pointer" onClick={() => setEditingTitle(true)}>
-                                {resource.name}
-                            </CardTitle>
-                        )}
-                    </div>
-                     {resource.createdAt && (
-                        <CardDescription className="text-xs pt-1">
-                            Created: {format(parseISO(resource.createdAt), 'MMM d, yyyy')}
-                        </CardDescription>
-                    )}
-                </CardHeader>
-                <div className="flex-grow min-h-0 overflow-y-auto">
-                    <CardContent className="p-3 pt-0">
-                        {resource.type === 'habit' || resource.type === 'mechanism' ? (
-                            <div className="space-y-1">
-                                <EditableField field="trigger" subField="action" prefix="Action: When I" suffix="," resource={resource} onUpdate={onUpdate} />
-                                <EditableField field="response" subField="visualize" prefix="Mechanism: It causes" suffix="internally." resource={resource} onUpdate={onUpdate} />
-                                <EditableField field="reward" prefix="Cost: This blocks" suffix="." resource={resource} onUpdate={onUpdate} />
-                                <EditableField field="newResponse" subField="visualize" prefix="Opposite: Only when" suffix="," resource={resource} onUpdate={onUpdate} />
-                                <EditableField field="trigger" subField="feeling" prefix="Emotion/Image: That one" suffix={`costs me ${resource.reward || "..."}.`} resource={resource} onUpdate={onUpdate} />
-                            </div>
-                        ) : (
-                         <DndContext onDragEnd={handlePointDragEnd}>
-                            <SortableContext items={(resource.points || []).map(p => p.id)}>
-                                <ul className="space-y-3 text-sm text-muted-foreground pr-2">
-                                    {(resource.points || []).map(point => (
-                                        <SortablePointInPopup
-                                            key={point.id}
-                                            point={point}
-                                            onUpdate={(newText) => handleUpdatePoint(point.id, newText)}
-                                            onDelete={() => handleDeletePoint(point.id)}
-                                            onOpenNestedPopup={(e: React.MouseEvent) => handleLinkClick(e, point.resourceId!)}
-                                            onEditLinkText={onEditLinkText}
-                                            onConvertToCard={() => onConvertToCard(point)}
-                                        />
-                                    ))}
-                                </ul>
-                            </SortableContext>
-                        </DndContext>
-                       )}
-                    </CardContent>
-                </div>
-                {resource.type !== 'habit' && resource.type !== 'mechanism' && (
-                 <CardFooter className="p-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="w-full">
-                                <PlusCircle className="mr-2 h-4 w-4" /> Add Step
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-48 p-1">
-                           <div className="space-y-1">
-                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('text')}><MessageSquare className="mr-2 h-4 w-4" />Text</Button>
-                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('markdown')}><MessageSquare className="mr-2 h-4 w-4" />Markdown</Button>
-                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('code')}><Code className="mr-2 h-4 w-4" />Code</Button>
-                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('link')}><LinkIcon className="mr-2 h-4 w-4" />Link</Button>
-                           </div>
-                        </PopoverContent>
-                    </Popover>
-                    <Popover open={linkCardPopoverOpen} onOpenChange={setLinkCardPopoverOpen}>
-                        <PopoverTrigger asChild>
-                             <Button variant="outline" size="sm" className="w-full">
-                                <LinkIcon className="mr-2 h-4 w-4" /> Link Card
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-80">
-                           <div className="grid gap-4">
-                               <div className="space-y-2">
-                                   <h4 className="font-medium leading-none">Link Card</h4>
-                                   <p className="text-sm text-muted-foreground">Select an existing card to link as a step.</p>
-                               </div>
-                                <div className="space-y-2">
-                                    <Select value={linkedCardId} onValueChange={setLinkedCardId}>
-                                        <SelectTrigger><SelectValue placeholder="Select a card..."/></SelectTrigger>
-                                        <SelectContent>
-                                            {resources.filter(r => (r.type === 'card' || r.type === 'habit' || r.type === 'mechanism') && r.id !== resource.id).map(r => (
-                                                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <Button onClick={handleAddCardLinkPoint} disabled={!linkedCardId} className="w-full">Link Card</Button>
-                                </div>
-                           </div>
-                        </PopoverContent>
-                    </Popover>
-                 </CardFooter>
-                )}
-            </Card>
-        </div>
-    );
-};
-
-const LinkDropZone = ({ resourceId, linkingFromId }: { resourceId: string; linkingFromId: string | null; }) => {
-    const { isOver, setNodeRef } = useDroppable({
-        id: `link-dropzone-${resourceId}`,
-        data: { type: 'link-dropzone', resourceId },
-    });
-    return (
-        <div
-            ref={setNodeRef}
-            className={cn(
-                "absolute -top-3 -right-3 z-20 h-7 w-7 rounded-full bg-muted/80 backdrop-blur-sm border border-dashed flex items-center justify-center transition-all opacity-0",
-                linkingFromId && linkingFromId !== resourceId && "opacity-100",
-                isOver && "ring-2 ring-primary scale-125 bg-primary/20"
-            )}
-        >
-            <LinkIcon className="h-4 w-4 text-primary" />
-        </div>
-    );
-};
-
-const SortableResourceCard = ({ children, item, className, linkingFromId }: { children: React.ReactNode; item: Resource; className?: string; linkingFromId: string | null; }) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id, data: { type: 'card', item } });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-    };
-  
-    return (
-        <div ref={setNodeRef} style={style} className={cn(className)}>
-          <div className="relative group/sortable h-full">
-            <button {...attributes} {...listeners} className="absolute -top-2 -left-2 z-10 p-1 bg-muted rounded-full cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
-            {(item.type === 'card' || item.type === 'habit' || item.type === 'mechanism') && <LinkDropZone resourceId={item.id} linkingFromId={linkingFromId} />}
-            {children}
-          </div>
-        </div>
-    );
-};
-
-
-const SortablePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText }: {
-    point: ResourcePoint;
-    onConvertToCard: (point: ResourcePoint) => void;
-    onUpdate: (updatedText: string) => void;
-    onDelete: () => void;
-    onOpenNestedPopup: (event: React.MouseEvent) => void;
-    onEditLinkText: (point: ResourcePoint) => void;
-}) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id, data: { type: 'point', item: point } });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        zIndex: isDragging ? 10 : 'auto',
-    };
-    
-    if (point.type === 'card' && point.resourceId) {
-        return (
-            <div ref={setNodeRef} style={style} className="relative flex items-center gap-3 group/item">
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-full flex items-center justify-center">
-                    <button {...attributes} {...listeners} className="cursor-grab p-1 opacity-0 group-hover/item:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
-                </div>
-                <div 
-                    onClick={onOpenNestedPopup}
-                    className="flex items-start gap-3 flex-grow cursor-pointer p-2 pl-8 rounded-md hover:bg-muted/50 border border-dashed"
-                >
-                    <Library className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
-                    <span className="font-medium text-foreground">{point.text}</span>
-                </div>
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-full flex items-center justify-center">
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={onDelete}>
-                        <Trash2 className="h-3 w-3"/>
-                    </Button>
-                </div>
-            </div>
-        )
-    }
-
-    return (
-        <div ref={setNodeRef} style={style} className="relative bg-card">
-            <EditableResourcePoint 
-                point={point}
-                onUpdate={onUpdate}
-                onDelete={onDelete}
-                onEditLinkText={onEditLinkText}
-                onConvertToCard={() => onConvertToCard(point)}
-                dragHandle={{ attributes, listeners }}
-            />
-        </div>
-    );
-};
-
-
-const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText, onConvertToCard }: {
-    point: ResourcePoint;
-    onUpdate: (text: string) => void;
-    onDelete: () => void;
-    onOpenNestedPopup: (event: React.MouseEvent) => void;
-    onEditLinkText: (point: ResourcePoint) => void;
-    onConvertToCard: (point: ResourcePoint) => void;
-}) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        zIndex: isDragging ? 10 : 'auto',
-    };
-    
-    if (point.type === 'card' && point.resourceId) {
-        return (
-            <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
-                <button {...attributes} {...listeners} className="cursor-grab p-1"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
-                <div 
-                    onClick={onOpenNestedPopup}
-                    className="flex items-start gap-3 flex-grow cursor-pointer p-2 rounded-md hover:bg-muted/50 border border-dashed"
-                >
-                    <Library className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
-                    <span className="font-medium text-foreground">{point.text}</span>
-                </div>
-                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={onDelete}>
-                    <Trash2 className="h-3 w-3"/>
-                </Button>
-            </div>
-        )
-    }
-
-    return (
-        <div ref={setNodeRef} style={style} className="relative bg-card">
-            <EditableResourcePoint 
-                point={point}
-                onUpdate={onUpdate}
-                onDelete={onDelete}
-                onEditLinkText={onEditLinkText}
-                onConvertToCard={onConvertToCard}
-                dragHandle={{ attributes, listeners }}
-            />
-        </div>
-    );
-};
 
 const ResourceCardComponent = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText, onClosePopup, onConvertToCard }: { 
     resource: Resource; 
@@ -795,6 +464,258 @@ const ResourceCardComponent = ({ resource, onUpdate, onDelete, onOpenNestedPopup
     );
 };
 
+const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAudio, setPlayingAudio, onOpenNestedPopup, onEditLinkText, onConvertToCard }: ResourcePopupProps) => {
+    const { resources } = useAuth();
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({
+        id: `popup-${popupState.resourceId}`,
+    });
+    
+    const [editingTitle, setEditingTitle] = useState(false);
+    const audioInputRef = useRef<HTMLInputElement>(null);
+    const [linkCardPopoverOpen, setLinkCardPopoverOpen] = useState(false);
+    const [linkedCardId, setLinkedCardId] = useState<string>('');
+
+
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: popupState.y,
+        left: popupState.x,
+        width: `${popupState.width || 512}px`,
+        willChange: 'transform',
+    };
+
+    if (transform) {
+        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
+    }
+    
+    const handleAudioUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const audioUrl = e.target?.result as string;
+                onUpdate({ ...resource, audioUrl });
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+    
+    const togglePlayAudio = (e: React.MouseEvent | React.PointerEvent) => {
+        e.stopPropagation();
+        setPlayingAudio(prev => {
+            if (prev?.id === resource.id && prev.isPlaying) {
+                return { ...prev, isPlaying: false };
+            }
+            return { id: resource.id, isPlaying: true };
+        });
+    };
+
+    const handleTitleChange = (newTitle: string) => {
+        onUpdate({ ...resource, name: newTitle });
+    };
+
+    const handleAddPoint = (type: ResourcePoint['type']) => {
+        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: 'New step...', type };
+        const updatedPoints = [...(resource.points || []), newPoint];
+        onUpdate({ ...resource, points: updatedPoints });
+    };
+
+    const handleAddCardLinkPoint = () => {
+        if (!linkedCardId) return;
+        const linkedCard = resources.find(r => r.id === linkedCardId);
+        if (!linkedCard) return;
+
+        const newPoint: ResourcePoint = {
+            id: `point_${Date.now()}`,
+            type: 'card',
+            text: linkedCard.name,
+            resourceId: linkedCardId
+        };
+        const updatedPoints = [...(resource.points || []), newPoint];
+        onUpdate({ ...resource, points: updatedPoints });
+        setLinkCardPopoverOpen(false);
+        setLinkedCardId('');
+    };
+
+    const handleUpdatePoint = (pointId: string, newText: string) => {
+        const updatedPoints = (resource.points || []).map(p =>
+            p.id === pointId ? { ...p, text: newText } : p
+        );
+        onUpdate({ ...resource, points: updatedPoints });
+    };
+
+    const handleDeletePoint = (pointId: string) => {
+        const updatedPoints = (resource.points || []).filter(p => p.id !== pointId);
+        onUpdate({ ...resource, points: updatedPoints });
+    };
+    
+    const handleClose = (e: React.MouseEvent | React.PointerEvent) => {
+        e.stopPropagation();
+        setPlayingAudio(null);
+        onClose(resource.id);
+    }
+    
+    const handleLinkClick = (e: React.MouseEvent, pointResourceId: string) => {
+      e.stopPropagation();
+      onOpenNestedPopup(pointResourceId, e, popupState);
+    };
+
+    const handlePointDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+        const oldIndex = (resource.points || []).findIndex(p => p.id === active.id);
+        const newIndex = (resource.points || []).findIndex(p => p.id === over.id);
+        if (oldIndex !== -1 && newIndex !== -1) {
+          const newPoints = arrayMove(resource.points!, oldIndex, newIndex);
+          onUpdate({ ...resource, points: newPoints });
+        }
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
+            <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
+            <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative group">
+                <div 
+                    className="absolute top-2 left-2 z-20 p-1 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
+                    {...listeners}
+                >
+                    <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
+                </div>
+                
+                 <div className="absolute top-2 right-2 z-20 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    {resource.audioUrl ? (
+                        <>
+                           <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={togglePlayAudio}>
+                                {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => audioInputRef.current?.click()}>
+                                <Upload className="h-4 w-4" />
+                            </Button>
+                        </>
+                    ) : (
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => audioInputRef.current?.click()}>
+                            <Upload className="h-4 w-4" />
+                        </Button>
+                    )}
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={handleClose}>
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+
+                <CardHeader className="p-3 pt-8 relative flex-shrink-0 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                        {resource.type === 'habit' ? <Zap className="h-4 w-4" /> : resource.type === 'mechanism' ? <Workflow className="h-4 w-4"/> : <Library className="h-4 w-4" />}
+                        {editingTitle ? (
+                            <Input 
+                                value={resource.name} 
+                                onChange={(e) => handleTitleChange(e.target.value)} 
+                                onBlur={() => setEditingTitle(false)} 
+                                onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
+                                className="h-8 text-base"
+                                autoFocus
+                            />
+                        ) : (
+                            <CardTitle className="text-base truncate cursor-pointer" onClick={() => setEditingTitle(true)}>
+                                {resource.name}
+                            </CardTitle>
+                        )}
+                    </div>
+                     {resource.createdAt && (
+                        <CardDescription className="text-xs pt-1">
+                            Created: {format(parseISO(resource.createdAt), 'MMM d, yyyy')}
+                        </CardDescription>
+                    )}
+                </CardHeader>
+                <div className="flex-grow min-h-0 overflow-y-auto">
+                    <CardContent className="p-3 pt-0">
+                        {(resource.type === 'habit' || resource.type === 'mechanism') ? (
+                            <div className="space-y-1">
+                                <EditableField field="trigger" subField="action" prefix="Action: When I" suffix="," resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="response" subField="visualize" prefix="Mechanism: It causes" suffix="internally." resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="reward" prefix="Cost: This blocks" suffix="." resource={resource} onUpdate={onUpdate} />
+                                <DoubleEditableField 
+                                  prefix="Opposite: Only when"
+                                  suffix=" happens."
+                                  value1={resource.newResponse?.visualize || ""}
+                                  value2={resource.newResponse?.action || ""}
+                                  onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, visualize: newValue } })}
+                                  onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, action: newValue } })}
+                                  placeholder1="..."
+                                  placeholder2="..."
+                                />
+                                <EditableField field="trigger" subField="feeling" prefix="Emotion/Image: That one" suffix={`costs me ${resource.reward || "..."}.`} resource={resource} onUpdate={onUpdate} />
+                            </div>
+                        ) : (
+                         <DndContext onDragEnd={handlePointDragEnd}>
+                            <SortableContext items={(resource.points || []).map(p => p.id)}>
+                                <ul className="space-y-3 text-sm text-muted-foreground pr-2">
+                                    {(resource.points || []).map(point => (
+                                        <SortablePointInPopup
+                                            key={point.id}
+                                            point={point}
+                                            onUpdate={(newText) => handleUpdatePoint(point.id, newText)}
+                                            onDelete={() => handleDeletePoint(point.id)}
+                                            onOpenNestedPopup={(e: React.MouseEvent) => handleLinkClick(e, point.resourceId!)}
+                                            onEditLinkText={onEditLinkText}
+                                            onConvertToCard={() => onConvertToCard(point)}
+                                        />
+                                    ))}
+                                </ul>
+                            </SortableContext>
+                        </DndContext>
+                       )}
+                    </CardContent>
+                </div>
+                {resource.type !== 'habit' && resource.type !== 'mechanism' && (
+                 <CardFooter className="p-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="w-full">
+                                <PlusCircle className="mr-2 h-4 w-4" /> Add Step
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-48 p-1">
+                           <div className="space-y-1">
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('text')}><MessageSquare className="mr-2 h-4 w-4" />Text</Button>
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('markdown')}><MessageSquare className="mr-2 h-4 w-4" />Markdown</Button>
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('code')}><Code className="mr-2 h-4 w-4" />Code</Button>
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('link')}><LinkIcon className="mr-2 h-4 w-4" />Link</Button>
+                           </div>
+                        </PopoverContent>
+                    </Popover>
+                    <Popover open={linkCardPopoverOpen} onOpenChange={setLinkCardPopoverOpen}>
+                        <PopoverTrigger asChild>
+                             <Button variant="outline" size="sm" className="w-full">
+                                <LinkIcon className="mr-2 h-4 w-4" /> Link Card
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80">
+                           <div className="grid gap-4">
+                               <div className="space-y-2">
+                                   <h4 className="font-medium leading-none">Link Card</h4>
+                                   <p className="text-sm text-muted-foreground">Select an existing card to link as a step.</p>
+                               </div>
+                                <div className="space-y-2">
+                                    <Select value={linkedCardId} onValueChange={setLinkedCardId}>
+                                        <SelectTrigger><SelectValue placeholder="Select a card..."/></SelectTrigger>
+                                        <SelectContent>
+                                            {resources.filter(r => (r.type === 'card' || r.type === 'habit' || r.type === 'mechanism') && r.id !== resource.id).map(r => (
+                                                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <Button onClick={handleAddCardLinkPoint} disabled={!linkedCardId} className="w-full">Link Card</Button>
+                                </div>
+                           </div>
+                        </PopoverContent>
+                    </Popover>
+                 </CardFooter>
+                )}
+            </Card>
+        </div>
+    );
+};
+
 const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingFromId }: {
     resource: Resource; 
     onUpdate: (updatedResource: Resource) => void; 
@@ -852,10 +773,159 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
                 <EditableField field="trigger" subField="action" prefix="Action: When I" suffix="," resource={resource} onUpdate={onUpdate} />
                 <EditableField field="response" subField="visualize" prefix="Mechanism: It causes" suffix="internally." resource={resource} onUpdate={onUpdate} />
                 <EditableField field="reward" prefix="Cost: This blocks" suffix="." resource={resource} onUpdate={onUpdate} />
-                <EditableField field="newResponse" subField="visualize" prefix="Opposite: Only when" suffix="," resource={resource} onUpdate={onUpdate} />
+                 <DoubleEditableField 
+                    prefix="Opposite: Only when"
+                    suffix=" happens."
+                    value1={resource.newResponse?.visualize || ""}
+                    value2={resource.newResponse?.action || ""}
+                    onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, visualize: newValue } })}
+                    onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, action: newValue } })}
+                    placeholder1="..."
+                    placeholder2="..."
+                />
                 <EditableField field="trigger" subField="feeling" prefix="Emotion/Image: That one" suffix={`costs me ${resource.reward || "..."}.`} resource={resource} onUpdate={onUpdate} />
             </CardContent>
         </Card>
+    );
+};
+
+const LinkDropZone = ({ resourceId, linkingFromId }: { resourceId: string; linkingFromId: string | null; }) => {
+    const { isOver, setNodeRef } = useDroppable({
+        id: `link-dropzone-${resourceId}`,
+        data: { type: 'link-dropzone', resourceId },
+    });
+    return (
+        <div
+            ref={setNodeRef}
+            className={cn(
+                "absolute -top-3 -right-3 z-20 h-7 w-7 rounded-full bg-muted/80 backdrop-blur-sm border border-dashed flex items-center justify-center transition-all opacity-0",
+                linkingFromId && linkingFromId !== resourceId && "opacity-100",
+                isOver && "ring-2 ring-primary scale-125 bg-primary/20"
+            )}
+        >
+            <LinkIcon className="h-4 w-4 text-primary" />
+        </div>
+    );
+};
+
+const SortableResourceCard = ({ children, item, className, linkingFromId }: { children: React.ReactNode; item: Resource; className?: string; linkingFromId: string | null; }) => {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id, data: { type: 'card', item } });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+  
+    return (
+        <div ref={setNodeRef} style={style} className={cn(className)}>
+          <div className="relative group/sortable h-full">
+            <button {...attributes} {...listeners} className="absolute -top-2 -left-2 z-10 p-1 bg-muted rounded-full cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
+            {(item.type === 'card' || item.type === 'habit' || item.type === 'mechanism') && <LinkDropZone resourceId={item.id} linkingFromId={linkingFromId} />}
+            {children}
+          </div>
+        </div>
+    );
+};
+
+
+const SortablePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText }: {
+    point: ResourcePoint;
+    onConvertToCard: (point: ResourcePoint) => void;
+    onUpdate: (updatedText: string) => void;
+    onDelete: () => void;
+    onOpenNestedPopup: (event: React.MouseEvent) => void;
+    onEditLinkText: (point: ResourcePoint) => void;
+}) => {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id, data: { type: 'point', item: point } });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        zIndex: isDragging ? 10 : 'auto',
+    };
+    
+    if (point.type === 'card' && point.resourceId) {
+        return (
+            <div ref={setNodeRef} style={style} className="relative flex items-center gap-3 group/item">
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-full flex items-center justify-center">
+                    <button {...attributes} {...listeners} className="cursor-grab p-1 opacity-0 group-hover/item:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
+                </div>
+                <div 
+                    onClick={onOpenNestedPopup}
+                    className="flex items-start gap-3 flex-grow cursor-pointer p-2 pl-8 rounded-md hover:bg-muted/50 border border-dashed"
+                >
+                    <Library className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
+                    <span className="font-medium text-foreground">{point.text}</span>
+                </div>
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-full flex items-center justify-center">
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={onDelete}>
+                        <Trash2 className="h-3 w-3"/>
+                    </Button>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div ref={setNodeRef} style={style} className="relative bg-card">
+            <EditableResourcePoint 
+                point={point}
+                onUpdate={onUpdate}
+                onDelete={onDelete}
+                onEditLinkText={onEditLinkText}
+                onConvertToCard={() => onConvertToCard(point)}
+                dragHandle={{ attributes, listeners }}
+            />
+        </div>
+    );
+};
+
+
+const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText, onConvertToCard }: {
+    point: ResourcePoint;
+    onUpdate: (text: string) => void;
+    onDelete: () => void;
+    onOpenNestedPopup: (event: React.MouseEvent) => void;
+    onEditLinkText: (point: ResourcePoint) => void;
+    onConvertToCard: (point: ResourcePoint) => void;
+}) => {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 10 : 'auto',
+    };
+    
+    if (point.type === 'card' && point.resourceId) {
+        return (
+            <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
+                <button {...attributes} {...listeners} className="cursor-grab p-1"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
+                <div 
+                    onClick={onOpenNestedPopup}
+                    className="flex items-start gap-3 flex-grow cursor-pointer p-2 rounded-md hover:bg-muted/50 border border-dashed"
+                >
+                    <Library className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
+                    <span className="font-medium text-foreground">{point.text}</span>
+                </div>
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={onDelete}>
+                    <Trash2 className="h-3 w-3"/>
+                </Button>
+            </div>
+        )
+    }
+
+    return (
+        <div ref={setNodeRef} style={style} className="relative bg-card">
+            <EditableResourcePoint 
+                point={point}
+                onUpdate={onUpdate}
+                onDelete={onDelete}
+                onEditLinkText={onEditLinkText}
+                onConvertToCard={onConvertToCard}
+                dragHandle={{ attributes, listeners }}
+            />
+        </div>
     );
 };
 
@@ -2507,6 +2577,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
