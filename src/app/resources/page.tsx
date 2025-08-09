@@ -643,7 +643,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                     </div>
                      <div>
                         <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Law</h4>
-                        <DoubleEditableField prefix=" " infix=" can only happen when " suffix="." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Positive Condition"/>
+                        <DoubleEditableField prefix="" infix=" can only happen when " suffix="." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Positive Condition"/>
                     </div>
                     <div>
                         <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Emotion/Image</h4>
@@ -673,7 +673,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                 </div>
                 <div>
                     <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Law</h4>
-                     <DoubleEditableField prefix=" " infix=" cannot happen when " suffix="." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Negative Condition"/>
+                     <DoubleEditableField prefix="" infix=" cannot happen when " suffix="." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Negative Condition"/>
                 </div>
                 <div>
                     <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Emotion/Image</h4>
@@ -835,7 +835,7 @@ const EditableResponse = ({ field, label, resource, onUpdate, onOpenNestedPopup,
   
     const handleUnlink = (e: React.MouseEvent) => {
         e.stopPropagation();
-        onUpdate({ ...resource, [field]: { ...responseValue, resourceId: undefined } });
+        onUpdate({ ...resource, [field]: { ...responseValue, text: '', resourceId: undefined } });
     };
   
     const handleUpdateField = (value: { text?: string; resourceId?: string }) => {
@@ -843,54 +843,58 @@ const EditableResponse = ({ field, label, resource, onUpdate, onOpenNestedPopup,
     };
 
     return (
-        <div className="space-y-1">
-            {linkedResource ? (
-                <div className="flex items-center justify-between text-sm p-2 rounded-md bg-muted/50 border-l-2 border-primary">
-                    <button
-                        onClick={(e) => {
-                            if (popupState) onOpenNestedPopup(linkedResource.id, e, popupState);
-                        }}
-                        className="flex items-center gap-2 min-w-0"
-                    >
-                        <span className="text-xs text-muted-foreground">{label}:</span>
-                        <Workflow className="h-4 w-4 text-primary flex-shrink-0" />
-                        <span className="font-medium text-foreground truncate" title={linkedResource.name}>{linkedResource.name}</span>
+        <div className="editable-sentence group/response">
+          <span contentEditable={false} className="uneditable-text">{label}:</span>
+          {linkedResource ? (
+            <>
+                <button 
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (popupState) onOpenNestedPopup(linkedResource.id, e, popupState);
+                    }}
+                    className="editable-placeholder text-primary hover:underline"
+                >
+                    {linkedResource.name}
+                </button>
+                <button onClick={handleUnlink} className="inline-block opacity-0 group-hover/response:opacity-100 transition-opacity ml-1">
+                    <Unlink className="h-3 w-3 text-destructive" />
+                </button>
+            </>
+          ) : (
+            <>
+              <EditableField
+                field={field}
+                subField="text"
+                prefix=""
+                resource={resource}
+                onUpdate={onUpdate}
+                placeholder="..."
+              />
+              <Popover>
+                <PopoverTrigger asChild>
+                    <button className="inline-block opacity-0 group-hover/response:opacity-100 transition-opacity ml-1">
+                        <LinkIcon className="h-3 w-3" />
                     </button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleUnlink}>
-                        <Unlink className="h-3 w-3 text-destructive" />
-                    </Button>
-                </div>
-            ) : (
-                <div className="flex items-center gap-2">
-                    <EditableField
-                      field={field}
-                      subField="text"
-                      prefix={`${label}:`}
-                      resource={resource}
-                      onUpdate={onUpdate}
-                    />
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7"><LinkIcon className="h-4 w-4" /></Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-56 p-0">
-                            <Select onValueChange={(val) => handleUpdateField({ text: '', resourceId: val })}>
-                                <SelectTrigger className="w-full border-0 focus:ring-0">
-                                    <SelectValue placeholder="Link a mechanism..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {resources.filter(r => r.type === 'mechanism').map(r => (
-                                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </PopoverContent>
-                    </Popover>
-                </div>
-            )}
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-0">
+                    <Select onValueChange={(val) => handleUpdateField({ text: '', resourceId: val })}>
+                        <SelectTrigger className="w-full border-0 focus:ring-0">
+                            <SelectValue placeholder="Link a mechanism..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {resources.filter(r => r.type === 'mechanism').map(r => (
+                                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </PopoverContent>
+              </Popover>
+            </>
+          )}
         </div>
     );
 };
+
 
 const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingFromId, onOpenNestedPopup }: {
     resource: Resource; 
@@ -978,7 +982,7 @@ const MechanismResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, link
                     </div>
                      <div>
                         <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Law</h4>
-                        <DoubleEditableField prefix=" " infix=" can only happen when " suffix="." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Positive Condition"/>
+                        <DoubleEditableField prefix="" infix=" can only happen when " suffix="." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Positive Condition"/>
                     </div>
                     <div>
                         <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Emotion/Image</h4>
@@ -1008,7 +1012,7 @@ const MechanismResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, link
                 </div>
                 <div>
                     <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Law</h4>
-                     <DoubleEditableField prefix=" " infix=" cannot happen when " suffix="." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Negative Condition"/>
+                     <DoubleEditableField prefix="" infix=" cannot happen when " suffix="." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Negative Condition"/>
                 </div>
                 <div>
                     <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Emotion/Image</h4>
@@ -2853,6 +2857,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
