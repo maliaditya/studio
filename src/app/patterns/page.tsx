@@ -1,38 +1,44 @@
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ChevronRight, FileText, Lightbulb, Zap, HelpCircle } from 'lucide-react';
-import type { Resource } from '@/types/workout';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-
-const stepCards = [
-    { title: "Step 1: Collect Data", icon: <FileText className="h-6 w-6" />, description: "For a week (or longer), fill out both the Negative and Positive Frameworks for different actions in your life using the Mechanism cards in the Resources page. Don’t overthink — just write what comes to mind, even if it’s messy." },
-    { title: "Step 2: Review Side-by-Side", icon: <ChevronRight className="h-6 w-6" />, description: "After you have 10–20 entries, review the aggregated lists below. Put all your “Costs” from the Negative Framework in one list and all your “Benefits” from the Positive Framework in another." },
-    { title: "Step 3: Spot Repeats", icon: <Zap className="h-6 w-6" />, description: "Look for phrases, feelings, or outcomes that keep showing up. If the same type of cost or benefit appears in different contexts, that’s a pattern." },
-    { title: "Step 4: Name the Pattern", icon: <Lightbulb className="h-6 w-6" />, description: "Give each recurring element a simple name — your subconscious likes labels. Use the form below to define your discovered patterns." },
-    { title: "Step 5: Create Meta-Rules", icon: <HelpCircle className="h-6 w-6" />, description: "Turn these patterns into guiding rules for your life. Structure = the container that organizes thoughts. Pattern = the recurring themes your subconscious reveals. Meta-rule = the directive you consciously create from those patterns." },
-];
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Badge } from '@/components/ui/badge';
+import { FileText, Lightbulb, Zap, PlusCircle, Trash2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface Pattern {
   id: string;
   name: string;
   type: 'Positive' | 'Negative';
-  rules: string;
+  phrases: string[];
+}
+
+interface MetaRule {
+  id: string;
+  text: string;
 }
 
 function PatternsPageContent() {
-    const { resources, setResources } = useAuth();
+    const { resources } = useAuth();
+    const { toast } = useToast();
+
     const [patterns, setPatterns] = useState<Pattern[]>([]);
+    const [metaRules, setMetaRules] = useState<MetaRule[]>([]);
+    
+    const [selectedPhrases, setSelectedPhrases] = useState<string[]>([]);
     const [newPatternName, setNewPatternName] = useState('');
     const [newPatternType, setNewPatternType] = useState<'Positive' | 'Negative'>('Positive');
-    const [newPatternRules, setNewPatternRules] = useState('');
+
+    const [newMetaRuleText, setNewMetaRuleText] = useState('');
 
     const mechanismCards = useMemo(() => {
         return resources.filter(r => r.type === 'mechanism');
@@ -40,40 +46,79 @@ function PatternsPageContent() {
 
     const aggregatedFields = useMemo(() => {
         const fields: Record<string, string[]> = {
-            Costs: [],
             Benefits: [],
+            Costs: [],
             PositiveLaws: [],
             NegativeLaws: [],
         };
 
         mechanismCards.forEach(card => {
-            if (card.mechanismFramework === 'negative') {
-                if (card.reward) fields.Costs.push(card.reward);
-                if (card.law?.premise && card.law?.outcome) {
-                    fields.NegativeLaws.push(`${card.law.premise} cannot happen when ${card.law.outcome}`);
-                }
-            } else {
-                if (card.benefit) fields.Benefits.push(card.benefit);
-                 if (card.law?.premise && card.law?.outcome) {
-                    fields.PositiveLaws.push(`${card.law.premise} can only happen when ${card.law.outcome}`);
-                }
+            if (card.benefit) fields.Benefits.push(card.benefit);
+            if (card.reward) fields.Costs.push(card.reward);
+            if (card.law?.premise && card.law?.outcome) {
+              if (card.mechanismFramework === 'positive') {
+                fields.PositiveLaws.push(`${card.law.premise} can only happen when ${card.law.outcome}`);
+              } else {
+                fields.NegativeLaws.push(`${card.law.premise} cannot happen when ${card.law.outcome}`);
+              }
             }
         });
+
+        // Deduplicate while preserving order
+        Object.keys(fields).forEach(key => {
+            fields[key] = [...new Set(fields[key])];
+        });
+
         return fields;
     }, [mechanismCards]);
-    
-    const handleAddPattern = () => {
-        if (!newPatternName.trim()) return;
+
+    const handlePhraseToggle = (phrase: string) => {
+        setSelectedPhrases(prev => 
+            prev.includes(phrase)
+                ? prev.filter(p => p !== phrase)
+                : [...prev, phrase]
+        );
+    };
+
+    const handleCreatePattern = () => {
+        if (!newPatternName.trim()) {
+            toast({ title: 'Error', description: 'Pattern name cannot be empty.', variant: 'destructive' });
+            return;
+        }
+        if (selectedPhrases.length === 0) {
+            toast({ title: 'Error', description: 'Please select at least one phrase for the pattern.', variant: 'destructive' });
+            return;
+        }
         const newPattern: Pattern = {
             id: `pattern_${Date.now()}`,
             name: newPatternName,
             type: newPatternType,
-            rules: newPatternRules
+            phrases: selectedPhrases,
         };
         setPatterns(prev => [...prev, newPattern]);
         setNewPatternName('');
-        setNewPatternRules('');
+        setSelectedPhrases([]);
+        toast({ title: 'Pattern Created!', description: `The "${newPattern.name}" pattern has been saved.`});
     };
+
+    const handleDeletePattern = (patternId: string) => {
+        setPatterns(prev => prev.filter(p => p.id !== patternId));
+    };
+
+    const handleAddMetaRule = () => {
+        if (!newMetaRuleText.trim()) return;
+        const newRule: MetaRule = {
+            id: `rule_${Date.now()}`,
+            text: newMetaRuleText,
+        };
+        setMetaRules(prev => [...prev, newRule]);
+        setNewMetaRuleText('');
+    };
+
+    const handleDeleteMetaRule = (ruleId: string) => {
+        setMetaRules(prev => prev.filter(r => r.id !== ruleId));
+    };
+
 
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
@@ -81,97 +126,145 @@ function PatternsPageContent() {
                 <h1 className="text-4xl font-bold tracking-tight text-primary">Pattern Recognition</h1>
                 <p className="mt-4 text-lg text-muted-foreground">Discover the underlying rules that govern your behavior.</p>
             </div>
+            
+            {/* Step 2: Review */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><FileText /> Step 2: Review Your Data</CardTitle>
+                    <CardDescription>Review aggregated data from your Mechanism cards. Select phrases that repeat or resonate with you.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {Object.entries(aggregatedFields).map(([title, phrases]) => (
+                            <div key={title}>
+                                <h3 className="font-semibold mb-2">{title}</h3>
+                                <ScrollArea className="h-60 border rounded-md p-2">
+                                    {phrases.length > 0 ? (
+                                        <div className="space-y-2">
+                                            {phrases.map((phrase, i) => (
+                                                <div key={i} className="flex items-start space-x-2">
+                                                    <Checkbox
+                                                        id={`phrase-${title}-${i}`}
+                                                        checked={selectedPhrases.includes(phrase)}
+                                                        onCheckedChange={() => handlePhraseToggle(phrase)}
+                                                    />
+                                                    <Label htmlFor={`phrase-${title}-${i}`} className="text-sm font-normal cursor-pointer">
+                                                        {phrase}
+                                                    </Label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : <p className="text-xs text-muted-foreground text-center pt-8">No data for this category yet.</p>}
+                                </ScrollArea>
+                            </div>
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                {stepCards.map((step, index) => (
-                    <Card key={index} className="text-center">
-                        <CardHeader className="items-center">
-                            <div className="p-3 rounded-full bg-primary/10 text-primary mb-2">
-                                {step.icon}
-                            </div>
-                            <CardTitle className="text-base">{step.title}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-xs text-muted-foreground">{step.description}</p>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                    <CardHeader><CardTitle>Review Your Data</CardTitle></CardHeader>
-                    <CardContent>
-                        <ScrollArea className="h-96 pr-4">
-                        <div className="space-y-4">
-                            <div>
-                                <h3 className="font-semibold mb-2">Benefits (from Positive Frameworks)</h3>
-                                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                                    {aggregatedFields.Benefits.map((item, i) => <li key={i}>{item}</li>)}
+            {/* Step 3 & 4: Name Pattern */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Zap /> Steps 3 & 4: Spot & Name Patterns</CardTitle>
+                    <CardDescription>Group your selected phrases into a named pattern.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                        <Label className="font-semibold">Selected Phrases ({selectedPhrases.length})</Label>
+                        <ScrollArea className="h-48 border rounded-md p-3 mt-2">
+                             {selectedPhrases.length > 0 ? (
+                                <ul className="list-disc list-inside space-y-1">
+                                    {selectedPhrases.map((phrase, i) => <li key={i} className="text-sm">{phrase}</li>)}
                                 </ul>
-                            </div>
-                            <div>
-                                <h3 className="font-semibold mb-2">Costs (from Negative Frameworks)</h3>
-                                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                                    {aggregatedFields.Costs.map((item, i) => <li key={i}>{item}</li>)}
-                                </ul>
-                            </div>
-                             <div>
-                                <h3 className="font-semibold mb-2">Positive Laws</h3>
-                                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                                    {aggregatedFields.PositiveLaws.map((item, i) => <li key={i}>{item}</li>)}
-                                </ul>
-                            </div>
-                             <div>
-                                <h3 className="font-semibold mb-2">Negative Laws</h3>
-                                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                                    {aggregatedFields.NegativeLaws.map((item, i) => <li key={i}>{item}</li>)}
-                                </ul>
-                            </div>
-                        </div>
+                            ) : <p className="text-xs text-muted-foreground text-center pt-10">Select phrases from Step 2 to create a pattern.</p>}
                         </ScrollArea>
-                    </CardContent>
-                </Card>
-                 <div className="space-y-6">
-                    <Card>
-                        <CardHeader><CardTitle>Define a New Pattern</CardTitle></CardHeader>
-                        <CardContent className="space-y-4">
-                             <div>
-                                <label className="text-sm font-medium">Pattern Name</label>
-                                <Input value={newPatternName} onChange={e => setNewPatternName(e.target.value)} placeholder="e.g., Energy Feeders, Focus Killers" />
-                            </div>
-                             <div>
-                                <label className="text-sm font-medium">Pattern Type</label>
-                                <div className="flex gap-4 mt-2">
-                                     <Button variant={newPatternType === 'Positive' ? 'default' : 'outline'} onClick={() => setNewPatternType('Positive')}>Positive</Button>
-                                     <Button variant={newPatternType === 'Negative' ? 'destructive' : 'outline'} onClick={() => setNewPatternType('Negative')}>Negative</Button>
+                    </div>
+                    <div className="space-y-4">
+                        <div>
+                            <Label htmlFor="pattern-name">Pattern Name</Label>
+                            <Input id="pattern-name" value={newPatternName} onChange={e => setNewPatternName(e.target.value)} placeholder="e.g., Energy Feeders, Focus Killers" />
+                        </div>
+                        <div>
+                            <Label>Pattern Type</Label>
+                            <RadioGroup value={newPatternType} onValueChange={(v) => setNewPatternType(v as any)} className="flex items-center space-x-4 mt-2">
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="Positive" id="type-positive" />
+                                    <Label htmlFor="type-positive">Positive</Label>
                                 </div>
-                            </div>
-                             <div>
-                                <label className="text-sm font-medium">Meta-Rule(s)</label>
-                                <Textarea value={newPatternRules} onChange={e => setNewPatternRules(e.target.value)} placeholder="e.g., Every day must start with an Energy Feeder." />
-                            </div>
-                            <Button onClick={handleAddPattern}>Save Pattern</Button>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader><CardTitle>Your Defined Patterns & Rules</CardTitle></CardHeader>
-                        <CardContent>
-                            <ScrollArea className="h-48">
-                            <ul className="space-y-4">
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="Negative" id="type-negative" />
+                                    <Label htmlFor="type-negative">Negative</Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
+                        <Button onClick={handleCreatePattern} disabled={selectedPhrases.length === 0 || !newPatternName.trim()}>
+                            <PlusCircle className="mr-2 h-4 w-4"/>
+                            Create Pattern
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+            
+            {/* Step 5: Meta-Rules */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Lightbulb /> Step 5: Create Meta-Rules</CardTitle>
+                    <CardDescription>Turn your defined patterns into actionable life rules.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                        <Label className="font-semibold">Your Defined Patterns</Label>
+                        <ScrollArea className="h-60 mt-2 pr-4">
+                            {patterns.length > 0 ? (
+                                <div className="space-y-4">
                                 {patterns.map(p => (
-                                    <li key={p.id}>
-                                        <h4 className={`font-semibold ${p.type === 'Positive' ? 'text-green-600' : 'text-red-600'}`}>{p.name}</h4>
-                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{p.rules}</p>
-                                    </li>
+                                    <Card key={p.id}>
+                                        <CardHeader className="p-3 flex flex-row items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant={p.type === 'Positive' ? 'default' : 'destructive'}>{p.type}</Badge>
+                                                <CardTitle className="text-base">{p.name}</CardTitle>
+                                            </div>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeletePattern(p.id)}><Trash2 className="h-4 w-4"/></Button>
+                                        </CardHeader>
+                                        <CardContent className="p-3 pt-0">
+                                            <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                                                {p.phrases.map((phrase, i) => <li key={i}>{phrase}</li>)}
+                                            </ul>
+                                        </CardContent>
+                                    </Card>
                                 ))}
-                                {patterns.length === 0 && <p className="text-sm text-muted-foreground text-center">No patterns defined yet.</p>}
-                            </ul>
+                                </div>
+                            ) : (
+                                <div className="h-full flex items-center justify-center border rounded-md">
+                                    <p className="text-sm text-muted-foreground text-center">No patterns defined yet.</p>
+                                </div>
+                            )}
+                        </ScrollArea>
+                    </div>
+                    <div className="space-y-4">
+                         <div>
+                            <Label htmlFor="meta-rule">New Meta-Rule</Label>
+                            <Textarea id="meta-rule" value={newMetaRuleText} onChange={e => setNewMetaRuleText(e.target.value)} placeholder="e.g., Every day must start with an Energy Feeder." />
+                            <Button onClick={handleAddMetaRule} className="mt-2">Add Rule</Button>
+                        </div>
+                        <div>
+                            <Label className="font-semibold">Your Meta-Rules</Label>
+                            <ScrollArea className="h-40 border rounded-md p-3 mt-2">
+                               {metaRules.length > 0 ? (
+                                <ul className="space-y-2">
+                                    {metaRules.map(rule => (
+                                        <li key={rule.id} className="text-sm flex justify-between items-start group">
+                                            <span>{rule.text}</span>
+                                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => handleDeleteMetaRule(rule.id)}><Trash2 className="h-3 w-3 text-destructive"/></Button>
+                                        </li>
+                                    ))}
+                                </ul>
+                               ) : <p className="text-xs text-muted-foreground text-center pt-10">No meta-rules defined yet.</p>}
                             </ScrollArea>
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }
