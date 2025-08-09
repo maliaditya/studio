@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -64,12 +65,12 @@ function PatternsPageContent() {
                   fields['Positive Laws'].push({ category: 'Positive Laws', text: lawText, mechanismCardId: cardId, mechanismCardName: cardName });
                 }
             } else { // Negative Framework
-                if (card.reward) { // This is a "Cost" in the negative framework
-                    const costText = `That one ${card.trigger?.feeling || 'action'} costs me ${card.reward}.`;
+                if (card.trigger?.feeling && card.benefit) {
+                    const costText = `That one ${card.trigger.feeling} costs me ${card.benefit}.`;
                     fields.Costs.push({ category: 'Costs', text: costText, mechanismCardId: cardId, mechanismCardName: cardName });
                 }
-                 if (card.benefit) { // This is a "Benefit" blocked by the negative action
-                    const benefitText = `This blocks ${card.benefit}.`;
+                if (card.reward) { // This is a "Benefit" blocked by the negative action
+                    const benefitText = `This blocks ${card.reward}.`;
                     fields.Benefits.push({ category: 'Benefits', text: benefitText, mechanismCardId: cardId, mechanismCardName: cardName });
                 }
                 if (card.law?.premise && card.law?.outcome) {
@@ -109,13 +110,41 @@ function PatternsPageContent() {
 
         return fields;
     }, [mechanismCards, habitCards, usedPhrases]);
-
+    
     const handlePhraseToggle = (phrase: PatternPhrase) => {
-        setSelectedPhrases(prev => 
-            prev.some(p => p.text === phrase.text)
-                ? prev.filter(p => p.text !== phrase.text)
-                : [...prev, phrase]
-        );
+        const isSelected = selectedPhrases.some(p => p.text === phrase.text);
+        
+        // Find habits linked to the current phrase's mechanism
+        const linkedHabitPhrases = aggregatedFields['Habit Cards'].filter(habitPhrase => {
+            const habitCard = habitCards.find(h => h.id === habitPhrase.mechanismCardId);
+            return habitCard && (habitCard.response?.resourceId === phrase.mechanismCardId || habitCard.newResponse?.resourceId === phrase.mechanismCardId);
+        });
+
+        if (!isSelected) {
+            // Add the phrase and its linked habits
+            const newSelection = [...selectedPhrases, phrase, ...linkedHabitPhrases];
+            // Remove duplicates
+            setSelectedPhrases(Array.from(new Map(newSelection.map(item => [item.text, item])).values()));
+        } else {
+            // Remove the phrase
+            let newSelection = selectedPhrases.filter(p => p.text !== phrase.text);
+            
+            // Check if we should remove the linked habits
+            linkedHabitPhrases.forEach(habitPhrase => {
+                // Find all phrases (benefits, costs, laws) linked to this habit's mechanism(s)
+                const habitCard = habitCards.find(h => h.id === habitPhrase.mechanismCardId);
+                const relatedMechanismIds = new Set([habitCard?.response?.resourceId, habitCard?.newResponse?.resourceId].filter(Boolean));
+                
+                const otherSelectedPhrasesRelyingOnHabit = newSelection.some(p => 
+                    p.category !== 'Habit Cards' && relatedMechanismIds.has(p.mechanismCardId)
+                );
+
+                if (!otherSelectedPhrasesRelyingOnHabit) {
+                    newSelection = newSelection.filter(p => p.text !== habitPhrase.text);
+                }
+            });
+            setSelectedPhrases(newSelection);
+        }
     };
 
     const handleCreateOrUpdatePattern = () => {
@@ -213,16 +242,14 @@ function PatternsPageContent() {
                                         <div className="space-y-2">
                                             {phrases.map((phrase, i) => (
                                                 <div key={i} className="flex items-start space-x-2">
-                                                    {title !== 'Habit Cards' ? (
-                                                      <Checkbox
-                                                          id={`phrase-${title}-${i}`}
-                                                          checked={selectedPhrases.some(p => p.text === phrase.text)}
-                                                          onCheckedChange={() => handlePhraseToggle(phrase)}
-                                                      />
-                                                    ) : null}
-                                                    <div className="flex-grow">
+                                                    <Checkbox
+                                                        id={`phrase-${title}-${i}`}
+                                                        checked={selectedPhrases.some(p => p.text === phrase.text)}
+                                                        onCheckedChange={() => handlePhraseToggle(phrase)}
+                                                    />
+                                                     <Label htmlFor={`phrase-${title}-${i}`} className="font-normal w-full flex-grow cursor-pointer">
                                                       {title === 'Habit Cards' ? (
-                                                        <div className="text-sm p-2 bg-muted/30 rounded-md">
+                                                        <div className="p-2 bg-muted/30 rounded-md">
                                                           <p className="font-semibold text-foreground">{phrase.text}</p>
                                                           {(phrase.linkedMechanisms && phrase.linkedMechanisms.length > 0) && (
                                                             <div className="mt-1 pt-1 border-t">
@@ -234,11 +261,9 @@ function PatternsPageContent() {
                                                           )}
                                                         </div>
                                                       ) : (
-                                                        <Label htmlFor={`phrase-${title}-${i}`} className="text-sm font-normal cursor-pointer">
-                                                            {phrase.text}
-                                                        </Label>
+                                                        phrase.text
                                                       )}
-                                                    </div>
+                                                    </Label>
                                                 </div>
                                             ))}
                                         </div>
@@ -319,9 +344,9 @@ function PatternsPageContent() {
                                       const isSelected = selectedPatternForRule === p.id;
                                       const categorizedPhrases = isSelected ? p.phrases.reduce((acc, phrase) => {
                                         if (!acc[phrase.category]) acc[phrase.category] = [];
-                                        acc[phrase.category].push(phrase.text);
+                                        acc[phrase.category].push(phrase);
                                         return acc;
-                                      }, {} as Record<string, string[]>) : null;
+                                      }, {} as Record<string, PatternPhrase[]>) : null;
 
                                       return (
                                         <Card key={p.id} className={cn("transition-all", isSelected && "ring-2 ring-primary")}>
@@ -346,7 +371,7 @@ function PatternsPageContent() {
                                                   <div key={category}>
                                                     <h4 className="font-medium text-muted-foreground mb-1">{category}</h4>
                                                     <ul className="list-disc list-inside space-y-1">
-                                                      {phrases.map((phrase, i) => <li key={i}>{phrase}</li>)}
+                                                      {phrases.map((phrase, i) => <li key={i}>{phrase.text}</li>)}
                                                     </ul>
                                                   </div>
                                                 ))}
