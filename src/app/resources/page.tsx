@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -32,7 +31,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { format, parseISO } from 'date-fns';
 import { ModelViewer } from '@/components/ModelViewer';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Separator } from '../ui/separator';
+import { Separator } from '@/components/ui/separator';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -1700,8 +1699,8 @@ function ResourcesPageContent() {
     toast({ title: "Resource Updated", description: `"${editingResource.name}" has been updated.` });
   };
 
-  const getChildFoldersRecursive = (folderId: string): ResourceFolderType[] => {
-    let children: ResourceFolderType[] = [];
+  const getChildFoldersRecursive = (folderId: string): ResourceFolder[] => {
+    let children: ResourceFolder[] = [];
     const directChildren = resourceFolders.filter(f => f.parentId === folderId);
     children.push(...directChildren);
     directChildren.forEach(child => {
@@ -2040,7 +2039,7 @@ function ResourcesPageContent() {
       let finalResources = [...resources];
 
       if (!existingSubFolder) {
-        const newFolder: ResourceFolderType = {
+        const newFolder: ResourceFolder = {
           id: `folder_${Date.now()}`,
           name: targetCard.name,
           parentId: parentFolderId,
@@ -2126,7 +2125,7 @@ function ResourcesPageContent() {
 
     if (!subFolder) {
       // If not, create it
-      const newSubFolder: ResourceFolderType = {
+      const newSubFolder: ResourceFolder = {
         id: `folder_${Date.now()}`,
         name: parentResource.name,
         parentId: parentFolderId,
@@ -2848,6 +2847,4 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
-
-
 
