@@ -116,7 +116,7 @@ interface PopupState {
   width?: number;
 }
 
-const EditableField = ({ field, subField, label, resource, onUpdate }: { field: keyof Resource, subField?: string, label: string, resource: Resource, onUpdate: (updatedResource: Resource) => void }) => {
+const EditableField = ({ field, subField, prefix, suffix, resource, onUpdate }: { field: keyof Resource, subField?: string, prefix: string, suffix?: string, resource: Resource, onUpdate: (updatedResource: Resource) => void }) => {
     const [isEditing, setIsEditing] = useState(false);
     
     let initialValue = '';
@@ -136,6 +136,10 @@ const EditableField = ({ field, subField, label, resource, onUpdate }: { field: 
             textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
         }
     }, [isEditing]);
+    
+    useEffect(() => {
+        setText(initialValue);
+    }, [initialValue]);
 
     const handleSave = () => {
         setIsEditing(false);
@@ -149,25 +153,26 @@ const EditableField = ({ field, subField, label, resource, onUpdate }: { field: 
     };
 
     return (
-        <div>
-            <Label className="text-xs font-semibold uppercase text-muted-foreground">{label}</Label>
-            {isEditing ? (
-                <Textarea 
-                    ref={textareaRef}
-                    value={text} 
-                    onChange={e => setText(e.target.value)}
-                    onBlur={handleSave}
-                    className="text-sm mt-1"
-                    rows={1}
-                />
-            ) : (
-                <p 
-                    className="text-sm text-foreground mt-1 p-2 rounded-md min-h-[40px] whitespace-pre-wrap"
-                    onDoubleClick={() => setIsEditing(true)}
-                >
-                    {text || <span className="text-muted-foreground italic">Double-click to edit...</span>}
-                </p>
-            )}
+        <div 
+          className="text-sm flex items-start gap-2 p-2 rounded-md transition-colors" 
+          onDoubleClick={() => setIsEditing(true)}
+        >
+          <span className="text-muted-foreground flex-shrink-0">{prefix}</span>
+          {isEditing ? (
+              <Textarea 
+                  ref={textareaRef}
+                  value={text} 
+                  onChange={e => setText(e.target.value)}
+                  onBlur={handleSave}
+                  className="text-sm mt-0 flex-grow bg-background/50 border-primary"
+                  rows={1}
+              />
+          ) : (
+              <span className="font-medium text-foreground flex-grow min-w-0 break-words">
+                  {text || <span className="text-muted-foreground italic font-normal">...</span>}
+              </span>
+          )}
+          {suffix && <span className="text-muted-foreground flex-shrink-0">{suffix}</span>}
         </div>
     );
 };
@@ -350,13 +355,13 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                 <div className="flex-grow min-h-0 overflow-y-auto">
                     <CardContent className="p-3 pt-0">
                         {resource.type === 'habit' || resource.type === 'mechanism' ? (
-                            <div className="space-y-4">
-                                <EditableField field="trigger" subField="action" label="Action: When I..." resource={resource} onUpdate={onUpdate} />
-                                <EditableField field="response" subField="visualize" label="Mechanism: It causes... internally." resource={resource} onUpdate={onUpdate} />
-                                <EditableField field="reward" label="Cost: This blocks..." resource={resource} onUpdate={onUpdate} />
-                                <EditableField field="newResponse" subField="visualize" label="Opposite: Only when...," resource={resource} onUpdate={onUpdate} />
-                                <EditableField field="newResponse" subField="action" label="... ...happens." resource={resource} onUpdate={onUpdate} />
-                                <EditableField field="trigger" subField="feeling" label="Emotion/Image: That one... costs me..." resource={resource} onUpdate={onUpdate} />
+                            <div className="space-y-1">
+                                <EditableField field="trigger" subField="action" prefix="Action: When I" suffix="," resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="response" subField="visualize" prefix="Mechanism: It causes" suffix="internally." resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="reward" prefix="Cost: This blocks" suffix="." resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="newResponse" subField="visualize" prefix="Opposite: Only when" suffix="," resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="newResponse" subField="action" prefix="..." suffix="happens." resource={resource} onUpdate={onUpdate} />
+                                <EditableField field="trigger" subField="feeling" prefix="Emotion/Image: That one" suffix={`costs me ${resource.reward || "..."}.`} resource={resource} onUpdate={onUpdate} />
                             </div>
                         ) : (
                          <DndContext onDragEnd={handlePointDragEnd}>
@@ -840,13 +845,13 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
                     </CardDescription>
                 )}
             </CardHeader>
-            <CardContent className="space-y-4">
-                <EditableField field="trigger" subField="action" label="Action: When I..." resource={resource} onUpdate={onUpdate} />
-                <EditableField field="response" subField="visualize" label="Mechanism: It causes... internally." resource={resource} onUpdate={onUpdate} />
-                <EditableField field="reward" label="Cost: This blocks..." resource={resource} onUpdate={onUpdate} />
-                <EditableField field="newResponse" subField="visualize" label="Opposite: Only when...," resource={resource} onUpdate={onUpdate} />
-                <EditableField field="newResponse" subField="action" label="... ...happens." resource={resource} onUpdate={onUpdate} />
-                <EditableField field="trigger" subField="feeling" label="Emotion/Image: That one... costs me..." resource={resource} onUpdate={onUpdate} />
+            <CardContent className="space-y-1">
+                <EditableField field="trigger" subField="action" prefix="Action: When I" suffix="," resource={resource} onUpdate={onUpdate} />
+                <EditableField field="response" subField="visualize" prefix="Mechanism: It causes" suffix="internally." resource={resource} onUpdate={onUpdate} />
+                <EditableField field="reward" prefix="Cost: This blocks" suffix="." resource={resource} onUpdate={onUpdate} />
+                <EditableField field="newResponse" subField="visualize" prefix="Opposite: Only when" suffix="," resource={resource} onUpdate={onUpdate} />
+                <EditableField field="newResponse" subField="action" prefix="..." suffix="happens." resource={resource} onUpdate={onUpdate} />
+                <EditableField field="trigger" subField="feeling" prefix="Emotion/Image: That one" suffix={`costs me ${resource.reward || "..."}.`} resource={resource} onUpdate={onUpdate} />
             </CardContent>
         </Card>
     );
@@ -2397,7 +2402,7 @@ function ResourcesPageContent() {
                         placeholder="Enter display text..."
                         autoFocus
                     />
-                    <p className="text-xs text-muted-foreground mt-2">URL: <span className="font-mono text-xs truncate">{linkTextDialog?.point.text}</span></p>
+                    <p className="text-xs text-muted-foreground mt-2">URL: <span className="font-mono text-xs truncate">{linkTextDialog.point.text}</span></p>
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setLinkTextDialog(null)}>Cancel</Button>
@@ -2498,3 +2503,4 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
