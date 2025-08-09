@@ -171,7 +171,7 @@ const EditableField = ({ field, subField, prefix, suffix, resource, onUpdate }: 
                 {suffix && <span className="text-muted-foreground flex-shrink-0 pt-2">{suffix}</span>}
               </div>
           ) : (
-            <p className="min-h-[1.5rem] text-foreground">
+             <p className="min-h-[1.5rem] text-foreground">
                 <span className="text-muted-foreground">{prefix}</span>
                 <span className="font-medium mx-1">
                     {text || <span className="italic font-normal text-muted-foreground/70">...</span>}
@@ -214,14 +214,11 @@ const DoubleEditableField = ({ prefix, suffix, value1, value2, onUpdate1, onUpda
                 <div className="space-y-2">
                     <div className="flex items-center gap-2">
                         <span className="text-muted-foreground flex-shrink-0">{prefix}</span>
-                        <Input value={text1} onChange={e => setText1(e.target.value)} className="h-8" />
+                        <Input value={text1} onChange={e => setText1(e.target.value)} onBlur={handleSave} className="h-8" />
                     </div>
                     <div className="flex items-center gap-2">
-                        <Input value={text2} onChange={e => setText2(e.target.value)} className="h-8" />
+                        <Input value={text2} onChange={e => setText2(e.target.value)} onBlur={handleSave} className="h-8" />
                         <span className="text-muted-foreground flex-shrink-0">{suffix}</span>
-                    </div>
-                    <div className="flex justify-end">
-                        <Button size="sm" onClick={handleSave}>Save</Button>
                     </div>
                 </div>
             ) : (
@@ -635,7 +632,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                                 <EditableField field="reward" prefix="Cost: This blocks" suffix="." resource={resource} onUpdate={onUpdate} />
                                 <DoubleEditableField 
                                   prefix="Opposite: Only when"
-                                  suffix=" happens."
+                                  suffix="happens."
                                   value1={resource.newResponse?.visualize || ""}
                                   value2={resource.newResponse?.action || ""}
                                   onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, visualize: newValue } })}
@@ -716,12 +713,13 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
     );
 };
 
-const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingFromId }: {
+const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingFromId, onOpenNestedPopup }: {
     resource: Resource; 
     onUpdate: (updatedResource: Resource) => void; 
     onDelete: (resourceId: string) => void;
     onLinkClick: (resourceId: string) => void;
     linkingFromId: string | null;
+    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
 }) => {
     const [editingTitle, setEditingTitle] = useState(false);
 
@@ -737,8 +735,8 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
     };
 
     return (
-        <Card className={cn("flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl", linkingFromId === resource.id && "ring-2 ring-primary", linkingFromId && linkingFromId !== resource.id && "cursor-pointer hover:ring-2 hover:ring-primary/50")}>
-            <CardHeader>
+        <Card onClick={(e) => onOpenNestedPopup(resource.id, e)} className={cn("flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl cursor-pointer", linkingFromId === resource.id && "ring-2 ring-primary", linkingFromId && linkingFromId !== resource.id && "cursor-pointer hover:ring-2 hover:ring-primary/50")}>
+            <CardHeader onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-start gap-2">
                     <div className="flex items-center gap-2 flex-grow min-w-0">
                         {editingTitle ? (
@@ -769,13 +767,13 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
                     </CardDescription>
                 )}
             </CardHeader>
-            <CardContent className="space-y-1">
+            <CardContent className="space-y-1" onClick={(e) => e.stopPropagation()}>
                 <EditableField field="trigger" subField="action" prefix="Action: When I" suffix="," resource={resource} onUpdate={onUpdate} />
                 <EditableField field="response" subField="visualize" prefix="Mechanism: It causes" suffix="internally." resource={resource} onUpdate={onUpdate} />
                 <EditableField field="reward" prefix="Cost: This blocks" suffix="." resource={resource} onUpdate={onUpdate} />
                  <DoubleEditableField 
                     prefix="Opposite: Only when"
-                    suffix=" happens."
+                    suffix="happens."
                     value1={resource.newResponse?.visualize || ""}
                     value2={resource.newResponse?.action || ""}
                     onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, visualize: newValue } })}
@@ -2047,7 +2045,7 @@ function ResourcesPageContent() {
                                 );
                             }
                             else if (isHabitType) {
-                                cardContent = <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} />;
+                                cardContent = <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={handleOpenNestedPopup} />;
                             }
                             else if(isCardType) {
                                 cardContent = <ResourceCardComponent resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
@@ -2577,6 +2575,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
