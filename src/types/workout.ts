@@ -155,7 +155,7 @@ export type UserDietPlan = EditableMealPlan[];
 // Types for homepage schedule
 export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation' | 'thoughtwork';
 
-export type Activity = {
+export interface Activity {
   id: string;
   type: ActivityType;
   details: string;

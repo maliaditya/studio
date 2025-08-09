@@ -14,7 +14,6 @@ import { Label } from '@/components/ui/label';
 
 function PurposePageContent() {
     const { 
-        coreSkills, 
         purposeStatement, 
         setPurposeStatement,
         specializationPurposes,
@@ -23,6 +22,7 @@ function PurposePageContent() {
         metaRules,
         setMetaRules,
         resources,
+        coreSkills,
     } = useAuth();
     const { toast } = useToast();
 
@@ -265,7 +265,7 @@ function PurposePageContent() {
                 ) : (
                     <div className="text-center text-muted-foreground py-10 border-2 border-dashed rounded-lg">
                         <p>You haven't defined any specializations yet.</p>
-                        <Button variant="link" asChild><a href="/skill">Go to the Skill page to add one.</a></Button>
+                        <Button variant="link" asChild><Link href="/skill">Go to the Skill page to add one.</Link></Button>
                     </div>
                 )}
             </div>
