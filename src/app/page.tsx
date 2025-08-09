@@ -151,6 +151,9 @@ export default function LandingPage() {
                         <Button onClick={handleProceed} size="lg" className="text-base font-semibold">
                             {currentUser ? 'Go to Dashboard' : 'Launch Your LifeOS'} <ArrowRight className="ml-2 h-5 w-5" />
                         </Button>
+                        <Link href="/seamless-editing-example">
+                            <Button variant="link">View Seamless Editing Example</Button>
+                        </Link>
                         {currentUser && (
                             <div className="flex items-center space-x-2">
                                 <Checkbox id="dont-show-again" checked={dontShowAgain} onCheckedChange={(checked) => setDontShowAgain(!!checked)} />
