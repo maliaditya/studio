@@ -22,6 +22,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { cn } from '@/lib/utils';
 
 function PatternsPageContent() {
     const { resources, patterns, setPatterns, metaRules, setMetaRules } = useAuth();
