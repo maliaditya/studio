@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen, Workflow } from 'lucide-react';
+import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen, Workflow, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Pattern, PatternPhrase, MetaRule } from '@/types/workout';
 import { cn } from '@/lib/utils';
@@ -48,10 +48,19 @@ function PatternsPageContent() {
             'Negative Laws': [],
             'Mechanism Cards': [],
         };
+        
+        const habitCards = resources.filter(r => r.type === 'habit');
 
         mechanismCards.forEach(card => {
             const cardName = card.name;
-            fields['Mechanism Cards'].push({ category: 'Mechanism Cards', text: cardName, mechanismCardId: card.id, mechanismCardName: cardName });
+
+            const linkedHabits = habitCards.filter(habit => 
+                habit.response?.resourceId === card.id || habit.newResponse?.resourceId === card.id
+            ).map(habit => habit.name).join(', ');
+
+            const displayText = linkedHabits ? `${cardName} (from: ${linkedHabits})` : cardName;
+
+            fields['Mechanism Cards'].push({ category: 'Mechanism Cards', text: displayText, mechanismCardId: card.id, mechanismCardName: cardName });
             
             if (card.mechanismFramework === 'positive') {
                 if (card.benefit) fields.Benefits.push({ category: 'Benefits', text: card.benefit, mechanismCardId: card.id, mechanismCardName: cardName });
@@ -62,7 +71,6 @@ function PatternsPageContent() {
                 }
             } else { // Negative Framework
                 if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: card.id, mechanismCardName: cardName });
-                if (card.benefit) fields.Costs.push({ category: 'Costs', text: card.benefit, mechanismCardId: card.id, mechanismCardName: cardName });
                 if (card.trigger?.feeling && card.benefit) {
                     const costText = `That one ${card.trigger.feeling} costs me ${card.benefit}.`;
                     fields.Costs.push({ category: 'Costs', text: costText, mechanismCardId: card.id, mechanismCardName: cardName });
@@ -79,13 +87,12 @@ function PatternsPageContent() {
               const uniquePhrases = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
               fields[key] = uniquePhrases.filter(phrase => !usedPhrases.has(phrase.text));
             } else {
-              // Don't filter out used mechanism cards, just list them all.
               fields[key] = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
             }
         });
 
         return fields;
-    }, [mechanismCards, usedPhrases]);
+    }, [mechanismCards, resources, usedPhrases]);
 
     const handlePhraseToggle = (phrase: PatternPhrase) => {
         setSelectedPhrases(prev => 
