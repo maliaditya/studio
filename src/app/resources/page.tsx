@@ -996,13 +996,12 @@ const SortablePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNeste
 };
 
 
-const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText, onConvertToCard }: {
+const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText }: {
     point: ResourcePoint;
     onUpdate: (text: string) => void;
     onDelete: () => void;
     onOpenNestedPopup: (event: React.MouseEvent) => void;
     onEditLinkText: (point: ResourcePoint) => void;
-    onConvertToCard: (point: ResourcePoint) => void;
 }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id });
 
@@ -1011,12 +1010,12 @@ const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, on
         transition,
         zIndex: isDragging ? 10 : 'auto',
     };
-    
+
     if (point.type === 'card' && point.resourceId) {
         return (
             <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
                 <button {...attributes} {...listeners} className="cursor-grab p-1"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
-                <div 
+                <div
                     onClick={onOpenNestedPopup}
                     className="flex items-start gap-3 flex-grow cursor-pointer p-2 rounded-md hover:bg-muted/50 border border-dashed"
                 >
@@ -1032,12 +1031,12 @@ const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, on
 
     return (
         <div ref={setNodeRef} style={style} className="relative bg-card">
-            <EditableResourcePoint 
+            <EditableResourcePoint
                 point={point}
                 onUpdate={onUpdate}
                 onDelete={onDelete}
                 onEditLinkText={onEditLinkText}
-                onConvertToCard={onConvertToCard}
+                onConvertToCard={() => {}} // Pass empty function as it's not needed in popup
                 dragHandle={{ attributes, listeners }}
             />
         </div>
@@ -2143,7 +2142,7 @@ function ResourcesPageContent() {
                                     <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl h-full">
                                         <CardHeader className="p-3">
                                             <div className="flex justify-between items-start gap-2">
-                                                <CardTitle className="flex items-center gap-2 text-sm">
+                                                <CardTitle className="text-sm flex items-center gap-2">
                                                     <span className="text-primary"><View className="h-4 w-4" /></span>
                                                     <span className="truncate">{res.name}</span>
                                                 </CardTitle>
@@ -2313,10 +2312,10 @@ function ResourcesPageContent() {
             const parentPopup = openPopups.get(popup.parentId);
             if (!parentPopup) return null;
             
-            const startX = parentPopup.x + (parentPopup.width || 0) / 2;
-            const startY = parentPopup.y + ((parentPopup.height || 0) / 2);
-            const endX = popup.x + (popup.width || 0) / 2;
-            const endY = popup.y + ((popup.height || 0) / 2);
+            const startX = popup.x + (popup.width || 0) / 2;
+            const startY = popup.y + ((popup.height || 0) / 2);
+            const endX = parentPopup.x + (parentPopup.width || 0) / 2;
+            const endY = parentPopup.y + ((parentPopup.height || 0) / 2);
             
             return (
               <line 
@@ -2653,7 +2652,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
     }
 
     return (
-        <li className="relative flex items-start gap-3 group/item w-full">
+        <li className="flex items-start gap-3 group/item w-full">
             <div className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity" {...dragHandle?.attributes} {...dragHandle?.listeners}>
                 <GripVertical className="h-4 w-4 text-muted-foreground/50" />
             </div>
@@ -2701,54 +2700,6 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
         </li>
     );
 }
-
-const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText, onConvertToCard }: {
-    point: ResourcePoint;
-    onUpdate: (text: string) => void;
-    onDelete: () => void;
-    onOpenNestedPopup: (event: React.MouseEvent) => void;
-    onEditLinkText: (point: ResourcePoint) => void;
-    onConvertToCard: (point: ResourcePoint) => void;
-}) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        zIndex: isDragging ? 10 : 'auto',
-    };
-    
-    if (point.type === 'card' && point.resourceId) {
-        return (
-            <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
-                <button {...attributes} {...listeners} className="cursor-grab p-1"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
-                <div 
-                    onClick={onOpenNestedPopup}
-                    className="flex items-start gap-3 flex-grow cursor-pointer p-2 rounded-md hover:bg-muted/50 border border-dashed"
-                >
-                    <Library className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
-                    <span className="font-medium text-foreground">{point.text}</span>
-                </div>
-                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={onDelete}>
-                    <Trash2 className="h-3 w-3"/>
-                </Button>
-            </div>
-        )
-    }
-
-    return (
-        <div ref={setNodeRef} style={style} className="relative bg-card">
-            <EditableResourcePoint 
-                point={point}
-                onUpdate={onUpdate}
-                onDelete={onDelete}
-                onEditLinkText={onEditLinkText}
-                onConvertToCard={onConvertToCard}
-                dragHandle={{ attributes, listeners }}
-            />
-        </div>
-    );
-};
 
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
