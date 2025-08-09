@@ -17,13 +17,8 @@ import { Badge } from '@/components/ui/badge';
 import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Pattern, PatternPhrase, MetaRule } from '@/types/workout';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
+
 
 function PatternsPageContent() {
     const { resources, patterns, setPatterns, metaRules, setMetaRules } = useAuth();
@@ -54,19 +49,20 @@ function PatternsPageContent() {
         };
 
         mechanismCards.forEach(card => {
+            const cardName = card.name;
             if (card.mechanismFramework === 'positive') {
-                if (card.benefit) fields.Benefits.push({ category: 'Benefits', text: card.benefit, mechanismCardId: card.id });
-                if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: card.id });
+                if (card.benefit) fields.Benefits.push({ category: 'Benefits', text: card.benefit, mechanismCardId: card.id, mechanismCardName: cardName });
+                if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: card.id, mechanismCardName: cardName });
                 if (card.law?.premise && card.law?.outcome) {
                   const lawText = `${card.law.premise} can only happen when ${card.law.outcome}`;
-                  fields['Positive Laws'].push({ category: 'Positive Laws', text: lawText, mechanismCardId: card.id });
+                  fields['Positive Laws'].push({ category: 'Positive Laws', text: lawText, mechanismCardId: card.id, mechanismCardName: cardName });
                 }
             } else { // Negative Framework
-                if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: card.id });
-                if (card.benefit) fields.Costs.push({ category: 'Costs', text: card.benefit, mechanismCardId: card.id });
+                if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: card.id, mechanismCardName: cardName });
+                if (card.benefit) fields.Costs.push({ category: 'Costs', text: card.benefit, mechanismCardId: card.id, mechanismCardName: cardName });
                 if (card.law?.premise && card.law?.outcome) {
                     const lawText = `${card.law.premise} cannot happen when ${card.law.outcome}`;
-                    fields['Negative Laws'].push({ category: 'Negative Laws', text: lawText, mechanismCardId: card.id });
+                    fields['Negative Laws'].push({ category: 'Negative Laws', text: lawText, mechanismCardId: card.id, mechanismCardName: cardName });
                 }
             }
         });
@@ -186,6 +182,7 @@ function PatternsPageContent() {
                                                     />
                                                     <Label htmlFor={`phrase-${title}-${i}`} className="text-sm font-normal cursor-pointer">
                                                         {phrase.text}
+                                                        <span className="block text-xs text-muted-foreground/70">from: {phrase.mechanismCardName}</span>
                                                     </Label>
                                                 </div>
                                             ))}

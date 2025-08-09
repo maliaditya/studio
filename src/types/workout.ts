@@ -404,6 +404,7 @@ export interface PatternPhrase {
   category: string;
   text: string;
   mechanismCardId: string;
+  mechanismCardName?: string;
 }
 
 export interface Pattern {
