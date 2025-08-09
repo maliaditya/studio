@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen } from 'lucide-react';
+import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen, Workflow } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Pattern, PatternPhrase, MetaRule } from '@/types/workout';
 import { cn } from '@/lib/utils';
@@ -46,10 +46,13 @@ function PatternsPageContent() {
             Costs: [],
             'Positive Laws': [],
             'Negative Laws': [],
+            'Mechanism Cards': [],
         };
 
         mechanismCards.forEach(card => {
             const cardName = card.name;
+            fields['Mechanism Cards'].push({ category: 'Mechanism Cards', text: cardName, mechanismCardId: card.id, mechanismCardName: cardName });
+            
             if (card.mechanismFramework === 'positive') {
                 if (card.benefit) fields.Benefits.push({ category: 'Benefits', text: card.benefit, mechanismCardId: card.id, mechanismCardName: cardName });
                 if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: card.id, mechanismCardName: cardName });
@@ -68,8 +71,13 @@ function PatternsPageContent() {
         });
         
         Object.keys(fields).forEach(key => {
-            const uniquePhrases = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
-            fields[key] = uniquePhrases.filter(phrase => !usedPhrases.has(phrase.text));
+            if (key !== 'Mechanism Cards') {
+              const uniquePhrases = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
+              fields[key] = uniquePhrases.filter(phrase => !usedPhrases.has(phrase.text));
+            } else {
+              // Don't filter out used mechanism cards, just list them all.
+              fields[key] = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
+            }
         });
 
         return fields;
@@ -166,23 +174,30 @@ function PatternsPageContent() {
                     <CardDescription>Review aggregated data from your Mechanism cards. Select phrases that repeat or resonate with you.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                         {Object.entries(aggregatedFields).map(([title, phrases]) => (
                             <div key={title}>
-                                <h3 className="font-semibold mb-2">{title}</h3>
+                                <h3 className="font-semibold mb-2 flex items-center gap-2">
+                                  {title === 'Mechanism Cards' && <Workflow className="h-4 w-4 text-muted-foreground" />}
+                                  {title}
+                                </h3>
                                 <ScrollArea className="h-60 border rounded-md p-2">
                                     {phrases.length > 0 ? (
                                         <div className="space-y-2">
                                             {phrases.map((phrase, i) => (
                                                 <div key={i} className="flex items-start space-x-2">
-                                                    <Checkbox
-                                                        id={`phrase-${title}-${i}`}
-                                                        checked={selectedPhrases.some(p => p.text === phrase.text)}
-                                                        onCheckedChange={() => handlePhraseToggle(phrase)}
-                                                    />
+                                                    {title !== 'Mechanism Cards' && (
+                                                      <Checkbox
+                                                          id={`phrase-${title}-${i}`}
+                                                          checked={selectedPhrases.some(p => p.text === phrase.text)}
+                                                          onCheckedChange={() => handlePhraseToggle(phrase)}
+                                                      />
+                                                    )}
                                                     <Label htmlFor={`phrase-${title}-${i}`} className="text-sm font-normal cursor-pointer">
                                                         {phrase.text}
-                                                        <span className="block text-xs text-muted-foreground/70">from: {phrase.mechanismCardName}</span>
+                                                        {title !== 'Mechanism Cards' && phrase.mechanismCardName && (
+                                                            <span className="block text-xs text-muted-foreground/70">from: {phrase.mechanismCardName}</span>
+                                                        )}
                                                     </Label>
                                                 </div>
                                             ))}
