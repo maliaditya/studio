@@ -2408,7 +2408,9 @@ function ResourcesPageContent() {
                         placeholder="Enter display text..."
                         autoFocus
                     />
-                    <p className="text-xs text-muted-foreground mt-2">URL: <span className="font-mono text-xs truncate">{linkTextDialog.point.text}</span></p>
+                    {linkTextDialog?.point && (
+                        <p className="text-xs text-muted-foreground mt-2">URL: <span className="font-mono text-xs truncate">{linkTextDialog.point.text}</span></p>
+                    )}
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setLinkTextDialog(null)}>Cancel</Button>
@@ -2509,5 +2511,6 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
