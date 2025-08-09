@@ -242,7 +242,7 @@ export interface Resource {
   // For 'habit' or 'mechanism' type
   mechanismFramework?: 'negative' | 'positive';
   trigger?: { action?: string; feeling?: string; };
-  response?: { text?: string; resourceId?: string; };
+  response?: { text?: string; resourceId?: string; visualize?: string; };
   reward?: string;
   benefit?: string;
   newResponse?: { action?: string; visualize?: string; };
@@ -265,6 +265,7 @@ export interface PopupState {
     parentId?: string;
     width?: number;
     height?: number;
+    z?: number;
 }
 
 // Canvas Types
