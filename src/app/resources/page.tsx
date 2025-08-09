@@ -154,25 +154,31 @@ const EditableField = ({ field, subField, prefix, suffix, resource, onUpdate }: 
 
     return (
         <div 
-          className="text-sm flex items-start gap-2 p-2 rounded-md transition-colors" 
+          className="text-sm p-2 rounded-md transition-colors" 
           onDoubleClick={() => setIsEditing(true)}
         >
-          <span className="text-muted-foreground flex-shrink-0">{prefix}</span>
           {isEditing ? (
-              <Textarea 
-                  ref={textareaRef}
-                  value={text} 
-                  onChange={e => setText(e.target.value)}
-                  onBlur={handleSave}
-                  className="text-sm mt-0 flex-grow bg-background/50 border-primary"
-                  rows={1}
-              />
+              <div className="flex items-start gap-2">
+                <span className="text-muted-foreground flex-shrink-0 pt-2">{prefix}</span>
+                <Textarea 
+                    ref={textareaRef}
+                    value={text} 
+                    onChange={e => setText(e.target.value)}
+                    onBlur={handleSave}
+                    className="text-sm mt-0 flex-grow bg-background/50 border-primary"
+                    rows={1}
+                />
+                {suffix && <span className="text-muted-foreground flex-shrink-0 pt-2">{suffix}</span>}
+              </div>
           ) : (
-              <span className="font-medium text-foreground flex-grow min-w-0 break-words">
-                  {text || <span className="text-muted-foreground italic font-normal">...</span>}
-              </span>
+            <p className="min-h-[1.5rem] text-foreground">
+                <span className="text-muted-foreground">{prefix}</span>
+                <span className="font-medium mx-1">
+                    {text || <span className="italic font-normal text-muted-foreground/70">...</span>}
+                </span>
+                {suffix && <span className="text-muted-foreground">{suffix}</span>}
+            </p>
           )}
-          {suffix && <span className="text-muted-foreground flex-shrink-0">{suffix}</span>}
         </div>
     );
 };
@@ -2503,4 +2509,5 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
