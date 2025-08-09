@@ -25,6 +25,7 @@ function PurposePageContent() {
         setMetaRules,
         resources,
         coreSkills,
+        handleOpenNestedPopup, // Import the popup handler
     } = useAuth();
     const { toast } = useToast();
 
@@ -79,25 +80,29 @@ function PurposePageContent() {
     };
     
     const habitCards = useMemo(() => resources.filter(r => r.type === 'habit'), [resources]);
+    const mechanismCards = useMemo(() => resources.filter(r => r.type === 'mechanism'), [resources]);
+
 
     const getHabitLinksForRule = (rule: { id: string, patternId: string, text: string }) => {
         const pattern = patterns.find(p => p.id === rule.patternId);
         if (!pattern) return [];
 
-        const mechanismIds = new Set(pattern.phrases.map(p => p.mechanismCardId));
+        const habitPhrases = pattern.phrases.filter(p => p.category === 'Habit Cards');
         
-        const linkedHabits = habitCards.filter(habit => {
-            if (!habit.response?.resourceId && !habit.newResponse?.resourceId) {
-                return false;
-            }
-            return mechanismIds.has(habit.response?.resourceId || '') || mechanismIds.has(habit.newResponse?.resourceId || '');
-        });
+        return habitPhrases.map(phrase => {
+            const habit = habitCards.find(h => h.id === phrase.mechanismCardId);
+            if (!habit) return null;
 
-        return linkedHabits.map(habit => ({
-            habitName: habit.name,
-            response: habit.response?.text || 'N/A',
-            newResponse: habit.newResponse?.text || 'N/A',
-        }));
+            const responseMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
+            const newResponseMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
+
+            return {
+                habitId: habit.id,
+                habitName: habit.name,
+                response: responseMechanism?.response?.visualize || '...',
+                newResponse: newResponseMechanism?.newResponse?.action || '...'
+            };
+        }).filter((h): h is NonNullable<typeof h> => h !== null);
     };
 
     return (
@@ -164,6 +169,7 @@ function PurposePageContent() {
                             if (!pattern) return null;
 
                             const categorizedPhrases = pattern.phrases.reduce((acc, phrase) => {
+                                if (phrase.category === 'Habit Cards') return acc;
                                 if (!acc[phrase.category]) {
                                     acc[phrase.category] = [];
                                 }
@@ -190,19 +196,23 @@ function PurposePageContent() {
                                                     </ul>
                                                 </div>
                                             ))}
-                                        </div>
-                                        {linkedHabits.length > 0 && (
-                                            <div className="mt-4 pt-3 border-t">
-                                                <h4 className="font-medium text-sm mb-2">Habits</h4>
-                                                <div className="space-y-2">
-                                                    {linkedHabits.map((link, i) => (
-                                                        <div key={i} className="text-xs p-2 rounded bg-background/50">
-                                                          <p className="font-semibold text-foreground">{link.habitName} = <span className="font-normal text-muted-foreground">{link.response} <ArrowRight className="inline h-3 w-3" /> {link.newResponse}</span></p>
-                                                        </div>
-                                                    ))}
+                                            {linkedHabits.length > 0 && (
+                                                <div className="md:col-span-2">
+                                                    <h4 className="font-medium text-sm mb-1">Habits</h4>
+                                                    <div className="space-y-1">
+                                                        {linkedHabits.map((habit, i) => (
+                                                            <button 
+                                                                key={i} 
+                                                                className="text-left p-1 rounded hover:bg-background w-full"
+                                                                onClick={(e) => handleOpenNestedPopup(habit.habitId, e)}
+                                                            >
+                                                                <span className="font-semibold text-foreground text-xs">{habit.habitName}</span> = <span className="text-muted-foreground text-xs">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
                                     </CardContent>
                                 </Card>
                             )
