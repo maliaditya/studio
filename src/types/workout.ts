@@ -240,9 +240,11 @@ export interface Resource {
   points?: ResourcePoint[];
   icon?: string;
   // For 'habit' or 'mechanism' type
+  mechanismFramework?: 'negative' | 'positive';
   trigger?: { action?: string; feeling?: string; };
   response?: { visualize?: string; action?: string; };
   reward?: string;
+  benefit?: string;
   newResponse?: { visualize?: string; action?: string; };
   // For 'model3d' type
   modelUrl?: string;
