@@ -826,7 +826,7 @@ const EditableResponse = ({ field, label, resource, onUpdate, onOpenNestedPopup,
     label: string;
     resource: Resource;
     onUpdate: (updatedResource: Resource) => void;
-    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
+    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => void;
     popupState?: PopupState;
 }) => {
     const { resources } = useAuth();
@@ -942,9 +942,9 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
             </CardHeader>
             <CardContent className="space-y-1" onClick={(e) => e.stopPropagation()}>
                 <EditableField field="trigger" subField="action" prefix="Trigger: When I" suffix="." resource={resource} onUpdate={onUpdate} />
-                <EditableResponse field="response" label="Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={onOpenNestedPopup} />
+                <EditableResponse field="response" label="Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(resourceId, event) => onOpenNestedPopup(resourceId, event)} />
                 <EditableField field="reward" prefix="Reward:" resource={resource} onUpdate={onUpdate} />
-                <EditableResponse field="newResponse" label="New Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={onOpenNestedPopup} />
+                <EditableResponse field="newResponse" label="New Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(resourceId, event) => onOpenNestedPopup(resourceId, event)} />
             </CardContent>
         </Card>
     );
@@ -2456,7 +2456,7 @@ function ResourcesPageContent() {
                     setPlayingAudio={setPlayingAudio}
                     onOpenNestedPopup={handleOpenNestedPopup}
                     onEditLinkText={handleEditLinkText}
-                    onConvertToCard={handleConvertToCard}
+                    onConvertToCard={() => {}} // No-op in this context
                 />
             );
         })}
@@ -2470,7 +2470,7 @@ function ResourcesPageContent() {
             const startX = popup.x + (popup.width || 0) / 2;
             const startY = popup.y + ((popup.height || 0) / 2);
             const endX = parentPopup.x + (parentPopup.width || 0) / 2;
-            const endY = parentPopup.y + ((popup.height || 0) / 2);
+            const endY = parentPopup.y + ((parentPopup.height || 0) / 2);
             
             return (
               <line 
@@ -2857,6 +2857,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
