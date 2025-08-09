@@ -717,9 +717,9 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                                         />
                                         <EmotionEditableField
                                             value1={resource.trigger?.feeling || ''}
-                                            value2={resource.reward || ''}
+                                            value2={resource.benefit || ''}
                                             onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...resource.trigger, feeling: newValue } })}
-                                            onUpdate2={(newValue) => onUpdate({ ...resource, reward: newValue })}
+                                            onUpdate2={(newValue) => onUpdate({ ...resource, benefit: newValue })}
                                             label="costs me"
                                             placeholder1="..."
                                             placeholder2="..."

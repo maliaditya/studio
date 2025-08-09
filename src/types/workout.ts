@@ -245,7 +245,7 @@ export interface Resource {
   response?: { text?: string; resourceId?: string; };
   reward?: string;
   benefit?: string;
-  newResponse?: { text?: string; resourceId?: string; };
+  newResponse?: { action?: string; visualize?: string; };
   // For 'model3d' type
   modelUrl?: string;
 }
