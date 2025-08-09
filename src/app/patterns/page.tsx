@@ -15,7 +15,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Pattern, PatternPhrase } from '@/types/workout';
+import type { Pattern, PatternPhrase, MetaRule } from '@/types/workout';
 import {
   Accordion,
   AccordionContent,
@@ -53,15 +53,20 @@ function PatternsPageContent() {
         };
 
         mechanismCards.forEach(card => {
-            if (card.benefit) fields.Benefits.push({ category: 'Benefits', text: card.benefit });
-            if (card.reward) fields.Costs.push({ category: 'Costs', text: card.reward });
-            if (card.law?.premise && card.law?.outcome) {
-              const lawText = `${card.law.premise} ${card.mechanismFramework === 'positive' ? 'can only happen when' : 'cannot happen when'} ${card.law.outcome}`;
-              if (card.mechanismFramework === 'positive') {
-                fields['Positive Laws'].push({ category: 'Positive Laws', text: lawText });
-              } else {
-                fields['Negative Laws'].push({ category: 'Negative Laws', text: lawText });
-              }
+            if (card.mechanismFramework === 'positive') {
+                if (card.benefit) fields.Benefits.push({ category: 'Benefits', text: card.benefit });
+                if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward }); // Positive Emotion/Image
+                if (card.law?.premise && card.law?.outcome) {
+                  const lawText = `${card.law.premise} can only happen when ${card.law.outcome}`;
+                  fields['Positive Laws'].push({ category: 'Positive Laws', text: lawText });
+                }
+            } else { // Negative Framework
+                if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward }); // "This blocks..."
+                if (card.benefit) fields.Costs.push({ category: 'Costs', text: card.benefit }); // "costs me..."
+                if (card.law?.premise && card.law?.outcome) {
+                    const lawText = `${card.law.premise} cannot happen when ${card.law.outcome}`;
+                    fields['Negative Laws'].push({ category: 'Negative Laws', text: lawText });
+                }
             }
         });
         
