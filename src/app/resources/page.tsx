@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -141,8 +142,10 @@ const EditableField = ({ field, subField, prefix, suffix, resource, onUpdate }: 
 
         if (newValue !== currentValue) {
             let updatedResource = { ...resource };
-            if (subField) {
+            if (subField && typeof updatedResource[field] === 'object' && updatedResource[field] !== null) {
                 updatedResource[field] = { ...(updatedResource[field] as object), [subField]: newValue };
+            } else if (subField) { // If subField exists but the field is not an object
+                 updatedResource[field] = { [subField]: newValue } as any;
             } else {
                 updatedResource[field] = newValue as any;
             }
@@ -249,7 +252,7 @@ const EmotionEditableField = ({ value1, value2, onUpdate1, onUpdate2, label, pla
           onBlur={handleBlur}
           className="editable-sentence"
         >
-          <span contentEditable={false} className="uneditable-text">Emotion/Image: That one</span>
+          <span contentEditable={false} className="uneditable-text">That one </span>
           <span 
             contentEditable={true} 
             suppressContentEditableWarning={true}
@@ -620,60 +623,24 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
         if (resource.mechanismFramework === 'positive') {
             return (
                 <div className="space-y-3">
-                    <div>
-                        <h4 className="font-semibold text-sm mb-1">Action</h4>
-                        <EditableField field="trigger" subField="action" prefix="When I" suffix="," resource={resource} onUpdate={onUpdate} />
-                    </div>
-                    <Separator />
-                    <div>
-                        <h4 className="font-semibold text-sm mb-1">Mechanism</h4>
-                        <EditableField field="response" subField="visualize" prefix="It triggers" suffix="internally." resource={resource} onUpdate={onUpdate} />
-                    </div>
-                    <Separator />
-                    <div>
-                        <h4 className="font-semibold text-sm mb-1">Benefit</h4>
-                        <EditableField field="benefit" prefix="This opens" suffix="." resource={resource} onUpdate={onUpdate} />
-                    </div>
-                    <Separator />
-                    <div>
-                        <h4 className="font-semibold text-sm mb-1">Key Condition</h4>
-                        <DoubleEditableField prefix="Only when" suffix="happens." value1={resource.newResponse?.visualize || ""} value2={resource.newResponse?.action || ""} onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, visualize: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, action: newValue } })} />
-                    </div>
-                    <Separator />
-                    <div>
-                        <h4 className="font-semibold text-sm mb-1">Emotion/Image</h4>
-                        <EmotionEditableField value1={resource.trigger?.feeling || ''} value2={resource.reward || ''} onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...resource.trigger, feeling: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, reward: newValue })} label="gives me" />
-                    </div>
+                     <EditableField field="trigger" subField="action" prefix="Action: When I " suffix="," resource={resource} onUpdate={onUpdate} />
+                     <EditableField field="response" subField="visualize" prefix="Mechanism: It triggers " suffix=" internally." resource={resource} onUpdate={onUpdate} />
+                     <EditableField field="benefit" prefix="Benefit: This enables " suffix="." resource={resource} onUpdate={onUpdate} />
+                     <DoubleEditableField prefix="Condition: Only when " suffix=" happens." value1={resource.newResponse?.visualize || ""} value2={resource.newResponse?.action || ""} onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), visualize: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), action: newValue } })} />
+                     <DoubleEditableField prefix="Law: " suffix=" can only happen when ________." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Outcome" placeholder2="Condition"/>
+                     <EmotionEditableField value1={resource.trigger?.feeling || ''} value2={resource.reward || ''} onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...(resource.trigger || {}), feeling: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, reward: newValue })} label=" gives me " />
                 </div>
             );
         }
         // Default to Negative Framework
         return (
             <div className="space-y-3">
-                 <div>
-                    <h4 className="font-semibold text-sm mb-1">Action</h4>
-                    <EditableField field="trigger" subField="action" prefix="When I" suffix="," resource={resource} onUpdate={onUpdate} />
-                </div>
-                <Separator />
-                <div>
-                    <h4 className="font-semibold text-sm mb-1">Mechanism</h4>
-                    <EditableField field="response" subField="visualize" prefix="It causes" suffix="internally." resource={resource} onUpdate={onUpdate} />
-                </div>
-                <Separator />
-                <div>
-                    <h4 className="font-semibold text-sm mb-1">Cost</h4>
-                    <EditableField field="reward" prefix="This blocks" suffix="." resource={resource} onUpdate={onUpdate} />
-                </div>
-                <Separator />
-                <div>
-                    <h4 className="font-semibold text-sm mb-1">Opposite</h4>
-                    <DoubleEditableField prefix="Only when" suffix="happens." value1={resource.newResponse?.visualize || ""} value2={resource.newResponse?.action || ""} onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, visualize: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, action: newValue } })} />
-                </div>
-                <Separator />
-                <div>
-                    <h4 className="font-semibold text-sm mb-1">Emotion/Image</h4>
-                    <EmotionEditableField value1={resource.trigger?.feeling || ''} value2={resource.benefit || ''} onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...resource.trigger, feeling: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, benefit: newValue })} label="costs me" />
-                </div>
+                 <EditableField field="trigger" subField="action" prefix="Action: When I " suffix="," resource={resource} onUpdate={onUpdate} />
+                 <EditableField field="response" subField="visualize" prefix="Mechanism: It causes " suffix=" internally." resource={resource} onUpdate={onUpdate} />
+                 <EditableField field="reward" prefix="Cost: This blocks " suffix="." resource={resource} onUpdate={onUpdate} />
+                 <DoubleEditableField prefix="Opposite: Only when " suffix=" happens." value1={resource.newResponse?.visualize || ""} value2={resource.newResponse?.action || ""} onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), visualize: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), action: newValue } })} />
+                 <DoubleEditableField prefix="Law: " suffix=" cannot happen when ________." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Bad Thing" />
+                 <EmotionEditableField value1={resource.trigger?.feeling || ''} value2={resource.benefit || ''} onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...(resource.trigger || {}), feeling: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, benefit: newValue })} label=" costs me " />
             </div>
         );
     };
@@ -952,61 +919,61 @@ const MechanismResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, link
     
     const renderFrameworkContent = () => {
         if (resource.mechanismFramework === 'positive') {
-            return (
-                <div className="space-y-3">
-                    <div>
-                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Action</h4>
-                        <EditableField field="trigger" subField="action" prefix="When I" suffix="," resource={resource} onUpdate={onUpdate} />
+             return (
+                <div className="space-y-4">
+                    <div className="space-y-1">
+                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">Action</h4>
+                        <EditableField field="trigger" subField="action" prefix="When I " suffix="," resource={resource} onUpdate={onUpdate} />
                     </div>
-                    <Separator />
-                    <div>
-                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Mechanism</h4>
-                        <EditableField field="response" subField="visualize" prefix="It triggers" suffix="internally." resource={resource} onUpdate={onUpdate} />
+                    <div className="space-y-1">
+                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">Mechanism</h4>
+                        <EditableField field="response" subField="visualize" prefix="It triggers " suffix=" internally." resource={resource} onUpdate={onUpdate} />
                     </div>
-                    <Separator />
-                    <div>
-                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Benefit</h4>
-                        <EditableField field="benefit" prefix="This opens" suffix="." resource={resource} onUpdate={onUpdate} />
+                    <div className="space-y-1">
+                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">Benefit</h4>
+                        <EditableField field="benefit" prefix="This enables " suffix="." resource={resource} onUpdate={onUpdate} />
                     </div>
-                    <Separator />
-                    <div>
-                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Key Condition</h4>
-                        <DoubleEditableField prefix="Only when" suffix="happens." value1={resource.newResponse?.visualize || ""} value2={resource.newResponse?.action || ""} onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, visualize: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, action: newValue } })} />
+                    <div className="space-y-1">
+                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">Condition</h4>
+                        <DoubleEditableField prefix="Only when " suffix=" happens." value1={resource.newResponse?.visualize || ""} value2={resource.newResponse?.action || ""} onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), visualize: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), action: newValue } })} />
                     </div>
-                    <Separator />
-                    <div>
-                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Emotion/Image</h4>
-                        <EmotionEditableField value1={resource.trigger?.feeling || ''} value2={resource.reward || ''} onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...resource.trigger, feeling: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, reward: newValue })} label="gives me" />
+                    <div className="space-y-1">
+                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">Law</h4>
+                        <DoubleEditableField prefix="" suffix=" can only happen when ________." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Outcome" placeholder2="Condition"/>
+                    </div>
+                    <div className="space-y-1">
+                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">Emotion/Image</h4>
+                        <EmotionEditableField value1={resource.trigger?.feeling || ''} value2={resource.reward || ''} onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...(resource.trigger || {}), feeling: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, reward: newValue })} label=" gives me " />
                     </div>
                 </div>
             );
         }
         // Default to Negative Framework
         return (
-            <div className="space-y-3">
-                 <div>
-                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Action</h4>
-                    <EditableField field="trigger" subField="action" prefix="When I" suffix="," resource={resource} onUpdate={onUpdate} />
+            <div className="space-y-4">
+                 <div className="space-y-1">
+                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">Action</h4>
+                    <EditableField field="trigger" subField="action" prefix="When I " suffix="," resource={resource} onUpdate={onUpdate} />
                 </div>
-                <Separator />
-                <div>
-                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Mechanism</h4>
-                    <EditableField field="response" subField="visualize" prefix="It causes" suffix="internally." resource={resource} onUpdate={onUpdate} />
+                <div className="space-y-1">
+                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">Mechanism</h4>
+                    <EditableField field="response" subField="visualize" prefix="It causes " suffix=" internally." resource={resource} onUpdate={onUpdate} />
                 </div>
-                <Separator />
-                <div>
-                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Cost</h4>
-                    <EditableField field="reward" prefix="This blocks" suffix="." resource={resource} onUpdate={onUpdate} />
+                <div className="space-y-1">
+                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">Cost</h4>
+                    <EditableField field="reward" prefix="This blocks " suffix="." resource={resource} onUpdate={onUpdate} />
                 </div>
-                <Separator />
-                <div>
-                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Opposite</h4>
-                    <DoubleEditableField prefix="Only when" suffix="happens." value1={resource.newResponse?.visualize || ""} value2={resource.newResponse?.action || ""} onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, visualize: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...resource.newResponse, action: newValue } })} />
+                <div className="space-y-1">
+                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">Opposite</h4>
+                    <DoubleEditableField prefix="Only when " suffix=" happens." value1={resource.newResponse?.visualize || ""} value2={resource.newResponse?.action || ""} onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), visualize: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), action: newValue } })} />
                 </div>
-                <Separator />
-                <div>
-                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Emotion/Image</h4>
-                    <EmotionEditableField value1={resource.trigger?.feeling || ''} value2={resource.benefit || ''} onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...resource.trigger, feeling: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, benefit: newValue })} label="costs me" />
+                <div className="space-y-1">
+                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">Law</h4>
+                     <DoubleEditableField prefix="" suffix=" cannot happen when ________." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Bad Thing" />
+                </div>
+                <div className="space-y-1">
+                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">Emotion/Image</h4>
+                    <EmotionEditableField value1={resource.trigger?.feeling || ''} value2={resource.benefit || ''} onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...(resource.trigger || {}), feeling: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, benefit: newValue })} label=" costs me " />
                 </div>
             </div>
         );
@@ -2847,4 +2814,5 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 

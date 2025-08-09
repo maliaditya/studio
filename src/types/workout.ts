@@ -244,8 +244,7 @@ export interface Resource {
   trigger?: { action?: string; feeling?: string; };
   reward?: string;
   benefit?: string;
-  
-  // Updated fields for Habit/Mechanism
+  law?: { premise?: string; outcome?: string; };
   response?: { text?: string; resourceId?: string; visualize?: string; };
   newResponse?: { text?: string; resourceId?: string; action?: string; visualize?: string; };
   
