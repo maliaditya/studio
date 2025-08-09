@@ -81,20 +81,20 @@ function PatternsPageContent() {
         });
 
         habitCards.forEach(habit => {
-            const linkedMechanisms: string[] = [];
+            const linkedMechanisms: {id: string, name: string}[] = [];
             const mechanismForResponse = mechanismCards.find(m => m.id === habit.response?.resourceId);
             const mechanismForNewResponse = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
             
-            if (mechanismForResponse) linkedMechanisms.push(mechanismForResponse.name);
-            if (mechanismForNewResponse && mechanismForNewResponse.name !== mechanismForResponse?.name) {
-                linkedMechanisms.push(mechanismForNewResponse.name);
+            if (mechanismForResponse) linkedMechanisms.push({id: mechanismForResponse.id, name: mechanismForResponse.name});
+            if (mechanismForNewResponse && mechanismForNewResponse.id !== mechanismForResponse?.id) {
+                linkedMechanisms.push({id: mechanismForNewResponse.id, name: mechanismForNewResponse.name});
             }
 
             fields['Habit Cards'].push({
                 category: 'Habit Cards',
                 text: habit.name,
-                mechanismCardId: habit.id,
-                linkedMechanisms: linkedMechanisms,
+                mechanismCardId: habit.id, // Using habit's own ID here for uniqueness
+                linkedMechanisms: linkedMechanisms.map(m => m.name) // Storing names for display
             });
         });
         
@@ -201,6 +201,30 @@ function PatternsPageContent() {
         setNewMetaRuleText('');
         setSelectedPatternForRule(null);
         toast({ title: 'Meta-Rule Created!', description: 'A new rule has been added to your Purpose page.' });
+    };
+
+    const getHabitLinksForRule = (rule: { id: string, patternId: string, text: string }) => {
+        const pattern = patterns.find(p => p.id === rule.patternId);
+        if (!pattern) return [];
+
+        const mechanismIds = new Set(pattern.phrases.map(p => p.mechanismCardId));
+        
+        const linkedHabits = habitCards.filter(habit => {
+            if (!habit.response?.resourceId && !habit.newResponse?.resourceId) {
+                return false;
+            }
+            return mechanismIds.has(habit.response?.resourceId || '') || mechanismIds.has(habit.newResponse?.resourceId || '');
+        });
+
+        return linkedHabits.map(habit => {
+          const responseMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
+          const newResponseMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
+          return {
+            habitName: habit.name,
+            response: responseMechanism?.response?.visualize || '...',
+            newResponse: newResponseMechanism?.newResponse?.action || '...'
+          };
+        });
     };
 
     return (
@@ -341,6 +365,8 @@ function PatternsPageContent() {
                                             return acc;
                                         }, {} as Record<string, PatternPhrase[]>) : null;
 
+                                        const linkedHabits = isSelected ? getHabitLinksForRule(p) : [];
+
                                         return (
                                             <Card key={p.id} className={cn("transition-all", isSelected && "ring-2 ring-primary")}>
                                                 <CardHeader className="p-3">
@@ -357,27 +383,11 @@ function PatternsPageContent() {
                                                     </Button>
                                                 </div>
                                                 </CardHeader>
-                                                {isSelected && categorizedPhrases && (
+                                                {isSelected && (
                                                 <CardContent className="p-3 pt-0 text-xs">
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
-                                                        {Object.entries(categorizedPhrases).map(([category, phrases]) => {
-                                                            if (category === 'Habit Cards') {
-                                                                const habitIds = new Set(phrases.map(phrase => phrase.mechanismCardId));
-                                                                const relatedHabits = habitCards.filter(habit => habitIds.has(habit.id));
-                                                                if (relatedHabits.length === 0) return null;
-                                                                return (
-                                                                    <div key={category} className="md:col-span-2">
-                                                                        <h4 className="font-medium text-muted-foreground mb-1">Habits</h4>
-                                                                        <div className="space-y-1">
-                                                                            {relatedHabits.map(habit => (
-                                                                                <div key={habit.id} className="p-1 rounded bg-background/50 text-foreground">
-                                                                                    <span className="font-semibold">{habit.name}</span> = <span className="text-muted-foreground">{habit.response?.text || '...'} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse?.text || '...'}</span>
-                                                                                </div>
-                                                                            ))}
-                                                                        </div>
-                                                                    </div>
-                                                                )
-                                                            }
+                                                        {categorizedPhrases && Object.entries(categorizedPhrases).map(([category, phrases]) => {
+                                                            if (category === 'Habit Cards') return null;
                                                             return (
                                                                 <div key={category}>
                                                                     <h4 className="font-medium text-muted-foreground mb-1">{category}</h4>
@@ -388,6 +398,18 @@ function PatternsPageContent() {
                                                             )
                                                         })}
                                                     </div>
+                                                    {linkedHabits.length > 0 && (
+                                                        <div className="mt-2 pt-2 border-t md:col-span-2">
+                                                            <h4 className="font-medium text-muted-foreground mb-1">Habits</h4>
+                                                            <div className="space-y-1">
+                                                                {linkedHabits.map((habit, i) => (
+                                                                    <div key={i} className="p-1 rounded bg-background/50 text-foreground">
+                                                                        <span className="font-semibold">{habit.habitName}</span> = <span className="text-muted-foreground">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </CardContent>
                                                 )}
                                             </Card>
@@ -421,5 +443,3 @@ export default function PatternsPage() {
         </AuthGuard>
     );
 }
-
-    
