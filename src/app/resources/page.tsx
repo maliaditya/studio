@@ -325,7 +325,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
 
                 <CardHeader className="p-3 pt-8 relative flex-shrink-0 text-center">
                     <div className="flex items-center justify-center gap-2">
-                        {resource.type === 'habit' ? <Zap className="h-4 w-4" /> : <Library className="h-4 w-4" />}
+                        {resource.type === 'habit' ? <Zap className="h-4 w-4" /> : resource.type === 'mechanism' ? <Workflow className="h-4 w-4"/> : <Library className="h-4 w-4" />}
                         {editingTitle ? (
                             <Input 
                                 value={resource.name} 
@@ -349,7 +349,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                 </CardHeader>
                 <div className="flex-grow min-h-0 overflow-y-auto">
                     <CardContent className="p-3 pt-0">
-                        {resource.type === 'habit' ? (
+                        {resource.type === 'habit' || resource.type === 'mechanism' ? (
                             <div className="space-y-4">
                                 <EditableField field="trigger" subField="action" label="Action: When I..." resource={resource} onUpdate={onUpdate} />
                                 <EditableField field="response" subField="visualize" label="Mechanism: It causes... internally." resource={resource} onUpdate={onUpdate} />
@@ -379,7 +379,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                        )}
                     </CardContent>
                 </div>
-                {resource.type !== 'habit' && (
+                {resource.type !== 'habit' && resource.type !== 'mechanism' && (
                  <CardFooter className="p-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Popover>
                         <PopoverTrigger asChild>
@@ -412,7 +412,7 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                                     <Select value={linkedCardId} onValueChange={setLinkedCardId}>
                                         <SelectTrigger><SelectValue placeholder="Select a card..."/></SelectTrigger>
                                         <SelectContent>
-                                            {resources.filter(r => (r.type === 'card' || r.type === 'habit') && r.id !== resource.id).map(r => (
+                                            {resources.filter(r => (r.type === 'card' || r.type === 'habit' || r.type === 'mechanism') && r.id !== resource.id).map(r => (
                                                 <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                                             ))}
                                         </SelectContent>
@@ -462,7 +462,7 @@ const SortableResourceCard = ({ children, item, className, linkingFromId }: { ch
         <div ref={setNodeRef} style={style} className={cn(className)}>
           <div className="relative group/sortable h-full">
             <button {...attributes} {...listeners} className="absolute -top-2 -left-2 z-10 p-1 bg-muted rounded-full cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
-            {(item.type === 'card' || item.type === 'habit') && <LinkDropZone resourceId={item.id} linkingFromId={linkingFromId} />}
+            {(item.type === 'card' || item.type === 'habit' || item.type === 'mechanism') && <LinkDropZone resourceId={item.id} linkingFromId={linkingFromId} />}
             {children}
           </div>
         </div>
@@ -771,7 +771,7 @@ const ResourceCard = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenM
                                     <Select value={linkedCardId} onValueChange={setLinkedCardId}>
                                         <SelectTrigger><SelectValue placeholder="Select a card..."/></SelectTrigger>
                                         <SelectContent>
-                                            {resources.filter(r => (r.type === 'card' || r.type === 'habit') && r.id !== resource.id).map(r => (
+                                            {resources.filter(r => (r.type === 'card' || r.type === 'habit' || r.type === 'mechanism') && r.id !== resource.id).map(r => (
                                                 <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                                             ))}
                                         </SelectContent>
@@ -796,6 +796,17 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
 }) => {
     const [editingTitle, setEditingTitle] = useState(false);
 
+    const getIcon = () => {
+        switch (resource.type) {
+            case 'habit':
+                return <Zap className="h-5 w-5" />;
+            case 'mechanism':
+                return <Workflow className="h-5 w-5"/>;
+            default:
+                return <Library className="h-5 w-5" />;
+        }
+    };
+
     return (
         <Card className={cn("flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl", linkingFromId === resource.id && "ring-2 ring-primary", linkingFromId && linkingFromId !== resource.id && "cursor-pointer hover:ring-2 hover:ring-primary/50")}>
             <CardHeader>
@@ -805,7 +816,7 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
                             <Input value={resource.name} onChange={(e) => onUpdate({...resource, name: e.target.value})} onBlur={() => setEditingTitle(false)} autoFocus className="text-lg font-semibold h-9" />
                         ) : (
                             <CardTitle className="flex items-center gap-3 text-lg cursor-pointer" onClick={() => setEditingTitle(true)}>
-                                <span className="text-primary"><Zap className="h-5 w-5" /></span>
+                                <span className="text-primary">{getIcon()}</span>
                                 <span className="truncate">{resource.name}</span>
                             </CardTitle>
                         )}
@@ -921,7 +932,7 @@ function ResourcesPageContent() {
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [mindMapRootFolderId, setMindMapRootFolderId] = useState<string | null>(null);
   
-  const [addResourceType, setAddResourceType] = useState<'link' | 'card' | 'habit' | 'model3d'>('link');
+  const [addResourceType, setAddResourceType] = useState<'link' | 'card' | 'habit' | 'model3d' | 'mechanism'>('link');
 
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
   
@@ -1232,12 +1243,12 @@ function ResourcesPageContent() {
       toast({ title: "Error", description: "Resource link is required for a link type.", variant: "destructive" });
       return;
     }
-    if ((addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'model3d') && !newResourceName.trim()) {
+    if ((addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d') && !newResourceName.trim()) {
       toast({ title: "Error", description: "Name is required.", variant: "destructive" });
       return;
     }
 
-    if (addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'model3d') {
+    if (addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d') {
         const newRes: Resource = {
             id: `res_${Date.now()}`,
             name: newResourceName.trim(),
@@ -1655,8 +1666,8 @@ function ResourcesPageContent() {
   const handleLinkClick = (resourceId: string) => {
     if (linkingFromId === null) {
       const sourceCard = resources.find(r => r.id === resourceId);
-      if (sourceCard?.type !== 'card' && sourceCard?.type !== 'habit') {
-        toast({ title: "Invalid Source", description: "You can only start a link from a 'Card' or 'Habit' type resource.", variant: "destructive" });
+      if (sourceCard?.type !== 'card' && sourceCard?.type !== 'habit' && sourceCard?.type !== 'mechanism') {
+        toast({ title: "Invalid Source", description: "You can only start a link from a 'Card', 'Habit', or 'Mechanism' type resource.", variant: "destructive" });
         return;
       }
       setLinkingFromId(resourceId);
@@ -1671,8 +1682,8 @@ function ResourcesPageContent() {
       const sourceCard = resources.find(r => r.id === linkingFromId);
       const targetCard = resources.find(r => r.id === resourceId);
 
-      if (!sourceCard || !targetCard || (targetCard.type !== 'card' && targetCard.type !== 'habit')) {
-        toast({ title: "Invalid Link", description: "The target must also be a 'Card' or 'Habit' type resource.", variant: "destructive" });
+      if (!sourceCard || !targetCard || (targetCard.type !== 'card' && targetCard.type !== 'habit' && targetCard.type !== 'mechanism')) {
+        toast({ title: "Invalid Link", description: "The target must also be a 'Card', 'Habit', or 'Mechanism' type resource.", variant: "destructive" });
         setLinkingFromId(null);
         return;
       }
@@ -1926,7 +1937,7 @@ function ResourcesPageContent() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                         {filteredResources.map(res => {
                              const isCardType = res.type === 'card';
-                             const isHabitType = res.type === 'habit';
+                             const isHabitType = res.type === 'habit' || res.type === 'mechanism';
                              const isModelType = res.type === 'model3d';
                              const hasMarkdownContent = isCardType && (res.points || []).some(p => p.type === 'markdown' || p.type === 'code');
                              const cardClassName = hasMarkdownContent ? "lg:col-span-3" : "";
@@ -2108,28 +2119,21 @@ function ResourcesPageContent() {
             const parentPopup = openPopups.get(popup.parentId);
             if (!parentPopup) return null;
             
-            const startX = popup.x + (popup.width || 0) / 2;
-            const startY = popup.y + 20;
-            const endX = parentPopup.x + (parentPopup.width || 0) / 2;
-            const endY = parentPopup.y + 20;
-
-            const dx = endX - startX;
-            const dy = endY - startY;
-            const controlPointX1 = startX + dx / 4;
-            const controlPointY1 = startY - Math.abs(dx)/4;
-            const controlPointX2 = endX - dx / 4;
-            const controlPointY2 = endY + Math.abs(dx)/4;
+            const startX = parentPopup.x + (parentPopup.width || 0) / 2;
+            const startY = parentPopup.y + ((parentPopup.height || 0) / 2);
+            const endX = popup.x + (popup.width || 0) / 2;
+            const endY = popup.y + ((popup.height || 0) / 2);
             
-            const d = `M ${startX},${startY} C ${controlPointX1},${startY} ${controlPointX2},${endY} ${endX},${endY}`;
-
             return (
-              <path 
+              <line 
                 key={`${popup.parentId}-${popup.resourceId}`}
-                d={d}
+                x1={startX} 
+                y1={startY} 
+                x2={endX} 
+                y2={endY} 
                 stroke="hsl(var(--primary))" 
                 strokeWidth="2"
                 strokeOpacity="0.5"
-                fill="none"
               />
             )
           })}
@@ -2304,10 +2308,11 @@ function ResourcesPageContent() {
                 <DialogTitle>Add New Resource</DialogTitle>
                 </DialogHeader>
                 <Tabs value={addResourceType} onValueChange={(v) => setAddResourceType(v as any)} className="w-full mt-2 mb-4">
-                    <TabsList className="grid w-full grid-cols-4">
+                    <TabsList className="grid w-full grid-cols-5">
                         <TabsTrigger value="link">Link</TabsTrigger>
                         <TabsTrigger value="card">Card</TabsTrigger>
                         <TabsTrigger value="habit">Habit</TabsTrigger>
+                        <TabsTrigger value="mechanism">Mechanism</TabsTrigger>
                         <TabsTrigger value="model3d">3D Model</TabsTrigger>
                     </TabsList>
                     <TabsContent value="link" className="pt-4">
@@ -2318,6 +2323,9 @@ function ResourcesPageContent() {
                     </TabsContent>
                     <TabsContent value="habit" className="pt-4">
                         <Input autoFocus placeholder="New habit name..." value={newResourceName} onChange={(e) => setNewResourceName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddResource()} />
+                    </TabsContent>
+                    <TabsContent value="mechanism" className="pt-4">
+                        <Input autoFocus placeholder="New mechanism name..." value={newResourceName} onChange={(e) => setNewResourceName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddResource()} />
                     </TabsContent>
                     <TabsContent value="model3d" className="pt-4 space-y-2">
                         <Input autoFocus placeholder="Model name..." value={newResourceName} onChange={(e) => setNewResourceName(e.target.value)} />

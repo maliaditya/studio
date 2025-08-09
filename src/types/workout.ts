@@ -226,7 +226,7 @@ export interface Resource {
   id: string;
   name: string;
   folderId: string;
-  type: 'link' | 'card' | 'habit' | 'model3d';
+  type: 'link' | 'card' | 'habit' | 'model3d' | 'mechanism';
   createdAt?: string;
   // For 'link' type
   link?: string;
@@ -239,7 +239,7 @@ export interface Resource {
   // For 'card' type
   points?: ResourcePoint[];
   icon?: string;
-  // For 'habit' type
+  // For 'habit' or 'mechanism' type
   trigger?: { action?: string; feeling?: string; };
   response?: { visualize?: string; action?: string; };
   reward?: string;
