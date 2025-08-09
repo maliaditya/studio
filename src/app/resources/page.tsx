@@ -675,7 +675,14 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                     <CardContent className="p-3 pt-0">
                         {(resource.type === 'habit' || resource.type === 'mechanism') ? (
                             <div className="space-y-1">
-                                {resource.mechanismFramework === 'positive' ? (
+                                {resource.type === 'habit' ? (
+                                    <>
+                                        <EditableField field="trigger" subField="action" prefix="Trigger: When I" suffix="." resource={resource} onUpdate={onUpdate} />
+                                        <EditableResponse field="response" label="Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={onOpenNestedPopup} popupState={popupState} />
+                                        <EditableField field="reward" prefix="Reward:" resource={resource} onUpdate={onUpdate} />
+                                        <EditableResponse field="newResponse" label="New Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={onOpenNestedPopup} popupState={popupState} />
+                                    </>
+                                ) : resource.mechanismFramework === 'positive' ? (
                                     <>
                                         <EditableField field="trigger" subField="action" prefix="Action: When I" suffix="," resource={resource} onUpdate={onUpdate} />
                                         <EditableField field="response" subField="visualize" prefix="Mechanism: It triggers" suffix="internally." resource={resource} onUpdate={onUpdate} />
@@ -798,6 +805,77 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
     );
 };
 
+const EditableResponse = ({ field, label, resource, onUpdate, onOpenNestedPopup, popupState }: { 
+    field: 'response' | 'newResponse';
+    label: string;
+    resource: Resource;
+    onUpdate: (updatedResource: Resource) => void;
+    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
+    popupState?: PopupState;
+}) => {
+    const { resources } = useAuth();
+    const responseValue = resource[field];
+    const linkedResource = responseValue?.resourceId ? resources.find(r => r.id === responseValue.resourceId) : null;
+  
+    const handleUnlink = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onUpdate({ ...resource, [field]: { ...responseValue, resourceId: undefined } });
+    };
+  
+    const handleUpdateField = (value: { text?: string; resourceId?: string }) => {
+        onUpdate({ ...resource, [field]: value });
+    };
+
+    return (
+        <div className="space-y-1">
+            {linkedResource ? (
+                <div className="flex items-center justify-between text-sm p-2 rounded-md bg-muted/50 border-l-2 border-primary">
+                    <button
+                        onClick={(e) => {
+                            if (popupState) onOpenNestedPopup(linkedResource.id, e, popupState);
+                        }}
+                        className="flex items-center gap-2 min-w-0"
+                    >
+                        <span className="text-xs text-muted-foreground">{label}:</span>
+                        <Workflow className="h-4 w-4 text-primary flex-shrink-0" />
+                        <span className="font-medium text-foreground truncate" title={linkedResource.name}>{linkedResource.name}</span>
+                    </button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleUnlink}>
+                        <Unlink className="h-3 w-3 text-destructive" />
+                    </Button>
+                </div>
+            ) : (
+                <div className="flex items-center gap-2">
+                    <EditableField
+                      field={field}
+                      subField="text"
+                      prefix={`${label}:`}
+                      resource={resource}
+                      onUpdate={onUpdate}
+                    />
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7"><LinkIcon className="h-4 w-4" /></Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-56 p-0">
+                            <Select onValueChange={(val) => handleUpdateField({ text: '', resourceId: val })}>
+                                <SelectTrigger className="w-full border-0 focus:ring-0">
+                                    <SelectValue placeholder="Link a mechanism..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {resources.filter(r => r.type === 'mechanism').map(r => (
+                                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </PopoverContent>
+                    </Popover>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingFromId, onOpenNestedPopup }: {
     resource: Resource; 
     onUpdate: (updatedResource: Resource) => void; 
@@ -808,58 +886,6 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
 }) => {
     const { resources } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
-
-    const handleUpdateField = (field: keyof Pick<Resource, 'response' | 'newResponse'>, value: { text?: string; resourceId?: string }) => {
-        onUpdate({ ...resource, [field]: value });
-    };
-
-    const renderEditableResponse = (field: 'response' | 'newResponse', label: string) => {
-        const responseValue = resource[field];
-        const linkedResource = responseValue?.resourceId ? resources.find(r => r.id === responseValue.resourceId) : null;
-        
-        return (
-            <div className="space-y-1">
-                {linkedResource ? (
-                    <div className="flex items-center justify-between text-sm p-2 rounded-md bg-muted/50 border-l-2 border-primary">
-                        <div className="flex items-center gap-2 min-w-0">
-                           <Workflow className="h-4 w-4 text-primary flex-shrink-0" />
-                           <span className="font-medium text-foreground truncate" title={linkedResource.name}>{linkedResource.name}</span>
-                        </div>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleUpdateField(field, { ...responseValue, resourceId: undefined })}>
-                            <Unlink className="h-3 w-3 text-destructive" />
-                        </Button>
-                    </div>
-                ) : (
-                    <div className="flex items-center gap-2">
-                        <EditableField
-                          field={field}
-                          subField="text"
-                          prefix={`${label}:`}
-                          resource={resource}
-                          onUpdate={onUpdate}
-                        />
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7"><LinkIcon className="h-4 w-4" /></Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-56 p-0">
-                                <Select onValueChange={(val) => handleUpdateField(field, { text: '', resourceId: val })}>
-                                    <SelectTrigger className="w-full border-0 focus:ring-0">
-                                        <SelectValue placeholder="Link a mechanism..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {resources.filter(r => r.type === 'mechanism').map(r => (
-                                            <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </PopoverContent>
-                        </Popover>
-                    </div>
-                )}
-            </div>
-        );
-    };
 
     return (
         <Card onClick={(e) => onOpenNestedPopup(resource.id, e)} className={cn("flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl cursor-pointer", linkingFromId === resource.id && "ring-2 ring-primary", linkingFromId && linkingFromId !== resource.id && "cursor-pointer hover:ring-2 hover:ring-primary/50")}>
@@ -896,9 +922,9 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
             </CardHeader>
             <CardContent className="space-y-1" onClick={(e) => e.stopPropagation()}>
                 <EditableField field="trigger" subField="action" prefix="Trigger: When I" suffix="." resource={resource} onUpdate={onUpdate} />
-                {renderEditableResponse('response', 'Response')}
+                <EditableResponse field="response" label="Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={onOpenNestedPopup} />
                 <EditableField field="reward" prefix="Reward:" resource={resource} onUpdate={onUpdate} />
-                {renderEditableResponse('newResponse', 'New Response')}
+                <EditableResponse field="newResponse" label="New Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={onOpenNestedPopup} />
             </CardContent>
         </Card>
     );
@@ -2411,7 +2437,7 @@ function ResourcesPageContent() {
             const startX = popup.x + (popup.width || 0) / 2;
             const startY = popup.y + ((popup.height || 0) / 2);
             const endX = parentPopup.x + (parentPopup.width || 0) / 2;
-            const endY = parentPopup.y + ((parentPopup.height || 0) / 2);
+            const endY = parentPopup.y + ((popup.height || 0) / 2);
             
             return (
               <line 
@@ -2800,4 +2826,5 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 

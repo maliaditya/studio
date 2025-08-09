@@ -242,10 +242,13 @@ export interface Resource {
   // For 'habit' or 'mechanism' type
   mechanismFramework?: 'negative' | 'positive';
   trigger?: { action?: string; feeling?: string; };
-  response?: { text?: string; resourceId?: string; visualize?: string; };
   reward?: string;
   benefit?: string;
-  newResponse?: { action?: string; visualize?: string; };
+  
+  // Updated fields for Habit/Mechanism
+  response?: { text?: string; resourceId?: string; visualize?: string; };
+  newResponse?: { text?: string; resourceId?: string; action?: string; visualize?: string; };
+  
   // For 'model3d' type
   modelUrl?: string;
 }
