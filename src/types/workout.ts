@@ -308,6 +308,7 @@ export interface PistonEntry {
     id: string;
     text: string;
     timestamp: number;
+    mechanismCardId?: string;
 }
 
 export type PistonState = PistonEntry[];
