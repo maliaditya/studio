@@ -366,7 +366,6 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
                                 <EditableField field="response" subField="visualize" prefix="Mechanism: It causes" suffix="internally." resource={resource} onUpdate={onUpdate} />
                                 <EditableField field="reward" prefix="Cost: This blocks" suffix="." resource={resource} onUpdate={onUpdate} />
                                 <EditableField field="newResponse" subField="visualize" prefix="Opposite: Only when" suffix="," resource={resource} onUpdate={onUpdate} />
-                                <EditableField field="newResponse" subField="action" prefix="..." suffix="happens." resource={resource} onUpdate={onUpdate} />
                                 <EditableField field="trigger" subField="feeling" prefix="Emotion/Image: That one" suffix={`costs me ${resource.reward || "..."}.`} resource={resource} onUpdate={onUpdate} />
                             </div>
                         ) : (
@@ -439,7 +438,6 @@ const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAud
         </div>
     );
 };
-
 
 const LinkDropZone = ({ resourceId, linkingFromId }: { resourceId: string; linkingFromId: string | null; }) => {
     const { isOver, setNodeRef } = useDroppable({
@@ -581,8 +579,7 @@ const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, on
     );
 };
 
-
-const ResourceCard = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText, onClosePopup, onConvertToCard }: { 
+const ResourceCardComponent = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText, onClosePopup, onConvertToCard }: { 
     resource: Resource; 
     onUpdate: (resource: Resource) => void; 
     onDelete: (resourceId: string) => void; 
@@ -856,7 +853,6 @@ const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingF
                 <EditableField field="response" subField="visualize" prefix="Mechanism: It causes" suffix="internally." resource={resource} onUpdate={onUpdate} />
                 <EditableField field="reward" prefix="Cost: This blocks" suffix="." resource={resource} onUpdate={onUpdate} />
                 <EditableField field="newResponse" subField="visualize" prefix="Opposite: Only when" suffix="," resource={resource} onUpdate={onUpdate} />
-                <EditableField field="newResponse" subField="action" prefix="..." suffix="happens." resource={resource} onUpdate={onUpdate} />
                 <EditableField field="trigger" subField="feeling" prefix="Emotion/Image: That one" suffix={`costs me ${resource.reward || "..."}.`} resource={resource} onUpdate={onUpdate} />
             </CardContent>
         </Card>
@@ -1984,7 +1980,7 @@ function ResourcesPageContent() {
                                 cardContent = <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} />;
                             }
                             else if(isCardType) {
-                                cardContent = <ResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
+                                cardContent = <ResourceCardComponent resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                 const isGif = isGifUrl(res.link);
@@ -2511,6 +2507,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText, onCo
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
 
