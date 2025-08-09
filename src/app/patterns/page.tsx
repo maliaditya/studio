@@ -63,6 +63,10 @@ function PatternsPageContent() {
             } else { // Negative Framework
                 if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: card.id, mechanismCardName: cardName });
                 if (card.benefit) fields.Costs.push({ category: 'Costs', text: card.benefit, mechanismCardId: card.id, mechanismCardName: cardName });
+                if (card.trigger?.feeling && card.benefit) {
+                    const costText = `That one ${card.trigger.feeling} costs me ${card.benefit}.`;
+                    fields.Costs.push({ category: 'Costs', text: costText, mechanismCardId: card.id, mechanismCardName: cardName });
+                }
                 if (card.law?.premise && card.law?.outcome) {
                     const lawText = `${card.law.premise} cannot happen when ${card.law.outcome}`;
                     fields['Negative Laws'].push({ category: 'Negative Laws', text: lawText, mechanismCardId: card.id, mechanismCardName: cardName });
@@ -195,9 +199,6 @@ function PatternsPageContent() {
                                                     )}
                                                     <Label htmlFor={`phrase-${title}-${i}`} className="text-sm font-normal cursor-pointer">
                                                         {phrase.text}
-                                                        {title !== 'Mechanism Cards' && phrase.mechanismCardName && (
-                                                            <span className="block text-xs text-muted-foreground/70">from: {phrase.mechanismCardName}</span>
-                                                        )}
                                                     </Label>
                                                 </div>
                                             ))}
