@@ -402,6 +402,7 @@ export interface PurposeData {
 export interface PatternPhrase {
   category: string;
   text: string;
+  mechanismCardId: string;
 }
 
 export interface Pattern {

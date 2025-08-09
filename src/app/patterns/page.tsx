@@ -54,18 +54,18 @@ function PatternsPageContent() {
 
         mechanismCards.forEach(card => {
             if (card.mechanismFramework === 'positive') {
-                if (card.benefit) fields.Benefits.push({ category: 'Benefits', text: card.benefit });
-                if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward }); // Positive Emotion/Image
+                if (card.benefit) fields.Benefits.push({ category: 'Benefits', text: card.benefit, mechanismCardId: card.id });
+                if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: card.id }); // Positive Emotion/Image
                 if (card.law?.premise && card.law?.outcome) {
                   const lawText = `${card.law.premise} can only happen when ${card.law.outcome}`;
-                  fields['Positive Laws'].push({ category: 'Positive Laws', text: lawText });
+                  fields['Positive Laws'].push({ category: 'Positive Laws', text: lawText, mechanismCardId: card.id });
                 }
             } else { // Negative Framework
-                if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward }); // "This blocks..."
-                if (card.benefit) fields.Costs.push({ category: 'Costs', text: card.benefit }); // "costs me..."
+                if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: card.id }); // "This blocks..."
+                if (card.benefit) fields.Costs.push({ category: 'Costs', text: card.benefit, mechanismCardId: card.id }); // "costs me..."
                 if (card.law?.premise && card.law?.outcome) {
                     const lawText = `${card.law.premise} cannot happen when ${card.law.outcome}`;
-                    fields['Negative Laws'].push({ category: 'Negative Laws', text: lawText });
+                    fields['Negative Laws'].push({ category: 'Negative Laws', text: lawText, mechanismCardId: card.id });
                 }
             }
         });
@@ -138,7 +138,7 @@ function PatternsPageContent() {
             return;
         }
 
-        const newRule = {
+        const newRule: MetaRule = {
             id: `rule_${Date.now()}`,
             text: newMetaRuleText.trim(),
             patternId: selectedPatternForRule,

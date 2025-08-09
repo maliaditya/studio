@@ -1,13 +1,13 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen } from 'lucide-react';
+import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +22,7 @@ function PurposePageContent() {
         patterns,
         metaRules,
         setMetaRules,
+        resources,
     } = useAuth();
     const { toast } = useToast();
 
@@ -73,6 +74,28 @@ function PurposePageContent() {
 
     const handleDeleteMetaRule = (ruleId: string) => {
         setMetaRules(prev => prev.filter(r => r.id !== ruleId));
+    };
+    
+    const habitCards = useMemo(() => resources.filter(r => r.type === 'habit'), [resources]);
+
+    const getHabitLinksForRule = (rule: { id: string, patternId: string, text: string }) => {
+        const pattern = patterns.find(p => p.id === rule.patternId);
+        if (!pattern) return [];
+
+        const mechanismIds = new Set(pattern.phrases.map(p => p.mechanismCardId));
+        
+        const linkedHabits = habitCards.filter(habit => {
+            if (!habit.response?.resourceId && !habit.newResponse?.resourceId) {
+                return false;
+            }
+            return mechanismIds.has(habit.response?.resourceId || '') || mechanismIds.has(habit.newResponse?.resourceId || '');
+        });
+
+        return linkedHabits.map(habit => ({
+            habitName: habit.name,
+            response: habit.response?.text || 'N/A',
+            newResponse: habit.newResponse?.text || 'N/A',
+        }));
     };
 
     return (
@@ -145,6 +168,8 @@ function PurposePageContent() {
                                 acc[phrase.category].push(phrase.text);
                                 return acc;
                             }, {} as Record<string, string[]>);
+                            
+                            const linkedHabits = getHabitLinksForRule(rule);
 
                             return (
                                 <Card key={rule.id} className="bg-muted/50">
@@ -164,6 +189,21 @@ function PurposePageContent() {
                                                 </div>
                                             ))}
                                         </div>
+                                        {linkedHabits.length > 0 && (
+                                            <div className="mt-4 pt-3 border-t">
+                                                <h4 className="font-medium text-sm mb-2">Connected Habits</h4>
+                                                <div className="space-y-2">
+                                                    {linkedHabits.map((link, i) => (
+                                                        <div key={i} className="text-xs p-2 rounded bg-background/50">
+                                                            <p className="font-semibold text-foreground">{link.habitName}</p>
+                                                            <p className="text-muted-foreground flex items-center">
+                                                                {link.response} <ArrowRight className="h-3 w-3 mx-1" /> {link.newResponse}
+                                                            </p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </CardContent>
                                 </Card>
                             )
