@@ -176,9 +176,9 @@ const EditableField = ({ field, subField, prefix, suffix, resource, onUpdate }: 
                 {suffix && <span className="text-muted-foreground flex-shrink-0">{suffix}</span>}
               </div>
           ) : (
-             <p className="min-h-[1.5rem] text-foreground">
+             <p className="min-h-[1.5rem] text-foreground whitespace-pre-wrap">
                 <span className="text-muted-foreground">{prefix}</span>
-                <span className="font-medium mx-1 whitespace-pre-wrap">
+                <span className="font-medium mx-1">
                     {text || <span className="italic font-normal text-muted-foreground/70">...</span>}
                 </span>
                 {suffix && <span className="text-muted-foreground">{suffix}</span>}
@@ -232,11 +232,11 @@ const DoubleEditableField = ({ prefix, suffix, value1, value2, onUpdate1, onUpda
                     <span className="text-muted-foreground shrink-0 pt-2">{suffix}</span>
                 </div>
             ) : (
-                 <p className="min-h-[1.5rem] text-foreground">
+                 <p className="min-h-[1.5rem] text-foreground whitespace-pre-wrap">
                     <span className="text-muted-foreground">{prefix}</span>
-                    <span className="font-medium mx-1 whitespace-pre-wrap">{value1 || <span className="italic font-normal text-muted-foreground/70">{placeholder1}</span>}</span>
+                    <span className="font-medium mx-1">{value1 || <span className="italic font-normal text-muted-foreground/70">{placeholder1}</span>}</span>
                     <span className="text-muted-foreground">,</span>
-                    <span className="font-medium mx-1 whitespace-pre-wrap">{value2 || <span className="italic font-normal text-muted-foreground/70">{placeholder2}</span>}</span>
+                    <span className="font-medium mx-1">{value2 || <span className="italic font-normal text-muted-foreground/70">{placeholder2}</span>}</span>
                     <span className="text-muted-foreground">{suffix}</span>
                 </p>
             )}
@@ -286,11 +286,11 @@ const EmotionEditableField = ({ value1, value2, onUpdate1, onUpdate2, placeholde
                     <span className="text-muted-foreground shrink-0 pt-2">.</span>
                 </div>
             ) : (
-                <p className="min-h-[1.5rem] text-foreground">
+                <p className="min-h-[1.5rem] text-foreground whitespace-pre-wrap">
                     <span className="text-muted-foreground">Emotion/Image: That one</span>
-                    <span className="font-medium mx-1 whitespace-pre-wrap">{value1 || <span className="italic font-normal text-muted-foreground/70">{placeholder1}</span>}</span>
-                    <span className="text-muted-foreground">costs me</span>
-                    <span className="font-medium mx-1 whitespace-pre-wrap">{value2 || <span className="italic font-normal text-muted-foreground/70">{placeholder2}</span>}</span>
+                    <span className="font-medium mx-1">{value1 || <span className="italic font-normal text-muted-foreground/70">{placeholder1}</span>}</span>
+                    <span className="text-muted-foreground mx-1">costs me</span>
+                    <span className="font-medium mx-1">{value2 || <span className="italic font-normal text-muted-foreground/70">{placeholder2}</span>}</span>
                     <span className="text-muted-foreground">.</span>
                 </p>
             )}
@@ -2654,5 +2654,3 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
-
-    
