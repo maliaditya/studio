@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -518,7 +519,7 @@ function PatternsPageContent() {
                                                             <Badge className="capitalize">{rule.purposePillar?.[0] || '?'}</Badge>
                                                         </Button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent>
+                                                    <DropdownMenuContent className="w-56">
                                                         {pillars.map(pillar => (
                                                             <DropdownMenuGroup key={pillar.name}>
                                                                 <DropdownMenuItem onSelect={() => handleUpdatePillar(rule.id, pillar.name)}>
@@ -557,3 +558,4 @@ export default function PatternsPage() {
         </AuthGuard>
     );
 }
+
