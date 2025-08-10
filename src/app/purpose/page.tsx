@@ -19,7 +19,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { format, subDays, parseISO, isBefore, startOfToday, addDays, isAfter } from 'date-fns';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { DashboardStats } from '@/components/DashboardStats';
 
 interface RuleDetailPopupState {
     rule: MetaRule;
@@ -109,7 +108,6 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
                                             className="text-left p-1 rounded hover:bg-muted/50 w-full"
                                             onClick={(e) => {
                                                 if (handleOpenNestedPopup) {
-                                                    // This is a simplified call; you might need more complex state management in the parent
                                                     handleOpenNestedPopup(habit.habitId, e);
                                                 }
                                             }}
@@ -272,50 +270,6 @@ function PurposePageContent() {
         }
     };
 
-    const consistencyData = useMemo(() => {
-    if (!allWorkoutLogs || !oneYearAgo || !today) return [];
-    const workoutDates = new Set(allWorkoutLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date));
-    const data: { date: string; fullDate: string; score: number }[] = [];
-    let score = 0.5;
-    for (let d = new Date(oneYearAgo); d <= today; d = addDays(d, 1)) {
-        const dateKey = format(d, 'yyyy-MM-dd');
-        if (workoutDates.has(dateKey)) { score += (1 - score) * 0.1; } else { score *= 0.95; }
-        data.push({ date: format(d, 'MMM dd'), fullDate: format(d, 'PPP'), score: Math.round(score * 100) });
-    }
-    return data;
-  }, [allWorkoutLogs, oneYearAgo, today]);
-  
-    const productivityStats = useMemo(() => {
-      const todayStr = format(new Date(), 'yyyy-MM-dd');
-      
-      const getDailyDuration = (logs: DatedWorkout[], dateStr: string, durationField: 'reps' | 'weight') => {
-          if (!logs) return 0;
-          const logForDay = logs.find(log => log.date === dateStr);
-          if (!logForDay) return 0;
-          return logForDay.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
-      };
-
-      const calculateChange = (todayVal: number, yesterdayVal: number) => {
-          if (yesterdayVal === 0) return todayVal > 0 ? 100 : 0;
-          return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
-      };
-      
-      const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
-      const todayDeepWork = getDailyDuration(allDeepWorkLogs, todayStr, 'weight');
-      const yesterdayDeepWork = getDailyDuration(allDeepWorkLogs, yesterdayStr, 'weight');
-      const todayUpskill = getDailyDuration(allUpskillLogs, todayStr, 'reps');
-      const yesterdayUpskill = getDailyDuration(allUpskillLogs, yesterdayStr, 'reps');
-
-      return {
-          todayDeepWorkHours: todayDeepWork / 60,
-          deepWorkChange: calculateChange(todayDeepWork, yesterdayDeepWork),
-          todayUpskillHours: todayUpskill / 60,
-          upskillChange: calculateChange(todayUpskill, yesterdayUpskill),
-          consistencyChange: (consistencyData[consistencyData.length - 1]?.score || 0) - (consistencyData[consistencyData.length - 2]?.score || 0),
-          latestConsistency: consistencyData[consistencyData.length - 1]?.score || 0,
-      };
-  }, [allUpskillLogs, allDeepWorkLogs, consistencyData]);
-    
     const pillars = [
         { name: 'Health', icon: <HeartPulse className="h-6 w-6 text-red-500" /> },
         { name: 'Wealth', icon: <Briefcase className="h-6 w-6 text-green-500" /> },
@@ -360,9 +314,6 @@ function PurposePageContent() {
                     <h1 className="text-4xl font-bold tracking-tight text-primary">
                         Your Purpose
                     </h1>
-                    <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-                        “In Life either you're growing or you're decaying; there's no middle ground. If you're standing still, you're decaying.”
-                    </p>
                 </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
@@ -394,12 +345,6 @@ function PurposePageContent() {
                                 <BrainCircuit className="h-6 w-6 text-primary" />
                                 My Central Purpose
                             </CardTitle>
-                            {!isEditingPurpose && (
-                                <Button variant="outline" size="sm" onClick={() => { setPurposeInput(purposeStatement); setIsEditingPurpose(true); }}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    {purposeStatement ? 'Edit' : 'Define'} Purpose
-                                </Button>
-                            )}
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -421,13 +366,13 @@ function PurposePageContent() {
                                 </div>
                             </div>
                         ) : (
-                            <p className="text-lg text-muted-foreground whitespace-pre-wrap min-h-[5rem]">
-                                {purposeStatement || "Your purpose is not yet defined. Click the button to set it."}
+                            <p className="text-lg text-muted-foreground whitespace-pre-wrap min-h-[5rem] cursor-pointer" onClick={() => { setPurposeInput(purposeStatement); setIsEditingPurpose(true); }}>
+                                {purposeStatement || "Click to define your purpose."}
                             </p>
                         )}
-                        <Separator />
+                        
                         <StrategicOverviewDiagram />
-                        <Separator />
+                        
                          <Accordion type="multiple" className="w-full">
                             {metaRules.filter(r => !r.purposePillar).map(rule => (
                                 <AccordionItem value={rule.id} key={rule.id}>
@@ -519,4 +464,3 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
-
