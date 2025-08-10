@@ -17,8 +17,6 @@ import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen, Workflow, Arrow
 import { useToast } from '@/hooks/use-toast';
 import type { Pattern, PatternPhrase, MetaRule, Resource } from '@/types/workout';
 import { cn } from '@/lib/utils';
-import { HabitPopup } from '@/components/HabitPopup';
-import { DndContext, type DragEndEvent } from '@dnd-kit/core';
 
 
 function PatternsPageContent() {
@@ -33,9 +31,6 @@ function PatternsPageContent() {
     const [newMetaRuleText, setNewMetaRuleText] = useState('');
     const [selectedPatternForRule, setSelectedPatternForRule] = useState<string | null>(null);
     
-    // New local state for the isolated habit popup
-    const [selectedHabit, setSelectedHabit] = useState<{ habit: Resource; position: { x: number; y: number; } } | null>(null);
-
 
     const mechanismCards = useMemo(() => {
         return resources.filter(r => r.type === 'mechanism');
@@ -266,7 +261,7 @@ function PatternsPageContent() {
     const handleOpenHabitPopup = (e: React.MouseEvent, habitId: string) => {
         handleOpenNestedPopup(habitId, e);
     };
-    
+
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
             <div className="text-center">
@@ -488,5 +483,3 @@ export default function PatternsPage() {
         </AuthGuard>
     );
 }
-
-
