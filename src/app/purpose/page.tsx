@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -18,7 +18,7 @@ import { DndContext, type DragEndEvent } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { DashboardStats } from '@/components/DashboardStats';
-import { format, subDays, parseISO, isBefore, startOfToday } from 'date-fns';
+import { format, subDays, parseISO, isBefore, startOfToday, addDays } from 'date-fns';
 import type { DatedWorkout } from '@/types/workout';
 
 
