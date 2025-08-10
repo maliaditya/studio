@@ -383,17 +383,6 @@ function MyPlatePageContent() {
 
   const selectedDaySchedule = schedule[selectedDateKey] || {};
 
-  const dailyStats = useMemo(() => {
-    const todaysActivities = schedule[todayKey] || {};
-    const completedActivities = Object.values(todaysActivities).flat().filter(activity => activity && activity.completed);
-    const healthDone = completedActivities.some(act => act.type === 'workout');
-    const wealthDone = completedActivities.some(act => act.type === 'deepwork');
-    const growthDone = completedActivities.some(act => act.type === 'upskill');
-    const planningDone = completedActivities.some(act => act.type === 'planning');
-    const trackingDone = completedActivities.some(act => act.type === 'tracking');
-    return { health: healthDone, wealth: wealthDone, growth: growthDone, direction: planningDone && trackingDone };
-  }, [schedule, todayKey]);
-
   const consistencyData = useMemo(() => {
     if (!allWorkoutLogs || !oneYearAgo || !today) return [];
     const workoutDates = new Set(allWorkoutLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date));
@@ -983,7 +972,6 @@ function MyPlatePageContent() {
               </Popover>
           </CardHeader>
           <CardContent>
-            <DashboardStats stats={productivityStats} />
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
               <div className="lg:col-span-3">
                 <ProductivitySnapshot 

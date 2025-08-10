@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -17,6 +17,9 @@ import { HabitPopup } from '@/components/HabitPopup';
 import { DndContext, type DragEndEvent } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { DashboardStats } from '@/components/DashboardStats';
+import { format, subDays, parseISO, isBefore, startOfToday } from 'date-fns';
+import type { DatedWorkout } from '@/types/workout';
 
 
 function PurposePageContent() {
@@ -31,6 +34,10 @@ function PurposePageContent() {
         resources,
         coreSkills,
         handleOpenNestedPopup,
+        allUpskillLogs,
+        allDeepWorkLogs,
+        allWorkoutLogs,
+        schedule,
     } = useAuth();
     const { toast } = useToast();
 
@@ -43,6 +50,66 @@ function PurposePageContent() {
 
     const [editingMetaRuleId, setEditingMetaRuleId] = useState<string | null>(null);
     const [editedMetaRuleText, setEditedMetaRuleText] = useState('');
+
+    const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
+    const [today, setToday] = useState<Date | null>(null);
+
+    useEffect(() => {
+        const now = new Date();
+        setToday(now);
+        setOneYearAgo(subDays(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 365));
+    }, []);
+
+    const consistencyData = useMemo(() => {
+        if (!allWorkoutLogs || !oneYearAgo || !today) return [];
+        const workoutDates = new Set(allWorkoutLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date));
+        const data: { date: string; fullDate: string; score: number }[] = [];
+        let score = 0.5;
+        for (let d = new Date(oneYearAgo); d <= today; d = addDays(d, 1)) {
+            const dateKey = format(d, 'yyyy-MM-dd');
+            if (workoutDates.has(dateKey)) { score += (1 - score) * 0.1; } else { score *= 0.95; }
+            data.push({ date: format(d, 'MMM dd'), fullDate: format(d, 'PPP'), score: Math.round(score * 100) });
+        }
+        return data;
+    }, [allWorkoutLogs, oneYearAgo, today]);
+    
+    const productivityStats = useMemo(() => {
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+        
+        const getDailyDuration = (logs: DatedWorkout[], dateStr: string, durationField: 'reps' | 'weight') => {
+            if (!logs) return 0;
+            const logForDay = logs.find(log => log.date === dateStr);
+            if (!logForDay) return 0;
+            return logForDay.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
+        };
+  
+        const calculateChange = (todayVal: number, yesterdayVal: number) => {
+            if (yesterdayVal === 0) return todayVal > 0 ? 100 : 0;
+            return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
+        };
+  
+        const todayDeepWork = getDailyDuration(allDeepWorkLogs, todayStr, 'weight');
+        const yesterdayDeepWork = getDailyDuration(allDeepWorkLogs, yesterdayStr, 'weight');
+        const todayUpskill = getDailyDuration(allUpskillLogs, todayStr, 'reps');
+        const yesterdayUpskill = getDailyDuration(allUpskillLogs, yesterdayStr, 'reps');
+
+        const todayKey = format(new Date(), 'yyyy-MM-dd');
+        const todaysActivities = schedule[todayKey] || {};
+        const completedActivities = Object.values(todaysActivities).flat().filter(activity => activity && activity.completed);
+        const planningDone = completedActivities.some(act => act.type === 'planning');
+        const trackingDone = completedActivities.some(act => act.type === 'tracking');
+
+  
+        return {
+            todayDeepWorkHours: todayDeepWork / 60, deepWorkChange: calculateChange(todayDeepWork, yesterdayDeepWork),
+            todayUpskillHours: todayUpskill / 60, upskillChange: calculateChange(todayUpskill, yesterdayUpskill),
+            consistencyChange: (consistencyData[consistencyData.length - 1]?.score || 0) - (consistencyData[consistencyData.length - 2]?.score || 0),
+            latestConsistency: consistencyData[consistencyData.length - 1]?.score || 0,
+            direction: planningDone && trackingDone,
+            overallNextMilestone: null, // This can be enhanced later if needed
+        };
+    }, [allUpskillLogs, allDeepWorkLogs, consistencyData, schedule]);
 
 
     const specializations = React.useMemo(() => {
@@ -158,6 +225,8 @@ function PurposePageContent() {
                         Define your central mission. Then, connect your specializations and meta-rules to see how every skill and insight serves your ultimate goal.
                     </p>
                 </div>
+                
+                <DashboardStats stats={productivityStats} />
 
                 <Card className="shadow-lg">
                     <CardHeader>
