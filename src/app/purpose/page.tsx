@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ClipboardCheck, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart } from 'lucide-react';
+import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ClipboardCheck, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -127,46 +127,59 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
 
 const StrategicOverviewDiagram = () => {
     const PillarCard = ({ icon, title, items }: { icon: React.ReactNode, title: string, items: string[] }) => (
-      <div className="flex flex-col items-center text-center p-4 border rounded-lg bg-card/50 w-48 shadow-sm">
+      <div className="flex flex-col items-center text-center p-3 border rounded-lg bg-card/50 w-40 shadow-sm">
         <div className="text-primary">{icon}</div>
-        <h4 className="font-semibold mt-2 text-foreground">{title}</h4>
-        <Separator className="my-2" />
+        <h4 className="font-semibold mt-2 text-sm text-foreground">{title}</h4>
+        <Separator className="my-1.5" />
         <div className="flex flex-wrap justify-center gap-1.5 mt-1">
-            {items.map(item => <Badge key={item} variant="secondary">{item}</Badge>)}
+            {items.map(item => <Badge key={item} variant="secondary" className="text-xs">{item}</Badge>)}
         </div>
       </div>
     );
-
-    const OutcomeCard = ({ title }: { title: string }) => (
-        <div className="text-center">
-            <Badge variant="secondary">{title}</Badge>
+    
+    const ActionCard = ({ icon, title }: { icon: React.ReactNode, title: string }) => (
+        <div className="flex flex-col items-center text-center p-3 border rounded-lg bg-card/50 w-32 shadow-sm">
+            <div className="text-primary">{icon}</div>
+            <h4 className="font-semibold mt-2 text-sm text-foreground">{title}</h4>
         </div>
     );
 
+    const OutcomeBadge = ({ children }: { children: React.ReactNode }) => (
+        <Badge variant="outline" className="text-sm py-1 px-3 border-primary/30 text-primary">{children}</Badge>
+    );
+
     return (
-        <div className="flex flex-col md:flex-row items-center justify-center p-6 space-y-6 md:space-y-0 md:space-x-6 overflow-x-auto">
-             <div className="flex flex-wrap items-stretch justify-center gap-4">
-                <PillarCard icon={<Brain className="h-6 w-6"/>} title="Mind" items={['Focus', 'Learning', 'Creativity']} />
-                <PillarCard icon={<HeartPulse className="h-6 w-6"/>} title="Body" items={['Health', 'Strength', 'Energy']} />
-                <PillarCard icon={<HandHeart className="h-6 w-6"/>} title="Heart" items={['Relationships', 'Emotional Health']} />
-                <PillarCard icon={<TrendingUp className="h-6 w-6"/>} title="Spirit" items={['Meaning', 'Contribution', 'Legacy']} />
-            </div>
+        <div className="flex items-center justify-center p-4 space-x-4 md:space-x-6 overflow-x-auto">
+            <PillarCard icon={<HandHeart className="h-5 w-5"/>} title="Heart" items={['Emotional Health']} />
+            <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0" />
             
-            <div className="flex items-center gap-2">
-               <ArrowRight className="h-6 w-6 text-muted-foreground" />
-                <div className="flex items-center gap-2 p-3 border rounded-lg bg-card/80 shadow">
-                    <DollarSign className="h-6 w-6 text-green-500" />
-                    <h3 className="text-lg font-bold">Monetization</h3>
-                </div>
-               <ArrowRight className="h-6 w-6 text-muted-foreground" />
+            <div className="flex flex-col space-y-3">
+                <PillarCard icon={<Brain className="h-5 w-5"/>} title="Mind" items={['Focus', 'Learning']} />
+                <PillarCard icon={<HeartPulse className="h-5 w-5"/>} title="Body" items={['Health', 'Energy']} />
+                <PillarCard icon={<TrendingUp className="h-5 w-5"/>} title="Spirit" items={['Contribution']} />
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-4">
-                <OutcomeCard title="Freedom" />
-                <OutcomeCard title="Limitless" />
-                <OutcomeCard title="Fearless" />
-                <OutcomeCard title="Independent" />
-                <OutcomeCard title="Provider" />
+            <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0" />
+            
+            <div className="flex flex-col space-y-3">
+                <ActionCard icon={<Activity className="h-5 w-5"/>} title="Skill" />
+                <ActionCard icon={<Package className="h-5 w-5"/>} title="Product" />
+            </div>
+
+            <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0" />
+            
+            <div className="flex items-center gap-2 p-3 border-2 border-primary/50 rounded-lg bg-card/80 shadow">
+                <DollarSign className="h-6 w-6 text-green-500" />
+                <h3 className="text-lg font-bold">Monetization</h3>
+            </div>
+
+            <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0" />
+
+            <div className="flex flex-col items-start space-y-3">
+                <OutcomeBadge>Freedom</OutcomeBadge>
+                <OutcomeBadge>Limitless</OutcomeBadge>
+                <OutcomeBadge>Fearless</OutcomeBadge>
+                <OutcomeBadge>Independent</OutcomeBadge>
             </div>
         </div>
     );
@@ -307,12 +320,6 @@ function PurposePageContent() {
     return (
         <DndContext onDragEnd={handleDragEnd}>
             <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
-                <div className="text-center">
-                    <h1 className="text-4xl font-bold tracking-tight text-primary">
-                        Your Purpose
-                    </h1>
-                </div>
-
                 <Card className="shadow-lg">
                     <CardHeader>
                         <div className="flex justify-between items-center">
@@ -461,4 +468,3 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
-
