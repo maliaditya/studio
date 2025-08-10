@@ -7,19 +7,20 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight } from 'lucide-react';
+import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ClipboardCheck, ArrowDown, ArrowUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import type { Resource } from '@/types/workout';
+import type { Resource, DatedWorkout } from '@/types/workout';
 import { HabitPopup } from '@/components/HabitPopup';
 import { DndContext, type DragEndEvent } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { DashboardStats } from '@/components/DashboardStats';
 import { format, subDays, parseISO, isBefore, startOfToday, addDays } from 'date-fns';
-import type { DatedWorkout } from '@/types/workout';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
 
 
 function PurposePageContent() {
@@ -28,11 +29,12 @@ function PurposePageContent() {
         setPurposeStatement,
         specializationPurposes,
         setSpecializationPurposes,
+        coreSkills,
+        setCoreSkills,
         patterns,
         metaRules,
         setMetaRules,
         resources,
-        coreSkills,
         handleOpenNestedPopup,
         allUpskillLogs,
         allDeepWorkLogs,
@@ -122,37 +124,14 @@ function PurposePageContent() {
         toast({ title: "Purpose Updated", description: "Your central purpose has been saved." });
     };
 
-    const handleStartEditSpecialization = (specId: string) => {
-        setEditingSpecializationId(specId);
-        setSpecializationPurposeInput(specializationPurposes[specId] || '');
-    };
-
-    const handleSaveSpecializationPurpose = () => {
-        if (editingSpecializationId) {
-            setSpecializationPurposes(prev => ({
-                ...prev,
-                [editingSpecializationId]: specializationPurposeInput
-            }));
-            setEditingSpecializationId(null);
-            setSpecializationPurposeInput('');
-            toast({ title: "Connection Saved", description: "The specialization's contribution to your purpose has been updated." });
-        }
+    const handleUpdatePillar = (id: string, pillar: 'Health' | 'Wealth' | 'Growth' | 'Direction', type: 'specialization' | 'meta-rule') => {
+      if (type === 'specialization') {
+        setCoreSkills(prev => prev.map(s => s.id === id ? { ...s, purposePillar: pillar } : s));
+      } else {
+        setMetaRules(prev => prev.map(r => r.id === id ? { ...r, purposePillar: pillar } : r));
+      }
     };
     
-    const handleCancelEditSpecialization = () => {
-        setEditingSpecializationId(null);
-        setSpecializationPurposeInput('');
-    };
-    
-    const handleClearSpecializationPurpose = (specId: string) => {
-        setSpecializationPurposes(prev => {
-            const newPurposes = { ...prev };
-            delete newPurposes[specId];
-            return newPurposes;
-        });
-        toast({ title: "Connection Cleared", description: "The specialization's link to your purpose has been removed." });
-    };
-
     const handleStartEditMetaRule = (rule: { id: string, text: string }) => {
         setEditingMetaRuleId(rule.id);
         setEditedMetaRuleText(rule.text);
@@ -306,6 +285,20 @@ function PurposePageContent() {
                                                       )}
                                                     </AccordionTrigger>
                                                     <div className="flex items-center pl-2">
+                                                      <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                          <Button variant="outline" size="sm" className="h-8">
+                                                            {rule.purposePillar ? <Badge>{rule.purposePillar}</Badge> : "Assign Pillar"}
+                                                          </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                          {(['Health', 'Wealth', 'Growth', 'Direction'] as const).map(pillar => (
+                                                            <DropdownMenuItem key={pillar} onSelect={() => handleUpdatePillar(rule.id, pillar, 'meta-rule')}>
+                                                              {pillar}
+                                                            </DropdownMenuItem>
+                                                          ))}
+                                                        </DropdownMenuContent>
+                                                      </DropdownMenu>
                                                       <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleStartEditMetaRule(rule)}>
                                                           <Edit className="h-4 w-4" />
                                                       </Button>
@@ -366,42 +359,21 @@ function PurposePageContent() {
                                         <CardDescription>Specialization</CardDescription>
                                     </CardHeader>
                                     <CardContent className="flex-grow">
-                                        {editingSpecializationId === spec.id ? (
-                                            <div className="space-y-2">
-                                                <Label htmlFor={`purpose-${spec.id}`}>How does this help your purpose?</Label>
-                                                <Textarea 
-                                                    id={`purpose-${spec.id}`}
-                                                    value={specializationPurposeInput}
-                                                    onChange={(e) => setSpecializationPurposeInput(e.target.value)}
-                                                    placeholder="e.g., 'Allows me to build the tools required for...'"
-                                                    className="min-h-[80px]"
-                                                    autoFocus
-                                                />
-                                            </div>
-                                        ) : (
-                                            <p className="text-sm text-muted-foreground min-h-[6rem]">
-                                                {specializationPurposes[spec.id] || "No contribution defined yet."}
-                                            </p>
-                                        )}
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button variant="outline" className="w-full">
+                                              {spec.purposePillar || "Assign to a Pillar"}
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent>
+                                            {(['Health', 'Wealth', 'Growth', 'Direction'] as const).map(pillar => (
+                                              <DropdownMenuItem key={pillar} onSelect={() => handleUpdatePillar(spec.id, pillar, 'specialization')}>
+                                                {pillar}
+                                              </DropdownMenuItem>
+                                            ))}
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </CardContent>
-                                    <CardFooter className="flex justify-between">
-                                        {editingSpecializationId === spec.id ? (
-                                            <div className="flex justify-end gap-2 w-full">
-                                                <Button variant="ghost" onClick={handleCancelEditSpecialization}>Cancel</Button>
-                                                <Button onClick={handleSaveSpecializationPurpose}><Save className="mr-2 h-4 w-4"/>Save</Button>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleClearSpecializationPurpose(spec.id)}>
-                                                    <X className="mr-2 h-4 w-4"/>Clear
-                                                </Button>
-                                                <Button variant="outline" size="sm" onClick={() => handleStartEditSpecialization(spec.id)}>
-                                                    <Edit className="mr-2 h-4 w-4" />
-                                                    {specializationPurposes[spec.id] ? 'Edit' : 'Define'} Connection
-                                                </Button>
-                                            </>
-                                        )}
-                                    </CardFooter>
                                 </Card>
                             ))}
                         </div>

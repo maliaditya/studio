@@ -502,7 +502,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedDomain = loadItem(`selected_domain_${username}`, false); setSelectedDomainId(storedDomain || null);
       const storedSkill = loadItem(`selected_skill_${username}`, false); setSelectedSkillId(storedSkill || null);
       const storedProject = loadItem(`selected_project_${username}`, false); setSelectedProjectId(storedProject || null);
-      const storedCompany = loadItem(`selected_company_${username}`, false); setSelectedCompanyId(storedCompany || null);
+      const storedCompany = loadItem(`selected_companyId_${username}`, false); setSelectedCompanyId(storedCompany || null);
 
     } else {
       // Clear all data on logout

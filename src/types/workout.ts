@@ -336,6 +336,7 @@ export interface CoreSkill {
   name: string;
   type: 'Foundation' | 'Specialization' | 'Professionalism';
   skillAreas: SkillArea[];
+  purposePillar?: 'Health' | 'Wealth' | 'Growth' | 'Direction';
 }
 
 export interface SkillArea {
@@ -418,4 +419,5 @@ export interface MetaRule {
   id: string;
   text: string;
   patternId: string;
+  purposePillar?: 'Health' | 'Wealth' | 'Growth' | 'Direction';
 }
