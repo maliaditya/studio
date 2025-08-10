@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -144,7 +145,7 @@ const StrategicOverviewDiagram = () => {
     );
 
     return (
-        <div className="flex flex-col items-center justify-center p-6 space-y-6">
+        <div className="flex flex-col md:flex-row items-center justify-center p-6 space-y-6 md:space-y-0 md:space-x-6 overflow-x-auto">
              <div className="flex flex-wrap items-stretch justify-center gap-4">
                 <PillarCard icon={<Brain className="h-6 w-6"/>} title="Mind" items={['Focus', 'Learning', 'Creativity']} />
                 <PillarCard icon={<HeartPulse className="h-6 w-6"/>} title="Body" items={['Health', 'Strength', 'Energy']} />
@@ -152,13 +153,13 @@ const StrategicOverviewDiagram = () => {
                 <PillarCard icon={<ClipboardCheck className="h-6 w-6"/>} title="Heart" items={['Relationships', 'Emotional Health']} />
             </div>
             
-            <div className="flex flex-col items-center gap-2">
-               <ArrowDown className="h-6 w-6 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+               <ArrowRight className="h-6 w-6 text-muted-foreground" />
                 <div className="flex items-center gap-2 p-3 border rounded-lg bg-card/80 shadow">
                     <DollarSign className="h-6 w-6 text-green-500" />
                     <h3 className="text-lg font-bold">Monetization</h3>
                 </div>
-               <ArrowDown className="h-6 w-6 text-muted-foreground" />
+               <ArrowRight className="h-6 w-6 text-muted-foreground" />
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-4">
@@ -184,18 +185,7 @@ function PurposePageContent() {
         patterns,
         metaRules,
         setMetaRules,
-        allWorkoutLogs, 
-        allUpskillLogs,
-        allDeepWorkLogs,
-        topicGoals,
-        brandingLogs,
-        productizationPlans,
-        offerizationPlans,
-        deepWorkDefinitions,
-        upskillDefinitions,
-        habitCards,
-        mechanismCards,
-        handleOpenNestedPopup
+        handleOpenNestedPopup,
     } = useAuth();
     const { toast } = useToast();
 
@@ -206,7 +196,6 @@ function PurposePageContent() {
     const [editedMetaRuleText, setEditedMetaRuleText] = useState('');
     
     const [ruleDetailPopup, setRuleDetailPopup] = useState<RuleDetailPopupState | null>(null);
-
     const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
     const [today, setToday] = useState<Date | null>(null);
 
@@ -370,43 +359,7 @@ function PurposePageContent() {
                                 {purposeStatement || "Click to define your purpose."}
                             </p>
                         )}
-                        
                         <StrategicOverviewDiagram />
-                        
-                         <Accordion type="multiple" className="w-full">
-                            {metaRules.filter(r => !r.purposePillar).map(rule => (
-                                <AccordionItem value={rule.id} key={rule.id}>
-                                    <div className="flex items-center group">
-                                        <AccordionTrigger className="flex-grow">
-                                            {editingMetaRuleId === rule.id ? (
-                                                <Input
-                                                    value={editedMetaRuleText}
-                                                    onChange={(e) => setEditedMetaRuleText(e.target.value)}
-                                                    onKeyDown={(e) => e.key === 'Enter' && handleSaveMetaRule()}
-                                                    onBlur={handleSaveMetaRule}
-                                                    className="text-sm h-8"
-                                                    autoFocus
-                                                    onClick={(e) => e.stopPropagation()}
-                                                />
-                                            ) : (
-                                                rule.text
-                                            )}
-                                        </AccordionTrigger>
-                                        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity pl-2">
-                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleStartEditMetaRule(e, rule)}>
-                                                <Edit className="h-4 w-4" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={(e) => handleDeleteMetaRule(e, rule.id)}>
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    <AccordionContent>
-                                        <p className="text-sm text-muted-foreground">Pattern: <span className="font-semibold text-foreground">{patterns.find(p => p.id === rule.patternId)?.name || 'Unknown'}</span></p>
-                                    </AccordionContent>
-                                </AccordionItem>
-                            ))}
-                        </Accordion>
                     </CardContent>
                 </Card>
 
