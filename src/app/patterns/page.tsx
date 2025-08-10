@@ -477,6 +477,38 @@ function PatternsPageContent() {
                     </div>
                 </CardContent>
             </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">Defined Meta-Rules</CardTitle>
+                    <CardDescription>A list of all the life rules you've created from your patterns.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <ScrollArea className="h-60">
+                        {metaRules.length > 0 ? (
+                            <div className="space-y-2 pr-4">
+                                {metaRules.map(rule => {
+                                    const pattern = patterns.find(p => p.id === rule.patternId);
+                                    return (
+                                        <div key={rule.id} className="p-3 rounded-md border bg-muted/30">
+                                            <p className="font-medium">{rule.text}</p>
+                                            {pattern && (
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                    Based on pattern: <span className="font-semibold">{pattern.name}</span>
+                                                </p>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-center h-40">
+                                <p className="text-muted-foreground">No meta-rules defined yet.</p>
+                            </div>
+                        )}
+                    </ScrollArea>
+                </CardContent>
+            </Card>
         </div>
     );
 }
