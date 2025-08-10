@@ -440,7 +440,7 @@ function PatternsPageContent() {
                                                                         className="text-left p-1 rounded hover:bg-background w-full"
                                                                         onClick={(e) => handleOpenNestedPopup(habit.habitId, e)}
                                                                     >
-                                                                        <span className="font-semibold text-foreground">{habit.habitName}</span> = <span className="text-muted-foreground">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</span>
+                                                                        <span className="font-semibold text-foreground text-xs">{habit.habitName}</span> = <span className="text-muted-foreground text-xs">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</span>
                                                                     </button>
                                                                 ))}
                                                             </div>
