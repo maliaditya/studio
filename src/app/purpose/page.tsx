@@ -41,6 +41,10 @@ function PurposePageContent() {
     
     const [selectedHabit, setSelectedHabit] = useState<{ habit: Resource; position: { x: number; y: number; } } | null>(null);
 
+    const [editingMetaRuleId, setEditingMetaRuleId] = useState<string | null>(null);
+    const [editedMetaRuleText, setEditedMetaRuleText] = useState('');
+
+
     const specializations = React.useMemo(() => {
         return coreSkills.filter(skill => skill.type === 'Specialization');
     }, [coreSkills]);
@@ -80,6 +84,20 @@ function PurposePageContent() {
             return newPurposes;
         });
         toast({ title: "Connection Cleared", description: "The specialization's link to your purpose has been removed." });
+    };
+
+    const handleStartEditMetaRule = (rule: { id: string, text: string }) => {
+        setEditingMetaRuleId(rule.id);
+        setEditedMetaRuleText(rule.text);
+    };
+
+    const handleSaveMetaRule = () => {
+        if (!editingMetaRuleId) return;
+        setMetaRules(prev => prev.map(rule =>
+            rule.id === editingMetaRuleId ? { ...rule, text: editedMetaRuleText } : rule
+        ));
+        setEditingMetaRuleId(null);
+        setEditedMetaRuleText('');
     };
 
     const handleDeleteMetaRule = (ruleId: string) => {
@@ -203,9 +221,29 @@ function PurposePageContent() {
 
                                         return (
                                             <AccordionItem key={rule.id} value={rule.id} className="border bg-muted/30 rounded-lg px-4">
-                                                <div className="flex items-center">
-                                                    <AccordionTrigger className="text-lg flex-grow">{rule.text}</AccordionTrigger>
-                                                    <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleDeleteMetaRule(rule.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                                <div className="flex items-center justify-between py-1">
+                                                    <AccordionTrigger className="text-lg flex-grow hover:no-underline py-3">
+                                                      {editingMetaRuleId === rule.id ? (
+                                                        <Input
+                                                            value={editedMetaRuleText}
+                                                            onChange={(e) => setEditedMetaRuleText(e.target.value)}
+                                                            onKeyDown={(e) => e.key === 'Enter' && handleSaveMetaRule()}
+                                                            onBlur={handleSaveMetaRule}
+                                                            className="text-lg"
+                                                            autoFocus
+                                                        />
+                                                      ) : (
+                                                        rule.text
+                                                      )}
+                                                    </AccordionTrigger>
+                                                    <div className="flex items-center pl-2">
+                                                      <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleStartEditMetaRule(rule)}>
+                                                          <Edit className="h-4 w-4" />
+                                                      </Button>
+                                                      <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleDeleteMetaRule(rule.id)}>
+                                                          <Trash2 className="h-4 w-4 text-destructive"/>
+                                                      </Button>
+                                                    </div>
                                                 </div>
                                                 <AccordionContent className="pt-2">
                                                     <p className="text-sm text-muted-foreground mb-4">Based on pattern: <span className="font-semibold text-foreground">{pattern.name}</span></p>
