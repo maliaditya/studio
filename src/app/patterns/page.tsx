@@ -331,7 +331,7 @@ function PatternsPageContent() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Zap /> Steps 3 & 4: Spot & Name Patterns</CardTitle>
+                    <CardTitle className="flex items-center gap-2"><Zap /> Steps 3 &amp; 4: Spot &amp; Name Patterns</CardTitle>
                     <CardDescription>Group your selected phrases into a new pattern or add them to an existing one.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -488,4 +488,3 @@ export default function PatternsPage() {
         </AuthGuard>
     );
 }
-
