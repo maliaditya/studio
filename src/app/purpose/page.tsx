@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -25,7 +24,7 @@ function PurposePageContent() {
         setMetaRules,
         resources,
         coreSkills,
-        handleOpenNestedPopup, // Import the popup handler
+        handleOpenNestedPopup,
     } = useAuth();
     const { toast } = useToast();
 
