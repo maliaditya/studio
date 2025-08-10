@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import type { Resource } from '@/types/workout';
 import { HabitPopup } from '@/components/HabitPopup';
+import { DndContext, type DragEndEvent } from '@dnd-kit/core';
 
 
 function PurposePageContent() {
@@ -36,8 +37,7 @@ function PurposePageContent() {
     const [specializationPurposeInput, setSpecializationPurposeInput] = useState('');
     
     // New local state for the isolated habit popup
-    const [selectedHabit, setSelectedHabit] = useState<Resource | null>(null);
-
+    const [selectedHabit, setSelectedHabit] = useState<{ habit: Resource; position: { x: number; y: number; } } | null>(null);
 
     const specializations = React.useMemo(() => {
         return coreSkills.filter(skill => skill.type === 'Specialization');
@@ -110,15 +110,28 @@ function PurposePageContent() {
         }).filter((h): h is NonNullable<typeof h> => h !== null);
     };
 
-    const handleOpenHabitPopup = (habitId: string) => {
+    const handleOpenHabitPopup = (e: React.MouseEvent, habitId: string) => {
         const habit = habitCards.find(h => h.id === habitId);
         if (habit) {
-            setSelectedHabit(habit);
+            setSelectedHabit({ habit, position: { x: e.clientX, y: e.clientY } });
+        }
+    };
+    
+    const handleDragEnd = (event: DragEndEvent) => {
+        if (selectedHabit && event.active.id === `habit-popup-${selectedHabit.habit.id}`) {
+            const { delta } = event;
+            setSelectedHabit(prev => prev ? {
+                ...prev,
+                position: {
+                    x: prev.position.x + delta.x,
+                    y: prev.position.y + delta.y,
+                }
+            } : null);
         }
     };
 
     return (
-        <>
+        <DndContext onDragEnd={handleDragEnd}>
             <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
                 <div className="text-center">
                     <h1 className="text-4xl font-bold tracking-tight text-primary">
@@ -217,7 +230,7 @@ function PurposePageContent() {
                                                                 <button 
                                                                     key={i} 
                                                                     className="text-left p-1 rounded hover:bg-background w-full"
-                                                                    onClick={() => handleOpenHabitPopup(habit.habitId)}
+                                                                    onClick={(e) => handleOpenHabitPopup(e, habit.habitId)}
                                                                 >
                                                                     <span className="font-semibold text-foreground text-xs">{habit.habitName}</span> = <span className="text-muted-foreground text-xs">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</span>
                                                                 </button>
@@ -294,11 +307,12 @@ function PurposePageContent() {
             </div>
             {selectedHabit && (
                 <HabitPopup 
-                    habit={selectedHabit} 
-                    onOpenChange={(isOpen) => { if (!isOpen) setSelectedHabit(null); }}
+                    habit={selectedHabit.habit} 
+                    position={selectedHabit.position}
+                    onClose={() => setSelectedHabit(null)}
                 />
             )}
-        </>
+        </DndContext>
     );
 }
 

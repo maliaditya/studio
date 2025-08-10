@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Pattern, PatternPhrase, MetaRule, Resource } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { HabitPopup } from '@/components/HabitPopup';
+import { DndContext, type DragEndEvent } from '@dnd-kit/core';
 
 
 function PatternsPageContent() {
@@ -33,7 +34,7 @@ function PatternsPageContent() {
     const [selectedPatternForRule, setSelectedPatternForRule] = useState<string | null>(null);
     
     // New local state for the isolated habit popup
-    const [selectedHabit, setSelectedHabit] = useState<Resource | null>(null);
+    const [selectedHabit, setSelectedHabit] = useState<{ habit: Resource; position: { x: number; y: number; } } | null>(null);
 
 
     const mechanismCards = useMemo(() => {
@@ -262,9 +263,29 @@ function PatternsPageContent() {
         }).filter((h): h is NonNullable<typeof h> => h !== null);
     };
 
+    const handleOpenHabitPopup = (e: React.MouseEvent, habitId: string) => {
+        const habit = habitCards.find(h => h.id === habitId);
+        if (habit) {
+            setSelectedHabit({ habit, position: { x: e.clientX, y: e.clientY } });
+        }
+    };
+    
+    const handleDragEnd = (event: DragEndEvent) => {
+        if (selectedHabit && event.active.id === `habit-popup-${selectedHabit.habit.id}`) {
+            const { delta } = event;
+            setSelectedHabit(prev => prev ? {
+                ...prev,
+                position: {
+                    x: prev.position.x + delta.x,
+                    y: prev.position.y + delta.y,
+                }
+            } : null);
+        }
+    };
+
 
     return (
-        <>
+        <DndContext onDragEnd={handleDragEnd}>
             <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
                 <div className="text-center">
                     <h1 className="text-4xl font-bold tracking-tight text-primary">Pattern Recognition</h1>
@@ -443,10 +464,7 @@ function PatternsPageContent() {
                                                                         <button 
                                                                             key={i} 
                                                                             className="text-left p-1 rounded hover:bg-background w-full"
-                                                                            onClick={() => {
-                                                                                const habitCard = habitCards.find(h => h.id === habit.habitId);
-                                                                                if (habitCard) setSelectedHabit(habitCard);
-                                                                            }}
+                                                                            onClick={(e) => handleOpenHabitPopup(e, habit.habitId)}
                                                                         >
                                                                             <span className="font-semibold text-foreground text-xs">{habit.habitName}</span> = <span className="text-muted-foreground text-xs">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</span>
                                                                         </button>
@@ -479,11 +497,12 @@ function PatternsPageContent() {
             </div>
             {selectedHabit && (
                 <HabitPopup 
-                    habit={selectedHabit} 
-                    onOpenChange={(isOpen) => { if (!isOpen) setSelectedHabit(null); }}
+                    habit={selectedHabit.habit} 
+                    position={selectedHabit.position}
+                    onClose={() => setSelectedHabit(null)}
                 />
             )}
-        </>
+        </DndContext>
     );
 }
 

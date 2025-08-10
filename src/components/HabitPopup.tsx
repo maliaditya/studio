@@ -1,18 +1,19 @@
 
 "use client";
 
-import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import React, { useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, ArrowRight, X } from 'lucide-react';
+import { Zap, X, GripVertical } from 'lucide-react';
 import type { Resource } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
+import { useDraggable } from '@dnd-kit/core';
 
 interface HabitPopupProps {
     habit: Resource;
-    onOpenChange: (isOpen: boolean) => void;
+    onClose: () => void;
+    position: { x: number; y: number };
 }
 
 const EditableField = ({ label, value, placeholder = "..." }: { label: string; value?: string; placeholder?: string }) => (
@@ -23,18 +24,13 @@ const EditableField = ({ label, value, placeholder = "..." }: { label: string; v
 );
 
 const LinkedMechanismField = ({ label, resourceId, resourceName }: { label: string; resourceId?: string; resourceName?: string }) => {
-    const { handleOpenNestedPopup } = useAuth(); // Assuming this can open resource popups
-    
+    // In this readonly popup, we don't need the live open functionality from context
+    // It could be added back if editing is required in the future.
     if (resourceId && resourceName) {
         return (
             <div>
                 <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">{label}</h4>
-                <button 
-                    onClick={(e) => handleOpenNestedPopup(resourceId, e)}
-                    className="text-sm text-primary hover:underline text-left"
-                >
-                    {resourceName}
-                </button>
+                <p className="text-sm text-primary">{resourceName}</p>
             </div>
         );
     }
@@ -42,23 +38,44 @@ const LinkedMechanismField = ({ label, resourceId, resourceName }: { label: stri
     return <EditableField label={label} value={resourceName} placeholder="Not linked" />;
 }
 
-export function HabitPopup({ habit, onOpenChange }: HabitPopupProps) {
+export function HabitPopup({ habit, onClose, position }: HabitPopupProps) {
     const { resources } = useAuth();
+    
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({
+        id: `habit-popup-${habit.id}`,
+    });
+
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: position.y,
+        left: position.x,
+        zIndex: 55, // High z-index to be on top
+        willChange: 'transform',
+    };
+
+    if (transform) {
+        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
+    }
 
     const responseMechanism = habit.response?.resourceId ? resources.find(r => r.id === habit.response.resourceId) : null;
     const newResponseMechanism = habit.newResponse?.resourceId ? resources.find(r => r.id === habit.newResponse.resourceId) : null;
 
     return (
-        <Dialog open={true} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Zap className="h-5 w-5 text-primary"/>
-                        Habit: {habit.name}
-                    </DialogTitle>
-                </DialogHeader>
-                <div className="flex-grow min-h-0">
-                    <ScrollArea className="h-full pr-4">
+        <div ref={setNodeRef} style={style} {...attributes}>
+            <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card max-h-[80vh] flex flex-col">
+                 <CardHeader className="p-3 relative cursor-grab" {...listeners}>
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2 flex-grow">
+                           <Zap className="h-5 w-5 text-primary"/> 
+                           <CardTitle className="text-base truncate">{habit.name}</CardTitle>
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); onClose();}}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-4 pt-0 flex-grow min-h-0">
+                    <ScrollArea className="h-full pr-2">
                         <div className="space-y-4">
                             <EditableField label="Trigger" value={habit.trigger?.action} placeholder="When I..." />
                             
@@ -69,22 +86,14 @@ export function HabitPopup({ habit, onOpenChange }: HabitPopupProps) {
 
                             <EditableField label="Reward" value={habit.reward} placeholder="And I will get..." />
                             
-                            <div className="flex items-center justify-center my-4">
-                               <ArrowRight className="h-6 w-6 text-muted-foreground" />
-                            </div>
-
                             {newResponseMechanism ? 
                                 <LinkedMechanismField label="New Response" resourceId={newResponseMechanism.id} resourceName={newResponseMechanism.name}/> : 
                                 <EditableField label="New Response" value={habit.newResponse?.text} placeholder="Instead, I will..." />
                             }
                         </div>
                     </ScrollArea>
-                </div>
-                 <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                </CardContent>
+            </Card>
+        </div>
     );
 }
-
