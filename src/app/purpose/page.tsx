@@ -8,12 +8,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIconLucide, Pill, Lock } from 'lucide-react';
+import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIconLucide, Pill, Lock, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill } from '@/types/workout';
+import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar } from '@/types/workout';
 import { DndContext, type DragEndEvent, useDraggable } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -127,89 +127,84 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
 };
 
 const StrategicOverviewDiagram = () => {
-    const PillarCard = ({ icon, title }: { icon: React.ReactNode, title: string }) => (
-        <div className="flex flex-col items-center text-center p-3 border rounded-lg bg-card/50 w-40 shadow-sm">
-            <div className="text-primary">{icon}</div>
-            <h4 className="font-semibold mt-2 text-sm text-foreground">{title}</h4>
-        </div>
+    const PillarCard = ({ icon, title }: { icon: React.ReactNode; title: string }) => (
+      <div className="flex flex-col items-center text-center p-3 border rounded-lg bg-card/50 w-40 shadow-sm">
+        <div className="text-primary">{icon}</div>
+        <h4 className="font-semibold mt-2 text-sm text-foreground">{title}</h4>
+      </div>
     );
-    
-    const ActionCard = ({ icon, title }: { icon: React.ReactNode, title: string }) => (
-        <div className="flex flex-col items-center text-center p-3 border rounded-lg bg-card/50 w-32 shadow-sm">
-            <div className="text-primary">{icon}</div>
-            <h4 className="font-semibold mt-2 text-sm text-foreground">{title}</h4>
-        </div>
+  
+    const ActionCard = ({ icon, title }: { icon: React.ReactNode; title: string }) => (
+      <div className="flex flex-col items-center text-center p-3 border rounded-lg bg-card/50 w-32 shadow-sm">
+        <div className="text-primary">{icon}</div>
+        <h4 className="font-semibold mt-2 text-sm text-foreground">{title}</h4>
+      </div>
     );
-
+  
     const OutcomeBadge = ({ children }: { children: React.ReactNode }) => (
-        <Badge variant="outline" className="text-sm py-1 px-3 border-primary/30 text-primary">{children}</Badge>
+      <Badge variant="outline" className="text-sm py-1 px-3 border-primary/30 text-primary">{children}</Badge>
     );
-    
+  
     const EgoOutcomeBadge = ({ children }: { children: React.ReactNode }) => (
-        <Badge variant="destructive" className="text-sm py-1 px-3 bg-destructive/10 text-destructive-foreground border-destructive/30">{children}</Badge>
+      <Badge variant="destructive" className="text-sm py-1 px-3 bg-destructive/10 text-destructive-foreground border-destructive/30">{children}</Badge>
     );
-
-
+  
     return (
-        <div className="flex flex-col xl:flex-row items-center justify-center gap-8 lg:gap-12 p-4 overflow-x-auto">
-            
-            {/* Negative Flow */}
-            <div className="flex items-center gap-4 text-center">
-                <div className="flex flex-col space-y-3">
-                    <PillarCard icon={<Brain className="h-5 w-5"/>} title="Mind" />
-                    <PillarCard icon={<HeartPulse className="h-5 w-5"/>} title="Body" />
-                    <PillarCard icon={<HandHeart className="h-5 w-5"/>} title="Heart" />
-                </div>
-                <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0" />
-                <div className="flex flex-col space-y-3">
-                    <ActionCard icon={<ShoppingBag className="h-5 w-5"/>} title="Consumption" />
-                    <ActionCard icon={<Smile className="h-5 w-5"/>} title="Pleasure" />
-                </div>
-                <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0" />
-                <div className="flex flex-col items-start space-y-2">
-                    <EgoOutcomeBadge>Dependent</EgoOutcomeBadge>
-                    <EgoOutcomeBadge>Poor</EgoOutcomeBadge>
-                    <EgoOutcomeBadge>Addict</EgoOutcomeBadge>
-                    <EgoOutcomeBadge>Fear</EgoOutcomeBadge>
-                    <EgoOutcomeBadge>Bondages</EgoOutcomeBadge>
-                </div>
+      <div className="flex flex-col xl:flex-row items-center justify-center gap-8 lg:gap-6 p-4 overflow-x-auto">
+  
+        {/* Negative Flow (Ego Path) - Flows Right to Left */}
+        <div className="flex flex-col-reverse xl:flex-row items-center gap-4 text-center">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+                <EgoOutcomeBadge>Dependent</EgoOutcomeBadge>
+                <EgoOutcomeBadge>Poor</EgoOutcomeBadge>
+                <EgoOutcomeBadge>Addict</EgoOutcomeBadge>
+                <EgoOutcomeBadge>Fear</EgoOutcomeBadge>
+                <EgoOutcomeBadge>Bondages</EgoOutcomeBadge>
             </div>
-
-            <Separator orientation="vertical" className="h-48 hidden xl:block" />
-            <Separator orientation="horizontal" className="w-48 xl:hidden" />
-
-            {/* Positive Flow */}
-            <div className="flex items-center gap-4 text-center">
-                <div className="flex flex-col items-center gap-4">
-                    <PillarCard icon={<HandHeart className="h-5 w-5"/>} title="Heart" />
-                </div>
-                <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0" />
-                <div className="flex flex-col space-y-3">
-                    <PillarCard icon={<Brain className="h-5 w-5"/>} title="Mind" />
-                    <PillarCard icon={<HeartPulse className="h-5 w-5"/>} title="Body" />
-                    <PillarCard icon={<TrendingUp className="h-5 w-5"/>} title="Spirit" />
-                </div>
-                <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0" />
-                <div className="flex flex-col space-y-3">
-                    <ActionCard icon={<Activity className="h-5 w-5"/>} title="Skill" />
-                    <ActionCard icon={<Package className="h-5 w-5"/>} title="Product" />
-                </div>
-                <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0" />
-                <div className="flex items-center gap-2 p-3 border-2 border-primary/50 rounded-lg bg-card/80 shadow">
-                    <DollarSign className="h-6 w-6 text-green-500" />
-                    <h3 className="text-lg font-bold">Monetization</h3>
-                </div>
-                <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0" />
-                <div className="flex flex-col items-start space-y-2">
-                    <OutcomeBadge>Freedom</OutcomeBadge>
-                    <OutcomeBadge>Limitless</OutcomeBadge>
-                    <OutcomeBadge>Fearless</OutcomeBadge>
-                    <OutcomeBadge>Independent</OutcomeBadge>
-                </div>
+            <ArrowLeft className="h-6 w-6 text-muted-foreground shrink-0 rotate-90 xl:rotate-0" />
+            <div className="flex xl:flex-col gap-3">
+                <ActionCard icon={<ShoppingBag className="h-5 w-5"/>} title="Consumption" />
+                <ActionCard icon={<Smile className="h-5 w-5"/>} title="Pleasure" />
             </div>
         </div>
+
+        <ArrowLeft className="h-6 w-6 text-muted-foreground shrink-0 rotate-90 xl:rotate-0" />
+
+        {/* Central Heart */}
+        <div className="flex flex-col items-center gap-4 text-center">
+            <PillarCard icon={<HandHeart className="h-5 w-5"/>} title="Heart" />
+        </div>
+
+        <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0 rotate-90 xl:rotate-0" />
+  
+        {/* Positive Flow (Virtue Path) - Flows Left to Right */}
+        <div className="flex flex-col xl:flex-row items-center gap-4 text-center">
+          <div className="flex xl:flex-col gap-3">
+            <PillarCard icon={<Brain className="h-5 w-5" />} title="Mind" />
+            <PillarCard icon={<HeartPulse className="h-5 w-5" />} title="Body" />
+            <PillarCard icon={<TrendingUp className="h-5 w-5" />} title="Spirit" />
+          </div>
+          <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0 rotate-90 xl:rotate-0" />
+          <div className="flex xl:flex-col gap-3">
+            <ActionCard icon={<Activity className="h-5 w-5" />} title="Skill" />
+            <ActionCard icon={<Package className="h-5 w-5" />} title="Product" />
+          </div>
+          <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0 rotate-90 xl:rotate-0" />
+          <div className="flex items-center gap-2 p-3 border-2 border-primary/50 rounded-lg bg-card/80 shadow">
+            <DollarSign className="h-6 w-6 text-green-500" />
+            <h3 className="text-lg font-bold">Monetization</h3>
+          </div>
+          <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0 rotate-90 xl:rotate-0" />
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <OutcomeBadge>Freedom</OutcomeBadge>
+            <OutcomeBadge>Limitless</OutcomeBadge>
+            <OutcomeBadge>Fearless</OutcomeBadge>
+            <OutcomeBadge>Independent</OutcomeBadge>
+          </div>
+        </div>
+      </div>
     );
-};
+  };
 
 
 function PurposePageContent() {
@@ -253,9 +248,9 @@ function PurposePageContent() {
 
     const handleUpdatePillar = (id: string, pillar: string, type: 'specialization' | 'meta-rule') => {
       if (type === 'specialization') {
-        setCoreSkills(prev => prev.map(s => s.id === id ? { ...s, purposePillar: pillar } : s));
+        setCoreSkills(prev => prev.map(s => s.id === id ? { ...s, purposePillar: pillar as PurposePillar } : s));
       } else {
-        setMetaRules(prev => prev.map(r => r.id === id ? { ...r, purposePillar: pillar } : r));
+        setMetaRules(prev => prev.map(r => r.id === id ? { ...r, purposePillar: pillar as PurposePillar } : r));
       }
     };
     
@@ -494,6 +489,7 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
 
 
