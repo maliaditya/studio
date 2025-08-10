@@ -151,7 +151,7 @@ function PurposePageContent() {
                         <div className="flex justify-between items-center">
                             <CardTitle className="flex items-center gap-3 text-xl">
                                 <BrainCircuit className="h-6 w-6 text-primary" />
-                                My Central Purpose & Meta-Rules
+                                My Central Purpose
                             </CardTitle>
                             {!isEditingPurpose && (
                                 <Button variant="outline" size="sm" onClick={() => { setPurposeInput(purposeStatement); setIsEditingPurpose(true); }}>
@@ -189,7 +189,6 @@ function PurposePageContent() {
                             <>
                                 <Separator />
                                 <div className="space-y-4">
-                                     <h3 className="font-semibold text-lg flex items-center gap-2"><BookOpen /> Your Meta-Rules</h3>
                                     {metaRules.map(rule => {
                                         const pattern = patterns.find(p => p.id === rule.patternId);
                                         if (!pattern) return null;
