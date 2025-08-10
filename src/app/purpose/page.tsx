@@ -185,6 +185,8 @@ function PurposePageContent() {
         metaRules,
         setMetaRules,
         handleOpenNestedPopup,
+        habitCards,
+        mechanismCards,
     } = useAuth();
     const { toast } = useToast();
 
@@ -340,9 +342,6 @@ function PurposePageContent() {
                                 <BrainCircuit className="h-6 w-6 text-primary" />
                                 My Central Purpose
                             </CardTitle>
-                            <Button variant="outline" size="sm" onClick={() => setIsEditingPurpose(true)}>
-                              <Edit className="mr-2 h-4 w-4" /> Edit
-                            </Button>
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
