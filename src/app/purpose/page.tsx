@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -17,7 +17,6 @@ import { HabitPopup } from '@/components/HabitPopup';
 import { DndContext, type DragEndEvent } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { DashboardStats } from '@/components/DashboardStats';
 import { format, subDays, parseISO, isBefore, startOfToday, addDays } from 'date-fns';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
@@ -45,74 +44,11 @@ function PurposePageContent() {
 
     const [isEditingPurpose, setIsEditingPurpose] = useState(false);
     const [purposeInput, setPurposeInput] = useState(purposeStatement);
-    const [editingSpecializationId, setEditingSpecializationId] = useState<string | null>(null);
-    const [specializationPurposeInput, setSpecializationPurposeInput] = useState('');
     
     const [selectedHabit, setSelectedHabit] = useState<{ habit: Resource; position: { x: number; y: number; } } | null>(null);
 
     const [editingMetaRuleId, setEditingMetaRuleId] = useState<string | null>(null);
     const [editedMetaRuleText, setEditedMetaRuleText] = useState('');
-
-    const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
-    const [today, setToday] = useState<Date | null>(null);
-
-    useEffect(() => {
-        const now = new Date();
-        setToday(now);
-        setOneYearAgo(subDays(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 365));
-    }, []);
-
-    const consistencyData = useMemo(() => {
-        if (!allWorkoutLogs || !oneYearAgo || !today) return [];
-        const workoutDates = new Set(allWorkoutLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date));
-        const data: { date: string; fullDate: string; score: number }[] = [];
-        let score = 0.5;
-        for (let d = new Date(oneYearAgo); d <= today; d = addDays(d, 1)) {
-            const dateKey = format(d, 'yyyy-MM-dd');
-            if (workoutDates.has(dateKey)) { score += (1 - score) * 0.1; } else { score *= 0.95; }
-            data.push({ date: format(d, 'MMM dd'), fullDate: format(d, 'PPP'), score: Math.round(score * 100) });
-        }
-        return data;
-    }, [allWorkoutLogs, oneYearAgo, today]);
-    
-    const productivityStats = useMemo(() => {
-        const todayStr = format(new Date(), 'yyyy-MM-dd');
-        const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
-        
-        const getDailyDuration = (logs: DatedWorkout[], dateStr: string, durationField: 'reps' | 'weight') => {
-            if (!logs) return 0;
-            const logForDay = logs.find(log => log.date === dateStr);
-            if (!logForDay) return 0;
-            return logForDay.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
-        };
-  
-        const calculateChange = (todayVal: number, yesterdayVal: number) => {
-            if (yesterdayVal === 0) return todayVal > 0 ? 100 : 0;
-            return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
-        };
-  
-        const todayDeepWork = getDailyDuration(allDeepWorkLogs, todayStr, 'weight');
-        const yesterdayDeepWork = getDailyDuration(allDeepWorkLogs, yesterdayStr, 'weight');
-        const todayUpskill = getDailyDuration(allUpskillLogs, todayStr, 'reps');
-        const yesterdayUpskill = getDailyDuration(allUpskillLogs, yesterdayStr, 'reps');
-
-        const todayKey = format(new Date(), 'yyyy-MM-dd');
-        const todaysActivities = schedule[todayKey] || {};
-        const completedActivities = Object.values(todaysActivities).flat().filter(activity => activity && activity.completed);
-        const planningDone = completedActivities.some(act => act.type === 'planning');
-        const trackingDone = completedActivities.some(act => act.type === 'tracking');
-
-  
-        return {
-            todayDeepWorkHours: todayDeepWork / 60, deepWorkChange: calculateChange(todayDeepWork, yesterdayDeepWork),
-            todayUpskillHours: todayUpskill / 60, upskillChange: calculateChange(todayUpskill, yesterdayUpskill),
-            consistencyChange: (consistencyData[consistencyData.length - 1]?.score || 0) - (consistencyData[consistencyData.length - 2]?.score || 0),
-            latestConsistency: consistencyData[consistencyData.length - 1]?.score || 0,
-            direction: planningDone && trackingDone,
-            overallNextMilestone: null, // This can be enhanced later if needed
-        };
-    }, [allUpskillLogs, allDeepWorkLogs, consistencyData, schedule]);
-
 
     const specializations = React.useMemo(() => {
         return coreSkills.filter(skill => skill.type === 'Specialization');
@@ -192,6 +128,91 @@ function PurposePageContent() {
             } : null);
         }
     };
+    
+    const pillars = [
+        { name: 'Health', icon: <HeartPulse className="h-6 w-6 text-red-500" /> },
+        { name: 'Wealth', icon: <Briefcase className="h-6 w-6 text-green-500" /> },
+        { name: 'Growth', icon: <TrendingUp className="h-6 w-6 text-blue-500" /> },
+        { name: 'Direction', icon: <ClipboardCheck className="h-6 w-6 text-purple-500" /> },
+    ];
+    
+    const renderMetaRule = (rule: { id: string, text: string, patternId: string }) => {
+        const pattern = patterns.find(p => p.id === rule.patternId);
+        if (!pattern) return null;
+
+        const categorizedPhrases = pattern.phrases.reduce((acc, phrase) => {
+            if (phrase.category === 'Habit Cards') return acc;
+            if (!acc[phrase.category]) { // @ts-ignore
+                acc[phrase.category] = [];
+            }
+            // @ts-ignore
+            acc[phrase.category].push(phrase.text);
+            return acc;
+        }, {} as Record<string, string[]>);
+        
+        const linkedHabits = getHabitLinksForRule(rule);
+
+        return (
+            <AccordionItem key={rule.id} value={rule.id} className="border bg-muted/30 rounded-lg px-4">
+                <div className="flex items-center justify-between py-1">
+                    <AccordionTrigger className="text-lg flex-grow hover:no-underline py-3">
+                      {editingMetaRuleId === rule.id ? (
+                        <Input
+                            value={editedMetaRuleText}
+                            onChange={(e) => setEditedMetaRuleText(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSaveMetaRule()}
+                            onBlur={handleSaveMetaRule}
+                            className="text-lg"
+                            autoFocus
+                        />
+                      ) : (
+                        rule.text
+                      )}
+                    </AccordionTrigger>
+                    <div className="flex items-center pl-2">
+                      <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleStartEditMetaRule(rule)}>
+                          <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleDeleteMetaRule(rule.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive"/>
+                      </Button>
+                    </div>
+                </div>
+                <AccordionContent className="pt-2">
+                    <p className="text-sm text-muted-foreground mb-4">Based on pattern: <span className="font-semibold text-foreground">{pattern.name}</span></p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {Object.entries(categorizedPhrases).map(([category, phrases]) => {
+                            if (category === 'Habit Cards') return null;
+                            return (
+                                <div key={category}>
+                                    <h4 className="font-medium text-sm mb-1">{category}</h4>
+                                    <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
+                                        {phrases.map((phrase, i) => <li key={i}>{phrase}</li>)}
+                                    </ul>
+                                </div>
+                            )
+                        })}
+                        {linkedHabits.length > 0 && (
+                            <div className="md:col-span-2">
+                                <h4 className="font-medium text-sm mb-1">Habits</h4>
+                                <div className="space-y-1">
+                                    {linkedHabits.map((habit, i) => (
+                                        <button 
+                                            key={i} 
+                                            className="text-left p-1 rounded hover:bg-background w-full"
+                                            onClick={(e) => handleOpenHabitPopup(e, habit.habitId)}
+                                        >
+                                            <span className="font-semibold text-foreground text-xs">{habit.habitName}</span> = <span className="text-muted-foreground text-xs">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </AccordionContent>
+            </AccordionItem>
+        )
+    }
 
     return (
         <DndContext onDragEnd={handleDragEnd}>
@@ -204,8 +225,30 @@ function PurposePageContent() {
                         “In Life either you're growing or you're decaying; there's no middle ground. If you're standing still, you're decaying.”
                     </p>
                 </div>
-                
-                <DashboardStats stats={productivityStats} />
+
+                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {pillars.map(pillar => {
+                        const rulesForPillar = metaRules.filter(r => r.purposePillar === pillar.name);
+                        return (
+                            <Card key={pillar.name}>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-3 text-xl">{pillar.icon}{pillar.name}</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {rulesForPillar.length > 0 ? (
+                                        <Accordion type="multiple" className="w-full space-y-4">
+                                            {rulesForPillar.map(renderMetaRule)}
+                                        </Accordion>
+                                    ) : (
+                                        <div className="text-center py-8 text-muted-foreground text-sm">
+                                            <p>No meta-rules assigned to this pillar yet.</p>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )
+                    })}
+                </div>
 
                 <Card className="shadow-lg">
                     <CardHeader>
@@ -244,106 +287,6 @@ function PurposePageContent() {
                             <p className="text-lg text-muted-foreground whitespace-pre-wrap min-h-[5rem]">
                                 {purposeStatement || "Your purpose is not yet defined. Click the button to set it."}
                             </p>
-                        )}
-                        
-                        {metaRules.length > 0 && (
-                            <>
-                                <Separator className="my-6" />
-                                <Accordion type="single" collapsible className="w-full space-y-4">
-                                    {metaRules.map(rule => {
-                                        const pattern = patterns.find(p => p.id === rule.patternId);
-                                        if (!pattern) return null;
-
-                                        const categorizedPhrases = pattern.phrases.reduce((acc, phrase) => {
-                                            if (phrase.category === 'Habit Cards') return acc;
-                                            if (!acc[phrase.category]) {
-                                                // @ts-ignore
-                                                acc[phrase.category] = [];
-                                            }
-                                            // @ts-ignore
-                                            acc[phrase.category].push(phrase.text);
-                                            return acc;
-                                        }, {} as Record<string, string[]>);
-                                        
-                                        const linkedHabits = getHabitLinksForRule(rule);
-
-                                        return (
-                                            <AccordionItem key={rule.id} value={rule.id} className="border bg-muted/30 rounded-lg px-4">
-                                                <div className="flex items-center justify-between py-1">
-                                                    <AccordionTrigger className="text-lg flex-grow hover:no-underline py-3">
-                                                      {editingMetaRuleId === rule.id ? (
-                                                        <Input
-                                                            value={editedMetaRuleText}
-                                                            onChange={(e) => setEditedMetaRuleText(e.target.value)}
-                                                            onKeyDown={(e) => e.key === 'Enter' && handleSaveMetaRule()}
-                                                            onBlur={handleSaveMetaRule}
-                                                            className="text-lg"
-                                                            autoFocus
-                                                        />
-                                                      ) : (
-                                                        rule.text
-                                                      )}
-                                                    </AccordionTrigger>
-                                                    <div className="flex items-center pl-2">
-                                                      <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                          <Button variant="outline" size="sm" className="h-8">
-                                                            {rule.purposePillar ? <Badge>{rule.purposePillar}</Badge> : "Assign Pillar"}
-                                                          </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                          {(['Health', 'Wealth', 'Growth', 'Direction'] as const).map(pillar => (
-                                                            <DropdownMenuItem key={pillar} onSelect={() => handleUpdatePillar(rule.id, pillar, 'meta-rule')}>
-                                                              {pillar}
-                                                            </DropdownMenuItem>
-                                                          ))}
-                                                        </DropdownMenuContent>
-                                                      </DropdownMenu>
-                                                      <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleStartEditMetaRule(rule)}>
-                                                          <Edit className="h-4 w-4" />
-                                                      </Button>
-                                                      <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleDeleteMetaRule(rule.id)}>
-                                                          <Trash2 className="h-4 w-4 text-destructive"/>
-                                                      </Button>
-                                                    </div>
-                                                </div>
-                                                <AccordionContent className="pt-2">
-                                                    <p className="text-sm text-muted-foreground mb-4">Based on pattern: <span className="font-semibold text-foreground">{pattern.name}</span></p>
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                        {Object.entries(categorizedPhrases).map(([category, phrases]) => {
-                                                            if (category === 'Habit Cards') return null;
-                                                            return (
-                                                                <div key={category}>
-                                                                    <h4 className="font-medium text-sm mb-1">{category}</h4>
-                                                                    <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
-                                                                        {phrases.map((phrase, i) => <li key={i}>{phrase}</li>)}
-                                                                    </ul>
-                                                                </div>
-                                                            )
-                                                        })}
-                                                        {linkedHabits.length > 0 && (
-                                                            <div className="md:col-span-2">
-                                                                <h4 className="font-medium text-sm mb-1">Habits</h4>
-                                                                <div className="space-y-1">
-                                                                    {linkedHabits.map((habit, i) => (
-                                                                        <button 
-                                                                            key={i} 
-                                                                            className="text-left p-1 rounded hover:bg-background w-full"
-                                                                            onClick={(e) => handleOpenHabitPopup(e, habit.habitId)}
-                                                                        >
-                                                                            <span className="font-semibold text-foreground text-xs">{habit.habitName}</span> = <span className="text-muted-foreground text-xs">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</span>
-                                                                        </button>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </AccordionContent>
-                                            </AccordionItem>
-                                        )
-                                    })}
-                                </Accordion>
-                            </>
                         )}
                     </CardContent>
                 </Card>
@@ -403,3 +346,5 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
+
