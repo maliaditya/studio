@@ -127,15 +127,11 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
 };
 
 const StrategicOverviewDiagram = () => {
-    const PillarCard = ({ icon, title, items }: { icon: React.ReactNode, title: string, items: string[] }) => (
-      <div className="flex flex-col items-center text-center p-3 border rounded-lg bg-card/50 w-40 shadow-sm">
-        <div className="text-primary">{icon}</div>
-        <h4 className="font-semibold mt-2 text-sm text-foreground">{title}</h4>
-        <Separator className="my-1.5" />
-        <div className="flex flex-wrap justify-center gap-1.5 mt-1">
-            {items.map(item => <Badge key={item} variant="secondary" className="text-xs">{item}</Badge>)}
+    const PillarCard = ({ icon, title }: { icon: React.ReactNode, title: string }) => (
+        <div className="flex flex-col items-center text-center p-3 border rounded-lg bg-card/50 w-40 shadow-sm">
+            <div className="text-primary">{icon}</div>
+            <h4 className="font-semibold mt-2 text-sm text-foreground">{title}</h4>
         </div>
-      </div>
     );
     
     const ActionCard = ({ icon, title }: { icon: React.ReactNode, title: string }) => (
@@ -151,17 +147,20 @@ const StrategicOverviewDiagram = () => {
 
     return (
         <div className="flex items-center justify-center p-4 space-x-4 md:space-x-6 overflow-x-auto">
-            <PillarCard icon={<HandHeart className="h-5 w-5"/>} title="Heart" items={['Relationships', 'Emotional Health']} />
+            {/* Stage 1: Core Self */}
+            <PillarCard icon={<HandHeart className="h-5 w-5"/>} title="Heart" />
             <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0" />
             
+            {/* Stage 2: Pillars */}
             <div className="flex flex-col space-y-3">
-                <PillarCard icon={<Brain className="h-5 w-5"/>} title="Mind" items={['Focus', 'Learning', 'Creativity']} />
-                <PillarCard icon={<HeartPulse className="h-5 w-5"/>} title="Body" items={['Health', 'Strength', 'Energy']} />
-                <PillarCard icon={<TrendingUp className="h-5 w-5"/>} title="Spirit" items={['Meaning', 'Contribution', 'Legacy']} />
+                <PillarCard icon={<Brain className="h-5 w-5"/>} title="Mind" />
+                <PillarCard icon={<HeartPulse className="h-5 w-5"/>} title="Body" />
+                <PillarCard icon={<TrendingUp className="h-5 w-5"/>} title="Spirit" />
             </div>
 
             <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0" />
             
+            {/* Stage 3: Actions */}
             <div className="flex flex-col space-y-3">
                 <ActionCard icon={<Activity className="h-5 w-5"/>} title="Skill" />
                 <ActionCard icon={<Package className="h-5 w-5"/>} title="Product" />
@@ -169,6 +168,7 @@ const StrategicOverviewDiagram = () => {
 
             <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0" />
             
+            {/* Stage 4: Engine */}
             <div className="flex items-center gap-2 p-3 border-2 border-primary/50 rounded-lg bg-card/80 shadow">
                 <DollarSign className="h-6 w-6 text-green-500" />
                 <h3 className="text-lg font-bold">Monetization</h3>
@@ -176,6 +176,7 @@ const StrategicOverviewDiagram = () => {
 
             <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0" />
 
+            {/* Stage 5: Outcomes */}
             <div className="flex flex-col items-start space-y-3">
                 <OutcomeBadge>Freedom</OutcomeBadge>
                 <OutcomeBadge>Limitless</OutcomeBadge>
@@ -469,4 +470,5 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
