@@ -112,31 +112,64 @@ function PatternsPageContent() {
     
     const handlePhraseToggle = (phrase: PatternPhrase) => {
         const isSelected = selectedPhrases.some(p => p.text === phrase.text);
-        
-        const linkedHabitPhrases = aggregatedFields['Habit Cards'].filter(habitPhrase => {
-            const habitCard = habitCards.find(h => h.id === habitPhrase.mechanismCardId);
-            return habitCard && (habitCard.response?.resourceId === phrase.mechanismCardId || habitCard.newResponse?.resourceId === phrase.mechanismCardId);
-        });
-
-        if (!isSelected) {
-            const newSelection = [...selectedPhrases, phrase, ...linkedHabitPhrases];
-            setSelectedPhrases(Array.from(new Map(newSelection.map(item => [item.text, item])).values()));
-        } else {
-            let newSelection = selectedPhrases.filter(p => p.text !== phrase.text);
+    
+        if (phrase.category === 'Habit Cards') {
+            const habitCard = habitCards.find(h => h.id === phrase.mechanismCardId);
+            if (!habitCard) return; // Should not happen
+    
+            const relatedMechanismIds = new Set([habitCard.response?.resourceId, habitCard.newResponse?.resourceId].filter(Boolean));
             
-            linkedHabitPhrases.forEach(habitPhrase => {
-                const habitCard = habitCards.find(h => h.id === habitPhrase.mechanismCardId);
-                const relatedMechanismIds = new Set([habitCard?.response?.resourceId, habitCard?.newResponse?.resourceId].filter(Boolean));
+            const relatedPhrases = Object.values(aggregatedFields)
+                .flat()
+                .filter(p => p.category !== 'Habit Cards' && p.mechanismCardId && relatedMechanismIds.has(p.mechanismCardId));
+    
+            if (!isSelected) {
+                // Add the habit and all its related unselected phrases
+                const phrasesToAdd = [...relatedPhrases, phrase];
+                setSelectedPhrases(prev => {
+                    const newSelectionMap = new Map(prev.map(p => [p.text, p]));
+                    phrasesToAdd.forEach(p_to_add => {
+                        if (!newSelectionMap.has(p_to_add.text)) {
+                            newSelectionMap.set(p_to_add.text, p_to_add);
+                        }
+                    });
+                    return Array.from(newSelectionMap.values());
+                });
+            } else {
+                // Remove the habit and its related phrases, but only if they aren't part of another selected habit.
+                const phrasesToRemove = new Set([phrase.text, ...relatedPhrases.map(p => p.text)]);
                 
-                const otherSelectedPhrasesRelyingOnHabit = newSelection.some(p => 
-                    p.category !== 'Habit Cards' && relatedMechanismIds.has(p.mechanismCardId)
-                );
+                // Get mechanism IDs of OTHER selected habits
+                const otherSelectedHabitsMechanisms = new Set<string>();
+                selectedPhrases.forEach(p => {
+                    if (p.category === 'Habit Cards' && p.text !== phrase.text) {
+                        const otherHabitCard = habitCards.find(h => h.id === p.mechanismCardId);
+                        if (otherHabitCard) {
+                            if (otherHabitCard.response?.resourceId) otherSelectedHabitsMechanisms.add(otherHabitCard.response.resourceId);
+                            if (otherHabitCard.newResponse?.resourceId) otherSelectedHabitsMechanisms.add(otherHabitCard.newResponse.resourceId);
+                        }
+                    }
+                });
 
-                if (!otherSelectedPhrasesRelyingOnHabit) {
-                    newSelection = newSelection.filter(p => p.text !== habitPhrase.text);
-                }
-            });
-            setSelectedPhrases(newSelection);
+                setSelectedPhrases(prev => prev.filter(p => {
+                    if (!phrasesToRemove.has(p.text)) return true; // Keep if not part of the current habit's group
+                    if (p.text === phrase.text) return false; // Always remove the clicked habit
+                    
+                    // Keep a related phrase if it's also related to another selected habit
+                    if (p.mechanismCardId && otherSelectedHabitsMechanisms.has(p.mechanismCardId)) {
+                        return true;
+                    }
+
+                    return false;
+                }));
+            }
+        } else {
+             // Default behavior for non-habit phrases
+            if (!isSelected) {
+                setSelectedPhrases(prev => [...prev, phrase]);
+            } else {
+                setSelectedPhrases(prev => prev.filter(p => p.text !== phrase.text));
+            }
         }
     };
 
@@ -404,7 +437,7 @@ function PatternsPageContent() {
                                                                 {linkedHabits.map((habit, i) => (
                                                                     <button 
                                                                         key={i} 
-                                                                        className="text-left p-1 rounded bg-background/50 hover:bg-background w-full"
+                                                                        className="text-left p-1 rounded hover:bg-background w-full"
                                                                         onClick={(e) => handleOpenNestedPopup(habit.habitId, e)}
                                                                     >
                                                                         <span className="font-semibold text-foreground">{habit.habitName}</span> = <span className="text-muted-foreground">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</span>
@@ -446,4 +479,5 @@ export default function PatternsPage() {
         </AuthGuard>
     );
 }
+
 
