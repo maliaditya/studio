@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -128,14 +127,14 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
 
 const StrategicOverviewDiagram = () => {
     const PillarCard = ({ icon, title, items }: { icon: React.ReactNode, title: string, items: string[] }) => (
-        <div className="flex flex-col items-center text-center p-4 border rounded-lg bg-card/50 w-48 shadow-sm">
-            <div className="text-primary">{icon}</div>
-            <h4 className="font-semibold mt-2 text-foreground">{title}</h4>
-            <Separator className="my-2" />
-            <ul className="text-xs text-muted-foreground space-y-1">
-                {items.map(item => <li key={item}>{item}</li>)}
-            </ul>
+      <div className="flex flex-col items-center text-center p-4 border rounded-lg bg-card/50 w-48 shadow-sm">
+        <div className="text-primary">{icon}</div>
+        <h4 className="font-semibold mt-2 text-foreground">{title}</h4>
+        <Separator className="my-2" />
+        <div className="flex flex-wrap justify-center gap-1.5 mt-1">
+            {items.map(item => <Badge key={item} variant="secondary">{item}</Badge>)}
         </div>
+      </div>
     );
 
     const OutcomeCard = ({ title }: { title: string }) => (
