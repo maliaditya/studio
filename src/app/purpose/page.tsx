@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -36,7 +37,6 @@ function PurposePageContent() {
     const [editingSpecializationId, setEditingSpecializationId] = useState<string | null>(null);
     const [specializationPurposeInput, setSpecializationPurposeInput] = useState('');
     
-    // New local state for the isolated habit popup
     const [selectedHabit, setSelectedHabit] = useState<{ habit: Resource; position: { x: number; y: number; } } | null>(null);
 
     const specializations = React.useMemo(() => {
@@ -272,6 +272,24 @@ function PurposePageContent() {
                                                 {specializationPurposes[spec.id] || "No contribution defined yet."}
                                             </p>
                                         )}
+                                    </CardContent>
+                                    <CardFooter className="flex justify-between">
+                                        {editingSpecializationId === spec.id ? (
+                                            <div className="flex justify-end gap-2 w-full">
+                                                <Button variant="ghost" onClick={handleCancelEditSpecialization}>Cancel</Button>
+                                                <Button onClick={handleSaveSpecializationPurpose}><Save className="mr-2 h-4 w-4"/>Save</Button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleClearSpecializationPurpose(spec.id)}>
+                                                    <X className="mr-2 h-4 w-4"/>Clear
+                                                </Button>
+                                                <Button variant="outline" size="sm" onClick={() => handleStartEditSpecialization(spec.id)}>
+                                                    <Edit className="mr-2 h-4 w-4" />
+                                                    {specializationPurposes[spec.id] ? 'Edit' : 'Define'} Connection
+                                                </Button>
+                                            </>
+                                        )}
                                     </CardFooter>
                                 </Card>
                             ))}
@@ -295,4 +313,3 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
-
