@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ClipboardCheck, ArrowDown, ArrowUp } from 'lucide-react';
+import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ClipboardCheck, ArrowDown, ArrowUp, DollarSign, Shield, Zap, Lightbulb } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -124,6 +124,58 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
                 </CardContent>
             </Card>
         </div>
+    );
+};
+
+const StrategicOverviewDiagram = () => {
+    const PillarCard = ({ icon, title, items }: { icon: React.ReactNode, title: string, items: string[] }) => (
+        <div className="flex flex-col items-center text-center p-4 border rounded-lg bg-card/50 w-48 shadow-sm">
+            <div className="text-primary">{icon}</div>
+            <h4 className="font-semibold mt-2 text-foreground">{title}</h4>
+            <Separator className="my-2" />
+            <ul className="text-xs text-muted-foreground space-y-1">
+                {items.map(item => <li key={item}>{item}</li>)}
+            </ul>
+        </div>
+    );
+
+    const OutcomeCard = ({ title }: { title: string }) => (
+        <div className="text-center">
+            <Badge variant="secondary">{title}</Badge>
+        </div>
+    );
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Strategic Overview</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center justify-center p-6 space-y-6">
+                 <div className="flex flex-wrap items-stretch justify-center gap-4">
+                    <PillarCard icon={<Brain className="h-6 w-6"/>} title="Mind" items={['Focus', 'Learning', 'Creativity']} />
+                    <PillarCard icon={<HeartPulse className="h-6 w-6"/>} title="Body" items={['Health', 'Strength', 'Energy']} />
+                    <PillarCard icon={<TrendingUp className="h-6 w-6"/>} title="Spirit" items={['Meaning', 'Contribution', 'Legacy']} />
+                    <PillarCard icon={<ClipboardCheck className="h-6 w-6"/>} title="Heart" items={['Relationships', 'Emotional Health']} />
+                </div>
+                
+                <div className="flex flex-col items-center gap-2">
+                   <ArrowDown className="h-6 w-6 text-muted-foreground" />
+                    <div className="flex items-center gap-2 p-3 border rounded-lg bg-card/80 shadow">
+                        <DollarSign className="h-6 w-6 text-green-500" />
+                        <h3 className="text-lg font-bold">Monetization</h3>
+                    </div>
+                   <ArrowDown className="h-6 w-6 text-muted-foreground" />
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center gap-4">
+                    <OutcomeCard title="Freedom" />
+                    <OutcomeCard title="Limitless" />
+                    <OutcomeCard title="Fearless" />
+                    <OutcomeCard title="Independent" />
+                    <OutcomeCard title="Provider" />
+                </div>
+            </CardContent>
+        </Card>
     );
 };
 
@@ -278,19 +330,7 @@ function PurposePageContent() {
     const renderMetaRule = (rule: { id: string, text: string, patternId: string, purposePillar?: string }) => {
         return (
             <div key={rule.id} className="group relative text-sm p-2 rounded-md transition-colors hover:bg-muted/50 cursor-pointer" onClick={(e) => handleOpenRuleDetail(e, rule)}>
-                {editingMetaRuleId === rule.id ? (
-                  <Input
-                      value={editedMetaRuleText}
-                      onChange={(e) => setEditedMetaRuleText(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSaveMetaRule()}
-                      onBlur={handleSaveMetaRule}
-                      className="text-sm h-8"
-                      autoFocus
-                      onClick={(e) => e.stopPropagation()}
-                  />
-                ) : (
-                  <p>{rule.text}</p>
-                )}
+                <p>{rule.text}</p>
                 <div className="absolute top-1 right-1 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -328,7 +368,7 @@ function PurposePageContent() {
                         “In Life either you're growing or you're decaying; there's no middle ground. If you're standing still, you're decaying.”
                     </p>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {pillars.map(pillar => {
                         const rulesForPillar = metaRules.filter(r => r.purposePillar === pillar.name);
@@ -351,50 +391,86 @@ function PurposePageContent() {
                     })}
                 </div>
 
-                <Card className="shadow-lg">
-                    <CardHeader>
-                        <div className="flex justify-between items-center">
-                            <CardTitle className="flex items-center gap-3 text-xl">
-                                <BrainCircuit className="h-6 w-6 text-primary" />
-                                My Central Purpose
-                            </CardTitle>
-                            {!isEditingPurpose && (
-                                <Button variant="outline" size="sm" onClick={() => { setPurposeInput(purposeStatement); setIsEditingPurpose(true); }}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    {purposeStatement ? 'Edit' : 'Define'} Purpose
-                                </Button>
-                            )}
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        {isEditingPurpose ? (
-                            <div className="space-y-4">
-                                <Textarea
-                                    value={purposeInput}
-                                    onChange={(e) => setPurposeInput(e.target.value)}
-                                    placeholder="What is your ultimate goal? What is the core mission that drives you?"
-                                    className="min-h-[100px] text-base"
-                                    autoFocus
-                                />
-                                <div className="flex justify-end gap-2">
-                                    <Button variant="ghost" onClick={() => setIsEditingPurpose(false)}>Cancel</Button>
-                                    <Button onClick={handleSavePurpose}>
-                                        <Save className="mr-2 h-4 w-4" />
-                                        Save Purpose
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
+                    <Card className="shadow-lg">
+                        <CardHeader>
+                            <div className="flex justify-between items-center">
+                                <CardTitle className="flex items-center gap-3 text-xl">
+                                    <BrainCircuit className="h-6 w-6 text-primary" />
+                                    My Central Purpose
+                                </CardTitle>
+                                {!isEditingPurpose && (
+                                    <Button variant="outline" size="sm" onClick={() => { setPurposeInput(purposeStatement); setIsEditingPurpose(true); }}>
+                                        <Edit className="mr-2 h-4 w-4" />
+                                        {purposeStatement ? 'Edit' : 'Define'} Purpose
                                     </Button>
-                                </div>
+                                )}
                             </div>
-                        ) : (
-                            <p className="text-lg text-muted-foreground whitespace-pre-wrap min-h-[5rem]">
-                                {purposeStatement || "Your purpose is not yet defined. Click the button to set it."}
-                            </p>
-                        )}
-                        <Separator />
-                        <div className="space-y-2">
-                            {metaRules.filter(r => !r.purposePillar).map(renderMetaRule)}
-                        </div>
-                    </CardContent>
-                </Card>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            {isEditingPurpose ? (
+                                <div className="space-y-4">
+                                    <Textarea
+                                        value={purposeInput}
+                                        onChange={(e) => setPurposeInput(e.target.value)}
+                                        placeholder="What is your ultimate goal? What is the core mission that drives you?"
+                                        className="min-h-[100px] text-base"
+                                        autoFocus
+                                    />
+                                    <div className="flex justify-end gap-2">
+                                        <Button variant="ghost" onClick={() => setIsEditingPurpose(false)}>Cancel</Button>
+                                        <Button onClick={handleSavePurpose}>
+                                            <Save className="mr-2 h-4 w-4" />
+                                            Save Purpose
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-lg text-muted-foreground whitespace-pre-wrap min-h-[5rem]">
+                                    {purposeStatement || "Your purpose is not yet defined. Click the button to set it."}
+                                </p>
+                            )}
+                            <Separator />
+                            <Accordion type="multiple" className="w-full">
+                                {metaRules.filter(r => !r.purposePillar).map(rule => (
+                                    <AccordionItem value={rule.id} key={rule.id}>
+                                        <div className="flex items-center group">
+                                            <AccordionTrigger className="flex-grow">
+                                                {editingMetaRuleId === rule.id ? (
+                                                    <Input
+                                                        value={editedMetaRuleText}
+                                                        onChange={(e) => setEditedMetaRuleText(e.target.value)}
+                                                        onKeyDown={(e) => e.key === 'Enter' && handleSaveMetaRule()}
+                                                        onBlur={handleSaveMetaRule}
+                                                        className="text-sm h-8"
+                                                        autoFocus
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    />
+                                                ) : (
+                                                    rule.text
+                                                )}
+                                            </AccordionTrigger>
+                                            <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity pl-2">
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleStartEditMetaRule(e, rule)}>
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={(e) => handleDeleteMetaRule(e, rule.id)}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <AccordionContent>
+                                            <p className="text-sm text-muted-foreground">Pattern: <span className="font-semibold text-foreground">{patterns.find(p => p.id === rule.patternId)?.name || 'Unknown'}</span></p>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                ))}
+                            </Accordion>
+                        </CardContent>
+                    </Card>
+
+                    <StrategicOverviewDiagram />
+                </div>
+
 
                 <div>
                     <h2 className="text-2xl font-bold text-center mb-6">How Your Specializations Serve Your Purpose</h2>
