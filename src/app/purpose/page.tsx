@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ClipboardCheck, ArrowDown, ArrowUp, DollarSign, Shield, Zap, Lightbulb } from 'lucide-react';
+import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ClipboardCheck, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -201,7 +201,8 @@ function PurposePageContent() {
         deepWorkDefinitions,
         upskillDefinitions,
         habitCards,
-        mechanismCards
+        mechanismCards,
+        handleOpenNestedPopup
     } = useAuth();
     const { toast } = useToast();
 
