@@ -61,20 +61,20 @@ function PatternsPageContent() {
                 if (card.benefit) fields.Benefits.push({ category: 'Benefits', text: card.benefit, mechanismCardId: cardId, mechanismCardName: cardName });
                 if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: cardId, mechanismCardName: cardName });
                 if (card.law?.premise && card.law?.outcome) {
-                  const lawText = `${card.law.premise} can only happen when ${card.law.outcome}`;
+                  const lawText = `${'${card.law.premise}'} can only happen when ${'${card.law.outcome}'}`;
                   fields['Positive Laws'].push({ category: 'Positive Laws', text: lawText, mechanismCardId: cardId, mechanismCardName: cardName });
                 }
             } else { // Negative Framework
                 if (card.trigger?.feeling && card.benefit) {
-                    const costText = `That one ${card.trigger.feeling} costs me ${card.benefit}.`;
+                    const costText = `That one ${'${card.trigger.feeling}'} costs me ${'${card.benefit}'}.`;
                     fields.Costs.push({ category: 'Costs', text: costText, mechanismCardId: cardId, mechanismCardName: cardName });
                 }
                 if (card.reward) { // This is a "Benefit" blocked by the negative action
-                    const benefitText = `This blocks ${card.reward}.`;
+                    const benefitText = `This blocks ${'${card.reward}'}.`;
                     fields.Benefits.push({ category: 'Benefits', text: benefitText, mechanismCardId: cardId, mechanismCardName: cardName });
                 }
                 if (card.law?.premise && card.law?.outcome) {
-                    const lawText = `${card.law.premise} cannot happen when ${card.law.outcome}`;
+                    const lawText = `${'${card.law.premise}'} cannot happen when ${'${card.law.outcome}'}`;
                     fields['Negative Laws'].push({ category: 'Negative Laws', text: lawText, mechanismCardId: cardId, mechanismCardName: cardName });
                 }
             }
@@ -93,7 +93,7 @@ function PatternsPageContent() {
             fields['Habit Cards'].push({
                 category: 'Habit Cards',
                 text: habit.name,
-                mechanismCardId: habit.id, // Using habit's own ID here for uniqueness
+                mechanismCardId: habit.id, // Using habit's own ID for uniqueness
                 // @ts-ignore
                 linkedMechanisms: linkedMechanisms.map(m => m.name) // Storing names for display
             });
@@ -197,14 +197,14 @@ function PatternsPageContent() {
                 return;
             }
             const newPattern: Pattern = {
-                id: `pattern_${Date.now()}`,
+                id: `pattern_${'${Date.now()}'}`,
                 name: newPatternName,
                 type: newPatternType,
                 phrases: selectedPhrases,
             };
             setPatterns(prev => [...prev, newPattern]);
             setNewPatternName('');
-            toast({ title: 'Pattern Created!', description: `The "${newPattern.name}" pattern has been saved.`});
+            toast({ title: 'Pattern Created!', description: `The "${'${newPattern.name}'}" pattern has been saved.`});
         }
 
         setSelectedPhrases([]);
@@ -227,7 +227,7 @@ function PatternsPageContent() {
         }
 
         const newRule: MetaRule = {
-            id: `rule_${Date.now()}`,
+            id: `rule_${'${Date.now()}'}`,
             text: newMetaRuleText.trim(),
             patternId: selectedPatternForRule,
         };
@@ -296,11 +296,11 @@ function PatternsPageContent() {
                                             {phrases.map((phrase, i) => (
                                                 <div key={i} className="flex items-start space-x-2">
                                                     <Checkbox
-                                                        id={`phrase-${title}-${i}`}
+                                                        id={`phrase-${'${title}'}-${i}`}
                                                         checked={selectedPhrases.some(p => p.text === phrase.text)}
                                                         onCheckedChange={() => handlePhraseToggle(phrase)}
                                                     />
-                                                    <Label htmlFor={`phrase-${title}-${i}`} className="font-normal w-full flex-grow cursor-pointer">
+                                                    <Label htmlFor={`phrase-${'${title}'}-${i}`} className="font-normal w-full flex-grow cursor-pointer">
                                                     {phrase.category === 'Habit Cards' ? (
                                                         <Card className="p-2 bg-muted/30">
                                                         <p className="font-semibold text-foreground">{phrase.text}</p>
@@ -353,8 +353,8 @@ function PatternsPageContent() {
                             </div>
                             {patterns.map(p => (
                                 <div key={p.id} className="flex items-center space-x-2">
-                                    <RadioGroupItem value={p.id} id={`pattern-${p.id}`} />
-                                    <Label htmlFor={`pattern-${p.id}`}>Add to: <span className="font-semibold">{p.name}</span></Label>
+                                    <RadioGroupItem value={p.id} id={`pattern-${'${p.id}'}`} />
+                                    <Label htmlFor={`pattern-${'${p.id}'}`}>Add to: <span className="font-semibold">{p.name}</span></Label>
                                 </div>
                             ))}
                         </RadioGroup>
@@ -413,8 +413,8 @@ function PatternsPageContent() {
                                                 <CardHeader className="p-3">
                                                 <div className="flex flex-row items-center justify-between">
                                                     <div className="flex items-center gap-2 flex-grow">
-                                                    <RadioGroupItem value={p.id} id={`rule-pattern-${p.id}`} />
-                                                    <Label htmlFor={`rule-pattern-${p.id}`} className="cursor-pointer flex-grow">
+                                                    <RadioGroupItem value={p.id} id={`rule-pattern-${'${p.id}'}`} />
+                                                    <Label htmlFor={`rule-pattern-${'${p.id}'}`} className="cursor-pointer flex-grow">
                                                         <Badge variant={p.type === 'Positive' ? 'default' : 'destructive'} className="mr-2">{p.type}</Badge>
                                                         {p.name}
                                                     </Label>
@@ -488,3 +488,4 @@ export default function PatternsPage() {
         </AuthGuard>
     );
 }
+
