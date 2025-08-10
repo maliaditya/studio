@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -35,10 +36,6 @@ function PurposePageContent() {
         setMetaRules,
         resources,
         handleOpenNestedPopup,
-        allUpskillLogs,
-        allDeepWorkLogs,
-        allWorkoutLogs,
-        schedule,
     } = useAuth();
     const { toast } = useToast();
 
@@ -136,7 +133,7 @@ function PurposePageContent() {
         { name: 'Direction', icon: <ClipboardCheck className="h-6 w-6 text-purple-500" /> },
     ];
     
-    const renderMetaRule = (rule: { id: string, text: string, patternId: string }) => {
+    const renderMetaRule = (rule: { id: string, text: string, patternId: string, purposePillar?: string }) => {
         const pattern = patterns.find(p => p.id === rule.patternId);
         if (!pattern) return null;
 
@@ -170,6 +167,20 @@ function PurposePageContent() {
                       )}
                     </AccordionTrigger>
                     <div className="flex items-center pl-2">
+                      <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-9 w-9">
+                              <Badge className="capitalize">{rule.purposePillar?.[0] || '?'}</Badge>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            {pillars.map(pillar => (
+                              <DropdownMenuItem key={pillar.name} onSelect={() => handleUpdatePillar(rule.id, pillar.name as any, 'meta-rule')}>
+                                {pillar.name}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                      </DropdownMenu>
                       <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleStartEditMetaRule(rule)}>
                           <Edit className="h-4 w-4" />
                       </Button>
@@ -226,7 +237,7 @@ function PurposePageContent() {
                     </p>
                 </div>
 
-                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {pillars.map(pillar => {
                         const rulesForPillar = metaRules.filter(r => r.purposePillar === pillar.name);
                         return (
@@ -236,12 +247,12 @@ function PurposePageContent() {
                                 </CardHeader>
                                 <CardContent>
                                     {rulesForPillar.length > 0 ? (
-                                        <Accordion type="multiple" className="w-full space-y-4">
+                                        <Accordion type="multiple" className="w-full space-y-2">
                                             {rulesForPillar.map(renderMetaRule)}
                                         </Accordion>
                                     ) : (
                                         <div className="text-center py-8 text-muted-foreground text-sm">
-                                            <p>No meta-rules assigned to this pillar yet.</p>
+                                            <p>No meta-rules assigned.</p>
                                         </div>
                                     )}
                                 </CardContent>
@@ -288,6 +299,12 @@ function PurposePageContent() {
                                 {purposeStatement || "Your purpose is not yet defined. Click the button to set it."}
                             </p>
                         )}
+                        <Separator />
+                        <div>
+                             <Accordion type="multiple" className="w-full space-y-4">
+                                {metaRules.filter(r => !r.purposePillar).map(renderMetaRule)}
+                            </Accordion>
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -311,7 +328,7 @@ function PurposePageContent() {
                                           <DropdownMenuContent>
                                             {(['Health', 'Wealth', 'Growth', 'Direction'] as const).map(pillar => (
                                               <DropdownMenuItem key={pillar} onSelect={() => handleUpdatePillar(spec.id, pillar, 'specialization')}>
-                                                {pillar}
+                                                {pillar.name}
                                               </DropdownMenuItem>
                                             ))}
                                           </DropdownMenuContent>
@@ -346,5 +363,6 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
 
