@@ -305,7 +305,7 @@ function PurposePageContent() {
                     </h1>
                 </div>
 
-                <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     {pillars.map(pillar => {
                         const rulesForPillar = metaRules.filter(r => r.purposePillar === pillar.name);
                         return (
