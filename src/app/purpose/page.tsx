@@ -12,6 +12,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
+import type { Resource } from '@/types/workout';
+import { HabitPopup } from '@/components/HabitPopup';
+
 
 function PurposePageContent() {
     const { 
@@ -24,7 +27,6 @@ function PurposePageContent() {
         setMetaRules,
         resources,
         coreSkills,
-        handleOpenNestedPopup,
     } = useAuth();
     const { toast } = useToast();
 
@@ -32,6 +34,10 @@ function PurposePageContent() {
     const [purposeInput, setPurposeInput] = useState(purposeStatement);
     const [editingSpecializationId, setEditingSpecializationId] = useState<string | null>(null);
     const [specializationPurposeInput, setSpecializationPurposeInput] = useState('');
+    
+    // New local state for the isolated habit popup
+    const [selectedHabit, setSelectedHabit] = useState<Resource | null>(null);
+
 
     const specializations = React.useMemo(() => {
         return coreSkills.filter(skill => skill.type === 'Specialization');
@@ -104,180 +110,195 @@ function PurposePageContent() {
         }).filter((h): h is NonNullable<typeof h> => h !== null);
     };
 
+    const handleOpenHabitPopup = (habitId: string) => {
+        const habit = habitCards.find(h => h.id === habitId);
+        if (habit) {
+            setSelectedHabit(habit);
+        }
+    };
+
     return (
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
-            <div className="text-center">
-                <h1 className="text-4xl font-bold tracking-tight text-primary">
-                    Your Purpose
-                </h1>
-                <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-                    Define your central mission. Then, connect your specializations and meta-rules to see how every skill and insight serves your ultimate goal.
-                </p>
-            </div>
+        <>
+            <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
+                <div className="text-center">
+                    <h1 className="text-4xl font-bold tracking-tight text-primary">
+                        Your Purpose
+                    </h1>
+                    <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
+                        Define your central mission. Then, connect your specializations and meta-rules to see how every skill and insight serves your ultimate goal.
+                    </p>
+                </div>
 
-            <Card className="shadow-lg">
-                <CardHeader>
-                    <div className="flex justify-between items-center">
-                        <CardTitle className="flex items-center gap-3 text-xl">
-                            <BrainCircuit className="h-6 w-6 text-primary" />
-                            My Central Purpose
-                        </CardTitle>
-                        {!isEditingPurpose && (
-                            <Button variant="outline" size="sm" onClick={() => { setPurposeInput(purposeStatement); setIsEditingPurpose(true); }}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                {purposeStatement ? 'Edit' : 'Define'} Purpose
-                            </Button>
-                        )}
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    {isEditingPurpose ? (
-                        <div className="space-y-4">
-                            <Textarea
-                                value={purposeInput}
-                                onChange={(e) => setPurposeInput(e.target.value)}
-                                placeholder="What is your ultimate goal? What is the core mission that drives you?"
-                                className="min-h-[100px] text-base"
-                                autoFocus
-                            />
-                            <div className="flex justify-end gap-2">
-                                <Button variant="ghost" onClick={() => setIsEditingPurpose(false)}>Cancel</Button>
-                                <Button onClick={handleSavePurpose}>
-                                    <Save className="mr-2 h-4 w-4" />
-                                    Save Purpose
-                                </Button>
-                            </div>
-                        </div>
-                    ) : (
-                        <p className="text-lg text-muted-foreground whitespace-pre-wrap min-h-[5rem]">
-                            {purposeStatement || "Your purpose is not yet defined. Click the button to set it."}
-                        </p>
-                    )}
-                </CardContent>
-            </Card>
-
-            {metaRules.length > 0 && (
-                <Card>
+                <Card className="shadow-lg">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><BookOpen /> Your Meta-Rules</CardTitle>
-                        <CardDescription>Your guiding principles, derived from your own data.</CardDescription>
+                        <div className="flex justify-between items-center">
+                            <CardTitle className="flex items-center gap-3 text-xl">
+                                <BrainCircuit className="h-6 w-6 text-primary" />
+                                My Central Purpose
+                            </CardTitle>
+                            {!isEditingPurpose && (
+                                <Button variant="outline" size="sm" onClick={() => { setPurposeInput(purposeStatement); setIsEditingPurpose(true); }}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    {purposeStatement ? 'Edit' : 'Define'} Purpose
+                                </Button>
+                            )}
+                        </div>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        {metaRules.map(rule => {
-                            const pattern = patterns.find(p => p.id === rule.patternId);
-                            if (!pattern) return null;
-
-                            const categorizedPhrases = pattern.phrases.reduce((acc, phrase) => {
-                                if (phrase.category === 'Habit Cards') return acc;
-                                if (!acc[phrase.category]) {
-                                    acc[phrase.category] = [];
-                                }
-                                acc[phrase.category].push(phrase.text);
-                                return acc;
-                            }, {} as Record<string, string[]>);
-                            
-                            const linkedHabits = getHabitLinksForRule(rule);
-
-                            return (
-                                <Card key={rule.id} className="bg-muted/50">
-                                    <CardHeader className="flex flex-row items-center justify-between pb-3">
-                                        <CardTitle className="text-lg">{rule.text}</CardTitle>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteMetaRule(rule.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <p className="text-sm text-muted-foreground mb-2">Based on pattern: <span className="font-semibold text-foreground">{pattern.name}</span></p>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {Object.entries(categorizedPhrases).map(([category, phrases]) => (
-                                                <div key={category}>
-                                                    <h4 className="font-medium text-sm mb-1">{category}</h4>
-                                                    <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
-                                                        {phrases.map((phrase, i) => <li key={i}>{phrase}</li>)}
-                                                    </ul>
-                                                </div>
-                                            ))}
-                                            {linkedHabits.length > 0 && (
-                                                <div className="md:col-span-2">
-                                                    <h4 className="font-medium text-sm mb-1">Habits</h4>
-                                                    <div className="space-y-1">
-                                                        {linkedHabits.map((habit, i) => (
-                                                            <button 
-                                                                key={i} 
-                                                                className="text-left p-1 rounded hover:bg-background w-full"
-                                                                onClick={(e) => handleOpenNestedPopup(habit.habitId, e)}
-                                                            >
-                                                                <span className="font-semibold text-foreground text-xs">{habit.habitName}</span> = <span className="text-muted-foreground text-xs">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</span>
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )
-                        })}
+                    <CardContent>
+                        {isEditingPurpose ? (
+                            <div className="space-y-4">
+                                <Textarea
+                                    value={purposeInput}
+                                    onChange={(e) => setPurposeInput(e.target.value)}
+                                    placeholder="What is your ultimate goal? What is the core mission that drives you?"
+                                    className="min-h-[100px] text-base"
+                                    autoFocus
+                                />
+                                <div className="flex justify-end gap-2">
+                                    <Button variant="ghost" onClick={() => setIsEditingPurpose(false)}>Cancel</Button>
+                                    <Button onClick={handleSavePurpose}>
+                                        <Save className="mr-2 h-4 w-4" />
+                                        Save Purpose
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-lg text-muted-foreground whitespace-pre-wrap min-h-[5rem]">
+                                {purposeStatement || "Your purpose is not yet defined. Click the button to set it."}
+                            </p>
+                        )}
                     </CardContent>
                 </Card>
-            )}
 
-            <div>
-                <h2 className="text-2xl font-bold text-center mb-6">How Your Specializations Serve Your Purpose</h2>
-                {specializations.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {specializations.map(spec => (
-                            <Card key={spec.id} className="flex flex-col">
-                                <CardHeader>
-                                    <CardTitle className="text-lg">{spec.name}</CardTitle>
-                                    <CardDescription>Specialization</CardDescription>
-                                </CardHeader>
-                                <CardContent className="flex-grow">
-                                    {editingSpecializationId === spec.id ? (
-                                        <div className="space-y-2">
-                                            <Label htmlFor={`purpose-${spec.id}`}>How does this help your purpose?</Label>
-                                            <Textarea 
-                                                id={`purpose-${spec.id}`}
-                                                value={specializationPurposeInput}
-                                                onChange={(e) => setSpecializationPurposeInput(e.target.value)}
-                                                placeholder="e.g., 'Allows me to build the tools required for...'"
-                                                className="min-h-[80px]"
-                                                autoFocus
-                                            />
-                                        </div>
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground min-h-[6rem]">
-                                            {specializationPurposes[spec.id] || "No contribution defined yet."}
-                                        </p>
-                                    )}
-                                </CardContent>
-                                <CardFooter>
-                                    {editingSpecializationId === spec.id ? (
-                                        <div className="flex justify-end gap-2 w-full">
-                                            <Button variant="ghost" size="icon" onClick={handleCancelEditSpecialization}><X className="h-4 w-4" /></Button>
-                                            <Button variant="secondary" size="icon" onClick={handleSaveSpecializationPurpose}><Check className="h-4 w-4" /></Button>
-                                        </div>
-                                    ) : (
-                                        <div className="flex justify-end gap-2 w-full">
-                                            {specializationPurposes[spec.id] && (
-                                                 <Button variant="ghost" size="icon" onClick={() => handleClearSpecializationPurpose(spec.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                                            )}
-                                            <Button variant="outline" size="sm" onClick={() => handleStartEditSpecialization(spec.id)}>
-                                                <Edit className="mr-2 h-4 w-4" />
-                                                {specializationPurposes[spec.id] ? 'Edit' : 'Connect'}
-                                            </Button>
-                                        </div>
-                                    )}
-                                </CardFooter>
-                            </Card>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="text-center text-muted-foreground py-10 border-2 border-dashed rounded-lg">
-                        <p>You haven't defined any specializations yet.</p>
-                        <Button variant="link" asChild><Link href="/skill">Go to the Skill page to add one.</Link></Button>
-                    </div>
+                {metaRules.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><BookOpen /> Your Meta-Rules</CardTitle>
+                            <CardDescription>Your guiding principles, derived from your own data.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {metaRules.map(rule => {
+                                const pattern = patterns.find(p => p.id === rule.patternId);
+                                if (!pattern) return null;
+
+                                const categorizedPhrases = pattern.phrases.reduce((acc, phrase) => {
+                                    if (phrase.category === 'Habit Cards') return acc;
+                                    if (!acc[phrase.category]) {
+                                        acc[phrase.category] = [];
+                                    }
+                                    acc[phrase.category].push(phrase.text);
+                                    return acc;
+                                }, {} as Record<string, string[]>);
+                                
+                                const linkedHabits = getHabitLinksForRule(rule);
+
+                                return (
+                                    <Card key={rule.id} className="bg-muted/50">
+                                        <CardHeader className="flex flex-row items-center justify-between pb-3">
+                                            <CardTitle className="text-lg">{rule.text}</CardTitle>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteMetaRule(rule.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <p className="text-sm text-muted-foreground mb-2">Based on pattern: <span className="font-semibold text-foreground">{pattern.name}</span></p>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {Object.entries(categorizedPhrases).map(([category, phrases]) => (
+                                                    <div key={category}>
+                                                        <h4 className="font-medium text-sm mb-1">{category}</h4>
+                                                        <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
+                                                            {phrases.map((phrase, i) => <li key={i}>{phrase}</li>)}
+                                                        </ul>
+                                                    </div>
+                                                ))}
+                                                {linkedHabits.length > 0 && (
+                                                    <div className="md:col-span-2">
+                                                        <h4 className="font-medium text-sm mb-1">Habits</h4>
+                                                        <div className="space-y-1">
+                                                            {linkedHabits.map((habit, i) => (
+                                                                <button 
+                                                                    key={i} 
+                                                                    className="text-left p-1 rounded hover:bg-background w-full"
+                                                                    onClick={() => handleOpenHabitPopup(habit.habitId)}
+                                                                >
+                                                                    <span className="font-semibold text-foreground text-xs">{habit.habitName}</span> = <span className="text-muted-foreground text-xs">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )
+                            })}
+                        </CardContent>
+                    </Card>
                 )}
+
+                <div>
+                    <h2 className="text-2xl font-bold text-center mb-6">How Your Specializations Serve Your Purpose</h2>
+                    {specializations.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {specializations.map(spec => (
+                                <Card key={spec.id} className="flex flex-col">
+                                    <CardHeader>
+                                        <CardTitle className="text-lg">{spec.name}</CardTitle>
+                                        <CardDescription>Specialization</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="flex-grow">
+                                        {editingSpecializationId === spec.id ? (
+                                            <div className="space-y-2">
+                                                <Label htmlFor={`purpose-${spec.id}`}>How does this help your purpose?</Label>
+                                                <Textarea 
+                                                    id={`purpose-${spec.id}`}
+                                                    value={specializationPurposeInput}
+                                                    onChange={(e) => setSpecializationPurposeInput(e.target.value)}
+                                                    placeholder="e.g., 'Allows me to build the tools required for...'"
+                                                    className="min-h-[80px]"
+                                                    autoFocus
+                                                />
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-muted-foreground min-h-[6rem]">
+                                                {specializationPurposes[spec.id] || "No contribution defined yet."}
+                                            </p>
+                                        )}
+                                    </CardContent>
+                                    <CardFooter>
+                                        {editingSpecializationId === spec.id ? (
+                                            <div className="flex justify-end gap-2 w-full">
+                                                <Button variant="ghost" size="icon" onClick={handleCancelEditSpecialization}><X className="h-4 w-4" /></Button>
+                                                <Button variant="secondary" size="icon" onClick={handleSaveSpecializationPurpose}><Check className="h-4 w-4" /></Button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex justify-end gap-2 w-full">
+                                                {specializationPurposes[spec.id] && (
+                                                    <Button variant="ghost" size="icon" onClick={() => handleClearSpecializationPurpose(spec.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                                )}
+                                                <Button variant="outline" size="sm" onClick={() => handleStartEditSpecialization(spec.id)}>
+                                                    <Edit className="mr-2 h-4 w-4" />
+                                                    {specializationPurposes[spec.id] ? 'Edit' : 'Connect'}
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </CardFooter>
+                                </Card>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center text-muted-foreground py-10 border-2 border-dashed rounded-lg">
+                            <p>You haven't defined any specializations yet.</p>
+                            <Button variant="link" asChild><Link href="/skill">Go to the Skill page to add one.</Link></Button>
+                        </div>
+                    )}
+                </div>
             </div>
-        </div>
+            {selectedHabit && (
+                <HabitPopup 
+                    habit={selectedHabit} 
+                    onOpenChange={(isOpen) => { if (!isOpen) setSelectedHabit(null); }}
+                />
+            )}
+        </>
     );
 }
 
