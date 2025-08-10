@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -262,7 +263,12 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: {
             </Button>
         </li>
     );
+};
+
+interface ResourcePopupProps {
+  popupState: PopupState;
 }
+
 // ----- End of moved components -----
 
 
@@ -270,10 +276,6 @@ interface PistonsInitialState {
   view: 'main' | 'health' | 'projects' | 'specializations' | 'desires' | 'mindset';
   topicId?: string;
   topicName?: string;
-}
-
-interface ResourcePopupProps {
-  popupState: PopupState;
 }
 
 interface AuthContextType {
@@ -579,7 +581,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [coreSkills, setCoreSkills] = useState<CoreSkill[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   
-  // Professional Experience State
+  // Professional Experience
   const [companies, setCompanies] = useState<Company[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
 
@@ -1750,7 +1752,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             y = event.clientY;
         }
         
-        newPopups.set(resourceId, {
+        newPopups.set(resourceId, { 
             resourceId, level, x, y, parentId, width: popupWidth, z: 80 + level
         });
         return newPopups;
@@ -1764,7 +1766,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const ResourcePopup: React.FC<ResourcePopupProps> = useCallback(({ popupState }) => {
     const resource = resources.find(r => r.id === popupState.resourceId);
     if (!resource) return null;
-    return <ResourcePopupCard popupState={popupState} resource={resource} onClose={handleClosePopup} onUpdate={handleUpdateResource} onOpenNestedPopup={handleOpenNestedPopup} {...{ playingAudio, setPlayingAudio }} />;
+    // return <ResourcePopupCard popupState={popupState} resource={resource} onClose={handleClosePopup} onUpdate={handleUpdateResource} onOpenNestedPopup={handleOpenNestedPopup} {...{ playingAudio, setPlayingAudio }} />;
+    return (
+      <div></div>
+    )
   }, [resources, handleOpenNestedPopup, handleClosePopup, handleUpdateResource, playingAudio, setPlayingAudio]);
 
   const handlePopupDragEnd = (event: DragEndEvent) => {
@@ -1962,4 +1967,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-
