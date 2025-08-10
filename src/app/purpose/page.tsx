@@ -13,14 +13,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill } from '@/types/workout';
-import { HabitPopup } from '@/components/HabitPopup';
 import { DndContext, type DragEndEvent, useDraggable } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { format, subDays, parseISO, isBefore, startOfToday, addDays, isAfter } from 'date-fns';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { DashboardStats } from '@/components/DashboardStats';
 
 interface RuleDetailPopupState {
@@ -49,7 +47,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
     const pattern = patterns.find(p => p.id === rule.patternId);
 
     const getHabitLinksForRule = (rule: MetaRule) => {
-        if (!pattern) return [];
+        if (!pattern || !habitCards || !mechanismCards) return [];
         const habitPhrases = pattern.phrases.filter(p => p.category === 'Habit Cards');
         return habitPhrases.map(phrase => {
             const habit = habitCards.find(h => h.id === phrase.mechanismCardId);
@@ -109,7 +107,12 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
                                         <button 
                                             key={i} 
                                             className="text-left p-1 rounded hover:bg-muted/50 w-full"
-                                            onClick={(e) => handleOpenNestedPopup(habit.habitId, e)}
+                                            onClick={(e) => {
+                                                if (handleOpenNestedPopup) {
+                                                    // This is a simplified call; you might need more complex state management in the parent
+                                                    handleOpenNestedPopup(habit.habitId, e);
+                                                }
+                                            }}
                                         >
                                             <span className="font-semibold text-foreground text-xs">{habit.habitName}</span> = <span className="text-muted-foreground text-xs">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</span>
                                         </button>
@@ -136,8 +139,6 @@ function PurposePageContent() {
         patterns,
         metaRules,
         setMetaRules,
-        resources,
-        handleOpenNestedPopup,
         allWorkoutLogs, 
         allUpskillLogs,
         allDeepWorkLogs,
@@ -146,7 +147,9 @@ function PurposePageContent() {
         productizationPlans,
         offerizationPlans,
         deepWorkDefinitions,
-        upskillDefinitions
+        upskillDefinitions,
+        habitCards,
+        mechanismCards
     } = useAuth();
     const { toast } = useToast();
 
@@ -204,9 +207,6 @@ function PurposePageContent() {
         e.stopPropagation();
         setMetaRules(prev => prev.filter(r => r.id !== ruleId));
     };
-    
-    const habitCards = useMemo(() => resources.filter(r => r.type === 'habit'), [resources]);
-    const mechanismCards = useMemo(() => resources.filter(r => r.type === 'mechanism'), [resources]);
 
 
     const handleOpenRuleDetail = (e: React.MouseEvent, rule: MetaRule) => {

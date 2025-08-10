@@ -22,7 +22,7 @@ import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea } from './ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { PlusCircle, Link as LinkIcon } from 'lucide-react';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
@@ -138,6 +138,8 @@ interface AuthContextType {
   setActiveResourceTabIds: React.Dispatch<React.SetStateAction<string[]>>;
   selectedResourceFolderId: string | null;
   setSelectedResourceFolderId: React.Dispatch<React.SetStateAction<string | null>>;
+  habitCards: Resource[];
+  mechanismCards: Resource[];
   
   // Resource Popups
   openPopups: Map<string, PopupState>;
@@ -371,6 +373,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     return map;
   }, [coreSkills]);
+
+  const habitCards = useMemo(() => resources.filter(r => r.type === 'habit'), [resources]);
+  const mechanismCards = useMemo(() => resources.filter(r => r.type === 'mechanism'), [resources]);
 
 
   useEffect(() => {
@@ -1679,6 +1684,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pinnedFolderIds, setPinnedFolderIds,
     activeResourceTabIds, setActiveResourceTabIds,
     selectedResourceFolderId, setSelectedResourceFolderId,
+    habitCards, mechanismCards,
     openPopups, handleOpenNestedPopup, 
     closeAllResourcePopups,
     handlePopupDragEnd,
