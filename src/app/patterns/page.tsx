@@ -13,10 +13,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen, Workflow, ArrowRight } from 'lucide-react';
+import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen, Workflow, ArrowRight, Brain, HeartPulse, HandHeart, TrendingUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Pattern, PatternPhrase, MetaRule, Resource } from '@/types/workout';
 import { cn } from '@/lib/utils';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup } from '@/components/ui/dropdown-menu';
 
 
 function PatternsPageContent() {
@@ -263,6 +264,17 @@ function PatternsPageContent() {
         handleOpenNestedPopup(habitId, e);
     };
 
+    const pillars = [
+        { name: 'Mind', icon: <Brain className="h-6 w-6 text-blue-500" />, attributes: ['Focus', 'Learning', 'Creativity'] },
+        { name: 'Body', icon: <HeartPulse className="h-6 w-6 text-red-500" />, attributes: ['Health', 'Strength', 'Energy'] },
+        { name: 'Heart', icon: <HandHeart className="h-6 w-6 text-pink-500" />, attributes: ['Relationships', 'Emotional Health'] },
+        { name: 'Spirit', icon: <TrendingUp className="h-6 w-6 text-purple-500" />, attributes: ['Meaning', 'Contribution', 'Legacy'] },
+    ];
+
+    const handleUpdatePillar = (id: string, pillar: string) => {
+        setMetaRules(prev => prev.map(r => r.id === id ? { ...r, purposePillar: pillar } : r));
+    };
+
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
             <div className="text-center">
@@ -490,13 +502,38 @@ function PatternsPageContent() {
                                 {metaRules.map(rule => {
                                     const pattern = patterns.find(p => p.id === rule.patternId);
                                     return (
-                                        <div key={rule.id} className="p-3 rounded-md border bg-muted/30">
-                                            <p className="font-medium">{rule.text}</p>
-                                            {pattern && (
-                                                <p className="text-xs text-muted-foreground mt-1">
-                                                    Based on pattern: <span className="font-semibold">{pattern.name}</span>
-                                                </p>
-                                            )}
+                                        <div key={rule.id} className="p-3 rounded-md border bg-muted/30 flex justify-between items-center group">
+                                            <div>
+                                                <p className="font-medium">{rule.text}</p>
+                                                {pattern && (
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        Based on pattern: <span className="font-semibold">{pattern.name}</span>
+                                                    </p>
+                                                )}
+                                            </div>
+                                             <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                            <Badge className="capitalize">{rule.purposePillar?.[0] || '?'}</Badge>
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent>
+                                                        {pillars.map(pillar => (
+                                                            <DropdownMenuGroup key={pillar.name}>
+                                                                <DropdownMenuItem onSelect={() => handleUpdatePillar(rule.id, pillar.name)}>
+                                                                    {pillar.name}
+                                                                </DropdownMenuItem>
+                                                                {pillar.attributes.map(attr => (
+                                                                    <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(rule.id, attr)} className="pl-6">
+                                                                        {attr}
+                                                                    </DropdownMenuItem>
+                                                                ))}
+                                                            </DropdownMenuGroup>
+                                                        ))}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
                                         </div>
                                     )
                                 })}
