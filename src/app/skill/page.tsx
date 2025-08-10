@@ -316,78 +316,6 @@ function SkillPageContent() {
     setSelectedProjectId(null);
   };
 
-  const renderCoreSkillPillar = useCallback((skill: CoreSkill) => {
-    let icon;
-    switch (skill.type) {
-        case 'Foundation': icon = <Blocks className="h-4 w-4"/>; break;
-        case 'Professionalism': icon = <Sprout className="h-4 w-4"/>; break;
-        case 'Specialization': icon = <BrainCircuit className="h-4 w-4"/>; break;
-    }
-    
-    return (
-        <div key={skill.id} className="group flex items-center justify-between p-2 rounded-md hover:bg-muted">
-            <button className="flex items-center gap-2 flex-grow min-w-0" onClick={() => handleSelectCoreSkill(skill.id)}>
-                {icon}
-                <span className={`text-sm ${selectedSkillId === skill.id ? 'font-semibold text-primary' : ''}`}>{skill.name}</span>
-            </button>
-            {skill.type === 'Specialization' && (
-                <div className="flex items-center opacity-0 group-hover:opacity-100">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingSkill(skill)}><Edit className="h-4 w-4"/></Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                         <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                          <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>This will permanently delete the "{skill.name}" specialization and all its contents.</AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDeleteCoreSkill(skill.id)}>Delete</AlertDialogAction>
-                          </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                </div>
-            )}
-        </div>
-    )
-  }, [selectedSkillId, handleDeleteCoreSkill]);
-
-  const specializationSkills = useMemo(() => {
-    return coreSkills.filter(skill => skill.type === 'Specialization');
-  }, [coreSkills]);
-
-  const linkedTasksByCoreSkill = useMemo(() => {
-    if (!selectedProject) return new Map();
-
-    const intentionsAndCuriosities = [...deepWorkDefinitions, ...upskillDefinitions];
-    const linkedItems = intentionsAndCuriosities.filter(item => item.linkedProjectId === selectedProject.id);
-
-    const groupedByCoreSkill = new Map<string, { coreSkillName: string; microSkills: Map<string, { microSkill: MicroSkill; tasks: ExerciseDefinition[] }> }>();
-
-    linkedItems.forEach(item => {
-      const microSkillInfo = Array.from(microSkillMap.entries()).find(([, ms]) => ms.microSkillName === item.category);
-      if (microSkillInfo) {
-        const [microSkillId, { coreSkillName, skillAreaName, microSkillName }] = microSkillInfo;
-        const microSkill = { id: microSkillId, name: microSkillName };
-
-        if (!groupedByCoreSkill.has(coreSkillName)) {
-          groupedByCoreSkill.set(coreSkillName, { coreSkillName, microSkills: new Map() });
-        }
-        const coreSkillGroup = groupedByCoreSkill.get(coreSkillName)!;
-        
-        const mapKey = `${skillAreaName} > ${microSkillName}`;
-        if (!coreSkillGroup.microSkills.has(mapKey)) {
-          coreSkillGroup.microSkills.set(mapKey, { microSkill, tasks: [] });
-        }
-        coreSkillGroup.microSkills.get(mapKey)!.tasks.push(item);
-      }
-    });
-
-    return groupedByCoreSkill;
-  }, [selectedProject, deepWorkDefinitions, upskillDefinitions, microSkillMap]);
-
   const linkedDeepWorkChildIds = useMemo(() => new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])), [deepWorkDefinitions]);
   const linkedUpskillChildIds = useMemo(() => new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || [])), [upskillDefinitions]);
 
@@ -470,25 +398,29 @@ function SkillPageContent() {
                                     <AccordionContent>
                                         <div className="space-y-2">
                                             <h4 className="font-semibold text-xs text-muted-foreground px-2">Core Pillars</h4>
-                                            {domainCoreSkills.filter(s => s.type !== 'Specialization').map(renderCoreSkillPillar)}
+                                            {domainCoreSkills.filter(s => s.type !== 'Specialization').map(skill => (
+                                              <Button key={skill.id} variant="ghost" size="sm" className={cn("w-full justify-start", selectedSkillId === skill.id && "bg-accent font-semibold")} onClick={() => handleSelectCoreSkill(skill.id)}>
+                                                  {skill.type === 'Foundation' ? <Blocks className="mr-2 h-4 w-4"/> : <Sprout className="mr-2 h-4 w-4"/>}
+                                                  {skill.name}
+                                              </Button>
+                                            ))}
                                             <h4 className="font-semibold text-xs text-muted-foreground px-2 pt-2">Specializations</h4>
-                                            {domainCoreSkills.filter(s => s.type === 'Specialization').map(renderCoreSkillPillar)}
+                                            {domainCoreSkills.filter(s => s.type === 'Specialization').map(skill => (
+                                              <Button key={skill.id} variant="ghost" size="sm" className={cn("w-full justify-start", selectedSkillId === skill.id && "bg-accent font-semibold")} onClick={() => handleSelectCoreSkill(skill.id)}>
+                                                  <BrainCircuit className="mr-2 h-4 w-4"/>
+                                                  {skill.name}
+                                              </Button>
+                                            ))}
                                             <div className="flex gap-2 pt-2">
                                               <Input placeholder="New Specialization" value={newSpecializationNames[domain.id] || ''} onChange={e => setNewSpecializationNames(prev => ({...prev, [domain.id]: e.target.value}))}/>
                                               <Button size="icon" onClick={() => handleAddSpecialization(domain.id)}><PlusCircle className="h-4 w-4"/></Button>
                                             </div>
                                             <h4 className="font-semibold text-xs text-muted-foreground px-2 pt-4">Projects</h4>
                                             {domainProjects.map(p => (
-                                                <div key={p.id} className="group flex items-center justify-between p-2 rounded-md hover:bg-muted">
-                                                  <button className="flex items-center gap-2 flex-grow min-w-0" onClick={() => handleSelectProject(p.id)}>
-                                                    <Briefcase className="h-4 w-4" />
-                                                    <span className={`text-sm ${selectedProjectId === p.id ? 'font-semibold text-primary' : ''}`}>{p.name}</span>
-                                                  </button>
-                                                  <div className="flex items-center opacity-0 group-hover:opacity-100">
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingProject(p)}><Edit className="h-4 w-4"/></Button>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteProject(p.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                                                  </div>
-                                                </div>
+                                                <Button key={p.id} variant="ghost" size="sm" className={cn("w-full justify-start", selectedProjectId === p.id && "bg-accent font-semibold")} onClick={() => handleSelectProject(p.id)}>
+                                                    <Briefcase className="mr-2 h-4 w-4"/>
+                                                    {p.name}
+                                                </Button>
                                             ))}
                                              <div className="flex gap-2 pt-2">
                                               <Input placeholder="New Project" value={newProjectName} onChange={e => setNewProjectName(e.target.value)}/>
@@ -562,7 +494,7 @@ function SkillPageContent() {
                                               <div className="space-y-1">
                                                   <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Flashlight className="h-3 w-3 text-amber-500" />Curiosities</h4>
                                                   {curiosities.length > 0 ? (
-                                                    <ul className="text-xs space-y-1">
+                                                    <ul className="space-y-1 text-xs">
                                                       {curiosities.map(task => (
                                                         <li key={task.id}>
                                                           <button onClick={() => openIntentionPopup(task.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{task.name}</button>
@@ -574,10 +506,10 @@ function SkillPageContent() {
                                               <div className="space-y-1">
                                                   <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Lightbulb className="h-3 w-3 text-green-500" />Intentions</h4>
                                                    {intentions.length > 0 ? (
-                                                    <ul className="text-xs space-y-1">
-                                                      {intentions.map(task => (
-                                                        <li key={task.id}>
-                                                          <button onClick={() => openIntentionPopup(task.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{task.name}</button>
+                                                    <ul className="space-y-1 text-xs">
+                                                      {intentions.map(intention => (
+                                                        <li key={intention.id}>
+                                                          <button onClick={() => openIntentionPopup(intention.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{intention.name}</button>
                                                         </li>
                                                       ))}
                                                     </ul>
@@ -594,10 +526,19 @@ function SkillPageContent() {
                   </div>
               ) : selectedCoreSkill ? (
                   <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                          <Input value={newSkillAreaNames[selectedSkillId!] || ''} onChange={e => setNewSkillAreaNames(prev => ({...prev, [selectedSkillId!]: e.target.value}))} placeholder="New Skill Area Name" />
-                          <Button onClick={() => handleAddSkillArea(selectedSkillId!)}>Add Skill Area</Button>
-                      </div>
+                      {selectedCoreSkill.type === 'Specialization' && (
+                          <Card>
+                              <CardHeader>
+                                <CardTitle className="text-base">Skill Areas</CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                  <div className="flex items-center gap-2">
+                                    <Input value={newSkillAreaNames[selectedSkillId!] || ''} onChange={e => setNewSkillAreaNames(prev => ({...prev, [selectedSkillId!]: e.target.value}))} placeholder="New Skill Area Name" />
+                                    <Button onClick={() => handleAddSkillArea(selectedSkillId!)}>Add</Button>
+                                  </div>
+                              </CardContent>
+                          </Card>
+                      )}
                        <Accordion type="multiple" className="w-full space-y-2">
                           {selectedCoreSkill.skillAreas.map(area => {
                               return (
@@ -620,10 +561,7 @@ function SkillPageContent() {
                                                     <AlertDialogTitle>Delete "{area.name}"?</AlertDialogTitle>
                                                     <AlertDialogDescription>This will permanently delete the skill area and all its micro-skills.</AlertDialogDescription>
                                                 </AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={() => handleDeleteSkillArea(selectedCoreSkill.id, area.id)}>Delete</AlertDialogAction>
-                                                </AlertDialogFooter>
+                                                <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteSkillArea(selectedCoreSkill.id, area.id)}>Delete</AlertDialogAction></AlertDialogFooter>
                                             </AlertDialogContent>
                                           </AlertDialog>
                                         </div>
@@ -659,7 +597,7 @@ function SkillPageContent() {
                                                           <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Lightbulb className="h-3 w-3 text-green-500" />Intentions</h4>
                                                            {relatedIntentions.length > 0 ? (
                                                               <ul className="space-y-1 text-xs">
-                                                                  {relatedIntentions.map(intention => (
+                                                                  {intentions.map(intention => (
                                                                       <li key={intention.id}>
                                                                           <button onClick={() => openIntentionPopup(intention.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{intention.name}</button>
                                                                       </li>
@@ -841,7 +779,7 @@ function SkillPageContent() {
                             <Select value={editingWorkProject.project.linkedSpecializationId} onValueChange={val => setEditingWorkProject(prev => prev ? {...prev, project: {...prev.project, linkedSpecializationId: val}} : null)}>
                                 <SelectTrigger id="wp-spec"><SelectValue placeholder="Select a specialization..." /></SelectTrigger>
                                 <SelectContent>
-                                    {specializationSkills.map(spec => (
+                                    {coreSkills.filter(s => s.type === 'Specialization').map(spec => (
                                         <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
                                     ))}
                                 </SelectContent>
