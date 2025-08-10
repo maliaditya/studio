@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -22,7 +21,7 @@ import { DndContext, type DragEndEvent } from '@dnd-kit/core';
 
 
 function PatternsPageContent() {
-    const { resources, patterns, setPatterns, metaRules, setMetaRules } = useAuth();
+    const { resources, patterns, setPatterns, metaRules, setMetaRules, handleOpenNestedPopup } = useAuth();
     const { toast } = useToast();
 
     const [selectedPhrases, setSelectedPhrases] = useState<PatternPhrase[]>([]);
@@ -264,10 +263,7 @@ function PatternsPageContent() {
     };
 
     const handleOpenHabitPopup = (e: React.MouseEvent, habitId: string) => {
-        const habit = habitCards.find(h => h.id === habitId);
-        if (habit) {
-            setSelectedHabit({ habit, position: { x: e.clientX, y: e.clientY } });
-        }
+        handleOpenNestedPopup(habitId, e);
     };
     
     const handleDragEnd = (event: DragEndEvent) => {
@@ -418,10 +414,11 @@ function PatternsPageContent() {
                                         {patterns.map(p => {
                                             const isSelected = selectedPatternForRule === p.id;
                                             const categorizedPhrases = isSelected ? p.phrases.reduce((acc, phrase) => {
+                                                if (phrase.category === 'Habit Cards') return acc;
                                                 if (!acc[phrase.category]) acc[phrase.category] = [];
                                                 acc[phrase.category].push(phrase);
                                                 return acc;
-                                            }, {} as Record<string, PatternPhrase[]>) : null;
+                                            }, {} as Record<string, PatternPhrase[]>);
 
                                             const linkedHabits = isSelected ? getHabitLinksForRule(p) : [];
 
@@ -495,13 +492,6 @@ function PatternsPageContent() {
                     </CardContent>
                 </Card>
             </div>
-            {selectedHabit && (
-                <HabitPopup 
-                    habit={selectedHabit.habit} 
-                    position={selectedHabit.position}
-                    onClose={() => setSelectedHabit(null)}
-                />
-            )}
         </DndContext>
     );
 }
@@ -513,3 +503,4 @@ export default function PatternsPage() {
         </AuthGuard>
     );
 }
+

@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -602,7 +601,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (selectedDomainId) localStorage.setItem(`selected_domain_${username}`, selectedDomainId); else localStorage.removeItem(`selected_domain_${username}`);
       if (selectedSkillId) localStorage.setItem(`selected_skill_${username}`, selectedSkillId); else localStorage.removeItem(`selected_skill_${username}`);
       if (selectedProjectId) localStorage.setItem(`selected_project_${username}`, selectedProjectId); else localStorage.removeItem(`selected_project_${username}`);
-      if (selectedCompanyId) localStorage.setItem(`selected_company_${username}`, selectedCompanyId); else localStorage.removeItem(`selected_company_${username}`);
+      if (selectedCompanyId) localStorage.setItem(`selected_company_${username}`, selectedCompanyId); else localStorage.removeItem(`selected_companyId_${username}`);
     }
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
@@ -1725,3 +1724,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+

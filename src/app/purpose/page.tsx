@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -28,6 +27,7 @@ function PurposePageContent() {
         setMetaRules,
         resources,
         coreSkills,
+        handleOpenNestedPopup,
     } = useAuth();
     const { toast } = useToast();
 
@@ -111,10 +111,7 @@ function PurposePageContent() {
     };
 
     const handleOpenHabitPopup = (e: React.MouseEvent, habitId: string) => {
-        const habit = habitCards.find(h => h.id === habitId);
-        if (habit) {
-            setSelectedHabit({ habit, position: { x: e.clientX, y: e.clientY } });
-        }
+        handleOpenNestedPopup(habitId, e);
     };
     
     const handleDragEnd = (event: DragEndEvent) => {
@@ -275,24 +272,6 @@ function PurposePageContent() {
                                                 {specializationPurposes[spec.id] || "No contribution defined yet."}
                                             </p>
                                         )}
-                                    </CardContent>
-                                    <CardFooter>
-                                        {editingSpecializationId === spec.id ? (
-                                            <div className="flex justify-end gap-2 w-full">
-                                                <Button variant="ghost" size="icon" onClick={handleCancelEditSpecialization}><X className="h-4 w-4" /></Button>
-                                                <Button variant="secondary" size="icon" onClick={handleSaveSpecializationPurpose}><Check className="h-4 w-4" /></Button>
-                                            </div>
-                                        ) : (
-                                            <div className="flex justify-end gap-2 w-full">
-                                                {specializationPurposes[spec.id] && (
-                                                    <Button variant="ghost" size="icon" onClick={() => handleClearSpecializationPurpose(spec.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                                                )}
-                                                <Button variant="outline" size="sm" onClick={() => handleStartEditSpecialization(spec.id)}>
-                                                    <Edit className="mr-2 h-4 w-4" />
-                                                    {specializationPurposes[spec.id] ? 'Edit' : 'Connect'}
-                                                </Button>
-                                            </div>
-                                        )}
                                     </CardFooter>
                                 </Card>
                             ))}
@@ -305,13 +284,6 @@ function PurposePageContent() {
                     )}
                 </div>
             </div>
-            {selectedHabit && (
-                <HabitPopup 
-                    habit={selectedHabit.habit} 
-                    position={selectedHabit.position}
-                    onClose={() => setSelectedHabit(null)}
-                />
-            )}
         </DndContext>
     );
 }
@@ -323,3 +295,4 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+

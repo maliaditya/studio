@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useRef } from 'react';
@@ -23,14 +22,12 @@ const EditableField = ({ label, value, placeholder = "..." }: { label: string; v
     </div>
 );
 
-const LinkedMechanismField = ({ label, resourceId, resourceName }: { label: string; resourceId?: string; resourceName?: string }) => {
-    // In this readonly popup, we don't need the live open functionality from context
-    // It could be added back if editing is required in the future.
+const LinkedMechanismField = ({ label, resourceId, resourceName, onOpenNestedPopup }: { label: string; resourceId?: string; resourceName?: string, onOpenNestedPopup: (e: React.MouseEvent) => void; }) => {
     if (resourceId && resourceName) {
         return (
             <div>
                 <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">{label}</h4>
-                <p className="text-sm text-primary">{resourceName}</p>
+                <button onClick={onOpenNestedPopup} className="text-sm text-primary hover:underline">{resourceName}</button>
             </div>
         );
     }
@@ -39,7 +36,7 @@ const LinkedMechanismField = ({ label, resourceId, resourceName }: { label: stri
 }
 
 export function HabitPopup({ habit, onClose, position }: HabitPopupProps) {
-    const { resources } = useAuth();
+    const { resources, handleOpenNestedPopup } = useAuth();
     
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `habit-popup-${habit.id}`,
@@ -79,17 +76,21 @@ export function HabitPopup({ habit, onClose, position }: HabitPopupProps) {
                         <div className="space-y-4">
                             <EditableField label="Trigger" value={habit.trigger?.action} placeholder="When I..." />
                             
-                            {responseMechanism ? 
-                                <LinkedMechanismField label="Response" resourceId={responseMechanism.id} resourceName={responseMechanism.name}/> : 
-                                <EditableField label="Response" value={habit.response?.text} placeholder="I will..." />
-                            }
+                            <LinkedMechanismField 
+                                label="Response" 
+                                resourceId={responseMechanism?.id} 
+                                resourceName={responseMechanism?.name || habit.response?.text}
+                                onOpenNestedPopup={(e) => responseMechanism && handleOpenNestedPopup(responseMechanism.id, e)}
+                            />
 
                             <EditableField label="Reward" value={habit.reward} placeholder="And I will get..." />
                             
-                            {newResponseMechanism ? 
-                                <LinkedMechanismField label="New Response" resourceId={newResponseMechanism.id} resourceName={newResponseMechanism.name}/> : 
-                                <EditableField label="New Response" value={habit.newResponse?.text} placeholder="Instead, I will..." />
-                            }
+                            <LinkedMechanismField 
+                                label="New Response" 
+                                resourceId={newResponseMechanism?.id} 
+                                resourceName={newResponseMechanism?.name || habit.newResponse?.text}
+                                onOpenNestedPopup={(e) => newResponseMechanism && handleOpenNestedPopup(newResponseMechanism.id, e)}
+                            />
                         </div>
                     </ScrollArea>
                 </CardContent>
@@ -97,3 +98,4 @@ export function HabitPopup({ habit, onClose, position }: HabitPopupProps) {
         </div>
     );
 }
+
