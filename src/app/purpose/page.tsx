@@ -111,7 +111,13 @@ function PurposePageContent() {
     };
 
     const handleOpenHabitPopup = (e: React.MouseEvent, habitId: string) => {
-        handleOpenNestedPopup(habitId, e);
+        const habit = resources.find(r => r.id === habitId);
+        if (habit) {
+            setSelectedHabit({
+                habit,
+                position: { x: e.clientX, y: e.clientY }
+            });
+        }
     };
     
     const handleDragEnd = (event: DragEndEvent) => {
@@ -302,6 +308,13 @@ function PurposePageContent() {
                     )}
                 </div>
             </div>
+            {selectedHabit && (
+                <HabitPopup 
+                    habit={selectedHabit.habit} 
+                    position={selectedHabit.position}
+                    onClose={() => setSelectedHabit(null)} 
+                />
+            )}
         </DndContext>
     );
 }

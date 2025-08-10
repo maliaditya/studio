@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -30,6 +31,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
+import { HabitPopup } from '@/components/HabitPopup';
 
 
 interface ResourcePopupProps {
@@ -601,7 +603,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (selectedDomainId) localStorage.setItem(`selected_domain_${username}`, selectedDomainId); else localStorage.removeItem(`selected_domain_${username}`);
       if (selectedSkillId) localStorage.setItem(`selected_skill_${username}`, selectedSkillId); else localStorage.removeItem(`selected_skill_${username}`);
       if (selectedProjectId) localStorage.setItem(`selected_project_${username}`, selectedProjectId); else localStorage.removeItem(`selected_project_${username}`);
-      if (selectedCompanyId) localStorage.setItem(`selected_company_${username}`, selectedCompanyId); else localStorage.removeItem(`selected_companyId_${username}`);
+      if (selectedCompanyId) localStorage.setItem(`selected_companyId_${username}`, selectedCompanyId); else localStorage.removeItem(`selected_companyId_${username}`);
     }
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
@@ -1525,9 +1527,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const resource = resources.find(r => r.id === popupState.resourceId);
     if (!resource) return null;
     return (
-      <div></div>
+      <HabitPopup 
+        habit={resource} 
+        position={{x: popupState.x, y: popupState.y}} 
+        onClose={() => closeAllResourcePopups()}
+      />
     )
-  }, [resources, handleOpenNestedPopup, handleClosePopup, handleUpdateResource, playingAudio, setPlayingAudio]);
+  }, [resources, closeAllResourcePopups]);
 
   const handlePopupDragEnd = (event: DragEndEvent) => {
       const { active, delta } = event;
@@ -1724,4 +1730,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useRef } from 'react';
@@ -98,4 +99,3 @@ export function HabitPopup({ habit, onClose, position }: HabitPopupProps) {
         </div>
     );
 }
-
