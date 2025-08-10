@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import type { Resource, DatedWorkout } from '@/types/workout';
+import type { Resource, DatedWorkout, MetaRule } from '@/types/workout';
 import { HabitPopup } from '@/components/HabitPopup';
 import { DndContext, type DragEndEvent } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
@@ -21,6 +21,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { format, subDays, parseISO, isBefore, startOfToday, addDays } from 'date-fns';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 
 function PurposePageContent() {
@@ -46,6 +47,8 @@ function PurposePageContent() {
 
     const [editingMetaRuleId, setEditingMetaRuleId] = useState<string | null>(null);
     const [editedMetaRuleText, setEditedMetaRuleText] = useState('');
+    
+    const [selectedRuleForDetails, setSelectedRuleForDetails] = useState<MetaRule | null>(null);
 
     const specializations = React.useMemo(() => {
         return coreSkills.filter(skill => skill.type === 'Specialization');
@@ -65,7 +68,8 @@ function PurposePageContent() {
       }
     };
     
-    const handleStartEditMetaRule = (rule: { id: string, text: string }) => {
+    const handleStartEditMetaRule = (e: React.MouseEvent, rule: { id: string, text: string }) => {
+        e.stopPropagation();
         setEditingMetaRuleId(rule.id);
         setEditedMetaRuleText(rule.text);
     };
@@ -79,7 +83,8 @@ function PurposePageContent() {
         setEditedMetaRuleText('');
     };
 
-    const handleDeleteMetaRule = (ruleId: string) => {
+    const handleDeleteMetaRule = (e: React.MouseEvent, ruleId: string) => {
+        e.stopPropagation();
         setMetaRules(prev => prev.filter(r => r.id !== ruleId));
     };
     
@@ -110,6 +115,7 @@ function PurposePageContent() {
     };
 
     const handleOpenHabitPopup = (e: React.MouseEvent, habitId: string) => {
+        e.stopPropagation();
         handleOpenNestedPopup(habitId, e);
     };
     
@@ -134,8 +140,52 @@ function PurposePageContent() {
     ];
     
     const renderMetaRule = (rule: { id: string, text: string, patternId: string, purposePillar?: string }) => {
-        const pattern = patterns.find(p => p.id === rule.patternId);
-        if (!pattern) return null;
+        return (
+            <div key={rule.id} className="group relative text-sm p-2 rounded-md transition-colors hover:bg-muted/50 cursor-pointer" onClick={() => setSelectedRuleForDetails(rule)}>
+                {editingMetaRuleId === rule.id ? (
+                  <Input
+                      value={editedMetaRuleText}
+                      onChange={(e) => setEditedMetaRuleText(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSaveMetaRule()}
+                      onBlur={handleSaveMetaRule}
+                      className="text-sm h-8"
+                      autoFocus
+                      onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <p>{rule.text}</p>
+                )}
+                <div className="absolute top-1 right-1 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()}>
+                          <Badge className="capitalize">{rule.purposePillar?.[0] || '?'}</Badge>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        {pillars.map(pillar => (
+                          <DropdownMenuItem key={pillar.name} onSelect={() => handleUpdatePillar(rule.id, pillar.name as any, 'meta-rule')}>
+                            {pillar.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                  </DropdownMenu>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleStartEditMetaRule(e, rule)}>
+                      <Edit className="h-3 w-3" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleDeleteMetaRule(e, rule.id)}>
+                      <Trash2 className="h-3 w-3 text-destructive"/>
+                  </Button>
+                </div>
+            </div>
+        )
+    }
+    
+    const renderRuleDetailContent = () => {
+        if (!selectedRuleForDetails) return null;
+        
+        const pattern = patterns.find(p => p.id === selectedRuleForDetails.patternId);
+        if (!pattern) return <p>Pattern not found.</p>;
 
         const categorizedPhrases = pattern.phrases.reduce((acc, phrase) => {
             if (phrase.category === 'Habit Cards') return acc;
@@ -147,81 +197,41 @@ function PurposePageContent() {
             return acc;
         }, {} as Record<string, string[]>);
         
-        const linkedHabits = getHabitLinksForRule(rule);
+        const linkedHabits = getHabitLinksForRule(selectedRuleForDetails);
 
         return (
-            <AccordionItem key={rule.id} value={rule.id} className="border bg-muted/30 rounded-lg px-4">
-                <div className="flex items-center justify-between py-1">
-                    <AccordionTrigger className="text-lg flex-grow hover:no-underline py-3">
-                      {editingMetaRuleId === rule.id ? (
-                        <Input
-                            value={editedMetaRuleText}
-                            onChange={(e) => setEditedMetaRuleText(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSaveMetaRule()}
-                            onBlur={handleSaveMetaRule}
-                            className="text-lg"
-                            autoFocus
-                        />
-                      ) : (
-                        rule.text
-                      )}
-                    </AccordionTrigger>
-                    <div className="flex items-center pl-2">
-                      <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-9 w-9">
-                              <Badge className="capitalize">{rule.purposePillar?.[0] || '?'}</Badge>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            {pillars.map(pillar => (
-                              <DropdownMenuItem key={pillar.name} onSelect={() => handleUpdatePillar(rule.id, pillar.name as any, 'meta-rule')}>
-                                {pillar.name}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                      </DropdownMenu>
-                      <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleStartEditMetaRule(rule)}>
-                          <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleDeleteMetaRule(rule.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive"/>
-                      </Button>
-                    </div>
-                </div>
-                <AccordionContent className="pt-2">
-                    <p className="text-sm text-muted-foreground mb-4">Based on pattern: <span className="font-semibold text-foreground">{pattern.name}</span></p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {Object.entries(categorizedPhrases).map(([category, phrases]) => {
-                            if (category === 'Habit Cards') return null;
-                            return (
-                                <div key={category}>
-                                    <h4 className="font-medium text-sm mb-1">{category}</h4>
-                                    <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
-                                        {phrases.map((phrase, i) => <li key={i}>{phrase}</li>)}
-                                    </ul>
-                                </div>
-                            )
-                        })}
-                        {linkedHabits.length > 0 && (
-                            <div className="md:col-span-2">
-                                <h4 className="font-medium text-sm mb-1">Habits</h4>
-                                <div className="space-y-1">
-                                    {linkedHabits.map((habit, i) => (
-                                        <button 
-                                            key={i} 
-                                            className="text-left p-1 rounded hover:bg-background w-full"
-                                            onClick={(e) => handleOpenHabitPopup(e, habit.habitId)}
-                                        >
-                                            <span className="font-semibold text-foreground text-xs">{habit.habitName}</span> = <span className="text-muted-foreground text-xs">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</span>
-                                        </button>
-                                    ))}
-                                </div>
+             <>
+                <p className="text-sm text-muted-foreground mb-4">Based on pattern: <span className="font-semibold text-foreground">{pattern.name}</span></p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.entries(categorizedPhrases).map(([category, phrases]) => {
+                        if (category === 'Habit Cards') return null;
+                        return (
+                            <div key={category}>
+                                <h4 className="font-medium text-sm mb-1">{category}</h4>
+                                <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
+                                    {phrases.map((phrase, i) => <li key={i}>{phrase}</li>)}
+                                </ul>
                             </div>
-                        )}
-                    </div>
-                </AccordionContent>
-            </AccordionItem>
+                        )
+                    })}
+                    {linkedHabits.length > 0 && (
+                        <div className="md:col-span-2">
+                            <h4 className="font-medium text-sm mb-1">Habits</h4>
+                            <div className="space-y-1">
+                                {linkedHabits.map((habit, i) => (
+                                    <button 
+                                        key={i} 
+                                        className="text-left p-1 rounded hover:bg-background w-full"
+                                        onClick={(e) => handleOpenHabitPopup(e, habit.habitId)}
+                                    >
+                                        <span className="font-semibold text-foreground text-xs">{habit.habitName}</span> = <span className="text-muted-foreground text-xs">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </>
         )
     }
 
@@ -245,11 +255,9 @@ function PurposePageContent() {
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-3 text-xl">{pillar.icon}{pillar.name}</CardTitle>
                                 </CardHeader>
-                                <CardContent>
+                                <CardContent className="space-y-2">
                                     {rulesForPillar.length > 0 ? (
-                                        <Accordion type="multiple" className="w-full space-y-2">
-                                            {rulesForPillar.map(renderMetaRule)}
-                                        </Accordion>
+                                        rulesForPillar.map(renderMetaRule)
                                     ) : (
                                         <div className="text-center py-8 text-muted-foreground text-sm">
                                             <p>No meta-rules assigned.</p>
@@ -300,10 +308,8 @@ function PurposePageContent() {
                             </p>
                         )}
                         <Separator />
-                        <div>
-                             <Accordion type="multiple" className="w-full space-y-4">
-                                {metaRules.filter(r => !r.purposePillar).map(renderMetaRule)}
-                            </Accordion>
+                        <div className="space-y-2">
+                            {metaRules.filter(r => !r.purposePillar).map(renderMetaRule)}
                         </div>
                     </CardContent>
                 </Card>
@@ -352,6 +358,19 @@ function PurposePageContent() {
                     onClose={() => setSelectedHabit(null)} 
                 />
             )}
+             <Dialog open={!!selectedRuleForDetails} onOpenChange={(open) => !open && setSelectedRuleForDetails(null)}>
+                <DialogContent className="sm:max-w-xl">
+                    <DialogHeader>
+                        <DialogTitle>{selectedRuleForDetails?.text}</DialogTitle>
+                        <DialogDescriptionComponent>
+                            Details about the pattern that this rule is based on.
+                        </DialogDescriptionComponent>
+                    </DialogHeader>
+                    <div className="py-4">
+                        {renderRuleDetailContent()}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </DndContext>
     );
 }
@@ -363,6 +382,7 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
 
 
