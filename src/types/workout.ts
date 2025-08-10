@@ -325,6 +325,12 @@ export interface PistonsCategoryData {
 }
 
 // Skill Page Types
+export type PurposePillar =
+  | 'Mind' | 'Focus' | 'Learning' | 'Creativity'
+  | 'Body' | 'Health' | 'Strength' | 'Energy'
+  | 'Heart' | 'Relationships' | 'Emotional Health'
+  | 'Spirit' | 'Meaning' | 'Contribution' | 'Legacy';
+
 export interface SkillDomain {
   id: string;
   name: string;
@@ -336,7 +342,7 @@ export interface CoreSkill {
   name: string;
   type: 'Foundation' | 'Specialization' | 'Professionalism';
   skillAreas: SkillArea[];
-  purposePillar?: 'Health' | 'Wealth' | 'Growth' | 'Direction';
+  purposePillar?: string;
 }
 
 export interface SkillArea {
@@ -419,5 +425,5 @@ export interface MetaRule {
   id: string;
   text: string;
   patternId: string;
-  purposePillar?: 'Health' | 'Wealth' | 'Growth' | 'Direction';
+  purposePillar?: string;
 }

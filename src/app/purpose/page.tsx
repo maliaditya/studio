@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ClipboardCheck, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain } from 'lucide-react';
+import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ClipboardCheck, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,7 +17,7 @@ import { DndContext, type DragEndEvent, useDraggable } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { format, subDays, parseISO, isBefore, startOfToday, addDays, isAfter } from 'date-fns';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 
 interface RuleDetailPopupState {
@@ -148,8 +148,8 @@ const StrategicOverviewDiagram = () => {
              <div className="flex flex-wrap items-stretch justify-center gap-4">
                 <PillarCard icon={<Brain className="h-6 w-6"/>} title="Mind" items={['Focus', 'Learning', 'Creativity']} />
                 <PillarCard icon={<HeartPulse className="h-6 w-6"/>} title="Body" items={['Health', 'Strength', 'Energy']} />
+                <PillarCard icon={<HandHeart className="h-6 w-6"/>} title="Heart" items={['Relationships', 'Emotional Health']} />
                 <PillarCard icon={<TrendingUp className="h-6 w-6"/>} title="Spirit" items={['Meaning', 'Contribution', 'Legacy']} />
-                <PillarCard icon={<ClipboardCheck className="h-6 w-6"/>} title="Heart" items={['Relationships', 'Emotional Health']} />
             </div>
             
             <div className="flex items-center gap-2">
@@ -214,7 +214,7 @@ function PurposePageContent() {
         toast({ title: "Purpose Updated", description: "Your central purpose has been saved." });
     };
 
-    const handleUpdatePillar = (id: string, pillar: 'Health' | 'Wealth' | 'Growth' | 'Direction', type: 'specialization' | 'meta-rule') => {
+    const handleUpdatePillar = (id: string, pillar: string, type: 'specialization' | 'meta-rule') => {
       if (type === 'specialization') {
         setCoreSkills(prev => prev.map(s => s.id === id ? { ...s, purposePillar: pillar } : s));
       } else {
@@ -259,10 +259,10 @@ function PurposePageContent() {
     };
 
     const pillars = [
-        { name: 'Health', icon: <HeartPulse className="h-6 w-6 text-red-500" /> },
-        { name: 'Wealth', icon: <Briefcase className="h-6 w-6 text-green-500" /> },
-        { name: 'Growth', icon: <TrendingUp className="h-6 w-6 text-blue-500" /> },
-        { name: 'Direction', icon: <ClipboardCheck className="h-6 w-6 text-purple-500" /> },
+        { name: 'Mind', icon: <Brain className="h-6 w-6 text-blue-500" />, attributes: ['Focus', 'Learning', 'Creativity'] },
+        { name: 'Body', icon: <HeartPulse className="h-6 w-6 text-red-500" />, attributes: ['Health', 'Strength', 'Energy'] },
+        { name: 'Heart', icon: <HandHeart className="h-6 w-6 text-pink-500" />, attributes: ['Relationships', 'Emotional Health'] },
+        { name: 'Spirit', icon: <TrendingUp className="h-6 w-6 text-purple-500" />, attributes: ['Meaning', 'Contribution', 'Legacy'] },
     ];
     
     const renderMetaRule = (rule: { id: string, text: string, patternId: string, purposePillar?: string }) => {
@@ -278,9 +278,16 @@ function PurposePageContent() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
                         {pillars.map(pillar => (
-                          <DropdownMenuItem key={pillar.name} onSelect={() => handleUpdatePillar(rule.id, pillar.name as any, 'meta-rule')}>
-                            {pillar.name}
-                          </DropdownMenuItem>
+                            <DropdownMenuGroup key={pillar.name}>
+                                <DropdownMenuItem onSelect={() => handleUpdatePillar(rule.id, pillar.name, 'meta-rule')}>
+                                    {pillar.name}
+                                </DropdownMenuItem>
+                                {pillar.attributes.map(attr => (
+                                    <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(rule.id, attr, 'meta-rule')} className="pl-6">
+                                        {attr}
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuGroup>
                         ))}
                       </DropdownMenuContent>
                   </DropdownMenu>
@@ -306,7 +313,7 @@ function PurposePageContent() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     {pillars.map(pillar => {
-                        const rulesForPillar = metaRules.filter(r => r.purposePillar === pillar.name);
+                        const rulesForPillar = metaRules.filter(r => r.purposePillar === pillar.name || pillar.attributes.includes(r.purposePillar || ''));
                         return (
                             <Card key={pillar.name}>
                                 <CardHeader>
@@ -333,6 +340,9 @@ function PurposePageContent() {
                                 <BrainCircuit className="h-6 w-6 text-primary" />
                                 My Central Purpose
                             </CardTitle>
+                            <Button variant="outline" size="sm" onClick={() => setIsEditingPurpose(true)}>
+                              <Edit className="mr-2 h-4 w-4" /> Edit
+                            </Button>
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -341,7 +351,7 @@ function PurposePageContent() {
                                 <Textarea
                                     value={purposeInput}
                                     onChange={(e) => setPurposeInput(e.target.value)}
-                                    placeholder="What is your ultimate goal? What is the core mission that drives you?"
+                                    placeholder="“In Life either you're growing or you're decaying; there's no middle ground. If you're standing still, you're decaying.”"
                                     className="min-h-[100px] text-base"
                                     autoFocus
                                 />
@@ -355,7 +365,7 @@ function PurposePageContent() {
                             </div>
                         ) : (
                             <p className="text-lg text-muted-foreground whitespace-pre-wrap min-h-[5rem] cursor-pointer" onClick={() => { setPurposeInput(purposeStatement); setIsEditingPurpose(true); }}>
-                                {purposeStatement || "Click to define your purpose."}
+                                {purposeStatement || "“In Life either you're growing or you're decaying; there's no middle ground. If you're standing still, you're decaying.”"}
                             </p>
                         )}
                         <StrategicOverviewDiagram />
@@ -381,9 +391,16 @@ function PurposePageContent() {
                                           </DropdownMenuTrigger>
                                           <DropdownMenuContent>
                                             {pillars.map(pillar => (
-                                              <DropdownMenuItem key={pillar.name} onSelect={() => handleUpdatePillar(spec.id, pillar.name as any, 'specialization')}>
-                                                {pillar.name}
-                                              </DropdownMenuItem>
+                                                <DropdownMenuGroup key={pillar.name}>
+                                                    <DropdownMenuItem onSelect={() => handleUpdatePillar(spec.id, pillar.name, 'specialization')}>
+                                                        {pillar.name}
+                                                    </DropdownMenuItem>
+                                                    {pillar.attributes.map(attr => (
+                                                        <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(spec.id, attr, 'specialization')} className="pl-6">
+                                                            {attr}
+                                                        </DropdownMenuItem>
+                                                    ))}
+                                                </DropdownMenuGroup>
                                             ))}
                                           </DropdownMenuContent>
                                         </DropdownMenu>
