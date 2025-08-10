@@ -16,6 +16,7 @@ import type { Resource } from '@/types/workout';
 import { HabitPopup } from '@/components/HabitPopup';
 import { DndContext, type DragEndEvent } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 
 function PurposePageContent() {
@@ -112,13 +113,7 @@ function PurposePageContent() {
     };
 
     const handleOpenHabitPopup = (e: React.MouseEvent, habitId: string) => {
-        const habit = resources.find(r => r.id === habitId);
-        if (habit) {
-            setSelectedHabit({
-                habit,
-                position: { x: e.clientX, y: e.clientY }
-            });
-        }
+        handleOpenNestedPopup(habitId, e);
     };
     
     const handleDragEnd = (event: DragEndEvent) => {
@@ -187,8 +182,8 @@ function PurposePageContent() {
                         
                         {metaRules.length > 0 && (
                             <>
-                                <Separator />
-                                <div className="space-y-4">
+                                <Separator className="my-6" />
+                                <Accordion type="single" collapsible className="w-full space-y-4">
                                     {metaRules.map(rule => {
                                         const pattern = patterns.find(p => p.id === rule.patternId);
                                         if (!pattern) return null;
@@ -196,8 +191,10 @@ function PurposePageContent() {
                                         const categorizedPhrases = pattern.phrases.reduce((acc, phrase) => {
                                             if (phrase.category === 'Habit Cards') return acc;
                                             if (!acc[phrase.category]) {
+                                                // @ts-ignore
                                                 acc[phrase.category] = [];
                                             }
+                                            // @ts-ignore
                                             acc[phrase.category].push(phrase.text);
                                             return acc;
                                         }, {} as Record<string, string[]>);
@@ -205,22 +202,25 @@ function PurposePageContent() {
                                         const linkedHabits = getHabitLinksForRule(rule);
 
                                         return (
-                                            <Card key={rule.id} className="bg-muted/50">
-                                                <CardHeader className="flex flex-row items-center justify-between pb-3">
-                                                    <CardTitle className="text-lg">{rule.text}</CardTitle>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteMetaRule(rule.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                                                </CardHeader>
-                                                <CardContent>
-                                                    <p className="text-sm text-muted-foreground mb-2">Based on pattern: <span className="font-semibold text-foreground">{pattern.name}</span></p>
+                                            <AccordionItem key={rule.id} value={rule.id} className="border bg-muted/30 rounded-lg px-4">
+                                                <div className="flex items-center">
+                                                    <AccordionTrigger className="text-lg flex-grow">{rule.text}</AccordionTrigger>
+                                                    <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleDeleteMetaRule(rule.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                                </div>
+                                                <AccordionContent className="pt-2">
+                                                    <p className="text-sm text-muted-foreground mb-4">Based on pattern: <span className="font-semibold text-foreground">{pattern.name}</span></p>
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                        {Object.entries(categorizedPhrases).map(([category, phrases]) => (
-                                                            <div key={category}>
-                                                                <h4 className="font-medium text-sm mb-1">{category}</h4>
-                                                                <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
-                                                                    {phrases.map((phrase, i) => <li key={i}>{phrase}</li>)}
-                                                                </ul>
-                                                            </div>
-                                                        ))}
+                                                        {Object.entries(categorizedPhrases).map(([category, phrases]) => {
+                                                            if (category === 'Habit Cards') return null;
+                                                            return (
+                                                                <div key={category}>
+                                                                    <h4 className="font-medium text-sm mb-1">{category}</h4>
+                                                                    <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
+                                                                        {phrases.map((phrase, i) => <li key={i}>{phrase}</li>)}
+                                                                    </ul>
+                                                                </div>
+                                                            )
+                                                        })}
                                                         {linkedHabits.length > 0 && (
                                                             <div className="md:col-span-2">
                                                                 <h4 className="font-medium text-sm mb-1">Habits</h4>
@@ -238,11 +238,11 @@ function PurposePageContent() {
                                                             </div>
                                                         )}
                                                     </div>
-                                                </CardContent>
-                                            </Card>
+                                                </AccordionContent>
+                                            </AccordionItem>
                                         )
                                     })}
-                                </div>
+                                </Accordion>
                             </>
                         )}
                     </CardContent>
