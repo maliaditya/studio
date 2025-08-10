@@ -197,14 +197,10 @@ function PurposePageContent() {
     const [editedMetaRuleText, setEditedMetaRuleText] = useState('');
     
     const [ruleDetailPopup, setRuleDetailPopup] = useState<RuleDetailPopupState | null>(null);
-    const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
-    const [today, setToday] = useState<Date | null>(null);
-
+    
     useEffect(() => {
-        const now = new Date();
-        setToday(now);
-        setOneYearAgo(subDays(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 365));
-    }, []);
+        setPurposeInput(purposeStatement);
+    }, [purposeStatement]);
 
     const specializations = React.useMemo(() => {
         return coreSkills.filter(skill => skill.type === 'Specialization');
@@ -303,6 +299,10 @@ function PurposePageContent() {
             </div>
         )
     }
+    
+    const uncategorizedRules = useMemo(() => {
+      return metaRules.filter(r => !r.purposePillar);
+    }, [metaRules]);
 
     return (
         <DndContext onDragEnd={handleDragEnd}>
@@ -311,28 +311,6 @@ function PurposePageContent() {
                     <h1 className="text-4xl font-bold tracking-tight text-primary">
                         Your Purpose
                     </h1>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    {pillars.map(pillar => {
-                        const rulesForPillar = metaRules.filter(r => r.purposePillar === pillar.name || pillar.attributes.includes(r.purposePillar || ''));
-                        return (
-                            <Card key={pillar.name}>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-3 text-xl">{pillar.icon}{pillar.name}</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-2">
-                                    {rulesForPillar.length > 0 ? (
-                                        rulesForPillar.map(renderMetaRule)
-                                    ) : (
-                                        <div className="text-center py-8 text-muted-foreground text-sm">
-                                            <p>No meta-rules assigned.</p>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        )
-                    })}
                 </div>
 
                 <Card className="shadow-lg">
@@ -364,12 +342,47 @@ function PurposePageContent() {
                             </div>
                         ) : (
                             <p className="text-lg text-muted-foreground whitespace-pre-wrap min-h-[5rem] cursor-pointer" onClick={() => { setPurposeInput(purposeStatement); setIsEditingPurpose(true); }}>
-                                {purposeStatement || "“In Life either you're growing or you're decaying; there's no middle ground. If you're standing still, you're decaying.”"}
+                                {purposeStatement || "Click to define your purpose..."}
                             </p>
                         )}
                         <StrategicOverviewDiagram />
                     </CardContent>
                 </Card>
+
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    {pillars.map(pillar => {
+                        const rulesForPillar = metaRules.filter(r => r.purposePillar === pillar.name || pillar.attributes.includes(r.purposePillar || ''));
+                        return (
+                            <Card key={pillar.name}>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-3 text-xl">{pillar.icon}{pillar.name}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                    {rulesForPillar.length > 0 ? (
+                                        rulesForPillar.map(renderMetaRule)
+                                    ) : (
+                                        <div className="text-center py-8 text-muted-foreground text-sm">
+                                            <p>No meta-rules assigned.</p>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )
+                    })}
+                </div>
+                
+                {uncategorizedRules.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Uncategorized Meta-Rules</CardTitle>
+                      <CardDescription>Assign these rules to a pillar using the dropdown menu.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {uncategorizedRules.map(renderMetaRule)}
+                    </CardContent>
+                  </Card>
+                )}
+
 
                 <div>
                     <h2 className="text-2xl font-bold text-center mb-6">How Your Specializations Serve Your Purpose</h2>
@@ -421,6 +434,22 @@ function PurposePageContent() {
                     onClose={() => setRuleDetailPopup(null)}
                 />
             )}
+            {editingMetaRuleId && (
+              <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setEditingMetaRuleId(null)}>
+                  <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" onClick={(e) => e.stopPropagation()}>
+                      <Card className="w-96">
+                          <CardHeader><CardTitle>Edit Meta-Rule</CardTitle></CardHeader>
+                          <CardContent>
+                              <Textarea value={editedMetaRuleText} onChange={(e) => setEditedMetaRuleText(e.target.value)} autoFocus className="min-h-[100px]" />
+                          </CardContent>
+                          <CardFooter className="flex justify-end gap-2">
+                              <Button variant="ghost" onClick={() => setEditingMetaRuleId(null)}>Cancel</Button>
+                              <Button onClick={handleSaveMetaRule}>Save</Button>
+                          </CardFooter>
+                      </Card>
+                  </div>
+              </div>
+            )}
         </DndContext>
     );
 }
@@ -432,3 +461,4 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
