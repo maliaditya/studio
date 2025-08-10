@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -150,13 +151,13 @@ const StrategicOverviewDiagram = () => {
 
     return (
         <div className="flex items-center justify-center p-4 space-x-4 md:space-x-6 overflow-x-auto">
-            <PillarCard icon={<HandHeart className="h-5 w-5"/>} title="Heart" items={['Emotional Health']} />
+            <PillarCard icon={<HandHeart className="h-5 w-5"/>} title="Heart" items={['Relationships', 'Emotional Health']} />
             <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0" />
             
             <div className="flex flex-col space-y-3">
-                <PillarCard icon={<Brain className="h-5 w-5"/>} title="Mind" items={['Focus', 'Learning']} />
-                <PillarCard icon={<HeartPulse className="h-5 w-5"/>} title="Body" items={['Health', 'Energy']} />
-                <PillarCard icon={<TrendingUp className="h-5 w-5"/>} title="Spirit" items={['Contribution']} />
+                <PillarCard icon={<Brain className="h-5 w-5"/>} title="Mind" items={['Focus', 'Learning', 'Creativity']} />
+                <PillarCard icon={<HeartPulse className="h-5 w-5"/>} title="Body" items={['Health', 'Strength', 'Energy']} />
+                <PillarCard icon={<TrendingUp className="h-5 w-5"/>} title="Spirit" items={['Meaning', 'Contribution', 'Legacy']} />
             </div>
 
             <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0" />
@@ -468,3 +469,4 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
