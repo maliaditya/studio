@@ -222,7 +222,7 @@ function PurposePageContent() {
                         Your Purpose
                     </h1>
                     <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-                        Define your central mission. Then, connect your specializations and meta-rules to see how every skill and insight serves your ultimate goal.
+                        “In Life either you're growing or you're decaying; there's no middle ground. If you're standing still, you're decaying.”
                     </p>
                 </div>
                 
