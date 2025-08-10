@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -16,9 +14,9 @@ import { format, addDays, parseISO, subDays } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS } from '@/lib/constants';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause } from 'lucide-react';
+import { X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3 } from 'lucide-react';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import ReactMarkdown from 'react-markdown';
@@ -27,6 +25,245 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { PlusCircle, Link as LinkIcon } from 'lucide-react';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
+
+
+// Helper components for rendering complex cards, moved from resources page.
+const EditableField = ({ field, subField, prefix, suffix, resource, onUpdate, placeholder = "..." }: { 
+    field: keyof Resource, 
+    subField?: string, 
+    prefix: string, 
+    suffix?: string, 
+    resource: Resource, 
+    onUpdate: (updatedResource: Resource) => void,
+    placeholder?: string,
+}) => {
+    const editorRef = useRef<HTMLDivElement>(null);
+    
+    const handleBlur = () => {
+        if (!editorRef.current) return;
+        const editableSpan = editorRef.current.querySelector<HTMLSpanElement>('[contenteditable=true]');
+        const newValue = editableSpan?.textContent || '';
+        
+        let currentValue = '';
+        if (subField && typeof resource[field] === 'object' && resource[field] !== null) {
+            currentValue = (resource[field] as any)[subField] || '';
+        } else {
+            currentValue = (resource[field] as string) || '';
+        }
+
+        if (newValue !== currentValue) {
+            let updatedResource = { ...resource };
+            if (subField && typeof updatedResource[field] === 'object' && updatedResource[field] !== null) {
+                updatedResource[field] = { ...(updatedResource[field] as object), [subField]: newValue };
+            } else if (subField) { // If subField exists but the field is not an object
+                 updatedResource[field] = { [subField]: newValue } as any;
+            } else {
+                updatedResource[field] = newValue as any;
+            }
+            onUpdate(updatedResource);
+        }
+    };
+    
+    let displayValue = '';
+    if (subField && typeof resource[field] === 'object' && resource[field] !== null) {
+      displayValue = (resource[field] as any)[subField] || '';
+    } else {
+      displayValue = (resource[field] as string) || '';
+    }
+
+    return (
+        <div 
+          ref={editorRef}
+          onBlur={handleBlur}
+          className="editable-sentence"
+        >
+          <span contentEditable={false} className="uneditable-text">{prefix}</span>
+          <span 
+            contentEditable={true} 
+            suppressContentEditableWarning={true}
+            className="editable-placeholder"
+            dangerouslySetInnerHTML={{ __html: displayValue || placeholder }} 
+          />
+          {suffix && <span contentEditable={false} className="uneditable-text">{suffix}</span>}
+        </div>
+    );
+};
+
+
+const DoubleEditableField = ({ prefix, infix, suffix, value1, value2, onUpdate1, onUpdate2, placeholder1 = "...", placeholder2 = "..." }: { 
+    prefix: string;
+    infix: string;
+    suffix: string;
+    value1: string;
+    value2: string;
+    onUpdate1: (newValue: string) => void;
+    onUpdate2: (newValue: string) => void;
+    placeholder1?: string;
+    placeholder2?: string;
+}) => {
+    const editorRef = useRef<HTMLDivElement>(null);
+    
+    const handleBlur = () => {
+        if (!editorRef.current) return;
+        const editableSpans = editorRef.current.querySelectorAll<HTMLSpanElement>('[contenteditable=true]');
+        const newValue1 = editableSpans[0]?.textContent || '';
+        const newValue2 = editableSpans[1]?.textContent || '';
+        if (newValue1 !== value1) onUpdate1(newValue1);
+        if (newValue2 !== value2) onUpdate2(newValue2);
+    };
+
+    return (
+        <div 
+          ref={editorRef}
+          onBlur={handleBlur}
+          className="editable-sentence"
+        >
+          <span contentEditable={false} className="uneditable-text">{prefix}</span>
+          <span 
+            contentEditable={true} 
+            suppressContentEditableWarning={true}
+            className="editable-placeholder"
+            dangerouslySetInnerHTML={{ __html: value1 || placeholder1 }} 
+          />
+          <span contentEditable={false} className="uneditable-text">{infix}</span>
+          <span 
+            contentEditable={true} 
+            suppressContentEditableWarning={true}
+            className="editable-placeholder"
+            dangerouslySetInnerHTML={{ __html: value2 || placeholder2 }} 
+          />
+          <span contentEditable={false} className="uneditable-text">{suffix}</span>
+        </div>
+    );
+};
+
+
+const EmotionEditableField = ({ value1, value2, onUpdate1, onUpdate2, label, placeholder1 = "...", placeholder2 = "..." }: { 
+    value1: string;
+    value2: string;
+    onUpdate1: (newValue: string) => void;
+    onUpdate2: (newValue: string) => void;
+    label: string;
+    placeholder1?: string;
+    placeholder2?: string;
+}) => {
+    const editorRef = useRef<HTMLDivElement>(null);
+    
+    const handleBlur = () => {
+        if (!editorRef.current) return;
+        const editableSpans = editorRef.current.querySelectorAll<HTMLSpanElement>('[contenteditable=true]');
+        const newValue1 = editableSpans[0]?.textContent || '';
+        const newValue2 = editableSpans[1]?.textContent || '';
+        if (newValue1 !== value1) onUpdate1(newValue1);
+        if (newValue2 !== value2) onUpdate2(newValue2);
+    };
+
+    return (
+        <div 
+          ref={editorRef}
+          onBlur={handleBlur}
+          className="editable-sentence"
+        >
+          <span contentEditable={false} className="uneditable-text">That one </span>
+          <span 
+            contentEditable={true} 
+            suppressContentEditableWarning={true}
+            className="editable-placeholder"
+            dangerouslySetInnerHTML={{ __html: value1 || placeholder1 }} 
+          />
+          <span contentEditable={false} className="uneditable-text">{label}</span>
+          <span 
+            contentEditable={true} 
+            suppressContentEditableWarning={true}
+            className="editable-placeholder"
+            dangerouslySetInnerHTML={{ __html: value2 || placeholder2 }} 
+          />
+          <span contentEditable={false} className="uneditable-text">.</span>
+        </div>
+    );
+};
+
+const EditableResourcePoint = ({ point, onUpdate, onDelete, onEditLinkText }: { 
+    point: ResourcePoint, 
+    onUpdate: (text: string) => void, 
+    onDelete: () => void,
+    onEditLinkText: (point: ResourcePoint) => void 
+}) => {
+    const { setFloatingVideoUrl } = useAuth();
+    const [isEditing, setIsEditing] = useState(point.text === 'New step...');
+    const [editText, setEditText] = useState(point.text);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    const handleSave = () => {
+        if (editText.trim() === '') {
+            onDelete();
+        } else {
+             onUpdate(editText);
+        }
+        setIsEditing(false);
+    };
+
+    useEffect(() => {
+        if (isEditing && textareaRef.current) {
+            textareaRef.current.focus();
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+    }, [isEditing]);
+    
+    const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setEditText(e.target.value);
+        e.target.style.height = 'auto';
+        e.target.style.height = `${e.target.scrollHeight}px`;
+    }
+
+    return (
+        <li className="flex items-start gap-3 group/item">
+            {point.type === 'code' ? <Code className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
+            point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
+            point.type === 'link' ? <LinkIcon className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
+            <ArrowRight className="h-4 w-4 mt-1.5 text-primary/50 flex-shrink-0" />
+            }
+             <div className="flex-grow min-w-0" onDoubleClick={() => !isEditing && setIsEditing(true)}>
+                {isEditing ? (
+                    <Textarea 
+                        ref={textareaRef} 
+                        value={editText} 
+                        onChange={handleTextareaChange} 
+                        onBlur={handleSave} 
+                        className="text-sm" 
+                        rows={1}
+                    />
+                ) : point.type === 'markdown' ? (
+                    <div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text}</ReactMarkdown></div>
+                ) : point.type === 'code' ? (
+                    <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                ) : point.type === 'link' ? (
+                     <div className="flex-grow min-w-0">
+                        <span 
+                            className="cursor-pointer text-primary hover:underline truncate" 
+                            title={point.text} 
+                            onClick={() => point.text && setFloatingVideoUrl(point.text)}
+                            onContextMenu={(e) => { e.preventDefault(); onEditLinkText(point); }}
+                        >
+                            {point.displayText || point.text || <span className="text-muted-foreground italic">New link...</span>}
+                        </span>
+                    </div>
+                ) : (
+                    <p className="whitespace-pre-wrap break-words">{point.text}</p>
+                )}
+            </div>
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100 flex-shrink-0" onClick={onDelete}>
+                <Trash2 className="h-3 w-3"/>
+            </Button>
+        </li>
+    );
+}
+// ----- End of moved components -----
 
 
 interface PistonsInitialState {
@@ -143,10 +380,9 @@ interface AuthContextType {
   // Resource Popups
   openPopups: Map<string, PopupState>;
   handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => void;
-  handleClosePopup: (resourceId: string) => void;
+  closeAllResourcePopups: () => void;
   handlePopupDragEnd: (event: DragEndEvent) => void;
   ResourcePopup: React.FC<ResourcePopupProps>;
-  closeAllResourcePopups: () => void;
 
   // Intention Popups
   intentionPopups: Map<string, PopupState>;
@@ -470,11 +706,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`core_skills_${username}`); setCoreSkills(d ? JSON.parse(d) : []); } catch (e) { setCoreSkills([]); }
       try { const d = loadItem(`projects_${username}`); setProjects(d ? JSON.parse(d) : []); } catch (e) { setProjects([]); }
 
-      // Professional Experience Data
+      // Professional Experience
       try { const d = loadItem(`companies_${username}`); setCompanies(d ? JSON.parse(d) : []); } catch (e) { setCompanies([]); }
       try { const d = loadItem(`positions_${username}`); setPositions(d ? JSON.parse(d) : []); } catch (e) { setPositions([]); }
       
-      // Purpose Page Data
+      // Purpose & Patterns Data
       const storedPurpose = loadItem(`purpose_data_${username}`);
       if (storedPurpose) {
           const purposeData: PurposeData = JSON.parse(storedPurpose);
@@ -591,7 +827,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`companies_${username}`, JSON.stringify(companies));
       localStorage.setItem(`positions_${username}`, JSON.stringify(positions));
 
-      // Purpose & Patterns
+      // Purpose & Patterns Data
       localStorage.setItem(`purpose_data_${username}`, JSON.stringify({ statement: purposeStatement, specializationPurposes }));
       localStorage.setItem(`patterns_${username}`, JSON.stringify(patterns));
       localStorage.setItem(`meta_rules_${username}`, JSON.stringify(metaRules));
@@ -1461,7 +1697,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsPistonsHeadOpen(true);
   };
   
-  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => {
+  const handleUpdateResource = useCallback((updatedResource: Resource) => {
+    setResources(prev =>
+      prev.map(res => res.id === updatedResource.id ? updatedResource : res)
+    );
+  }, [setResources]);
+
+  const handleClosePopup = useCallback((resourceId: string) => {
+    setOpenPopups(prev => {
+      const newPopups = new Map(prev);
+      const popupsToDelete = new Set<string>();
+      function findChildren(parentId: string) {
+        popupsToDelete.add(parentId);
+        for (const [id, popup] of newPopups.entries()) {
+          if (popup.parentId === parentId) findChildren(id);
+        }
+      }
+      findChildren(resourceId);
+      for (const id of popupsToDelete) {
+        if (playingAudio?.id === id) setPlayingAudio(null);
+        newPopups.delete(id);
+      }
+      return newPopups;
+    });
+  }, [playingAudio]);
+
+  const handleOpenNestedPopup = useCallback((resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => {
     setOpenPopups(prev => {
         const newPopups = new Map(prev);
         const resource = resources.find(r => r.id === resourceId);
@@ -1494,30 +1755,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
         return newPopups;
     });
-  };
+  }, [resources]);
 
   const closeAllResourcePopups = useCallback(() => {
     setOpenPopups(new Map());
   }, []);
 
-  const handleClosePopup = (resourceId: string) => {
-    setOpenPopups(prev => {
-      const newPopups = new Map(prev);
-      const popupsToDelete = new Set<string>();
-      function findChildren(parentId: string) {
-        popupsToDelete.add(parentId);
-        for (const [id, popup] of newPopups.entries()) {
-          if (popup.parentId === parentId) findChildren(id);
-        }
-      }
-      findChildren(resourceId);
-      for (const id of popupsToDelete) {
-        if (playingAudio?.id === id) setPlayingAudio(null);
-        newPopups.delete(id);
-      }
-      return newPopups;
-    });
-  };
+  const ResourcePopup: React.FC<ResourcePopupProps> = useCallback(({ popupState }) => {
+    const resource = resources.find(r => r.id === popupState.resourceId);
+    if (!resource) return null;
+    return <ResourcePopupCard popupState={popupState} resource={resource} onClose={handleClosePopup} onUpdate={handleUpdateResource} onOpenNestedPopup={handleOpenNestedPopup} {...{ playingAudio, setPlayingAudio }} />;
+  }, [resources, handleOpenNestedPopup, handleClosePopup, handleUpdateResource, playingAudio, setPlayingAudio]);
 
   const handlePopupDragEnd = (event: DragEndEvent) => {
       const { active, delta } = event;
@@ -1638,69 +1886,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const ResourcePopup: React.FC<ResourcePopupProps> = useCallback(({ popupState }) => {
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `popup-${popupState.resourceId}` });
-    const resource = resources.find(r => r.id === popupState.resourceId);
-
-    const style: React.CSSProperties = {
-        position: 'fixed',
-        top: popupState.y,
-        left: popupState.x,
-        width: `${popupState.width || 512}px`,
-        willChange: 'transform',
-        zIndex: 80 + popupState.level,
-    };
-    if (transform) {
-        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
-    }
-
-    if (!resource) return null;
-
-    return (
-        <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
-             <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative group">
-                <div 
-                    className="absolute top-2 left-2 z-20 p-1 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
-                    {...listeners}
-                >
-                    <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
-                </div>
-                <CardHeader className="p-3 pt-8 relative flex-shrink-0 text-center">
-                    <div className="flex justify-between items-center">
-                        <CardTitle className="text-base flex items-center gap-2">
-                           <Library className="h-4 w-4" /> <span className="truncate">{resource.name}</span>
-                        </CardTitle>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleClosePopup(popupState.resourceId)}>
-                            <X className="h-4 w-4" />
-                        </Button>
-                    </div>
-                </CardHeader>
-                <div className="flex-grow min-h-0 overflow-y-auto">
-                    <CardContent className="p-3 pt-0">
-                        <ul className="space-y-2 text-sm text-muted-foreground pr-2">
-                            {(resource.points || []).map(point => (
-                                <li key={point.id} className="flex items-start gap-2">
-                                    {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5" /> : point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5" /> : <ArrowRight className="h-4 w-4 mt-0.5" />}
-                                    {point.type === 'card' && point.resourceId ? (
-                                        <button onClick={(e) => { e.stopPropagation(); handleOpenNestedPopup(point.resourceId!, e, popupState); }} className="text-left font-medium text-primary hover:underline">{point.text}</button>
-                                    ) : point.type === 'markdown' ? (
-                                        <div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown></div>
-                                    ) : point.type === 'code' ? (
-                                         <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono">{point.text}</pre>
-                                    ) : (
-                                        <span className="break-words">{point.text}</span>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    </CardContent>
-                </div>
-            </Card>
-        </div>
-    );
-  }, [resources, handleClosePopup, handleOpenNestedPopup]);
-
-
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -1726,10 +1911,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pinnedFolderIds, setPinnedFolderIds,
     activeResourceTabIds, setActiveResourceTabIds,
     selectedResourceFolderId, setSelectedResourceFolderId,
-    openPopups, handleOpenNestedPopup, handleClosePopup,
+    openPopups, handleOpenNestedPopup, 
+    closeAllResourcePopups,
     handlePopupDragEnd,
     ResourcePopup,
-    closeAllResourcePopups,
     intentionPopups, openIntentionPopup, closeIntentionPopup,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
@@ -1777,3 +1962,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
