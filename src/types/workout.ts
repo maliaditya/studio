@@ -378,6 +378,7 @@ export interface Project {
   productType?: string;
   gapAnalysis?: GapAnalysis;
   releases?: Release[];
+  purposePillar?: string;
 }
 
 // Professional Experience Types
@@ -426,4 +427,10 @@ export interface MetaRule {
   text: string;
   patternId: string;
   purposePillar?: string;
+}
+
+export type PistonsInitialState = {
+    view: 'health' | 'projects' | 'specializations' | 'desires' | 'mindset' | 'thoughts';
+    topicId?: string;
+    topicName?: string;
 }

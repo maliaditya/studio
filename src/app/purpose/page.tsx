@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState } from '@/types/workout';
+import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project } from '@/types/workout';
 import { DndContext, type DragEndEvent, useDraggable } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -234,6 +234,8 @@ function PurposePageContent() {
         setSpecializationPurposes,
         coreSkills,
         setCoreSkills,
+        projects,
+        setProjects,
         patterns,
         metaRules,
         setMetaRules,
@@ -264,12 +266,14 @@ function PurposePageContent() {
         toast({ title: "Purpose Updated", description: "Your central purpose has been saved." });
     };
 
-    const handleUpdatePillar = (id: string, pillar: string, type: 'specialization' | 'meta-rule') => {
-      if (type === 'specialization') {
-        setCoreSkills(prev => prev.map(s => s.id === id ? { ...s, purposePillar: pillar as PurposePillar } : s));
-      } else {
-        setMetaRules(prev => prev.map(r => r.id === id ? { ...r, purposePillar: pillar as PurposePillar } : r));
-      }
+    const handleUpdatePillar = (id: string, pillar: string, type: 'specialization' | 'meta-rule' | 'project') => {
+        if (type === 'specialization') {
+            setCoreSkills(prev => prev.map(s => s.id === id ? { ...s, purposePillar: pillar as PurposePillar } : s));
+        } else if (type === 'project') {
+            setProjects(prev => prev.map(p => p.id === id ? { ...p, purposePillar: pillar as PurposePillar } : p));
+        } else {
+            setMetaRules(prev => prev.map(r => r.id === id ? { ...r, purposePillar: pillar as PurposePillar } : r));
+        }
     };
     
     const handleStartEditMetaRule = (e: React.MouseEvent, rule: { id: string, text: string }) => {
@@ -364,6 +368,11 @@ function PurposePageContent() {
     const uncategorizedSkills = useMemo(() => {
         return specializations.filter(s => !s.purposePillar);
     }, [specializations]);
+    
+    const uncategorizedProjects = useMemo(() => {
+        return projects.filter(p => !p.purposePillar);
+    }, [projects]);
+
 
     return (
         <DndContext onDragEnd={handleDragEndLocal}>
@@ -408,6 +417,7 @@ function PurposePageContent() {
                     {pillars.map(pillar => {
                         const rulesForPillar = metaRules.filter(r => r.purposePillar === pillar.name || pillar.attributes.includes(r.purposePillar || ''));
                         const skillsForPillar = specializations.filter(s => s.purposePillar === pillar.name || pillar.attributes.includes(s.purposePillar || ''));
+                        const projectsForPillar = projects.filter(p => p.purposePillar === pillar.name || pillar.attributes.includes(p.purposePillar || ''));
                         
                         return (
                             <Card key={pillar.name}>
@@ -461,13 +471,49 @@ function PurposePageContent() {
                                             )}
                                         </div>
                                     </div>
+                                     <Separator />
+                                    <div>
+                                        <h4 className="font-semibold text-sm mb-2">Projects</h4>
+                                        <div className="space-y-1">
+                                            {projectsForPillar.length > 0 ? (
+                                                projectsForPillar.map(project => (
+                                                    <div key={project.id} className="text-sm p-2 rounded-md flex justify-between items-center group">
+                                                        <span>{project.name}</span>
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
+                                                                <Badge className="capitalize">{project.purposePillar?.[0] || '?'}</Badge>
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent>
+                                                                {pillars.map(p => (
+                                                                    <DropdownMenuGroup key={p.name}>
+                                                                        <DropdownMenuItem onSelect={() => handleUpdatePillar(project.id, p.name, 'project')}>
+                                                                            {p.name}
+                                                                        </DropdownMenuItem>
+                                                                        {p.attributes.map(attr => (
+                                                                            <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(project.id, attr, 'project')} className="pl-6">
+                                                                                {attr}
+                                                                            </DropdownMenuItem>
+                                                                        ))}
+                                                                    </DropdownMenuGroup>
+                                                                ))}
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <p className="text-xs text-muted-foreground text-center py-4">No projects assigned.</p>
+                                            )}
+                                        </div>
+                                    </div>
                                 </CardContent>
                             </Card>
                         )
                     })}
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {uncategorizedRules.length > 0 && (
                       <Card>
                         <CardHeader>
@@ -503,6 +549,42 @@ function PurposePageContent() {
                                                         </DropdownMenuItem>
                                                         {p.attributes.map(attr => (
                                                             <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(skill.id, attr, 'specialization')} className="pl-6">
+                                                                {attr}
+                                                            </DropdownMenuItem>
+                                                        ))}
+                                                    </DropdownMenuGroup>
+                                                ))}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    )}
+                    {uncategorizedProjects.length > 0 && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Uncategorized Projects</CardTitle>
+                                <CardDescription>Assign these projects to a pillar using the dropdown menu.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                {uncategorizedProjects.map(project => (
+                                    <div key={project.id} className="text-sm p-2 rounded-md flex justify-between items-center group hover:bg-muted/50">
+                                        <span>{project.name}</span>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
+                                                <Badge className="capitalize">?</Badge>
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent>
+                                                {pillars.map(p => (
+                                                    <DropdownMenuGroup key={p.name}>
+                                                        <DropdownMenuItem onSelect={() => handleUpdatePillar(project.id, p.name, 'project')}>
+                                                            {p.name}
+                                                        </DropdownMenuItem>
+                                                        {p.attributes.map(attr => (
+                                                            <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(project.id, attr, 'project')} className="pl-6">
                                                                 {attr}
                                                             </DropdownMenuItem>
                                                         ))}
@@ -551,5 +633,6 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
 
