@@ -71,9 +71,9 @@ function PatternsPageContent() {
                     const costText = `That one ${card.trigger.feeling} costs me ${card.benefit}.`;
                     fields.Costs.push({ category: 'Costs', text: costText, mechanismCardId: cardId, mechanismCardName: cardName });
                 }
-                if (card.reward) { // This is a "Benefit" blocked by the negative action
-                    const benefitText = `This blocks ${card.reward}.`;
-                    fields.Benefits.push({ category: 'Benefits', text: benefitText, mechanismCardId: cardId, mechanismCardName: cardName });
+                if (card.reward) { // This is a "Benefit" blocked by the negative action, hence a cost.
+                    const costText = `This blocks ${card.reward}.`;
+                    fields.Costs.push({ category: 'Costs', text: costText, mechanismCardId: cardId, mechanismCardName: cardName });
                 }
                 if (card.law?.premise && card.law?.outcome) {
                     const lawText = `${card.law.premise} cannot happen when ${card.law.outcome}`;
