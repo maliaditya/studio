@@ -358,7 +358,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
 
-  // Purpose Page State
+  // Purpose & Patterns Data
   const [purposeStatement, setPurposeStatement] = useState('');
   const [specializationPurposes, setSpecializationPurposes] = useState<Record<string, string>>({});
   const [patterns, setPatterns] = useState<Pattern[]>([]);
@@ -1603,19 +1603,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [resources, handleClosePopup, handleUpdateResource, handleOpenNestedPopup]);
   
   const GeneralPopup: React.FC<{ popupState: PopupState }> = useCallback(({ popupState }) => {
+    const resource = resources.find(r => r.id === popupState.resourceId);
+    if (!resource) {
+        closeGeneralPopup(popupState.resourceId);
+        return null;
+    }
     return (
         <GeneralResourcePopup
             popupState={popupState}
             onClose={closeGeneralPopup}
             onUpdate={handleUpdateResource}
             onOpenNestedPopup={(resourceId, event, parentState) => {
-                if (cardRef.current) {
-                    openGeneralPopup(resourceId, event, parentState, cardRef.current.getBoundingClientRect());
-                }
+                // This logic needs a ref to the parent card, which is tricky here.
+                // A simpler approach for now is to just open it relative to the event.
+                openGeneralPopup(resourceId, event, parentState);
             }}
         />
     );
-  }, [closeGeneralPopup, handleUpdateResource, openGeneralPopup]);
+  }, [resources, closeGeneralPopup, handleUpdateResource, openGeneralPopup]);
 
 
   const handlePopupDragEnd = (event: DragEndEvent) => {
