@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -111,229 +110,6 @@ const isObsidianUrl = (url: string | undefined): boolean => {
         return urlObj.hostname.includes('obsidian.md') || urlObj.hostname.includes('publish.obsidian.md');
     } catch (e) { return false; }
 };
-
-interface ResourcePopupProps {
-  popupState: PopupState;
-  allResources: Resource[];
-  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
-  onClose: (resourceId: string) => void;
-  onUpdate: (resource: Resource) => void;
-  setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
-  playingAudio: { id: string; isPlaying: boolean } | null;
-}
-
-const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClose, onUpdate, playingAudio, setPlayingAudio }: ResourcePopupProps) => {
-    const resource = allResources.find(r => r.id === popupState.resourceId);
-    const cardRef = useRef<HTMLDivElement>(null);
-    const [editingTitle, setEditingTitle] = useState(false);
-    const audioInputRef = useRef<HTMLInputElement>(null);
-
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({
-        id: `popup-${popupState.resourceId}`,
-    });
-
-    const style: React.CSSProperties = {
-        position: 'fixed',
-        top: popupState.y,
-        left: popupState.x,
-        width: `${popupState.width || 512}px`,
-        willChange: 'transform',
-        zIndex: 65 + (popupState.level || 0),
-    };
-
-    if (transform) {
-        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
-    }
-
-    if (!resource) return null;
-    
-    const handleTitleChange = (newTitle: string) => {
-        onUpdate({ ...resource, name: newTitle });
-    };
-
-    const handleAddPoint = (type: ResourcePoint['type']) => {
-        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: 'New step...', type };
-        const updatedPoints = [...(resource.points || []), newPoint];
-        onUpdate({ ...resource, points: updatedPoints });
-    };
-
-    const handleUpdatePoint = (pointId: string, newText: string) => {
-        const updatedPoints = (resource.points || []).map(p =>
-            p.id === pointId ? { ...p, text: newText } : p
-        );
-        onUpdate({ ...resource, points: updatedPoints });
-    };
-
-    const handleDeletePoint = (pointId: string) => {
-        const updatedPoints = (resource.points || []).filter(p => p.id !== pointId);
-        onUpdate({ ...resource, points: updatedPoints });
-    };
-
-    const handleLinkClick = (e: React.MouseEvent, pointResourceId: string) => {
-      e.stopPropagation();
-      onOpenNestedPopup(pointResourceId, e, popupState);
-    };
-
-    const handleClose = (e: React.MouseEvent | React.PointerEvent) => {
-        e.stopPropagation();
-        setPlayingAudio(null);
-        onClose(resource.id);
-    };
-
-    const getIcon = () => {
-        switch (resource.type) {
-            case 'habit': return <Zap className="h-5 w-5 text-primary"/>;
-            case 'mechanism': return <Workflow className="h-5 w-5 text-primary"/>;
-            case 'card': return <Library className="h-5 w-5 text-primary"/>;
-            default: return <Library className="h-5 w-5 text-primary"/>;
-        }
-    };
-
-    const renderContent = () => {
-        switch (resource.type) {
-            case 'card':
-                return (
-                    <ul className="space-y-3 text-sm text-muted-foreground pr-2">
-                        {(resource.points || []).map(point => (
-                            <EditableResourcePoint 
-                                key={point.id}
-                                point={point}
-                                onUpdate={(newText) => handleUpdatePoint(point.id, newText)}
-                                onDelete={() => handleDeletePoint(point.id)}
-                                onOpenNestedPopup={(e) => onOpenNestedPopup(point.resourceId!, e, popupState)}
-                            />
-                        ))}
-                    </ul>
-                );
-            case 'habit':
-                return (
-                    <div className="space-y-1">
-                        <EditableField field="trigger" subField="action" prefix="Trigger: When I" suffix="." resource={resource} onUpdate={onUpdate} />
-                        <EditableResponse field="response" label="Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState} />
-                        <EditableField field="reward" prefix="Reward:" resource={resource} onUpdate={onUpdate} />
-                        <EditableResponse field="newResponse" label="New Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState}/>
-                    </div>
-                );
-            case 'mechanism':
-                return resource.mechanismFramework === 'positive' ? (
-                     <div className="space-y-4 text-sm">
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Action</h4>
-                            <EditableField field="trigger" subField="action" prefix="When I " suffix="," resource={resource} onUpdate={onUpdate} placeholder="describe the positive action"/>
-                        </div>
-                         <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Mechanism</h4>
-                            <EditableField field="response" subField="visualize" prefix="It causes " suffix=" internally." resource={resource} onUpdate={onUpdate} placeholder="positive internal effect"/>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Benefit</h4>
-                            <EditableField field="benefit" prefix="This enables " suffix="." resource={resource} onUpdate={onUpdate} placeholder="good outcome"/>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Condition</h4>
-                            <DoubleEditableField prefix="Only when " infix=", " suffix=" happens." value1={resource.newResponse?.visualize || ""} value2={resource.newResponse?.action || ""} onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), visualize: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), action: newValue } })} placeholder1="specific condition" placeholder2="good outcome" />
-                        </div>
-                         <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Law</h4>
-                            <DoubleEditableField prefix="" infix=" can only happen when " suffix="." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Positive Condition"/>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Emotion/Image</h4>
-                            <EmotionEditableField value1={resource.trigger?.feeling || ''} value2={resource.reward || ''} onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...(resource.trigger || {}), feeling: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, reward: newValue })} label=" gives me " placeholder1="action/image" placeholder2="positive feeling"/>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="space-y-4 text-sm">
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Action</h4>
-                            <EditableField field="trigger" subField="action" prefix="When I " suffix="," resource={resource} onUpdate={onUpdate} placeholder="describe the negative action"/>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Mechanism</h4>
-                            <EditableField field="response" subField="visualize" prefix="It causes " suffix=" internally." resource={resource} onUpdate={onUpdate} placeholder="negative internal effect"/>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Cost</h4>
-                            <EditableField field="reward" prefix="This blocks " suffix="." resource={resource} onUpdate={onUpdate} placeholder="good outcome"/>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Opposite</h4>
-                            <DoubleEditableField prefix="Only when " infix=", " suffix=" happens." value1={resource.newResponse?.visualize || ""} value2={resource.newResponse?.action || ""} onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), visualize: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), action: newValue } })} placeholder1="avoidance of bad action" placeholder2="good outcome" />
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Law</h4>
-                            <DoubleEditableField prefix="" infix=" cannot happen when " suffix="." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Negative Condition"/>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Emotion/Image</h4>
-                            <EmotionEditableField value1={resource.trigger?.feeling || ''} value2={resource.benefit || ''} onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...(resource.trigger || {}), feeling: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, benefit: newValue })} label=" costs me " placeholder1="action/image" placeholder2="negative consequence"/>
-                        </div>
-                    </div>
-                );
-            default:
-                return <p className="text-sm text-muted-foreground">Unknown resource type.</p>;
-        }
-    };
-
-    return (
-        <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
-            <Card ref={cardRef} className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative group">
-                <div className="absolute top-2 left-2 z-20 p-1 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity" {...listeners}>
-                    <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
-                </div>
-                 <div className="absolute top-2 right-2 z-20 flex items-center">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={handleClose}>
-                        <X className="h-4 w-4" />
-                    </Button>
-                </div>
-                 <CardHeader className="p-3 pt-8 relative flex-shrink-0 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                        {getIcon()}
-                        {editingTitle ? (
-                            <Input 
-                                value={resource.name} 
-                                onChange={(e) => handleTitleChange(e.target.value)} 
-                                onBlur={() => setEditingTitle(false)} 
-                                onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
-                                className="h-8 text-base"
-                                autoFocus
-                            />
-                        ) : (
-                            <CardTitle className="text-base truncate cursor-pointer" onClick={() => setEditingTitle(true)}>
-                                {resource.name}
-                            </CardTitle>
-                        )}
-                    </div>
-                </CardHeader>
-                <div className="flex-grow min-h-0 overflow-y-auto">
-                    <CardContent className="p-3 pt-0">
-                        {renderContent()}
-                    </CardContent>
-                </div>
-                 {resource.type === 'card' && (
-                    <CardFooter className="p-2 flex gap-2">
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button variant="outline" size="sm" className="w-full">
-                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Step
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-48 p-1">
-                               <div className="space-y-1">
-                                    <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('text')}><MessageSquare className="mr-2 h-4 w-4" />Text</Button>
-                                    <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('markdown')}><MessageSquare className="mr-2 h-4 w-4" />Markdown</Button>
-                                    <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('code')}><Code className="mr-2 h-4 w-4" />Code</Button>
-                                    <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('link')}><LinkIcon className="mr-2 h-4 w-4" />Link</Button>
-                               </div>
-                            </PopoverContent>
-                        </Popover>
-                    </CardFooter>
-                 )}
-            </Card>
-        </div>
-    );
-};
-
 
 interface ResourceCardComponentProps {
     resource: Resource; 
@@ -695,7 +471,7 @@ function ResourcesPageContent() {
   
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   
-  const [youtubeModalState, setYoutubeModalState] = useState<{
+  const [youtubeModalState, setYoutubeModalState = useState<{
     isOpen: boolean;
     playlist: Resource[];
     currentIndex: number;
@@ -708,20 +484,20 @@ function ResourcesPageContent() {
   } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
-  const [deleteConfirmation, setDeleteConfirmation] = useState<{ item: ResourceFolder | Resource } | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation = useState<{ item: ResourceFolder | Resource } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isFetchingMeta, setIsFetchingMeta] = useState(false);
   
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
-  const [mindMapRootFolderId, setMindMapRootFolderId] = useState<string | null>(null);
+  const [mindMapRootFolderId, setMindMapRootFolderId = useState<string | null>(null);
   
-  const [addResourceType, setAddResourceType] = useState<'link' | 'card' | 'habit' | 'model3d' | 'mechanism'>('link');
-  const [mechanismFramework, setMechanismFramework] = useState<'negative' | 'positive'>('negative');
+  const [addResourceType, setAddResourceType = useState<'link' | 'card' | 'habit' | 'model3d' | 'mechanism'>('link');
+  const [mechanismFramework, setMechanismFramework = useState<'negative' | 'positive'>('negative');
 
-  const [shareDialogOpen, setShareDialogOpen] = useState(false);
-  const [shareUrl, setShareUrl] = useState('');
+  const [shareDialogOpen, setShareDialogOpen = useState(false);
+  const [shareUrl, setShareUrl = useState('');
 
-  const [markdownModalState, setMarkdownModalState] = useState<{
+  const [markdownModalState, setMarkdownModalState = useState<{
     isOpen: boolean;
     resourceId: string | null;
     pointId: string | null;
@@ -729,14 +505,14 @@ function ResourcesPageContent() {
   
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   
-  const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
+  const [playingAudio, setPlayingAudio = useState<{ id: string; isPlaying: boolean } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
-  const [linkingFromId, setLinkingFromId] = useState<string | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [linkingFromId, setLinkingFromId = useState<string | null>(null);
+  const [activeId, setActiveId = useState<string | null>(null);
   
-  const [searchTerm, setSearchTerm] = useState('');
-  const [modelModalState, setModelModalState] = useState<{ isOpen: boolean; modelUrl: string | null }>({ isOpen: false, modelUrl: null });
+  const [searchTerm, setSearchTerm = useState('');
+  const [modelModalState, setModelModalState = useState<{ isOpen: boolean; modelUrl: string | null }>({ isOpen: false, modelUrl: null });
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -1451,8 +1227,8 @@ function ResourcesPageContent() {
   }, [activeResourceTabIds, pinnedFolderIds]);
   
 
-  const [linkTextDialog, setLinkTextDialog] = useState<{ point: ResourcePoint, resourceId: string } | null>(null);
-  const [currentDisplayText, setCurrentDisplayText] = useState('');
+  const [linkTextDialog, setLinkTextDialog = useState<{ point: ResourcePoint, resourceId: string } | null>(null);
+  const [currentDisplayText, setCurrentDisplayText = useState('');
 
   const handleEditLinkText = (point: ResourcePoint) => {
     const resource = resources.find(r => r.points?.some(p => p.id === point.id));
@@ -1569,215 +1345,216 @@ function ResourcesPageContent() {
 
 
   return (
-    <DndContext
-      sensors={useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))}
-      onDragStart={(e) => setActiveId(e.active.id.toString())}
-      onDragEnd={handleDragEnd}
-    >
+    <>
       <audio ref={audioRef} onEnded={() => setPlayingAudio(null)} />
-      <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            {/* Left Sidebar */}
-            <aside className="md:col-span-1 space-y-6">
-            <Card>
-                <CardHeader>
-                <div className="flex justify-between items-center">
-                    <CardTitle>Folders</CardTitle>
-                </div>
-                </CardHeader>
-                <CardContent>
-                    <div className="relative mb-4">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                            value={searchTerm} 
-                            onChange={e => setSearchTerm(e.target.value)} 
-                            placeholder="Search folders & cards..."
-                            className="pl-10"
-                        />
-                    </div>
-                    <form onSubmit={handleAddFolder} className="flex gap-2 mb-4">
-                        <Input value={newFolderName} onChange={e => setNewFolderName(e.target.value)} placeholder="New Root Folder" />
-                        <Button size="icon" type="submit"><PlusCircle className="h-4 w-4" /></Button>
-                    </form>
-                    {renderSidebarFolders(null, 0)}
-                </CardContent>
-            </Card>
-            </aside>
+      <DndContext
+        sensors={sensors}
+        onDragStart={(e) => setActiveId(e.active.id.toString())}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+              {/* Left Sidebar */}
+              <aside className="md:col-span-1 space-y-6">
+              <Card>
+                  <CardHeader>
+                  <div className="flex justify-between items-center">
+                      <CardTitle>Folders</CardTitle>
+                  </div>
+                  </CardHeader>
+                  <CardContent>
+                      <div className="relative mb-4">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input 
+                              value={searchTerm} 
+                              onChange={e => setSearchTerm(e.target.value)} 
+                              placeholder="Search folders & cards..."
+                              className="pl-10"
+                          />
+                      </div>
+                      <form onSubmit={handleAddFolder} className="flex gap-2 mb-4">
+                          <Input value={newFolderName} onChange={e => setNewFolderName(e.target.value)} placeholder="New Root Folder" />
+                          <Button size="icon" type="submit"><PlusCircle className="h-4 w-4" /></Button>
+                      </form>
+                      {renderSidebarFolders(null, 0)}
+                  </CardContent>
+              </Card>
+              </aside>
 
-            {/* Main Content */}
-            <main className="md:col-span-3">
-                 <div
-                    ref={tabsContainerRef}
-                    onWheel={handleWheelScroll}
-                    className="flex items-center border-b mb-4 overflow-x-auto"
-                >
-                    {sortedTabs.map(tabId => {
-                        const folder = resourceFolders.find(f => f.id === tabId);
-                        if (!folder) return null;
-                        const isPinned = pinnedFolderIds.has(tabId);
-                        return (
-                            <button
-                                key={tabId}
-                                onClick={() => setSelectedResourceFolderId(tabId)}
-                                className={cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2",
-                                    selectedResourceFolderId === tabId 
-                                        ? "border-primary text-primary" 
-                                        : "border-transparent text-muted-foreground hover:bg-muted"
-                                )}
-                            >
-                                {isPinned && <Pin className="h-3 w-3 text-primary flex-shrink-0" />}
-                                <Folder className="h-4 w-4" />
-                                <span className="whitespace-nowrap">{folder.name}</span>
-                                {!isPinned && (
-                                    <X className="h-4 w-4 ml-2 hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleCloseTab(tabId); }} />
-                                )}
-                            </button>
-                        );
-                    })}
-                </div>
-                <div>
-                <h2 className="text-2xl font-bold mb-4">
-                    {selectedResourceFolderId && !searchTerm
-                    ? resourceFolders.find(f => f.id === selectedResourceFolderId)?.name
-                    : searchTerm ? `Search results for "${searchTerm}"` : 'Select a folder'}
-                </h2>
-                
-                <SortableContext items={filteredResources.map(r => r.id)}>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {filteredResources.map(res => {
-                             const hasMarkdownContent = res.type === 'card' && (res.points || []).some(p => p.type === 'markdown' || p.type === 'code');
-                             const cardClassName = hasMarkdownContent ? "lg:col-span-3" : "";
- 
-                            let cardContent: React.ReactNode;
-                            
-                            if (res.type === 'model3d') {
-                                cardContent = (
-                                    <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl h-full">
-                                        <CardHeader className="p-3">
-                                            <div className="flex justify-between items-start gap-2">
-                                                <CardTitle className="text-sm flex items-center gap-2">
-                                                    <span className="text-primary"><View className="h-4 w-4" /></span>
-                                                    <span className="truncate">{res.name}</span>
-                                                </CardTitle>
-                                                <div className="flex items-center">
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setModelModalState({ isOpen: true, modelUrl: res.modelUrl || null })}>
-                                                        <Expand className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteResource(res)}>
-                                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent className="flex-grow flex items-center justify-center bg-black/10 dark:bg-black/20 aspect-video">
-                                            {res.modelUrl ? <ModelViewer modelUrl={res.modelUrl} /> : <p className="text-muted-foreground">No model</p>}
-                                        </CardContent>
-                                    </Card>
-                                );
-                            } else if (res.type === 'habit') {
-                                cardContent = <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} />;
-                            } else if (res.type === 'mechanism') {
-                                cardContent = <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} />;
-                            } else if(res.type === 'card') {
-                                cardContent = <ResourceCardComponent resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
-                            } else {
-                                const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
-                                const isGif = isGifUrl(res.link);
-                                const imageEmbedUrl = isImageUrl(res.link) && !isGif ? res.link : null;
-                                const isObsidianUrlLink = isObsidianUrl(res.link);
+              {/* Main Content */}
+              <main className="md:col-span-3">
+                   <div
+                      ref={tabsContainerRef}
+                      onWheel={handleWheelScroll}
+                      className="flex items-center border-b mb-4 overflow-x-auto"
+                  >
+                      {sortedTabs.map(tabId => {
+                          const folder = resourceFolders.find(f => f.id === tabId);
+                          if (!folder) return null;
+                          const isPinned = pinnedFolderIds.has(tabId);
+                          return (
+                              <button
+                                  key={tabId}
+                                  onClick={() => setSelectedResourceFolderId(tabId)}
+                                  className={cn(
+                                      "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2",
+                                      selectedResourceFolderId === tabId 
+                                          ? "border-primary text-primary" 
+                                          : "border-transparent text-muted-foreground hover:bg-muted"
+                                  )}
+                              >
+                                  {isPinned && <Pin className="h-3 w-3 text-primary flex-shrink-0" />}
+                                  <Folder className="h-4 w-4" />
+                                  <span className="whitespace-nowrap">{folder.name}</span>
+                                  {!isPinned && (
+                                      <X className="h-4 w-4 ml-2 hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleCloseTab(tabId); }} />
+                                  )}
+                              </button>
+                          );
+                      })}
+                  </div>
+                  <div>
+                  <h2 className="text-2xl font-bold mb-4">
+                      {selectedResourceFolderId && !searchTerm
+                      ? resourceFolders.find(f => f.id === selectedResourceFolderId)?.name
+                      : searchTerm ? `Search results for "${searchTerm}"` : 'Select a folder'}
+                  </h2>
+                  
+                  <SortableContext items={filteredResources.map(r => r.id)}>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                          {filteredResources.map(res => {
+                               const hasMarkdownContent = res.type === 'card' && (res.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+                               const cardClassName = hasMarkdownContent ? "lg:col-span-3" : "";
+   
+                              let cardContent: React.ReactNode;
+                              
+                              if (res.type === 'model3d') {
+                                  cardContent = (
+                                      <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl h-full">
+                                          <CardHeader className="p-3">
+                                              <div className="flex justify-between items-start gap-2">
+                                                  <CardTitle className="text-sm flex items-center gap-2">
+                                                      <span className="text-primary"><View className="h-4 w-4" /></span>
+                                                      <span className="truncate">{res.name}</span>
+                                                  </CardTitle>
+                                                  <div className="flex items-center">
+                                                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setModelModalState({ isOpen: true, modelUrl: res.modelUrl || null })}>
+                                                          <Expand className="h-4 w-4" />
+                                                      </Button>
+                                                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteResource(res)}>
+                                                          <Trash2 className="h-4 w-4 text-destructive" />
+                                                      </Button>
+                                                  </div>
+                                              </div>
+                                          </CardHeader>
+                                          <CardContent className="flex-grow flex items-center justify-center bg-black/10 dark:bg-black/20 aspect-video">
+                                              {res.modelUrl ? <ModelViewer modelUrl={res.modelUrl} /> : <p className="text-muted-foreground">No model</p>}
+                                          </CardContent>
+                                      </Card>
+                                  );
+                              } else if (res.type === 'habit') {
+                                  cardContent = <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} />;
+                              } else if (res.type === 'mechanism') {
+                                  cardContent = <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} />;
+                              } else if(res.type === 'card') {
+                                  cardContent = <ResourceCardComponent resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
+                              } else {
+                                  const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
+                                  const isGif = isGifUrl(res.link);
+                                  const imageEmbedUrl = isImageUrl(res.link) && !isGif ? res.link : null;
+                                  const isObsidianUrlLink = isObsidianUrl(res.link);
 
-                                const cardProps: any = {};
-                                if (isGif && res.linkedResourceId) {
-                                  cardProps.onClick = (e: React.MouseEvent) => handleOpenNestedPopup(res.linkedResourceId!, e);
-                                } else if (youtubeEmbedUrl) {
-                                  cardProps.onClick = (e: React.MouseEvent) => {
-                                      e.stopPropagation();
-                                      setYoutubeModalState({isOpen: true, playlist: filteredResources.filter(r => getYouTubeEmbedUrl(r.link)), currentIndex: filteredResources.filter(r => getYouTubeEmbedUrl(r.link)).findIndex(v => v.id === res.id) });
-                                  };
-                                }
-                                
-                                return (
-                                <SortableResourceCard key={res.id} item={res} className={cardClassName} linkingFromId={linkingFromId}>
-                                     <Card
-                                        {...cardProps}
-                                        className={cn(
-                                            "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full bg-card",
-                                            (youtubeEmbedUrl || (isGif && res.linkedResourceId)) && "cursor-pointer"
-                                        )}
-                                    >
-                                        <CardHeader className="flex-row items-center gap-3 p-3 space-y-0">
-                                            {res.iconUrl ? <Image src={res.iconUrl} alt="" width={16} height={16} className="flex-shrink-0" unoptimized/> : <Globe className="h-4 w-4 flex-shrink-0"/>}
-                                            <CardTitle className="text-sm truncate flex-grow" title={res.name}>{res.name}</CardTitle>
-                                        </CardHeader>
-                                        <div className="absolute top-2 right-2 z-30 flex items-center gap-1">
-                                            {res.githubLink && (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><a href={res.githubLink} target="_blank" rel="noopener noreferrer"><Github className="h-4 w-4"/></a></Button>)}
-                                            {res.demoLink && (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><a href={res.demoLink} target="_blank" rel="noopener noreferrer"><Globe className="h-4 w-4"/></a></Button>)}
-                                            {youtubeEmbedUrl && <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setFloatingVideoUrl(res.link!); }}><PictureInPicture className="h-4 w-4" /></Button>}
-                                            {youtubeEmbedUrl && <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setYoutubeModalState({isOpen: true, playlist: [res], currentIndex: 0}); }}><Expand className="h-4 w-4" /></Button>}
-                                            <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                                        </div>
-                                        {imageEmbedUrl ? (
-                                            <>
-                                                <div className="aspect-video w-full bg-black overflow-hidden relative">
-                                                    <Image src={imageEmbedUrl} alt={res.name} layout="fill" objectFit="contain" data-ai-hint="illustration" />
-                                                </div>
-                                            </>
-                                        ) : isGif ? (
-                                            <>
-                                                <div className="aspect-video w-full bg-black overflow-hidden relative">
-                                                    <Image src={res.link!} alt={res.name} layout="fill" objectFit="contain" data-ai-hint="illustration" />
-                                                </div>
-                                            </>
-                                        ) : youtubeEmbedUrl ? (
-                                            <div className="h-full flex flex-col">
-                                                <div className="aspect-video w-full bg-black overflow-hidden">
-                                                   <iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
-                                                </div>
-                                            </div>
-                                        ) : isObsidianUrlLink && res.link ? (
-                                            <div className="flex flex-col h-full">
-                                                <div className="flex-grow min-h-0 aspect-[4/3]">
-                                                    <iframe src={res.link} title={res.name} frameBorder="0" className="w-full h-full" />
-                                                </div>
-                                                <div className="p-2 border-t flex items-center gap-2">
-                                                    <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
-                                                    <Button variant="outline" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="p-4 flex flex-col flex-grow">
-                                                <a href={res.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline mt-1">{res.link}</a>
-                                                <p className="text-sm text-muted-foreground mt-3 line-clamp-2 flex-grow min-h-[40px]">{res.description || 'No description available.'}</p>
-                                                <div className="mt-auto pt-4 flex items-center gap-2">
-                                                    <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
-                                                    {res.link && (
-                                                        <Button variant="outline" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </Card>
-                                </SortableResourceCard>
-                                )
-                            }
-                             return <SortableResourceCard key={res.id} item={res} className={cardClassName} linkingFromId={linkingFromId}>{cardContent}</SortableResourceCard>;
-                        })}
-                        {selectedResourceFolderId && !searchTerm && (
-                            <Card 
-                                onClick={() => setIsAdding(true)}
-                                className="rounded-3xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[220px] hover:shadow-xl hover:-translate-y-1"
-                            >
-                                <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add New Resource</p>
-                            </Card>
-                            )}
-                    </div>
-                </SortableContext>
-                </div>
-            </main>
-        </div>
-        </div>
+                                  const cardProps: any = {};
+                                  if (isGif && res.linkedResourceId) {
+                                    cardProps.onClick = (e: React.MouseEvent) => handleOpenNestedPopup(res.linkedResourceId!, e);
+                                  } else if (youtubeEmbedUrl) {
+                                    cardProps.onClick = (e: React.MouseEvent) => {
+                                        e.stopPropagation();
+                                        setYoutubeModalState({isOpen: true, playlist: filteredResources.filter(r => getYouTubeEmbedUrl(r.link)), currentIndex: filteredResources.filter(r => getYouTubeEmbedUrl(r.link)).findIndex(v => v.id === res.id) });
+                                    };
+                                  }
+                                  
+                                  return (
+                                  <SortableResourceCard key={res.id} item={res} className={cardClassName} linkingFromId={linkingFromId}>
+                                       <Card
+                                          {...cardProps}
+                                          className={cn(
+                                              "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full bg-card",
+                                              (youtubeEmbedUrl || (isGif && res.linkedResourceId)) && "cursor-pointer"
+                                          )}
+                                      >
+                                          <CardHeader className="flex-row items-center gap-3 p-3 space-y-0">
+                                              {res.iconUrl ? <Image src={res.iconUrl} alt="" width={16} height={16} className="flex-shrink-0" unoptimized/> : <Globe className="h-4 w-4 flex-shrink-0"/>}
+                                              <CardTitle className="text-sm truncate flex-grow" title={res.name}>{res.name}</CardTitle>
+                                          </CardHeader>
+                                          <div className="absolute top-2 right-2 z-30 flex items-center gap-1">
+                                              {res.githubLink && (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><a href={res.githubLink} target="_blank" rel="noopener noreferrer"><Github className="h-4 w-4"/></a></Button>)}
+                                              {res.demoLink && (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><a href={res.demoLink} target="_blank" rel="noopener noreferrer"><Globe className="h-4 w-4"/></a></Button>)}
+                                              {youtubeEmbedUrl && <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setFloatingVideoUrl(res.link!); }}><PictureInPicture className="h-4 w-4" /></Button>}
+                                              {youtubeEmbedUrl && <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setYoutubeModalState({isOpen: true, playlist: [res], currentIndex: 0}); }}><Expand className="h-4 w-4" /></Button>}
+                                              <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                                          </div>
+                                          {imageEmbedUrl ? (
+                                              <>
+                                                  <div className="aspect-video w-full bg-black overflow-hidden relative">
+                                                      <Image src={imageEmbedUrl} alt={res.name} layout="fill" objectFit="contain" data-ai-hint="illustration" />
+                                                  </div>
+                                              </>
+                                          ) : isGif ? (
+                                              <>
+                                                  <div className="aspect-video w-full bg-black overflow-hidden relative">
+                                                      <Image src={res.link!} alt={res.name} layout="fill" objectFit="contain" data-ai-hint="illustration" />
+                                                  </div>
+                                              </>
+                                          ) : youtubeEmbedUrl ? (
+                                              <div className="h-full flex flex-col">
+                                                  <div className="aspect-video w-full bg-black overflow-hidden">
+                                                     <iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+                                                  </div>
+                                              </div>
+                                          ) : isObsidianUrlLink && res.link ? (
+                                              <div className="flex flex-col h-full">
+                                                  <div className="flex-grow min-h-0 aspect-[4/3]">
+                                                      <iframe src={res.link} title={res.name} frameBorder="0" className="w-full h-full" />
+                                                  </div>
+                                                  <div className="p-2 border-t flex items-center gap-2">
+                                                      <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
+                                                      <Button variant="outline" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
+                                                  </div>
+                                              </div>
+                                          ) : (
+                                              <div className="p-4 flex flex-col flex-grow">
+                                                  <a href={res.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline mt-1">{res.link}</a>
+                                                  <p className="text-sm text-muted-foreground mt-3 line-clamp-2 flex-grow min-h-[40px]">{res.description || 'No description available.'}</p>
+                                                  <div className="mt-auto pt-4 flex items-center gap-2">
+                                                      <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
+                                                      {res.link && (
+                                                          <Button variant="outline" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
+                                                      )}
+                                                  </div>
+                                              </div>
+                                          )}
+                                      </Card>
+                                  </SortableResourceCard>
+                                  )
+                              }
+                               return <SortableResourceCard key={res.id} item={res} className={cardClassName} linkingFromId={linkingFromId}>{cardContent}</SortableResourceCard>;
+                          })}
+                          {selectedResourceFolderId && !searchTerm && (
+                              <Card 
+                                  onClick={() => setIsAdding(true)}
+                                  className="rounded-3xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[220px] hover:shadow-xl hover:-translate-y-1"
+                              >
+                                  <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                  <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add New Resource</p>
+                              </Card>
+                              )}
+                      </div>
+                  </SortableContext>
+                  </div>
+              </main>
+          </div>
+          </div>
         {contextMenu && (
             <div ref={contextMenuRef} style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }} className="fixed z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => e.stopPropagation()}>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { togglePinFolder(contextMenu.item.id); setContextMenu(null); }}>
@@ -2029,7 +1806,7 @@ function ResourcesPageContent() {
               </div>
           </DialogContent>
         </Dialog>
-    </DndContext>
+      </DndContext>
     </>
   );
 }
@@ -2044,8 +1821,8 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
 }) => {
     const { setFloatingVideoUrl } = useAuth();
     
-    const [isEditing, setIsEditing] = useState(point.text === 'New step...');
-    const [editText, setEditText] = useState(point.text);
+    const [isEditing, setIsEditing = useState(point.text === 'New step...');
+    const [editText, setEditText = useState(point.text);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const handleSave = () => {
@@ -2057,7 +1834,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
         setIsEditing(false);
     };
 
-    useEffect(() => {
+    React.useEffect(() => {
         if (isEditing && textareaRef.current) {
             textareaRef.current.focus();
             textareaRef.current.style.height = 'auto';
@@ -2124,9 +1901,6 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
-
     
 
     
-
-
