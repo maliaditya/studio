@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -158,7 +158,7 @@ interface AuthContextType {
   generalPopups: Map<string, PopupState>;
   openGeneralPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => void;
   closeGeneralPopup: (resourceId: string) => void;
-  GeneralPopup: React.FC<{ popupState: PopupState }>;
+  handleUpdateResource: (resource: Resource) => void;
 
 
   // Workout Log Handlers
@@ -357,7 +357,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Professional Experience
   const [companies, setCompanies] = useState<Company[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
-
+  
   // Purpose & Patterns Data
   const [purposeStatement, setPurposeStatement] = useState('');
   const [specializationPurposes, setSpecializationPurposes] = useState<Record<string, string>>({});
@@ -1598,70 +1598,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         onClose={handleClosePopup}
         onUpdate={handleUpdateResource}
         onOpenNestedPopup={handleOpenNestedPopup}
+        resources={resources}
       />
     )
   }, [resources, handleClosePopup, handleUpdateResource, handleOpenNestedPopup]);
   
-  const GeneralPopup: React.FC<{ popupState: PopupState }> = useCallback(({ popupState }) => {
-    const resource = resources.find(r => r.id === popupState.resourceId);
-    if (!resource) {
-        closeGeneralPopup(popupState.resourceId);
-        return null;
-    }
-    return (
-        <GeneralResourcePopup
-            popupState={popupState}
-            onClose={closeGeneralPopup}
-            onUpdate={handleUpdateResource}
-            onOpenNestedPopup={(resourceId, event, parentState) => {
-                // This logic needs a ref to the parent card, which is tricky here.
-                // A simpler approach for now is to just open it relative to the event.
-                openGeneralPopup(resourceId, event, parentState);
-            }}
-        />
-    );
-  }, [resources, closeGeneralPopup, handleUpdateResource, openGeneralPopup]);
-
-
   const handlePopupDragEnd = (event: DragEndEvent) => {
-      const { active, delta } = event;
-      const activeId = active.id as string;
-  
-      if (activeId.startsWith('popup-')) {
-          const resourceId = activeId.replace('popup-', '');
-          setOpenPopups(prev => {
-              const newPopups = new Map(prev);
-              const popup = newPopups.get(resourceId);
-              if (popup) {
-                  newPopups.set(resourceId, {
-                      ...popup,
-                      x: popup.x + delta.x,
-                      y: popup.y + delta.y,
-                  });
-              }
-              return newPopups;
-          });
-      } else if (activeId.startsWith('general-popup-')) {
-          const resourceId = activeId.replace('general-popup-', '');
-          setGeneralPopups(prev => {
-              const newPopups = new Map(prev);
-              const popup = newPopups.get(resourceId);
-              if (popup) {
-                  newPopups.set(resourceId, { ...popup, x: popup.x + delta.x, y: popup.y + delta.y });
-              }
-              return newPopups;
-          });
-      } else if (activeId.startsWith('intention-popup-')) {
+    const { active, delta } = event;
+    const activeId = active.id as string;
+    const { x, y } = delta;
+
+    setGeneralPopups(prev => {
+        const newPopups = new Map(prev);
+        const popup = newPopups.get(activeId.replace('general-popup-', ''));
+        if (popup) {
+            newPopups.set(popup.resourceId, { ...popup, x: popup.x + x, y: popup.y + y });
+        }
+        return newPopups;
+    });
+
+    if (activeId.startsWith('intention-popup-')) {
         const intentionId = activeId.replace('intention-popup-', '');
         setIntentionPopups(prev => {
             const newPopups = new Map(prev);
             const popup = newPopups.get(intentionId);
             if (popup) {
-                newPopups.set(intentionId, { ...popup, x: popup.x + delta.x, y: popup.y + delta.y });
+                newPopups.set(intentionId, { ...popup, x: popup.x + x, y: popup.y + y });
             }
             return newPopups;
         });
-      }
+    }
   };
 
   const handleUpdateSkillArea = (skillId: string, areaId: string, name: string, purpose: string) => {
@@ -1783,7 +1749,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     handlePopupDragEnd,
     ResourcePopup,
     intentionPopups, openIntentionPopup, closeIntentionPopup,
-    generalPopups, openGeneralPopup, closeGeneralPopup, GeneralPopup,
+    generalPopups, openGeneralPopup, closeGeneralPopup,
+    handleUpdateResource,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,
