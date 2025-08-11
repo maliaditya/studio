@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -34,6 +33,7 @@ import { MindMapViewer } from '@/components/MindMapViewer';
 import { IntentionDetailPopup } from '@/components/IntentionDetailModal';
 import { SkillLibrary } from '@/components/SkillLibrary';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 function SkillPageContent() {
   const { toast } = useToast();
