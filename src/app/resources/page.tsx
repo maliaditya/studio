@@ -117,11 +117,16 @@ interface ResourcePopupProps {
   allResources: Resource[];
   onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
   onClose: (resourceId: string) => void;
+  onUpdate: (resource: Resource) => void;
+  setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
+  playingAudio: { id: string; isPlaying: boolean } | null;
 }
 
-const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClose }: ResourcePopupProps) => {
+const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClose, onUpdate, playingAudio, setPlayingAudio }: ResourcePopupProps) => {
     const resource = allResources.find(r => r.id === popupState.resourceId);
     const cardRef = useRef<HTMLDivElement>(null);
+    const [editingTitle, setEditingTitle] = useState(false);
+    const audioInputRef = useRef<HTMLInputElement>(null);
 
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `popup-${popupState.resourceId}`,
@@ -131,8 +136,9 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
         position: 'fixed',
         top: popupState.y,
         left: popupState.x,
-        width: `${popupState.width}px`,
+        width: `${popupState.width || 512}px`,
         willChange: 'transform',
+        zIndex: 65 + (popupState.level || 0),
     };
 
     if (transform) {
@@ -140,56 +146,189 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
     }
 
     if (!resource) return null;
+    
+    const handleTitleChange = (newTitle: string) => {
+        onUpdate({ ...resource, name: newTitle });
+    };
+
+    const handleAddPoint = (type: ResourcePoint['type']) => {
+        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: 'New step...', type };
+        const updatedPoints = [...(resource.points || []), newPoint];
+        onUpdate({ ...resource, points: updatedPoints });
+    };
+
+    const handleUpdatePoint = (pointId: string, newText: string) => {
+        const updatedPoints = (resource.points || []).map(p =>
+            p.id === pointId ? { ...p, text: newText } : p
+        );
+        onUpdate({ ...resource, points: updatedPoints });
+    };
+
+    const handleDeletePoint = (pointId: string) => {
+        const updatedPoints = (resource.points || []).filter(p => p.id !== pointId);
+        onUpdate({ ...resource, points: updatedPoints });
+    };
 
     const handleLinkClick = (e: React.MouseEvent, pointResourceId: string) => {
       e.stopPropagation();
       onOpenNestedPopup(pointResourceId, e, popupState);
     };
 
+    const handleClose = (e: React.MouseEvent | React.PointerEvent) => {
+        e.stopPropagation();
+        setPlayingAudio(null);
+        onClose(resource.id);
+    };
+
+    const getIcon = () => {
+        switch (resource.type) {
+            case 'habit': return <Zap className="h-5 w-5 text-primary"/>;
+            case 'mechanism': return <Workflow className="h-5 w-5 text-primary"/>;
+            case 'card': return <Library className="h-5 w-5 text-primary"/>;
+            default: return <Library className="h-5 w-5 text-primary"/>;
+        }
+    };
+
+    const renderContent = () => {
+        switch (resource.type) {
+            case 'card':
+                return (
+                    <ul className="space-y-3 text-sm text-muted-foreground pr-2">
+                        {(resource.points || []).map(point => (
+                            <EditableResourcePoint 
+                                key={point.id}
+                                point={point}
+                                onUpdate={(newText) => handleUpdatePoint(point.id, newText)}
+                                onDelete={() => handleDeletePoint(point.id)}
+                                onOpenNestedPopup={(e) => onOpenNestedPopup(point.resourceId!, e, popupState)}
+                            />
+                        ))}
+                    </ul>
+                );
+            case 'habit':
+                return (
+                    <div className="space-y-1">
+                        <EditableField field="trigger" subField="action" prefix="Trigger: When I" suffix="." resource={resource} onUpdate={onUpdate} />
+                        <EditableResponse field="response" label="Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState} />
+                        <EditableField field="reward" prefix="Reward:" resource={resource} onUpdate={onUpdate} />
+                        <EditableResponse field="newResponse" label="New Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState}/>
+                    </div>
+                );
+            case 'mechanism':
+                return resource.mechanismFramework === 'positive' ? (
+                     <div className="space-y-4 text-sm">
+                        <div>
+                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Action</h4>
+                            <EditableField field="trigger" subField="action" prefix="When I " suffix="," resource={resource} onUpdate={onUpdate} placeholder="describe the positive action"/>
+                        </div>
+                         <div>
+                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Mechanism</h4>
+                            <EditableField field="response" subField="visualize" prefix="It causes " suffix=" internally." resource={resource} onUpdate={onUpdate} placeholder="positive internal effect"/>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Benefit</h4>
+                            <EditableField field="benefit" prefix="This enables " suffix="." resource={resource} onUpdate={onUpdate} placeholder="good outcome"/>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Condition</h4>
+                            <DoubleEditableField prefix="Only when " infix=", " suffix=" happens." value1={resource.newResponse?.visualize || ""} value2={resource.newResponse?.action || ""} onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), visualize: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), action: newValue } })} placeholder1="specific condition" placeholder2="good outcome" />
+                        </div>
+                         <div>
+                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Law</h4>
+                            <DoubleEditableField prefix="" infix=" can only happen when " suffix="." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Positive Condition"/>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Emotion/Image</h4>
+                            <EmotionEditableField value1={resource.trigger?.feeling || ''} value2={resource.reward || ''} onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...(resource.trigger || {}), feeling: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, reward: newValue })} label=" gives me " placeholder1="action/image" placeholder2="positive feeling"/>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="space-y-4 text-sm">
+                        <div>
+                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Action</h4>
+                            <EditableField field="trigger" subField="action" prefix="When I " suffix="," resource={resource} onUpdate={onUpdate} placeholder="describe the negative action"/>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Mechanism</h4>
+                            <EditableField field="response" subField="visualize" prefix="It causes " suffix=" internally." resource={resource} onUpdate={onUpdate} placeholder="negative internal effect"/>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Cost</h4>
+                            <EditableField field="reward" prefix="This blocks " suffix="." resource={resource} onUpdate={onUpdate} placeholder="good outcome"/>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Opposite</h4>
+                            <DoubleEditableField prefix="Only when " infix=", " suffix=" happens." value1={resource.newResponse?.visualize || ""} value2={resource.newResponse?.action || ""} onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), visualize: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), action: newValue } })} placeholder1="avoidance of bad action" placeholder2="good outcome" />
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Law</h4>
+                            <DoubleEditableField prefix="" infix=" cannot happen when " suffix="." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Negative Condition"/>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Emotion/Image</h4>
+                            <EmotionEditableField value1={resource.trigger?.feeling || ''} value2={resource.benefit || ''} onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...(resource.trigger || {}), feeling: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, benefit: newValue })} label=" costs me " placeholder1="action/image" placeholder2="negative consequence"/>
+                        </div>
+                    </div>
+                );
+            default:
+                return <p className="text-sm text-muted-foreground">Unknown resource type.</p>;
+        }
+    };
+
     return (
-        <div ref={setNodeRef} style={style} {...attributes} className="z-[60]">
-            <Card ref={cardRef} className="shadow-2xl border-2 border-primary/50 bg-card max-h-[70vh] flex flex-col">
-                <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
-                    <CardTitle className="text-base flex items-center gap-2">
-                        <Library className="h-4 w-4" />
-                        <span className="truncate">{resource.name}</span>
-                    </CardTitle>
+        <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
+            <Card ref={cardRef} className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative group">
+                <div className="absolute top-2 left-2 z-20 p-1 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity" {...listeners}>
+                    <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
+                </div>
+                 <div className="absolute top-2 right-2 z-20 flex items-center">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={handleClose}>
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+                 <CardHeader className="p-3 pt-8 relative flex-shrink-0 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                        {getIcon()}
+                        {editingTitle ? (
+                            <Input 
+                                value={resource.name} 
+                                onChange={(e) => handleTitleChange(e.target.value)} 
+                                onBlur={() => setEditingTitle(false)} 
+                                onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
+                                className="h-8 text-base"
+                                autoFocus
+                            />
+                        ) : (
+                            <CardTitle className="text-base truncate cursor-pointer" onClick={() => setEditingTitle(true)}>
+                                {resource.name}
+                            </CardTitle>
+                        )}
+                    </div>
                 </CardHeader>
                 <div className="flex-grow min-h-0 overflow-y-auto">
                     <CardContent className="p-3 pt-0">
-                        <ul className="space-y-2 text-sm text-muted-foreground pr-2">
-                            {(resource.points || []).map(point => (
-                                <li key={point.id} className="flex items-start gap-2">
-                                    {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                    point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                    <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
-                                    }
-                                    {point.type === 'card' && point.resourceId ? (
-                                        <button
-                                            onClick={(e) => handleLinkClick(e, point.resourceId!)}
-                                            className="text-left font-medium text-primary hover:underline"
-                                        >
-                                            {point.text}
-                                        </button>
-                                    ) : point.type === 'markdown' ? (
-                                        <div className="w-full prose dark:prose-invert prose-sm">
-                                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
-                                        </div>
-                                    ) : point.type === 'code' ? (
-                                         <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
-                                    ) : (
-                                        <span className="break-words w-full" title={point.text}>{point.text}</span>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
+                        {renderContent()}
                     </CardContent>
                 </div>
-                <CardFooter className="p-2 flex justify-end flex-shrink-0 relative">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onClose(resource.id); }}>
-                        <X className="h-4 w-4" />
-                    </Button>
-                </CardFooter>
+                 {resource.type === 'card' && (
+                    <CardFooter className="p-2 flex gap-2">
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="w-full">
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Step
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-48 p-1">
+                               <div className="space-y-1">
+                                    <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('text')}><MessageSquare className="mr-2 h-4 w-4" />Text</Button>
+                                    <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('markdown')}><MessageSquare className="mr-2 h-4 w-4" />Markdown</Button>
+                                    <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('code')}><Code className="mr-2 h-4 w-4" />Code</Button>
+                                    <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('link')}><LinkIcon className="mr-2 h-4 w-4" />Link</Button>
+                               </div>
+                            </PopoverContent>
+                        </Popover>
+                    </CardFooter>
+                 )}
             </Card>
         </div>
     );
@@ -608,8 +747,7 @@ function ResourcesPageContent() {
         const resource = resources.find(r => r.id === resourceId);
         if (!resource) return newPopups;
         
-        const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
-        const popupWidth = hasMarkdown ? 896 : 512;
+        const popupWidth = (resource.type === 'habit' || resource.type === 'mechanism') ? 420 : 512;
     
         let x, y, level, parentId;
     
@@ -621,13 +759,8 @@ function ResourcesPageContent() {
         } else {
             level = 0;
             parentId = undefined;
-            if (hasMarkdown) {
-                x = window.innerWidth / 2 - popupWidth / 2;
-                y = window.innerHeight / 2 - Math.min(window.innerHeight * 0.7, 700) / 2;
-            } else {
-                x = event.clientX;
-                y = event.clientY;
-            }
+            x = event.clientX;
+            y = event.clientY;
         }
         
         newPopups.set(resourceId, {
@@ -658,19 +791,11 @@ function ResourcesPageContent() {
     });
   }, [playingAudio]);
   
-  const handleSizeChange = useCallback((resourceId: string, newSize: { width: number; height: number }) => {
-    setOpenPopups(prev => {
-        const newPopups = new Map(prev);
-        const popup = newPopups.get(resourceId);
-        if (popup) {
-            newPopups.set(resourceId, {
-                ...popup,
-                ...newSize
-            });
-        }
-        return newPopups;
-    });
-  }, []);
+  const handleUpdateResource = (updatedResource: Resource) => {
+    setResources(prev =>
+      prev.map(res => res.id === updatedResource.id ? updatedResource : res)
+    );
+  };
 
   const handleLinkClick = useCallback((resourceId: string) => {
     if (linkingFromId === null) {
@@ -1605,11 +1730,11 @@ function ResourcesPageContent() {
                                     </Card>
                                 );
                             } else if (res.type === 'habit') {
-                                cardContent = <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={handleOpenNestedPopup} />;
+                                cardContent = <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} />;
                             } else if (res.type === 'mechanism') {
-                                cardContent = <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={handleOpenNestedPopup} />;
+                                cardContent = <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} />;
                             } else if(res.type === 'card') {
-                                cardContent = <ResourceCardComponent resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
+                                cardContent = <ResourceCardComponent resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                 const isGif = isGifUrl(res.link);
@@ -1712,8 +1837,11 @@ function ResourcesPageContent() {
                 key={popupState.resourceId}
                 popupState={popupState}
                 allResources={resources}
-                onOpenNestedPopup={handleOpenNestedPopup}
+                onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e, popupState)}
                 onClose={handleClosePopup}
+                onUpdate={handleUpdateResource}
+                playingAudio={playingAudio}
+                setPlayingAudio={setPlayingAudio}
             />
         ))}
         <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-[60]">
@@ -1722,8 +1850,8 @@ function ResourcesPageContent() {
                 const parentPopup = openPopups.get(popup.parentId);
                 if (!parentPopup) return null;
 
-                const startX = parentPopup.x + (parentPopup.width || 0) / 2;
-                const startY = parentPopup.y + ((parentPopup.height || 0) / 2);
+                const startX = popupState.x + (popupState.width || 0) / 2;
+                const startY = popupState.y + ((popupState.height || 0) / 2);
                 const endX = popup.x + (popup.width || 0) / 2;
                 const endY = popup.y + ((popup.height || 0) / 2);
                 
@@ -2117,3 +2245,4 @@ export default function ResourcesPage() {
     
 
     
+
