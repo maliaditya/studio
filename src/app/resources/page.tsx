@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -110,6 +109,183 @@ const isObsidianUrl = (url: string | undefined): boolean => {
         const urlObj = new URL(url);
         return urlObj.hostname.includes('obsidian.md') || urlObj.hostname.includes('publish.obsidian.md');
     } catch (e) { return false; }
+};
+
+interface ResourcePopupProps {
+  popupState: PopupState;
+  resource: Resource;
+  onClose: (resourceId: string) => void;
+  onUpdate: (resource: Resource) => void;
+  playingAudio: { id: string; isPlaying: boolean } | null;
+  setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
+  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
+  onEditLinkText: (point: ResourcePoint) => void;
+}
+
+const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAudio, setPlayingAudio, onOpenNestedPopup, onEditLinkText }: ResourcePopupProps) => {
+    const { resources } = useAuth();
+    const [editingTitle, setEditingTitle] = useState(false);
+    const audioInputRef = useRef<HTMLInputElement>(null);
+
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({
+        id: `popup-${popupState.resourceId}`,
+    });
+
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: popupState.y,
+        left: popupState.x,
+        width: `${popupState.width}px`,
+        willChange: 'transform',
+    };
+
+    if (transform) {
+        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
+    }
+
+    if (!resource) return null;
+
+    const handleLinkClick = (e: React.MouseEvent, pointResourceId: string) => {
+      e.stopPropagation();
+      onOpenNestedPopup(pointResourceId, e, popupState);
+    };
+    
+    const handleTitleChange = (newTitle: string) => {
+        onUpdate({ ...resource, name: newTitle });
+    };
+
+    const handleAddPoint = (type: ResourcePoint['type']) => {
+        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: 'New step...', type };
+        const updatedPoints = [...(resource.points || []), newPoint];
+        onUpdate({ ...resource, points: updatedPoints });
+    };
+
+    const handleAddCardLinkPoint = (linkedCardId: string) => {
+        if (!linkedCardId) return;
+        const linkedCard = resources.find(r => r.id === linkedCardId);
+        if (!linkedCard) return;
+
+        const newPoint: ResourcePoint = {
+            id: `point_${Date.now()}`,
+            type: 'card',
+            text: linkedCard.name,
+            resourceId: linkedCardId
+        };
+        const updatedPoints = [...(resource.points || []), newPoint];
+        onUpdate({ ...resource, points: updatedPoints });
+    };
+
+    const handleDeletePoint = (pointId: string) => {
+        const updatedPoints = (resource.points || []).filter(p => p.id !== pointId);
+        onUpdate({ ...resource, points: updatedPoints });
+    };
+
+    const handleAudioUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const audioUrl = e.target?.result as string;
+                onUpdate({ ...resource, audioUrl });
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const togglePlayAudio = (e: React.MouseEvent | React.PointerEvent) => {
+        e.stopPropagation();
+        setPlayingAudio(prev => {
+            if (prev?.id === resource.id && prev.isPlaying) {
+                return { ...prev, isPlaying: false };
+            }
+            return { id: resource.id, isPlaying: true };
+        });
+    };
+    
+    return (
+        <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
+            <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
+            <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col">
+                <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
+                    <div className="flex justify-between items-start gap-2">
+                        <div className="flex items-center gap-2 flex-grow min-w-0">
+                            {editingTitle ? (
+                                <Input value={resource.name} onChange={(e) => handleTitleChange(e.target.value)} onBlur={() => setEditingTitle(false)} autoFocus className="text-lg font-semibold h-9" />
+                            ) : (
+                                <CardTitle className="flex items-center gap-3 text-lg cursor-pointer" onClick={() => setEditingTitle(true)}>
+                                    <span className="text-primary"><Library className="h-5 w-5" /></span>
+                                    <span className="truncate">{resource.name}</span>
+                                </CardTitle>
+                            )}
+                        </div>
+                        <div className="flex items-center">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); onClose(resource.id); }}>
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+                </CardHeader>
+                <div className="flex-grow min-h-0 overflow-y-auto">
+                    <CardContent className="p-3 pt-0">
+                         <ul className="space-y-2 text-sm text-muted-foreground pr-2">
+                            {(resource.points || []).map(point => (
+                                <EditableResourcePoint 
+                                    key={point.id}
+                                    point={point}
+                                    onUpdate={(newText) => onUpdate({...resource, points: resource.points?.map(p => p.id === point.id ? {...p, text: newText} : p)}) }
+                                    onDelete={() => handleDeletePoint(point.id)}
+                                    onOpenNestedPopup={(e) => onOpenNestedPopup(point.resourceId!, e, popupState)}
+                                    onEditLinkText={onEditLinkText}
+                                />
+                            ))}
+                        </ul>
+                    </CardContent>
+                </div>
+                 <CardFooter className="p-2 flex gap-2">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="w-full">
+                                <PlusCircle className="mr-2 h-4 w-4" /> Add Step
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-48 p-1">
+                           <div className="space-y-1">
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('text')}><MessageSquare className="mr-2 h-4 w-4" />Text</Button>
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('markdown')}><MessageSquare className="mr-2 h-4 w-4" />Markdown</Button>
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('code')}><Code className="mr-2 h-4 w-4" />Code</Button>
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('link')}><LinkIcon className="mr-2 h-4 w-4" />Link</Button>
+                           </div>
+                        </PopoverContent>
+                    </Popover>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                             <Button variant="outline" size="sm" className="w-full">
+                                <LinkIcon className="mr-2 h-4 w-4" /> Link Card
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80">
+                           <div className="grid gap-4">
+                               <div className="space-y-2">
+                                   <h4 className="font-medium leading-none">Link Card</h4>
+                                   <p className="text-sm text-muted-foreground">Select an existing card to link as a step.</p>
+                               </div>
+                                <div className="space-y-2">
+                                    <Select onValueChange={handleAddCardLinkPoint}>
+                                        <SelectTrigger><SelectValue placeholder="Select a card..."/></SelectTrigger>
+                                        <SelectContent>
+                                            {resources.filter(r => (r.type === 'card' || r.type === 'habit' || r.type === 'mechanism') && r.id !== resource.id).map(r => (
+                                                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                           </div>
+                        </PopoverContent>
+                    </Popover>
+                 </CardFooter>
+            </Card>
+        </div>
+    );
 };
 
 const ResourceCardComponent = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText, onClosePopup, onConvertToCard }: { 
@@ -456,7 +632,6 @@ function ResourcesPageContent() {
     selectedResourceFolderId,
     setSelectedResourceFolderId,
     globalVolume,
-    openGeneralPopup,
   } = useAuth();
   const { toast } = useToast();
   
@@ -491,7 +666,7 @@ function ResourcesPageContent() {
   const [mindMapRootFolderId, setMindMapRootFolderId] = useState<string | null>(null);
   
   const [addResourceType, setAddResourceType] = useState<'link' | 'card' | 'habit' | 'model3d' | 'mechanism'>('link');
-  const [mechanismFramework, setMechanismFramework]<'negative' | 'positive'>('negative');
+  const [mechanismFramework, setMechanismFramework] = useState<'negative' | 'positive'>('negative');
 
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
@@ -513,13 +688,81 @@ function ResourcesPageContent() {
   const [searchTerm, setSearchTerm] = useState('');
   const [modelModalState, setModelModalState] = useState<{ isOpen: boolean; modelUrl: string | null }>({ isOpen: false, modelUrl: null });
 
+  const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
-  const handleLinkClick = useCallback((resourceId: string) => {
-    const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => {
-        openGeneralPopup(resourceId, event, parentPopupState, parentRect);
-    };
+  const handleOpenNestedPopup = useCallback((resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
+    setOpenPopups(prev => {
+        const newPopups = new Map(prev);
+        const resource = resources.find(r => r.id === resourceId);
+        if (!resource) return newPopups;
+        
+        const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+        const popupWidth = hasMarkdown ? 896 : 512;
+    
+        let x, y, level, parentId;
+    
+        if (parentPopupState) {
+            level = parentPopupState.level + 1;
+            parentId = parentPopupState.resourceId;
+            x = parentPopupState.x + 40;
+            y = parentPopupState.y + 40;
+        } else {
+            level = 0;
+            parentId = undefined;
+            if (hasMarkdown) {
+                x = window.innerWidth / 2 - popupWidth / 2;
+                y = window.innerHeight / 2 - Math.min(window.innerHeight * 0.7, 700) / 2;
+            } else {
+                x = event.clientX;
+                y = event.clientY;
+            }
+        }
+        
+        newPopups.set(resourceId, {
+            resourceId, level, x, y, parentId, width: popupWidth
+        });
+        return newPopups;
+    });
+  }, [resources]);
 
+   const handleClosePopup = useCallback((resourceId: string) => {
+    setOpenPopups(prev => {
+      const newPopups = new Map(prev);
+      const popupsToDelete = new Set<string>();
+      function findChildren(parentId: string) {
+        popupsToDelete.add(parentId);
+        for (const [id, popup] of newPopups.entries()) {
+          if (popup.parentId === parentId) findChildren(id);
+        }
+      }
+      findChildren(resourceId);
+      for (const id of popupsToDelete) {
+        if (playingAudio?.id === id) {
+            setPlayingAudio(null);
+        }
+        newPopups.delete(id);
+      }
+      return newPopups;
+    });
+  }, [playingAudio]);
+  
+  const handleSizeChange = useCallback((resourceId: string, newSize: { width: number; height: number }) => {
+    setOpenPopups(prev => {
+        const newPopups = new Map(prev);
+        const popup = newPopups.get(resourceId);
+        if (popup) {
+            newPopups.set(resourceId, {
+                ...popup,
+                ...newSize
+            });
+        }
+        return newPopups;
+    });
+  }, []);
+
+  const handleLinkClick = useCallback((resourceId: string) => {
     if (linkingFromId === null) {
       const sourceCard = resources.find(r => r.id === resourceId);
       if (sourceCard?.type !== 'card' && sourceCard?.type !== 'habit' && sourceCard?.type !== 'mechanism') {
@@ -594,7 +837,7 @@ function ResourcesPageContent() {
       setLinkingFromId(null);
       toast({ title: "Success!", description: `Linked "${sourceCard.name}" to "${targetCard.name}" and moved it to the "${targetCard.name}" folder.` });
     }
-  }, [linkingFromId, resources, resourceFolders, setResourceFolders, setResources, toast, openGeneralPopup]);
+  }, [linkingFromId, resources, resourceFolders, setResourceFolders, setResources, toast]);
 
   useEffect(() => {
     const audioEl = audioRef.current;
@@ -1452,11 +1695,11 @@ function ResourcesPageContent() {
                                     </Card>
                                 );
                             } else if (res.type === 'habit') {
-                                cardContent = <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={() => {}} />;
+                                cardContent = <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event)} />;
                             } else if (res.type === 'mechanism') {
-                                cardContent = <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={() => {}} />;
+                                cardContent = <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event)} />;
                             } else if(res.type === 'card') {
-                                cardContent = <ResourceCardComponent resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={() => {}} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
+                                cardContent = <ResourceCardComponent resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={(resourceId, event) => handleOpenNestedPopup(resourceId, event)} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                 const isGif = isGifUrl(res.link);
@@ -1465,7 +1708,7 @@ function ResourcesPageContent() {
 
                                 const cardProps: any = {};
                                 if (isGif && res.linkedResourceId) {
-                                  cardProps.onClick = (e: React.MouseEvent) => {};
+                                  cardProps.onClick = (e: React.MouseEvent) => handleOpenNestedPopup(res.linkedResourceId!, e);
                                 } else if (youtubeEmbedUrl) {
                                   cardProps.onClick = (e: React.MouseEvent) => {
                                       e.stopPropagation();
@@ -1554,6 +1797,48 @@ function ResourcesPageContent() {
             </main>
         </div>
         </div>
+        {Array.from(openPopups.values()).map(popupState => {
+            const resource = resources.find(r => r.id === popupState.resourceId);
+            if (!resource) return null;
+            return (
+                <ResourcePopupCard
+                    key={popupState.resourceId}
+                    popupState={popupState}
+                    resource={resource}
+                    onClose={handleClosePopup}
+                    onUpdate={handleUpdateResource}
+                    playingAudio={playingAudio}
+                    setPlayingAudio={setPlayingAudio}
+                    onOpenNestedPopup={handleOpenNestedPopup}
+                    onEditLinkText={handleEditLinkText}
+                />
+            );
+        })}
+        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-[60]">
+            {Array.from(openPopups.values()).map(popup => {
+                if (!popup.parentId) return null;
+                const parentPopup = openPopups.get(popup.parentId);
+                if (!parentPopup) return null;
+
+                const startX = parentPopup.x + (parentPopup.width || 0) / 2;
+                const startY = parentPopup.y + 20;
+                const endX = popup.x + (popup.width || 0) / 2;
+                const endY = popup.y + 20;
+
+                const d = `M ${startX},${startY} L ${endX},${endY}`;
+
+                return (
+                <path
+                    key={`${popup.parentId}-${popup.resourceId}`}
+                    d={d}
+                    stroke="hsl(var(--primary))"
+                    strokeWidth="1"
+                    strokeOpacity="0.3"
+                    fill="none"
+                />
+                )
+            })}
+        </svg>
         <Dialog open={!!linkTextDialog} onOpenChange={() => setLinkTextDialog(null)}>
             <DialogContent>
                 <DialogHeader>
@@ -1926,5 +2211,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
+    
 
     
