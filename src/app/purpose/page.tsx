@@ -350,6 +350,10 @@ function PurposePageContent() {
       return metaRules.filter(r => !r.purposePillar);
     }, [metaRules]);
 
+    const uncategorizedSkills = useMemo(() => {
+        return specializations.filter(s => !s.purposePillar);
+    }, [specializations]);
+
     return (
         <DndContext onDragEnd={handleDragEnd}>
             <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
@@ -452,17 +456,56 @@ function PurposePageContent() {
                     })}
                 </div>
                 
-                {uncategorizedRules.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Uncategorized Meta-Rules</CardTitle>
-                      <CardDescription>Assign these rules to a pillar using the dropdown menu.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      {uncategorizedRules.map(renderMetaRule)}
-                    </CardContent>
-                  </Card>
-                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {uncategorizedRules.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Uncategorized Meta-Rules</CardTitle>
+                          <CardDescription>Assign these rules to a pillar using the dropdown menu.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          {uncategorizedRules.map(renderMetaRule)}
+                        </CardContent>
+                      </Card>
+                    )}
+                    {uncategorizedSkills.length > 0 && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Uncategorized Specializations</CardTitle>
+                                <CardDescription>Assign these skills to a pillar using the dropdown menu.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                {uncategorizedSkills.map(skill => (
+                                    <div key={skill.id} className="text-sm p-2 rounded-md flex justify-between items-center group hover:bg-muted/50">
+                                        <span>{skill.name}</span>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
+                                                <Badge className="capitalize">?</Badge>
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent>
+                                                {pillars.map(p => (
+                                                    <DropdownMenuGroup key={p.name}>
+                                                        <DropdownMenuItem onSelect={() => handleUpdatePillar(skill.id, p.name, 'specialization')}>
+                                                            {p.name}
+                                                        </DropdownMenuItem>
+                                                        {p.attributes.map(attr => (
+                                                            <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(skill.id, attr, 'specialization')} className="pl-6">
+                                                                {attr}
+                                                            </DropdownMenuItem>
+                                                        ))}
+                                                    </DropdownMenuGroup>
+                                                ))}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+
             </div>
             {ruleDetailPopup && (
                 <RuleDetailPopupCard 
@@ -497,3 +540,4 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
