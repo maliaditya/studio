@@ -466,6 +466,7 @@ function ResourcesPageContent() {
     selectedResourceFolderId,
     setSelectedResourceFolderId,
     globalVolume,
+    openGeneralPopup,
   } = useAuth();
   const { toast } = useToast();
   
@@ -526,6 +527,9 @@ function ResourcesPageContent() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
+  const handleOpenNestedPopup = useCallback((resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => {
+    openGeneralPopup(resourceId, event, parentPopupState, parentRect);
+  }, [openGeneralPopup]);
 
   useEffect(() => {
     const audioEl = audioRef.current;
