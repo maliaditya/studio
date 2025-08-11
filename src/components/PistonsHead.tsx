@@ -353,10 +353,4 @@ const StarredView = () => {
             </ScrollArea>
         </CardContent>
     );
-}
-
-interface LogEntry {
-    id: string;
-    text: string;
-    timestamp: number;
-}
+};
