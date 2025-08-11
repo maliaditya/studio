@@ -196,7 +196,7 @@ const MainPistonView = ({ onSelect }: { onSelect: (view: 'desires' | 'thoughts' 
     </CardContent>
 );
 
-const ThoughtsView = ({ onSelect }: { onSelect: ('Fantasy' | 'Disruptive') => void }) => (
+const ThoughtsView = ({ onSelect }: { onSelect: (type: 'Fantasy' | 'Disruptive') => void }) => (
     <CardContent className="p-4">
         <div className="grid grid-cols-2 gap-4">
             <Button onClick={() => onSelect('Fantasy')} variant="outline" className="flex-col h-20"><ThumbsUp className="h-6 w-6 text-green-500 mb-1"/>Fantasy</Button>
@@ -205,7 +205,7 @@ const ThoughtsView = ({ onSelect }: { onSelect: ('Fantasy' | 'Disruptive') => vo
     </CardContent>
 );
 
-const NegativeThoughtsView = ({ onSelect, onSchedule }: { onSelect: (state: EmotionalState) => void; onSchedule: (e: React.MouseEvent<HTMLButtonElement>, state: EmotionalState) => void; }) => {
+const NegativeThoughtsView = ({ onSelect, onSchedule }: { onSelect: (state: EmotionalState) => void, onSchedule: () => void }) => {
     return (
         <CardContent className="p-4">
             <ScrollArea className="h-80">
@@ -224,7 +224,7 @@ const NegativeThoughtsView = ({ onSelect, onSchedule }: { onSelect: (state: Emot
     );
 };
 
-const PositiveThoughtsView = ({ onSelect, onSchedule }: { onSelect: (state: FantasyState) => void; onSchedule: (e: React.MouseEvent<HTMLButtonElement>, state: FantasyState) => void; }) => {
+const PositiveThoughtsView = ({ onSelect, onSchedule }: { onSelect: (state: FantasyState) => void, onSchedule: () => void }) => {
     return (
         <CardContent className="p-4">
             <ScrollArea className="h-80">
@@ -354,3 +354,5 @@ const StarredView = () => {
         </CardContent>
     );
 };
+
+    
