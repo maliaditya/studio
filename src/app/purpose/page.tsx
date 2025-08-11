@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar } from '@/types/workout';
+import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState } from '@/types/workout';
 import { DndContext, type DragEndEvent, useDraggable } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -28,9 +28,10 @@ interface RuleDetailPopupState {
 }
 
 const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPopupState; onClose: () => void; }) => {
-    const { patterns, habitCards, mechanismCards, handleOpenNestedPopup } = useAuth();
+    const { patterns, habitCards, mechanismCards, openGeneralPopup } = useAuth();
     const { rule, x, y } = popupState;
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `rule-popup-${rule.id}` });
+    const cardRef = useRef<HTMLDivElement>(null);
 
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -77,7 +78,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
 
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
-            <Card className="w-[600px] shadow-2xl border-2 border-primary/30 bg-card">
+            <Card ref={cardRef} className="w-[600px] shadow-2xl border-2 border-primary/30 bg-card">
                 <CardHeader className="p-4 relative cursor-grab" {...listeners}>
                     <div className="flex justify-between items-start">
                         <div className="flex-grow pr-10">
@@ -116,8 +117,14 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
                                                 key={i} 
                                                 className="bg-muted/50 cursor-pointer hover:bg-muted"
                                                 onClick={(e) => {
-                                                    if (handleOpenNestedPopup) {
-                                                        handleOpenNestedPopup(habit.habitId, e);
+                                                    if (cardRef.current) {
+                                                        const parentPopupState = {
+                                                            resourceId: rule.id,
+                                                            x,
+                                                            y,
+                                                            level: 0,
+                                                        }
+                                                        openGeneralPopup(habit.habitId, e, parentPopupState, cardRef.current.getBoundingClientRect());
                                                     }
                                                 }}
                                             >
@@ -230,9 +237,8 @@ function PurposePageContent() {
         patterns,
         metaRules,
         setMetaRules,
-        handleOpenNestedPopup,
-        habitCards,
-        mechanismCards,
+        generalPopups,
+        handlePopupDragEnd
     } = useAuth();
     const { toast } = useToast();
 
@@ -291,14 +297,19 @@ function PurposePageContent() {
         setRuleDetailPopup({ rule, x: e.clientX, y: e.clientY });
     };
     
-    const handleDragEnd = (event: DragEndEvent) => {
+    const handleDragEndLocal = (event: DragEndEvent) => {
         const { active, delta } = event;
-        if (ruleDetailPopup && active.id === `rule-popup-${ruleDetailPopup.rule.id}`) {
+        const activeId = active.id as string;
+    
+        if (ruleDetailPopup && activeId === `rule-popup-${ruleDetailPopup.rule.id}`) {
             setRuleDetailPopup(prev => prev ? {
                 ...prev,
                 x: prev.x + delta.x,
                 y: prev.y + delta.y,
             } : null);
+        } else {
+            // Forward to global handler if it's not the local popup
+            handlePopupDragEnd(event);
         }
     };
 
@@ -355,7 +366,7 @@ function PurposePageContent() {
     }, [specializations]);
 
     return (
-        <DndContext onDragEnd={handleDragEnd}>
+        <DndContext onDragEnd={handleDragEndLocal}>
             <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
                 <Card className="shadow-lg">
                     <CardHeader>
@@ -540,4 +551,5 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
