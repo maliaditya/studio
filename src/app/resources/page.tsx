@@ -280,7 +280,7 @@ const ResourceCardComponent = ({ resource, onUpdate, onDelete, onOpenNestedPopup
                                         onDelete={() => handleDeletePoint(point.id)}
                                         onOpenNestedPopup={(e: React.MouseEvent) => onOpenNestedPopup(point.resourceId!, e)}
                                         onEditLinkText={onEditLinkText}
-                                        onConvertToCard={onConvertToCard}
+                                        onConvertToCard={() => onConvertToCard(point)}
                                     />
                                 ))}
                             </ul>
@@ -1158,7 +1158,7 @@ function ResourcesPageContent() {
     });
   }, [activeResourceTabIds, pinnedFolderIds]);
   
-  const handleLinkClick = (resourceId: string) => {
+  const handleLinkClick = useCallback((resourceId: string) => {
     if (linkingFromId === null) {
       const sourceCard = resources.find(r => r.id === resourceId);
       if (sourceCard?.type !== 'card' && sourceCard?.type !== 'habit' && sourceCard?.type !== 'mechanism') {
@@ -1233,7 +1233,7 @@ function ResourcesPageContent() {
       setLinkingFromId(null);
       toast({ title: "Success!", description: `Linked "${sourceCard.name}" to "${targetCard.name}" and moved it to the "${targetCard.name}" folder.` });
     }
-  };
+  }, [linkingFromId, resources, resourceFolders, setResourceFolders, setResources, toast]);
 
   const [linkTextDialog, setLinkTextDialog] = useState<{ point: ResourcePoint, resourceId: string } | null>(null);
   const [currentDisplayText, setCurrentDisplayText] = useState('');
@@ -1465,7 +1465,7 @@ function ResourcesPageContent() {
                             } else if (res.type === 'mechanism') {
                                 cardContent = <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={handleOpenNestedPopup} />;
                             } else if(res.type === 'card') {
-                                cardContent = <ResourceCardComponent resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
+                                cardContent = <ResourceCardComponent resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={() => handleConvertToCard(res as unknown as ResourcePoint)} />;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                 const isGif = isGifUrl(res.link);
