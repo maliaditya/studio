@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from './ui/textarea';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { EditableField, DoubleEditableField, EmotionEditableField, EditableResponse } from './EditableFields';
+import { EditableField, DoubleEditableField, EmotionEditableField, EditableResponse } from '@/components/EditableFields';
 
 interface GeneralResourcePopupProps {
   popupState: PopupState;
@@ -89,7 +89,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         const updatedPoints = (resource.points || []).filter(p => p.id !== pointId);
         onUpdate({ ...resource, points: updatedPoints });
     };
-
+    
     const handleClose = (e: React.MouseEvent | React.PointerEvent) => {
         e.stopPropagation();
         setPlayingAudio(false);
@@ -125,9 +125,9 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                 return (
                     <div className="space-y-1">
                         <EditableField field="trigger" subField="action" prefix="Trigger: When I" suffix="." resource={resource} onUpdate={onUpdate} />
-                        <EditableResponse field="response" label="Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} />
+                        <EditableResponse field="response" label="Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState} />
                         <EditableField field="reward" prefix="Reward:" resource={resource} onUpdate={onUpdate} />
-                        <EditableResponse field="newResponse" label="New Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} />
+                        <EditableResponse field="newResponse" label="New Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState}/>
                     </div>
                 );
             case 'mechanism':
@@ -290,7 +290,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, o
      if (point.type === 'card' && point.resourceId) {
         return (
             <li className="flex items-start gap-3 group/item">
-                <Library className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" />
+                <ArrowRight className="h-4 w-4 mt-1.5 text-primary/50 flex-shrink-0" />
                 <button onClick={onOpenNestedPopup} className="text-left font-medium text-primary hover:underline flex-grow">
                     {point.text}
                 </button>
