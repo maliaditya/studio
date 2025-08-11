@@ -484,7 +484,7 @@ function ResourcesPageContent() {
     currentIndex: number;
   }>({ isOpen: false, playlist: [], currentIndex: 0 });
 
-  const [contextMenu, setContextMenu<{
+  const [contextMenu, setContextMenu] = useState<{
     mouseX: number;
     mouseY: number;
     item: ResourceFolder;
