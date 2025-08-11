@@ -346,6 +346,45 @@ function SkillPageContent() {
     });
     return map;
   }, [upskillDefinitions, linkedUpskillChildIds]);
+  
+  const linkedTasksByCoreSkill = useMemo(() => {
+    if (!selectedProject) return new Map();
+
+    const taskMap = new Map<string, {
+      microSkills: Map<string, { microSkill: MicroSkill, tasks: ExerciseDefinition[] }>
+    }>();
+
+    selectedProject.features.forEach(feature => {
+      feature.linkedSkills.forEach(link => {
+        const microSkillInfo = microSkillMap.get(link.microSkillId);
+        if (microSkillInfo) {
+          const { coreSkillName, skillAreaName, microSkillName } = microSkillInfo;
+          
+          if (!taskMap.has(coreSkillName)) {
+            taskMap.set(coreSkillName, { microSkills: new Map() });
+          }
+          const coreSkillData = taskMap.get(coreSkillName)!;
+          
+          const mapKey = `${skillAreaName} > ${microSkillName}`;
+          if (!coreSkillData.microSkills.has(mapKey)) {
+            const microSkill = coreSkills.flatMap(cs => cs.skillAreas).flatMap(sa => sa.microSkills).find(ms => ms.id === link.microSkillId);
+            if (microSkill) {
+              coreSkillData.microSkills.set(mapKey, { microSkill, tasks: [] });
+            }
+          }
+          
+          const microSkillData = coreSkillData.microSkills.get(mapKey);
+          if (microSkillData) {
+            const intentions = deepWorkDefinitions.filter(def => def.category === microSkillName);
+            const curiosities = upskillDefinitions.filter(def => def.category === microSkillName);
+            microSkillData.tasks.push(...intentions, ...curiosities);
+          }
+        }
+      });
+    });
+
+    return taskMap;
+  }, [selectedProject, microSkillMap, coreSkills, deepWorkDefinitions, upskillDefinitions]);
 
   return (
     <>
@@ -387,10 +426,7 @@ function SkillPageContent() {
                                                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                                     <AlertDialogDescription>This will permanently delete the "{domain.name}" domain and all its contents.</AlertDialogDescription>
                                                 </AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={() => handleDeleteDomain(domain.id)}>Delete</AlertDialogAction>
-                                                </AlertDialogFooter>
+                                                <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteDomain(domain.id)}>Delete</AlertDialogAction></AlertDialogFooter>
                                             </AlertDialogContent>
                                           </AlertDialog>
                                         </div>
@@ -481,6 +517,7 @@ function SkillPageContent() {
                                       const curiosities = tasks.filter(t => upskillDefinitions.some(d => d.id === t.id));
                                       const intentions = tasks.filter(t => deepWorkDefinitions.some(d => d.id === t.id));
                                       const skillAreaName = mapKey.split(' > ')[0];
+                                      const relatedIntentions = microSkillIntentions.get(microSkill.name) || [];
                                       
                                       return (
                                         <Card key={mapKey} className="w-full">
