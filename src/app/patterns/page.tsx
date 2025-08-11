@@ -558,4 +558,3 @@ export default function PatternsPage() {
         </AuthGuard>
     );
 }
-
