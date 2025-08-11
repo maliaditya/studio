@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -34,6 +33,8 @@ import { ModelViewer } from '@/components/ModelViewer';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { EditableField, DoubleEditableField, EmotionEditableField, EditableResponse } from '@/components/EditableFields';
+import { HabitResourceCard } from '@/components/HabitResourceCard';
+import { MechanismResourceCard } from '@/components/MechanismResourceCard';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -338,7 +339,7 @@ const ResourceCardComponent = ({ resource, onUpdate, onDelete, onOpenNestedPopup
 
 const SortablePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText }: {
     point: ResourcePoint;
-    onConvertToCard: (point: ResourcePoint) => void;
+    onConvertToCard: () => void;
     onUpdate: (updatedText: string) => void;
     onDelete: () => void;
     onOpenNestedPopup: (event: React.MouseEvent) => void;
@@ -477,35 +478,35 @@ function ResourcesPageContent() {
   
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   
-  const [youtubeModalState, setYoutubeModalState] = useState<{
+  const [youtubeModalState, setYoutubeModalState<{
     isOpen: boolean;
     playlist: Resource[];
     currentIndex: number;
   }>({ isOpen: false, playlist: [], currentIndex: 0 });
 
-  const [contextMenu, setContextMenu] = useState<{
+  const [contextMenu, setContextMenu<{
     mouseX: number;
     mouseY: number;
     item: ResourceFolder;
   } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
-  const [deleteConfirmation, setDeleteConfirmation] = useState<{ item: ResourceFolder | Resource } | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation<{ item: ResourceFolder | Resource } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isFetchingMeta, setIsFetchingMeta] = useState(false);
   
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [mindMapRootFolderId, setMindMapRootFolderId] = useState<string | null>(null);
   
-  const [addResourceType, setAddResourceType] = useState<'link' | 'card' | 'habit' | 'model3d' | 'mechanism'>('link');
-  const [mechanismFramework, setMechanismFramework] = useState<'negative' | 'positive'>('negative');
+  const [addResourceType, setAddResourceType<'link' | 'card' | 'habit' | 'model3d' | 'mechanism'>('link');
+  const [mechanismFramework, setMechanismFramework<'negative' | 'positive'>('negative');
 
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
   
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
 
-  const [markdownModalState, setMarkdownModalState] = useState<{
+  const [markdownModalState, setMarkdownModalState<{
     isOpen: boolean;
     resourceId: string | null;
     pointId: string | null;
@@ -513,14 +514,14 @@ function ResourcesPageContent() {
   
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   
-  const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
+  const [playingAudio, setPlayingAudio<{ id: string; isPlaying: boolean } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
   const [linkingFromId, setLinkingFromId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [modelModalState, setModelModalState] = useState<{ isOpen: boolean; modelUrl: string | null }>({ isOpen: false, modelUrl: null });
+  const [modelModalState, setModelModalState<{ isOpen: boolean; modelUrl: string | null }>({ isOpen: false, modelUrl: null });
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -1233,7 +1234,7 @@ function ResourcesPageContent() {
     }
   };
 
-  const [linkTextDialog, setLinkTextDialog] = useState<{ point: ResourcePoint, resourceId: string } | null>(null);
+  const [linkTextDialog, setLinkTextDialog<{ point: ResourcePoint, resourceId: string } | null>(null);
   const [currentDisplayText, setCurrentDisplayText] = useState('');
 
   const handleEditLinkText = (point: ResourcePoint) => {
@@ -1481,7 +1482,7 @@ function ResourcesPageContent() {
                                 }
                                 
                                 return (
-                                <div key={res.id} className={cardClassName}>
+                                <SortableResourceCard key={res.id} item={res} className={cardClassName} linkingFromId={linkingFromId}>
                                      <Card
                                         {...cardProps}
                                         className={cn(
@@ -1541,10 +1542,10 @@ function ResourcesPageContent() {
                                             </div>
                                         )}
                                     </Card>
-                                </div>
+                                </SortableResourceCard>
                                 )
                             }
-                             return <div key={res.id} className={cardClassName}>{cardContent}</div>;
+                             return <SortableResourceCard key={res.id} item={res} className={cardClassName} linkingFromId={linkingFromId}>{cardContent}</SortableResourceCard>;
                         })}
                         {selectedResourceFolderId && !searchTerm && (
                             <Card 
@@ -1966,11 +1967,4 @@ export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
 
-
-
-
-
-
-
-
-
+    
