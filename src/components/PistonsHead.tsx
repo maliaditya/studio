@@ -10,7 +10,7 @@ import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
-import { PistonEntry, PistonType, PistonsData, Resource, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, AutoSuggestionEntry } from '@/types/workout';
+import { AutoSuggestionEntry, DailySchedule, MetaRule, Pattern, PistonEntry, PistonType, PistonsCategoryData, PistonsInitialState, PurposeData, Resource } from '@/types/workout';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
@@ -247,6 +247,7 @@ const AutoSuggestionView = () => {
     const { autoSuggestions, setAutoSuggestions } = useAuth();
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [newSuggestion, setNewSuggestion] = useState('');
+    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const suggestionsForDate = autoSuggestions[dateKey] || [];
@@ -283,7 +284,28 @@ const AutoSuggestionView = () => {
     return (
         <CardContent className="p-4">
             <div className="flex flex-col gap-4">
-                <CalendarComponent mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} className="rounded-md border self-center" />
+                <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">Suggestions for:</p>
+                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-[180px] justify-start text-left font-normal">
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {format(selectedDate, 'PPP')}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                            <CalendarComponent
+                                mode="single"
+                                selected={selectedDate}
+                                onSelect={(date) => {
+                                    if (date) setSelectedDate(date);
+                                    setIsCalendarOpen(false);
+                                }}
+                                initialFocus
+                            />
+                        </PopoverContent>
+                    </Popover>
+                </div>
                 <div className="flex gap-2">
                     <Input value={newSuggestion} onChange={e => setNewSuggestion(e.target.value)} placeholder="Log an idea..." onKeyDown={e => e.key === 'Enter' && handleAddSuggestion()} />
                     <Button onClick={handleAddSuggestion} size="icon"><Plus/></Button>
@@ -354,5 +376,3 @@ const StarredView = () => {
         </CardContent>
     );
 };
-
-    
