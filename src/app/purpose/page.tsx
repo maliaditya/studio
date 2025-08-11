@@ -313,7 +313,11 @@ function PurposePageContent() {
 
 
     const handleOpenRuleDetail = (e: React.MouseEvent, rule: MetaRule) => {
-        setRuleDetailPopup({ rule, x: e.clientX, y: e.clientY });
+        const popupWidth = 600;
+        const popupHeight = 500; // Approximate height
+        const x = window.innerWidth / 2 - popupWidth / 2;
+        const y = window.innerHeight / 2 - popupHeight / 2;
+        setRuleDetailPopup({ rule, x: Math.max(20, x), y: Math.max(20, y) });
     };
     
     const handleDragEndLocal = (event: DragEndEvent) => {
@@ -327,7 +331,6 @@ function PurposePageContent() {
                 y: prev.y + delta.y,
             } : null);
         } else {
-            // Forward to global handler if it's not the local popup
             handlePopupDragEnd(event);
         }
     };
@@ -648,8 +651,3 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
-
-
-
-
-
