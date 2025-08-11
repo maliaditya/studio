@@ -491,7 +491,7 @@ function ResourcesPageContent() {
   } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
-  const [deleteConfirmation, setDeleteConfirmation<{ item: ResourceFolder | Resource } | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{ item: ResourceFolder | Resource } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isFetchingMeta, setIsFetchingMeta] = useState(false);
   
@@ -1234,7 +1234,7 @@ function ResourcesPageContent() {
     }
   };
 
-  const [linkTextDialog, setLinkTextDialog]<{ point: ResourcePoint, resourceId: string } | null>(null);
+  const [linkTextDialog, setLinkTextDialog] = useState<{ point: ResourcePoint, resourceId: string } | null>(null);
   const [currentDisplayText, setCurrentDisplayText] = useState('');
 
   const handleEditLinkText = (point: ResourcePoint) => {
