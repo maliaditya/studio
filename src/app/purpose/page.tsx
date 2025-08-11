@@ -59,18 +59,13 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
             const responseMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
             const newResponseMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
             
-            const linkedMechanisms = [];
-            if (responseMechanism) linkedMechanisms.push(responseMechanism.name);
-            if (newResponseMechanism && newResponseMechanism.id !== responseMechanism?.id) {
-                linkedMechanisms.push(newResponseMechanism.name);
-            }
-
             return {
                 habitId: habit.id,
                 habitName: habit.name,
-                response: responseMechanism?.response?.visualize || '...',
-                newResponse: newResponseMechanism?.newResponse?.action || '...',
-                linkedMechanisms: linkedMechanisms,
+                negativeMechanismText: responseMechanism?.response?.visualize || '...',
+                negativeMechanismName: responseMechanism?.name || 'Unlinked',
+                positiveMechanismText: newResponseMechanism?.newResponse?.action || '...',
+                positiveMechanismName: newResponseMechanism?.name || 'Unlinked',
             };
         }).filter((h): h is NonNullable<typeof h> => h !== null);
     };
@@ -139,17 +134,18 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
                                                     }
                                                 }}
                                             >
-                                                <CardContent className="p-3 text-xs">
-                                                    <p className="font-semibold text-foreground mb-1">{habit.habitName}</p>
-                                                    <p className="text-muted-foreground">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</p>
-                                                    {habit.linkedMechanisms.length > 0 && (
-                                                        <div className="mt-2 pt-2 border-t">
-                                                            <p className="font-medium text-muted-foreground">Linked Mechanisms:</p>
-                                                            <ul className="list-disc list-inside">
-                                                                {habit.linkedMechanisms.map(mech => <li key={mech}>{mech}</li>)}
-                                                            </ul>
-                                                        </div>
-                                                    )}
+                                                <CardHeader className="p-3">
+                                                    <CardTitle className="text-sm font-semibold text-foreground mb-1">{habit.habitName}</CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="p-3 pt-0 text-xs space-y-2">
+                                                    <div>
+                                                        <p className="font-medium text-red-600 dark:text-red-400">Negative Mechanism:</p>
+                                                        <p className="text-muted-foreground">{habit.negativeMechanismText} <span className="text-xs italic">({habit.negativeMechanismName})</span></p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium text-green-600 dark:text-green-400">Positive Mechanism:</p>
+                                                        <p className="text-muted-foreground">{habit.positiveMechanismText} <span className="text-xs italic">({habit.positiveMechanismName})</span></p>
+                                                    </div>
                                                 </CardContent>
                                             </Card>
                                         ))}
@@ -652,6 +648,7 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
 
 
