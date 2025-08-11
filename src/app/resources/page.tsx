@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -498,7 +499,7 @@ function ResourcesPageContent() {
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [mindMapRootFolderId, setMindMapRootFolderId] = useState<string | null>(null);
   
-  const [addResourceType, setAddResourceType]<'link' | 'card' | 'habit' | 'model3d' | 'mechanism'>('link');
+  const [addResourceType, setAddResourceType] = useState<'link' | 'card' | 'habit' | 'model3d' | 'mechanism'>('link');
   const [mechanismFramework, setMechanismFramework]<'negative' | 'positive'>('negative');
 
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
@@ -506,7 +507,7 @@ function ResourcesPageContent() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
 
-  const [markdownModalState, setMarkdownModalState]<{
+  const [markdownModalState, setMarkdownModalState] = useState<{
     isOpen: boolean;
     resourceId: string | null;
     pointId: string | null;
@@ -514,14 +515,14 @@ function ResourcesPageContent() {
   
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   
-  const [playingAudio, setPlayingAudio]<{ id: string; isPlaying: boolean } | null>(null);
+  const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
   const [linkingFromId, setLinkingFromId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [modelModalState, setModelModalState<{ isOpen: boolean; modelUrl: string | null }>({ isOpen: false, modelUrl: null });
+  const [modelModalState, setModelModalState] = useState<{ isOpen: boolean; modelUrl: string | null }>({ isOpen: false, modelUrl: null });
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
