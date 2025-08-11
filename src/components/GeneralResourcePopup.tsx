@@ -1,8 +1,7 @@
-
 "use client";
 
 import React, { useRef, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Workflow, Link as LinkIcon, Edit3, Unlink, PlusCircle, PopoverClose } from 'lucide-react';
 import type { Resource, ResourcePoint, PopupState } from '@/types/workout';
@@ -30,7 +29,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
     const [playingAudio, setPlayingAudio] = useState(false);
-    const audioRef = useRef<HTMLAudioElement>(null);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
     
     const resource = resources.find(r => r.id === popupState.resourceId);
     
@@ -252,11 +251,12 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     );
 }
 
-const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup }: { 
+const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText }: { 
     point: ResourcePoint, 
     onUpdate: (text: string) => void, 
     onDelete: () => void,
-    onOpenNestedPopup: (event: React.MouseEvent) => void
+    onOpenNestedPopup: (event: React.MouseEvent) => void;
+    onEditLinkText: (point: ResourcePoint) => void 
 }) => {
     const { setFloatingVideoUrl } = useAuth();
     const [isEditing, setIsEditing] = useState(point.text === 'New step...');
@@ -272,7 +272,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup }:
         setIsEditing(false);
     };
 
-    useEffect(() => {
+    React.useEffect(() => {
         if (isEditing && textareaRef.current) {
             textareaRef.current.focus();
             textareaRef.current.style.height = 'auto';
@@ -321,8 +321,19 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup }:
                     <div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text}</ReactMarkdown></div>
                 ) : point.type === 'code' ? (
                     <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                ) : point.type === 'link' ? (
+                     <div className="flex-grow min-w-0">
+                        <span 
+                            className="cursor-pointer text-primary hover:underline truncate" 
+                            title={point.text} 
+                            onClick={() => point.text && setFloatingVideoUrl(point.text)}
+                            onContextMenu={(e) => { e.preventDefault(); onEditLinkText(point); }}
+                        >
+                            {point.displayText || point.text || <span className="text-muted-foreground italic">New link...</span>}
+                        </span>
+                    </div>
                 ) : (
-                    <p className="whitespace-pre-wrap">{point.text}</p>
+                    <p className="whitespace-pre-wrap break-words">{point.text}</p>
                 )}
             </div>
             <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100 flex-shrink-0" onClick={onDelete}>
