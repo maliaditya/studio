@@ -505,9 +505,9 @@ function SkillPageContent() {
                                               </div>
                                               <div className="space-y-1">
                                                   <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Lightbulb className="h-3 w-3 text-green-500" />Intentions</h4>
-                                                   {intentions.length > 0 ? (
+                                                   {relatedIntentions.length > 0 ? (
                                                     <ul className="space-y-1 text-xs">
-                                                      {intentions.map(intention => (
+                                                      {relatedIntentions.map(intention => (
                                                         <li key={intention.id}>
                                                           <button onClick={() => openIntentionPopup(intention.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{intention.name}</button>
                                                         </li>
@@ -597,7 +597,7 @@ function SkillPageContent() {
                                                           <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Lightbulb className="h-3 w-3 text-green-500" />Intentions</h4>
                                                            {relatedIntentions.length > 0 ? (
                                                               <ul className="space-y-1 text-xs">
-                                                                  {intentions.map(intention => (
+                                                                  {relatedIntentions.map(intention => (
                                                                       <li key={intention.id}>
                                                                           <button onClick={() => openIntentionPopup(intention.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{intention.name}</button>
                                                                       </li>
