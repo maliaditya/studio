@@ -1576,12 +1576,12 @@ const PistonEditorView = ({ topicId, topicName, onBack, onEditTopicName, setHist
                                                       <Library className="h-4 w-4 text-primary" />
                                                   </Button>
                                               ) : null }
+                                              {entries.length > 0 && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleOpenHistory(e, piston)}><History className="mr-2 h-4 w-4"/></Button>}
                                                   <DropdownMenu>
                                                   <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
                                                   <DropdownMenuPortal>
                                                       <DropdownMenuContent side="right" align="start" sideOffset={5}>
                                                           <DropdownMenuItem onSelect={() => setNewEntryPiston(piston)}><Plus className="mr-2 h-4 w-4"/>New Entry</DropdownMenuItem>
-                                                          {entries.length > 0 && <DropdownMenuItem onSelect={(e) => handleOpenHistory(e, piston)}><History className="mr-2 h-4 w-4"/>View History</DropdownMenuItem>}
                                                            <DropdownMenuItem onSelect={() => onLinkResource({ piston, currentResourceId: topicPistons.linkedResourceIds?.[piston as PistonType] })}>
                                                               <LinkIcon className="mr-2 h-4 w-4"/> {isResourceLinked ? 'Change Resource' : 'Link Resource'}
                                                           </DropdownMenuItem>
@@ -1617,6 +1617,7 @@ const TopicPistonView = ({ topicId, topicName, onBack, onEditTopicName, setHisto
     
 
     
+
 
 
 
