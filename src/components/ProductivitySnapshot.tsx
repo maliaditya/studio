@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, LayoutDashboard } from 'lucide-react';
+import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, LayoutDashboard, Brain as BrainIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ChartContainer } from '@/components/ui/chart';
@@ -35,9 +36,10 @@ interface ProductivitySnapshotProps {
   timeAllocationData: { name: string; time: number; fill: string; }[];
   onOpenStatsModal: () => void;
   onOpenKanbanModal: () => void;
+  onOpenParkingLotModal: () => void;
 }
 
-export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsModal, onOpenKanbanModal }: ProductivitySnapshotProps) {
+export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsModal, onOpenKanbanModal, onOpenParkingLotModal }: ProductivitySnapshotProps) {
   const router = useRouter();
   const [isAddFeatureModalOpen, setIsAddFeatureModalOpen] = useState(false);
   const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service' } | null>(null);
@@ -64,6 +66,10 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             <CardTitle className="flex items-center gap-2 text-primary">Your Productivity Snapshot</CardTitle>
           </div>
           <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" onClick={onOpenParkingLotModal}>
+              <BrainIcon className="h-4 w-4" />
+              <span className="sr-only">Open Thought Parking Lot</span>
+            </Button>
             <Button variant="outline" size="icon" onClick={onOpenKanbanModal}>
               <LayoutDashboard className="h-4 w-4" />
               <span className="sr-only">Open Kanban Board</span>

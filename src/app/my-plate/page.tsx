@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -25,13 +26,14 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from '@/lib/utils';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, Brain as BrainIcon, MessageSquare } from 'lucide-react';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 
 
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { KanbanPageContent } from '@/app/kanban/page';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
@@ -60,6 +62,13 @@ const productivityLevels = [
     { level: 'L20', min: 900, max: Infinity, description: 'Legendary grind day (Rare / Purpose-driven only)', zone: '⚠️ Apex Zone' },
 ];
 
+const EMOTIONAL_STATES = ['Doubt', 'Fear', 'Shame', 'Regret', 'Overwhelm', 'Hopelessness', 'Loneliness', 'Imposter Syndrome', 'Resentment / Envy'];
+const FANTASY_STATES = ['Excitement', 'Anticipation', 'Euphoria', 'Pride', 'Desire', 'Longing', 'Curiosity', 'Hope', 'Satisfaction'];
+
+interface ThoughtEntry extends PistonEntry {
+  type: string;
+}
+
 function MyPlatePageContent() {
   const { 
     currentUser, 
@@ -84,6 +93,7 @@ function MyPlatePageContent() {
     productizationPlans,
     offerizationPlans,
     openIntentionPopup,
+    pistons,
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -101,6 +111,7 @@ function MyPlatePageContent() {
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [isKanbanModalOpen, setIsKanbanModalOpen] = useState(false);
+  const [isParkingLotModalOpen, setIsParkingLotModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<{ slotName: string; activity: Activity } | null>(null);
   const [workoutActivityToLog, setWorkoutActivityToLog] = useState<Activity | null>(null);
 
@@ -863,6 +874,30 @@ function MyPlatePageContent() {
     if(g) toast({ title: "Gender Set!", description: `Your gender has been saved.` });
   };
 
+  const allThoughts = useMemo(() => {
+    const thoughts: ThoughtEntry[] = [];
+    Object.keys(pistons).forEach(key => {
+        if (key.startsWith('thought_')) {
+            const thoughtName = key.replace('thought_', '');
+            if (EMOTIONAL_STATES.includes(thoughtName) || FANTASY_STATES.includes(thoughtName)) {
+                const thoughtPistons = pistons[key];
+                const entries = thoughtPistons?.[thoughtName as keyof typeof thoughtPistons] || [];
+                entries.forEach(entry => {
+                    thoughts.push({
+                        ...entry,
+                        type: thoughtName,
+                    });
+                });
+            }
+        }
+    });
+    return thoughts.sort((a, b) => b.timestamp - a.timestamp);
+  }, [pistons]);
+
+  const disruptiveThoughts = allThoughts.filter(t => EMOTIONAL_STATES.includes(t.type));
+  const fantasyThoughts = allThoughts.filter(t => FANTASY_STATES.includes(t.type));
+
+
   // MODAL HANDLERS
   const handleDietModalOpenChange = (isOpen: boolean) => {
       setIsDietPlanModalOpen(isOpen);
@@ -979,6 +1014,7 @@ function MyPlatePageContent() {
                   timeAllocationData={timeAllocationData} 
                   onOpenStatsModal={() => setIsStatsModalOpen(true)} 
                   onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
+                  onOpenParkingLotModal={() => setIsParkingLotModalOpen(true)}
                 />
               </div>
               <div className="lg:col-span-2 space-y-6">
@@ -1120,6 +1156,48 @@ function MyPlatePageContent() {
             </div>
           </DialogContent>
         </Dialog>
+        
+        <Dialog open={isParkingLotModalOpen} onOpenChange={setIsParkingLotModalOpen}>
+          <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Thought Parking Lot</DialogTitle>
+              <DialogDescription>A complete history of all your logged thoughts.</DialogDescription>
+            </DialogHeader>
+            <div className="flex-grow min-h-0 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex flex-col">
+                <h3 className="font-semibold text-center mb-2 flex items-center justify-center gap-2"><MessageSquare className="h-4 w-4 text-red-500" /> Disruptive Thoughts</h3>
+                <ScrollArea className="h-full border rounded-md p-3 bg-muted/30">
+                  <ul className="space-y-3">
+                    {disruptiveThoughts.map(thought => (
+                      <li key={thought.id} className="text-sm">
+                        <p className="font-medium text-foreground">{thought.type}</p>
+                        <p className="text-muted-foreground whitespace-pre-wrap">{thought.text}</p>
+                        <p className="text-xs text-muted-foreground/70 text-right mt-1">{format(thought.timestamp, 'MMM d, yyyy')}</p>
+                      </li>
+                    ))}
+                  </ul>
+                  {disruptiveThoughts.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">No disruptive thoughts logged.</p>}
+                </ScrollArea>
+              </div>
+              <div className="flex flex-col">
+                <h3 className="font-semibold text-center mb-2 flex items-center justify-center gap-2"><MessageSquare className="h-4 w-4 text-green-500" /> Fantasies</h3>
+                <ScrollArea className="h-full border rounded-md p-3 bg-muted/30">
+                  <ul className="space-y-3">
+                    {fantasyThoughts.map(thought => (
+                      <li key={thought.id} className="text-sm">
+                        <p className="font-medium text-foreground">{thought.type}</p>
+                        <p className="text-muted-foreground whitespace-pre-wrap">{thought.text}</p>
+                        <p className="text-xs text-muted-foreground/70 text-right mt-1">{format(thought.timestamp, 'MMM d, yyyy')}</p>
+                      </li>
+                    ))}
+                  </ul>
+                  {fantasyThoughts.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">No fantasies logged.</p>}
+                </ScrollArea>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
       </div>
     </>
   );
