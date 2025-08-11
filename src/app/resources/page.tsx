@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink, Edit3, Blocks, Zap, Search, View } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
-import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
+import type { Resource, ResourceFolder, ResourcePoint, PopupState } from '@/types/workout';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -111,16 +111,6 @@ const isObsidianUrl = (url: string | undefined): boolean => {
         return urlObj.hostname.includes('obsidian.md') || urlObj.hostname.includes('publish.obsidian.md');
     } catch (e) { return false; }
 };
-
-interface PopupState {
-  resourceId: string;
-  level: number;
-  x: number;
-  y: number;
-  parentId?: string;
-  width?: number;
-}
-
 
 const ResourceCardComponent = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText, onClosePopup, onConvertToCard }: { 
     resource: Resource; 
@@ -485,7 +475,7 @@ function ResourcesPageContent() {
     playlist: Resource[];
     currentIndex: number;
   }>({ isOpen: false, playlist: [], currentIndex: 0 });
-
+  
   const [contextMenu, setContextMenu] = useState<{
     mouseX: number;
     mouseY: number;
@@ -503,8 +493,6 @@ function ResourcesPageContent() {
   const [addResourceType, setAddResourceType] = useState<'link' | 'card' | 'habit' | 'model3d' | 'mechanism'>('link');
   const [mechanismFramework, setMechanismFramework]<'negative' | 'positive'>('negative');
 
-  const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
-  
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
 
@@ -527,9 +515,86 @@ function ResourcesPageContent() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
-  const handleOpenNestedPopup = useCallback((resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => {
-    openGeneralPopup(resourceId, event, parentPopupState, parentRect);
-  }, [openGeneralPopup]);
+  const handleLinkClick = useCallback((resourceId: string) => {
+    const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => {
+        openGeneralPopup(resourceId, event, parentPopupState, parentRect);
+    };
+
+    if (linkingFromId === null) {
+      const sourceCard = resources.find(r => r.id === resourceId);
+      if (sourceCard?.type !== 'card' && sourceCard?.type !== 'habit' && sourceCard?.type !== 'mechanism') {
+        toast({ title: "Invalid Source", description: "You can only start a link from a 'Card', 'Habit', or 'Mechanism' type resource.", variant: "destructive" });
+        return;
+      }
+      setLinkingFromId(resourceId);
+      toast({ title: "Linking Mode", description: "Click the link icon on another card to complete the link." });
+    } else {
+      if (linkingFromId === resourceId) {
+        setLinkingFromId(null);
+        toast({ title: "Linking Canceled" });
+        return;
+      }
+
+      const sourceCard = resources.find(r => r.id === linkingFromId);
+      const targetCard = resources.find(r => r.id === resourceId);
+
+      if (!sourceCard || !targetCard || (targetCard.type !== 'card' && targetCard.type !== 'habit' && targetCard.type !== 'mechanism')) {
+        toast({ title: "Invalid Link", description: "The target must also be a 'Card', 'Habit', or 'Mechanism' type resource.", variant: "destructive" });
+        setLinkingFromId(null);
+        return;
+      }
+
+      // --- Start of automated folder logic ---
+      const parentFolderId = targetCard.folderId;
+      let subFolderId: string;
+
+      let existingSubFolder = resourceFolders.find(f => f.parentId === parentFolderId && f.name === targetCard.name);
+      
+      let finalFolders = [...resourceFolders];
+      let finalResources = [...resources];
+
+      if (!existingSubFolder) {
+        const newFolder: ResourceFolder = {
+          id: `folder_${Date.now()}`,
+          name: targetCard.name,
+          parentId: parentFolderId,
+          icon: 'Folder',
+        };
+        finalFolders.push(newFolder);
+        subFolderId = newFolder.id;
+      } else {
+        subFolderId = existingSubFolder.id;
+      }
+
+      // Update the source card to link to the target
+      finalResources = finalResources.map(r => {
+        if (r.id === targetCard.id) {
+            const newPoint: ResourcePoint = {
+                id: `point_${Date.now()}`,
+                type: 'card',
+                text: sourceCard.name,
+                resourceId: sourceCard.id
+            };
+            return { ...r, points: [...(r.points || []), newPoint] };
+        }
+        return r;
+      });
+
+      // Move the source card to the new/existing subfolder
+      finalResources = finalResources.map(r => {
+        if (r.id === sourceCard.id) {
+          return { ...r, folderId: subFolderId };
+        }
+        return r;
+      });
+      
+      setResourceFolders(finalFolders);
+      setResources(finalResources);
+      
+      setLinkingFromId(null);
+      toast({ title: "Success!", description: `Linked "${sourceCard.name}" to "${targetCard.name}" and moved it to the "${targetCard.name}" folder.` });
+    }
+  }, [linkingFromId, resources, resourceFolders, setResourceFolders, setResources, toast, openGeneralPopup]);
 
   useEffect(() => {
     const audioEl = audioRef.current;
@@ -682,7 +747,6 @@ function ResourcesPageContent() {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
         if (event.key === 'Escape') {
-            setOpenPopups(new Map());
             setLinkingFromId(null);
         }
     };
@@ -1161,82 +1225,6 @@ function ResourcesPageContent() {
     });
   }, [activeResourceTabIds, pinnedFolderIds]);
   
-  const handleLinkClick = useCallback((resourceId: string) => {
-    if (linkingFromId === null) {
-      const sourceCard = resources.find(r => r.id === resourceId);
-      if (sourceCard?.type !== 'card' && sourceCard?.type !== 'habit' && sourceCard?.type !== 'mechanism') {
-        toast({ title: "Invalid Source", description: "You can only start a link from a 'Card', 'Habit', or 'Mechanism' type resource.", variant: "destructive" });
-        return;
-      }
-      setLinkingFromId(resourceId);
-      toast({ title: "Linking Mode", description: "Click the link icon on another card to complete the link." });
-    } else {
-      if (linkingFromId === resourceId) {
-        setLinkingFromId(null);
-        toast({ title: "Linking Canceled" });
-        return;
-      }
-
-      const sourceCard = resources.find(r => r.id === linkingFromId);
-      const targetCard = resources.find(r => r.id === resourceId);
-
-      if (!sourceCard || !targetCard || (targetCard.type !== 'card' && targetCard.type !== 'habit' && targetCard.type !== 'mechanism')) {
-        toast({ title: "Invalid Link", description: "The target must also be a 'Card', 'Habit', or 'Mechanism' type resource.", variant: "destructive" });
-        setLinkingFromId(null);
-        return;
-      }
-
-      // --- Start of automated folder logic ---
-      const parentFolderId = targetCard.folderId;
-      let subFolderId: string;
-
-      let existingSubFolder = resourceFolders.find(f => f.parentId === parentFolderId && f.name === targetCard.name);
-      
-      let finalFolders = [...resourceFolders];
-      let finalResources = [...resources];
-
-      if (!existingSubFolder) {
-        const newFolder: ResourceFolder = {
-          id: `folder_${Date.now()}`,
-          name: targetCard.name,
-          parentId: parentFolderId,
-          icon: 'Folder',
-        };
-        finalFolders.push(newFolder);
-        subFolderId = newFolder.id;
-      } else {
-        subFolderId = existingSubFolder.id;
-      }
-
-      // Update the source card to link to the target
-      finalResources = finalResources.map(r => {
-        if (r.id === targetCard.id) {
-            const newPoint: ResourcePoint = {
-                id: `point_${Date.now()}`,
-                type: 'card',
-                text: sourceCard.name,
-                resourceId: sourceCard.id
-            };
-            return { ...r, points: [...(r.points || []), newPoint] };
-        }
-        return r;
-      });
-
-      // Move the source card to the new/existing subfolder
-      finalResources = finalResources.map(r => {
-        if (r.id === sourceCard.id) {
-          return { ...r, folderId: subFolderId };
-        }
-        return r;
-      });
-      
-      setResourceFolders(finalFolders);
-      setResources(finalResources);
-      
-      setLinkingFromId(null);
-      toast({ title: "Success!", description: `Linked "${sourceCard.name}" to "${targetCard.name}" and moved it to the "${targetCard.name}" folder.` });
-    }
-  }, [linkingFromId, resources, resourceFolders, setResourceFolders, setResources, toast]);
 
   const [linkTextDialog, setLinkTextDialog] = useState<{ point: ResourcePoint, resourceId: string } | null>(null);
   const [currentDisplayText, setCurrentDisplayText] = useState('');
@@ -1566,39 +1554,31 @@ function ResourcesPageContent() {
             </main>
         </div>
         </div>
-        {Array.from(openPopups.values()).map((popupState) => {
-            const resource = resources.find(r => r.id === popupState.resourceId);
-            if (!resource) return null;
-            return (
-                <div key="dummy" />
-            );
-        })}
-
-        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
-          {Array.from(openPopups.values()).map(popup => {
-            if (!popup.parentId) return null;
-            const parentPopup = openPopups.get(popup.parentId);
-            if (!parentPopup) return null;
-            
-            const startX = popup.x + (popup.width || 0) / 2;
-            const startY = popup.y + ((popup.height || 0) / 2);
-            const endX = parentPopup.x + (parentPopup.width || 0) / 2;
-            const endY = parentPopup.y + ((parentPopup.height || 0) / 2);
-            
-            return (
-              <line 
-                key={`${popup.parentId}-${popup.resourceId}`}
-                x1={startX} 
-                y1={startY} 
-                x2={endX} 
-                y2={endY} 
-                stroke="hsl(var(--primary))" 
-                strokeWidth="2"
-                strokeOpacity="0.5"
-              />
-            )
-          })}
-        </svg>
+        <Dialog open={!!linkTextDialog} onOpenChange={() => setLinkTextDialog(null)}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Set Display Text</DialogTitle>
+                    <DialogDescription>Set the text that will be displayed for this link.</DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <Label htmlFor="display-text-input">Display Text</Label>
+                    <Input
+                        id="display-text-input"
+                        value={currentDisplayText}
+                        onChange={(e) => setCurrentDisplayText(e.target.value)}
+                        placeholder="Enter display text..."
+                        autoFocus
+                    />
+                    {linkTextDialog?.point.url && (
+                        <p className="text-xs text-muted-foreground mt-2">URL: <span className="font-mono text-xs truncate">{linkTextDialog.point.text}</span></p>
+                    )}
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setLinkTextDialog(null)}>Cancel</Button>
+                    <Button onClick={handleSaveLinkText}>Save</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </DndContext>
         {contextMenu && (
             <div ref={contextMenuRef} style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }} className="fixed z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => e.stopPropagation()}>
@@ -1851,31 +1831,7 @@ function ResourcesPageContent() {
               </div>
           </DialogContent>
         </Dialog>
-        <Dialog open={!!linkTextDialog} onOpenChange={() => setLinkTextDialog(null)}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Set Display Text</DialogTitle>
-                    <DialogDescription>Set the text that will be displayed for this link.</DialogDescription>
-                </DialogHeader>
-                <div className="py-4">
-                    <Label htmlFor="display-text-input">Display Text</Label>
-                    <Input
-                        id="display-text-input"
-                        value={currentDisplayText}
-                        onChange={(e) => setCurrentDisplayText(e.target.value)}
-                        placeholder="Enter display text..."
-                        autoFocus
-                    />
-                    {linkTextDialog?.point.url && (
-                        <p className="text-xs text-muted-foreground mt-2">URL: <span className="font-mono text-xs truncate">{linkTextDialog.point.text}</span></p>
-                    )}
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setLinkTextDialog(null)}>Cancel</Button>
-                    <Button onClick={handleSaveLinkText}>Save</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+        
     </>
   );
 }
