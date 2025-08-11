@@ -466,6 +466,7 @@ function ResourcesPageContent() {
     selectedResourceFolderId,
     setSelectedResourceFolderId,
     globalVolume,
+    handleOpenNestedPopup,
   } = useAuth();
   const { toast } = useToast();
   
@@ -1086,7 +1087,6 @@ function ResourcesPageContent() {
     );
   }, [filteredFolders, editingFolder, selectedResourceFolderId, collapsedFolders, handleSelectFolder, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder, toggleFolderCollapse, activeId, searchTerm]);
 
-  const { handleOpenNestedPopup } = useAuth();
   
   const isDescendant = (childId: string, parentId: string): boolean => {
     if (childId === parentId) return true;
@@ -1465,7 +1465,7 @@ function ResourcesPageContent() {
                             } else if (res.type === 'mechanism') {
                                 cardContent = <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={handleOpenNestedPopup} />;
                             } else if(res.type === 'card') {
-                                cardContent = <ResourceCardComponent resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={() => handleConvertToCard(res as unknown as ResourcePoint)} />;
+                                cardContent = <ResourceCardComponent resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                 const isGif = isGifUrl(res.link);
