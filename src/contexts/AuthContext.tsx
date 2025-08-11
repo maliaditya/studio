@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -241,6 +241,10 @@ interface AuthContextType {
   selectedCompanyId: string | null;
   setSelectedCompanyId: React.Dispatch<React.SetStateAction<string | null>>;
 
+  // Auto Suggestion
+  autoSuggestions: Record<string, AutoSuggestionEntry[]>;
+  setAutoSuggestions: React.Dispatch<React.SetStateAction<Record<string, AutoSuggestionEntry[]>>>;
+
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -374,7 +378,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Persisted task state
   const [selectedUpskillTask, setSelectedUpskillTask] = useState<ExerciseDefinition | null>(null);
   const [selectedDeepWorkTask, setSelectedDeepWorkTask] = useState<ExerciseDefinition | null>(null);
-  
+
+  // Auto Suggestion State
+  const [autoSuggestions, setAutoSuggestions] = useState<Record<string, AutoSuggestionEntry[]>>({});
+
   const microSkillMap = useMemo(() => {
     const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>();
     coreSkills.forEach(coreSkill => {
@@ -528,6 +535,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedProject = loadItem(`selected_project_${username}`, false); setSelectedProjectId(storedProject || null);
       const storedCompany = loadItem(`selected_companyId_${username}`, false); setSelectedCompanyId(storedCompany || null);
 
+      // Auto Suggestion Data
+      try { const d = loadItem(`auto_suggestions_${username}`); setAutoSuggestions(d ? JSON.parse(d) : {}); } catch (e) { setAutoSuggestions({}); }
+
     } else {
       // Clear all data on logout
       setWeightLogs([]); setGoalWeight(null); setHeight(null); setDateOfBirth(null); setGender(null); setDietPlan([]);
@@ -552,6 +562,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSelectedUpskillTask(null);
       setSelectedDeepWorkTask(null);
       setExpandedItems([]); setSelectedDomainId(null); setSelectedSkillId(null); setSelectedProjectId(null); setSelectedCompanyId(null);
+      setAutoSuggestions({});
     }
   }, [currentUser]);
 
@@ -630,6 +641,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (selectedSkillId) localStorage.setItem(`selected_skill_${username}`, selectedSkillId); else localStorage.removeItem(`selected_skill_${username}`);
       if (selectedProjectId) localStorage.setItem(`selected_project_${username}`, selectedProjectId); else localStorage.removeItem(`selected_project_${username}`);
       if (selectedCompanyId) localStorage.setItem(`selected_companyId_${username}`, selectedCompanyId); else localStorage.removeItem(`selected_companyId_${username}`);
+
+      // Auto Suggestion Data
+      localStorage.setItem(`auto_suggestions_${username}`, JSON.stringify(autoSuggestions));
     }
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
@@ -644,7 +658,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     companies, positions,
     purposeStatement, specializationPurposes, patterns, metaRules,
     currentUser, loading, selectedUpskillTask, selectedDeepWorkTask,
-    expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId
+    expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
+    autoSuggestions
   ]);
 
 
@@ -813,6 +828,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSpecializationPurposes(purposeData.specializationPurposes || {});
     setPatterns(data.patterns || []);
     setMetaRules(data.metaRules || []);
+    
+    // Auto Suggestion
+    setAutoSuggestions(data.autoSuggestions || {});
   };
   
   const register = async (username: string, password: string) => {
@@ -877,7 +895,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       patterns, metaRules,
       // Sidebar persistence
       expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
-      selectedUpskillTask, selectedDeepWorkTask
+      selectedUpskillTask, selectedDeepWorkTask,
+      autoSuggestions
     };
   }
 
@@ -1804,6 +1823,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     selectedSkillId, setSelectedSkillId,
     selectedProjectId, setSelectedProjectId,
     selectedCompanyId, setSelectedCompanyId,
+    autoSuggestions, setAutoSuggestions,
   };
 
   return (

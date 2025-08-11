@@ -1,5 +1,3 @@
-
-
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -434,4 +432,11 @@ export type PistonsInitialState = {
     view: 'health' | 'projects' | 'specializations' | 'desires' | 'mindset' | 'thoughts';
     topicId?: string;
     topicName?: string;
+}
+
+export interface AutoSuggestionEntry {
+    id: string;
+    text: string;
+    starred: boolean;
+    timestamp: number;
 }
