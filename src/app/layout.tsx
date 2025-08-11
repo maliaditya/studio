@@ -19,6 +19,7 @@ import { DndContext } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { IntentionDetailPopup } from '@/components/IntentionDetailModal';
 import { createPortal } from 'react-dom';
+import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 
 
 // export const metadata: Metadata = {
@@ -28,7 +29,7 @@ import { createPortal } from 'react-dom';
 // Metadata needs to be in a server component, moving to a new AppWrapper client component
 
 function AppWrapper({ children }: { children: React.ReactNode }) {
-  const { isPistonsHeadOpen, setIsPistonsHeadOpen, openPopups, ResourcePopup, handlePopupDragEnd, intentionPopups, closeIntentionPopup, closeAllResourcePopups } = useAuth();
+  const { isPistonsHeadOpen, setIsPistonsHeadOpen, openPopups, ResourcePopup, handlePopupDragEnd, intentionPopups, closeIntentionPopup, closeAllResourcePopups, generalPopups, openGeneralPopup, handleUpdateResource, closeGeneralPopup } = useAuth();
   const [isBrowser, setIsBrowser] = React.useState(false);
 
   useEffect(() => {
@@ -38,7 +39,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       // If there are no popups, do nothing.
-      if (openPopups.size === 0) return;
+      if (openPopups.size === 0 && generalPopups.size === 0) return;
 
       const target = event.target as HTMLElement;
 
@@ -52,7 +53,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [openPopups, closeAllResourcePopups]);
+  }, [openPopups, generalPopups, closeAllResourcePopups]);
 
   return (
     <DndContext onDragEnd={handlePopupDragEnd}>
@@ -73,6 +74,15 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             ))}
             {Array.from(intentionPopups.values()).map(popupState => (
                 <IntentionDetailPopup key={popupState.resourceId} popupState={popupState} onClose={closeIntentionPopup} />
+            ))}
+            {Array.from(generalPopups.values()).map(popupState => (
+              <GeneralResourcePopup 
+                key={popupState.resourceId} 
+                popupState={popupState} 
+                onClose={closeGeneralPopup}
+                onUpdate={handleUpdateResource}
+                onOpenNestedPopup={(resourceId, event, parentPopupState) => openGeneralPopup(resourceId, event, parentPopupState)}
+              />
             ))}
             <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-[65]">
               {Array.from(openPopups.values()).map(popup => {

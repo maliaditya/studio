@@ -209,7 +209,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     deepWorkDefinitions, 
     upskillDefinitions, 
     resources, 
-    handleOpenNestedPopup
+    openGeneralPopup
   } = useAuth();
   
   const [navigationStack, setNavigationStack] = useState<ExerciseDefinition[]>([]);
@@ -388,7 +388,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
         .filter((r): r is Resource => !!r)
         .map(r => <ResourceItem key={r.id} item={r} onOpenNestedPopup={(resourceId, event) => {
             if (cardRef.current) {
-                handleOpenNestedPopup(resourceId, event, popupState, cardRef.current.getBoundingClientRect());
+                openGeneralPopup(resourceId, event, popupState, cardRef.current.getBoundingClientRect());
             }
         }} />);
         
@@ -412,7 +412,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
         .filter((r): r is Resource => !!r)
         .map(r => <ResourceItem key={r.id} item={r} onOpenNestedPopup={(resourceId, event) => {
             if (cardRef.current) {
-                handleOpenNestedPopup(resourceId, event, popupState, cardRef.current.getBoundingClientRect());
+                openGeneralPopup(resourceId, event, popupState, cardRef.current.getBoundingClientRect());
             }
         }} />);
 
@@ -478,7 +478,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                     {linkedItems.resource.map(item => <ResourceItem key={item.id} item={item} onOpenNestedPopup={(resourceId, event) => {
                                         if (cardRef.current) {
-                                            handleOpenNestedPopup(resourceId, event, popupState, cardRef.current.getBoundingClientRect());
+                                            openGeneralPopup(resourceId, event, popupState, cardRef.current.getBoundingClientRect());
                                         }
                                     }} />)}
                                 </div>

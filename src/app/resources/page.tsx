@@ -33,6 +33,7 @@ import { format, parseISO } from 'date-fns';
 import { ModelViewer } from '@/components/ModelViewer';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
+import { EditableField, DoubleEditableField, EmotionEditableField, EditableResponse } from '@/components/EditableFields';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -118,173 +119,6 @@ interface PopupState {
   width?: number;
 }
 
-const EditableField = ({ field, subField, prefix, suffix, resource, onUpdate, placeholder = "..." }: { 
-    field: keyof Resource, 
-    subField?: string, 
-    prefix: string, 
-    suffix?: string, 
-    resource: Resource, 
-    onUpdate: (updatedResource: Resource) => void,
-    placeholder?: string,
-}) => {
-    const editorRef = useRef<HTMLDivElement>(null);
-    
-    const handleBlur = () => {
-        if (!editorRef.current) return;
-        const editableSpan = editorRef.current.querySelector<HTMLSpanElement>('[contenteditable=true]');
-        const newValue = editableSpan?.textContent || '';
-        
-        let currentValue = '';
-        if (subField && typeof resource[field] === 'object' && resource[field] !== null) {
-            currentValue = (resource[field] as any)[subField] || '';
-        } else {
-            currentValue = (resource[field] as string) || '';
-        }
-
-        if (newValue !== currentValue) {
-            let updatedResource = { ...resource };
-            if (subField && typeof updatedResource[field] === 'object' && updatedResource[field] !== null) {
-                updatedResource[field] = { ...(updatedResource[field] as object), [subField]: newValue };
-            } else if (subField) { // If subField exists but the field is not an object
-                 updatedResource[field] = { [subField]: newValue } as any;
-            } else {
-                updatedResource[field] = newValue as any;
-            }
-            onUpdate(updatedResource);
-        }
-    };
-    
-    let displayValue = '';
-    if (subField && typeof resource[field] === 'object' && resource[field] !== null) {
-      displayValue = (resource[field] as any)[subField] || '';
-    } else {
-      displayValue = (resource[field] as string) || '';
-    }
-
-    return (
-        <div 
-          ref={editorRef}
-          onBlur={handleBlur}
-          className="editable-sentence"
-        >
-          <span contentEditable={false} className="uneditable-text">{prefix}</span>
-          <span 
-            contentEditable={true} 
-            suppressContentEditableWarning={true}
-            className="editable-placeholder"
-            dangerouslySetInnerHTML={{ __html: displayValue || placeholder }} 
-          />
-          {suffix && <span contentEditable={false} className="uneditable-text">{suffix}</span>}
-        </div>
-    );
-};
-
-
-const DoubleEditableField = ({ prefix, infix, suffix, value1, value2, onUpdate1, onUpdate2, placeholder1 = "...", placeholder2 = "..." }: { 
-    prefix: string;
-    infix: string;
-    suffix: string;
-    value1: string;
-    value2: string;
-    onUpdate1: (newValue: string) => void;
-    onUpdate2: (newValue: string) => void;
-    placeholder1?: string;
-    placeholder2?: string;
-}) => {
-    const editorRef = useRef<HTMLDivElement>(null);
-    
-    const handleBlur = () => {
-        if (!editorRef.current) return;
-        const editableSpans = editorRef.current.querySelectorAll<HTMLSpanElement>('[contenteditable=true]');
-        const newValue1 = editableSpans[0]?.textContent || '';
-        const newValue2 = editableSpans[1]?.textContent || '';
-        if (newValue1 !== value1) onUpdate1(newValue1);
-        if (newValue2 !== value2) onUpdate2(newValue2);
-    };
-
-    return (
-        <div 
-          ref={editorRef}
-          onBlur={handleBlur}
-          className="editable-sentence"
-        >
-          <span contentEditable={false} className="uneditable-text">{prefix}</span>
-          <span 
-            contentEditable={true} 
-            suppressContentEditableWarning={true}
-            className="editable-placeholder"
-            dangerouslySetInnerHTML={{ __html: value1 || placeholder1 }} 
-          />
-          <span contentEditable={false} className="uneditable-text">{infix}</span>
-          <span 
-            contentEditable={true} 
-            suppressContentEditableWarning={true}
-            className="editable-placeholder"
-            dangerouslySetInnerHTML={{ __html: value2 || placeholder2 }} 
-          />
-          <span contentEditable={false} className="uneditable-text">{suffix}</span>
-        </div>
-    );
-};
-
-
-const EmotionEditableField = ({ value1, value2, onUpdate1, onUpdate2, label, placeholder1 = "...", placeholder2 = "..." }: { 
-    value1: string;
-    value2: string;
-    onUpdate1: (newValue: string) => void;
-    onUpdate2: (newValue: string) => void;
-    label: string;
-    placeholder1?: string;
-    placeholder2?: string;
-}) => {
-    const editorRef = useRef<HTMLDivElement>(null);
-    
-    const handleBlur = () => {
-        if (!editorRef.current) return;
-        const editableSpans = editorRef.current.querySelectorAll<HTMLSpanElement>('[contenteditable=true]');
-        const newValue1 = editableSpans[0]?.textContent || '';
-        const newValue2 = editableSpans[1]?.textContent || '';
-        if (newValue1 !== value1) onUpdate1(newValue1);
-        if (newValue2 !== value2) onUpdate2(newValue2);
-    };
-
-    return (
-        <div 
-          ref={editorRef}
-          onBlur={handleBlur}
-          className="editable-sentence"
-        >
-          <span contentEditable={false} className="uneditable-text">That one </span>
-          <span 
-            contentEditable={true} 
-            suppressContentEditableWarning={true}
-            className="editable-placeholder"
-            dangerouslySetInnerHTML={{ __html: value1 || placeholder1 }} 
-          />
-          <span contentEditable={false} className="uneditable-text">{label}</span>
-          <span 
-            contentEditable={true} 
-            suppressContentEditableWarning={true}
-            className="editable-placeholder"
-            dangerouslySetInnerHTML={{ __html: value2 || placeholder2 }} 
-          />
-          <span contentEditable={false} className="uneditable-text">.</span>
-        </div>
-    );
-};
-
-
-interface ResourcePopupProps {
-  popupState: PopupState;
-  resource: Resource;
-  onClose: (resourceId: string) => void;
-  onUpdate: (updatedResource: Resource) => void;
-  playingAudio: { id: string; isPlaying: boolean } | null;
-  setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
-  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
-  onEditLinkText: (point: ResourcePoint) => void;
-  onConvertToCard: (point: ResourcePoint) => void;
-}
 
 const ResourceCardComponent = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText, onClosePopup, onConvertToCard }: { 
     resource: Resource; 
@@ -502,606 +336,6 @@ const ResourceCardComponent = ({ resource, onUpdate, onDelete, onOpenNestedPopup
     );
 };
 
-interface ResourcePopupProps {
-  popupState: PopupState;
-  resource: Resource;
-  onClose: (resourceId: string) => void;
-  onUpdate: (updatedResource: Resource) => void;
-  playingAudio: { id: string; isPlaying: boolean } | null;
-  setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
-  onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState: PopupState) => void;
-  onEditLinkText: (point: ResourcePoint) => void;
-  onConvertToCard: (point: ResourcePoint) => void;
-}
-
-const ResourcePopupCard = ({ popupState, resource, onClose, onUpdate, playingAudio, setPlayingAudio, onOpenNestedPopup, onEditLinkText, onConvertToCard }: ResourcePopupProps) => {
-    const { resources } = useAuth();
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({
-        id: `popup-${popupState.resourceId}`,
-    });
-    
-    const [editingTitle, setEditingTitle] = useState(false);
-    const audioInputRef = useRef<HTMLInputElement>(null);
-    const [linkCardPopoverOpen, setLinkCardPopoverOpen] = useState(false);
-    const [linkedCardId, setLinkedCardId] = useState<string>('');
-
-
-    const style: React.CSSProperties = {
-        position: 'fixed',
-        top: popupState.y,
-        left: popupState.x,
-        width: `${popupState.width || 512}px`,
-        willChange: 'transform',
-    };
-
-    if (transform) {
-        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
-    }
-    
-    const handleAudioUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const audioUrl = e.target?.result as string;
-                onUpdate({ ...resource, audioUrl });
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-    
-    const togglePlayAudio = (e: React.MouseEvent | React.PointerEvent) => {
-        e.stopPropagation();
-        setPlayingAudio(prev => {
-            if (prev?.id === resource.id && prev.isPlaying) {
-                return { ...prev, isPlaying: false };
-            }
-            return { id: resource.id, isPlaying: true };
-        });
-    };
-
-    const handleTitleChange = (newTitle: string) => {
-        onUpdate({ ...resource, name: newTitle });
-    };
-
-    const handleAddPoint = (type: ResourcePoint['type']) => {
-        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: 'New step...', type };
-        const updatedPoints = [...(resource.points || []), newPoint];
-        onUpdate({ ...resource, points: updatedPoints });
-    };
-
-    const handleAddCardLinkPoint = () => {
-        if (!linkedCardId) return;
-        const linkedCard = resources.find(r => r.id === linkedCardId);
-        if (!linkedCard) return;
-
-        const newPoint: ResourcePoint = {
-            id: `point_${Date.now()}`,
-            type: 'card',
-            text: linkedCard.name,
-            resourceId: linkedCardId
-        };
-        const updatedPoints = [...(resource.points || []), newPoint];
-        onUpdate({ ...resource, points: updatedPoints });
-        setLinkCardPopoverOpen(false);
-        setLinkedCardId('');
-    };
-
-    const handleUpdatePoint = (pointId: string, newText: string) => {
-        const updatedPoints = (resource.points || []).map(p =>
-            p.id === pointId ? { ...p, text: newText } : p
-        );
-        onUpdate({ ...resource, points: updatedPoints });
-    };
-
-    const handleDeletePoint = (pointId: string) => {
-        const updatedPoints = (resource.points || []).filter(p => p.id !== pointId);
-        onUpdate({ ...resource, points: updatedPoints });
-    };
-    
-    const handleClose = (e: React.MouseEvent | React.PointerEvent) => {
-        e.stopPropagation();
-        setPlayingAudio(null);
-        onClose(resource.id);
-    }
-    
-    const handleLinkClick = (e: React.MouseEvent, pointResourceId: string) => {
-      e.stopPropagation();
-      onOpenNestedPopup(pointResourceId, e, popupState);
-    };
-
-    const handlePointDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event;
-        if (!over || active.id === over.id) return;
-        const oldIndex = (resource.points || []).findIndex(p => p.id === active.id);
-        const newIndex = (resource.points || []).findIndex(p => p.id === over.id);
-        if (oldIndex !== -1 && newIndex !== -1) {
-          const newPoints = arrayMove(resource.points!, oldIndex, newIndex);
-          onUpdate({ ...resource, points: newPoints });
-        }
-    };
-
-    const renderFrameworkContent = () => {
-        if (resource.mechanismFramework === 'positive') {
-            return (
-                <div className="space-y-4 text-sm">
-                    <div>
-                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Action</h4>
-                        <EditableField field="trigger" subField="action" prefix="When I " suffix="," resource={resource} onUpdate={onUpdate} placeholder="describe the positive action"/>
-                    </div>
-                     <div>
-                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Mechanism</h4>
-                        <EditableField field="response" subField="visualize" prefix="It causes " suffix=" internally." resource={resource} onUpdate={onUpdate} placeholder="positive internal effect"/>
-                    </div>
-                    <div>
-                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Benefit</h4>
-                        <EditableField field="benefit" prefix="This enables " suffix="." resource={resource} onUpdate={onUpdate} placeholder="good outcome"/>
-                    </div>
-                    <div>
-                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Condition</h4>
-                        <DoubleEditableField prefix="Only when " infix=", " suffix=" happens." value1={resource.newResponse?.visualize || ""} value2={resource.newResponse?.action || ""} onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), visualize: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), action: newValue } })} placeholder1="specific condition" placeholder2="good outcome" />
-                    </div>
-                     <div>
-                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Law</h4>
-                        <DoubleEditableField prefix="" infix=" can only happen when " suffix="." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Positive Condition"/>
-                    </div>
-                    <div>
-                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Emotion/Image</h4>
-                        <EmotionEditableField value1={resource.trigger?.feeling || ''} value2={resource.reward || ''} onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...(resource.trigger || {}), feeling: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, reward: newValue })} label=" gives me " placeholder1="action/image" placeholder2="positive feeling"/>
-                    </div>
-                </div>
-            );
-        }
-        // Negative Framework
-        return (
-             <div className="space-y-4 text-sm">
-                 <div>
-                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Action</h4>
-                    <EditableField field="trigger" subField="action" prefix="When I " suffix="," resource={resource} onUpdate={onUpdate} placeholder="describe the negative action"/>
-                </div>
-                <div>
-                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Mechanism</h4>
-                    <EditableField field="response" subField="visualize" prefix="It causes " suffix=" internally." resource={resource} onUpdate={onUpdate} placeholder="negative internal effect"/>
-                </div>
-                <div>
-                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Cost</h4>
-                    <EditableField field="reward" prefix="This blocks " suffix="." resource={resource} onUpdate={onUpdate} placeholder="good outcome"/>
-                </div>
-                <div>
-                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Opposite</h4>
-                    <DoubleEditableField prefix="Only when " infix=", " suffix=" happens." value1={resource.newResponse?.visualize || ""} value2={resource.newResponse?.action || ""} onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), visualize: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), action: newValue } })} placeholder1="avoidance of bad action" placeholder2="good outcome" />
-                </div>
-                <div>
-                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Law</h4>
-                     <DoubleEditableField prefix="" infix=" cannot happen when " suffix="." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Negative Condition"/>
-                </div>
-                <div>
-                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Emotion/Image</h4>
-                    <EmotionEditableField value1={resource.trigger?.feeling || ''} value2={resource.benefit || ''} onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...(resource.trigger || {}), feeling: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, benefit: newValue })} label=" costs me " placeholder1="action/image" placeholder2="negative consequence"/>
-                </div>
-            </div>
-        );
-    };
-
-
-    return (
-        <div ref={setNodeRef} style={style} {...attributes} className="z-[70]">
-            <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
-            <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative group">
-                <div 
-                    className="absolute top-2 left-2 z-20 p-1 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
-                    {...listeners}
-                >
-                    <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
-                </div>
-                
-                 <div className="absolute top-2 right-2 z-20 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    {resource.audioUrl ? (
-                        <>
-                           <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={togglePlayAudio}>
-                                {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => audioInputRef.current?.click()}>
-                                <Upload className="h-4 w-4" />
-                            </Button>
-                        </>
-                    ) : (
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => audioInputRef.current?.click()}>
-                            <Upload className="h-4 w-4" />
-                        </Button>
-                    )}
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDownCapture={handleClose}>
-                        <X className="h-4 w-4" />
-                    </Button>
-                </div>
-
-                <CardHeader className="p-3 pt-8 relative flex-shrink-0 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                        {resource.type === 'habit' ? <Zap className="h-4 w-4" /> : resource.type === 'mechanism' ? <Workflow className="h-4 w-4"/> : <Library className="h-4 w-4" />}
-                        {editingTitle ? (
-                            <Input 
-                                value={resource.name} 
-                                onChange={(e) => handleTitleChange(e.target.value)} 
-                                onBlur={() => setEditingTitle(false)} 
-                                onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
-                                className="h-8 text-base"
-                                autoFocus
-                            />
-                        ) : (
-                            <CardTitle className="text-base truncate cursor-pointer" onClick={() => setEditingTitle(true)}>
-                                {resource.name}
-                            </CardTitle>
-                        )}
-                    </div>
-                     {resource.createdAt && (
-                        <CardDescription className="text-xs pt-1">
-                            Created: {format(parseISO(resource.createdAt), 'MMM d, yyyy')}
-                        </CardDescription>
-                    )}
-                </CardHeader>
-                <div className="flex-grow min-h-0 overflow-y-auto">
-                    <CardContent className="p-3 pt-0">
-                        {(resource.type === 'habit' || resource.type === 'mechanism') ? (
-                            resource.type === 'mechanism' ? renderFrameworkContent() : (
-                                <div className="space-y-1">
-                                    <EditableField field="trigger" subField="action" prefix="Trigger: When I" suffix="." resource={resource} onUpdate={onUpdate} />
-                                    <EditableResponse field="response" label="Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={onOpenNestedPopup} popupState={popupState} />
-                                    <EditableField field="reward" prefix="Reward:" resource={resource} onUpdate={onUpdate} />
-                                    <EditableResponse field="newResponse" label="New Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={onOpenNestedPopup} popupState={popupState} />
-                                </div>
-                            )
-                        ) : (
-                         <DndContext onDragEnd={handlePointDragEnd}>
-                            <SortableContext items={(resource.points || []).map(p => p.id)}>
-                                <ul className="space-y-3 text-sm text-muted-foreground pr-2">
-                                    {(resource.points || []).map(point => (
-                                        <SortablePointInPopup
-                                            key={point.id}
-                                            point={point}
-                                            onUpdate={(newText) => handleUpdatePoint(point.id, newText)}
-                                            onDelete={() => handleDeletePoint(point.id)}
-                                            onOpenNestedPopup={(e: React.MouseEvent) => handleLinkClick(e, point.resourceId!)}
-                                            onEditLinkText={onEditLinkText}
-                                            onConvertToCard={() => {}}
-                                        />
-                                    ))}
-                                </ul>
-                            </SortableContext>
-                        </DndContext>
-                       )}
-                    </CardContent>
-                </div>
-                {resource.type !== 'habit' && resource.type !== 'mechanism' && (
-                 <CardFooter className="p-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="w-full">
-                                <PlusCircle className="mr-2 h-4 w-4" /> Add Step
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-48 p-1">
-                           <div className="space-y-1">
-                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('text')}><MessageSquare className="mr-2 h-4 w-4" />Text</Button>
-                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('markdown')}><MessageSquare className="mr-2 h-4 w-4" />Markdown</Button>
-                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('code')}><Code className="mr-2 h-4 w-4" />Code</Button>
-                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('link')}><LinkIcon className="mr-2 h-4 w-4" />Link</Button>
-                           </div>
-                        </PopoverContent>
-                    </Popover>
-                    <Popover open={linkCardPopoverOpen} onOpenChange={setLinkCardPopoverOpen}>
-                        <PopoverTrigger asChild>
-                             <Button variant="outline" size="sm" className="w-full">
-                                <LinkIcon className="mr-2 h-4 w-4" /> Link Card
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-80">
-                           <div className="grid gap-4">
-                               <div className="space-y-2">
-                                   <h4 className="font-medium leading-none">Link Card</h4>
-                                   <p className="text-sm text-muted-foreground">Select an existing card to link as a step.</p>
-                               </div>
-                                <div className="space-y-2">
-                                    <Select value={linkedCardId} onValueChange={setLinkedCardId}>
-                                        <SelectTrigger><SelectValue placeholder="Select a card..."/></SelectTrigger>
-                                        <SelectContent>
-                                            {resources.filter(r => (r.type === 'card' || r.type === 'habit' || r.type === 'mechanism') && r.id !== resource.id).map(r => (
-                                                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <Button onClick={handleAddCardLinkPoint} disabled={!linkedCardId} className="w-full">Link Card</Button>
-                                </div>
-                           </div>
-                        </PopoverContent>
-                    </Popover>
-                 </CardFooter>
-                )}
-            </Card>
-        </div>
-    );
-};
-
-const EditableResponse = ({ field, label, resource, onUpdate, onOpenNestedPopup, popupState }: { 
-    field: 'response' | 'newResponse';
-    label: string;
-    resource: Resource;
-    onUpdate: (updatedResource: Resource) => void;
-    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => void;
-    popupState?: PopupState;
-}) => {
-    const { resources } = useAuth();
-    const responseValue = resource[field];
-    const linkedResource = responseValue?.resourceId ? resources.find(r => r.id === responseValue.resourceId) : null;
-  
-    const handleUnlink = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        onUpdate({ ...resource, [field]: { ...responseValue, text: '', resourceId: undefined } });
-    };
-  
-    const handleUpdateField = (value: { text?: string; resourceId?: string }) => {
-        onUpdate({ ...resource, [field]: value });
-    };
-
-    return (
-        <div className="editable-sentence group/response">
-          <span contentEditable={false} className="uneditable-text">{label}:</span>
-          {linkedResource ? (
-            <>
-                <button 
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        if (popupState) onOpenNestedPopup(linkedResource.id, e, popupState);
-                    }}
-                    className="editable-placeholder text-primary hover:underline"
-                >
-                    {linkedResource.name}
-                </button>
-                <button onClick={handleUnlink} className="inline-block opacity-0 group-hover/response:opacity-100 transition-opacity ml-1">
-                    <Unlink className="h-3 w-3 text-destructive" />
-                </button>
-            </>
-          ) : (
-            <>
-              <EditableField
-                field={field}
-                subField="text"
-                prefix=""
-                resource={resource}
-                onUpdate={onUpdate}
-                placeholder="..."
-              />
-              <Popover>
-                <PopoverTrigger asChild>
-                    <button className="inline-block opacity-0 group-hover/response:opacity-100 transition-opacity ml-1">
-                        <LinkIcon className="h-3 w-3" />
-                    </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-56 p-0">
-                    <Select onValueChange={(val) => handleUpdateField({ text: '', resourceId: val })}>
-                        <SelectTrigger className="w-full border-0 focus:ring-0">
-                            <SelectValue placeholder="Link a mechanism..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {resources.filter(r => r.type === 'mechanism').map(r => (
-                                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </PopoverContent>
-              </Popover>
-            </>
-          )}
-        </div>
-    );
-};
-
-
-const HabitResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingFromId, onOpenNestedPopup }: {
-    resource: Resource; 
-    onUpdate: (updatedResource: Resource) => void; 
-    onDelete: (resourceId: string) => void;
-    onLinkClick: (resourceId: string) => void;
-    linkingFromId: string | null;
-    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
-}) => {
-    const { resources } = useAuth();
-    const [editingTitle, setEditingTitle] = useState(false);
-
-    return (
-        <Card onClick={(e) => onOpenNestedPopup(resource.id, e)} className={cn("flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl cursor-pointer", linkingFromId === resource.id && "ring-2 ring-primary", linkingFromId && linkingFromId !== resource.id && "cursor-pointer hover:ring-2 hover:ring-primary/50")}>
-            <CardHeader onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-between items-start gap-2">
-                    <div className="flex items-center gap-2 flex-grow min-w-0">
-                        {editingTitle ? (
-                            <Input value={resource.name} onChange={(e) => onUpdate({...resource, name: e.target.value})} onBlur={() => setEditingTitle(false)} autoFocus className="text-lg font-semibold h-9" />
-                        ) : (
-                            <CardTitle className="flex items-center gap-3 text-lg cursor-pointer" onClick={() => setEditingTitle(true)}>
-                                <span className="text-primary"><Zap className="h-5 w-5" /></span>
-                                <span className="truncate">{resource.name}</span>
-                            </CardTitle>
-                        )}
-                    </div>
-                     <div className="flex items-center">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onLinkClick(resource.id)}>
-                            <LinkIcon className="h-4 w-4" />
-                        </Button>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 -mr-2 -mt-1"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem onSelect={() => setEditingTitle(true)}>Edit Title</DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => onDelete(resource.id)} className="text-destructive">Delete Card</DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                </div>
-                 {resource.createdAt && (
-                    <CardDescription className="text-xs pt-1">
-                        Created: {format(parseISO(resource.createdAt), 'MMM d, yyyy')}
-                    </CardDescription>
-                )}
-            </CardHeader>
-            <CardContent className="space-y-1" onClick={(e) => e.stopPropagation()}>
-                <EditableField field="trigger" subField="action" prefix="Trigger: When I" suffix="." resource={resource} onUpdate={onUpdate} />
-                <EditableResponse field="response" label="Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(resourceId, event) => onOpenNestedPopup(resourceId, event)} />
-                <EditableField field="reward" prefix="Reward:" resource={resource} onUpdate={onUpdate} />
-                <EditableResponse field="newResponse" label="New Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(resourceId, event) => onOpenNestedPopup(resourceId, event)} />
-            </CardContent>
-        </Card>
-    );
-};
-
-const MechanismResourceCard = ({ resource, onUpdate, onDelete, onLinkClick, linkingFromId, onOpenNestedPopup }: {
-    resource: Resource; 
-    onUpdate: (updatedResource: Resource) => void; 
-    onDelete: (resourceId: string) => void;
-    onLinkClick: (resourceId: string) => void;
-    linkingFromId: string | null;
-    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
-}) => {
-    const [editingTitle, setEditingTitle] = useState(false);
-    
-    const renderFrameworkContent = () => {
-        if (resource.mechanismFramework === 'positive') {
-            return (
-                <div className="space-y-4 text-sm">
-                    <div>
-                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Action</h4>
-                        <EditableField field="trigger" subField="action" prefix="When I " suffix="," resource={resource} onUpdate={onUpdate} placeholder="describe the positive action"/>
-                    </div>
-                     <div>
-                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Mechanism</h4>
-                        <EditableField field="response" subField="visualize" prefix="It causes " suffix=" internally." resource={resource} onUpdate={onUpdate} placeholder="positive internal effect"/>
-                    </div>
-                    <div>
-                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Benefit</h4>
-                        <EditableField field="benefit" prefix="This enables " suffix="." resource={resource} onUpdate={onUpdate} placeholder="good outcome"/>
-                    </div>
-                    <div>
-                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Condition</h4>
-                        <DoubleEditableField prefix="Only when " infix=", " suffix=" happens." value1={resource.newResponse?.visualize || ""} value2={resource.newResponse?.action || ""} onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), visualize: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), action: newValue } })} placeholder1="specific condition" placeholder2="good outcome" />
-                    </div>
-                     <div>
-                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Law</h4>
-                        <DoubleEditableField prefix="" infix=" can only happen when " suffix="." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Positive Condition"/>
-                    </div>
-                    <div>
-                        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Emotion/Image</h4>
-                        <EmotionEditableField value1={resource.trigger?.feeling || ''} value2={resource.reward || ''} onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...(resource.trigger || {}), feeling: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, reward: newValue })} label=" gives me " placeholder1="action/image" placeholder2="positive feeling" />
-                    </div>
-                </div>
-            );
-        }
-        // Negative Framework
-        return (
-             <div className="space-y-4 text-sm">
-                 <div>
-                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Action</h4>
-                    <EditableField field="trigger" subField="action" prefix="When I " suffix="," resource={resource} onUpdate={onUpdate} placeholder="describe the negative action"/>
-                </div>
-                <div>
-                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Mechanism</h4>
-                    <EditableField field="response" subField="visualize" prefix="It causes " suffix=" internally." resource={resource} onUpdate={onUpdate} placeholder="negative internal effect"/>
-                </div>
-                <div>
-                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Cost</h4>
-                    <EditableField field="reward" prefix="This blocks " suffix="." resource={resource} onUpdate={onUpdate} placeholder="good outcome"/>
-                </div>
-                <div>
-                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Opposite</h4>
-                    <DoubleEditableField prefix="Only when " infix=", " suffix=" happens." value1={resource.newResponse?.visualize || ""} value2={resource.newResponse?.action || ""} onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), visualize: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), action: newValue } })} placeholder1="avoidance of bad action" placeholder2="good outcome" />
-                </div>
-                <div>
-                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Law</h4>
-                     <DoubleEditableField prefix="" infix=" cannot happen when " suffix="." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Negative Condition"/>
-                </div>
-                <div>
-                    <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Emotion/Image</h4>
-                    <EmotionEditableField value1={resource.trigger?.feeling || ''} value2={resource.benefit || ''} onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...(resource.trigger || {}), feeling: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, benefit: newValue })} label=" costs me " placeholder1="action/image" placeholder2="negative consequence"/>
-                </div>
-            </div>
-        );
-    };
-
-    return (
-        <Card onClick={(e) => onOpenNestedPopup(resource.id, e)} className={cn("flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl cursor-pointer", linkingFromId === resource.id && "ring-2 ring-primary", linkingFromId && linkingFromId !== resource.id && "cursor-pointer hover:ring-2 hover:ring-primary/50")}>
-            <CardHeader onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-between items-start gap-2">
-                    <div className="flex items-center gap-2 flex-grow min-w-0">
-                        {editingTitle ? (
-                            <Input value={resource.name} onChange={(e) => onUpdate({...resource, name: e.target.value})} onBlur={() => setEditingTitle(false)} autoFocus className="text-lg font-semibold h-9" />
-                        ) : (
-                            <CardTitle className="flex items-center gap-3 text-lg cursor-pointer" onClick={() => setEditingTitle(true)}>
-                                <span className="text-primary"><Workflow className="h-5 w-5" /></span>
-                                <span className="truncate">{resource.name}</span>
-                            </CardTitle>
-                        )}
-                    </div>
-                     <div className="flex items-center">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onLinkClick(resource.id)}>
-                            <LinkIcon className="h-4 w-4" />
-                        </Button>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 -mr-2 -mt-1"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem onSelect={() => setEditingTitle(true)}>Edit Title</DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => onDelete(resource.id)} className="text-destructive">Delete Card</DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                </div>
-                 {resource.createdAt && (
-                    <CardDescription className="text-xs pt-1">
-                        Created: {format(parseISO(resource.createdAt), 'MMM d, yyyy')}
-                    </CardDescription>
-                )}
-            </CardHeader>
-            <CardContent onClick={(e) => e.stopPropagation()}>
-                {renderFrameworkContent()}
-            </CardContent>
-        </Card>
-    );
-}
-
-const LinkDropZone = ({ resourceId, linkingFromId }: { resourceId: string; linkingFromId: string | null; }) => {
-    const { isOver, setNodeRef } = useDroppable({
-        id: `link-dropzone-${resourceId}`,
-        data: { type: 'link-dropzone', resourceId },
-    });
-    return (
-        <div
-            ref={setNodeRef}
-            className={cn(
-                "absolute -top-3 -right-3 z-20 h-7 w-7 rounded-full bg-muted/80 backdrop-blur-sm border border-dashed flex items-center justify-center transition-all opacity-0",
-                linkingFromId && linkingFromId !== resourceId && "opacity-100",
-                isOver && "ring-2 ring-primary scale-125 bg-primary/20"
-            )}
-        >
-            <LinkIcon className="h-4 w-4 text-primary" />
-        </div>
-    );
-};
-
-const SortableResourceCard = ({ children, item, className, linkingFromId }: { children: React.ReactNode; item: Resource; className?: string; linkingFromId: string | null; }) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id, data: { type: 'card', item } });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-    };
-  
-    return (
-        <div ref={setNodeRef} style={style} className={cn(className)}>
-          <div className="relative group/sortable h-full">
-            <button {...attributes} {...listeners} className="absolute -top-2 -left-2 z-10 p-1 bg-muted rounded-full cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-100 transition-opacity"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
-            {(item.type === 'card' || item.type === 'habit' || item.type === 'mechanism') && <LinkDropZone resourceId={item.id} linkingFromId={linkingFromId} />}
-            {children}
-          </div>
-        </div>
-    );
-};
-
-
 const SortablePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText }: {
     point: ResourcePoint;
     onConvertToCard: (point: ResourcePoint) => void;
@@ -1153,53 +387,35 @@ const SortablePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNeste
     );
 };
 
-
-const SortablePointInPopup = ({ point, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText }: {
-    point: ResourcePoint;
-    onUpdate: (text: string) => void;
-    onDelete: () => void;
-    onOpenNestedPopup: (event: React.MouseEvent) => void;
-    onEditLinkText: (point: ResourcePoint) => void;
+const SortableResourceCard = ({ item, children, className, linkingFromId }: { 
+    item: Resource; 
+    children: React.ReactNode;
+    className?: string;
+    linkingFromId: string | null;
 }) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id });
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: item.id, data: { type: 'card', item }});
 
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
-        zIndex: isDragging ? 10 : 'auto',
+        opacity: isDragging ? 0.5 : 1,
+        cursor: linkingFromId && linkingFromId !== item.id ? 'pointer' : 'default',
     };
 
-    if (point.type === 'card' && point.resourceId) {
-        return (
-            <div ref={setNodeRef} style={style} className="relative flex items-start gap-3 text-sm text-muted-foreground group/item">
-                <button {...attributes} {...listeners} className="cursor-grab p-1"><GripVertical className="h-4 w-4 text-muted-foreground/50" /></button>
-                <div
-                    onClick={onOpenNestedPopup}
-                    className="flex items-start gap-3 flex-grow cursor-pointer p-2 rounded-md hover:bg-muted/50 border border-dashed"
-                >
-                    <Library className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />
-                    <span className="font-medium text-foreground">{point.text}</span>
-                </div>
-                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100" onClick={onDelete}>
-                    <Trash2 className="h-3 w-3"/>
-                </Button>
-            </div>
-        )
-    }
-
     return (
-        <div ref={setNodeRef} style={style} className="relative bg-card">
-            <EditableResourcePoint
-                point={point}
-                onUpdate={onUpdate}
-                onDelete={onDelete}
-                onEditLinkText={onEditLinkText}
-                onConvertToCard={() => {}} // Pass empty function as it's not needed in popup
-                dragHandle={{ attributes, listeners }}
-            />
+        <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={className}>
+            {children}
         </div>
     );
 };
+
 
 const DraggableFolder = ({ folder, children, isDragging, ...props }: { folder: ResourceFolder, children: React.ReactNode, isDragging: boolean } & React.HTMLAttributes<HTMLDivElement>) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -1868,69 +1084,8 @@ function ResourcesPageContent() {
     );
   }, [filteredFolders, editingFolder, selectedResourceFolderId, collapsedFolders, handleSelectFolder, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder, toggleFolderCollapse, activeId, searchTerm]);
 
-  const handleOpenNestedPopup = (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
-    setOpenPopups(prev => {
-        const newPopups = new Map(prev);
-        const resource = resources.find(r => r.id === resourceId);
-        if (!resource) return newPopups;
-        
-        const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
-        const popupWidth = hasMarkdown ? 896 : 512;
-    
-        let x, y, level, parentId;
-    
-        if (parentPopupState) {
-            level = parentPopupState.level + 1;
-            parentId = parentPopupState.resourceId;
-            x = parentPopupState.x + 40;
-            y = parentPopupState.y + 40;
-        } else {
-            level = 0;
-            parentId = undefined;
-            if (hasMarkdown) {
-                // Center large popups
-                x = window.innerWidth / 2 - popupWidth / 2;
-                y = window.innerHeight / 2 - Math.min(window.innerHeight * 0.7, 700) / 2;
-            } else {
-                x = event.clientX;
-                y = event.clientY;
-            }
-        }
-        
-        newPopups.set(resourceId, {
-            resourceId, level, x, y, parentId, width: popupWidth
-        });
-        return newPopups;
-    });
-  };
-
-  const handleClosePopup = (resourceId: string) => {
-    setOpenPopups(prev => {
-      const newPopups = new Map(prev);
-      const popupsToDelete = new Set<string>();
+  const { handleOpenNestedPopup } = useAuth();
   
-      function findChildren(parentId: string) {
-        popupsToDelete.add(parentId);
-        for (const [id, popup] of newPopups.entries()) {
-          if (popup.parentId === parentId) {
-            findChildren(id);
-          }
-        }
-      }
-  
-      findChildren(resourceId);
-  
-      for (const id of popupsToDelete) {
-        if (playingAudio?.id === id) {
-            setPlayingAudio(null);
-        }
-        newPopups.delete(id);
-      }
-  
-      return newPopups;
-    });
-  };
-
   const isDescendant = (childId: string, parentId: string): boolean => {
     if (childId === parentId) return true;
     const parentFolder = resourceFolders.find(f => f.id === childId);
@@ -1941,19 +1096,6 @@ function ResourcesPageContent() {
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null);
     const { active, over, delta } = event;
-
-    if (active.id.toString().startsWith('popup-')) {
-        setOpenPopups(prev => {
-            const newPopups = new Map(prev);
-            const popupId = active.id.toString().replace('popup-', '');
-            const popup = newPopups.get(popupId);
-            if (popup) {
-                newPopups.set(popupId, { ...popup, x: popup.x + delta.x, y: popup.y + delta.y });
-            }
-            return newPopups;
-        });
-        return;
-    }
 
     if (!over) return;
     
@@ -2339,7 +1481,7 @@ function ResourcesPageContent() {
                                 }
                                 
                                 return (
-                                <SortableResourceCard key={res.id} item={res} className={cardClassName} linkingFromId={linkingFromId}>
+                                <div key={res.id} className={cardClassName}>
                                      <Card
                                         {...cardProps}
                                         className={cn(
@@ -2399,10 +1541,10 @@ function ResourcesPageContent() {
                                             </div>
                                         )}
                                     </Card>
-                                </SortableResourceCard>
+                                </div>
                                 )
                             }
-                             return <SortableResourceCard key={res.id} item={res} className={cardClassName} linkingFromId={linkingFromId}>{cardContent}</SortableResourceCard>;
+                             return <div key={res.id} className={cardClassName}>{cardContent}</div>;
                         })}
                         {selectedResourceFolderId && !searchTerm && (
                             <Card 
@@ -2415,29 +1557,6 @@ function ResourcesPageContent() {
                             )}
                     </div>
                 </SortableContext>
-                <DragOverlay>
-                  {activeId && activeId.startsWith('res_') ? (
-                    <div className="w-48">
-                        <Card className="shadow-2xl">
-                            <CardHeader><CardTitle className="text-base">{resources.find(r=>r.id===activeId)?.name}</CardTitle></CardHeader>
-                        </Card>
-                    </div>
-                  ) : activeId && activeId.startsWith('point_') ? (
-                     <div className="bg-card p-2 rounded-md shadow-lg opacity-80 flex items-start gap-3 w-64">
-                        <GripVertical className="h-4 w-4 text-muted-foreground/50" />
-                        {resources.flatMap(r => r.points || []).find(p => p.id === activeId)?.text}
-                    </div>
-                  ) : activeId && activeId.startsWith('cat_') ? (
-                    <div className="w-48">
-                        <Card className="shadow-2xl p-2 bg-primary/10">
-                           <div className="flex items-center gap-2">
-                                <Folder className="h-4 w-4" />
-                                <p className="font-semibold text-sm">{resourceFolders.find(f => f.id === activeId)?.name}</p>
-                           </div>
-                        </Card>
-                    </div>
-                  ) : null}
-                </DragOverlay>
                 </div>
             </main>
         </div>
@@ -2446,18 +1565,7 @@ function ResourcesPageContent() {
             const resource = resources.find(r => r.id === popupState.resourceId);
             if (!resource) return null;
             return (
-                <ResourcePopupCard
-                    key={popupState.resourceId}
-                    popupState={popupState}
-                    resource={resource}
-                    onClose={handleClosePopup}
-                    onUpdate={handleUpdateResource}
-                    playingAudio={playingAudio}
-                    setPlayingAudio={setPlayingAudio}
-                    onOpenNestedPopup={handleOpenNestedPopup}
-                    onEditLinkText={handleEditLinkText}
-                    onConvertToCard={() => {}} // No-op in this context
-                />
+                <div key="dummy" />
             );
         })}
 
@@ -2857,6 +1965,8 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
+
 
 
 

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -31,7 +32,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
-import { HabitPopup } from '@/components/HabitPopup';
+import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 
 
 interface ResourcePopupProps {
@@ -141,7 +142,7 @@ interface AuthContextType {
   habitCards: Resource[];
   mechanismCards: Resource[];
   
-  // Resource Popups
+  // Resource Popups (Original system, kept for resources page)
   openPopups: Map<string, PopupState>;
   handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => void;
   closeAllResourcePopups: () => void;
@@ -152,6 +153,12 @@ interface AuthContextType {
   intentionPopups: Map<string, PopupState>;
   openIntentionPopup: (intentionId: string) => void;
   closeIntentionPopup: (intentionId: string) => void;
+  
+  // General Popups (New System)
+  generalPopups: Map<string, PopupState>;
+  openGeneralPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => void;
+  closeGeneralPopup: (resourceId: string) => void;
+  GeneralPopup: React.FC<{ popupState: PopupState }>;
 
 
   // Workout Log Handlers
@@ -300,6 +307,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   // Intention Popups
   const [intentionPopups, setIntentionPopups] = useState<Map<string, PopupState>>(new Map());
+  
+  // General Popups (New System)
+  const [generalPopups, setGeneralPopups] = useState<Map<string, PopupState>>(new Map());
+
 
   // Sidebar State
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
@@ -420,7 +431,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = localStorage.getItem(`branding_logs_${username}`); setAllBrandingLogs(d ? JSON.parse(d) : []); } catch (e) { setAllBrandingLogs([]); }
       try { const d = localStorage.getItem(`leadgen_logs_${username}`); setAllLeadGenLogs(d ? JSON.parse(d) : []); } catch (e) { setAllLeadGenLogs([]); }
       
-      // Definitions, Plans, and Goals
+      // Data Definitions & Plans
       const storedMode = loadItem(`workoutMode_${username}`, false);
       if (storedMode === 'one-muscle' || storedMode === 'two-muscle') setWorkoutMode(storedMode as WorkoutMode); else setWorkoutMode('two-muscle');
       try { const d = loadItem(`workoutPlans_${username}`); setWorkoutPlans(d ? JSON.parse(d) : INITIAL_PLANS); } catch (e) { setWorkoutPlans(INITIAL_PLANS); }
@@ -1464,11 +1475,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsPistonsHeadOpen(true);
   };
   
-  const handleUpdateResource = useCallback((updatedResource: Resource) => {
+  const handleUpdateResource = (updatedResource: Resource) => {
     setResources(prev =>
       prev.map(res => res.id === updatedResource.id ? updatedResource : res)
     );
-  }, [setResources]);
+  };
 
   const handleClosePopup = useCallback((resourceId: string) => {
     setOpenPopups(prev => {
@@ -1523,22 +1534,89 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return newPopups;
     });
   }, [resources]);
+  
+  const openGeneralPopup = useCallback((resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => {
+    setGeneralPopups(prev => {
+        const newPopups = new Map(prev);
+        const resource = resources.find(r => r.id === resourceId);
+        if (!resource) return newPopups;
+        
+        const popupWidth = 512;
+        let x, y, level, parentId;
+
+        if (parentPopupState && parentRect) {
+            level = parentPopupState.level + 1;
+            parentId = parentPopupState.resourceId;
+            const screenWidth = window.innerWidth;
+            if (parentRect.x + parentRect.width + popupWidth + 20 < screenWidth) {
+                x = parentRect.x + parentRect.width + 20;
+            } else {
+                x = parentRect.x - popupWidth - 20;
+            }
+            y = parentRect.y;
+        } else {
+            level = 0;
+            parentId = undefined;
+            x = event.clientX;
+            y = event.clientY;
+        }
+        
+        newPopups.set(resourceId, { 
+            resourceId, level, x, y, parentId, width: popupWidth, z: 80 + level
+        });
+        return newPopups;
+    });
+  }, [resources]);
+
 
   const closeAllResourcePopups = useCallback(() => {
     setOpenPopups(new Map());
+  }, []);
+  
+  const closeGeneralPopup = useCallback((resourceId: string) => {
+    setGeneralPopups(prev => {
+      const newPopups = new Map(prev);
+      const popupsToDelete = new Set<string>();
+      function findChildren(parentId: string) {
+        popupsToDelete.add(parentId);
+        for (const [id, popup] of newPopups.entries()) {
+          if (popup.parentId === parentId) findChildren(id);
+        }
+      }
+      findChildren(resourceId);
+      for (const id of popupsToDelete) newPopups.delete(id);
+      return newPopups;
+    });
   }, []);
 
   const ResourcePopup: React.FC<ResourcePopupProps> = useCallback(({ popupState }) => {
     const resource = resources.find(r => r.id === popupState.resourceId);
     if (!resource) return null;
     return (
-      <HabitPopup 
-        habit={resource} 
-        position={{x: popupState.x, y: popupState.y}} 
-        onClose={() => closeAllResourcePopups()}
+      <GeneralResourcePopup 
+        popupState={popupState} 
+        onClose={handleClosePopup}
+        onUpdate={handleUpdateResource}
+        onOpenNestedPopup={handleOpenNestedPopup}
       />
     )
-  }, [resources, closeAllResourcePopups]);
+  }, [resources, handleClosePopup, handleUpdateResource, handleOpenNestedPopup]);
+  
+  const GeneralPopup: React.FC<{ popupState: PopupState }> = useCallback(({ popupState }) => {
+    return (
+        <GeneralResourcePopup
+            popupState={popupState}
+            onClose={closeGeneralPopup}
+            onUpdate={handleUpdateResource}
+            onOpenNestedPopup={(resourceId, event, parentState) => {
+                if (cardRef.current) {
+                    openGeneralPopup(resourceId, event, parentState, cardRef.current.getBoundingClientRect());
+                }
+            }}
+        />
+    );
+  }, [closeGeneralPopup, handleUpdateResource, openGeneralPopup]);
+
 
   const handlePopupDragEnd = (event: DragEndEvent) => {
       const { active, delta } = event;
@@ -1555,6 +1633,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                       x: popup.x + delta.x,
                       y: popup.y + delta.y,
                   });
+              }
+              return newPopups;
+          });
+      } else if (activeId.startsWith('general-popup-')) {
+          const resourceId = activeId.replace('general-popup-', '');
+          setGeneralPopups(prev => {
+              const newPopups = new Map(prev);
+              const popup = newPopups.get(resourceId);
+              if (popup) {
+                  newPopups.set(resourceId, { ...popup, x: popup.x + delta.x, y: popup.y + delta.y });
               }
               return newPopups;
           });
@@ -1690,6 +1778,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     handlePopupDragEnd,
     ResourcePopup,
     intentionPopups, openIntentionPopup, closeIntentionPopup,
+    generalPopups, openGeneralPopup, closeGeneralPopup, GeneralPopup,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,
