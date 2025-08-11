@@ -478,7 +478,7 @@ function ResourcesPageContent() {
   
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   
-  const [youtubeModalState, setYoutubeModalState<{
+  const [youtubeModalState, setYoutubeModalState] = useState<{
     isOpen: boolean;
     playlist: Resource[];
     currentIndex: number;
@@ -498,15 +498,15 @@ function ResourcesPageContent() {
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [mindMapRootFolderId, setMindMapRootFolderId] = useState<string | null>(null);
   
-  const [addResourceType, setAddResourceType<'link' | 'card' | 'habit' | 'model3d' | 'mechanism'>('link');
-  const [mechanismFramework, setMechanismFramework<'negative' | 'positive'>('negative');
+  const [addResourceType, setAddResourceType]<'link' | 'card' | 'habit' | 'model3d' | 'mechanism'>('link');
+  const [mechanismFramework, setMechanismFramework]<'negative' | 'positive'>('negative');
 
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
   
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
 
-  const [markdownModalState, setMarkdownModalState<{
+  const [markdownModalState, setMarkdownModalState]<{
     isOpen: boolean;
     resourceId: string | null;
     pointId: string | null;
@@ -514,7 +514,7 @@ function ResourcesPageContent() {
   
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   
-  const [playingAudio, setPlayingAudio<{ id: string; isPlaying: boolean } | null>(null);
+  const [playingAudio, setPlayingAudio]<{ id: string; isPlaying: boolean } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
   const [linkingFromId, setLinkingFromId] = useState<string | null>(null);
@@ -1234,7 +1234,7 @@ function ResourcesPageContent() {
     }
   };
 
-  const [linkTextDialog, setLinkTextDialog<{ point: ResourcePoint, resourceId: string } | null>(null);
+  const [linkTextDialog, setLinkTextDialog]<{ point: ResourcePoint, resourceId: string } | null>(null);
   const [currentDisplayText, setCurrentDisplayText] = useState('');
 
   const handleEditLinkText = (point: ResourcePoint) => {
