@@ -10,7 +10,7 @@ import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
-import { AutoSuggestionEntry, DailySchedule, MetaRule, Pattern, PistonEntry, PistonsCategoryData, PistonsInitialState, PurposeData, Resource, PistonType } from '@/types/workout';
+import { PistonEntry, PistonType, PistonsData, Resource, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, AutoSuggestionEntry } from '@/types/workout';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
@@ -184,7 +184,7 @@ export function PistonsHead() {
   );
 }
 
-const MainPistonView = ({ onSelect }) => (
+const MainPistonView = ({ onSelect }: { onSelect: (view: 'desires' | 'thoughts' | 'autosuggestion' | 'starred') => void }) => (
     <CardContent className="p-4">
         <p className="text-muted-foreground text-center mb-4 text-sm">Select a category to define your core motivations.</p>
         <div className="grid grid-cols-2 gap-4">
@@ -196,7 +196,7 @@ const MainPistonView = ({ onSelect }) => (
     </CardContent>
 );
 
-const ThoughtsView = ({ onSelect }) => (
+const ThoughtsView = ({ onSelect }: { onSelect: (type: 'Fantasy' | 'Disruptive') => void }) => (
     <CardContent className="p-4">
         <div className="grid grid-cols-2 gap-4">
             <Button onClick={() => onSelect('Fantasy')} variant="outline" className="flex-col h-20"><ThumbsUp className="h-6 w-6 text-green-500 mb-1"/>Fantasy</Button>
@@ -205,7 +205,7 @@ const ThoughtsView = ({ onSelect }) => (
     </CardContent>
 );
 
-const NegativeThoughtsView = ({ onSelect, onSchedule }) => {
+const NegativeThoughtsView = ({ onSelect, onSchedule }: { onSelect: (state: EmotionalState) => void; onSchedule: () => void; }) => {
     return (
         <CardContent className="p-4">
             <ScrollArea className="h-80">
@@ -224,7 +224,7 @@ const NegativeThoughtsView = ({ onSelect, onSchedule }) => {
     );
 };
 
-const PositiveThoughtsView = ({ onSelect, onSchedule }) => {
+const PositiveThoughtsView = ({ onSelect, onSchedule }: { onSelect: (state: FantasyState) => void; onSchedule: () => void; }) => {
     return (
         <CardContent className="p-4">
             <ScrollArea className="h-80">
@@ -293,7 +293,7 @@ const AutoSuggestionView = () => {
                                 {format(selectedDate, 'PPP')}
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="end" side="right" sideOffset={8}>
+                        <PopoverContent className="w-auto p-0" align="end" side="right" sideOffset={12} alignOffset={10}>
                             <CalendarComponent
                                 mode="single"
                                 selected={selectedDate}
