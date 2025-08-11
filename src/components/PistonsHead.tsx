@@ -293,7 +293,7 @@ const AutoSuggestionView = () => {
                                 {format(selectedDate, 'PPP')}
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="end">
+                        <PopoverContent className="w-auto p-0" align="end" side="right" sideOffset={8}>
                             <CalendarComponent
                                 mode="single"
                                 selected={selectedDate}
