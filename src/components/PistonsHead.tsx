@@ -1,11 +1,10 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, ChevronLeft, Target, Shield, Edit, X, History, Plus, Save, Star, Mic, MessageSquare, Lightbulb, ThumbsUp, Flame, Compass, Sun, GitBranch, Anchor } from 'lucide-react';
+import { BrainCircuit, ChevronLeft, Target, Shield, Edit, X, History, Plus, Save, Star, Mic, MessageSquare, Lightbulb, ThumbsUp, Flame, Compass, Sun, GitBranch, Anchor, Trash2 } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
@@ -197,7 +196,7 @@ const MainPistonView = ({ onSelect }: { onSelect: (view: 'desires' | 'thoughts' 
     </CardContent>
 );
 
-const ThoughtsView = ({ onSelect }: { onSelect: (type: 'Fantasy' | 'Disruptive') => void }) => (
+const ThoughtsView = ({ onSelect }: { onSelect: ('Fantasy' | 'Disruptive') => void }) => (
     <CardContent className="p-4">
         <div className="grid grid-cols-2 gap-4">
             <Button onClick={() => onSelect('Fantasy')} variant="outline" className="flex-col h-20"><ThumbsUp className="h-6 w-6 text-green-500 mb-1"/>Fantasy</Button>
@@ -354,4 +353,10 @@ const StarredView = () => {
             </ScrollArea>
         </CardContent>
     );
-};
+}
+
+interface LogEntry {
+    id: string;
+    text: string;
+    timestamp: number;
+}
