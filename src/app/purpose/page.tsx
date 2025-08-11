@@ -497,10 +497,3 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
-
-
-
-
-
-
-
