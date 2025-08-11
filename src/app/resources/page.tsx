@@ -681,6 +681,7 @@ function ResourcesPageContent() {
     selectedResourceFolderId,
     setSelectedResourceFolderId,
     globalVolume,
+    openGeneralPopup,
   } = useAuth();
   const { toast } = useToast();
   
@@ -737,66 +738,18 @@ function ResourcesPageContent() {
   const [searchTerm, setSearchTerm] = useState('');
   const [modelModalState, setModelModalState] = useState<{ isOpen: boolean; modelUrl: string | null }>({ isOpen: false, modelUrl: null });
 
-  const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
-
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
-  const handleOpenNestedPopup = useCallback((resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
-    setOpenPopups(prev => {
-        const newPopups = new Map(prev);
-        const resource = resources.find(r => r.id === resourceId);
-        if (!resource) return newPopups;
-        
-        const popupWidth = (resource.type === 'habit' || resource.type === 'mechanism') ? 420 : 512;
-    
-        let x, y, level, parentId;
-    
-        if (parentPopupState) {
-            level = parentPopupState.level + 1;
-            parentId = parentPopupState.resourceId;
-            x = parentPopupState.x + 40;
-            y = parentPopupState.y + 40;
-        } else {
-            level = 0;
-            parentId = undefined;
-            x = event.clientX;
-            y = event.clientY;
-        }
-        
-        newPopups.set(resourceId, {
-            resourceId, level, x, y, parentId, width: popupWidth
-        });
-        return newPopups;
-    });
-  }, [resources]);
+  const handleOpenNestedPopup = useCallback((resourceId: string, event: React.MouseEvent) => {
+    openGeneralPopup(resourceId, event);
+  }, [openGeneralPopup]);
 
-   const handleClosePopup = useCallback((resourceId: string) => {
-    setOpenPopups(prev => {
-      const newPopups = new Map(prev);
-      const popupsToDelete = new Set<string>();
-      function findChildren(parentId: string) {
-        popupsToDelete.add(parentId);
-        for (const [id, popup] of newPopups.entries()) {
-          if (popup.parentId === parentId) findChildren(id);
-        }
-      }
-      findChildren(resourceId);
-      for (const id of popupsToDelete) {
-        if (playingAudio?.id === id) {
-            setPlayingAudio(null);
-        }
-        newPopups.delete(id);
-      }
-      return newPopups;
-    });
-  }, [playingAudio]);
-  
   const handleUpdateResource = (updatedResource: Resource) => {
     setResources(prev =>
       prev.map(res => res.id === updatedResource.id ? updatedResource : res)
     );
   };
-
+  
   const handleLinkClick = useCallback((resourceId: string) => {
     if (linkingFromId === null) {
       const sourceCard = resources.find(r => r.id === resourceId);
@@ -1251,12 +1204,6 @@ function ResourcesPageContent() {
       setEditingResource(prev => prev ? ({...prev, folderId: value}) : null);
   };
 
-  const handleUpdateResource = (updatedResource: Resource) => {
-    setResources(prev =>
-      prev.map(res => res.id === updatedResource.id ? updatedResource : res)
-    );
-  };
-
   const handleSaveResourceEdit = () => {
     if (!editingResource) return;
     if (!editingResource.name?.trim() || !editingResource.folderId) {
@@ -1622,14 +1569,13 @@ function ResourcesPageContent() {
 
 
   return (
-    <>
-    <audio ref={audioRef} onEnded={() => setPlayingAudio(null)} />
     <DndContext
-      sensors={sensors}
+      sensors={useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))}
       onDragStart={(e) => setActiveId(e.active.id.toString())}
       onDragEnd={handleDragEnd}
     >
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
+      <audio ref={audioRef} onEnded={() => setPlayingAudio(null)} />
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {/* Left Sidebar */}
             <aside className="md:col-span-1 space-y-6">
@@ -1832,69 +1778,6 @@ function ResourcesPageContent() {
             </main>
         </div>
         </div>
-        {Array.from(openPopups.values()).map((popupState) => (
-            <ResourcePopupCard
-                key={popupState.resourceId}
-                popupState={popupState}
-                allResources={resources}
-                onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e, popupState)}
-                onClose={handleClosePopup}
-                onUpdate={handleUpdateResource}
-                playingAudio={playingAudio}
-                setPlayingAudio={setPlayingAudio}
-            />
-        ))}
-        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-[60]">
-            {Array.from(openPopups.values()).map(popup => {
-                if (!popup.parentId) return null;
-                const parentPopup = openPopups.get(popup.parentId);
-                if (!parentPopup) return null;
-
-                const startX = popupState.x + (popupState.width || 0) / 2;
-                const startY = popupState.y + ((popupState.height || 0) / 2);
-                const endX = popup.x + (popup.width || 0) / 2;
-                const endY = popup.y + ((popup.height || 0) / 2);
-                
-                return (
-                <line 
-                    key={`${popup.parentId}-${popup.resourceId}`}
-                    x1={startX} 
-                    y1={startY} 
-                    x2={endX} 
-                    y2={endY} 
-                    stroke="hsl(var(--primary))" 
-                    strokeWidth="2"
-                    strokeOpacity="0.5"
-                />
-                )
-            })}
-        </svg>
-        <Dialog open={!!linkTextDialog} onOpenChange={() => setLinkTextDialog(null)}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Set Display Text</DialogTitle>
-                    <DialogDescription>Set the text that will be displayed for this link.</DialogDescription>
-                </DialogHeader>
-                <div className="py-4">
-                    <Label htmlFor="display-text-input">Display Text</Label>
-                    <Input
-                        id="display-text-input"
-                        value={currentDisplayText}
-                        onChange={(e) => setCurrentDisplayText(e.target.value)}
-                        placeholder="Enter display text..."
-                        autoFocus
-                    />
-                    {linkTextDialog?.point.url && (
-                        <p className="text-xs text-muted-foreground mt-2">URL: <span className="font-mono text-xs truncate">{linkTextDialog.point.text}</span></p>
-                    )}
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setLinkTextDialog(null)}>Cancel</Button>
-                    <Button onClick={handleSaveLinkText}>Save</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    </DndContext>
         {contextMenu && (
             <div ref={contextMenuRef} style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }} className="fixed z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => e.stopPropagation()}>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { togglePinFolder(contextMenu.item.id); setContextMenu(null); }}>
@@ -2146,14 +2029,14 @@ function ResourcesPageContent() {
               </div>
           </DialogContent>
         </Dialog>
-        
+    </DndContext>
     </>
   );
 }
 
 const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onEditLinkText, dragHandle }: { 
     point: ResourcePoint, 
-    onUpdate: (text: string) => void, 
+    onUpdate: (updatedText: string) => void, 
     onDelete: () => void,
     onEditLinkText: (point: ResourcePoint) => void;
     onConvertToCard: () => void;
@@ -2245,4 +2128,5 @@ export default function ResourcesPage() {
     
 
     
+
 
