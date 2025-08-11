@@ -471,7 +471,7 @@ function ResourcesPageContent() {
   
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   
-  const [youtubeModalState, setYoutubeModalState = useState<{
+  const [youtubeModalState, setYoutubeModalState] = useState<{
     isOpen: boolean;
     playlist: Resource[];
     currentIndex: number;
@@ -484,20 +484,20 @@ function ResourcesPageContent() {
   } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
-  const [deleteConfirmation, setDeleteConfirmation = useState<{ item: ResourceFolder | Resource } | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{ item: ResourceFolder | Resource } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isFetchingMeta, setIsFetchingMeta] = useState(false);
   
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
-  const [mindMapRootFolderId, setMindMapRootFolderId = useState<string | null>(null);
+  const [mindMapRootFolderId, setMindMapRootFolderId] = useState<string | null>(null);
   
-  const [addResourceType, setAddResourceType = useState<'link' | 'card' | 'habit' | 'model3d' | 'mechanism'>('link');
-  const [mechanismFramework, setMechanismFramework = useState<'negative' | 'positive'>('negative');
+  const [addResourceType, setAddResourceType] = useState<'link' | 'card' | 'habit' | 'model3d' | 'mechanism'>('link');
+  const [mechanismFramework, setMechanismFramework] = useState<'negative' | 'positive'>('negative');
 
-  const [shareDialogOpen, setShareDialogOpen = useState(false);
-  const [shareUrl, setShareUrl = useState('');
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
 
-  const [markdownModalState, setMarkdownModalState = useState<{
+  const [markdownModalState, setMarkdownModalState] = useState<{
     isOpen: boolean;
     resourceId: string | null;
     pointId: string | null;
@@ -505,16 +505,22 @@ function ResourcesPageContent() {
   
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   
-  const [playingAudio, setPlayingAudio = useState<{ id: string; isPlaying: boolean } | null>(null);
+  const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
-  const [linkingFromId, setLinkingFromId = useState<string | null>(null);
-  const [activeId, setActiveId = useState<string | null>(null);
+  const [linkingFromId, setLinkingFromId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   
-  const [searchTerm, setSearchTerm = useState('');
-  const [modelModalState, setModelModalState = useState<{ isOpen: boolean; modelUrl: string | null }>({ isOpen: false, modelUrl: null });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [modelModalState, setModelModalState] = useState<{ isOpen: boolean; modelUrl: string | null }>({ isOpen: false, modelUrl: null });
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   const handleOpenNestedPopup = useCallback((resourceId: string, event: React.MouseEvent) => {
     openGeneralPopup(resourceId, event);
@@ -1227,8 +1233,8 @@ function ResourcesPageContent() {
   }, [activeResourceTabIds, pinnedFolderIds]);
   
 
-  const [linkTextDialog, setLinkTextDialog = useState<{ point: ResourcePoint, resourceId: string } | null>(null);
-  const [currentDisplayText, setCurrentDisplayText = useState('');
+  const [linkTextDialog, setLinkTextDialog] = useState<{ point: ResourcePoint, resourceId: string } | null>(null);
+  const [currentDisplayText, setCurrentDisplayText] = useState('');
 
   const handleEditLinkText = (point: ResourcePoint) => {
     const resource = resources.find(r => r.points?.some(p => p.id === point.id));
@@ -1342,7 +1348,6 @@ function ResourcesPageContent() {
     };
     reader.readAsDataURL(file);
   };
-
 
   return (
     <>
@@ -1821,8 +1826,8 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
 }) => {
     const { setFloatingVideoUrl } = useAuth();
     
-    const [isEditing, setIsEditing = useState(point.text === 'New step...');
-    const [editText, setEditText = useState(point.text);
+    const [isEditing, setIsEditing] = useState(point.text === 'New step...');
+    const [editText, setEditText] = useState(point.text);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const handleSave = () => {
