@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -141,6 +141,10 @@ interface AuthContextType {
   setSelectedResourceFolderId: React.Dispatch<React.SetStateAction<string | null>>;
   habitCards: Resource[];
   mechanismCards: Resource[];
+  createHabitFromThought: (thought: PistonEntry, habitName: string, folderId: string) => void;
+  lastSelectedHabitFolder: string | null;
+  setLastSelectedHabitFolder: React.Dispatch<React.SetStateAction<string | null>>;
+
   
   // Resource Popups (Original system, kept for resources page)
   openPopups: Map<string, PopupState>;
@@ -206,7 +210,7 @@ interface AuthContextType {
   positions: Position[];
   setPositions: React.Dispatch<React.SetStateAction<Position[]>>;
   
-  // Purpose Page
+  // Purpose & Patterns Data
   purposeStatement: string;
   setPurposeStatement: React.Dispatch<React.SetStateAction<string>>;
   specializationPurposes: Record<string, string>;
@@ -299,6 +303,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [pinnedFolderIds, setPinnedFolderIds] = useState<Set<string>>(new Set());
   const [activeResourceTabIds, setActiveResourceTabIds] = useState<string[]>([]);
   const [selectedResourceFolderId, setSelectedResourceFolderId] = useState<string | null>(null);
+  const [lastSelectedHabitFolder, setLastSelectedHabitFolder] = useState<string | null>(null);
+
 
   // Resource Popups
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
@@ -468,6 +474,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`activeResourceTabIds_${username}`); setActiveResourceTabIds(d ? JSON.parse(d) : []); } catch (e) { setActiveResourceTabIds([]); }
       const storedSelectedFolder = loadItem(`selectedResourceFolderId_${username}`, false);
       setSelectedResourceFolderId(storedSelectedFolder || null);
+      const storedLastHabitFolder = loadItem(`last_selected_habit_folder_${username}`, false);
+      setLastSelectedHabitFolder(storedLastHabitFolder || null);
 
       
       // Canvas Data
@@ -533,6 +541,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setOfferizationPlans({});
       setResources([]); setResourceFolders([]); setPinnedFolderIds(new Set());
       setActiveResourceTabIds([]); setSelectedResourceFolderId(null);
+      setLastSelectedHabitFolder(null);
       setCanvasLayout({ nodes: [], edges: [] });
       setMindsetCards(DEFAULT_MINDSET_CARDS);
       setPistons({});
@@ -585,6 +594,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`pinned_folder_ids_${username}`, JSON.stringify(Array.from(pinnedFolderIds)));
       localStorage.setItem(`activeResourceTabIds_${username}`, JSON.stringify(activeResourceTabIds));
       if (selectedResourceFolderId) localStorage.setItem(`selectedResourceFolderId_${username}`, selectedResourceFolderId); else localStorage.removeItem(`selectedResourceFolderId_${username}`);
+      if (lastSelectedHabitFolder) localStorage.setItem(`last_selected_habit_folder_${username}`, lastSelectedHabitFolder); else localStorage.removeItem(`last_selected_habit_folder_${username}`);
 
       
       // Canvas
@@ -626,7 +636,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
     exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions,
     productizationPlans, offerizationPlans,
-    resources, resourceFolders, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId,
+    resources, resourceFolders, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
     canvasLayout,
     mindsetCards,
     pistons,
@@ -783,6 +793,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setPinnedFolderIds(data.pinnedFolderIds ? new Set(data.pinnedFolderIds) : new Set());
     setActiveResourceTabIds(data.activeResourceTabIds || []);
     setSelectedResourceFolderId(data.selectedResourceFolderId || null);
+    setLastSelectedHabitFolder(data.lastSelectedHabitFolder || null);
 
 
     setCanvasLayout(data.canvasLayout || { nodes: [], edges: [] });
@@ -856,7 +867,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       dailyPurposes,
       dietPlan, weightLogs, goalWeight, height, dateOfBirth, gender,
       resources: resourcesToSave, resourceFolders, pinnedFolderIds: Array.from(pinnedFolderIds),
-      activeResourceTabIds, selectedResourceFolderId,
+      activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
       canvasLayout,
       mindsetCards,
       pistons,
@@ -1598,7 +1609,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         onClose={handleClosePopup}
         onUpdate={handleUpdateResource}
         onOpenNestedPopup={handleOpenNestedPopup}
-        resources={resources}
       />
     )
   }, [resources, handleClosePopup, handleUpdateResource, handleOpenNestedPopup]);
@@ -1718,6 +1728,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const createHabitFromThought = (thought: PistonEntry, habitName: string, folderId: string) => {
+    const newHabit: Resource = {
+      id: `res_habit_${Date.now()}`,
+      name: habitName,
+      folderId: folderId,
+      type: 'habit',
+      trigger: { action: thought.text },
+      createdAt: new Date().toISOString(),
+    };
+    setResources(prev => [...prev, newHabit]);
+  };
+
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -1744,6 +1766,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     activeResourceTabIds, setActiveResourceTabIds,
     selectedResourceFolderId, setSelectedResourceFolderId,
     habitCards, mechanismCards,
+    createHabitFromThought, lastSelectedHabitFolder, setLastSelectedHabitFolder,
     openPopups, handleOpenNestedPopup, 
     closeAllResourcePopups,
     handlePopupDragEnd,

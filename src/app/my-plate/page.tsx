@@ -9,7 +9,7 @@ import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subYea
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { MindMapViewer } from '@/components/MindMapViewer';
 
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
@@ -26,14 +26,17 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Brain as BrainIcon, MessageSquare } from 'lucide-react';
+import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow } from 'lucide-react';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 
 
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { KanbanPageContent } from '@/app/kanban/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
@@ -94,6 +97,10 @@ function MyPlatePageContent() {
     offerizationPlans,
     openIntentionPopup,
     pistons,
+    resourceFolders,
+    createHabitFromThought,
+    lastSelectedHabitFolder,
+    setLastSelectedHabitFolder,
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -112,8 +119,38 @@ function MyPlatePageContent() {
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [isKanbanModalOpen, setIsKanbanModalOpen] = useState(false);
   const [isParkingLotModalOpen, setIsParkingLotModalOpen] = useState(false);
+  const [isConvertToHabitModalOpen, setIsConvertToHabitModalOpen] = useState(false);
+  const [thoughtToConvert, setThoughtToConvert] = useState<ThoughtEntry | null>(null);
+  const [newHabitName, setNewHabitName] = useState('');
+  const [selectedHabitFolder, setSelectedHabitFolder] = useState('');
   const [editingActivity, setEditingActivity] = useState<{ slotName: string; activity: Activity } | null>(null);
   const [workoutActivityToLog, setWorkoutActivityToLog] = useState<Activity | null>(null);
+
+  useEffect(() => {
+    if (lastSelectedHabitFolder) {
+      setSelectedHabitFolder(lastSelectedHabitFolder);
+    }
+  }, [lastSelectedHabitFolder, isConvertToHabitModalOpen]);
+
+  const handleOpenConvertToHabit = (thought: ThoughtEntry) => {
+    setThoughtToConvert(thought);
+    setNewHabitName(thought.type); // Pre-fill name
+    setIsConvertToHabitModalOpen(true);
+  };
+  
+  const handleHabitCreation = () => {
+    if (!thoughtToConvert || !newHabitName.trim() || !selectedHabitFolder) {
+        toast({ title: 'Error', description: 'Please provide a name and select a folder.', variant: 'destructive' });
+        return;
+    }
+    createHabitFromThought(thoughtToConvert, newHabitName.trim(), selectedHabitFolder);
+    setLastSelectedHabitFolder(selectedHabitFolder);
+    setIsConvertToHabitModalOpen(false);
+    setThoughtToConvert(null);
+    setNewHabitName('');
+    toast({ title: 'Habit Created!', description: `A new habit card has been added to your resources.` });
+  };
+
 
   // State for Modal content
   const [todaysExercises, setTodaysExercises] = useState<WorkoutExercise[]>([]);
@@ -1169,10 +1206,15 @@ function MyPlatePageContent() {
                 <ScrollArea className="h-full border rounded-md p-3 bg-muted/30">
                   <ul className="space-y-3">
                     {disruptiveThoughts.map(thought => (
-                      <li key={thought.id} className="text-sm">
-                        <p className="font-medium text-foreground">{thought.type}</p>
-                        <p className="text-muted-foreground whitespace-pre-wrap">{thought.text}</p>
-                        <p className="text-xs text-muted-foreground/70 text-right mt-1">{format(thought.timestamp, 'MMM d, yyyy')}</p>
+                      <li key={thought.id} className="text-sm group flex items-start gap-2">
+                        <div className="flex-grow">
+                          <p className="font-medium text-foreground">{thought.type}</p>
+                          <p className="text-muted-foreground whitespace-pre-wrap">{thought.text}</p>
+                          <p className="text-xs text-muted-foreground/70 text-right mt-1">{format(thought.timestamp, 'MMM d, yyyy')}</p>
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100" onClick={() => handleOpenConvertToHabit(thought)}>
+                          <Workflow className="h-4 w-4" />
+                        </Button>
                       </li>
                     ))}
                   </ul>
@@ -1184,10 +1226,15 @@ function MyPlatePageContent() {
                 <ScrollArea className="h-full border rounded-md p-3 bg-muted/30">
                   <ul className="space-y-3">
                     {fantasyThoughts.map(thought => (
-                      <li key={thought.id} className="text-sm">
-                        <p className="font-medium text-foreground">{thought.type}</p>
-                        <p className="text-muted-foreground whitespace-pre-wrap">{thought.text}</p>
-                        <p className="text-xs text-muted-foreground/70 text-right mt-1">{format(thought.timestamp, 'MMM d, yyyy')}</p>
+                      <li key={thought.id} className="text-sm group flex items-start gap-2">
+                         <div className="flex-grow">
+                            <p className="font-medium text-foreground">{thought.type}</p>
+                            <p className="text-muted-foreground whitespace-pre-wrap">{thought.text}</p>
+                            <p className="text-xs text-muted-foreground/70 text-right mt-1">{format(thought.timestamp, 'MMM d, yyyy')}</p>
+                         </div>
+                         <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100" onClick={() => handleOpenConvertToHabit(thought)}>
+                          <Workflow className="h-4 w-4" />
+                        </Button>
                       </li>
                     ))}
                   </ul>
@@ -1196,6 +1243,42 @@ function MyPlatePageContent() {
               </div>
             </div>
           </DialogContent>
+        </Dialog>
+
+        <Dialog open={isConvertToHabitModalOpen} onOpenChange={setIsConvertToHabitModalOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Convert Thought to Habit</DialogTitle>
+                    <DialogDescription>Create a new habit card in your resources based on this thought.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div>
+                        <Label>Thought</Label>
+                        <p className="text-sm p-3 rounded-md bg-muted/50 border">{thoughtToConvert?.text}</p>
+                    </div>
+                    <div>
+                        <Label htmlFor="habit-name">Habit Name</Label>
+                        <Input id="habit-name" value={newHabitName} onChange={(e) => setNewHabitName(e.target.value)} />
+                    </div>
+                    <div>
+                        <Label htmlFor="habit-folder">Folder</Label>
+                        <Select value={selectedHabitFolder} onValueChange={setSelectedHabitFolder}>
+                            <SelectTrigger id="habit-folder">
+                                <SelectValue placeholder="Select a folder..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {resourceFolders.filter(f => f.parentId === null).map(folder => (
+                                    <SelectItem key={folder.id} value={folder.id}>{folder.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsConvertToHabitModalOpen(false)}>Cancel</Button>
+                    <Button onClick={handleHabitCreation}>Create Habit</Button>
+                </DialogFooter>
+            </DialogContent>
         </Dialog>
 
       </div>

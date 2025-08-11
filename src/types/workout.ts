@@ -413,6 +413,7 @@ export interface PatternPhrase {
   text: string;
   mechanismCardId: string;
   mechanismCardName?: string;
+  linkedMechanisms?: string[];
 }
 
 export interface Pattern {
