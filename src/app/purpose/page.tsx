@@ -392,19 +392,60 @@ function PurposePageContent() {
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     {pillars.map(pillar => {
                         const rulesForPillar = metaRules.filter(r => r.purposePillar === pillar.name || pillar.attributes.includes(r.purposePillar || ''));
+                        const skillsForPillar = specializations.filter(s => s.purposePillar === pillar.name || pillar.attributes.includes(s.purposePillar || ''));
+                        
                         return (
                             <Card key={pillar.name}>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-3 text-xl">{pillar.icon}{pillar.name}</CardTitle>
                                 </CardHeader>
-                                <CardContent className="space-y-2">
-                                    {rulesForPillar.length > 0 ? (
-                                        rulesForPillar.map(renderMetaRule)
-                                    ) : (
-                                        <div className="text-center py-8 text-muted-foreground text-sm">
-                                            <p>No meta-rules assigned.</p>
+                                <CardContent className="space-y-4">
+                                    <div>
+                                        <h4 className="font-semibold text-sm mb-2">Meta-Rules</h4>
+                                        <div className="space-y-1">
+                                            {rulesForPillar.length > 0 ? (
+                                                rulesForPillar.map(renderMetaRule)
+                                            ) : (
+                                                <p className="text-xs text-muted-foreground text-center py-4">No rules assigned.</p>
+                                            )}
                                         </div>
-                                    )}
+                                    </div>
+                                    <Separator />
+                                    <div>
+                                        <h4 className="font-semibold text-sm mb-2">Specializations</h4>
+                                        <div className="space-y-1">
+                                            {skillsForPillar.length > 0 ? (
+                                                skillsForPillar.map(skill => (
+                                                    <div key={skill.id} className="text-sm p-2 rounded-md flex justify-between items-center group">
+                                                        <span>{skill.name}</span>
+                                                         <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
+                                                                <Badge className="capitalize">{skill.purposePillar?.[0] || '?'}</Badge>
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent>
+                                                                {pillars.map(p => (
+                                                                    <DropdownMenuGroup key={p.name}>
+                                                                        <DropdownMenuItem onSelect={() => handleUpdatePillar(skill.id, p.name, 'specialization')}>
+                                                                            {p.name}
+                                                                        </DropdownMenuItem>
+                                                                        {p.attributes.map(attr => (
+                                                                            <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(skill.id, attr, 'specialization')} className="pl-6">
+                                                                                {attr}
+                                                                            </DropdownMenuItem>
+                                                                        ))}
+                                                                    </DropdownMenuGroup>
+                                                                ))}
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <p className="text-xs text-muted-foreground text-center py-4">No skills assigned.</p>
+                                            )}
+                                        </div>
+                                    </div>
                                 </CardContent>
                             </Card>
                         )
@@ -422,51 +463,6 @@ function PurposePageContent() {
                     </CardContent>
                   </Card>
                 )}
-
-
-                <div>
-                    <h2 className="text-2xl font-bold text-center mb-6">How Your Specializations Serve Your Purpose</h2>
-                    {specializations.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {specializations.map(spec => (
-                                <Card key={spec.id} className="flex flex-col">
-                                    <CardHeader>
-                                        <CardTitle className="text-lg">{spec.name}</CardTitle>
-                                        <CardDescription>Specialization</CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="flex-grow">
-                                        <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
-                                            <Button variant="outline" className="w-full">
-                                              {spec.purposePillar || "Assign to a Pillar"}
-                                            </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent>
-                                            {pillars.map(pillar => (
-                                                <DropdownMenuGroup key={pillar.name}>
-                                                    <DropdownMenuItem onSelect={() => handleUpdatePillar(spec.id, pillar.name, 'specialization')}>
-                                                        {pillar.name}
-                                                    </DropdownMenuItem>
-                                                    {pillar.attributes.map(attr => (
-                                                        <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(spec.id, attr, 'specialization')} className="pl-6">
-                                                            {attr}
-                                                        </DropdownMenuItem>
-                                                    ))}
-                                                </DropdownMenuGroup>
-                                            ))}
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </CardContent>
-                                </Card>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center text-muted-foreground py-10 border-2 border-dashed rounded-lg">
-                            <p>You haven't defined any specializations yet.</p>
-                            <Button variant="link" asChild><Link href="/skill">Go to the Skill page to add one.</Link></Button>
-                        </div>
-                    )}
-                </div>
             </div>
             {ruleDetailPopup && (
                 <RuleDetailPopupCard 
@@ -501,6 +497,7 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
 
 
