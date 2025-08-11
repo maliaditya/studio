@@ -77,48 +77,60 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
 
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
-            <Card className="w-[450px] shadow-2xl border-2 border-primary/30 bg-card">
-                <CardHeader className="p-3 relative cursor-grab" {...listeners}>
-                    <div className="flex justify-between items-center">
-                        <CardTitle className="text-base flex-grow pr-8" title={rule.text}>{rule.text}</CardTitle>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={onClose}>
+            <Card className="w-[600px] shadow-2xl border-2 border-primary/30 bg-card">
+                <CardHeader className="p-4 relative cursor-grab" {...listeners}>
+                    <div className="flex justify-between items-start">
+                        <div className="flex-grow pr-10">
+                            <CardTitle className="text-lg">{rule.text}</CardTitle>
+                            {pattern && (
+                                <CardDescription>Based on pattern: <span className="font-semibold text-foreground">{pattern.name}</span></CardDescription>
+                            )}
+                        </div>
+                         <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 absolute top-2 right-2" onPointerDown={onClose}>
                             <X className="h-4 w-4" />
                         </Button>
                     </div>
-                    {pattern && (
-                         <CardDescription>Based on pattern: <span className="font-semibold text-foreground">{pattern.name}</span></CardDescription>
-                    )}
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {categorizedPhrases && Object.entries(categorizedPhrases).map(([category, phrases]) => (
-                            <div key={category}>
-                                <h4 className="font-medium text-sm mb-1">{category}</h4>
-                                <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
-                                    {phrases.map((phrase, i) => <li key={i}>{phrase}</li>)}
-                                </ul>
-                            </div>
-                        ))}
-                         {linkedHabits.length > 0 && (
-                            <div className="md:col-span-2">
-                                <h4 className="font-medium text-sm mb-1">Habits</h4>
-                                <div className="space-y-1">
-                                    {linkedHabits.map((habit, i) => (
-                                        <button 
-                                            key={i} 
-                                            className="text-left p-1 rounded hover:bg-muted/50 w-full"
-                                            onClick={(e) => {
-                                                if (handleOpenNestedPopup) {
-                                                    handleOpenNestedPopup(habit.habitId, e);
-                                                }
-                                            }}
-                                        >
-                                            <span className="font-semibold text-foreground text-xs">{habit.habitName}</span> = <span className="text-muted-foreground text-xs">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</span>
-                                        </button>
-                                    ))}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                        {/* Left Column: Phrases */}
+                        <div className="space-y-4">
+                            {categorizedPhrases && Object.entries(categorizedPhrases).map(([category, phrases]) => (
+                                <div key={category}>
+                                    <h4 className="font-semibold text-sm mb-2 border-b pb-1">{category}</h4>
+                                    <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
+                                        {phrases.map((phrase, i) => <li key={i}>{phrase}</li>)}
+                                    </ul>
                                 </div>
-                            </div>
-                        )}
+                            ))}
+                        </div>
+
+                        {/* Right Column: Habits */}
+                        <div className="space-y-4">
+                            {linkedHabits.length > 0 && (
+                                <div>
+                                    <h4 className="font-semibold text-sm mb-2 border-b pb-1">Linked Habits</h4>
+                                    <div className="space-y-2">
+                                        {linkedHabits.map((habit, i) => (
+                                            <Card 
+                                                key={i} 
+                                                className="bg-muted/50 cursor-pointer hover:bg-muted"
+                                                onClick={(e) => {
+                                                    if (handleOpenNestedPopup) {
+                                                        handleOpenNestedPopup(habit.habitId, e);
+                                                    }
+                                                }}
+                                            >
+                                                <CardContent className="p-2 text-xs">
+                                                    <p className="font-semibold text-foreground mb-1">{habit.habitName}</p>
+                                                    <p className="text-muted-foreground">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</p>
+                                                </CardContent>
+                                            </Card>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </CardContent>
             </Card>
@@ -489,6 +501,7 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
 
 
