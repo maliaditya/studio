@@ -466,7 +466,6 @@ function ResourcesPageContent() {
     selectedResourceFolderId,
     setSelectedResourceFolderId,
     globalVolume,
-    handleOpenNestedPopup,
   } = useAuth();
   const { toast } = useToast();
   
@@ -1461,11 +1460,11 @@ function ResourcesPageContent() {
                                     </Card>
                                 );
                             } else if (res.type === 'habit') {
-                                cardContent = <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={handleOpenNestedPopup} />;
+                                cardContent = <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={() => {}} />;
                             } else if (res.type === 'mechanism') {
-                                cardContent = <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={handleOpenNestedPopup} />;
+                                cardContent = <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={() => {}} />;
                             } else if(res.type === 'card') {
-                                cardContent = <ResourceCardComponent resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={handleOpenNestedPopup} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
+                                cardContent = <ResourceCardComponent resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={() => {}} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
                             } else {
                                 const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                 const isGif = isGifUrl(res.link);
@@ -1474,7 +1473,7 @@ function ResourcesPageContent() {
 
                                 const cardProps: any = {};
                                 if (isGif && res.linkedResourceId) {
-                                  cardProps.onClick = (e: React.MouseEvent) => handleOpenNestedPopup(res.linkedResourceId!, e);
+                                  cardProps.onClick = (e: React.MouseEvent) => {};
                                 } else if (youtubeEmbedUrl) {
                                   cardProps.onClick = (e: React.MouseEvent) => {
                                       e.stopPropagation();
