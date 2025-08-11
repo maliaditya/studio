@@ -48,18 +48,29 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
     const pattern = patterns.find(p => p.id === rule.patternId);
 
     const getHabitLinksForRule = (rule: MetaRule) => {
-        if (!pattern || !habitCards || !mechanismCards) return [];
+        if (!pattern) return [];
+
         const habitPhrases = pattern.phrases.filter(p => p.category === 'Habit Cards');
+
         return habitPhrases.map(phrase => {
             const habit = habitCards.find(h => h.id === phrase.mechanismCardId);
             if (!habit) return null;
+
             const responseMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
             const newResponseMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
+            
+            const linkedMechanisms = [];
+            if (responseMechanism) linkedMechanisms.push(responseMechanism.name);
+            if (newResponseMechanism && newResponseMechanism.id !== responseMechanism?.id) {
+                linkedMechanisms.push(newResponseMechanism.name);
+            }
+
             return {
                 habitId: habit.id,
                 habitName: habit.name,
                 response: responseMechanism?.response?.visualize || '...',
-                newResponse: newResponseMechanism?.newResponse?.action || '...'
+                newResponse: newResponseMechanism?.newResponse?.action || '...',
+                linkedMechanisms: linkedMechanisms,
             };
         }).filter((h): h is NonNullable<typeof h> => h !== null);
     };
@@ -128,9 +139,17 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
                                                     }
                                                 }}
                                             >
-                                                <CardContent className="p-2 text-xs">
+                                                <CardContent className="p-3 text-xs">
                                                     <p className="font-semibold text-foreground mb-1">{habit.habitName}</p>
                                                     <p className="text-muted-foreground">{habit.response} <ArrowRight className="inline h-3 w-3" /> {habit.newResponse}</p>
+                                                    {habit.linkedMechanisms.length > 0 && (
+                                                        <div className="mt-2 pt-2 border-t">
+                                                            <p className="font-medium text-muted-foreground">Linked Mechanisms:</p>
+                                                            <ul className="list-disc list-inside">
+                                                                {habit.linkedMechanisms.map(mech => <li key={mech}>{mech}</li>)}
+                                                            </ul>
+                                                        </div>
+                                                    )}
                                                 </CardContent>
                                             </Card>
                                         ))}
@@ -633,6 +652,7 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
 
 
