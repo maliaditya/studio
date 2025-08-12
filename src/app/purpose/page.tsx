@@ -379,7 +379,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                 ))}
                             </div>
 
-                            {/* Right Column: Habits and Stoppers */}
+                            {/* Right Column: Habits and Resistance */}
                             <div className="space-y-4">
                                 {linkedHabits.length > 0 && (
                                     <div>
@@ -993,6 +993,7 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
 
 
