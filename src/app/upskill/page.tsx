@@ -847,6 +847,10 @@ function UpskillPageContent() {
 
   const handleViewProgress = (definition: ExerciseDefinition) => { setProgressModalConfig({ isOpen: true, exercise: definition }); };
   
+  const availableSpecializations = useMemo(() => {
+    return coreSkills.filter(s => s.type === 'Specialization');
+  }, [coreSkills]);
+
   const getSpecializationForCategory = useCallback((category: string) => {
     const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === category);
     if (microSkillInfo) {
@@ -991,10 +995,6 @@ function UpskillPageContent() {
     }
     return visualizations;
   }, [upskillDefinitions]);
-
-  const availableSpecializations = useMemo(() => {
-    return coreSkills.filter(s => s.type === 'Specialization');
-  }, [coreSkills]);
 
   const microSkillsForSpecialization = useMemo(() => {
     if (!selectedSpecializationId) return [];
@@ -1461,3 +1461,4 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
+
