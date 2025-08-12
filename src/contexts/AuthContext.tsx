@@ -372,7 +372,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [positions, setPositions] = useState<Position[]>([]);
   
   // Purpose & Patterns Data
-  const [purposeStatement, setPurposeStatement] = useState('');
+  const [purposeStatement, setPurposeStatement] = useState('Mind like a fort, Body like steel, Heart like a garden, Spirit like the sun.');
   const [specializationPurposes, setSpecializationPurposes] = useState<Record<string, string>>({});
   const [patterns, setPatterns] = useState<Pattern[]>([]);
   const [metaRules, setMetaRules] = useState<MetaRule[]>([]);
