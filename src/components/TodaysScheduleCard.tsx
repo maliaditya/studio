@@ -177,7 +177,7 @@ export function TodaysScheduleCard({
   onStartLeadGenLog,
   onToggleComplete,
 }: TodaysScheduleCardProps) {
-  const { carryForwardTask, dailyPurposes, setDailyPurposes } = useAuth();
+  const { carryForwardTask, dailyPurposes, setDailyPurposes, metaRules, openRuleDetailPopup } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
   const [purposeText, setPurposeText] = useState(dailyPurposes[dayKey] || '');
@@ -305,32 +305,30 @@ export function TodaysScheduleCard({
                 </span>
               )}
             </div>
-            {isAgendaDocked && (
-                <div className="flex items-center gap-2 mt-1">
-                    <Popover open={purposePopoverOpen} onOpenChange={setPurposePopoverOpen}>
-                        <PopoverTrigger asChild>
-                            <button className="flex items-center gap-2 text-left cursor-pointer group">
-                                <BrainCircuit className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                <CardDescription className="text-xs group-hover:text-foreground transition-colors truncate" title={purposeText}>
-                                    {purposeText || "Click to set a daily purpose..."}
-                                </CardDescription>
-                            </button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-80">
-                            <div className="grid gap-4">
-                                <div className="space-y-2">
-                                    <h4 className="font-medium leading-none">Daily Purpose</h4>
-                                    <p className="text-sm text-muted-foreground">Set your main intention for today.</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <Input value={purposeText} onChange={(e) => setPurposeText(e.target.value)} />
-                                    <Button onClick={handleSavePurpose} className="w-full">Save Purpose</Button>
-                                </div>
+             <div className="flex items-center gap-2 mt-1">
+                <Popover open={purposePopoverOpen} onOpenChange={setPurposePopoverOpen}>
+                    <PopoverTrigger asChild>
+                        <button className="flex items-center gap-2 text-left cursor-pointer group">
+                            <BrainCircuit className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                            <CardDescription className="text-xs group-hover:text-foreground transition-colors truncate" title={purposeText}>
+                                {purposeText || "Click to set a daily purpose..."}
+                            </CardDescription>
+                        </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80">
+                        <div className="grid gap-4">
+                            <div className="space-y-2">
+                                <h4 className="font-medium leading-none">Daily Purpose</h4>
+                                <p className="text-sm text-muted-foreground">Set your main intention for today.</p>
                             </div>
-                        </PopoverContent>
-                    </Popover>
-                </div>
-            )}
+                            <div className="space-y-2">
+                                <Input value={purposeText} onChange={(e) => setPurposeText(e.target.value)} />
+                                <Button onClick={handleSavePurpose} className="w-full">Save Purpose</Button>
+                            </div>
+                        </div>
+                    </PopoverContent>
+                </Popover>
+            </div>
           </div>
           <div className="flex items-center">
             <Popover>
@@ -387,7 +385,7 @@ export function TodaysScheduleCard({
       </CardHeader>
       <CardContent className="p-3">
         {scheduledActivities.length > 0 ? (
-          <ul className="space-y-1 max-h-96 overflow-y-auto pr-2">
+          <ul className="space-y-1 max-h-64 overflow-y-auto pr-2">
             {scheduledActivities.map((activity) => (
               <AgendaWidgetItem
                 key={activity.id}
@@ -401,10 +399,30 @@ export function TodaysScheduleCard({
             ))}
           </ul>
         ) : (
-          <div className="text-center text-muted-foreground py-8">
+          <div className="text-center text-muted-foreground py-4">
             <p className="text-sm">No activities scheduled.</p>
           </div>
         )}
+        <div className="mt-4 pt-4 border-t">
+          <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+              <BrainCircuit className="h-4 w-4" />
+              Meta Rules
+          </h4>
+          <ScrollArea className="h-48">
+              <ul className="space-y-1 pr-2">
+                  {metaRules.map(rule => (
+                      <li key={rule.id}>
+                          <button 
+                              className="text-left text-xs text-muted-foreground hover:text-foreground w-full p-1 rounded"
+                              onClick={(e) => openRuleDetailPopup(rule.id, e)}
+                          >
+                              {rule.text}
+                          </button>
+                      </li>
+                  ))}
+              </ul>
+          </ScrollArea>
+        </div>
       </CardContent>
     </Card>
   );
