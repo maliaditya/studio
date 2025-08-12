@@ -175,7 +175,7 @@ const ManageResistancePopup = ({ habit, popupState, onClose }: {
         position: 'fixed',
         top: y,
         left: x,
-        zIndex: 115,
+        zIndex: 75, // Lowered z-index
         willChange: 'transform',
     };
 
