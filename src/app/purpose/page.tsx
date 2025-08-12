@@ -20,6 +20,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { format, subDays, parseISO, isBefore, startOfToday, addDays, isAfter } from 'date-fns';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface RuleDetailPopupState {
     rule: MetaRule;
@@ -700,4 +701,3 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
-
