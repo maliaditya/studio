@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -158,16 +159,29 @@ const LogicDiagramPopup = ({ popupState, onClose }: { popupState: LogicDiagramPo
     );
 };
 
-const ManageResistancePopup = ({ habit, popupState, onClose }: { 
+const ManageResistancePopup = ({ habit, popupState, onClose }: {
     habit: Resource;
     popupState: ManageResistancePopupState;
     onClose: () => void;
 }) => {
     const { setResources, resources: allResources } = useAuth();
-    const { stopper } = popupState;
+    const { stopper, x, y } = popupState;
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `manage-resistance-${stopper.id}` });
     
     const [managementStrategy, setManagementStrategy] = useState(stopper.managementStrategy || '');
     const [linkedResourceId, setLinkedResourceId] = useState(stopper.linkedResourceId || '');
+
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: y,
+        left: x,
+        zIndex: 115,
+        willChange: 'transform',
+    };
+
+    if (transform) {
+        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
+    }
 
     const handleSaveManagementStrategy = () => {
         setResources(prev => prev.map(r => {
@@ -183,15 +197,16 @@ const ManageResistancePopup = ({ habit, popupState, onClose }: {
     };
 
     return (
-        <Dialog open={true} onOpenChange={(isOpen) => !isOpen && onClose()}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Manage Resistance</DialogTitle>
-                    <DialogDescription>
-                        Create a strategy to overcome this obstacle.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="p-4 space-y-4">
+        <div ref={setNodeRef} style={style} {...attributes}>
+            <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
+                <CardHeader className="p-3 relative cursor-grab" {...listeners}>
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-base">Manage Resistance</CardTitle>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}><X className="h-4 w-4" /></Button>
+                    </div>
+                     <CardDescription>Create a strategy to overcome this obstacle.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-4 space-y-4">
                     <p className="font-semibold border p-3 rounded-md bg-muted/50 text-sm">"{stopper.text}"</p>
                     <div>
                         <Label htmlFor="management-strategy">How will you manage this?</Label>
@@ -216,13 +231,13 @@ const ManageResistancePopup = ({ habit, popupState, onClose }: {
                             </SelectContent>
                         </Select>
                     </div>
-                </div>
-                <DialogFooter className="flex justify-end gap-2">
+                </CardContent>
+                <CardFooter className="p-3 flex justify-end gap-2">
                     <Button variant="outline" onClick={onClose}>Cancel</Button>
                     <Button onClick={handleSaveManagementStrategy}>Save Strategy</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                </CardFooter>
+            </Card>
+        </div>
     );
 };
 
@@ -540,7 +555,7 @@ export const RuleDetailPopupCard = ({ popupState, onClose }: {
                                                     <Tabs defaultValue="resistance" className="w-full">
                                                         <TabsList className="grid w-full grid-cols-2">
                                                             <TabsTrigger value="resistance">{pattern?.type === 'Negative' ? 'Urge' : 'Resistance'}</TabsTrigger>
-                                                            <TabsTrigger value="truth">{pattern?.type === 'Negative' ? 'Truth' : 'Truth'}</TabsTrigger>
+                                                            <TabsTrigger value="truth">Truth</TabsTrigger>
                                                         </TabsList>
                                                         <TabsContent value="resistance" className="mt-2">
                                                             <ResistanceSection habit={currentHabit} isNegative={pattern?.type === 'Negative'}/>
