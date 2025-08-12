@@ -175,7 +175,7 @@ const ManageResistancePopup = ({ habit, popupState, onClose }: {
         position: 'fixed',
         top: y,
         left: x,
-        zIndex: 75, // Lowered z-index
+        zIndex: 75,
         willChange: 'transform',
     };
 
@@ -223,7 +223,7 @@ const ManageResistancePopup = ({ habit, popupState, onClose }: {
                             <SelectTrigger id="linked-resource">
                                 <SelectValue placeholder="Select a resource..." />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent side="right" align="start" sideOffset={5}>
                                 <SelectItem value="none">-- None --</SelectItem>
                                 {allResources.filter(card => card.type === 'habit' || card.type === 'mechanism').map(card => (
                                     <SelectItem key={card.id} value={card.id}>{card.name} ({card.type})</SelectItem>
