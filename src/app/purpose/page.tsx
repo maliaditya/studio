@@ -22,15 +22,18 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 interface RuleDetailPopupState {
-    rule: MetaRule;
+    ruleId: string;
     x: number;
     y: number;
 }
 
-const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPopupState; onClose: () => void; }) => {
+const RuleDetailPopupCard = ({ popupState, onClose, rule }: { 
+    popupState: RuleDetailPopupState & { rule: MetaRule | undefined }; 
+    onClose: () => void; 
+}) => {
     const { patterns, habitCards, mechanismCards, openGeneralPopup, setMetaRules } = useAuth();
     const { rule, x, y } = popupState;
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `rule-popup-${rule.id}` });
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `rule-popup-${rule?.id}` });
     const cardRef = useRef<HTMLDivElement>(null);
 
     const [newStopperText, setNewStopperText] = useState('');
@@ -47,9 +50,11 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
 
+    if (!rule) return null;
+
     const pattern = patterns.find(p => p.id === rule.patternId);
 
-    const getHabitLinksForRule = (rule: MetaRule) => {
+    const getHabitLinksForRule = (currentRule: MetaRule) => {
         if (!pattern) return [];
 
         const habitPhrases = pattern.phrases.filter(p => p.category === 'Habit Cards');
@@ -114,7 +119,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
                                 <CardDescription>Based on pattern: <span className="font-semibold text-foreground">{pattern.name}</span></CardDescription>
                             )}
                         </div>
-                         <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 absolute top-2 right-2" onPointerDown={onClose}>
+                         <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 absolute top-2 right-2" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}>
                             <X className="h-4 w-4" />
                         </Button>
                     </div>
@@ -366,14 +371,14 @@ function PurposePageContent() {
         const popupHeight = 500; // Approximate height
         const x = window.innerWidth / 2 - popupWidth / 2;
         const y = window.innerHeight / 2 - popupHeight / 2;
-        setRuleDetailPopup({ rule, x: Math.max(20, x), y: Math.max(20, y) });
+        setRuleDetailPopup({ ruleId: rule.id, x: Math.max(20, x), y: Math.max(20, y) });
     };
     
     const handleDragEndLocal = (event: DragEndEvent) => {
         const { active, delta } = event;
         const activeId = active.id as string;
     
-        if (ruleDetailPopup && activeId === `rule-popup-${ruleDetailPopup.rule.id}`) {
+        if (ruleDetailPopup && activeId === `rule-popup-${ruleDetailPopup.ruleId}`) {
             setRuleDetailPopup(prev => prev ? {
                 ...prev,
                 x: prev.x + delta.x,
@@ -669,7 +674,10 @@ function PurposePageContent() {
             </div>
             {ruleDetailPopup && (
                 <RuleDetailPopupCard 
-                    popupState={ruleDetailPopup}
+                    popupState={{
+                        ...ruleDetailPopup,
+                        rule: metaRules.find(r => r.id === ruleDetailPopup.ruleId),
+                    }}
                     onClose={() => setRuleDetailPopup(null)}
                 />
             )}
