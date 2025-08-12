@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -33,18 +34,10 @@ const FlowNode = ({ children, className }: { children: React.ReactNode, classNam
     </div>
 );
 
-const StrengtheningTruthsNode = ({ truths }: { truths: string[] }) => (
-    <div className="bg-green-100/50 border-2 border-green-500/50 p-3 rounded-lg text-center shadow-lg">
-        <h4 className="font-bold text-sm text-green-700 dark:text-green-300 mb-2">Strengthening Truths</h4>
-        <ul className="space-y-1 text-xs text-green-800 dark:text-green-400 text-left list-disc list-inside">
-            {truths.map((truth, i) => <li key={i}>{truth}</li>)}
-        </ul>
-    </div>
-);
-
-
 const LogicDiagramPopup = ({ rule, pattern, onClose }: { rule: MetaRule; pattern: Pattern | undefined; onClose: () => void; }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `logic-diagram-${rule.id}` });
+    const { habitCards, mechanismCards } = useAuth();
+
     const style: React.CSSProperties = {
         position: 'fixed',
         top: '50%',
@@ -53,100 +46,102 @@ const LogicDiagramPopup = ({ rule, pattern, onClose }: { rule: MetaRule; pattern
         zIndex: 110,
     };
 
-    const truths = [
-        "Buddy needs this walk too",
-        "Just 1 hour → rest of day benefits",
-        "Morning insulin low → fat used for energy",
-        "Fresh air resets mind for the day"
-    ];
+    const linkedHabit = useMemo(() => {
+        if (!pattern) return null;
+        const habitPhrase = pattern.phrases.find(p => p.category === 'Habit Cards');
+        if (!habitPhrase) return null;
+        return habitCards.find(h => h.id === habitPhrase.mechanismCardId);
+    }, [pattern, habitCards]);
+
+    if (!linkedHabit) {
+        return (
+            <div ref={setNodeRef} style={style} {...attributes}>
+                <Card className="w-[400px] shadow-2xl border-2 border-primary/30 bg-card">
+                     <CardHeader className="p-3 relative cursor-grab" {...listeners}>
+                        <div className="flex justify-between items-center">
+                            <CardTitle className="text-base flex items-center gap-2"><Workflow className="h-4 w-4 text-primary"/>Decision Logic</CardTitle>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={onClose}><X className="h-4 w-4" /></Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-4 text-center text-muted-foreground">
+                        No Habit Card is linked to this pattern. A logic diagram cannot be generated.
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+    
+    const negativeMechanism = mechanismCards.find(m => m.id === linkedHabit.response?.resourceId);
+    const positiveMechanism = mechanismCards.find(m => m.id === linkedHabit.newResponse?.resourceId);
+    const stoppers = rule.stoppers || [];
+    
+    const negativeCosts = [
+        negativeMechanism?.reward ? `Blocks: ${negativeMechanism.reward}` : null,
+        negativeMechanism?.benefit ? `Costs me: ${negativeMechanism.benefit}` : null
+    ].filter(Boolean);
+
+    const positiveBenefits = [
+        positiveMechanism?.benefit ? `Enables: ${positiveMechanism.benefit}` : null,
+        positiveMechanism?.reward ? `Gives me: ${positiveMechanism.reward}` : null
+    ].filter(Boolean);
+
 
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
-            <Card className="w-[900px] shadow-2xl border-2 border-primary/30 bg-card">
+            <Card className="w-auto max-w-[90vw] shadow-2xl border-2 border-primary/30 bg-card">
                 <CardHeader className="p-3 relative cursor-grab" {...listeners}>
                     <div className="flex justify-between items-center">
-                        <CardTitle className="text-base flex items-center gap-2">
-                           <Workflow className="h-4 w-4 text-primary"/>
-                           MORNING WALK DECISION LOGIC
-                        </CardTitle>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={onClose}>
-                            <X className="h-4 w-4" />
-                        </Button>
+                        <CardTitle className="text-base flex items-center gap-2"><Workflow className="h-4 w-4 text-primary"/>Decision Logic for: "{rule.text}"</CardTitle>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={onClose}><X className="h-4 w-4" /></Button>
                     </div>
                 </CardHeader>
                 <CardContent className="p-4 pt-2">
                     <div className="flex flex-col items-center space-y-2">
-                        <FlowNode>Is it morning time?</FlowNode>
+                        <FlowNode>Trigger: When I {linkedHabit.trigger?.action || '...'}</FlowNode>
+                        <ArrowDown className="h-5 w-5 text-muted-foreground" />
+                        <FlowNode className="font-bold bg-primary/10">{rule.text}</FlowNode>
                         <ArrowDown className="h-5 w-5 text-muted-foreground" />
                         
-                        <div className="flex w-full justify-around">
-                            <div className="flex flex-col items-center space-y-2 w-1/4">
-                                <Badge variant="outline">No</Badge>
+                        <div className="flex w-full justify-around items-start gap-4">
+                            {/* Negative Path */}
+                            <div className="flex flex-col items-center space-y-2 w-1/2">
+                                <Badge variant="destructive">Old Path</Badge>
                                 <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                                <FlowNode className="w-full">Find earliest backup slot</FlowNode>
-                            </div>
-
-                            <div className="flex flex-col items-center space-y-2 w-3/4">
-                                <Badge variant="secondary">Yes</Badge>
-                                <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                                <FlowNode>Is walk window open?</FlowNode>
-                                <ArrowDown className="h-5 w-5 text-muted-foreground" />
-
-                                <div className="flex w-full justify-around">
-                                     <div className="flex flex-col items-center space-y-2 w-1/4">
-                                        <Badge variant="outline">No</Badge>
-                                    </div>
-                                    <div className="flex flex-col items-center space-y-2 w-3/4">
-                                         <Badge variant="secondary">Yes</Badge>
+                                <FlowNode className="bg-red-100/50 border-red-500/50 w-full">Response: {linkedHabit.response?.visualize || '...'}</FlowNode>
+                                {stoppers.length > 0 && (
+                                    <>
                                         <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                                        <FlowNode>Identify Resistance:</FlowNode>
-                                        <div className="flex justify-around w-full pt-2">
-                                            <div className="flex flex-col items-center space-y-2 w-1/3 px-1">
-                                                <FlowNode className="w-full">Sleepy?</FlowNode>
-                                                <ArrowDown className="h-4 w-4 text-muted-foreground" />
-                                                <FlowNode className="w-full min-h-[50px] bg-sky-100/50 border-sky-500/50">2-min activation (shoes on, step outside)</FlowNode>
-                                            </div>
-                                            <div className="flex flex-col items-center space-y-2 w-1/3 px-1">
-                                                <FlowNode className="w-full">YouTube/Phone pull?</FlowNode>
-                                                 <ArrowDown className="h-4 w-4 text-muted-foreground" />
-                                                <FlowNode className="w-full min-h-[50px] bg-sky-100/50 border-sky-500/50">Put device away</FlowNode>
-                                            </div>
-                                            <div className="flex flex-col items-center space-y-2 w-1/3 px-1">
-                                                <FlowNode className="w-full">Tired body?</FlowNode>
-                                                 <ArrowDown className="h-4 w-4 text-muted-foreground" />
-                                                <FlowNode className="w-full min-h-[50px] bg-sky-100/50 border-sky-500/50">Lower pace walk, focus on habit alive</FlowNode>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                        <FlowNode className="border-yellow-500/50 bg-yellow-100/30 w-full">
+                                            <p className="font-semibold text-yellow-700 dark:text-yellow-300">Stoppers</p>
+                                            <ul className="list-disc list-inside text-left mt-1">
+                                                {stoppers.map(s => <li key={s.id}>{s.text}</li>)}
+                                            </ul>
+                                        </FlowNode>
+                                    </>
+                                )}
+                                <ArrowDown className="h-5 w-5 text-muted-foreground" />
+                                <FlowNode className="w-full bg-red-100/20">
+                                    <p className="font-semibold">Costs & Consequences</p>
+                                    <ul className="list-disc list-inside text-left mt-1">
+                                        {negativeCosts.length > 0 ? negativeCosts.map((c, i) => <li key={i}>{c}</li>) : <li>Not specified</li>}
+                                    </ul>
+                                </FlowNode>
+                            </div>
+
+                             {/* Positive Path */}
+                            <div className="flex flex-col items-center space-y-2 w-1/2">
+                                <Badge variant="secondary" className="bg-green-600 text-white">New Path</Badge>
+                                <ArrowDown className="h-5 w-5 text-muted-foreground" />
+                                <FlowNode className="bg-green-100/50 border-green-500/50 w-full">New Response: {linkedHabit.newResponse?.action || '...'}</FlowNode>
+                                <ArrowDown className="h-5 w-5 text-muted-foreground" />
+                                <FlowNode className="w-full bg-green-100/20">
+                                     <p className="font-semibold">Benefits & Rewards</p>
+                                     <ul className="list-disc list-inside text-left mt-1">
+                                        {positiveBenefits.length > 0 ? positiveBenefits.map((b, i) => <li key={i}>{b}</li>) : <li>Not specified</li>}
+                                    </ul>
+                                </FlowNode>
                             </div>
                         </div>
-
-                         <div className="w-full flex justify-center py-2">
-                            <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        
-                        <StrengtheningTruthsNode truths={truths}/>
-
-                        <ArrowDown className="h-5 w-5 text-muted-foreground" />
-
-                        <FlowNode>Is safe light available?</FlowNode>
-                        <ArrowDown className="h-5 w-5 text-muted-foreground" />
-
-                        <div className="flex w-full justify-around">
-                             <div className="flex flex-col items-center space-y-2">
-                                <Badge variant="outline">No</Badge>
-                                <ArrowDown className="h-4 w-4 text-muted-foreground" />
-                                <FlowNode>Indoor movement + light exposure</FlowNode>
-                             </div>
-                             <div className="flex flex-col items-center space-y-2">
-                                <Badge variant="secondary">Yes</Badge>
-                                <ArrowDown className="h-4 w-4 text-muted-foreground" />
-                                <FlowNode>Walk with Buddy</FlowNode>
-                             </div>
-                        </div>
-                        <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                        <FlowNode className="bg-primary text-primary-foreground font-bold">End → Energy + Focus + Self-worth ↑</FlowNode>
                     </div>
                 </CardContent>
             </Card>
@@ -535,7 +530,11 @@ function PurposePageContent() {
                 x: prev.x + delta.x,
                 y: prev.y + delta.y,
             } : null);
-        } else {
+        } else if (activeId.startsWith('logic-diagram-')) {
+            // This is a placeholder as the LogicDiagramPopup is now the component to drag
+            // Its internal useDraggable handles its own state
+        }
+        else {
             handlePopupDragEnd(event);
         }
     };
@@ -615,7 +614,7 @@ function PurposePageContent() {
                                 <Textarea
                                     value={purposeInput}
                                     onChange={(e) => setPurposeInput(e.target.value)}
-                                    placeholder="“In Life either you're growing or you're decaying; there's no middle ground. If you're standing still, you're decaying.”"
+                                    placeholder="“Mind like a fort, Body like steel, Heart like a garden, Spirit like the sun.”"
                                     className="min-h-[100px] text-base"
                                     autoFocus
                                 />
@@ -856,4 +855,3 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
-
