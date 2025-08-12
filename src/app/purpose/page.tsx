@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern } from '@/types/workout';
+import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern, Strength } from '@/types/workout';
 import { DndContext, type DragEndEvent, useDraggable } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogPortal } from '@/components/ui/dialog';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
 interface RuleDetailPopupState {
@@ -223,16 +224,18 @@ const ManageResistancePopup = ({ habit, popupState, onClose }: {
                         </div>
                         <div>
                             <Label htmlFor="linked-resource">Link a Resource Card (Optional)</Label>
-                             <Select value={linkedResourceId || 'none'} onValueChange={(value) => setLinkedResourceId(value === 'none' ? '' : value)}>
+                            <Select value={linkedResourceId || 'none'} onValueChange={(value) => setLinkedResourceId(value === 'none' ? '' : value)}>
                                 <SelectTrigger id="linked-resource">
                                     <SelectValue placeholder="Select a resource..." />
                                 </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">-- None --</SelectItem>
-                                    {allResources.filter(card => card.type === 'habit' || card.type === 'mechanism').map(card => (
-                                        <SelectItem key={card.id} value={card.id}>{card.name} ({card.type})</SelectItem>
-                                    ))}
-                                </SelectContent>
+                                <DialogPortal>
+                                  <SelectContent>
+                                      <SelectItem value="none">-- None --</SelectItem>
+                                      {allResources.filter(card => card.type === 'habit' || card.type === 'mechanism').map(card => (
+                                          <SelectItem key={card.id} value={card.id}>{card.name} ({card.type})</SelectItem>
+                                      ))}
+                                  </SelectContent>
+                                </DialogPortal>
                             </Select>
                         </div>
                     </CardContent>
@@ -310,6 +313,38 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
             return r;
         }));
     };
+    
+    const handleAddStrength = (habitId: string, newStrengthText: string) => {
+        if (!newStrengthText.trim()) return;
+        const newStrength: Strength = {
+            id: `strength_${Date.now()}`,
+            text: newStrengthText.trim(),
+        };
+        setResources(prev => prev.map(r => {
+            if (r.id === habitId) {
+                return { ...r, strengths: [...(r.strengths || []), newStrength] };
+            }
+            return r;
+        }));
+    };
+
+    const handleDeleteStopper = (habitId: string, stopperId: string) => {
+        setResources(prev => prev.map(r => {
+            if (r.id === habitId) {
+                return { ...r, stoppers: (r.stoppers || []).filter(s => s.id !== stopperId) };
+            }
+            return r;
+        }));
+    };
+    
+    const handleDeleteStrength = (habitId: string, strengthId: string) => {
+        setResources(prev => prev.map(r => {
+            if (r.id === habitId) {
+                return { ...r, strengths: (r.strengths || []).filter(s => s.id !== strengthId) };
+            }
+            return r;
+        }));
+    };
 
     const handleStopperStatusChange = (e: React.PointerEvent, habitId: string, stopperId: string, status: Stopper['status']) => {
         e.stopPropagation();
@@ -342,7 +377,6 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
       
         return (
             <div>
-                <h4 className="font-semibold text-sm mb-2 border-b pb-1">Resistance</h4>
                 <ScrollArea className={cn((habit.stoppers || []).length > 4 && "h-40", "pr-2")}>
                   <div className="space-y-2">
                       {(habit.stoppers || []).map(stopper => {
@@ -376,6 +410,9 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                       <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, habit.id, 'unmanageable'); }}>
                                           <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
                                       </Button>
+                                       <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleDeleteStopper(habit.id, stopper.id)}>
+                                          <Trash2 className="h-3 w-3 text-destructive" />
+                                      </Button>
                                   </div>
                               </div>
                           )
@@ -395,6 +432,38 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
             </div>
         );
       };
+
+    const StrengthsSection = ({ habit }: { habit: Resource }) => {
+        const [newStrengthText, setNewStrengthText] = useState('');
+      
+        return (
+            <div>
+                <ScrollArea className={cn((habit.strengths || []).length > 4 && "h-40", "pr-2")}>
+                  <div className="space-y-2">
+                      {(habit.strengths || []).map(strength => (
+                          <div key={strength.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-background group w-full text-left">
+                              <p className="flex-grow pr-2">{strength.text}</p>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDown={() => handleDeleteStrength(habit.id, strength.id)}>
+                                <Trash2 className="h-3 w-3 text-destructive" />
+                              </Button>
+                          </div>
+                      ))}
+                  </div>
+                </ScrollArea>
+                <div className="mt-2 flex gap-2">
+                    <Input
+                        value={newStrengthText}
+                        onChange={(e) => setNewStrengthText(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { handleAddStrength(habit.id, newStrengthText); setNewStrengthText(''); } }}
+                        placeholder="What's a reinforcing truth?"
+                        className="h-8 text-xs"
+                    />
+                    <Button size="sm" onClick={() => { handleAddStrength(habit.id, newStrengthText); setNewStrengthText(''); }} className="h-8">Add</Button>
+                </div>
+            </div>
+        );
+    };
+
 
     return (
         <>
@@ -432,7 +501,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                 ))}
                             </div>
 
-                            {/* Right Column: Habits and Resistance */}
+                            {/* Right Column: Habits and Resistance/Strengths */}
                             <div className="space-y-4">
                                 {linkedHabits.length > 0 && (
                                     <div>
@@ -442,10 +511,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                                 const responseMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
                                                 const newResponseMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
                                                 return (
-                                                  <Card 
-                                                      key={i} 
-                                                      className="bg-muted/50"
-                                                  >
+                                                  <Card key={i} className="bg-muted/50">
                                                       <CardHeader className="p-3">
                                                           <CardTitle 
                                                             className="text-sm font-semibold text-foreground mb-1 cursor-pointer hover:underline"
@@ -467,8 +533,19 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                                               <p className="font-medium text-green-600 dark:text-green-400">Positive Mechanism:</p>
                                                               <p className="text-muted-foreground">{newResponseMechanism?.newResponse?.action || '...'} <span className="text-xs italic">({newResponseMechanism?.name || 'Unlinked'})</span></p>
                                                           </div>
-                                                          <div className="pt-2 mt-2 border-t">
-                                                            <ResistanceSection habit={habit} />
+                                                          <div className="pt-2 mt-2">
+                                                            <Tabs defaultValue="resistance" className="w-full">
+                                                                <TabsList className="grid w-full grid-cols-2">
+                                                                    <TabsTrigger value="resistance">Resistance</TabsTrigger>
+                                                                    <TabsTrigger value="strengths">Strengths</TabsTrigger>
+                                                                </TabsList>
+                                                                <TabsContent value="resistance" className="mt-2">
+                                                                    <ResistanceSection habit={habit} />
+                                                                </TabsContent>
+                                                                <TabsContent value="strengths" className="mt-2">
+                                                                    <StrengthsSection habit={habit} />
+                                                                </TabsContent>
+                                                            </Tabs>
                                                           </div>
                                                       </CardContent>
                                                   </Card>
@@ -998,10 +1075,3 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
-
-
-
-
-
-
-

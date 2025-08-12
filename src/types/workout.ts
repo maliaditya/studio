@@ -222,6 +222,11 @@ export interface Stopper {
   linkedResourceId?: string;
 }
 
+export interface Strength {
+  id: string;
+  text: string;
+}
+
 export interface ResourcePoint {
   id: string;
   text: string;
@@ -256,6 +261,7 @@ export interface Resource {
   response?: { text?: string; resourceId?: string; visualize?: string; };
   newResponse?: { text?: string; resourceId?: string; action?: string; visualize?: string; };
   stoppers?: Stopper[];
+  strengths?: Strength[];
   
   // For 'model3d' type
   modelUrl?: string;
