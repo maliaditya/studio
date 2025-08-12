@@ -22,7 +22,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogPortal } from '@/components/ui/dialog';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 
@@ -199,48 +199,50 @@ const ManageResistancePopup = ({ habit, popupState, onClose }: {
     };
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes}>
-             <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
-                <CardHeader className="p-3 relative cursor-grab" {...listeners}>
-                    <div className="flex justify-between items-center">
-                        <CardTitle className="text-base">Manage Resistance</CardTitle>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={onClose}>
-                            <X className="h-4 w-4" />
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardContent className="p-4 space-y-4">
-                    <p className="font-semibold border p-3 rounded-md bg-muted/50 text-sm">"{stopper.text}"</p>
-                    <div>
-                        <Label htmlFor="management-strategy">How will you manage this?</Label>
-                        <Textarea 
-                            id="management-strategy" 
-                            value={managementStrategy}
-                            onChange={(e) => setManagementStrategy(e.target.value)}
-                            placeholder="e.g., Use the 2-minute rule, put my phone in another room..."
-                        />
-                    </div>
-                    <div>
-                        <Label htmlFor="linked-resource">Link a Resource Card (Optional)</Label>
-                         <Select value={linkedResourceId || 'none'} onValueChange={(value) => setLinkedResourceId(value === 'none' ? '' : value)}>
-                            <SelectTrigger id="linked-resource">
-                                <SelectValue placeholder="Select a resource..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="none">-- None --</SelectItem>
-                                {allResources.filter(card => card.type === 'habit' || card.type === 'mechanism').map(card => (
-                                    <SelectItem key={card.id} value={card.id}>{card.name} ({card.type})</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </CardContent>
-                <CardFooter className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleSaveManagementStrategy}>Save Strategy</Button>
-                </CardFooter>
-            </Card>
-        </div>
+        <DialogPortal>
+            <div ref={setNodeRef} style={style} {...attributes}>
+                 <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
+                    <CardHeader className="p-3 relative cursor-grab" {...listeners}>
+                        <div className="flex justify-between items-center">
+                            <CardTitle className="text-base">Manage Resistance</CardTitle>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={onClose}>
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-4">
+                        <p className="font-semibold border p-3 rounded-md bg-muted/50 text-sm">"{stopper.text}"</p>
+                        <div>
+                            <Label htmlFor="management-strategy">How will you manage this?</Label>
+                            <Textarea 
+                                id="management-strategy" 
+                                value={managementStrategy}
+                                onChange={(e) => setManagementStrategy(e.target.value)}
+                                placeholder="e.g., Use the 2-minute rule, put my phone in another room..."
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="linked-resource">Link a Resource Card (Optional)</Label>
+                             <Select value={linkedResourceId || 'none'} onValueChange={(value) => setLinkedResourceId(value === 'none' ? '' : value)}>
+                                <SelectTrigger id="linked-resource">
+                                    <SelectValue placeholder="Select a resource..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">-- None --</SelectItem>
+                                    {allResources.filter(card => card.type === 'habit' || card.type === 'mechanism').map(card => (
+                                        <SelectItem key={card.id} value={card.id}>{card.name} ({card.type})</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </CardContent>
+                    <CardFooter className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={onClose}>Cancel</Button>
+                        <Button onClick={handleSaveManagementStrategy}>Save Strategy</Button>
+                    </CardFooter>
+                </Card>
+            </div>
+        </DialogPortal>
     );
 };
 
@@ -371,7 +373,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                       <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { handleStopperStatusChange(e, habit.id, stopper.id, 'manageable'); }}>
                                           <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
                                       </Button>
-                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, habit.id, stopper.id, 'unmanageable'); }}>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, habit.id, 'unmanageable'); }}>
                                           <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
                                       </Button>
                                   </div>
@@ -996,6 +998,7 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
 
 
