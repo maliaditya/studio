@@ -27,12 +27,14 @@ interface RuleDetailPopupState {
     y: number;
 }
 
-const RuleDetailPopupCard = ({ popupState, onClose, rule }: { 
-    popupState: RuleDetailPopupState & { rule: MetaRule | undefined }; 
+const RuleDetailPopupCard = ({ popupState, onClose }: { 
+    popupState: RuleDetailPopupState;
     onClose: () => void; 
 }) => {
-    const { patterns, habitCards, mechanismCards, openGeneralPopup, setMetaRules } = useAuth();
-    const { rule, x, y } = popupState;
+    const { patterns, habitCards, mechanismCards, openGeneralPopup, metaRules, setMetaRules } = useAuth();
+    const { ruleId, x, y } = popupState;
+    const rule = metaRules.find(r => r.id === ruleId);
+    
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `rule-popup-${rule?.id}` });
     const cardRef = useRef<HTMLDivElement>(null);
 
@@ -674,10 +676,7 @@ function PurposePageContent() {
             </div>
             {ruleDetailPopup && (
                 <RuleDetailPopupCard 
-                    popupState={{
-                        ...ruleDetailPopup,
-                        rule: metaRules.find(r => r.id === ruleDetailPopup.ruleId),
-                    }}
+                    popupState={ruleDetailPopup}
                     onClose={() => setRuleDetailPopup(null)}
                 />
             )}
