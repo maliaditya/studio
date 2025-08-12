@@ -434,7 +434,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
         );
       };
 
-    const StrengthsSection = ({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
+    const TruthSection = ({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
         const [newStrengthText, setNewStrengthText] = useState('');
         const placeholder = isNegative ? "What's the truth?" : "What's a reinforcing truth?";
       
@@ -541,13 +541,13 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                                             <Tabs defaultValue="resistance" className="w-full">
                                                                 <TabsList className="grid w-full grid-cols-2">
                                                                     <TabsTrigger value="resistance">{isNegativePattern ? 'Urge' : 'Resistance'}</TabsTrigger>
-                                                                    <TabsTrigger value="strengths">{isNegativePattern ? 'Truth' : 'Strengths'}</TabsTrigger>
+                                                                    <TabsTrigger value="truth">{isNegativePattern ? 'Truth' : 'Truth'}</TabsTrigger>
                                                                 </TabsList>
                                                                 <TabsContent value="resistance" className="mt-2">
                                                                     <ResistanceSection habit={habit} isNegative={isNegativePattern}/>
                                                                 </TabsContent>
-                                                                <TabsContent value="strengths" className="mt-2">
-                                                                    <StrengthsSection habit={habit} isNegative={isNegativePattern}/>
+                                                                <TabsContent value="truth" className="mt-2">
+                                                                    <TruthSection habit={habit} isNegative={isNegativePattern}/>
                                                                 </TabsContent>
                                                             </Tabs>
                                                           </div>
