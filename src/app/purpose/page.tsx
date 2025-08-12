@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -20,6 +21,7 @@ import { format, subDays, parseISO, isBefore, startOfToday, addDays, isAfter } f
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface RuleDetailPopupState {
     ruleId: string;
@@ -182,20 +184,24 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                             )}
                              <div>
                                 <h4 className="font-semibold text-sm mb-2 border-b pb-1">Stoppers</h4>
-                                <div className="space-y-2">
-                                    {(rule.stoppers || []).map(stopper => (
-                                        <div key={stopper.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-muted/50">
-                                            <p className="flex-grow pr-2">{stopper.text}</p>
-                                            <div className="flex-shrink-0 flex items-center gap-1">
-                                                <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(stopper.id, 'manageable'); }}>
-                                                    <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
-                                                </Button>
-                                                <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(stopper.id, 'unmanageable'); }}>
-                                                    <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
-                                                </Button>
+                                <div className={cn((rule.stoppers || []).length > 4 && "h-40")}>
+                                  <ScrollArea className="h-full pr-2">
+                                    <div className="space-y-2">
+                                        {(rule.stoppers || []).map(stopper => (
+                                            <div key={stopper.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-muted/50 group">
+                                                <p className="flex-grow pr-2">{stopper.text}</p>
+                                                <div className="flex-shrink-0 flex items-center gap-1">
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(stopper.id, 'manageable'); }}>
+                                                        <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(stopper.id, 'unmanageable'); }}>
+                                                        <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
+                                                    </Button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
+                                  </ScrollArea>
                                 </div>
                                 <div className="mt-2 flex gap-2">
                                     <Input
