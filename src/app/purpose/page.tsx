@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -263,6 +261,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
 
     const [logicDiagramRule, setLogicDiagramRule] = useState<MetaRule | null>(null);
     const [manageResistancePopupState, setManageResistancePopupState] = useState<ManageResistancePopupState | null>(null);
+    const [currentHabitIndex, setCurrentHabitIndex] = useState(0);
 
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -275,6 +274,10 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
     if (transform) {
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
+
+    useEffect(() => {
+        setCurrentHabitIndex(0);
+    }, [ruleId]);
 
     if (!rule) return null;
 
@@ -297,6 +300,16 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
             return habitCards.find(h => h.id === phrase.mechanismCardId);
         }).filter((h): h is Resource => !!h);
     }, [pattern, habitCards]);
+
+    const currentHabit = linkedHabits[currentHabitIndex];
+
+    const handleNextHabit = () => {
+        setCurrentHabitIndex((prevIndex) => (prevIndex + 1) % linkedHabits.length);
+    };
+
+    const handlePrevHabit = () => {
+        setCurrentHabitIndex((prevIndex) => (prevIndex - 1 + linkedHabits.length) % linkedHabits.length);
+    };
 
 
     const handleAddStopper = (habitId: string, newStopperText: string) => {
@@ -408,7 +421,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                       <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { handleStopperStatusChange(e, habit.id, stopper.id, 'manageable'); }}>
                                           <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
                                       </Button>
-                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, habit.id, stopper.id, 'unmanageable'); }}>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, habit.id, 'unmanageable'); }}>
                                           <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
                                       </Button>
                                        <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleDeleteStopper(habit.id, stopper.id)}>
@@ -503,64 +516,77 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                 ))}
                             </div>
 
-                            {/* Right Column: Habits and Resistance/Strengths */}
+                            {/* Right Column: Habits and Resistance/Truth */}
                             <div className="space-y-4">
-                                {linkedHabits.length > 0 && (
+                                {linkedHabits.length > 0 && currentHabit && (
                                     <div>
-                                        <h4 className="font-semibold text-sm mb-2 border-b pb-1">Linked Habits</h4>
+                                        <h4 className="font-semibold text-sm mb-2 border-b pb-1">
+                                            Linked Habit ({currentHabitIndex + 1}/{linkedHabits.length})
+                                        </h4>
                                         <div className="space-y-2">
-                                            {linkedHabits.map((habit, i) => {
-                                                const responseMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
-                                                const newResponseMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
-                                                const isNegativePattern = pattern?.type === 'Negative';
-                                                
-                                                return (
-                                                  <Card key={i} className="bg-muted/50">
-                                                      <CardHeader className="p-3">
-                                                          <CardTitle 
-                                                            className="text-sm font-semibold text-foreground mb-1 cursor-pointer hover:underline"
-                                                            onClick={(e) => {
-                                                              if (cardRef.current) {
-                                                                  openGeneralPopup(habit.id, e, popupState, cardRef.current.getBoundingClientRect());
-                                                              }
-                                                            }}
-                                                          >
-                                                            {habit.name}
-                                                          </CardTitle>
-                                                      </CardHeader>
-                                                      <CardContent className="p-3 pt-0 text-xs space-y-2">
-                                                          <div>
-                                                              <p className="font-medium text-red-600 dark:text-red-400">Negative Mechanism:</p>
-                                                              <p className="text-muted-foreground">{responseMechanism?.response?.visualize || '...'} <span className="text-xs italic">({responseMechanism?.name || 'Unlinked'})</span></p>
-                                                          </div>
-                                                          <div>
-                                                              <p className="font-medium text-green-600 dark:text-green-400">Positive Mechanism:</p>
-                                                              <p className="text-muted-foreground">{newResponseMechanism?.newResponse?.action || '...'} <span className="text-xs italic">({newResponseMechanism?.name || 'Unlinked'})</span></p>
-                                                          </div>
-                                                          <div className="pt-2 mt-2">
-                                                            <Tabs defaultValue="resistance" className="w-full">
-                                                                <TabsList className="grid w-full grid-cols-2">
-                                                                    <TabsTrigger value="resistance">{isNegativePattern ? 'Urge' : 'Resistance'}</TabsTrigger>
-                                                                    <TabsTrigger value="truth">{isNegativePattern ? 'Truth' : 'Truth'}</TabsTrigger>
-                                                                </TabsList>
-                                                                <TabsContent value="resistance" className="mt-2">
-                                                                    <ResistanceSection habit={habit} isNegative={isNegativePattern}/>
-                                                                </TabsContent>
-                                                                <TabsContent value="truth" className="mt-2">
-                                                                    <TruthSection habit={habit} isNegative={isNegativePattern}/>
-                                                                </TabsContent>
-                                                            </Tabs>
-                                                          </div>
-                                                      </CardContent>
-                                                  </Card>
-                                                )
-                                            })}
+                                            <Card key={currentHabit.id} className="bg-muted/50">
+                                                <CardHeader className="p-3">
+                                                    <CardTitle 
+                                                    className="text-sm font-semibold text-foreground mb-1 cursor-pointer hover:underline"
+                                                    onClick={(e) => {
+                                                        if (cardRef.current) {
+                                                            openGeneralPopup(currentHabit.id, e, popupState, cardRef.current.getBoundingClientRect());
+                                                        }
+                                                    }}
+                                                    >
+                                                    {currentHabit.name}
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="p-3 pt-0 text-xs space-y-2">
+                                                    <div>
+                                                        <p className="font-medium text-red-600 dark:text-red-400">Negative Mechanism:</p>
+                                                        <p className="text-muted-foreground">{mechanismCards.find(m => m.id === currentHabit.response?.resourceId)?.response?.visualize || '...'} <span className="text-xs italic">({mechanismCards.find(m => m.id === currentHabit.response?.resourceId)?.name || 'Unlinked'})</span></p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium text-green-600 dark:text-green-400">Positive Mechanism:</p>
+                                                        <p className="text-muted-foreground">{mechanismCards.find(m => m.id === currentHabit.newResponse?.resourceId)?.newResponse?.action || '...'} <span className="text-xs italic">({mechanismCards.find(m => m.id === currentHabit.newResponse?.resourceId)?.name || 'Unlinked'})</span></p>
+                                                    </div>
+                                                    <div className="pt-2 mt-2">
+                                                    <Tabs defaultValue="resistance" className="w-full">
+                                                        <TabsList className="grid w-full grid-cols-2">
+                                                            <TabsTrigger value="resistance">{pattern?.type === 'Negative' ? 'Urge' : 'Resistance'}</TabsTrigger>
+                                                            <TabsTrigger value="truth">Truth</TabsTrigger>
+                                                        </TabsList>
+                                                        <TabsContent value="resistance" className="mt-2">
+                                                            <ResistanceSection habit={currentHabit} isNegative={pattern?.type === 'Negative'}/>
+                                                        </TabsContent>
+                                                        <TabsContent value="truth" className="mt-2">
+                                                            <TruthSection habit={currentHabit} isNegative={pattern?.type === 'Negative'}/>
+                                                        </TabsContent>
+                                                    </Tabs>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
                                         </div>
                                     </div>
                                 )}
                             </div>
                         </div>
                     </CardContent>
+                     {linkedHabits.length > 1 && (
+                        <CardFooter className="p-2 flex justify-between items-center">
+                            <Button variant="ghost" size="sm" onClick={handlePrevHabit} className="truncate">
+                                <ArrowLeft className="mr-2 h-4 w-4 shrink-0" />
+                                <span className="truncate">
+                                    {linkedHabits[(currentHabitIndex - 1 + linkedHabits.length) % linkedHabits.length].name}
+                                </span>
+                            </Button>
+                            <span className="text-xs text-muted-foreground">
+                                {currentHabitIndex + 1} / {linkedHabits.length}
+                            </span>
+                            <Button variant="ghost" size="sm" onClick={handleNextHabit} className="truncate">
+                                 <span className="truncate">
+                                    {linkedHabits[(currentHabitIndex + 1) % linkedHabits.length].name}
+                                </span>
+                                <ArrowRight className="ml-2 h-4 w-4 shrink-0" />
+                            </Button>
+                        </CardFooter>
+                    )}
                 </Card>
             </div>
             {logicDiagramRule && (
@@ -683,13 +709,13 @@ function PurposePageContent() {
     } = useAuth();
     const { toast } = useToast();
 
-    const [isEditingPurpose, setIsEditingPurpose] = useState(false);
-    const [purposeInput, setPurposeInput] = useState(purposeStatement);
+    const [isEditingPurpose, setIsEditingPurpose = useState(false);
+    const [purposeInput, setPurposeInput = useState(purposeStatement);
     
-    const [editingMetaRuleId, setEditingMetaRuleId] = useState<string | null>(null);
-    const [editedMetaRuleText, setEditedMetaRuleText] = useState('');
+    const [editingMetaRuleId, setEditingMetaRuleId = useState<string | null>(null);
+    const [editedMetaRuleText, setEditedMetaRuleText = useState('');
     
-    const [ruleDetailPopup, setRuleDetailPopup] = useState<RuleDetailPopupState | null>(null);
+    const [ruleDetailPopup, setRuleDetailPopup = useState<RuleDetailPopupState | null>(null);
     
     useEffect(() => {
         setPurposeInput(purposeStatement);
