@@ -8,12 +8,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIconLucide, Pill, Lock, ArrowLeft } from 'lucide-react';
+import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIconLucide, Pill, Lock, ArrowLeft, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project } from '@/types/workout';
+import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper } from '@/types/workout';
 import { DndContext, type DragEndEvent, useDraggable } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -28,10 +28,12 @@ interface RuleDetailPopupState {
 }
 
 const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPopupState; onClose: () => void; }) => {
-    const { patterns, habitCards, mechanismCards, openGeneralPopup } = useAuth();
+    const { patterns, habitCards, mechanismCards, openGeneralPopup, setMetaRules } = useAuth();
     const { rule, x, y } = popupState;
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `rule-popup-${rule.id}` });
     const cardRef = useRef<HTMLDivElement>(null);
+
+    const [newStopperText, setNewStopperText] = useState('');
 
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -82,6 +84,25 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
 
     const linkedHabits = getHabitLinksForRule(rule);
 
+    const handleAddStopper = () => {
+        if (!newStopperText.trim()) return;
+        const newStopper: Stopper = {
+            id: `stopper_${Date.now()}`,
+            text: newStopperText.trim(),
+            status: 'none',
+        };
+        const updatedStoppers = [...(rule.stoppers || []), newStopper];
+        setMetaRules(prev => prev.map(r => r.id === rule.id ? { ...r, stoppers: updatedStoppers } : r));
+        setNewStopperText('');
+    };
+
+    const handleStopperStatusChange = (stopperId: string, status: Stopper['status']) => {
+        const updatedStoppers = (rule.stoppers || []).map(stopper =>
+            stopper.id === stopperId ? { ...stopper, status: stopper.status === status ? 'none' : status } : stopper
+        );
+        setMetaRules(prev => prev.map(r => r.id === rule.id ? { ...r, stoppers: updatedStoppers } : r));
+    };
+
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
             <Card ref={cardRef} className="w-[600px] shadow-2xl border-2 border-primary/30 bg-card">
@@ -112,7 +133,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
                             ))}
                         </div>
 
-                        {/* Right Column: Habits */}
+                        {/* Right Column: Habits and Stoppers */}
                         <div className="space-y-4">
                             {linkedHabits.length > 0 && (
                                 <div>
@@ -152,6 +173,34 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
                                     </div>
                                 </div>
                             )}
+                             <div>
+                                <h4 className="font-semibold text-sm mb-2 border-b pb-1">Stoppers</h4>
+                                <div className="space-y-2">
+                                    {(rule.stoppers || []).map(stopper => (
+                                        <div key={stopper.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-muted/50">
+                                            <p className="flex-grow pr-2">{stopper.text}</p>
+                                            <div className="flex-shrink-0 flex items-center gap-1">
+                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleStopperStatusChange(stopper.id, 'manageable')}>
+                                                    <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleStopperStatusChange(stopper.id, 'unmanageable')}>
+                                                    <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-2 flex gap-2">
+                                    <Input
+                                        value={newStopperText}
+                                        onChange={(e) => setNewStopperText(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleAddStopper()}
+                                        placeholder="What's stopping you?"
+                                        className="h-8 text-xs"
+                                    />
+                                    <Button size="sm" onClick={handleAddStopper} className="h-8">Add</Button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </CardContent>
@@ -651,3 +700,4 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+

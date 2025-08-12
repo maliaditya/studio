@@ -421,11 +421,18 @@ export interface Pattern {
   phrases: PatternPhrase[];
 }
 
+export interface Stopper {
+  id: string;
+  text: string;
+  status: 'manageable' | 'unmanageable' | 'none';
+}
+
 export interface MetaRule {
   id: string;
   text: string;
   patternId: string;
   purposePillar?: string;
+  stoppers?: Stopper[];
 }
 
 export type PistonsInitialState = {
