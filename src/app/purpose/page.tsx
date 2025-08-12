@@ -22,6 +22,9 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+
 
 interface RuleDetailPopupState {
     ruleId: string;
@@ -164,6 +167,9 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
 
     const [newStopperText, setNewStopperText] = useState('');
     const [logicDiagramRule, setLogicDiagramRule] = useState<MetaRule | null>(null);
+    const [manageResistanceModalState, setManageResistanceModalState] = useState<{ isOpen: boolean, stopper: Stopper | null }>({ isOpen: false, stopper: null });
+    const [managementStrategy, setManagementStrategy] = useState('');
+    const [linkedResourceId, setLinkedResourceId] = useState('');
 
 
     const style: React.CSSProperties = {
@@ -230,10 +236,33 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
     };
 
     const handleStopperStatusChange = (stopperId: string, status: Stopper['status']) => {
-        const updatedStoppers = (rule.stoppers || []).map(stopper =>
-            stopper.id === stopperId ? { ...stopper, status: stopper.status === status ? 'none' : status } : stopper
+        const stopper = (rule.stoppers || []).find(s => s.id === stopperId);
+        if (status === 'manageable' && stopper) {
+            setManagementStrategy(stopper.managementStrategy || '');
+            setLinkedResourceId(stopper.linkedResourceId || '');
+            setManageResistanceModalState({ isOpen: true, stopper });
+        } else {
+            const updatedStoppers = (rule.stoppers || []).map(s =>
+                s.id === stopperId ? { ...s, status: s.status === status ? 'none' : status } : s
+            );
+            setMetaRules(prev => prev.map(r => r.id === rule.id ? { ...r, stoppers: updatedStoppers } : r));
+        }
+    };
+    
+    const handleSaveManagementStrategy = () => {
+        const { stopper } = manageResistanceModalState;
+        if (!stopper) return;
+        
+        const updatedStoppers = (rule.stoppers || []).map(s =>
+            s.id === stopper.id ? { 
+                ...s, 
+                status: 'manageable', 
+                managementStrategy: managementStrategy.trim(), 
+                linkedResourceId: linkedResourceId || undefined
+            } : s
         );
         setMetaRules(prev => prev.map(r => r.id === rule.id ? { ...r, stoppers: updatedStoppers } : r));
+        setManageResistanceModalState({ isOpen: false, stopper: null });
     };
 
     return (
@@ -318,7 +347,14 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                       <div className="space-y-2">
                                           {(rule.stoppers || []).map(stopper => (
                                               <div key={stopper.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-background group">
-                                                  <p className="flex-grow pr-2">{stopper.text}</p>
+                                                  <div className="flex-grow pr-2">
+                                                    <p>{stopper.text}</p>
+                                                    {stopper.managementStrategy && (
+                                                      <p className="text-muted-foreground text-blue-600 dark:text-blue-400 mt-1 italic">
+                                                        Strategy: {stopper.managementStrategy}
+                                                      </p>
+                                                    )}
+                                                  </div>
                                                   <div className="flex-shrink-0 flex items-center gap-1">
                                                       <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(stopper.id, 'manageable'); }}>
                                                           <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
@@ -354,6 +390,49 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                     onClose={() => setLogicDiagramRule(null)} 
                 />
             )}
+            
+            <Dialog open={manageResistanceModalState.isOpen} onOpenChange={(isOpen) => setManageResistanceModalState(prev => ({ ...prev, isOpen }))}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Manage Resistance</DialogTitle>
+                        <DialogDescription>Define how you will manage this point of resistance.</DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        <p className="font-semibold border p-3 rounded-md bg-muted/50">"{manageResistanceModalState.stopper?.text}"</p>
+                        <div>
+                            <Label htmlFor="management-strategy">How will you manage this?</Label>
+                            <Textarea 
+                                id="management-strategy" 
+                                value={managementStrategy}
+                                onChange={(e) => setManagementStrategy(e.target.value)}
+                                placeholder="e.g., Use the 2-minute rule, put my phone in another room..."
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="linked-resource">Link a Resource Card (Optional)</Label>
+                             <Select value={linkedResourceId} onValueChange={setLinkedResourceId}>
+                                <SelectTrigger id="linked-resource">
+                                    <SelectValue placeholder="Select a resource..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="">-- None --</SelectItem>
+                                    {habitCards.map(card => (
+                                        <SelectItem key={card.id} value={card.id}>{card.name} (Habit)</SelectItem>
+                                    ))}
+                                     {mechanismCards.map(card => (
+                                        <SelectItem key={card.id} value={card.id}>{card.name} (Mechanism)</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setManageResistanceModalState({isOpen: false, stopper: null})}>Cancel</Button>
+                        <Button onClick={handleSaveManagementStrategy}>Save Strategy</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
         </>
     );
 };

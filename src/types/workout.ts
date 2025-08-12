@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -399,7 +400,7 @@ export interface Position {
     projects: WorkProject[];
 }
 
-// Purpose Page Types
+// Purpose & Patterns Data
 export interface PurposeData {
   statement: string;
   specializationPurposes: Record<string, string>; // Key is CoreSkill ID
@@ -425,6 +426,8 @@ export interface Stopper {
   id: string;
   text: string;
   status: 'manageable' | 'unmanageable' | 'none';
+  managementStrategy?: string;
+  linkedResourceId?: string;
 }
 
 export interface MetaRule {
